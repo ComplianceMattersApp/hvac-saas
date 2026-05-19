@@ -4,7 +4,9 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  addEstimateOptionLineItem,
   createDefaultEstimateOptions,
+  removeEstimateOptionLineItem,
   updateEstimateOptionMetadata,
 } from "@/lib/estimates/estimate-actions";
 
@@ -189,6 +191,212 @@ function makeSupabaseClient(
     }),
     __insertedRows: insertedRows,
     __updatedRows: updatedRows,
+  } as any;
+}
+
+function makeOptionLineSupabaseClient(
+  options: {
+    estimateExists?: boolean;
+    estimateStatus?: string;
+    flatLinesCount?: number;
+    optionExists?: boolean;
+    optionLineSubtotals?: number[];
+  } = {}
+) {
+  const {
+    estimateExists = true,
+    estimateStatus = "draft",
+    flatLinesCount = 0,
+    optionExists = true,
+    optionLineSubtotals = [],
+  } = options;
+
+  const insertedRows: Array<{ table: string; payload: any }> = [];
+  const updatedRows: Array<{ table: string; payload: Record<string, unknown> }> = [];
+  const deletedRows: Array<{ table: string; filters: Record<string, unknown>; deleted: number }> = [];
+  const estimateUpdates: Array<Record<string, unknown>> = [];
+
+  let optionLines = optionLineSubtotals.map((subtotal, index) => ({
+    id: `opt-line-${index + 1}`,
+    estimate_option_id: OPTION_ID,
+    estimate_id: ESTIMATE_ID,
+    sort_order: index + 1,
+    item_name_snapshot: `Line ${index + 1}`,
+    line_subtotal_cents: subtotal,
+  }));
+  let nextLineId = optionLines.length + 1;
+
+  function matchesFilters(row: Record<string, unknown>, filters: Record<string, unknown>) {
+    return Object.entries(filters).every(([key, value]) => row[key] === value);
+  }
+
+  function makeOptionLineSelectChain(selectClause: string) {
+    const filters: Record<string, unknown> = {};
+    const chain: any = {
+      eq: vi.fn((key: string, value: unknown) => {
+        filters[key] = value;
+        return chain;
+      }),
+      order: vi.fn(() => chain),
+      maybeSingle: vi.fn(async () => {
+        const row = optionLines.find((line) => matchesFilters(line, filters)) ?? null;
+        if (!row) return { data: null, error: null };
+
+        if (selectClause.includes("item_name_snapshot")) {
+          return {
+            data: {
+              id: row.id,
+              item_name_snapshot: row.item_name_snapshot,
+            },
+            error: null,
+          };
+        }
+
+        if (selectClause === "id") {
+          return { data: { id: row.id }, error: null };
+        }
+
+        return { data: row, error: null };
+      }),
+      then: (resolve: any, reject: any) => {
+        const filtered = optionLines.filter((line) => matchesFilters(line, filters));
+        const data = filtered.map((line) => {
+          if (selectClause.includes("line_subtotal_cents")) {
+            return { line_subtotal_cents: line.line_subtotal_cents };
+          }
+          if (selectClause === "id") {
+            return { id: line.id };
+          }
+          return line;
+        });
+        return Promise.resolve({ data, error: null }).then(resolve, reject);
+      },
+    };
+    return chain;
+  }
+
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "estimates") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: estimateExists
+                    ? {
+                        id: ESTIMATE_ID,
+                        status: estimateStatus,
+                        account_owner_user_id: ACCOUNT_OWNER,
+                      }
+                    : null,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            estimateUpdates.push(payload);
+            return makeThenableResult({ data: null, error: null });
+          }),
+        };
+      }
+
+      if (table === "estimate_line_items") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              limit: vi.fn(async () => ({
+                data: flatLinesCount > 0 ? [{ id: "line-flat-1" }] : [],
+                error: null,
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "estimate_options") {
+        const filters: Record<string, unknown> = {};
+        const selectChain: any = {
+          eq: vi.fn((key: string, value: unknown) => {
+            filters[key] = value;
+            return selectChain;
+          }),
+          maybeSingle: vi.fn(async () => ({
+            data:
+              optionExists && filters.id === OPTION_ID && filters.estimate_id === ESTIMATE_ID
+                ? { id: OPTION_ID, estimate_id: ESTIMATE_ID }
+                : null,
+            error: null,
+          })),
+        };
+
+        return {
+          select: vi.fn(() => selectChain),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            updatedRows.push({ table, payload });
+            return makeThenableResult({ data: null, error: null });
+          }),
+        };
+      }
+
+      if (table === "estimate_option_line_items") {
+        return {
+          select: vi.fn((selectClause: string) => makeOptionLineSelectChain(selectClause)),
+          insert: vi.fn((payload: any) => {
+            insertedRows.push({ table, payload });
+            const id = `opt-line-${nextLineId++}`;
+            optionLines.push({
+              id,
+              estimate_option_id: payload.estimate_option_id,
+              estimate_id: payload.estimate_id,
+              sort_order: payload.sort_order,
+              item_name_snapshot: payload.item_name_snapshot,
+              line_subtotal_cents: payload.line_subtotal_cents,
+            });
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id }, error: null })),
+              })),
+            };
+          }),
+          delete: vi.fn(() => {
+            const filters: Record<string, unknown> = {};
+            const chain: any = {
+              eq: vi.fn((key: string, value: unknown) => {
+                filters[key] = value;
+                return chain;
+              }),
+              then: (resolve: any, reject: any) => {
+                const before = optionLines.length;
+                optionLines = optionLines.filter((line) => !matchesFilters(line, filters));
+                const deleted = before - optionLines.length;
+                deletedRows.push({ table, filters: { ...filters }, deleted });
+                return Promise.resolve({ error: null }).then(resolve, reject);
+              },
+            };
+            return chain;
+          }),
+        };
+      }
+
+      if (table === "estimate_events") {
+        return {
+          insert: vi.fn(async (payload: unknown) => {
+            insertedRows.push({ table, payload });
+            return { data: null, error: null };
+          }),
+        };
+      }
+
+      return {
+        select: vi.fn(async () => ({ data: [], error: null })),
+      };
+    }),
+    __insertedRows: insertedRows,
+    __updatedRows: updatedRows,
+    __deletedRows: deletedRows,
+    __estimateUpdates: estimateUpdates,
   } as any;
 }
 
@@ -513,5 +721,261 @@ describe("updateEstimateOptionMetadata", () => {
       expect(result.error).toContain("unavailable");
     }
     expect(createClientMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("addEstimateOptionLineItem", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isEstimatesEnabledMock.mockReturnValue(true);
+  });
+
+  it("adds a manual line, computes option totals, and keeps parent totals isolated", async () => {
+    const supabase = makeOptionLineSupabaseClient({ optionLineSubtotals: [5000] });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      itemName: "Repair Labor",
+      itemType: "service",
+      quantity: 2,
+      unitPriceCents: 1500,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.subtotal_cents).toBe(8000);
+      expect(result.total_cents).toBe(8000);
+    }
+
+    const lineInsert = supabase.__insertedRows.find((row: any) => row.table === "estimate_option_line_items");
+    expect(lineInsert?.payload).toMatchObject({
+      estimate_option_id: OPTION_ID,
+      estimate_id: ESTIMATE_ID,
+      source_pricebook_item_id: null,
+      sort_order: 2,
+      item_name_snapshot: "Repair Labor",
+      item_type_snapshot: "service",
+      quantity: 2,
+      unit_price_cents: 1500,
+      line_subtotal_cents: 3000,
+      created_by_user_id: USER_ID,
+      updated_by_user_id: USER_ID,
+    });
+
+    expect(supabase.__updatedRows).toContainEqual({
+      table: "estimate_options",
+      payload: expect.objectContaining({
+        subtotal_cents: 8000,
+        total_cents: 8000,
+        updated_by_user_id: USER_ID,
+      }),
+    });
+
+    expect(supabase.__estimateUpdates).toHaveLength(0);
+    expect(supabase.__insertedRows).toContainEqual({
+      table: "estimate_events",
+      payload: expect.objectContaining({
+        estimate_id: ESTIMATE_ID,
+        event_type: "estimate_option_line_item_added",
+        user_id: USER_ID,
+      }),
+    });
+  });
+
+  it("blocks non-draft estimate", async () => {
+    const supabase = makeOptionLineSupabaseClient({ estimateStatus: "sent" });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      itemName: "Repair Labor",
+      itemType: "service",
+      quantity: 1,
+      unitPriceCents: 100,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("draft");
+    }
+  });
+
+  it("blocks when flat line items exist", async () => {
+    const supabase = makeOptionLineSupabaseClient({ flatLinesCount: 1 });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      itemName: "Repair Labor",
+      itemType: "service",
+      quantity: 1,
+      unitPriceCents: 100,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("flat estimate lines");
+    }
+  });
+
+  it("blocks out-of-scope estimate and unknown option", async () => {
+    const supabase = makeOptionLineSupabaseClient({ estimateExists: false, optionExists: false });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+
+    const estimateResult = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      itemName: "Repair Labor",
+      itemType: "service",
+      quantity: 1,
+      unitPriceCents: 100,
+    });
+
+    expect(estimateResult.success).toBe(false);
+    if (!estimateResult.success) {
+      expect(estimateResult.error).toContain("not found");
+    }
+
+    const supabase2 = makeOptionLineSupabaseClient({ optionExists: false });
+    createClientMock.mockResolvedValue(supabase2);
+    const optionResult = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: "opt-other",
+      itemName: "Repair Labor",
+      itemType: "service",
+      quantity: 1,
+      unitPriceCents: 100,
+    });
+    expect(optionResult.success).toBe(false);
+    if (!optionResult.success) {
+      expect(optionResult.error).toContain("Option package not found");
+    }
+  });
+
+  it("validates required and numeric inputs", async () => {
+    const missingItem = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      itemName: "  ",
+      itemType: "service",
+      quantity: 1,
+      unitPriceCents: 100,
+    });
+    expect(missingItem.success).toBe(false);
+
+    const invalidQty = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      itemName: "Repair",
+      itemType: "service",
+      quantity: 0,
+      unitPriceCents: 100,
+    });
+    expect(invalidQty.success).toBe(false);
+
+    const invalidUnitPrice = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      itemName: "Repair",
+      itemType: "service",
+      quantity: 1,
+      unitPriceCents: -1,
+    });
+    expect(invalidUnitPrice.success).toBe(false);
+  });
+
+  it("fails closed when estimates feature is disabled", async () => {
+    isEstimatesEnabledMock.mockReturnValue(false);
+
+    const result = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      itemName: "Repair",
+      itemType: "service",
+      quantity: 1,
+      unitPriceCents: 100,
+    });
+
+    expect(result.success).toBe(false);
+    expect(createClientMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("removeEstimateOptionLineItem", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isEstimatesEnabledMock.mockReturnValue(true);
+  });
+
+  it("removes a line item, recomputes option totals, and records event", async () => {
+    const supabase = makeOptionLineSupabaseClient({ optionLineSubtotals: [4000, 2000] });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await removeEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      lineItemId: "opt-line-2",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.subtotal_cents).toBe(4000);
+      expect(result.total_cents).toBe(4000);
+    }
+
+    expect(supabase.__deletedRows).toContainEqual(
+      expect.objectContaining({ table: "estimate_option_line_items", deleted: 1 })
+    );
+    expect(supabase.__updatedRows).toContainEqual({
+      table: "estimate_options",
+      payload: expect.objectContaining({ subtotal_cents: 4000, total_cents: 4000 }),
+    });
+    expect(supabase.__estimateUpdates).toHaveLength(0);
+    expect(supabase.__insertedRows).toContainEqual({
+      table: "estimate_events",
+      payload: expect.objectContaining({
+        event_type: "estimate_option_line_item_removed",
+        meta: expect.objectContaining({ line_item_id: "opt-line-2" }),
+      }),
+    });
+  });
+
+  it("blocks non-draft, missing line ownership, and feature-disabled paths", async () => {
+    const nonDraftClient = makeOptionLineSupabaseClient({ estimateStatus: "approved" });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(nonDraftClient);
+
+    const nonDraft = await removeEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      lineItemId: "opt-line-1",
+    });
+    expect(nonDraft.success).toBe(false);
+
+    const missingLineClient = makeOptionLineSupabaseClient({ optionLineSubtotals: [] });
+    createClientMock.mockResolvedValue(missingLineClient);
+    const missingLine = await removeEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      lineItemId: "opt-line-missing",
+    });
+    expect(missingLine.success).toBe(false);
+
+    isEstimatesEnabledMock.mockReturnValue(false);
+    const disabled = await removeEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      lineItemId: "opt-line-1",
+    });
+    expect(disabled.success).toBe(false);
   });
 });

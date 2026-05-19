@@ -27,7 +27,10 @@ Internal authoring closeout notes (2026-05-19):
 
 - Empty draft estimates can create exactly three default option packages: Good / Better / Best.
 - Draft multi-option estimates can edit option `label` and `summary` only.
+- Draft multi-option estimates can add/remove manual option line items inside each option package with server-computed line subtotals and option-only total recomputation.
 - Option metadata editing preserves `default_label_key`, `slot_index`, `sort_order`, option totals, option line items, and parent estimate totals.
+- Manual option line authoring is draft-only, account-scoped, and blocked whenever legacy flat `estimate_line_items` exist on the same estimate.
+- Parent estimate subtotal/total remains unchanged by manual option line add/remove in this slice.
 - Option `notes` remain reserved/internal and are not exposed or edited in this slice.
 - Option line authoring, option delete/reorder, print multi-option rendering, readiness scoring, approval/response, conversion, portal, email, payment, add-ons, QBO, and SMS remain deferred.
 

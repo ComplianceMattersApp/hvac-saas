@@ -2,6 +2,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const addEstimateLineItemMock = vi.fn();
 const removeEstimateLineItemMock = vi.fn();
+const addEstimateOptionLineItemMock = vi.fn();
+const removeEstimateOptionLineItemMock = vi.fn();
 const transitionEstimateStatusMock = vi.fn();
 const createDefaultEstimateOptionsMock = vi.fn();
 const updateEstimateOptionMetadataMock = vi.fn();
@@ -10,6 +12,9 @@ const revalidatePathMock = vi.fn();
 vi.mock("@/lib/estimates/estimate-actions", () => ({
   addEstimateLineItem: (...args: unknown[]) => addEstimateLineItemMock(...args),
   removeEstimateLineItem: (...args: unknown[]) => removeEstimateLineItemMock(...args),
+  addEstimateOptionLineItem: (...args: unknown[]) => addEstimateOptionLineItemMock(...args),
+  removeEstimateOptionLineItem: (...args: unknown[]) =>
+    removeEstimateOptionLineItemMock(...args),
   transitionEstimateStatus: (...args: unknown[]) => transitionEstimateStatusMock(...args),
   createDefaultEstimateOptions: (...args: unknown[]) => createDefaultEstimateOptionsMock(...args),
   updateEstimateOptionMetadata: (...args: unknown[]) => updateEstimateOptionMetadataMock(...args),
@@ -185,6 +190,114 @@ describe("estimate route action guards", () => {
       estimateOptionId: "opt-1",
       label: "Repair Only",
       summary: "Summary",
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
+  });
+
+  it("addEstimateOptionLineItemFromForm short-circuits when feature flag disabled", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    const { addEstimateOptionLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("estimate_option_id", "opt-1");
+    fd.set("item_name", "Repair Labor");
+    fd.set("item_type", "service");
+    fd.set("quantity", "1");
+    fd.set("unit_price", "100");
+
+    const result = await addEstimateOptionLineItemFromForm(fd);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(addEstimateOptionLineItemMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("addEstimateOptionLineItemFromForm delegates and revalidates when enabled", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    addEstimateOptionLineItemMock.mockResolvedValue({
+      success: true,
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      lineItemId: "opt-line-1",
+      subtotal_cents: 10000,
+      total_cents: 10000,
+    });
+
+    const { addEstimateOptionLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("estimate_option_id", "opt-1");
+    fd.set("item_name", "Repair Labor");
+    fd.set("item_type", "service");
+    fd.set("quantity", "2");
+    fd.set("unit_price", "12.34");
+
+    const result = await addEstimateOptionLineItemFromForm(fd);
+
+    expect(result.success).toBe(true);
+    expect(addEstimateOptionLineItemMock).toHaveBeenCalledWith({
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      itemName: "Repair Labor",
+      itemType: "service",
+      quantity: 2,
+      unitPriceCents: 1234,
+      description: null,
+      category: null,
+      unitLabel: null,
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
+  });
+
+  it("removeEstimateOptionLineItemFromForm short-circuits when feature flag disabled", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    const { removeEstimateOptionLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("estimate_option_id", "opt-1");
+    fd.set("line_item_id", "opt-line-1");
+
+    const result = await removeEstimateOptionLineItemFromForm(fd);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(removeEstimateOptionLineItemMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("removeEstimateOptionLineItemFromForm delegates and revalidates when enabled", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    removeEstimateOptionLineItemMock.mockResolvedValue({
+      success: true,
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      lineItemId: "opt-line-1",
+      subtotal_cents: 8000,
+      total_cents: 8000,
+    });
+
+    const { removeEstimateOptionLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("estimate_option_id", "opt-1");
+    fd.set("line_item_id", "opt-line-1");
+
+    const result = await removeEstimateOptionLineItemFromForm(fd);
+
+    expect(result.success).toBe(true);
+    expect(removeEstimateOptionLineItemMock).toHaveBeenCalledWith({
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      lineItemId: "opt-line-1",
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
   });

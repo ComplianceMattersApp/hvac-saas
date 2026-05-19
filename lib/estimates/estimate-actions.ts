@@ -663,6 +663,351 @@ export async function removeEstimateLineItem(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Recompute estimate option totals (option-only)
+// ---------------------------------------------------------------------------
+
+export async function recomputeEstimateOptionTotals(params: {
+  estimateId: string;
+  estimateOptionId: string;
+  updatedByUserId: string;
+  supabase: any;
+}): Promise<{ subtotal_cents: number; total_cents: number }> {
+  const { data: lines, error: linesErr } = await params.supabase
+    .from("estimate_option_line_items")
+    .select("line_subtotal_cents")
+    .eq("estimate_id", params.estimateId)
+    .eq("estimate_option_id", params.estimateOptionId);
+  if (linesErr) throw linesErr;
+
+  const subtotal = (lines ?? []).reduce(
+    (sum: number, li: { line_subtotal_cents: number }) => sum + (li.line_subtotal_cents ?? 0),
+    0
+  );
+  const total = subtotal;
+
+  const { error: updateErr } = await params.supabase
+    .from("estimate_options")
+    .update({
+      subtotal_cents: subtotal,
+      total_cents: total,
+      updated_by_user_id: params.updatedByUserId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", params.estimateOptionId)
+    .eq("estimate_id", params.estimateId);
+  if (updateErr) throw updateErr;
+
+  return { subtotal_cents: subtotal, total_cents: total };
+}
+
+// ---------------------------------------------------------------------------
+// Add / remove estimate option line item (manual, draft-only)
+// ---------------------------------------------------------------------------
+
+export type AddEstimateOptionLineItemParams = {
+  estimateId: string;
+  estimateOptionId: string;
+  itemName: string;
+  itemType: string;
+  quantity: number;
+  unitPriceCents: number;
+  description?: string | null;
+  category?: string | null;
+  unitLabel?: string | null;
+};
+
+export type AddEstimateOptionLineItemResult =
+  | {
+      success: true;
+      estimateId: string;
+      estimateOptionId: string;
+      lineItemId: string;
+      subtotal_cents: number;
+      total_cents: number;
+    }
+  | { success: false; error: string };
+
+export async function addEstimateOptionLineItem(
+  params: AddEstimateOptionLineItemParams
+): Promise<AddEstimateOptionLineItemResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const accountOwnerUserId = internalUser.account_owner_user_id;
+  const userId = internalUser.user_id;
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  const estimateOptionId = String(params.estimateOptionId ?? "").trim();
+  const itemName = String(params.itemName ?? "").trim();
+  const itemType = String(params.itemType ?? "").trim();
+  const description = String(params.description ?? "").trim() || null;
+  const category = String(params.category ?? "").trim() || null;
+  const unitLabel = String(params.unitLabel ?? "").trim() || null;
+
+  if (!estimateId || !estimateOptionId) {
+    return { success: false, error: "estimate_id and estimate_option_id are required." };
+  }
+
+  if (!itemName) {
+    return { success: false, error: "item_name is required." };
+  }
+
+  if (!itemType) {
+    return { success: false, error: "item_type is required." };
+  }
+
+  const quantity = Number(params.quantity);
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return { success: false, error: "quantity must be a positive number." };
+  }
+
+  const unitPriceCents = Math.round(Number(params.unitPriceCents));
+  if (!Number.isFinite(unitPriceCents) || unitPriceCents < 0) {
+    return { success: false, error: "unit_price_cents must be a non-negative integer." };
+  }
+
+  const lineSubtotalCents = Math.floor(quantity * unitPriceCents);
+
+  const { data: estimate, error: estErr } = await supabase
+    .from("estimates")
+    .select("id, status, account_owner_user_id")
+    .eq("id", estimateId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (estErr) throw estErr;
+  if (!estimate?.id) {
+    return { success: false, error: "Estimate not found in this account." };
+  }
+
+  if (estimate.status !== "draft") {
+    return {
+      success: false,
+      error: "Option line items can only be added to draft estimates.",
+    };
+  }
+
+  const { data: flatLines, error: flatErr } = await supabase
+    .from("estimate_line_items")
+    .select("id")
+    .eq("estimate_id", estimateId)
+    .limit(1);
+  if (flatErr) throw flatErr;
+  if ((flatLines ?? []).length > 0) {
+    return {
+      success: false,
+      error: "Option line items are unavailable while flat estimate lines exist on this estimate.",
+    };
+  }
+
+  const { data: option, error: optionErr } = await supabase
+    .from("estimate_options")
+    .select("id")
+    .eq("id", estimateOptionId)
+    .eq("estimate_id", estimateId)
+    .maybeSingle();
+  if (optionErr) throw optionErr;
+  if (!option?.id) {
+    return { success: false, error: "Option package not found on this estimate." };
+  }
+
+  const { data: existingLines, error: countErr } = await supabase
+    .from("estimate_option_line_items")
+    .select("id")
+    .eq("estimate_option_id", estimateOptionId);
+  if (countErr) throw countErr;
+  const sortOrder = (existingLines?.length ?? 0) + 1;
+
+  const { data: lineItem, error: insertErr } = await supabase
+    .from("estimate_option_line_items")
+    .insert({
+      estimate_option_id: estimateOptionId,
+      estimate_id: estimateId,
+      sort_order: sortOrder,
+      source_pricebook_item_id: null,
+      item_name_snapshot: itemName,
+      description_snapshot: description,
+      item_type_snapshot: itemType,
+      category_snapshot: category,
+      unit_label_snapshot: unitLabel,
+      quantity,
+      unit_price_cents: unitPriceCents,
+      line_subtotal_cents: lineSubtotalCents,
+      created_by_user_id: userId,
+      updated_by_user_id: userId,
+    })
+    .select("id")
+    .single();
+
+  if (insertErr || !lineItem?.id) {
+    return { success: false, error: insertErr?.message ?? "Failed to add option line item." };
+  }
+
+  const totals = await recomputeEstimateOptionTotals({
+    estimateId,
+    estimateOptionId,
+    updatedByUserId: userId,
+    supabase,
+  });
+
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: "estimate_option_line_item_added",
+    meta: {
+      estimate_option_id: estimateOptionId,
+      line_item_id: lineItem.id,
+      item_name: itemName,
+      line_subtotal_cents: lineSubtotalCents,
+      source: "manual",
+    },
+    user_id: userId,
+  });
+
+  return {
+    success: true,
+    estimateId,
+    estimateOptionId,
+    lineItemId: lineItem.id,
+    ...totals,
+  };
+}
+
+export type RemoveEstimateOptionLineItemParams = {
+  estimateId: string;
+  estimateOptionId: string;
+  lineItemId: string;
+};
+
+export type RemoveEstimateOptionLineItemResult =
+  | {
+      success: true;
+      estimateId: string;
+      estimateOptionId: string;
+      lineItemId: string;
+      subtotal_cents: number;
+      total_cents: number;
+    }
+  | { success: false; error: string };
+
+export async function removeEstimateOptionLineItem(
+  params: RemoveEstimateOptionLineItemParams
+): Promise<RemoveEstimateOptionLineItemResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const accountOwnerUserId = internalUser.account_owner_user_id;
+  const userId = internalUser.user_id;
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  const estimateOptionId = String(params.estimateOptionId ?? "").trim();
+  const lineItemId = String(params.lineItemId ?? "").trim();
+
+  if (!estimateId || !estimateOptionId || !lineItemId) {
+    return {
+      success: false,
+      error: "estimate_id, estimate_option_id, and line_item_id are required.",
+    };
+  }
+
+  const { data: estimate, error: estErr } = await supabase
+    .from("estimates")
+    .select("id, status, account_owner_user_id")
+    .eq("id", estimateId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (estErr) throw estErr;
+  if (!estimate?.id) {
+    return { success: false, error: "Estimate not found in this account." };
+  }
+
+  if (estimate.status !== "draft") {
+    return {
+      success: false,
+      error: "Option line items can only be removed from draft estimates.",
+    };
+  }
+
+  const { data: flatLines, error: flatErr } = await supabase
+    .from("estimate_line_items")
+    .select("id")
+    .eq("estimate_id", estimateId)
+    .limit(1);
+  if (flatErr) throw flatErr;
+  if ((flatLines ?? []).length > 0) {
+    return {
+      success: false,
+      error: "Option line items are unavailable while flat estimate lines exist on this estimate.",
+    };
+  }
+
+  const { data: option, error: optionErr } = await supabase
+    .from("estimate_options")
+    .select("id")
+    .eq("id", estimateOptionId)
+    .eq("estimate_id", estimateId)
+    .maybeSingle();
+  if (optionErr) throw optionErr;
+  if (!option?.id) {
+    return { success: false, error: "Option package not found on this estimate." };
+  }
+
+  const { data: lineItem, error: lineErr } = await supabase
+    .from("estimate_option_line_items")
+    .select("id, item_name_snapshot")
+    .eq("id", lineItemId)
+    .eq("estimate_option_id", estimateOptionId)
+    .eq("estimate_id", estimateId)
+    .maybeSingle();
+  if (lineErr) throw lineErr;
+  if (!lineItem?.id) {
+    return { success: false, error: "Option line item not found on this option package." };
+  }
+
+  const { error: deleteErr } = await supabase
+    .from("estimate_option_line_items")
+    .delete()
+    .eq("id", lineItemId)
+    .eq("estimate_option_id", estimateOptionId)
+    .eq("estimate_id", estimateId);
+  if (deleteErr) throw deleteErr;
+
+  const totals = await recomputeEstimateOptionTotals({
+    estimateId,
+    estimateOptionId,
+    updatedByUserId: userId,
+    supabase,
+  });
+
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: "estimate_option_line_item_removed",
+    meta: {
+      estimate_option_id: estimateOptionId,
+      line_item_id: lineItemId,
+      item_name: lineItem.item_name_snapshot,
+    },
+    user_id: userId,
+  });
+
+  return {
+    success: true,
+    estimateId,
+    estimateOptionId,
+    lineItemId,
+    ...totals,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Transition estimate status (V1E internal-only transitions)
 // ---------------------------------------------------------------------------
 

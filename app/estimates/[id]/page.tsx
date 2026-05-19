@@ -28,6 +28,8 @@ import EstimateStatusActionForm from "./EstimateStatusActionForm";
 import SendEstimateForm from "./SendEstimateForm";
 import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
 import EditEstimateOptionForm from "./EditEstimateOptionForm";
+import AddEstimateOptionLineForm from "./AddEstimateOptionLineForm";
+import { removeEstimateOptionLineItemFromForm } from "./actions";
 import { isEstimateEmailSendEnabled } from "@/lib/estimates/estimate-exposure";
 
 export const metadata = { title: "Estimate" };
@@ -157,6 +159,11 @@ export default async function EstimateDetailPage({
 
   const isDraft = estimate.status === "draft";
   const isSent = estimate.status === "sent";
+  async function submitRemoveOptionLine(formData: FormData) {
+    "use server";
+    await removeEstimateOptionLineItemFromForm(formData);
+  }
+
   const statusMessage = statusGuidanceMessage(estimate.status);
   const statusPanelTitle = isDraft
     ? "Editable proposal"
@@ -597,7 +604,7 @@ export default async function EstimateDetailPage({
                     <div className="divide-y divide-slate-200/60">
                       {option.line_items.map((line) => (
                         <div key={line.id} className="px-5 py-4 print:px-4 print:py-3">
-                          <div className="grid gap-3 sm:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)] sm:items-center">
+                          <div className={`grid gap-3 sm:items-center ${isDraft ? "sm:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)_auto]" : "sm:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)]"}`}>
                             <div>
                               <div className="font-semibold text-slate-950">{line.item_name_snapshot}</div>
                               {line.description_snapshot && (
@@ -620,9 +627,34 @@ export default async function EstimateDetailPage({
                             <div>
                               <div className="font-semibold text-slate-950">{formatCents(line.line_subtotal_cents)}</div>
                             </div>
+
+                            {isDraft && (
+                              <div className="flex justify-end print:hidden">
+                                <form action={submitRemoveOptionLine}>
+                                  <input type="hidden" name="estimate_id" value={estimate.id} />
+                                  <input type="hidden" name="estimate_option_id" value={option.id} />
+                                  <input type="hidden" name="line_item_id" value={line.id} />
+                                  <button
+                                    type="submit"
+                                    className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
+                                  >
+                                    Remove
+                                  </button>
+                                </form>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
+                    </div>
+                  )}
+
+                  {isDraft && (
+                    <div className="px-5 pb-4 print:hidden">
+                      <AddEstimateOptionLineForm
+                        estimateId={estimate.id}
+                        estimateOptionId={option.id}
+                      />
                     </div>
                   )}
                 </div>
