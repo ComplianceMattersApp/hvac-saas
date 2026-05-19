@@ -42,6 +42,10 @@ function firstNonEmpty(...values: Array<unknown>) {
   return null;
 }
 
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value ?? '').trim());
+}
+
 const INTERNAL_INVOICE_PANEL_HASH = 'internal-invoice-panel';
 
 function buildJobDetailHref(jobId: string, tab: string, banner: string) {
@@ -467,7 +471,7 @@ async function loadInternalInvoiceContext(formData: FormData) {
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
     .select(
-      'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
+      'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, job_address, city, state, zip'
     )
     .eq('id', jobId)
     .single();
@@ -497,13 +501,16 @@ function buildInternalInvoiceEmailBody(args: {
   supportEmail: string | null;
   supportPhone: string | null;
   invoice: InternalInvoiceRecord;
+  customerName: string | null;
   jobTitle: string | null;
+  serviceLocation: string | null;
 }) {
   const lineItemsHtml = (args.invoice.line_items ?? [])
     .map((lineItem) => {
       const name = escapeHtml(String(lineItem.item_name_snapshot ?? '').trim() || 'Line item');
       const description = escapeHtml(String(lineItem.description_snapshot ?? '').trim());
       const quantity = escapeHtml(String(lineItem.quantity ?? '0'));
+      const unitPrice = escapeHtml(formatCurrencyFromCents(Math.round(Number(lineItem.unit_price ?? 0) * 100)));
       const subtotal = escapeHtml(formatCurrencyFromCents(Math.round(Number(lineItem.line_subtotal ?? 0) * 100)));
 
       return `
@@ -513,6 +520,7 @@ function buildInternalInvoiceEmailBody(args: {
             ${description ? `<div style="margin-top: 4px; color: #4b5563; font-size: 13px;">${description}</div>` : ''}
           </td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; text-align: right; white-space: nowrap;">${quantity}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; text-align: right; white-space: nowrap;">${unitPrice}</td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; text-align: right; white-space: nowrap;">${subtotal}</td>
         </tr>`;
     })
@@ -520,8 +528,9 @@ function buildInternalInvoiceEmailBody(args: {
 
   const invoiceNumber = escapeHtml(String(args.invoice.invoice_number ?? '').trim());
   const invoiceDate = escapeHtml(String(args.invoice.invoice_date ?? '').trim());
-  const recipientName = escapeHtml(String(args.invoice.billing_name ?? '').trim() || 'Customer');
+  const recipientName = escapeHtml(String(args.customerName ?? args.invoice.billing_name ?? '').trim() || 'Customer');
   const jobTitle = escapeHtml(String(args.jobTitle ?? '').trim() || 'Service visit');
+  const serviceLocation = escapeHtml(String(args.serviceLocation ?? '').trim());
   const total = escapeHtml(formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0)));
   const supportLine = [args.supportEmail, args.supportPhone].filter(Boolean).map((value) => escapeHtml(String(value))).join(' • ');
   const notes = escapeHtml(String(args.invoice.notes ?? '').trim());
@@ -533,30 +542,82 @@ function buildInternalInvoiceEmailBody(args: {
     supportEmail: args.supportEmail,
     supportPhone: args.supportPhone,
     bodyHtml: `
-      <p style="margin: 0 0 12px 0;">Hello ${recipientName},</p>
+      <p style="margin: 0 0 12px 0;">Hi ${recipientName},</p>
       <p style="margin: 0 0 16px 0;">Your invoice for ${jobTitle} is ready.</p>
       <div style="margin: 0 0 18px 0; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 16px; background: #f8fafc;">
         <div style="font-size: 13px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">Invoice Summary</div>
         <div style="margin-top: 10px; color: #111827;"><strong>Invoice #:</strong> ${invoiceNumber}</div>
         <div style="margin-top: 6px; color: #111827;"><strong>Invoice Date:</strong> ${invoiceDate}</div>
+        ${serviceLocation ? `<div style="margin-top: 6px; color: #111827;"><strong>Service Location:</strong> ${serviceLocation}</div>` : ''}
         <div style="margin-top: 6px; color: #111827;"><strong>Total:</strong> ${total}</div>
       </div>
       <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 0 0 18px 0; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
         <thead>
           <tr style="background: #f8fafc;">
-            <th align="left" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Line Item</th>
+            <th align="left" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Description</th>
             <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Qty</th>
+            <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Unit Price</th>
             <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Subtotal</th>
           </tr>
         </thead>
         <tbody>
-          ${lineItemsHtml || `<tr><td colspan="3" style="padding: 12px; color: #475569;">No billed line items were recorded.</td></tr>`}
+          ${lineItemsHtml || `<tr><td colspan="4" style="padding: 12px; color: #475569;">No billed line items were recorded.</td></tr>`}
         </tbody>
       </table>
       ${notes ? `<div style="margin: 0 0 16px 0;"><strong>Notes:</strong><br />${notes.replace(/\n/g, '<br />')}</div>` : ''}
+      <p style="margin: 0 0 14px 0; color: #374151;">Please contact us with any billing questions.</p>
       ${supportLine ? `<p style="margin: 0; color: #4b5563;">Questions? Contact ${escapeHtml(args.businessName)} at ${supportLine}.</p>` : ''}
     `,
   });
+}
+
+function buildInternalInvoiceEmailText(args: {
+  businessName: string;
+  supportEmail: string | null;
+  supportPhone: string | null;
+  invoice: InternalInvoiceRecord;
+  customerName: string | null;
+  jobTitle: string | null;
+  serviceLocation: string | null;
+}) {
+  const invoiceNumber = String(args.invoice.invoice_number ?? '').trim();
+  const invoiceDate = String(args.invoice.invoice_date ?? '').trim();
+  const recipientName = String(args.customerName ?? args.invoice.billing_name ?? '').trim() || 'Customer';
+  const jobTitle = String(args.jobTitle ?? '').trim() || 'Service visit';
+  const serviceLocation = String(args.serviceLocation ?? '').trim();
+  const total = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
+  const supportLine = [args.supportEmail, args.supportPhone].filter(Boolean).join(' | ');
+
+  const lineItems = (args.invoice.line_items ?? [])
+    .map((lineItem, index) => {
+      const itemName = String(lineItem.item_name_snapshot ?? '').trim() || `Line item ${index + 1}`;
+      const quantity = String(lineItem.quantity ?? '0').trim() || '0';
+      const unitPrice = formatCurrencyFromCents(Math.round(Number(lineItem.unit_price ?? 0) * 100));
+      const subtotal = formatCurrencyFromCents(Math.round(Number(lineItem.line_subtotal ?? 0) * 100));
+      return `${index + 1}. ${itemName} | Qty: ${quantity} | Unit: ${unitPrice} | Subtotal: ${subtotal}`;
+    })
+    .join('\n');
+
+  const notes = String(args.invoice.notes ?? '').trim();
+
+  return [
+    `Hi ${recipientName},`,
+    '',
+    `Your invoice for ${jobTitle} is ready.`,
+    '',
+    'INVOICE SUMMARY',
+    `Invoice #: ${invoiceNumber}`,
+    `Invoice Date: ${invoiceDate}`,
+    ...(serviceLocation ? [`Service Location: ${serviceLocation}`] : []),
+    `Total: ${total}`,
+    '',
+    'CHARGES',
+    lineItems || 'No billed line items were recorded.',
+    ...(notes ? ['', 'NOTES', notes] : []),
+    '',
+    'Please contact us with any billing questions.',
+    ...(supportLine ? [`Contact: ${args.businessName} | ${supportLine}`] : []),
+  ].join('\n');
 }
 
 async function listInternalInvoiceEmailNotifications(params: {
@@ -1642,6 +1703,10 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_recipient_required', context.returnTo));
   }
 
+  if (!isValidEmail(recipientEmail)) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_recipient_invalid', context.returnTo));
+  }
+
   const sendHistory = await listInternalInvoiceEmailNotifications({
     supabase: context.supabase,
     jobId: context.jobId,
@@ -1656,14 +1721,39 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     accountOwnerUserId: context.internalUser.account_owner_user_id,
   });
 
-  const subject = `${businessIdentity.display_name} invoice ${context.invoice.invoice_number}`;
+  const serviceLocation = [
+    getOptionalText(context.job.job_address),
+    [context.job.city, context.job.state, context.job.zip]
+      .map((value) => getOptionalText(value))
+      .filter(Boolean)
+      .join(' '),
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const customerName = [context.job.customer_first_name, context.job.customer_last_name]
+    .map((value) => getOptionalText(value))
+    .filter(Boolean)
+    .join(' ');
+
+  const subject = `Invoice ${context.invoice.invoice_number} from ${businessIdentity.display_name}`;
   const body = buildInternalInvoiceEmailBody({
     businessName: businessIdentity.display_name,
     companyLogoUrl: businessIdentity.logo_url,
     supportEmail: businessIdentity.support_email,
     supportPhone: businessIdentity.support_phone,
     invoice: context.invoice,
+    customerName: customerName || context.invoice.billing_name || null,
     jobTitle: context.job.title ?? null,
+    serviceLocation: serviceLocation || null,
+  });
+  const textBody = buildInternalInvoiceEmailText({
+    businessName: businessIdentity.display_name,
+    supportEmail: businessIdentity.support_email,
+    supportPhone: businessIdentity.support_phone,
+    invoice: context.invoice,
+    customerName: customerName || context.invoice.billing_name || null,
+    jobTitle: context.job.title ?? null,
+    serviceLocation: serviceLocation || null,
   });
 
   const queuedDelivery = await insertInternalInvoiceEmailNotification({
@@ -1684,6 +1774,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
       to: recipientEmail,
       subject,
       html: body,
+      text: textBody,
     });
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unknown send error';

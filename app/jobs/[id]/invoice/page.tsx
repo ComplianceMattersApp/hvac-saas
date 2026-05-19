@@ -119,13 +119,14 @@ function bannerMessage(value?: string | null) {
   const messages: Record<string, string> = {
     internal_invoice_draft_created: "Draft invoice created.",
     internal_invoice_draft_exists: "A draft invoice already exists for this job.",
-    internal_invoice_issued: "Invoice issued.",
+    internal_invoice_issued: "Invoice issued. Send it to the billing recipient when ready.",
     internal_invoice_issue_blocked: "Invoice cannot be issued until job and field work are complete.",
     internal_invoice_issue_incomplete: "Review recipient, charges, and total before issuing.",
     internal_invoice_email_sent: "Invoice email sent.",
     internal_invoice_email_resent: "Invoice email resent.",
     internal_invoice_email_failed: "Invoice email failed to send.",
     internal_invoice_send_recipient_required: "Billing recipient email is required before sending.",
+    internal_invoice_send_recipient_invalid: "Enter a valid billing recipient email before sending.",
     internal_invoice_payment_recorded: "Tracking-only payment recorded.",
     internal_invoice_payment_overpay_denied: "Payment amount cannot exceed the remaining balance.",
     internal_invoice_voided: "Invoice voided.",
@@ -633,7 +634,7 @@ export default async function InternalInvoiceWorkspacePage({
               <section className={`${panelClass} p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Send / Resend</div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Sending is communication-only. It does not create a second invoice or change charge lines.
+                  Invoice issue and invoice send are separate steps. Sending is communication-only and does not create a second invoice or change charge lines.
                 </p>
                 <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
                   <input type="hidden" name="job_id" value={jobId} />
@@ -647,6 +648,38 @@ export default async function InternalInvoiceWorkspacePage({
                     {latestSuccessfulInternalInvoiceEmailDelivery ? "Send Again" : "Send Invoice Email"}
                   </SubmitButton>
                 </form>
+
+                {internalInvoiceEmailDeliveries.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    {(internalInvoiceEmailDeliveries as InternalInvoiceEmailDeliveryRecord[]).slice(0, 5).map((delivery) => (
+                      <div key={delivery.id} className="rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-2.5 text-sm text-slate-700">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-semibold text-slate-900">
+                            {delivery.attemptKind === "resent" ? `Resend #${delivery.attemptNumber}` : `Send #${delivery.attemptNumber}`}
+                          </span>
+                          <span
+                            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                              delivery.status === "sent"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                : delivery.status === "failed"
+                                ? "border-rose-200 bg-rose-50 text-rose-800"
+                                : "border-amber-200 bg-amber-50 text-amber-800"
+                            }`}
+                          >
+                            {delivery.status}
+                          </span>
+                        </div>
+                        <div className="mt-1 text-xs text-slate-500">
+                          {delivery.recipientEmail || "Recipient unavailable"}
+                          {delivery.createdAt ? ` • ${formatTimestampDateDisplayLA(delivery.createdAt)}` : ""}
+                        </div>
+                        {delivery.status === "failed" && delivery.errorDetail ? (
+                          <div className="mt-1 text-xs text-rose-700">{delivery.errorDetail}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </section>
             ) : null}
 
