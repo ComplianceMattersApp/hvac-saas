@@ -2857,6 +2857,12 @@ return (
                 {isPanelExpanded("closeout") ? "Show less" : "View all"}
               </Link>
             ) : null}
+            <Link
+              href={`/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`}
+              className={inlineSectionLinkClass}
+            >
+              View Closeout Queue
+            </Link>
           </div>
         </div>
         {closeoutVisibleJobs.length === 0 ? (
