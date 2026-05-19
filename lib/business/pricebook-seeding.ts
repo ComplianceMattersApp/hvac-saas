@@ -273,7 +273,7 @@ export const STARTER_KIT_V1_SEEDS: PricebookStarterSeedDefinition[] = [
   {
     seed_key: 'starter_v1.diagnostics.diagnostic_fee',
     starter_version: 'starter_v1',
-    item_name: 'Diagnostic Fee',
+    item_name: 'Diagnostic',
     item_type: 'diagnostic',
     category: 'HVAC - General',
     default_description: 'System diagnostic / inspection fee.',
@@ -438,7 +438,7 @@ export const STARTER_KIT_V2_SEEDS: PricebookStarterSeedDefinition[] = [
   {
     seed_key: 'starter_v2.diagnostics.system_diagnostic',
     starter_version: 'starter_v2',
-    item_name: 'Diagnostic Fee',
+    item_name: 'Diagnostic',
     item_type: 'diagnostic',
     category: 'HVAC - Diagnostics',
     default_description:
@@ -719,7 +719,7 @@ function createStarterV3Seed(params: {
 export const STARTER_KIT_V3_SEEDS: PricebookStarterSeedDefinition[] = [
   // Diagnostics
   createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.service_call', item_name: 'Service Call', item_type: 'service', category: 'Fees', default_description: 'Standard dispatched service call fee.', default_unit_price: 95, unit_label: 'trip' }),
-  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.diagnostic_fee', item_name: 'Diagnostic Fee', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'System diagnostic and fault isolation.', default_unit_price: 0, unit_label: 'visit' }),
+  createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.diagnostic_fee', item_name: 'Diagnostic', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'System diagnostic and fault isolation.', default_unit_price: 0, unit_label: 'visit' }),
   createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.performance_diagnostic', item_name: 'System Performance Diagnostic', item_type: 'diagnostic', category: 'HVAC - Diagnostics', default_description: 'Performance diagnostic for airflow, electrical, and refrigerant checks.', default_unit_price: 0, unit_label: 'system' }),
   createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.airflow_diagnostic', item_name: 'Airflow Diagnostic', item_type: 'diagnostic', category: 'Duct / Airflow', default_description: 'Airflow diagnostic including static checks and balancing observations.', default_unit_price: 0, unit_label: 'test' }),
   createStarterV3Seed({ seed_key: 'starter_v3.diagnostics.electrical_diagnostic', item_name: 'Electrical Diagnostic', item_type: 'diagnostic', category: 'Electrical', default_description: 'Electrical system diagnostic for low/high voltage controls and components.', default_unit_price: 0, unit_label: 'system' }),

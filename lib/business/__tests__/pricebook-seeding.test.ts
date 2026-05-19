@@ -140,7 +140,7 @@ describe('PricebookSeeding', () => {
           },
           {
             seed_key: 'starter_v1.diagnostics.diagnostic_fee',
-            item_name: 'Diagnostic Fee',
+            item_name: 'Diagnostic',
           },
         ],
         error: null,
@@ -337,7 +337,7 @@ describe('PricebookSeeding', () => {
           },
           {
             seed_key: 'starter_v2.diagnostics.system_diagnostic',
-            item_name: 'Diagnostic Fee',
+            item_name: 'Diagnostic',
           },
         ],
         error: null,

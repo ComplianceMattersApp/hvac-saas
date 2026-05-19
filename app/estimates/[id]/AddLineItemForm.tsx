@@ -305,7 +305,7 @@ export default function AddLineItemForm({
                 name="item_name"
                 type="text"
                 required
-                placeholder="e.g. Diagnostic Fee"
+                placeholder="e.g. Diagnostic"
                 value={pricebookDraft.itemName}
                 onChange={(event) =>
                   setPricebookDraft((prev) => ({ ...prev, itemName: event.target.value }))
