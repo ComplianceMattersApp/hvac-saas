@@ -81,10 +81,14 @@ function formatJobTypeLabel(value?: string | null) {
 
 export default async function JobAttachmentsPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ context?: string }>;
 }) {
   const { id: jobId } = await params;
+  const { context } = searchParams ? await searchParams : { context: undefined };
+  const isRefrigerantChargePhotoContext = context === "refrigerant-charge-photo";
 
   if (!jobId) {
     throw new Error("Missing route param: id");
@@ -270,10 +274,25 @@ export default async function JobAttachmentsPage({
       </div>
 
       <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600 shadow-sm">
-        Full attachment library for this job. Use Back to Job to return to the main workspace.
+        {isRefrigerantChargePhotoContext ? (
+          <div className="space-y-1">
+            <div className="font-medium text-slate-700">
+              Refrigerant charge photo support mode.
+            </div>
+            <div>
+              Photo Taken still lives in ECC as attestation. Attach the actual photo here as supporting evidence.
+            </div>
+          </div>
+        ) : (
+          <div>Full attachment library for this job. Use Back to Job to return to the main workspace.</div>
+        )}
       </div>
 
-      <JobAttachmentsInternal jobId={job.id} initialItems={attachmentItems} />
+      <JobAttachmentsInternal
+        jobId={job.id}
+        initialItems={attachmentItems}
+        attachmentInputMode={isRefrigerantChargePhotoContext ? "images" : "all"}
+      />
     </div>
   );
 }

@@ -3821,6 +3821,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     Photo Taken — user attests gauge photo was captured
                   </label>
 
+                  <div className="rounded-md border border-blue-100 bg-blue-50/80 px-3 py-3 text-xs text-blue-800">
+                    <div className="font-medium text-blue-900">
+                      Photo Taken records the field attestation. Attach the photo to the job for supporting evidence.
+                    </div>
+                    <div className="mt-2">
+                      <Link
+                        href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
+                        className={eccSecondaryButtonClass}
+                      >
+                        Attach refrigerant charge photo
+                      </Link>
+                    </div>
+                  </div>
+
                   <label className="flex items-center gap-2 text-sm mt-2">
                     <input
                       form={rcSaveFormId}

@@ -72,9 +72,11 @@ function fileGlyph(contentType: string | null, name: string) {
 export default function JobAttachmentsInternal({
   jobId,
   initialItems,
+  attachmentInputMode = "all",
 }: {
   jobId: string;
   initialItems: Item[];
+  attachmentInputMode?: "all" | "images";
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -97,6 +99,7 @@ export default function JobAttachmentsInternal({
     () => new Set()
   );
 
+  const isImageCaptureMode = attachmentInputMode === "images";
   const hasFiles = files.length > 0;
   const canAct = !isPending && hasFiles;
 
@@ -290,6 +293,8 @@ export default function JobAttachmentsInternal({
           ref={fileRef}
           type="file"
           multiple
+          accept={isImageCaptureMode ? "image/*" : undefined}
+          capture={isImageCaptureMode ? "environment" : undefined}
           onChange={onPickFiles}
           className="hidden"
           disabled={isPending}
@@ -305,7 +310,7 @@ export default function JobAttachmentsInternal({
             disabled={isPending}
             className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-50"
           >
-            Choose Files
+            {isImageCaptureMode ? "Take or Choose Photo" : "Choose Files"}
           </button>
 
           <div className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
@@ -318,7 +323,11 @@ export default function JobAttachmentsInternal({
         <input
           value={caption}
           onChange={(e) => setCaption(e.target.value)}
-          placeholder="Optional caption (e.g., gauges, nameplate, permit photo)"
+          placeholder={
+            isImageCaptureMode
+              ? "Optional caption (e.g., Refrigerant charge verification photo)"
+              : "Optional caption (e.g., gauges, nameplate, permit photo)"
+          }
           className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400"
           disabled={isPending}
         />
@@ -345,7 +354,11 @@ export default function JobAttachmentsInternal({
           {!initialItems || initialItems.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/72 px-4 py-8 text-center text-sm text-slate-600">
               <div className="font-medium text-slate-700">No files uploaded yet.</div>
-              <div className="mt-1 text-xs text-slate-500">Upload job photos, reports, or permit documents here.</div>
+              <div className="mt-1 text-xs text-slate-500">
+                {isImageCaptureMode
+                  ? "Capture or upload the refrigerant charge photo here as a normal job attachment."
+                  : "Upload job photos, reports, or permit documents here."}
+              </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
