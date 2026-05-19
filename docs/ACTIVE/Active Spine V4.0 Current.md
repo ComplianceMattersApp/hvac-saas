@@ -18,6 +18,9 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 
 Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No codebase split. No customer portal in current scope. Deferred and runbook-gated items remain parked unless explicitly reopened.
 
+**Estimate Multi-Option Proposal Model Lock:**
+Future Good / Better / Best proposal support is locked in [Estimate_Multi_Option_Proposal_Model_Spec.md](./Estimate_Multi_Option_Proposal_Model_Spec.md): one parent Estimate / Proposal with child Option Packages, editable labels, stored sort order, option-scoped line items/totals, and single-select primary option approval intent. Three linked estimates and fake option headers inside flat estimate line items are rejected. This is docs/model only and does not authorize schema, UI, approval, conversion, payment, email, portal, QBO, or SMS work.
+
 **Maintenance Agreements / Recurring Services V1:**
 Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md). The preferred future domain/table name is `maintenance_agreements`; avoid `service_contracts` because existing service-contract language classifies service cases/jobs and is not customer-owned agreement truth.
 Group 9A-9A model decisions are now documented there: future linkage should prefer separate `maintenance_agreement_visits`, counting should occur only after linked maintenance work is completed/closed as valid, V1 visit balance should be derived from counted links (not mutable remaining counters), `next_due_date` remains manual in current scope, and full ledger remains parked for V2.

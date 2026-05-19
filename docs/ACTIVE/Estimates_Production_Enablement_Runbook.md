@@ -42,6 +42,7 @@ The latest clean-run Estimates rehearsal closed the earlier enabled-mode render-
 	- Estimate Lines remain proposed commercial scope and are not Work Items or Invoice Charges
 	- no estimate email/PDF/customer approval/customer portal/conversion/payment/Stripe tenant payment/QBO behavior was added
 - Estimate Internal Quote Readiness Checklist V1 is complete on the guarded internal baseline: estimate detail now includes a read-only internal checklist for customer/location context, title/scope notes readiness, line-item presence, total readiness, recipient email-on-file readiness for manual send-attempt recording, and explicit proposed-scope/internal-only boundary reminders.
+- Estimate Multi-Option Proposal Model Lock is documented in `docs/ACTIVE/Estimate_Multi_Option_Proposal_Model_Spec.md`: future Good / Better / Best proposals must use one parent Estimate / Proposal with child Option Packages; fake option headers inside flat estimate line items and three linked estimates remain rejected. This is docs/model only and does not change runbook gates or current production behavior.
 
 ### Locked internal-only boundaries for this runbook
 

@@ -2648,6 +2648,8 @@ Required line-item fields:
 - unit_price
 - line_subtotal
 
+Multi-option proposal planning note: future Good / Better / Best support is locked to a parent Estimate / Proposal with child Option Packages, not three linked estimates and not fake option headers inside flat `estimate_line_items`. See [Estimate_Multi_Option_Proposal_Model_Spec.md](./Estimate_Multi_Option_Proposal_Model_Spec.md).
+
 ### Locked rule
 If the pricebook changes later, old estimates do not change.
 
@@ -2655,6 +2657,8 @@ If the pricebook changes later, old estimates do not change.
 - `estimate_events` = lifecycle/operator audit truth
 - `estimate_communications` = send-attempt/communication truth
 - Estimate = proposed commercial scope
+- Future Estimate Options / Packages = proposed commercial alternatives
+- Future Optional Add-ons = proposed selectable extras
 - Visit Scope = operational work scope
 - Invoice = billed commercial scope
 - Payment = collected truth only where implemented
@@ -2695,6 +2699,7 @@ Full procedure: hardened committed production execution runbook (`df9870f`) at `
 
 ### Next implementation direction (post-V1J)
 - V1I decision remains recorded and V1J internal document-template/readiness implementation is complete.
+- Future multi-option proposal work must follow the parent-estimate + child-option model lock in `docs/ACTIVE/Estimate_Multi_Option_Proposal_Model_Spec.md`.
 - Any production estimate enablement remains a future explicit execution decision under the hardened runbook gates; Option A comes later as sandbox-only real provider enablement after all documented go/no-go gates are satisfied.
 - draft-detail smoke caveat is closed.
 - Do not enable production estimate email sending without an explicit rollout plan.
