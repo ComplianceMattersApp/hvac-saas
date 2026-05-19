@@ -2383,9 +2383,62 @@ const dueIn8To30Days = servicePlanSummary
     )
   : 0;
 
+const operationalFlowCards = [
+  {
+    key: "unscheduled",
+    label: "Unscheduled Work",
+    count: counts.get("need_to_schedule") ?? 0,
+    tone: "bg-blue-600",
+    href: `/ops${buildQueryString({
+      bucket: "need_to_schedule",
+      contractor: contractorScopeFilter ?? "",
+      q: q ?? "",
+      sort: sort ?? "",
+      signal: "",
+    })}#ops-queues`,
+  },
+  {
+    key: "scheduled",
+    label: "Scheduled",
+    count: counts.get("scheduled") ?? 0,
+    tone: "bg-cyan-600",
+    href: `/ops${buildQueryString({
+      bucket: "scheduled",
+      contractor: contractorScopeFilter ?? "",
+      q: q ?? "",
+      sort: sort ?? "",
+      signal: "",
+    })}#ops-queues`,
+  },
+  {
+    key: "field_work",
+    label: "Field Work",
+    count: prioritizedFieldWorkJobs.length,
+    tone: "bg-emerald-600",
+    href: "#field-work",
+  },
+  {
+    key: "closeout",
+    label: "Closeout",
+    count: prioritizedCloseoutJobs.length,
+    tone: "bg-violet-600",
+    href: `/ops${buildQueryString({
+      bucket: "closeout",
+      contractor: contractorScopeFilter ?? "",
+      q: q ?? "",
+      sort: sort ?? "",
+      signal: "",
+    })}#ops-queues`,
+  },
+];
+
+const operationalFlowTotal = operationalFlowCards.reduce((sum, card) => sum + card.count, 0);
+const activeOpsWorkCount = uniqueAllOpenOpsJobs.length;
+const exceptionCount = sortedExceptionJobs.length;
+
 if (opsTimingEnabled) console.log(`[ops:totalBeforeRender] ${Date.now() - _t_total}ms`);
 return (
-  <div className="mx-auto max-w-7xl space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 lg:space-y-4.5">
+  <div className="mx-auto max-w-[92rem] space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 lg:space-y-4.5 xl:px-6">
     {notice === "estimates_unavailable" ? (
       <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.24)]">
         <div className="font-semibold">Estimates are not enabled for this environment yet.</div>
@@ -2395,84 +2448,170 @@ return (
       </section>
     ) : null}
 
-    <section className="relative overflow-hidden rounded-2xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_60%,rgba(239,246,255,0.75))] p-3 shadow-[0_18px_42px_-28px_rgba(15,23,42,0.35)] ring-1 ring-slate-200/60 sm:p-3.5">
-      <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-28 w-28 rounded-full bg-blue-100/50 blur-3xl" />
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section className="relative overflow-hidden rounded-3xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_48%,rgba(219,234,254,0.58))] p-4 shadow-[0_22px_54px_-34px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/70 sm:p-5">
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(22rem,0.65fr)] lg:items-center">
         <div className="min-w-0">
-          <div className={`${opsUtilityLabelClass} truncate text-slate-500`}>{internalBusinessDisplayName}</div>
-          <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[1.45rem]">Ops Dashboard</h1>
-          <div className="mt-1 max-w-2xl text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">Operational queues, field follow-up, and closeout work in one surface.</div>
+          <div className={`${opsUtilityLabelClass} truncate text-blue-700`}>{internalBusinessDisplayName}</div>
+          <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[2rem]">
+            Ops Command Center
+          </h1>
+          <div className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+            Dispatch, field progress, exceptions, and closeout work in one daily operating surface.
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link href="/calendar" className={sectionActionLinkClass}>
+              Calendar
+            </Link>
+            <Link href="/ops/call-list" className={sectionActionLinkClass}>
+              Call List
+            </Link>
+            <Link href="/reports/dashboard" className={sectionActionLinkClass}>
+              Reports
+            </Link>
+          </div>
         </div>
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center">
-          <Image src="/icon.png" alt={`${internalBusinessDisplayName} logo`} width={32} height={32} className="h-8 w-8 rounded-md shadow-[0_12px_24px_-18px_rgba(15,23,42,0.45)]" />
+        <div className="rounded-2xl border border-white/80 bg-white/78 p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)]">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Live Workload</div>
+              <div className="mt-1 text-3xl font-semibold tracking-[-0.03em] text-slate-950 tabular-nums">
+                {activeOpsWorkCount}
+              </div>
+              <div className="mt-1 text-xs leading-5 text-slate-600">active jobs in the current operating scope</div>
+            </div>
+            <Image src="/icon.png" alt={`${internalBusinessDisplayName} logo`} width={36} height={36} className="h-9 w-9 rounded-lg shadow-[0_12px_24px_-18px_rgba(15,23,42,0.45)]" />
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Exceptions</div>
+              <div className={`mt-1 text-lg font-semibold tabular-nums ${exceptionCount > 0 ? "text-rose-700" : "text-slate-900"}`}>
+                {exceptionCount}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Closeout</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{prioritizedCloseoutJobs.length}</div>
+            </div>
+          </div>
         </div>
       </div>
     </section>
 
-    <section className="rounded-2xl border border-slate-300/75 bg-slate-50/80 p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-4">
-      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
-        <div>
-          <div className={`${opsUtilityLabelClass} text-slate-500`}>Internal</div>
-          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Filters</div>
+    <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.88))] p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(24rem,0.75fr)]">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <div>
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Operational Snapshot</div>
+              <div className="text-lg font-semibold tracking-tight text-slate-950">Work Flow</div>
+            </div>
+            <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+              {operationalFlowTotal} jobs in flow
+            </div>
+          </div>
+
+          <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.78)]">
+            <div className="flex h-3 w-full bg-slate-100" aria-hidden="true">
+              {operationalFlowCards.map((card) => (
+                <div
+                  key={card.key}
+                  className={`${card.tone} ${card.count === 0 ? "opacity-25" : ""}`}
+                  style={{ flexGrow: operationalFlowTotal > 0 ? card.count : 1, flexBasis: 0 }}
+                />
+              ))}
+            </div>
+            <div className="grid gap-px bg-slate-200 sm:grid-cols-4">
+              {operationalFlowCards.map((card) => (
+                <Link
+                  key={card.key}
+                  href={card.href}
+                  className="group bg-white px-3 py-3 transition-colors hover:bg-slate-50"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className={`h-2.5 w-2.5 rounded-full ${card.tone}`} aria-hidden="true" />
+                    <span className={`${opsUtilityLabelClass} text-slate-500 group-hover:text-slate-700`}>{card.label}</span>
+                  </div>
+                  <div className="mt-1.5 text-2xl font-semibold tracking-[-0.03em] text-slate-950 tabular-nums">{card.count}</div>
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div className="rounded-xl border border-slate-200 bg-white/88 px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Active Jobs</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{activeOpsWorkCount}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white/88 px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Scheduled Visits</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{counts.get("scheduled") ?? 0}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white/88 px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Need to Schedule</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{counts.get("need_to_schedule") ?? 0}</div>
+            </div>
+            <div className={`rounded-xl border px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)] ${exceptionCount > 0 ? "border-rose-200 bg-rose-50/70" : "border-slate-200 bg-white/88"}`}>
+              <div className={`${opsUtilityLabelClass} ${exceptionCount > 0 ? "text-rose-700" : "text-slate-500"}`}>Exceptions</div>
+              <div className={`mt-1 text-lg font-semibold tabular-nums ${exceptionCount > 0 ? "text-rose-700" : "text-slate-900"}`}>{exceptionCount}</div>
+            </div>
+          </div>
         </div>
-        <div className="text-right text-[12px] leading-5 sm:text-[11px] sm:leading-4">
-          <div className={`${opsUtilityLabelClass} text-slate-500`}>Queue</div>
-          <div className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</div>
-        </div>
-      </div>
-      <div className={`grid grid-cols-1 gap-2.5 ${(showContractorFilterInPrimary || isHvacServiceMode) ? "lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" : "lg:grid-cols-1"}`}>
-        {showContractorFilterInPrimary ? (
-          <ContractorFilter contractors={contractors ?? []} selectedId={contractorScopeFilter ?? ""} />
-        ) : null}
+
         {isHvacServiceMode ? (
-          <div className="rounded-xl border border-slate-200/80 bg-white/90 p-3">
-            <div className={`${opsUtilityLabelClass} text-slate-500`}>Mode-aware</div>
-            <div className="mt-0.5 text-[14px] font-semibold tracking-tight text-slate-950">Team Work Snapshot</div>
+          <div className="rounded-2xl border border-slate-200/90 bg-white/92 p-3.5 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.35)]">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>Team Work Snapshot</div>
+                <div className="mt-0.5 text-base font-semibold tracking-tight text-slate-950">Field coverage</div>
+              </div>
+              <div className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] ${scheduledWithoutTechSnapshot.count === 0 ? "border-slate-200 bg-slate-50 text-slate-600" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
+                {scheduledWithoutTechSnapshot.count} without tech
+              </div>
+            </div>
+
             {teamSnapshotTotalCount === 0 ? (
-              <div className="mt-2 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
                 No active team work to summarize yet.
               </div>
             ) : (
-              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-5">
+              <div className="mt-3 grid grid-cols-2 gap-2">
                 {teamSnapshotCards.map((card) => (
-                  <div key={card.key} className="rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-2">
+                  <div key={card.key} className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{card.label}</div>
-                    <div className="mt-1 text-base font-semibold text-slate-900 tabular-nums">{card.count}</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{card.count}</div>
                   </div>
                 ))}
               </div>
             )}
 
-            <div className={`mt-2 rounded-lg border px-2.5 py-2 ${scheduledWithoutTechSnapshot.count === 0 ? "border-slate-200 bg-slate-50/80" : "border-amber-200/80 bg-amber-50/55"}`}>
+            <div className={`mt-2 rounded-xl border px-3 py-2 ${scheduledWithoutTechSnapshot.count === 0 ? "border-slate-200 bg-slate-50/80" : "border-amber-200/80 bg-amber-50/65"}`}>
               <div className="flex items-center justify-between gap-2">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Scheduled Without Tech</div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-sm font-semibold tabular-nums ${scheduledWithoutTechSnapshot.count === 0 ? "text-slate-600" : "text-amber-800"}`}>
-                    {scheduledWithoutTechSnapshot.count}
-                  </span>
-                  <Link
-                    href={`/ops${buildQueryString({
-                      bucket: "scheduled",
-                      contractor: contractorScopeFilter ?? "",
-                      q: q ?? "",
-                      sort: sort ?? "",
-                      signal: "",
-                    })}#ops-queues`}
-                    className={inlineSectionLinkClass}
-                  >
-                    View scheduled queue
-                  </Link>
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Scheduled Without Tech</div>
+                  <div className="mt-0.5 text-xs text-slate-600">Scheduled open jobs with zero active assigned techs.</div>
                 </div>
+                <Link
+                  href={`/ops${buildQueryString({
+                    bucket: "scheduled",
+                    contractor: contractorScopeFilter ?? "",
+                    q: q ?? "",
+                    sort: sort ?? "",
+                    signal: "",
+                  })}#ops-queues`}
+                  className={inlineSectionLinkClass}
+                >
+                  View
+                </Link>
               </div>
             </div>
 
-            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
+            <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Work by Technician</div>
               {workByTechnicianRows.length === 0 ? (
                 <div className="mt-1 text-xs text-slate-600">No assigned team work to summarize yet.</div>
               ) : (
-                <div className="mt-1 space-y-1.5 text-xs text-slate-700">
-                  {workByTechnicianRows.slice(0, 6).map((row) => (
+                <div className="mt-1.5 space-y-1.5 text-xs text-slate-700">
+                  {workByTechnicianRows.slice(0, 5).map((row) => (
                     <div key={row.name} className="flex items-center justify-between gap-3">
                       <span className="truncate font-medium text-slate-800">{row.name}</span>
                       <span className="shrink-0 text-slate-600">
@@ -2496,6 +2635,24 @@ return (
               </div>
             ) : null}
           </div>
+        ) : null}
+      </div>
+    </section>
+
+    <section className="rounded-2xl border border-slate-300/75 bg-slate-50/80 p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-4">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
+        <div>
+          <div className={`${opsUtilityLabelClass} text-slate-500`}>Internal</div>
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Filters</div>
+        </div>
+        <div className="text-right text-[12px] leading-5 sm:text-[11px] sm:leading-4">
+          <div className={`${opsUtilityLabelClass} text-slate-500`}>Queue</div>
+          <div className="font-medium text-slate-800">{OPS_TABS.find((t) => t.key === bucket)?.label ?? "Ops"}</div>
+        </div>
+      </div>
+      <div className={`grid grid-cols-1 gap-2.5 ${showContractorFilterInPrimary ? "lg:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]" : "lg:grid-cols-1"}`}>
+        {showContractorFilterInPrimary ? (
+          <ContractorFilter contractors={contractors ?? []} selectedId={contractorScopeFilter ?? ""} />
         ) : null}
         <div className="grid gap-1">
           <label className={`${opsUtilityLabelClass} text-slate-500`}>Sort</label>
@@ -2702,7 +2859,7 @@ return (
         )}
       </div>
 
-    <div className={`rounded-2xl border ${prioritizedFieldWorkJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
+    <div id="field-work" className={`rounded-2xl border ${prioritizedFieldWorkJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
       <div className="mb-2 flex items-center justify-between gap-2">
         <div className="text-[15px] font-semibold tracking-tight text-slate-950">Field Work</div>
         <div className="flex items-center gap-3">
