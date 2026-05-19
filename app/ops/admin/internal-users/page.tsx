@@ -189,13 +189,13 @@ export default async function AdminInternalUsersPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal Team</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Manage internal role assignments, profile details, and day-to-day access changes for office and field staff.
+              Manage the employees, staff, and technicians inside your company.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Internal Team members are users inside your company account.
+              Internal Team is for people inside your company.
             </div>
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Use People &amp; Access for broader invite, contractor, and Portal Access recovery actions.
+              Use People &amp; Access for invites, contractor users, and Portal Access recovery.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -250,10 +250,8 @@ export default async function AdminInternalUsersPage({
 
       <div>
       <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
-        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite internal team member</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">
-          Invite a team member and attach internal role access automatically.
-        </p>
+        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite team member</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">Invite a person on your internal team and set their role.</p>
         <form action={inviteInternalUserFromForm} className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-4">
           <input
             name="email"
@@ -283,8 +281,8 @@ export default async function AdminInternalUsersPage({
 
       <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
         <div className="border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Internal team directory</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">Edit profiles, adjust roles, or pause access for internal staff.</p>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Team results</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">Internal team members in the current view.</p>
         </div>
 
         <div className="divide-y divide-gray-200">
@@ -388,7 +386,7 @@ export default async function AdminInternalUsersPage({
           })}
           {(internalUsers ?? []).length === 0 ? (
             <div className="px-5 py-12 text-center text-sm leading-6 text-slate-600">
-              No internal team members are in this account yet.
+              No internal team members have been added yet.
             </div>
           ) : null}
         </div>

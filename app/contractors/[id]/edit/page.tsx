@@ -116,7 +116,7 @@ export default async function EditContractorPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Contractor Admin</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">{contractorName}</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Maintain contractor profile details, review access posture, and manage lifecycle state from one page.
+              Manage contractor details, access, and lifecycle from one page.
             </p>
             <div className="flex flex-wrap items-center gap-2 pt-1">
               <span
@@ -158,10 +158,8 @@ export default async function EditContractorPage({
         <div className="space-y-6">
           <section className="space-y-3">
             <div className="space-y-1">
-              <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Core Contractor Profile</h2>
-              <p className="text-sm leading-6 text-slate-600">
-                Update identity, contact, notes, and billing information.
-              </p>
+              <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Contractor details</h2>
+              <p className="text-sm leading-6 text-slate-600">Update name, contact, notes, and billing info.</p>
             </div>
             <ContractorForm
               mode="edit"
@@ -176,9 +174,7 @@ export default async function EditContractorPage({
           <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
             <div className="space-y-1">
               <h2 className="text-base font-semibold tracking-[-0.01em] text-slate-950">Manage Contractor Access</h2>
-              <p className="text-xs leading-5 text-slate-600">
-                Visibility into linked users, open invites, and access readiness.
-              </p>
+              <p className="text-xs leading-5 text-slate-600">Linked users, open invites, and portal readiness.</p>
             </div>
 
             <div className="mt-4 space-y-3 text-sm">
@@ -205,10 +201,8 @@ export default async function EditContractorPage({
 
           <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
             <div className="space-y-1">
-              <h2 className="text-base font-semibold tracking-[-0.01em] text-slate-950">Lifecycle & Sensitive Actions</h2>
-              <p className="text-xs leading-5 text-slate-600">
-                Archive blocks new operational participation without removing historical records.
-              </p>
+              <h2 className="text-base font-semibold tracking-[-0.01em] text-slate-950">Lifecycle</h2>
+              <p className="text-xs leading-5 text-slate-600">Archiving blocks new participation while keeping history intact.</p>
             </div>
 
             <div className="mt-4 space-y-3">
@@ -259,7 +253,7 @@ export default async function EditContractorPage({
                 <form action={archiveContractorFromForm} className="rounded-xl border border-amber-200 bg-amber-50/60 p-3 space-y-3">
                   <input type="hidden" name="contractor_id" value={contractor.id ?? ""} />
                   <p className="text-xs leading-5 text-amber-900">
-                    Sensitive action: Archive removes this contractor from active assignment/invite flows while preserving historical attribution.
+                    Archive this contractor to stop new invites and assignments while preserving history.
                   </p>
                   <input
                     name="archived_reason"

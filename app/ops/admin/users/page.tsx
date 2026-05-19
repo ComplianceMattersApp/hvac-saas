@@ -352,13 +352,13 @@ export default async function AdminUsersCommandCenterPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">People &amp; Access</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Broader account access workspace for internal users, contractor-linked users, invites, and recovery actions.
+              Find internal staff, contractor users, invites, and portal recovery actions.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Internal Team members are users inside your company. Contractors are external ECC/HERS workflow partners.
+              Internal Team is for people inside your company. Contractors are external partners.
             </div>
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Portal access controls who can view or submit job information outside your internal team.
+              Portal Access is for people outside your company who need to view or submit job information.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -411,8 +411,8 @@ export default async function AdminUsersCommandCenterPage({
 
       <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div className="mb-4 space-y-1">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Filter directory</h2>
-          <p className="text-sm leading-6 text-slate-600">Refine the current view by account type or search across names, emails, and companies.</p>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Find people</h2>
+          <p className="text-sm leading-6 text-slate-600">Filter by account type or search by name, email, or company.</p>
         </div>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <form method="get" className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:w-full">
@@ -486,15 +486,13 @@ export default async function AdminUsersCommandCenterPage({
 
       <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
         <div className="border-b border-slate-200/80 bg-slate-50/70 px-5 py-4">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Directory results</h2>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            Internal and contractor user accounts in the current view.
-          </p>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">People results</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">Internal staff, contractors, and invited users in the current view.</p>
         </div>
 
         {filtered.length === 0 ? (
           <div className="px-5 py-12 text-center text-sm leading-6 text-slate-600">
-            No user accounts match the current filters.
+            No people match the current filters.
           </div>
         ) : (
           <div className="divide-y divide-gray-200">

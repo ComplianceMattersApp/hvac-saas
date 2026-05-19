@@ -294,7 +294,7 @@ export default async function AdminContractorsPage({
 
           <details className="rounded-lg" open={!isArchived}>
             <summary className={`cursor-pointer list-none rounded-lg px-1 py-2 text-sm font-medium ${detailsSummaryTone}`}>
-              Access and invite details
+              Access and invites
             </summary>
 
             <div className={`space-y-4 border-t pt-3 ${detailsDividerTone}`}>
@@ -328,7 +328,7 @@ export default async function AdminContractorsPage({
               <div className={`border-t pt-3 ${detailsDividerTone}`}>
                 <h4 className="text-sm font-semibold text-slate-900">Invite contractor user</h4>
                 <p className="mt-1 text-xs leading-5 text-slate-600">
-                  Everyone invited here shares the same contractor-scoped access for this company.
+                  Everyone invited here shares contractor access for this company.
                   {isArchived ? " Archived contractors cannot receive new invites." : ""}
                 </p>
                 <form action={inviteContractorUserFromForm} className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-5">
@@ -470,16 +470,16 @@ export default async function AdminContractorsPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Contractors</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Manage contractor companies, primary contacts, and contractor-scoped member access from one clean workspace.
+              Manage contractor companies, contacts, and access from one place.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
               Contractors are external ECC/HERS workflow partners.
             </div>
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Use People &amp; Access for broader invite and recovery actions across all account users.
+              Use People &amp; Access for invites and recovery across all account users.
             </div>
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Portal Access controls outside-internal-team participation.
+              Portal Access is for people outside your company.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

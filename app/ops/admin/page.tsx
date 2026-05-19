@@ -60,21 +60,20 @@ export default async function OpsAdminPage() {
   const modeContextByProductMode: Record<ProductMode, { badge: string; heroHint: string; peopleCopy: string }> = {
     hvac_service: {
       badge: "HVAC Service",
-      heroHint: "Service/work-order-first workspace. Contractor tools remain optional and unchanged.",
+      heroHint: "Service-first workspace. Contractor tools stay optional.",
       peopleCopy:
-        "Start with People & Access, then move into Internal Team. Contractor tools stay optional and are only needed for outside ECC/HERS-style collaboration.",
+        "Start with People & Access, then use Internal Team. Contractor tools stay optional for outside collaboration.",
     },
     ecc_hers: {
       badge: "ECC/HERS",
       heroHint: "Compliance and contractor collaboration remain relevant in this workspace.",
       peopleCopy:
-        "Start with People & Access, then step into Internal Team and contractor collaboration tools when needed.",
+        "Start with People & Access, then use Internal Team and Contractor tools as needed.",
     },
     hybrid: {
       badge: "All-in-One",
       heroHint: "Owner all-in-one workspace. Service and compliance tools remain available together.",
-      peopleCopy:
-        "Start with People & Access, then step into Internal Team and optional contractor tools when needed.",
+      peopleCopy: "Start with People & Access, then use Internal Team and optional contractor tools when needed.",
     },
   };
 
@@ -85,7 +84,7 @@ export default async function OpsAdminPage() {
       section: "people",
       eyebrow: "People",
       title: "People & Access",
-      description: "Broader account access workspace for internal users, contractor-linked users, invites, and recovery actions.",
+      description: "Find internal staff, contractor users, invites, and portal recovery actions.",
       href: "/ops/admin/users",
       ctaLabel: "Open workspace",
       enabled: true,
@@ -94,7 +93,7 @@ export default async function OpsAdminPage() {
       section: "people",
       eyebrow: "People",
       title: "Internal Team",
-      description: "Internal Team members are users inside your company account. Manage roles, active status, and team-setup confirmation.",
+      description: "Manage employees, staff, and technicians inside your company.",
       href: "/ops/admin/internal-users",
       ctaLabel: "Open workspace",
       enabled: true,
@@ -105,8 +104,8 @@ export default async function OpsAdminPage() {
       title: productMode === "hvac_service" ? "Contractors (Optional)" : "Contractors",
       description:
         productMode === "hvac_service"
-          ? "Optional external partner directory for service accounts. Core HVAC Service operation does not require ECC contractor lanes."
-          : "Contractors are external ECC/HERS workflow partners for collaboration workflows.",
+          ? "Optional external partner workspace for service accounts."
+          : "External contractor relationships and contractor portal users.",
       href: "/ops/admin/contractors",
       ctaLabel: productMode === "hvac_service" ? "Optional workspace" : "Open workspace",
       enabled: true,
@@ -117,8 +116,8 @@ export default async function OpsAdminPage() {
       title: productMode === "hvac_service" ? "Intake Proposals (Optional)" : "Intake Proposals",
       description:
         productMode === "hvac_service"
-          ? "Optional external partner proposal review for service accounts that use outside collaboration lanes."
-          : "Optional contractor-submitted work review for accounts that use contractor intake.",
+          ? "Optional review queue for outside collaboration proposals."
+          : "Review contractor-submitted proposals before they become jobs.",
       href: "/ops/admin/contractor-intake-submissions",
       ctaLabel: productMode === "hvac_service" ? "Optional workspace" : "Review contractor proposals",
       enabled: true,
@@ -185,10 +184,10 @@ export default async function OpsAdminPage() {
       : [];
   const organizationCards = cards.filter((card) => card.section === "organization");
   const peopleSectionTitle =
-    productMode === "hvac_service" ? "Service team and access workspaces" : "People & access workspaces";
+    productMode === "hvac_service" ? "People & Access" : "People & Access";
   const peopleSectionDescription =
     productMode === "hvac_service"
-      ? "Start with People & Access and Internal Team. Optional outside collaboration tools are moved below so this page stays service/work-order first."
+      ? "Use this area for account access, internal staff, and optional outside collaboration tools."
       : modeContext.peopleCopy;
 
   return (
@@ -203,7 +202,7 @@ export default async function OpsAdminPage() {
               Manage people, company settings, and your operational workspace in one place.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Live workspaces are grouped below. Future tools stay clearly separated.
+              People, company settings, and workspaces are grouped below.
             </div>
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
               {modeContext.badge}: {modeContext.heroHint}
@@ -229,7 +228,7 @@ export default async function OpsAdminPage() {
               Required: {readiness.completedRequiredCount} of {readiness.totalRequiredCount} complete
             </p>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Readiness tracks setup confirmations, not just whether a field has text.
+              This checks setup steps, not just whether fields are filled in.
             </p>
           </div>
         </div>

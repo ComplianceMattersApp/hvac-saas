@@ -89,10 +89,10 @@ export default async function ContractorIntakeSubmissionsPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Admin Center</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Contractor Intake Proposals</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Review pending external partner proposals and finalize into canonical job creation.
+              Review contractor proposals before they become jobs.
             </p>
             <p className="mt-1 text-sm text-slate-600">
-              Contractors are external ECC/HERS workflow partners in these lanes.
+              Contractors are external ECC/HERS partners.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -115,7 +115,7 @@ export default async function ContractorIntakeSubmissionsPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         {productMode === "hvac_service" ? (
           <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
-            Optional collaboration tool for HVAC Service accounts. Use this queue only when outside ECC/HERS contractor collaboration is needed.
+            Optional collaboration queue for HVAC Service accounts.
           </div>
         ) : null}
 
@@ -125,7 +125,7 @@ export default async function ContractorIntakeSubmissionsPage() {
 
         {rows.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-sm text-slate-600">
-            No pending contractor intake proposals.
+            No contractor proposals waiting for review.
           </div>
         ) : (
           <div className="overflow-x-auto">

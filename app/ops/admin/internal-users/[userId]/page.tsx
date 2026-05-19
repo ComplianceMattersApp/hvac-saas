@@ -167,12 +167,12 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="space-y-2">
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</div>
-            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal profile details</h1>
+            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal Team profile</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
-              Update the practical profile details your team sees across the app without changing sign-in credentials or account ownership.
+              Update the name and phone number your team sees for this person.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Profile details only. Role changes and recovery actions stay in the parent admin workspaces.
+              Use Internal Team for roles and access. Use People &amp; Access for invites and recovery.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -308,9 +308,9 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
           </section>
 
           <section className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-5 shadow-[0_18px_32px_-30px_rgba(15,23,42,0.18)] sm:p-6">
-            <h2 className="text-sm font-semibold text-slate-900">Where to make other changes</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Need other changes?</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Edit profile details here. Use Internal Team for role changes and People &amp; Access for broader invite or password work.
+              Use Internal Team for role changes and People &amp; Access for invites or recovery.
             </p>
           </section>
         </aside>
