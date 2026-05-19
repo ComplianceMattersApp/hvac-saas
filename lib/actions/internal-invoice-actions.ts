@@ -471,7 +471,7 @@ async function loadInternalInvoiceContext(formData: FormData) {
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
     .select(
-      'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, job_address, city, state, zip'
+      'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
     )
     .eq('id', jobId)
     .single();
@@ -1721,15 +1721,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     accountOwnerUserId: context.internalUser.account_owner_user_id,
   });
 
-  const serviceLocation = [
-    getOptionalText(context.job.job_address),
-    [context.job.city, context.job.state, context.job.zip]
-      .map((value) => getOptionalText(value))
-      .filter(Boolean)
-      .join(' '),
-  ]
-    .filter(Boolean)
-    .join(', ');
+  const serviceLocation = null;
   const customerName = [context.job.customer_first_name, context.job.customer_last_name]
     .map((value) => getOptionalText(value))
     .filter(Boolean)
