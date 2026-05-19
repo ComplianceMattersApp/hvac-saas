@@ -779,7 +779,7 @@ function TimedServiceStatusActions({
 }
 
 const workspacePanelClass =
-  "rounded-2xl border border-slate-200/90 bg-white shadow-[0_16px_36px_-28px_rgba(15,23,42,0.28)]";
+  "rounded-3xl border border-slate-200/90 bg-white shadow-[0_18px_42px_-32px_rgba(15,23,42,0.3)]";
 const workspaceSectionClass = `${workspacePanelClass} p-5 sm:p-6`;
 const workspaceInsetClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3";
@@ -805,7 +805,7 @@ const compactUtilityButtonClass =
 const compactWorkspaceActionButtonClass =
   "inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-200/90 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-900 shadow-[0_10px_22px_-20px_rgba(37,99,235,0.35)] transition-[border-color,background-color,box-shadow,transform,color] hover:border-blue-300 hover:bg-blue-100 hover:text-blue-950 hover:shadow-[0_14px_26px_-20px_rgba(37,99,235,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
 const workspaceDetailsClass =
-  `${workspaceSectionClass} group border-emerald-200/90 text-gray-900 shadow-[0_16px_36px_-28px_rgba(15,23,42,0.28)] transition-[border-color,box-shadow,transform] duration-150 hover:border-emerald-300/90 hover:shadow-[0_18px_38px_-30px_rgba(15,23,42,0.32)] [&[open]_.disclosure-icon]:rotate-90`;
+  `${workspaceSectionClass} group text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] [&[open]_.disclosure-icon]:rotate-90`;
 const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
 const workspaceSoftCardClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
@@ -2886,12 +2886,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   };
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[88rem] space-y-5 overflow-x-hidden p-4 sm:p-6">
+    <div className="mx-auto w-full min-w-0 max-w-[92rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-4 sm:p-5 lg:p-6">
 
-<section className={`${workspaceSectionClass} mb-6 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] shadow-[0_20px_44px_-34px_rgba(15,23,42,0.26)]`}>
+<section className={`${workspaceSectionClass} mb-6 overflow-hidden border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] shadow-[0_24px_58px_-38px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70`}>
   <div className="mb-4 border-b border-slate-200/80 pb-4">
     <div className="mt-1 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div className="min-w-0 max-w-3xl">
+        <div className="mb-2 inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-800">
+          Job Command Center
+        </div>
         <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
           {normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}
         </h1>
@@ -2979,15 +2982,22 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
   </div>
 
-  <div className={`${workspaceInsetClass} mb-4 border-slate-200/70 bg-[linear-gradient(180deg,rgba(248,250,252,0.82),rgba(255,255,255,0.99))] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] sm:px-4`}>
-    <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(28rem,auto)] lg:items-center">
+  <div className="mb-4 rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9),rgba(255,255,255,0.99))] px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),0_18px_36px_-34px_rgba(15,23,42,0.32)] sm:px-4">
+    <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(34rem,0.95fr)] xl:items-center">
       <div className="min-w-0">
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Schedule</div>
-          <div className="min-w-0 text-[1.05rem] font-semibold tracking-[-0.01em] text-slate-950 sm:text-[1.16rem]">
-            {appointmentDateLabel}
+        <div className="grid gap-2 sm:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+          <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">When</div>
+            <div className="mt-0.5 min-w-0 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950">
+              {appointmentDateLabel}
+            </div>
+            <div className="mt-0.5 text-sm font-medium text-slate-600">{appointmentTimeLabel}</div>
           </div>
-          <div className="text-sm font-medium text-slate-600">{appointmentTimeLabel}</div>
+          <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Current State</div>
+            <div className="mt-0.5 text-sm font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</div>
+            <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{jobStatusSummaryText}</div>
+          </div>
         </div>
 
         {job.job_type === "service" ? (
@@ -3004,9 +3014,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-4 lg:min-w-[28rem]">
+      <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[34rem] 2xl:grid-cols-4">
         <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Schedule Status</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Schedule</div>
           <div className={`mt-0.5 text-sm font-semibold ${job.scheduled_date ? "text-emerald-800" : "text-slate-700"}`}>
             {job.scheduled_date ? "Scheduled" : "Unscheduled"}
           </div>
@@ -3018,20 +3028,30 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </div>
         </div>
         <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Field Status</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Field</div>
           <div className={`mt-0.5 text-sm font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>
             {formatStatus(job.status)}
           </div>
         </div>
         <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Ops Status</div>
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Ops</div>
           <div className="mt-0.5 text-sm font-semibold text-slate-800">{formatOpsStatusLabel(job.ops_status)}</div>
         </div>
       </div>
     </div>
   </div>
 
-  <div className="mb-4 grid items-start gap-4 xl:grid-cols-[minmax(300px,0.94fr)_minmax(420px,1.22fr)_minmax(250px,0.74fr)]">
+  <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+    <div>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Operations Board</div>
+      <div className="mt-1 text-sm text-slate-600">Who to contact, where to go, who owns it, and what equipment matters.</div>
+    </div>
+    <div className="inline-flex rounded-full border border-slate-200 bg-white/86 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+      {equipmentCount} equipment / {assignedTeam.length} assigned
+    </div>
+  </div>
+
+  <div className="mb-4 grid items-start gap-4 xl:grid-cols-[minmax(300px,0.92fr)_minmax(420px,1.25fr)_minmax(260px,0.83fr)]">
     {/* Left: customer / contact info */}
     <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -4664,7 +4684,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 ) : null}
 
 {isInternalUser ? (
-  <div id="visit-scope-section" className="mt-6 rounded-2xl border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.95))] p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)]">
+  <div id="visit-scope-section" className="mt-6 scroll-mt-24 rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-4 shadow-[0_22px_48px_-36px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-5">
     <div className="space-y-3">
       {job.job_type === "service" && visitScopeCount === 0 ? (
         <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
@@ -4675,14 +4695,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-2">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Visit Scope</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">Work Package</div>
             {job.job_type === "service" ? (
               <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                 {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
               </span>
             ) : null}
           </div>
-          <div className="text-xs leading-5 text-slate-500">Reason and work planned for this visit.</div>
+          <div className="text-lg font-semibold tracking-tight text-slate-950">Visit Scope</div>
+          <div className="text-xs leading-5 text-slate-500">Reason, work items, and companion follow-up for this visit.</div>
         </div>
 
         <details className="group">
@@ -4705,7 +4726,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
       </div>
 
-      <div className="rounded-xl border border-slate-200/70 bg-white/92 px-4 py-3.5 shadow-[0_10px_20px_-30px_rgba(15,23,42,0.18)]">
+      <div className="rounded-2xl border border-slate-200/80 bg-white/94 px-4 py-3.5 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)]">
       <div className="space-y-3.5">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Reason for Visit</div>
@@ -4719,7 +4740,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items</div>
             <div className="mt-2 space-y-2.5">
               {primaryVisitScopeItems.map((item, index) => (
-                <div key={`primary-${index}-${item.title}`} className="space-y-1 border-l-2 border-slate-200 pl-3">
+                <div key={`primary-${index}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
                   <div className="text-sm font-semibold leading-5 text-slate-900">
                     {item.title}
                     {item.expected_unit_price !== null && item.expected_unit_price !== undefined
@@ -4745,7 +4766,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 const itemIndex = visitScopeItems.findIndex((candidate) => candidate === item);
 
                 return (
-                  <div key={`companion-${companionIndex}-${item.title}`} className="space-y-1 border-l-2 border-slate-200 pl-3">
+                  <div key={`companion-${companionIndex}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
                     <div className="flex flex-wrap items-center gap-2">
                       <div className="text-sm font-semibold leading-5 text-slate-900">{item.title}</div>
                       <div className="text-xs text-slate-500">{formatVisitScopeItemKindLabel(item.kind)}</div>
@@ -4819,7 +4840,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   </Suspense>
 ) : null}
 
-<details id="job-status" className={`${workspaceDetailsClass} mb-6`}>
+<details id="job-status" className={`${workspaceDetailsClass} mb-6 border-blue-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(239,246,255,0.5))]`}>
   <summary className="cursor-pointer list-none">
     <CollapsibleHeader
       title="Job Status"
@@ -5002,8 +5023,20 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       ) : null}
 
-    <section className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.99))] p-4 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/70 sm:p-5">
+      <div className="mb-4 flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Job Records</div>
+          <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950">Activity, Evidence, and History</div>
+          <div className="mt-1 text-sm text-slate-600">Notes, attachments, follow-up, timeline, service chain, and compliance context.</div>
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          <span className={infoChipClass}>{noteCountSummary.timelineNoteEventCount} notes</span>
+          <span className={infoChipClass}>{serviceCaseVisitCount} visits</span>
+          {showEccSummaryCard ? <span className={infoChipClass}>{eccRunCount} ECC runs</span> : null}
+        </div>
+      </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
         {/* Internal Notes */}
         <details id="internal-notes" className={workspaceDetailsClass} open={Boolean(internalNoteBannerMessage)}>
           <summary className="cursor-pointer list-none">
