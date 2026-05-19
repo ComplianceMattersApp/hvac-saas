@@ -10,7 +10,9 @@ import {
   removeEstimateLineItem,
   transitionEstimateStatus,
   createDefaultEstimateOptions,
+  updateEstimateOptionMetadata,
   type AddEstimateLineItemParams,
+  type UpdateEstimateOptionMetadataParams,
 } from "@/lib/estimates/estimate-actions";
 import { sendEstimateCommunication } from "@/lib/estimates/estimate-communication";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
@@ -122,4 +124,24 @@ export async function createDefaultEstimateOptionsFromForm(formData: FormData) {
   if (result.success) {
     revalidatePath(`/estimates/${estimateId}`);
   }
+}
+
+/**
+ * Update draft-only option label and summary from the internal option card.
+ */
+export async function updateEstimateOptionMetadataAction(
+  params: UpdateEstimateOptionMetadataParams
+) {
+  if (!isEstimatesEnabled()) {
+    return {
+      success: false as const,
+      error: "Estimates are currently unavailable.",
+    };
+  }
+
+  const result = await updateEstimateOptionMetadata(params);
+  if (result.success) {
+    revalidatePath(`/estimates/${result.estimateId}`);
+  }
+  return result;
 }

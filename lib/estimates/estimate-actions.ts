@@ -971,3 +971,143 @@ export async function createDefaultEstimateOptions(
     createdOptions: 3,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Update estimate option metadata (V1 internal-only)
+// ---------------------------------------------------------------------------
+
+const ESTIMATE_OPTION_LABEL_MAX_LENGTH = 100;
+const ESTIMATE_OPTION_SUMMARY_MAX_LENGTH = 750;
+
+export type UpdateEstimateOptionMetadataParams = {
+  estimateId: string;
+  estimateOptionId: string;
+  label: string;
+  summary?: string | null;
+};
+
+export type UpdateEstimateOptionMetadataResult =
+  | {
+      success: true;
+      estimateId: string;
+      estimateOptionId: string;
+      label: string;
+      summary: string | null;
+    }
+  | { success: false; error: string };
+
+/**
+ * Update draft-only option label and summary.
+ *
+ * This action intentionally does not edit option notes, slot/default identity,
+ * sort order, line items, or option totals.
+ */
+export async function updateEstimateOptionMetadata(
+  params: UpdateEstimateOptionMetadataParams
+): Promise<UpdateEstimateOptionMetadataResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  const estimateOptionId = String(params.estimateOptionId ?? "").trim();
+  const label = String(params.label ?? "").trim();
+  const summary = String(params.summary ?? "").trim() || null;
+
+  if (!estimateId || !estimateOptionId) {
+    return { success: false, error: "estimate_id and estimate_option_id are required." };
+  }
+
+  if (!label) {
+    return { success: false, error: "Option label is required." };
+  }
+
+  if (label.length > ESTIMATE_OPTION_LABEL_MAX_LENGTH) {
+    return {
+      success: false,
+      error: `Option label must be ${ESTIMATE_OPTION_LABEL_MAX_LENGTH} characters or fewer.`,
+    };
+  }
+
+  if (summary && summary.length > ESTIMATE_OPTION_SUMMARY_MAX_LENGTH) {
+    return {
+      success: false,
+      error: `Option summary must be ${ESTIMATE_OPTION_SUMMARY_MAX_LENGTH} characters or fewer.`,
+    };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const accountOwnerUserId = internalUser.account_owner_user_id;
+  const userId = internalUser.user_id;
+
+  const { data: estimate, error: estErr } = await supabase
+    .from("estimates")
+    .select("id, status, account_owner_user_id")
+    .eq("id", estimateId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (estErr) throw estErr;
+  if (!estimate?.id) {
+    return { success: false, error: "Estimate not found in this account." };
+  }
+
+  if (estimate.status !== "draft") {
+    return {
+      success: false,
+      error: "Option metadata can only be edited for draft estimates.",
+    };
+  }
+
+  const { data: option, error: optionErr } = await supabase
+    .from("estimate_options")
+    .select(
+      "id, estimate_id, default_label_key, slot_index, sort_order, subtotal_cents, total_cents"
+    )
+    .eq("id", estimateOptionId)
+    .eq("estimate_id", estimateId)
+    .maybeSingle();
+
+  if (optionErr) throw optionErr;
+  if (!option?.id) {
+    return { success: false, error: "Option package not found on this estimate." };
+  }
+
+  const updatedAt = new Date().toISOString();
+
+  const { error: updateErr } = await supabase
+    .from("estimate_options")
+    .update({
+      label,
+      summary,
+      updated_by_user_id: userId,
+      updated_at: updatedAt,
+    })
+    .eq("id", estimateOptionId)
+    .eq("estimate_id", estimateId);
+
+  if (updateErr) throw updateErr;
+
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: "estimate_option_updated",
+    meta: {
+      estimate_option_id: estimateOptionId,
+      default_label_key: option.default_label_key,
+      slot_index: option.slot_index,
+      label,
+      has_summary: summary !== null,
+    },
+    user_id: userId,
+  });
+
+  return {
+    success: true,
+    estimateId,
+    estimateOptionId,
+    label,
+    summary,
+  };
+}

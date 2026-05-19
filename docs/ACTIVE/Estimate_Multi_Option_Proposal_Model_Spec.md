@@ -23,7 +23,15 @@ Schema foundation closeout note (2026-05-19):
 - Option-line consistency is enforced with a composite FK from `(estimate_option_id, estimate_id)` to `estimate_options(id, estimate_id)`.
 - RLS is internal/authenticated/account-scoped through parent `estimates`; no customer, contractor, public, portal, approval, conversion, payment, email, QBO, or SMS behavior is introduced.
 
-Locked boundary for this slice:
+Internal authoring closeout notes (2026-05-19):
+
+- Empty draft estimates can create exactly three default option packages: Good / Better / Best.
+- Draft multi-option estimates can edit option `label` and `summary` only.
+- Option metadata editing preserves `default_label_key`, `slot_index`, `sort_order`, option totals, option line items, and parent estimate totals.
+- Option `notes` remain reserved/internal and are not exposed or edited in this slice.
+- Option line authoring, option delete/reorder, print multi-option rendering, readiness scoring, approval/response, conversion, portal, email, payment, add-ons, QBO, and SMS remain deferred.
+
+Original model-lock boundary:
 
 - no code changes
 - no schema changes

@@ -27,6 +27,7 @@ import AddLineItemForm from "./AddLineItemForm";
 import EstimateStatusActionForm from "./EstimateStatusActionForm";
 import SendEstimateForm from "./SendEstimateForm";
 import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
+import EditEstimateOptionForm from "./EditEstimateOptionForm";
 import { isEstimateEmailSendEnabled } from "@/lib/estimates/estimate-exposure";
 
 export const metadata = { title: "Estimate" };
@@ -568,8 +569,13 @@ export default async function EstimateDetailPage({
                         {option.summary && (
                           <p className="mt-1 text-sm text-slate-600">{option.summary}</p>
                         )}
-                        {option.notes && (
-                          <p className="mt-1 text-xs text-slate-500">{option.notes}</p>
+                        {isDraft && (
+                          <EditEstimateOptionForm
+                            estimateId={estimate.id}
+                            estimateOptionId={option.id}
+                            label={option.label}
+                            summary={option.summary}
+                          />
                         )}
                       </div>
                       <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-right text-xs text-slate-600 print:border-slate-300">

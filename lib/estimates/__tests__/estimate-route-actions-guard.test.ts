@@ -3,12 +3,16 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const addEstimateLineItemMock = vi.fn();
 const removeEstimateLineItemMock = vi.fn();
 const transitionEstimateStatusMock = vi.fn();
+const createDefaultEstimateOptionsMock = vi.fn();
+const updateEstimateOptionMetadataMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock("@/lib/estimates/estimate-actions", () => ({
   addEstimateLineItem: (...args: unknown[]) => addEstimateLineItemMock(...args),
   removeEstimateLineItem: (...args: unknown[]) => removeEstimateLineItemMock(...args),
   transitionEstimateStatus: (...args: unknown[]) => transitionEstimateStatusMock(...args),
+  createDefaultEstimateOptions: (...args: unknown[]) => createDefaultEstimateOptionsMock(...args),
+  updateEstimateOptionMetadata: (...args: unknown[]) => updateEstimateOptionMetadataMock(...args),
 }));
 
 vi.mock("next/cache", () => ({
@@ -134,6 +138,53 @@ describe("estimate route action guards", () => {
     expect(transitionEstimateStatusMock).toHaveBeenCalledWith({
       estimateId: "est-1",
       nextStatus: "sent",
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
+  });
+
+  it("updateEstimateOptionMetadataAction short-circuits when feature flag disabled", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    const { updateEstimateOptionMetadataAction } = await import("@/app/estimates/[id]/actions");
+
+    const result = await updateEstimateOptionMetadataAction({
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      label: "Repair Only",
+      summary: "Summary",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(updateEstimateOptionMetadataMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("updateEstimateOptionMetadataAction delegates and revalidates when enabled", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    updateEstimateOptionMetadataMock.mockResolvedValue({
+      success: true,
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      label: "Repair Only",
+      summary: "Summary",
+    });
+
+    const { updateEstimateOptionMetadataAction } = await import("@/app/estimates/[id]/actions");
+    const result = await updateEstimateOptionMetadataAction({
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      label: "Repair Only",
+      summary: "Summary",
+    });
+
+    expect(result.success).toBe(true);
+    expect(updateEstimateOptionMetadataMock).toHaveBeenCalledWith({
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      label: "Repair Only",
+      summary: "Summary",
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
   });
