@@ -17,7 +17,7 @@ import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
-import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import {
   buildPromotedCompanionReadModel,
@@ -221,7 +221,7 @@ export default async function OpsPage({
   const contractorScopeFilter = isHvacServiceMode ? null : contractor;
 
   const _t_businessIdentity = opsTimingEnabled ? Date.now() : 0;
-  const internalBusinessIdentityPromise = resolveInternalBusinessIdentityByAccountOwnerId({
+  const operationalTenantIdentityPromise = resolveOperationalTenantIdentity({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   }).then((result) => {
@@ -869,8 +869,9 @@ if (opsTimingEnabled) console.log(`[ops:customerLocationMaps] ${Date.now() - _t_
 const customersById = new Map((custRes.data ?? []).map((c: any) => [c.id, c]));
 const locationsById = new Map((locRes.data ?? []).map((l: any) => [l.id, l]));
 
-const internalBusinessIdentity = await internalBusinessIdentityPromise;
-const internalBusinessDisplayName = internalBusinessIdentity.display_name;
+const operationalTenantIdentity = await operationalTenantIdentityPromise;
+const internalBusinessDisplayName = operationalTenantIdentity.displayName;
+const internalBusinessLogoUrl = operationalTenantIdentity.logoUrl;
 
 // helpers used in JSX (prefer truth tables, fallback to job snapshot)
 function customerLine(j: any) {
@@ -2494,7 +2495,15 @@ return (
               </div>
               <div className="mt-1 text-xs leading-5 text-slate-600">active jobs in the current operating scope</div>
             </div>
-            <Image src="/icon.png" alt={`${internalBusinessDisplayName} logo`} width={36} height={36} className="h-9 w-9 rounded-lg shadow-[0_12px_24px_-18px_rgba(15,23,42,0.45)]" />
+            {internalBusinessLogoUrl ? (
+              <img
+                src={internalBusinessLogoUrl}
+                alt=""
+                className="h-10 max-h-12 w-12 max-w-14 rounded-lg bg-white/95 p-1 object-contain shadow-[0_12px_24px_-18px_rgba(15,23,42,0.45)]"
+              />
+            ) : (
+              <Image src="/icon.png" alt={`${internalBusinessDisplayName} logo`} width={36} height={36} className="h-9 w-9 rounded-lg shadow-[0_12px_24px_-18px_rgba(15,23,42,0.45)]" />
+            )}
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             <div className="rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2">
