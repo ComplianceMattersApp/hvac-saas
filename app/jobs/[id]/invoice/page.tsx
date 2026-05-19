@@ -364,6 +364,16 @@ export default async function InternalInvoiceWorkspacePage({
               Back to Job
             </Link>
             {invoice ? (
+              <Link
+                href={`/jobs/${jobId}/invoice/print`}
+                target="_blank"
+                rel="noreferrer"
+                className={secondaryButtonClass}
+              >
+                Print / Save PDF
+              </Link>
+            ) : null}
+            {invoice ? (
               <Link href="#invoice-charges" className={darkButtonClass}>
                 Review Charges
               </Link>
