@@ -2574,36 +2574,22 @@ return (
                 No active team work to summarize yet.
               </div>
             ) : (
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {teamSnapshotCards.map((card) => (
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {teamSnapshotCards.slice(0, 4).map((card) => (
                   <div key={card.key} className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{card.label}</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{card.count}</div>
+                  </div>
+                ))}
+
+                {teamSnapshotCards.slice(4).map((card) => (
+                  <div key={card.key} className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 sm:col-span-2">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{card.label}</div>
                     <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{card.count}</div>
                   </div>
                 ))}
               </div>
             )}
-
-            <div className={`mt-2 rounded-xl border px-3 py-2 ${scheduledWithoutTechSnapshot.count === 0 ? "border-slate-200 bg-slate-50/80" : "border-amber-200/80 bg-amber-50/65"}`}>
-              <div className="flex items-center justify-between gap-2">
-                <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Scheduled Without Tech</div>
-                  <div className="mt-0.5 text-xs text-slate-600">Scheduled open jobs with zero active assigned techs.</div>
-                </div>
-                <Link
-                  href={`/ops${buildQueryString({
-                    bucket: "scheduled",
-                    contractor: contractorScopeFilter ?? "",
-                    q: q ?? "",
-                    sort: sort ?? "",
-                    signal: "",
-                  })}#ops-queues`}
-                  className={inlineSectionLinkClass}
-                >
-                  View
-                </Link>
-              </div>
-            </div>
 
             <div className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Work by Technician</div>
