@@ -197,6 +197,7 @@ export default async function EstimatesPage({
         <div className="grid gap-3">
           {estimates.map((est) => {
             const customerName = est.customer_id ? customerMap[est.customer_id] ?? "Unknown Customer" : null;
+            const isMultiOptionProposal = est.proposalMode === "multi_option_packages";
             return (
               <Link
                 key={est.id}
@@ -217,11 +218,25 @@ export default async function EstimatesPage({
                     {customerName && (
                       <div className="mt-0.5 text-sm text-slate-500">{customerName}</div>
                     )}
+                    {isMultiOptionProposal && (
+                      <div className="mt-2 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                        Multi-option proposal
+                      </div>
+                    )}
                   </div>
                   <div className="shrink-0 text-right">
-                    <div className="text-base font-semibold text-slate-950">
-                      {formatCents(est.total_cents)}
-                    </div>
+                    {isMultiOptionProposal ? (
+                      <>
+                        <div className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                          Multi-option
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-slate-700">See option totals</div>
+                      </>
+                    ) : (
+                      <div className="text-base font-semibold text-slate-950">
+                        {formatCents(est.total_cents)}
+                      </div>
+                    )}
                     <div className="mt-0.5 text-xs text-slate-400">{formatDate(est.created_at)}</div>
                   </div>
                 </div>

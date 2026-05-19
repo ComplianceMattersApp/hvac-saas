@@ -33,7 +33,7 @@ Internal authoring closeout notes (2026-05-19):
 - Manual option line authoring is draft-only, account-scoped, and blocked whenever legacy flat `estimate_line_items` exist on the same estimate.
 - Parent estimate subtotal/total remains unchanged by manual option line add/remove in this slice.
 - Option `notes` remain reserved/internal and are not exposed or edited in this slice.
-- Option line authoring, option delete/reorder, print multi-option rendering, readiness scoring, approval/response, conversion, portal, email, payment, add-ons, QBO, and SMS remain deferred.
+- Option line authoring, option delete/reorder, readiness scoring, approval/response, conversion, portal, email, payment, add-ons, QBO, and SMS remain deferred.
 - Option line authoring, option delete/reorder, readiness scoring, approval/response, conversion, portal, email, payment, add-ons, QBO, and SMS remain deferred.
 
 Print rendering closeout note (2026-05-19):

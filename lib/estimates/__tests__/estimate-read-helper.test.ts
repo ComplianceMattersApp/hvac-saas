@@ -5,7 +5,7 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { InternalUserRow } from "@/lib/auth/internal-user";
-import { getEstimateById } from "../estimate-read";
+import { getEstimateById, listEstimatesByAccount } from "../estimate-read";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -411,5 +411,77 @@ describe("estimate read helper - type contracts", () => {
     });
 
     expect(Array.isArray(result?.line_items)).toBe(true);
+  });
+});
+
+describe("estimate list helper - proposal mode summary", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("marks multi-option estimates while preserving flat rows", async () => {
+    const estimates = [
+      {
+        id: "est-flat",
+        estimate_number: "EST-20260519-AAAA1111",
+        customer_id: null,
+        location_id: null,
+        status: "draft",
+        title: "Flat estimate",
+        subtotal_cents: 1000,
+        total_cents: 1000,
+        created_at: "2026-05-19T10:00:00Z",
+        updated_at: "2026-05-19T10:00:00Z",
+      },
+      {
+        id: "est-multi",
+        estimate_number: "EST-20260519-BBBB2222",
+        customer_id: null,
+        location_id: null,
+        status: "draft",
+        title: "Multi-option estimate",
+        subtotal_cents: 2000,
+        total_cents: 2000,
+        created_at: "2026-05-19T11:00:00Z",
+        updated_at: "2026-05-19T11:00:00Z",
+      },
+    ];
+
+    const mockSupabase = {
+      from: vi.fn((table: string) => {
+        if (table === "estimates") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockResolvedValue({ data: estimates, error: null }),
+              }),
+            }),
+          };
+        }
+
+        if (table === "estimate_options") {
+          return {
+            select: vi.fn().mockReturnValue({
+              in: vi.fn().mockResolvedValue({
+                data: [{ estimate_id: "est-multi" }],
+                error: null,
+              }),
+            }),
+          };
+        }
+
+        return {};
+      }),
+    };
+
+    const result = await listEstimatesByAccount({
+      internalUser: { account_owner_user_id: "owner-123" },
+      supabase: mockSupabase,
+    });
+
+    expect(result.map((estimate) => estimate.proposalMode)).toEqual([
+      "single_option_flat",
+      "multi_option_packages",
+    ]);
   });
 });

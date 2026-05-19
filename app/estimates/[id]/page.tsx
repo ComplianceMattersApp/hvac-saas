@@ -325,16 +325,32 @@ export default async function EstimateDetailPage({
 
           {/* Totals */}
           <div className="shrink-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-right print:min-w-[14rem] print:rounded-lg print:border-slate-300 print:bg-white">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Total
-            </div>
-            <div className="mt-0.5 text-2xl font-bold tracking-[-0.02em] text-slate-950">
-              {formatCents(documentView.totals.totalCents)}
-            </div>
-            {documentView.totals.subtotalCents !== documentView.totals.totalCents && (
-              <div className="text-xs text-slate-500">
-                Subtotal {formatCents(documentView.totals.subtotalCents)}
-              </div>
+            {isMultiOptionProposal ? (
+              <>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Proposal mode
+                </div>
+                <div className="mt-0.5 text-2xl font-bold tracking-[-0.02em] text-slate-950">
+                  Multi-option
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Totals are shown inside each option package.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Total
+                </div>
+                <div className="mt-0.5 text-2xl font-bold tracking-[-0.02em] text-slate-950">
+                  {formatCents(documentView.totals.totalCents)}
+                </div>
+                {documentView.totals.subtotalCents !== documentView.totals.totalCents && (
+                  <div className="text-xs text-slate-500">
+                    Subtotal {formatCents(documentView.totals.subtotalCents)}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -492,8 +508,16 @@ export default async function EstimateDetailPage({
                   estimateId={estimate.id}
                   nextStatus="sent"
                   label="Mark Sent Manually"
-                  helperText="Updates the estimate status only. This does not send an email or PDF."
-                  confirmMessage="Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent."
+                  helperText={
+                    isMultiOptionProposal
+                      ? "Updates the estimate status only. This does not send an email or PDF, capture approval, or select an option."
+                      : "Updates the estimate status only. This does not send an email or PDF."
+                  }
+                  confirmMessage={
+                    isMultiOptionProposal
+                      ? "Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent, and no option will be selected or approved."
+                      : "Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent."
+                  }
                   className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition-[background-color,border-color,transform] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
                 />
                 <EstimateStatusActionForm
@@ -809,6 +833,7 @@ export default async function EstimateDetailPage({
               estimateId={estimate.id}
               action={sendEstimateFromForm}
               isEmailSendEnabled={emailSendEnabled}
+              isMultiOptionProposal={isMultiOptionProposal}
               defaultRecipientEmail={customerEmail}
             />
           </div>

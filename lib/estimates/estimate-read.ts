@@ -456,6 +456,7 @@ export type EstimateListItem = {
   total_cents: number;
   created_at: string;
   updated_at: string;
+  proposalMode: "single_option_flat" | "multi_option_packages";
 };
 
 /**
@@ -486,5 +487,37 @@ export async function listEstimatesByAccount(params: {
 
   const { data, error } = await query;
   if (error) throw error;
-  return data ?? [];
+
+  const estimates = (data ?? []) as EstimateListItem[];
+  const estimateIds = estimates.map((estimate) => estimate.id);
+
+  if (estimateIds.length === 0) {
+    return estimates.map((estimate) => ({
+      ...estimate,
+      proposalMode: "single_option_flat",
+    }));
+  }
+
+  let multiOptionEstimateIds = new Set<string>();
+  const { data: optionRows, error: optionRowsError } = await params.supabase
+    .from("estimate_options")
+    .select("estimate_id")
+    .in("estimate_id", estimateIds);
+
+  if (optionRowsError) {
+    if (!isMissingOptionPackageSchemaError(optionRowsError)) {
+      throw optionRowsError;
+    }
+  } else {
+    multiOptionEstimateIds = new Set(
+      (optionRows ?? []).map((row: { estimate_id: string }) => row.estimate_id)
+    );
+  }
+
+  return estimates.map((estimate) => ({
+    ...estimate,
+    proposalMode: multiOptionEstimateIds.has(estimate.id)
+      ? "multi_option_packages"
+      : "single_option_flat",
+  }));
 }

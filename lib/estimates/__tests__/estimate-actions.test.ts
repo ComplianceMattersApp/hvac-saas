@@ -876,15 +876,27 @@ describe("listEstimatesByAccount", () => {
       estimates: { select: estimates as unknown[] as unknown },
     });
     // Override from to return a thenable with the list
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((_table: string) => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          order: vi.fn(() =>
-            Promise.resolve({ data: estimates, error: null })
-          ),
-        })),
-      })),
-    }));
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
+      if (table === "estimates") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => Promise.resolve({ data: estimates, error: null })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "estimate_options") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+        };
+      }
+
+      return {};
+    });
 
     const result = await listEstimatesByAccount({
       internalUser: { account_owner_user_id: ACCOUNT_OWNER },
@@ -897,17 +909,29 @@ describe("listEstimatesByAccount", () => {
   it("filters by status when provided", async () => {
     const filtered = estimates.filter((e) => e.status === "draft");
     const supabase = makeSupabaseClient({});
-    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((_table: string) => ({
-      select: vi.fn(() => ({
-        eq: vi.fn(() => ({
-          order: vi.fn(() => ({
-            eq: vi.fn(() =>
-              Promise.resolve({ data: filtered, error: null })
-            ),
+    (supabase.from as ReturnType<typeof vi.fn>).mockImplementation((table: string) => {
+      if (table === "estimates") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              order: vi.fn(() => ({
+                eq: vi.fn(() => Promise.resolve({ data: filtered, error: null })),
+              })),
+            })),
           })),
-        })),
-      })),
-    }));
+        };
+      }
+
+      if (table === "estimate_options") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(() => Promise.resolve({ data: [], error: null })),
+          })),
+        };
+      }
+
+      return {};
+    });
 
     const result = await listEstimatesByAccount({
       internalUser: { account_owner_user_id: ACCOUNT_OWNER },
