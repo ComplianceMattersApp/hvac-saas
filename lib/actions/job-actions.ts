@@ -4872,7 +4872,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   const rules = {
     indoor_min_f: 70, // we will use lowest_return_air_db_f as indoor proxy
     outdoor_min_f: 55,
-    subcool_tolerance_f: 2,
+    subcool_tolerance_f: 3,
     superheat_max_f: 25,
     filter_drier_required: true,
   };
@@ -6188,7 +6188,7 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
   const rules = {
     indoor_min_f: 70,
     outdoor_min_f: 55,
-    subcool_tolerance_f: 2,
+    subcool_tolerance_f: 3,
     superheat_max_f: 25,
     filter_drier_required: true,
   };

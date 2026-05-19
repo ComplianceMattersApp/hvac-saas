@@ -334,6 +334,7 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
 
       const measuredSubcool = condenserSat != null && liquidTemp != null ? condenserSat - liquidTemp : null;
       const measuredSuperheat = suctionTemp != null && evapSat != null ? suctionTemp - evapSat : null;
+      const subcoolToleranceF = 3;
       const subcoolDelta =
         measuredSubcool != null && targetSubcool != null ? measuredSubcool - targetSubcool : null;
 
@@ -347,9 +348,9 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
       if (
         measuredSubcool != null &&
         targetSubcool != null &&
-        Math.abs(measuredSubcool - targetSubcool) > 2
+        Math.abs(measuredSubcool - targetSubcool) > subcoolToleranceF
       ) {
-        failures.push("Subcool out of +/-2F tolerance");
+        failures.push(`Subcool out of +/-${subcoolToleranceF}F tolerance`);
       }
 
       const hasCoreCompute =
@@ -377,7 +378,7 @@ export default function EccLivePreview({ mode, formId, projectType }: Props) {
           ? "pass"
           : measuredSubcool == null || targetSubcool == null
           ? "pending"
-          : Math.abs(measuredSubcool - targetSubcool) <= 2
+          : Math.abs(measuredSubcool - targetSubcool) <= subcoolToleranceF
           ? "pass"
           : "fail";
       const superheatTone: Tone =

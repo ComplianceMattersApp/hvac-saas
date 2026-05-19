@@ -1013,9 +1013,9 @@ describe("contractor report entitlement hardening", () => {
         headline: "Refrigerant charge failed – Subcooling",
         detail_lines: [
           "Target subcooling: 10.0°F",
-          "Allowed range: ±2.0°F",
+          "Allowed range: ±3.0°F",
           "Measured: 15.0°F",
-          "Difference: 3.0°F outside allowed range",
+          "Difference: 2.0°F outside allowed range",
         ],
       };
       const { supabase } = makeContractorReportFixture({
@@ -1027,7 +1027,7 @@ describe("contractor report entitlement hardening", () => {
             override_pass: null,
             is_completed: true,
             __pass: false,
-            __reasons: ["Subcool not within ±2F of target"],
+            __reasons: ["Subcool not within ±3F of target"],
             __details: [subcoolDetail],
           },
         ],
@@ -1040,7 +1040,7 @@ describe("contractor report entitlement hardening", () => {
 
       expect(preview.failure_details[0].headline).toBe("Refrigerant charge failed – Subcooling");
       expect(preview.failure_details[0].detail_lines).toContain("Target subcooling: 10.0°F");
-      expect(preview.failure_details[0].detail_lines).toContain("Allowed range: ±2.0°F");
+      expect(preview.failure_details[0].detail_lines).toContain("Allowed range: ±3.0°F");
     });
 
     it("refrigerant superheat failure detail includes limit, measured, difference", async () => {

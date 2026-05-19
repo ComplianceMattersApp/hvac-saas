@@ -123,7 +123,7 @@ function buildNumericReading(): FormData {
   fd.set("job_id", "job-1");
   fd.set("test_run_id", "run-1");
   fd.set("system_id", "sys-1");
-  // Passing readings: subcool within ±2F of target, superheat < 25F, filter drier confirmed
+  // Passing readings: subcool within ±3F of target, superheat < 25F, filter drier confirmed
   fd.set("liquid_line_temp_f", "100");
   fd.set("condenser_sat_temp_f", "110");   // measured_subcool = 10F
   fd.set("target_subcool_f", "10");         // target = 10F → delta = 0 (pass)
