@@ -2115,12 +2115,27 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     <div
       key={j.id}
       className={[
-        "relative rounded-xl border bg-white px-3 py-2 shadow-[0_10px_20px_-22px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 transition-all duration-150 hover:-translate-y-px hover:shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] sm:px-3 sm:py-2.5",
+        "relative overflow-hidden rounded-xl border bg-white px-3 py-2 shadow-[0_10px_20px_-22px_rgba(15,23,42,0.28)] ring-1 ring-slate-200/70 transition-all duration-150 hover:-translate-y-px hover:shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] sm:px-3 sm:py-2.5",
         emphasize && needsAttention
-          ? "border-amber-300 bg-amber-50/35"
+          ? "border-amber-300 bg-amber-50/30"
           : "border-slate-200/90",
       ].join(" ")}
     >
+      <div
+        aria-hidden="true"
+        className={[
+          "absolute inset-y-0 left-0 w-1",
+          needsAttention
+            ? "bg-amber-400"
+            : isFailedFamily
+            ? "bg-rose-400"
+            : opsStatus === "scheduled"
+            ? "bg-cyan-500"
+            : opsStatus === "need_to_schedule"
+            ? "bg-blue-500"
+            : "bg-slate-200",
+        ].join(" ")}
+      />
       <div className="min-w-0">
         <div className="flex flex-col gap-2 sm:grid sm:grid-cols-[minmax(10rem,0.75fr)_minmax(0,1.25fr)] sm:items-start sm:gap-3">
           <div className="min-w-0">
@@ -2146,7 +2161,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
             <div className={`${opsSupportTextClass} text-slate-600`}>{addressLine(j)}</div>
             {visitScope.hasContent ? (
               <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] leading-4 text-slate-600">
-                <span className="font-semibold uppercase tracking-[0.08em] text-slate-500">{isEccJob ? "Includes" : "Visit"}</span>
+                <span className="font-semibold uppercase tracking-[0.08em] text-slate-500">{isEccJob ? "Includes" : "Work"}</span>
                 <span className="min-w-0 font-medium text-slate-700">{isEccJob ? visitScopeIncludes?.label : visitScope.lead}</span>
                 {visitScope.itemCount > 0 ? (
                   <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
@@ -2163,7 +2178,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
                 ))}
               </div>
             ) : null}
-            {customerPhone ? (
+            {customerPhone && (supportsAttemptHistory || opsStatus === "need_to_schedule") ? (
               <div className={`mt-0.5 ${opsSupportTextClass} text-slate-600`}>
                 <span className="font-medium text-slate-500">Phone</span>{" "}
                 {preferredPhoneHref ? (
@@ -2182,7 +2197,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
           <div className="flex w-full flex-col gap-1.5 sm:min-w-0 sm:items-start sm:border-l sm:border-slate-200 sm:pl-3">
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] sm:justify-start sm:text-[10px]">
               {emphasize && needsAttention ? (
-                <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-[0.08em] text-amber-800">
+                <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold uppercase tracking-[0.08em] text-amber-800">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500" aria-hidden="true" />
                   Attention
                 </span>
@@ -2692,6 +2707,159 @@ return (
       </div>
     </section>
 
+    <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))] p-3.5 shadow-[0_22px_52px_-36px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/70 sm:p-4">
+      <div className="mb-3 flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className={`${opsUtilityLabelClass} text-amber-700`}>Attention Board</div>
+          <div className="text-lg font-semibold tracking-tight text-slate-950">Overdue / Exceptions</div>
+          <div className="mt-1 text-[12.5px] leading-5 text-slate-600 sm:text-[13px]">
+            Jobs that need a decision, follow-up, or closeout movement.
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {sectionCountPill(
+            sortedExceptionJobs.length,
+            sortedExceptionJobs.length > 0 ? "danger" : "neutral"
+          )}
+          {sortedExceptionJobs.length > EXCEPTION_PREVIEW_LIMIT ? (
+            <Link
+              href={`/ops${buildQueryString({
+                bucket,
+                contractor: contractorScopeFilter ?? "",
+                q: q ?? "",
+                sort: sort ?? "",
+                signal: signal ?? "",
+                panel: isPanelExpanded("exceptions") ? "" : "exceptions",
+              })}`}
+              className={inlineSectionLinkClass}
+            >
+              {isPanelExpanded("exceptions") ? "Show less" : "View all"}
+            </Link>
+          ) : null}
+        </div>
+      </div>
+      {exceptionVisibleJobs.length === 0 ? (
+        quietSectionEmptyState("No exception jobs with the current filters.", "success")
+      ) : (
+        <div className="grid gap-2 xl:grid-cols-2">
+          {exceptionVisibleJobs.map((j: any) => {
+            const meta = exceptionMetaById.get(String(j?.id ?? ""));
+            const note = meta ? `${meta.reason} | ${meta.aging}` : "Exception";
+            return compactRow(j, true, note, true);
+          })}
+        </div>
+      )}
+    </section>
+
+    <section className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+      <div id="field-work" className={`rounded-2xl border ${prioritizedFieldWorkJobs.length === 0 ? "border-emerald-200/80 bg-emerald-50/50 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div>
+            <div className={`${opsUtilityLabelClass} text-emerald-700`}>Today / Active</div>
+            <div className="text-[15px] font-semibold tracking-tight text-slate-950">Field Work</div>
+          </div>
+          <div className="flex items-center gap-3">
+            {sectionCountPill(prioritizedFieldWorkJobs.length)}
+            {prioritizedFieldWorkJobs.length > PREVIEW_LIMIT ? (
+              <Link
+                href={`/ops${buildQueryString({
+                  bucket,
+                  contractor: contractorScopeFilter ?? "",
+                  q: q ?? "",
+                  sort: sort ?? "",
+                  signal: signal ?? "",
+                  panel: isPanelExpanded("field_work") ? "" : "field_work",
+                })}`}
+                className={inlineSectionLinkClass}
+              >
+                {isPanelExpanded("field_work") ? "Show less" : "View all"}
+              </Link>
+            ) : null}
+          </div>
+        </div>
+
+        {prioritizedFieldWorkJobs.length === 0 ? (
+          quietSectionEmptyState("Field work complete for today.", "success")
+        ) : (
+          <div className="space-y-2">
+            {fieldWorkVisibleJobs.map((j: any) => compactRow(j, true, undefined, true))}
+          </div>
+        )}
+      </div>
+
+      <div className={`rounded-2xl border ${callListVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div>
+            <div className={`${opsUtilityLabelClass} text-blue-700`}>Planning</div>
+            <div className="text-[15px] font-semibold tracking-tight text-slate-950">Unscheduled Work</div>
+          </div>
+          <div className="flex items-center gap-3">
+            {sectionCountPill(prioritizedCallListJobs.length)}
+            {prioritizedCallListJobs.length > PREVIEW_LIMIT ? (
+              <Link
+                href={`/ops${buildQueryString({
+                  bucket,
+                  contractor: contractorScopeFilter ?? "",
+                  q: q ?? "",
+                  sort: sort ?? "",
+                  signal: signal ?? "",
+                  panel: isPanelExpanded("call_list") ? "" : "call_list",
+                })}`}
+                className={inlineSectionLinkClass}
+              >
+                {isPanelExpanded("call_list") ? "Show less" : "View all"}
+              </Link>
+            ) : null}
+            <Link
+              href={`/ops/call-list${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`}
+              className={inlineSectionLinkClass}
+            >
+              View Unscheduled Work
+            </Link>
+          </div>
+        </div>
+        {callListVisibleJobs.length === 0 ? (
+          quietSectionEmptyState("No unscheduled work right now.")
+        ) : (
+          <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true))}</div>
+        )}
+      </div>
+
+      <div className={`rounded-2xl border ${closeoutVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div>
+            <div className={`${opsUtilityLabelClass} text-violet-700`}>Closeout</div>
+            <div className="text-[15px] font-semibold tracking-tight text-slate-950">Closeout Work Queue</div>
+          </div>
+          <div className="flex items-center gap-3">
+            {sectionCountPill(prioritizedCloseoutJobs.length)}
+            {prioritizedCloseoutJobs.length > PREVIEW_LIMIT ? (
+              <Link
+                href={`/ops${buildQueryString({
+                  bucket: "closeout",
+                  contractor: contractorScopeFilter ?? "",
+                  q: q ?? "",
+                  sort: sort ?? "",
+                  signal: signal ?? "",
+                  panel: isPanelExpanded("closeout") ? "" : "closeout",
+                })}`}
+                className={inlineSectionLinkClass}
+              >
+                {isPanelExpanded("closeout") ? "Show less" : "View all"}
+              </Link>
+            ) : null}
+          </div>
+        </div>
+        {closeoutVisibleJobs.length === 0 ? (
+          quietSectionEmptyState("No closeout work is waiting right now.")
+        ) : (
+          <div className="space-y-2">
+            {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j), true))}
+          </div>
+        )}
+      </div>
+    </section>
+
     {maintenanceAgreementsEnabled && servicePlanSummary ? (
       <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5">
         <div className="mb-2.5 flex items-end justify-between gap-2 border-b border-slate-200/80 pb-2.5">
@@ -2808,144 +2976,6 @@ return (
       contractorId={contractorScopeFilter}
       sort={sort}
     />
-
-    <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
-      <div className={`rounded-2xl border ${callListVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Unscheduled Work</div>
-          <div className="flex items-center gap-3">
-            {sectionCountPill(prioritizedCallListJobs.length)}
-            {prioritizedCallListJobs.length > PREVIEW_LIMIT ? (
-              <Link
-                href={`/ops${buildQueryString({
-                  bucket,
-                  contractor: contractorScopeFilter ?? "",
-                  q: q ?? "",
-                  sort: sort ?? "",
-                  signal: signal ?? "",
-                  panel: isPanelExpanded("call_list") ? "" : "call_list",
-                })}`}
-                className={inlineSectionLinkClass}
-              >
-                {isPanelExpanded("call_list") ? "Show less" : "View all"}
-              </Link>
-            ) : null}
-            <Link
-              href={`/ops/call-list${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`}
-              className={inlineSectionLinkClass}
-            >
-              View Unscheduled Work
-            </Link>
-          </div>
-        </div>
-        {callListVisibleJobs.length === 0 ? (
-          quietSectionEmptyState("No unscheduled work right now.")
-        ) : (
-          <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true))}</div>
-        )}
-      </div>
-
-    <div id="field-work" className={`rounded-2xl border ${prioritizedFieldWorkJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="text-[15px] font-semibold tracking-tight text-slate-950">Field Work</div>
-        <div className="flex items-center gap-3">
-          {sectionCountPill(prioritizedFieldWorkJobs.length)}
-          {prioritizedFieldWorkJobs.length > PREVIEW_LIMIT ? (
-            <Link
-              href={`/ops${buildQueryString({
-                bucket,
-                contractor: contractorScopeFilter ?? "",
-                q: q ?? "",
-                sort: sort ?? "",
-                signal: signal ?? "",
-                panel: isPanelExpanded("field_work") ? "" : "field_work",
-              })}`}
-              className={inlineSectionLinkClass}
-            >
-              {isPanelExpanded("field_work") ? "Show less" : "View all"}
-            </Link>
-          ) : null}
-        </div>
-      </div>
-
-  {prioritizedFieldWorkJobs.length === 0 ? (
-    quietSectionEmptyState("Field work complete for today.", "success")
-  ) : (
-    <div className="space-y-2">
-      {fieldWorkVisibleJobs.map((j: any) => compactRow(j, true, undefined, true))}
-    </div>
-  )}
-</div>
-
-      <div className={`rounded-2xl border ${closeoutVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Closeout Work Queue</div>
-          <div className="flex items-center gap-3">
-            {sectionCountPill(prioritizedCloseoutJobs.length)}
-            {prioritizedCloseoutJobs.length > PREVIEW_LIMIT ? (
-              <Link
-                href={`/ops${buildQueryString({
-                  bucket: "closeout",
-                  contractor: contractorScopeFilter ?? "",
-                  q: q ?? "",
-                  sort: sort ?? "",
-                  signal: signal ?? "",
-                  panel: isPanelExpanded("closeout") ? "" : "closeout",
-                })}`}
-                className={inlineSectionLinkClass}
-              >
-                {isPanelExpanded("closeout") ? "Show less" : "View all"}
-              </Link>
-            ) : null}
-          </div>
-        </div>
-        {closeoutVisibleJobs.length === 0 ? (
-          quietSectionEmptyState("No closeout work is waiting right now.")
-        ) : (
-          <div className="space-y-2">
-            {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j), true))}
-          </div>
-        )}
-      </div>
-    </section>
-
-    <section className={`rounded-2xl border ${exceptionVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="text-[15px] font-semibold tracking-tight text-slate-950">Overdue / Exceptions</div>
-        <div className="flex items-center gap-3">
-          {sectionCountPill(
-            sortedExceptionJobs.length,
-            sortedExceptionJobs.length > 0 ? "danger" : "neutral"
-          )}
-          {sortedExceptionJobs.length > EXCEPTION_PREVIEW_LIMIT ? (
-            <Link
-              href={`/ops${buildQueryString({
-                bucket,
-                contractor: contractorScopeFilter ?? "",
-                q: q ?? "",
-                sort: sort ?? "",
-                signal: signal ?? "",
-                panel: isPanelExpanded("exceptions") ? "" : "exceptions",
-              })}`}
-              className={inlineSectionLinkClass}
-            >
-              {isPanelExpanded("exceptions") ? "Show less" : "View all"}
-            </Link>
-          ) : null}
-        </div>
-      </div>
-      {exceptionVisibleJobs.length === 0 ? (
-        quietSectionEmptyState("No exception jobs with the current filters.")
-      ) : (
-        <div className="space-y-2">
-          {exceptionVisibleJobs.map((j: any) => {
-            const meta = exceptionMetaById.get(String(j?.id ?? ""));
-            const note = meta ? `${meta.reason} | ${meta.aging}` : "Exception";
-            return compactRow(j, true, note);
-          })}
-        </div>
-      )}
-    </section>
 
     <section id="ops-queues" className="rounded-2xl border border-slate-300/80 bg-slate-100/70 p-3 shadow-[0_18px_42px_-32px_rgba(15,23,42,0.38)] sm:p-4">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">

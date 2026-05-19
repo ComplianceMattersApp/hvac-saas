@@ -77,7 +77,31 @@ export default function OpsLoading() {
         </div>
       </div>
 
-      <div className="grid gap-3 lg:grid-cols-3">
+      <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+        <div className="mb-3 flex flex-col gap-2 border-b border-slate-100 pb-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="h-3 w-32 animate-pulse rounded bg-amber-100" />
+            <div className="mt-2 h-6 w-48 animate-pulse rounded bg-slate-200" />
+            <div className="mt-2 h-3 w-72 max-w-full animate-pulse rounded bg-slate-100" />
+          </div>
+          <div className="h-7 w-20 animate-pulse rounded-full bg-slate-100" />
+        </div>
+        <div className="grid gap-2 xl:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, rowIndex) => (
+            <div key={rowIndex} className="relative overflow-hidden rounded-xl border border-slate-100 bg-slate-50 px-3 py-2">
+              <div className="absolute inset-y-0 left-0 w-1 bg-amber-200" />
+              <div className="h-4 w-52 max-w-full animate-pulse rounded bg-slate-200" />
+              <div className="mt-2 h-3 w-64 max-w-full animate-pulse rounded bg-slate-100" />
+              <div className="mt-3 flex gap-2">
+                <div className="h-6 w-20 animate-pulse rounded-full bg-white" />
+                <div className="h-6 w-28 animate-pulse rounded-full bg-white" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid gap-3 xl:grid-cols-3">
         {Array.from({ length: 3 }).map((_, sectionIndex) => (
           <div key={sectionIndex} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/5">
             <div className="mb-3 flex items-center justify-between gap-2">
