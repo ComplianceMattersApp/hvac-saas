@@ -28,6 +28,7 @@ function makeJob(params: {
     customer_phone: '555-1212',
     contractor_id: null,
     contractor_name: null,
+    work_context_label: null,
     assignments: params.assignmentUserIds.map((userId, index) => ({
       user_id: userId,
       display_name: userId,
