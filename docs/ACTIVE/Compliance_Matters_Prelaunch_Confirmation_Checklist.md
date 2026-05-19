@@ -223,8 +223,8 @@ If any item here conflicts with the active spine, the spine wins.
   - Closeout Queue V2 waits until the owner uses V1 and provides feedback.
   - SMS/provider-powered messaging stays behind the existing gates.
   - Live tenant customer payment execution remains deferred.
-- Watch item only:
-  - the unrelated `calendar-filtering.test.ts` TypeScript fixture gap remains open and does not change product behavior.
+- Resolved watch item:
+  - `calendar-filtering.test.ts` is green again and no longer represents an active TypeScript fixture gap.
 
 ### 2.3.7 Performance/responsiveness closeout (current pass) and active backlog
 - The focused performance/responsiveness intervention batch is complete for the current pass and is now closed for this pass.
