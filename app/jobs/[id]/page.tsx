@@ -3028,62 +3028,47 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   </div>
 
   <div className="mb-4 rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9),rgba(255,255,255,0.99))] px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),0_18px_36px_-34px_rgba(15,23,42,0.32)] sm:px-4">
-    <div className="grid gap-3 xl:grid-cols-[minmax(0,1.05fr)_minmax(34rem,0.95fr)] xl:items-center">
-      <div className="min-w-0">
-        <div className="grid gap-2 sm:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
-          <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">When</div>
-            <div className="mt-0.5 min-w-0 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950">
-              {appointmentDateLabel}
-            </div>
-            <div className="mt-0.5 text-sm font-medium text-slate-600">{appointmentTimeLabel}</div>
-          </div>
-          <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Current State</div>
-            <div className="mt-0.5 text-sm font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</div>
-            <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{currentStateDetailText}</div>
-          </div>
+    <div className="grid gap-2 lg:grid-cols-3">
+      <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Appointment</div>
+        <div className="mt-0.5 min-w-0 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950">
+          {appointmentDateLabel}
         </div>
-
-        {job.job_type === "service" ? (
-          <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
-            <span className="font-semibold uppercase tracking-[0.1em] text-slate-500">Work Needed</span>
-            <span className="font-semibold text-slate-900">{visitScopeBadgeMainText}</span>
-            <a
-              href="#visit-scope-section"
-              className="text-xs font-medium text-slate-500 underline-offset-2 transition-colors hover:text-slate-700 hover:underline"
-            >
-              {hasVisitScopeDefined ? "View details" : "Add details"}
-            </a>
-          </div>
-        ) : null}
+        <div className="mt-0.5 text-sm font-medium text-slate-600">
+          {appointmentTimeLabel}
+          {job.scheduled_date ? ` - ${hasFullSchedule ? "Confirmed window" : "Window pending"}` : ""}
+        </div>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[34rem] 2xl:grid-cols-4">
-        <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Schedule</div>
-          <div className={`mt-0.5 text-sm font-semibold ${job.scheduled_date ? "text-emerald-800" : "text-slate-700"}`}>
-            {job.scheduled_date ? "Date set" : "Needs scheduling"}
-          </div>
+      <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Workflow</div>
+        <div className="mt-0.5 text-sm font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</div>
+        <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{currentStateDetailText}</div>
+      </div>
+
+      <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
+        <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Field</div>
+        <div className={`mt-0.5 text-sm font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>
+          {formatStatus(job.status)}
         </div>
-        <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Time Window</div>
-          <div className="mt-0.5 text-sm font-semibold text-slate-800">
-            {job.scheduled_date ? (hasFullSchedule ? "Confirmed" : "Pending") : "Not set"}
-          </div>
-        </div>
-        <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Field</div>
-          <div className={`mt-0.5 text-sm font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>
-            {formatStatus(job.status)}
-          </div>
-        </div>
-        <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Ops</div>
-          <div className="mt-0.5 text-sm font-semibold text-slate-800">{formatOpsStatusLabel(job.ops_status)}</div>
+        <div className="mt-0.5 text-xs leading-5 text-slate-600">
+          {isFieldComplete ? "Field work complete" : "Field work open"}
         </div>
       </div>
     </div>
+
+    {job.job_type === "service" ? (
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
+        <span className="font-semibold uppercase tracking-[0.1em] text-slate-500">Work Needed</span>
+        <span className="font-semibold text-slate-900">{visitScopeBadgeMainText}</span>
+        <a
+          href="#visit-scope-section"
+          className="text-xs font-medium text-slate-500 underline-offset-2 transition-colors hover:text-slate-700 hover:underline"
+        >
+          {hasVisitScopeDefined ? "View details" : "Add details"}
+        </a>
+      </div>
+    ) : null}
   </div>
 
   <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
