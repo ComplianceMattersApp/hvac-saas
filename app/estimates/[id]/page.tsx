@@ -26,6 +26,7 @@ import { removeLineItemFromForm, transitionEstimateStatusFromForm, sendEstimateF
 import AddLineItemForm from "./AddLineItemForm";
 import EstimateStatusActionForm from "./EstimateStatusActionForm";
 import SendEstimateForm from "./SendEstimateForm";
+import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
 import { isEstimateEmailSendEnabled } from "@/lib/estimates/estimate-exposure";
 
 export const metadata = { title: "Estimate" };
@@ -448,6 +449,15 @@ export default async function EstimateDetailPage({
           </>
         )}
       </section>
+
+      {/* Create default option packages (if eligible for multi-option upgrade) */}
+      <CreateDefaultOptionsForm
+        estimateId={estimate.id}
+        isDraft={isDraft}
+        isMultiOptionProposal={isMultiOptionProposal}
+        hasFlatLines={(estimate.line_items ?? []).length > 0}
+        optionsUnavailable={false}
+      />
 
       {/* Status actions (internal + scoped + feature-gated by route access) */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">

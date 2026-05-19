@@ -9,6 +9,7 @@ import {
   addEstimateLineItem,
   removeEstimateLineItem,
   transitionEstimateStatus,
+  createDefaultEstimateOptions,
   type AddEstimateLineItemParams,
 } from "@/lib/estimates/estimate-actions";
 import { sendEstimateCommunication } from "@/lib/estimates/estimate-communication";
@@ -105,4 +106,20 @@ export async function sendEstimateFromForm(formData: FormData) {
 
   await sendEstimateCommunication({ estimateId, recipientEmail });
   revalidatePath(`/estimates/${estimateId}`);
+}
+
+/**
+ * Create default estimate option packages (Good, Better, Best).
+ * Route-level wrapper that revalidates the estimate detail page.
+ */
+export async function createDefaultEstimateOptionsFromForm(formData: FormData) {
+  if (!isEstimatesEnabled()) return;
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  if (!estimateId) return;
+
+  const result = await createDefaultEstimateOptions({ estimateId });
+  if (result.success) {
+    revalidatePath(`/estimates/${estimateId}`);
+  }
 }

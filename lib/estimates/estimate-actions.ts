@@ -775,3 +775,199 @@ export async function transitionEstimateStatus(
     nextStatus,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Create default estimate option packages (V1 internal-only)
+// ---------------------------------------------------------------------------
+
+export type CreateDefaultEstimateOptionsParams = {
+  estimateId: string;
+};
+
+export type CreateDefaultEstimateOptionsResult =
+  | {
+      success: true;
+      estimateId: string;
+      createdOptions: number;
+    }
+  | { success: false; error: string };
+
+/**
+ * Create exactly three default empty option packages (Good, Better, Best)
+ * on a draft estimate with no existing options and no flat line items.
+ *
+ * Eligibility:
+ * - estimate status is draft
+ * - no existing estimate_options
+ * - no existing estimate_line_items (flat lines)
+ * - internal active user is scoped to the account
+ * - ENABLE_ESTIMATES is enabled
+ *
+ * Hard rule: If flat lines exist, block the action.
+ * Do not copy or move flat lines into options.
+ *
+ * On success:
+ * - Creates exactly 3 rows in estimate_options
+ * - Writes estimate_options_created event
+ * - Does not update parent estimate totals
+ * - Returns the number of options created
+ */
+export async function createDefaultEstimateOptions(
+  params: CreateDefaultEstimateOptionsParams
+): Promise<CreateDefaultEstimateOptionsResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const accountOwnerUserId = internalUser.account_owner_user_id;
+  const userId = internalUser.user_id;
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  if (!estimateId) {
+    return { success: false, error: "estimate_id is required." };
+  }
+
+  // Load and scope-check the estimate
+  const { data: estimate, error: estErr } = await supabase
+    .from("estimates")
+    .select("id, status, account_owner_user_id")
+    .eq("id", estimateId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (estErr) throw estErr;
+  if (!estimate?.id) {
+    return { success: false, error: "Estimate not found in this account." };
+  }
+
+  // Draft-only guard
+  if (estimate.status !== "draft") {
+    return {
+      success: false,
+      error: "Option packages can only be created for draft estimates.",
+    };
+  }
+
+  // Check for existing flat line items (hard rule: block if they exist)
+  const { data: flatLines, error: flatErr } = await supabase
+    .from("estimate_line_items")
+    .select("id")
+    .eq("estimate_id", estimateId)
+    .limit(1);
+
+  if (flatErr) throw flatErr;
+  if (flatLines && flatLines.length > 0) {
+    return {
+      success: false,
+      error:
+        "This estimate has flat line items. Option packages cannot be created for estimates with existing lines. This functionality will be extended in a future release.",
+    };
+  }
+
+  // Check for existing options (should not exist yet)
+  const { data: existingOptions, error: optErr } = await supabase
+    .from("estimate_options")
+    .select("id")
+    .eq("estimate_id", estimateId);
+
+  // Handle schema-missing gracefully
+  const isSchemaMissing =
+    optErr &&
+    (String(optErr.code ?? "").includes("PGRST205") ||
+      String(optErr.message ?? "").toLowerCase().includes("estimate_options"));
+
+  if (optErr && !isSchemaMissing) {
+    throw optErr;
+  }
+
+  if (existingOptions && existingOptions.length > 0) {
+    return {
+      success: false,
+      error: "This estimate already has option packages.",
+    };
+  }
+
+  // If schema is missing, return graceful unavailable
+  if (isSchemaMissing) {
+    return {
+      success: false,
+      error: "Option packages are not available in this environment.",
+    };
+  }
+
+  // Create exactly three default option packages
+  const nowIso = new Date().toISOString();
+  const defaultOptions = [
+    {
+      estimate_id: estimateId,
+      slot_index: 1,
+      default_label_key: "good",
+      label: "Good",
+      sort_order: 1,
+      summary: null,
+      notes: null,
+      subtotal_cents: 0,
+      total_cents: 0,
+      created_by_user_id: userId,
+      updated_by_user_id: userId,
+      created_at: nowIso,
+      updated_at: nowIso,
+    },
+    {
+      estimate_id: estimateId,
+      slot_index: 2,
+      default_label_key: "better",
+      label: "Better",
+      sort_order: 2,
+      summary: null,
+      notes: null,
+      subtotal_cents: 0,
+      total_cents: 0,
+      created_by_user_id: userId,
+      updated_by_user_id: userId,
+      created_at: nowIso,
+      updated_at: nowIso,
+    },
+    {
+      estimate_id: estimateId,
+      slot_index: 3,
+      default_label_key: "best",
+      label: "Best",
+      sort_order: 3,
+      summary: null,
+      notes: null,
+      subtotal_cents: 0,
+      total_cents: 0,
+      created_by_user_id: userId,
+      updated_by_user_id: userId,
+      created_at: nowIso,
+      updated_at: nowIso,
+    },
+  ];
+
+  const { error: insertErr } = await supabase
+    .from("estimate_options")
+    .insert(defaultOptions);
+
+  if (insertErr) throw insertErr;
+
+  // Write estimate_options_created event
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: "estimate_options_created",
+    meta: {
+      option_count: 3,
+      labels: ["Good", "Better", "Best"],
+    },
+    user_id: userId,
+  });
+
+  return {
+    success: true,
+    estimateId,
+    createdOptions: 3,
+  };
+}
