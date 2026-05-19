@@ -20,7 +20,9 @@ describe("buildCustomerScheduledEmailHtml", () => {
     });
 
     expect(html).toContain('src="https://cdn.example.test/acme-logo.png"');
-    expect(html).toContain("Acme HVAC logo");
+    expect(html).toContain("Appointment Scheduled");
+    expect(html).toContain("Your appointment is scheduled");
+    expect(html).toContain("05-13-2026");
     expect(html).toContain("automated message from Acme HVAC");
     expect(html).not.toContain("Compliance Matters logo");
   });
@@ -42,6 +44,7 @@ describe("buildCustomerScheduledEmailHtml", () => {
     });
 
     expect(html).toContain("Northside Mechanical");
+    expect(html).toContain("Need to make changes? Contact Northside Mechanical.");
     expect(html).not.toContain("Compliance Matters logo");
   });
 });
