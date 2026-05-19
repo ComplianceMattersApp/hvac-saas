@@ -4366,6 +4366,34 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
       {/* Single-workspace context (tab query preserved for compatibility) */}
 
+{showExternalDataEntryPrompt ? (
+  <div className="mt-4 rounded-2xl border border-amber-300/80 bg-[linear-gradient(135deg,rgba(255,251,235,0.97),rgba(255,247,237,0.94))] px-4 py-3.5 text-amber-950 shadow-[0_14px_30px_-24px_rgba(146,64,14,0.34)] ring-1 ring-amber-200/80">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-sm font-semibold text-amber-950">Billing closeout</div>
+          <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-800">
+            Invoice Required
+          </span>
+        </div>
+        <div className="mt-1 text-sm leading-5 text-amber-900">
+          Field work is complete. This job remains in closeout until invoice sending is confirmed.
+        </div>
+      </div>
+
+      <form action={completeDataEntryFromForm} className="shrink-0">
+        <input type="hidden" name="job_id" value={job.id} />
+        <SubmitButton
+          loadingText="Saving..."
+          className={darkButtonClass}
+        >
+          Mark Invoice Sent
+        </SubmitButton>
+      </form>
+    </div>
+  </div>
+) : null}
+
           <details id="edit-job" className={`${workspaceDetailsClass} mb-6`}>
             <summary className="cursor-pointer list-none">
               <CollapsibleHeader
@@ -4685,34 +4713,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
 
       {/* Info workspace */}
-{showExternalDataEntryPrompt ? (
-  <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50/90 p-4 text-amber-950 shadow-[0_12px_24px_-22px_rgba(180,83,9,0.35)]">
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="text-sm font-semibold text-amber-950">Billing closeout</div>
-          <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-800">
-            Invoice Required
-          </span>
-        </div>
-        <div className="mt-1 text-sm leading-5 text-amber-900">
-          Field work is complete. This job remains in closeout until invoice sending is confirmed.
-        </div>
-      </div>
-
-      <form action={completeDataEntryFromForm} className="shrink-0">
-        <input type="hidden" name="job_id" value={job.id} />
-        <SubmitButton
-          loadingText="Saving..."
-          className={darkButtonClass}
-        >
-          Mark Invoice Sent
-        </SubmitButton>
-      </form>
-    </div>
-  </div>
-) : null}
-
 {isInternalUser ? (
   <div id="visit-scope-section" className="mt-6 scroll-mt-24 rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-4 shadow-[0_22px_48px_-36px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-5">
     <div className="space-y-3">
