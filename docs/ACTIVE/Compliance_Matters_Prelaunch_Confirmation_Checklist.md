@@ -203,7 +203,30 @@ If any item here conflicts with the active spine, the spine wins.
   - `npx.cmd tsc --noEmit` passed
   - targeted Vitest passed: contractor intake hotfix + attachment resilience tests, 2 files / 10 tests
 
-### 2.3.5 Performance/responsiveness closeout (current pass) and active backlog
+### 2.3.6 Recent closeout polish pass (completed)
+- Dedicated Closeout Queue V1 is closed and complete for the current pass.
+- Calendar Work Context/Includes display is closed and complete for the current pass.
+- Internal Invoice Workspace V1 is closed and complete for the current pass, including send workflow clarity and Print / Save PDF view.
+- Premium internal invoice email template, premium appointment scheduled email template, appointment email company header polish, and Ops tenant logo polish are closed and complete for the current pass.
+- ECC subcool tolerance is now +/-3F.
+- Pricebook runtime seed display name is now `Diagnostic` instead of `Diagnostic Fee`.
+- Confirmed boundaries for this closeout:
+  - Invoice Charges remain billed truth.
+  - Work Items / Visit Scope remain operational work scope.
+  - External billing remains lightweight invoice-sent tracking.
+  - Internal invoicing remains internal/admin only.
+  - Payment entries remain tracking-only and do not execute live customer payment rails.
+  - Closeout Queue V1 continues to use existing closeout projection truth.
+  - Calendar Work Context uses a derived compact label, not a new truth model.
+- Parked follow-up remains parked:
+  - Contact recipient write/edit workflow stays deferred unless field use proves need.
+  - Closeout Queue V2 waits until the owner uses V1 and provides feedback.
+  - SMS/provider-powered messaging stays behind the existing gates.
+  - Live tenant customer payment execution remains deferred.
+- Watch item only:
+  - the unrelated `calendar-filtering.test.ts` TypeScript fixture gap remains open and does not change product behavior.
+
+### 2.3.7 Performance/responsiveness closeout (current pass) and active backlog
 - The focused performance/responsiveness intervention batch is complete for the current pass and is now closed for this pass.
 - Additional job-detail responsiveness closeout is complete in commits `655d83b` and `4ecf127`:
   - Service Closeout Read De-Dupe (`655d83b`): removed duplicate blocking job read from `ServiceStatusActions`; parent job detail now passes already-loaded `jobType` and `opsStatus`.

@@ -123,6 +123,11 @@ This is acceptable under Strategy B **only if the sync points above remain intac
 **Phase 2 policy:** No major refactors to normalize reads across the app right now.  
 Future work may normalize pages gradually, but must not break the snapshot sync safety net until complete.
 
+### Calendar Work Context Read Rule
+- Calendar Work Context displays a derived compact label from Visit Scope data.
+- It is a read-model convenience only and does not create a new operational truth layer.
+- Visit Scope remains the operational source for included work, while the derived calendar label is presentation-only.
+
 ---
 
 ## Guardrails (Do Not Break)

@@ -28,6 +28,12 @@ This packet therefore recommends:
 - start with Support V0 plus controlled onboarding,
 - sequence post-launch roadmap in low-risk dependency order.
 
+Recent closeout status snapshot (May 2026):
+- Closed and treated as complete for this pass: Dedicated Closeout Queue V1, Calendar Work Context/Includes display, Job Detail Command Center polish, External Billing one-click closeout UX, Internal Invoice Workspace V1, internal invoice send workflow clarity, premium internal invoice email template, internal invoice Print / Save PDF view, premium appointment scheduled email template, appointment email company header polish, Ops tenant logo polish, ECC subcool tolerance change to +/-3F, and Pricebook naming cleanup (`Diagnostic Fee` -> `Diagnostic`).
+- Confirmed boundaries remain intact: Invoice Charges remain billed truth, Work Items/Visit Scope remain operational work scope, external billing remains lightweight invoice-sent tracking, internal invoicing remains internal/admin only, payment entries remain tracking-only, and Closeout Queue V1 continues to use existing closeout projection truth.
+- Parked follow-up remains parked: Closeout Queue V2 waits until the owner uses V1 and gives feedback, contact recipient write/edit workflow remains deferred unless field use proves need, SMS/provider-powered messaging remains behind the existing gates, and live tenant customer payment execution remains deferred.
+- Watch item: an unrelated `calendar-filtering.test.ts` TypeScript gap remains a watch item only and does not change product behavior.
+
 Field bus closeout documentation note (May 2026):
 - Active documentation now records completed passes for:
    - New Job Alert lifecycle cleanup
@@ -251,6 +257,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 14. Full case-level timeline / case_events expansion.
 15. Notification test expansion / badge optimization hardening.
 16. Broad performance campaign unless daily use surfaces specific real issues.
+17. Calendar-filtering TypeScript watch item only, until the unrelated `work_context_label` fixture gap is resolved in the test suite.
 
 Deferred means intentionally sequenced later, not ignored.
 

@@ -2832,6 +2832,10 @@ Deferred refinement still remaining:
 - invoice email content/design polish
 - broader presentation refinements that do not change billed truth, closeout ownership, or payment boundaries
 
+Recent closeout polish status:
+- Internal Invoice Workspace V1, internal invoice send workflow clarity, internal invoice Print / Save PDF view, premium internal invoice email template, premium appointment scheduled email template, appointment email company header polish, and Ops tenant logo polish are now treated as closed presentation/workflow refinement for this pass.
+- These closeouts did not change billed truth, payment boundaries, invoice provenance, or processor execution posture.
+
 ### Invoice communication seam
 Invoice communication tracking is an invoice-owned communication seam, not payment execution.
 

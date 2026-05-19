@@ -24,6 +24,13 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 
 **Owner-Completion Cycle Closeout (May 2026):** All areas in the owner-release completion matrix are confirmed closed at current quality bar. Next work is treated as post-launch/future-roadmap work unless the owner explicitly reopens a release-scope item. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical decision surface.
 
+Recent closeout snapshot (May 2026):
+- Dedicated Closeout Queue V1, Calendar Work Context/Includes display, Ops Command Center premium layout/work board, job detail command-center polish, external billing one-click closeout UX, internal invoice workspace/send clarity, internal invoice print/save PDF, premium internal invoice and appointment email templates, appointment header polish, and Ops tenant logo polish are complete and treated as closed for this pass.
+- ECC subcool tolerance is now +/-3F.
+- Pricebook runtime seed display name is now Diagnostic instead of Diagnostic Fee.
+- Source-of-truth boundaries remain unchanged: Invoice Charges remain billed truth, Work Items/Visit Scope remain operational work scope, external billing remains lightweight invoice-sent tracking, internal invoicing remains internal/admin only, payment entries remain tracking-only, Closeout Queue V1 uses existing closeout projection truth, and Calendar Work Context uses a derived compact label rather than a new truth model.
+- Parked follow-up remains parked: Closeout Queue V2 waits for owner feedback after V1 use, contact recipient write/edit workflow stays deferred unless field use proves need, SMS/provider-powered messaging stays behind existing gates, and live tenant customer payment execution remains deferred.
+
 Current Program Status Note (May 2026)
 
 - Manual Text Logging Wording Clarification is complete and pushed in commit `36460b8`:
