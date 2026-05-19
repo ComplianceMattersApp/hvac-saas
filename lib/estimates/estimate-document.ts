@@ -34,7 +34,30 @@ export type EstimateRevisionFreezeTrigger = typeof ESTIMATE_REVISION_FREEZE_TRIG
 export type EstimateRevisionHistoryPolicy = typeof ESTIMATE_REVISION_HISTORY_POLICY;
 export type EstimateRevisionPostFreezeEditPolicy = typeof ESTIMATE_REVISION_POST_FREEZE_EDIT_POLICY;
 
+export type EstimateDocumentOptionLineViewModel = {
+  id: string;
+  sortOrder: number;
+  itemName: string;
+  description: string | null;
+  itemType: string;
+  quantity: number;
+  unitPriceCents: number;
+  lineSubtotalCents: number;
+};
+
+export type EstimateDocumentOptionViewModel = {
+  id: string;
+  slotIndex: number;
+  label: string;
+  summary: string | null;
+  // notes: excluded from print view per spec
+  subtotalCents: number;
+  totalCents: number;
+  lines: EstimateDocumentOptionLineViewModel[];
+};
+
 export type EstimateDocumentViewModel = {
+  proposalMode: "single_option_flat" | "multi_option_packages";
   identity: {
     estimateId: string;
     estimateNumber: string;
@@ -65,6 +88,7 @@ export type EstimateDocumentViewModel = {
     unitPriceCents: number;
     lineSubtotalCents: number;
   }>;
+  options: EstimateDocumentOptionViewModel[];
 };
 
 export type EstimateQuoteReadinessStatus = "ready" | "attention";
@@ -95,7 +119,32 @@ export function buildEstimateDocumentViewModel(params: {
   locationDisplay?: string | null;
 }): EstimateDocumentViewModel {
   const status = String(params.estimate.status ?? "").trim();
+  const proposalMode = params.estimate.proposalMode;
+  const options: EstimateDocumentOptionViewModel[] =
+    proposalMode === "multi_option_packages" && Array.isArray(params.estimate.options)
+      ? params.estimate.options.map((opt) => ({
+          id: opt.id,
+          slotIndex: opt.slot_index,
+          label: opt.label,
+          summary: opt.summary,
+          // notes are excluded from document view per print spec
+          subtotalCents: opt.subtotal_cents,
+          totalCents: opt.total_cents,
+          lines: opt.line_items.map((line) => ({
+            id: line.id,
+            sortOrder: line.sort_order,
+            itemName: line.item_name_snapshot,
+            description: line.description_snapshot,
+            itemType: line.item_type_snapshot,
+            quantity: line.quantity,
+            unitPriceCents: line.unit_price_cents,
+            lineSubtotalCents: line.line_subtotal_cents,
+          })),
+        }))
+      : [];
+
   return {
+    proposalMode,
     identity: {
       estimateId: params.estimate.id,
       estimateNumber: params.estimate.estimate_number,
@@ -126,6 +175,7 @@ export function buildEstimateDocumentViewModel(params: {
       unitPriceCents: line.unit_price_cents,
       lineSubtotalCents: line.line_subtotal_cents,
     })),
+    options,
   };
 }
 

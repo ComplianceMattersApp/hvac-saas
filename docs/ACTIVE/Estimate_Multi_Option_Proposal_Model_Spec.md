@@ -34,6 +34,17 @@ Internal authoring closeout notes (2026-05-19):
 - Parent estimate subtotal/total remains unchanged by manual option line add/remove in this slice.
 - Option `notes` remain reserved/internal and are not exposed or edited in this slice.
 - Option line authoring, option delete/reorder, print multi-option rendering, readiness scoring, approval/response, conversion, portal, email, payment, add-ons, QBO, and SMS remain deferred.
+- Option line authoring, option delete/reorder, readiness scoring, approval/response, conversion, portal, email, payment, add-ons, QBO, and SMS remain deferred.
+
+Print rendering closeout note (2026-05-19):
+
+- Internal authenticated browser print route (`/estimates/[id]/print`) branches on `proposalMode`: single-option flat renders as before; multi-option renders option package sections (label, summary, line items, per-option total) with no parent "Proposed Total" shown.
+- Option notes are excluded from the print view model; option summaries are included.
+- Empty options show a safe empty message ("No line items added for this option.").
+- Explanatory copy states options are proposed alternatives and no selection occurs in the print view.
+- Boundary copy states choosing/approving/paying/converting/invoicing an option is not captured by this print view.
+- Document view model (`buildEstimateDocumentViewModel`) extended with `proposalMode` and `options` fields; flat `lines` and parent `totals` remain unchanged.
+- Readiness scoring, approval, selected-option response, conversion, portal, outbound email, stored/generated PDFs, public links, payment, QBO, and SMS remain deferred.
 
 Original model-lock boundary:
 
