@@ -30,6 +30,27 @@ function buildJobDetailHref(jobId: string, tab: string, banner: string) {
   return `/jobs/${jobId}?tab=${safeTab}&banner=${banner}#${INTERNAL_INVOICE_PANEL_HASH}`;
 }
 
+function buildInternalInvoiceReturnHref(jobId: string, tab: string, banner: string, returnTo?: string | null) {
+  const fallback = buildJobDetailHref(jobId, tab, banner);
+  const raw = String(returnTo ?? '').trim();
+  if (!raw) return fallback;
+
+  try {
+    const parsed = new URL(raw, 'https://app.local');
+    const allowedPaths = new Set([`/jobs/${jobId}`, `/jobs/${jobId}/invoice`]);
+    if (!allowedPaths.has(parsed.pathname)) return fallback;
+
+    parsed.searchParams.set('banner', banner);
+    if (!parsed.hash) {
+      parsed.hash = parsed.pathname.endsWith('/invoice') ? 'invoice-workspace' : INTERNAL_INVOICE_PANEL_HASH;
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
 function parseMoneyToCents(raw: string) {
   const normalized = String(raw ?? '').trim();
   if (!normalized || !/^\d+(?:\.\d{1,2})?$/.test(normalized)) {
@@ -76,6 +97,7 @@ async function requireOperationalInternalInvoicePaymentEntitlementAccessOrRedire
 export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   const jobId = getTrimmedString(formData.get('job_id'));
   const tab = getTrimmedString(formData.get('tab')) || 'info';
+  const returnTo = getTrimmedString(formData.get('return_to'));
 
   if (!jobId) {
     throw new Error('Job ID is required.');
@@ -91,7 +113,7 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   });
 
   if (!scopedJob?.id) {
-    redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
 
   await requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect({
@@ -105,7 +127,7 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   });
 
   if (billingMode !== 'internal_invoicing') {
-    redirect(buildJobDetailHref(jobId, tab, 'internal_invoicing_billing_pending'));
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoicing_billing_pending', returnTo));
   }
 
   const invoice = await resolveInternalInvoiceByJobId({
@@ -114,27 +136,27 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   });
 
   if (!invoice) {
-    redirect(buildJobDetailHref(jobId, tab, 'internal_invoice_missing'));
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_missing', returnTo));
   }
 
   if (invoice.account_owner_user_id !== internalUser.account_owner_user_id || invoice.job_id !== jobId) {
-    redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
 
   if (invoice.status !== 'issued') {
-    redirect(buildJobDetailHref(jobId, tab, 'internal_invoice_payment_requires_issued'));
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_requires_issued', returnTo));
   }
 
   const method = normalizePaymentMethod(formData.get('payment_method'));
   if (!method) {
-    redirect(buildJobDetailHref(jobId, tab, 'internal_invoice_payment_method_required'));
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_method_required', returnTo));
   }
 
   let amountCents = 0;
   try {
     amountCents = parseMoneyToCents(getTrimmedString(formData.get('payment_amount')));
   } catch {
-    redirect(buildJobDetailHref(jobId, tab, 'internal_invoice_payment_invalid_amount'));
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_invalid_amount', returnTo));
   }
 
   const summary = await resolveInvoiceCollectedPaymentSummary(
@@ -144,7 +166,7 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   );
 
   if (summary.balanceDueCents <= 0 || amountCents > summary.balanceDueCents) {
-    redirect(buildJobDetailHref(jobId, tab, 'internal_invoice_payment_overpay_denied'));
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_overpay_denied', returnTo));
   }
 
   const { data: insertedPayment, error: insertErr } = await supabase
@@ -184,9 +206,10 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   });
 
   revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
   revalidatePath('/reports/invoices');
 
-  redirect(buildJobDetailHref(jobId, tab, 'internal_invoice_payment_recorded'));
+  redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_recorded', returnTo));
 }

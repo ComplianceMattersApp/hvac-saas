@@ -49,6 +49,27 @@ function buildJobDetailHref(jobId: string, tab: string, banner: string) {
   return `/jobs/${jobId}?tab=${safeTab}&banner=${banner}#${INTERNAL_INVOICE_PANEL_HASH}`;
 }
 
+function buildInternalInvoiceReturnHref(jobId: string, tab: string, banner: string, returnTo?: string | null) {
+  const fallback = buildJobDetailHref(jobId, tab, banner);
+  const raw = String(returnTo ?? '').trim();
+  if (!raw) return fallback;
+
+  try {
+    const parsed = new URL(raw, 'https://app.local');
+    const allowedPaths = new Set([`/jobs/${jobId}`, `/jobs/${jobId}/invoice`]);
+    if (!allowedPaths.has(parsed.pathname)) return fallback;
+
+    parsed.searchParams.set('banner', banner);
+    if (!parsed.hash) {
+      parsed.hash = parsed.pathname.endsWith('/invoice') ? 'invoice-workspace' : INTERNAL_INVOICE_PANEL_HASH;
+    }
+
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return fallback;
+  }
+}
+
 function buildInternalInvoiceNumber() {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const suffix = crypto.randomUUID().slice(0, 8).toUpperCase();
@@ -460,6 +481,7 @@ async function loadInternalInvoiceContext(formData: FormData) {
     userId,
     tab,
     jobId,
+    returnTo: getTrimmedString(formData.get('return_to')),
     internalUser,
     job,
     invoice,
@@ -707,7 +729,7 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
   if (context.invoice) {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_draft_exists'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_draft_exists', context.returnTo));
   }
 
   const { customerBilling, contractorBilling, locationBilling } = await loadCanonicalDraftBillingSources({
@@ -814,7 +836,7 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
 
   if (error) {
     if (error.code === '23505') {
-      redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_draft_exists'));
+      redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_draft_exists', context.returnTo));
     }
     throw error;
   }
@@ -833,9 +855,10 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
   });
 
   revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath(`/jobs/${context.jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
-  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_draft_created'));
+  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_draft_created', context.returnTo));
 }
 
 export async function saveInternalInvoiceDraftFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
@@ -940,24 +963,24 @@ export async function issueInternalInvoiceFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
   if (!context.invoice) {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_missing'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));
   }
 
   if (context.invoice.status === 'issued') {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_already_issued'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_already_issued', context.returnTo));
   }
 
   if (context.invoice.status === 'void') {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_locked'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_locked', context.returnTo));
   }
 
   if (!context.job.field_complete || String(context.job.status ?? '').trim().toLowerCase() !== 'completed') {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_issue_blocked'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issue_blocked', context.returnTo));
   }
 
   const billingName = getTrimmedString(context.invoice.billing_name);
   if (!billingName || context.invoice.total_cents <= 0 || (context.invoice.line_items?.length ?? 0) === 0) {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_issue_incomplete'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issue_incomplete', context.returnTo));
   }
 
   const issuedAt = new Date().toISOString();
@@ -1010,20 +1033,21 @@ export async function issueInternalInvoiceFromForm(formData: FormData) {
   });
 
   revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath(`/jobs/${context.jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
-  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_issued'));
+  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issued', context.returnTo));
 }
 
 export async function voidInternalInvoiceFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
   if (!context.invoice) {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_missing'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));
   }
 
   if (context.invoice.status === 'void') {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_already_voided'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_already_voided', context.returnTo));
   }
 
   const voidedAt = new Date().toISOString();
@@ -1084,9 +1108,10 @@ export async function voidInternalInvoiceFromForm(formData: FormData) {
   }
 
   revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath(`/jobs/${context.jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
-  redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_voided'));
+  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_voided', context.returnTo));
 }
 
 export async function addInternalInvoiceLineItemFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
@@ -1604,17 +1629,17 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
   if (!context.invoice) {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_missing'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));
   }
 
   if (context.invoice.status !== 'issued') {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_send_requires_issued'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_requires_issued', context.returnTo));
   }
 
   const recipientEmail = getTrimmedString(formData.get('recipient_email')).toLowerCase() || getTrimmedString(context.invoice.billing_email).toLowerCase();
 
   if (!recipientEmail) {
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_send_recipient_required'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_send_recipient_required', context.returnTo));
   }
 
   const sendHistory = await listInternalInvoiceEmailNotifications({
@@ -1685,9 +1710,10 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     });
 
     revalidatePath(`/jobs/${context.jobId}`);
+    revalidatePath(`/jobs/${context.jobId}/invoice`);
     revalidatePath('/jobs');
     revalidatePath('/ops');
-    redirect(buildJobDetailHref(context.jobId, context.tab, 'internal_invoice_email_failed'));
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_email_failed', context.returnTo));
   }
 
   await markInternalInvoiceEmailNotification({
@@ -1710,7 +1736,8 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
   });
 
   revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath(`/jobs/${context.jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
-  redirect(buildJobDetailHref(context.jobId, context.tab, attemptKind === 'resent' ? 'internal_invoice_email_resent' : 'internal_invoice_email_sent'));
+  redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, attemptKind === 'resent' ? 'internal_invoice_email_resent' : 'internal_invoice_email_sent', context.returnTo));
 }

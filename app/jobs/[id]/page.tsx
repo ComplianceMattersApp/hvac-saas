@@ -1203,16 +1203,21 @@ export default async function JobDetailPage({
     if (!(isInternalUser && billingMode === "internal_invoicing")) {
       return {
         internalInvoiceTruth: null as {
+          id: string;
           status: InternalInvoiceStatus;
           invoice_number: string;
           issued_at: string | null;
+          total_cents: number;
+          billing_name: string | null;
+          billing_email: string | null;
+          line_item_count: number;
         } | null,
       };
     }
 
     const { data: invoiceTruthRow, error: invoiceTruthErr } = await supabase
       .from("internal_invoices")
-      .select("id, status, invoice_number, issued_at")
+      .select("id, status, invoice_number, issued_at, total_cents, billing_name, billing_email")
       .eq("job_id", jobId)
       .neq("status", "void")
       .maybeSingle();
@@ -1225,11 +1230,23 @@ export default async function JobDetailPage({
       };
     }
 
+    const { count: lineItemCount, error: lineItemCountErr } = await supabase
+      .from("internal_invoice_line_items")
+      .select("id", { count: "exact", head: true })
+      .eq("invoice_id", invoiceTruthRow.id);
+
+    if (lineItemCountErr) throw lineItemCountErr;
+
     return {
       internalInvoiceTruth: {
-          status: normalizeInternalInvoiceStatus(invoiceTruthRow.status),
-          invoice_number: String(invoiceTruthRow.invoice_number ?? "").trim(),
+        id: String(invoiceTruthRow.id),
+        status: normalizeInternalInvoiceStatus(invoiceTruthRow.status),
+        invoice_number: String(invoiceTruthRow.invoice_number ?? "").trim(),
         issued_at: invoiceTruthRow.issued_at ?? null,
+        total_cents: Number(invoiceTruthRow.total_cents ?? 0) || 0,
+        billing_name: String(invoiceTruthRow.billing_name ?? "").trim() || null,
+        billing_email: String(invoiceTruthRow.billing_email ?? "").trim() || null,
+        line_item_count: Number(lineItemCount ?? 0) || 0,
       },
     };
   });
@@ -4852,22 +4869,59 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 ) : null}
 
 {showInternalInvoicePanel ? (
-  <Suspense
-    fallback={
-      <div id="internal-invoice-panel" className={`mt-6 scroll-mt-24 rounded-2xl border border-slate-200/70 bg-slate-50/75 p-5 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.18)]`}>
-        <div className="space-y-3" aria-busy="true" aria-live="polite">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div
-              key={index}
-              className="h-20 animate-pulse rounded-xl border border-slate-200/70 bg-white/80"
-            />
-          ))}
+  <div id="internal-invoice-panel" className="mt-6 scroll-mt-24 rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-4 shadow-[0_20px_42px_-34px_rgba(15,23,42,0.32)] ring-1 ring-slate-200/70 sm:p-5">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Billing</div>
+        <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+          {internalInvoiceTruth ? formatInternalInvoiceStatus(internalInvoiceTruth.status) : "Invoice required"}
+        </div>
+        <div className="mt-1 text-sm leading-6 text-slate-600">
+          {internalInvoiceTruth
+            ? `${internalInvoiceTruth.invoice_number || "Invoice"} / ${internalInvoiceTruth.line_item_count} charge${internalInvoiceTruth.line_item_count === 1 ? "" : "s"} / ${formatCurrencyFromCents(internalInvoiceTruth.total_cents)}`
+            : "No draft invoice yet. Build charges in the Invoice Workspace when billing is ready."}
         </div>
       </div>
-    }
-  >
-    <DeferredInternalInvoicePanel />
-  </Suspense>
+      <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[28rem]">
+        <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Closeout Billing</div>
+          <div className="mt-0.5 text-sm font-semibold text-slate-900">{billingState.statusLabel}</div>
+        </div>
+        <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Recipient</div>
+          <div className="mt-0.5 truncate text-sm font-semibold text-slate-900">
+            {internalInvoiceTruth?.billing_name || internalInvoiceTruth?.billing_email || "Review needed"}
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Next Step</div>
+          <div className="mt-0.5 text-sm font-semibold text-slate-900">
+            {!internalInvoiceTruth ? "Start invoice" : internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review invoice" : "Build charges") : "Open invoice"}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200/80 pt-3">
+      {!internalInvoiceTruth ? (
+        <form action={createInternalInvoiceDraftFromForm}>
+          <input type="hidden" name="job_id" value={job.id} />
+          <input type="hidden" name="tab" value={tab} />
+          <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+          <SubmitButton loadingText="Starting..." className={darkButtonClass}>
+            Start Invoice
+          </SubmitButton>
+        </form>
+      ) : (
+        <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={darkButtonClass}>
+          {internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review Invoice" : "Build Invoice") : "Open Invoice Workspace"}
+        </Link>
+      )}
+      <div className="flex min-h-10 items-center text-xs leading-5 text-slate-500">
+        Invoice Charges are billed scope. Work Items remain operational scope.
+      </div>
+    </div>
+  </div>
 ) : null}
 
 <details id="job-status" className={`${workspaceDetailsClass} mb-6 border-blue-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(239,246,255,0.5))]`}>
