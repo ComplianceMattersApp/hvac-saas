@@ -74,7 +74,20 @@ export default function ServiceStatusActions({
             </SubmitButton>
           </form>
         ) : null}
+
       </div>
+
+      {!isInternalInvoicing ? (
+        <p className="mt-2 text-xs text-neutral-500">
+          Using external billing tracking only.{" "}
+          To create and send invoices directly from jobs, an account admin can switch to{" "}
+          <b>Internal invoicing</b> in{" "}
+          <a href="/ops/admin/company-profile" className="underline underline-offset-2">
+            Company Settings
+          </a>
+          .
+        </p>
+      ) : null}
 
       {isInternalInvoicing ? (
         <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs leading-5 text-amber-900">
