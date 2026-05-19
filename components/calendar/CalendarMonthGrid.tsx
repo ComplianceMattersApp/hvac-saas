@@ -250,11 +250,11 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
 
                         <div className="mb-1 flex items-center gap-1 text-slate-600">
                           <span className={`h-2 w-2 rounded-full ${dotClass}`} />
-                          <span>{formatCalendarDisplayStatus(lifecycle)}</span>
+                          <span>Field status: {formatCalendarDisplayStatus(lifecycle)}</span>
                         </div>
 
-                        <div className="mb-1 text-slate-600">Type: {job.job_type || 'N/A'}</div>
-                        <div className="mb-1 text-slate-600">Scheduled: {job.scheduled_date || 'N/A'}</div>
+                        <div className="mb-1 text-slate-600">Work: {job.job_type || 'N/A'}</div>
+                        <div className="mb-1 text-slate-600">Appointment: {job.scheduled_date || 'N/A'}</div>
                         <div className="mb-1 text-slate-600">
                           Window: {displayWindowLA(job.window_start, job.window_end) || 'No window'}
                         </div>

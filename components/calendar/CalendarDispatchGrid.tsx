@@ -380,7 +380,7 @@ export default function CalendarDispatchGrid(props: Props) {
         <div className="grid" style={{ gridTemplateColumns: "84px minmax(0, 1fr)" }}>
           <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Time</div>
           <div className="border-b border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-3">
-            <p className="truncate text-sm font-semibold text-slate-900">Schedule</p>
+            <p className="truncate text-sm font-semibold text-slate-900">Appointment timeline</p>
             <p className="mt-0.5 truncate text-[11px] text-slate-500">Assigned techs stay as card metadata. Drag/drop schedules by date and time only.</p>
           </div>
 
@@ -654,7 +654,7 @@ export default function CalendarDispatchGrid(props: Props) {
 
             {!rows.length ? (
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">No scheduled jobs or blocks for this {mode}.</div>
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">No appointments or blocks for this {mode}.</div>
               </div>
             ) : null}
           </div>

@@ -279,7 +279,7 @@ function calendarJobTooltip(job: DispatchJob) {
     customerAddressLine1(job),
     customerAddressLine2(job),
     `Window: ${listTimeWindowLabel(job.window_start, job.window_end)}`,
-    `Status: ${lifecycle}`,
+    `Field status: ${lifecycle}`,
   ];
 
   if (job.contractor_name) summary.push(`Contractor: ${job.contractor_name}`);
@@ -639,8 +639,8 @@ function DetailPanel(props: {
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Schedule</p>
-              <p className="mt-1 text-xs text-slate-500">Adjust date and window without leaving calendar.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Appointment</p>
+              <p className="mt-1 text-xs text-slate-500">Adjust appointment date and window without leaving calendar.</p>
             </div>
             {job.scheduled_date ? (
               <p className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-800">
@@ -648,7 +648,7 @@ function DetailPanel(props: {
                 {job.window_start ? ` · ${displayWindowLA(job.window_start, job.window_end) ?? ''}` : ''}
               </p>
             ) : (
-              <p className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">Not yet scheduled</p>
+              <p className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-500">Appointment not set</p>
             )}
           </div>
           <form action={updateJobScheduleFromForm} className="grid gap-3">
@@ -677,7 +677,7 @@ function DetailPanel(props: {
 
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
           <div className="mb-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Assignment</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Field team</p>
             <p className="mt-1 text-xs text-slate-500">Assign or remove internal technicians for this visit.</p>
           </div>
           <form action={assignJobAssigneeFromForm} className="grid gap-3">
