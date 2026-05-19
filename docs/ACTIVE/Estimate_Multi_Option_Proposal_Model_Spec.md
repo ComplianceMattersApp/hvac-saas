@@ -15,6 +15,14 @@ The current implemented Estimates model supports one parent estimate with one fl
 
 This spec locks the future model direction before schema or UI work begins.
 
+Schema foundation closeout note (2026-05-19):
+
+- Migration `supabase/migrations/20260519110000_estimate_option_packages_foundation.sql` adds additive `estimate_options` and `estimate_option_line_items` tables only.
+- Existing `estimate_line_items` remains unchanged for current single-option estimates.
+- Option V1 max slots are guarded by `slot_index BETWEEN 1 AND 3` plus unique `(estimate_id, slot_index)`; trigger-based count enforcement is intentionally absent.
+- Option-line consistency is enforced with a composite FK from `(estimate_option_id, estimate_id)` to `estimate_options(id, estimate_id)`.
+- RLS is internal/authenticated/account-scoped through parent `estimates`; no customer, contractor, public, portal, approval, conversion, payment, email, QBO, or SMS behavior is introduced.
+
 Locked boundary for this slice:
 
 - no code changes
