@@ -142,7 +142,7 @@ export default async function EditContractorPage({
               href="/ops/admin/contractors"
               className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Contractor Directory
+              View Contractors
             </Link>
             <Link
               href="/ops/admin/users"
@@ -175,7 +175,7 @@ export default async function EditContractorPage({
         <div className="space-y-6">
           <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
             <div className="space-y-1">
-              <h2 className="text-base font-semibold tracking-[-0.01em] text-slate-950">Invite & Access State</h2>
+              <h2 className="text-base font-semibold tracking-[-0.01em] text-slate-950">Manage Contractor Access</h2>
               <p className="text-xs leading-5 text-slate-600">
                 Visibility into linked users, open invites, and access readiness.
               </p>

@@ -25,7 +25,7 @@ export default function DeleteInternalUserButton({
         type="submit"
         className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
       >
-        Delete
+        Remove Team Member
       </button>
     </form>
   );

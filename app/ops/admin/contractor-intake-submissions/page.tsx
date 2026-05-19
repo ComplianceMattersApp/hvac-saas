@@ -167,7 +167,7 @@ export default async function ContractorIntakeSubmissionsPage() {
                           href={`/ops/admin/contractor-intake-submissions/${row.id}`}
                           className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-900 hover:bg-slate-50"
                         >
-                          Review
+                          View Proposal
                         </Link>
                       </td>
                     </tr>

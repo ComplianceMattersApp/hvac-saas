@@ -478,7 +478,7 @@ export default async function AdminUsersCommandCenterPage({
               type="submit"
               className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
             >
-              Invite team member
+              Send Invite
             </button>
           </form>
         </div>
@@ -559,7 +559,7 @@ export default async function AdminUsersCommandCenterPage({
                             type="submit"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Update role
+                            Manage Team Access
                           </button>
                         </form>
                       ) : null}
@@ -572,7 +572,7 @@ export default async function AdminUsersCommandCenterPage({
                               type="submit"
                               className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
                             >
-                              Deactivate access
+                              Pause Team Access
                             </button>
                           </form>
                         ) : (
@@ -582,7 +582,7 @@ export default async function AdminUsersCommandCenterPage({
                               type="submit"
                               className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
                             >
-                              Reactivate access
+                              Restore Team Access
                             </button>
                           </form>
                         )
@@ -596,7 +596,7 @@ export default async function AdminUsersCommandCenterPage({
                             type="submit"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Send password reset
+                            Recover Access
                           </button>
                         </form>
                       ) : null}
@@ -610,7 +610,7 @@ export default async function AdminUsersCommandCenterPage({
                             type="submit"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Resend invite
+                            Resend Setup Link
                           </button>
                         </form>
                       ) : null}
@@ -624,7 +624,7 @@ export default async function AdminUsersCommandCenterPage({
                             type="submit"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Resend invite
+                            Resend Setup Link
                           </button>
                         </form>
                       ) : null}
