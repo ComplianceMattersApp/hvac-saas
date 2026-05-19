@@ -4350,6 +4350,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
       if (!meta) return null;
 
+      // When external billing closeout card is shown below, suppress this generic ribbon
+      // to avoid a split problem-statement + disconnected action.
+      if (showExternalDataEntryPrompt) return null;
+
       return (
         <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 text-amber-900">
           <div className="text-sm font-semibold">{meta.title}</div>
@@ -4682,25 +4686,30 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
       {/* Info workspace */}
 {showExternalDataEntryPrompt ? (
-  <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-amber-950 shadow-[0_12px_24px_-22px_rgba(180,83,9,0.35)]">
-    <div className="mb-2 font-semibold">
-      Invoice sent tracking
+  <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50/90 p-4 text-amber-950 shadow-[0_12px_24px_-22px_rgba(180,83,9,0.35)]">
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="text-sm font-semibold text-amber-950">Billing closeout</div>
+          <span className="inline-flex items-center rounded-full border border-amber-300 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-800">
+            Invoice Required
+          </span>
+        </div>
+        <div className="mt-1 text-sm leading-5 text-amber-900">
+          Field work is complete. This job remains in closeout until invoice sending is confirmed.
+        </div>
+      </div>
+
+      <form action={completeDataEntryFromForm} className="shrink-0">
+        <input type="hidden" name="job_id" value={job.id} />
+        <SubmitButton
+          loadingText="Saving..."
+          className={darkButtonClass}
+        >
+          Mark Invoice Sent
+        </SubmitButton>
+      </form>
     </div>
-
-    <div className="mb-3 text-sm leading-6 text-amber-900">
-      Mark the external invoice as sent to finish billing closeout tracking.
-    </div>
-
-    <form action={completeDataEntryFromForm}>
-      <input type="hidden" name="job_id" value={job.id} />
-
-      <SubmitButton
-        loadingText="Saving..."
-        className={darkButtonClass}
-      >
-        Mark Invoice Sent
-      </SubmitButton>
-    </form>
   </div>
 ) : null}
 
