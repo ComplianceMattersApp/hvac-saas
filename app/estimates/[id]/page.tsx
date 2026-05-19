@@ -654,6 +654,7 @@ export default async function EstimateDetailPage({
                       <AddEstimateOptionLineForm
                         estimateId={estimate.id}
                         estimateOptionId={option.id}
+                        pricebookItems={pricebookItems}
                       />
                     </div>
                   )}
