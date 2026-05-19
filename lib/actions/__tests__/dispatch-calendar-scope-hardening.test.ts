@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "fs";
+import { resolve } from "path";
 
 const createClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const getActiveJobAssignmentDisplayMapMock = vi.fn();
 const getAssignableInternalUsersMock = vi.fn();
+const calendarActionsSource = readFileSync(resolve(__dirname, "../calendar-actions.ts"), "utf-8");
 
 type JobRow = {
   id: string;
@@ -26,6 +29,8 @@ type JobRow = {
   contractors: { name: string | null } | null;
   customers: { phone: string | null } | null;
   locations: { city: string | null } | null;
+  visit_scope_summary: string | null;
+  visit_scope_items: Array<{ title: string; details: string | null; kind: string }> | null;
   created_at: string;
   deleted_at: string | null;
 };
@@ -85,6 +90,11 @@ function makeCalendarFixture() {
       contractors: null,
       customers: { phone: null },
       locations: { city: "Los Angeles" },
+      visit_scope_summary: null,
+      visit_scope_items: [
+        { title: "Diagnostic", details: null, kind: "primary" },
+        { title: "Filter replacement", details: null, kind: "primary" },
+      ],
       created_at: "2026-04-24T08:00:00.000Z",
       deleted_at: null,
     },
@@ -109,6 +119,8 @@ function makeCalendarFixture() {
       contractors: null,
       customers: { phone: null },
       locations: { city: "Pasadena" },
+      visit_scope_summary: null,
+      visit_scope_items: null,
       created_at: "2026-04-24T09:00:00.000Z",
       deleted_at: null,
     },
@@ -292,6 +304,7 @@ describe("dispatch calendar same-account scope hardening", () => {
 
     expect(result.day.jobs[0]?.latest_event_type).toBe("scoped_event");
     expect(result.day.jobs[0]?.assignment_names).toEqual(["Scoped Tech"]);
+    expect(result.day.jobs[0]?.work_context_label).toBe("Diagnostic + 1 more");
 
     expect(getActiveJobAssignmentDisplayMapMock).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -319,5 +332,11 @@ describe("dispatch calendar same-account scope hardening", () => {
 
     expect(fixture.calls).toHaveLength(0);
     expect(getActiveJobAssignmentDisplayMapMock).not.toHaveBeenCalled();
+  });
+
+  it("expands the dispatch payload with visit scope fields and a derived work label", () => {
+    expect(calendarActionsSource).toContain("visit_scope_summary");
+    expect(calendarActionsSource).toContain("visit_scope_items");
+    expect(calendarActionsSource).toContain("work_context_label");
   });
 });

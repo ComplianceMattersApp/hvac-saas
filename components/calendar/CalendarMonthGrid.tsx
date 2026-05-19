@@ -202,6 +202,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                   const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
                   const primaryLine = shortTitle(job);
                   const secondaryLine = job.city || 'City not available';
+                  const workContextLabel = String(job.work_context_label ?? '').trim();
 
                   return (
                     <div key={job.id} className="group relative overflow-visible">
@@ -223,6 +224,9 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                         <div className="min-w-0 flex-1">
                           <div className="truncate font-medium text-slate-900">{primaryLine}</div>
                           <div className="mt-0.5 truncate text-[10px] text-slate-500">{secondaryLine}</div>
+                          {workContextLabel ? (
+                            <div className="mt-0.5 truncate text-[10px] text-slate-500">Work: {workContextLabel}</div>
+                          ) : null}
                           {lifecycle === 'cancelled' ? (
                             <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500">Cancelled</div>
                           ) : null}
@@ -246,6 +250,10 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
 
                         {job.contractor_name ? (
                           <div className="mb-1 text-slate-600">Contractor: {job.contractor_name}</div>
+                        ) : null}
+
+                        {workContextLabel ? (
+                          <div className="mb-1 text-slate-600">Work: {workContextLabel}</div>
                         ) : null}
 
                         <div className="mb-1 flex items-center gap-1 text-slate-600">

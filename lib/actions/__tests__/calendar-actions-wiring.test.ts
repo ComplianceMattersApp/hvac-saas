@@ -45,6 +45,8 @@ type JobRow = {
   contractors: { name: string | null } | null;
   customers: { phone: string | null } | null;
   locations: { city: string | null } | null;
+  visit_scope_summary: string | null;
+  visit_scope_items: Array<{ title: string; details: string | null; kind: string }> | null;
   created_at: string;
   deleted_at: string | null;
 };
@@ -80,6 +82,12 @@ function makeFixture() {
       contractors: null,
       customers: { phone: '555-1000' },
       locations: { city: 'Canonical City' },
+      visit_scope_summary: null,
+      visit_scope_items: [
+        { title: 'Diagnostic', details: null, kind: 'primary' },
+        { title: 'Replace contactor', details: null, kind: 'primary' },
+        { title: 'Filter replacement', details: null, kind: 'companion_service' },
+      ],
       created_at: '2026-04-29T08:00:00.000Z',
       deleted_at: null,
     },
@@ -104,6 +112,8 @@ function makeFixture() {
       contractors: null,
       customers: { phone: null },
       locations: { city: null },
+      visit_scope_summary: null,
+      visit_scope_items: null,
       created_at: '2026-04-29T08:30:00.000Z',
       deleted_at: null,
     },
@@ -261,11 +271,13 @@ describe('calendar action wiring', () => {
     expect(assigned?.title).toBe('Attic Duct Repair');
     expect(assigned?.city).toBe('Canonical City');
     expect(assigned?.customer_phone).toBe('555-1000');
+    expect(assigned?.work_context_label).toBe('Diagnostic + 1 more');
     expect(assigned?.assignments.map((a) => a.user_id)).toEqual(['tech-1']);
 
     expect(unassigned?.title).toBe('Condenser Check');
     expect(unassigned?.city).toBe('Snapshot Fallback City');
     expect(unassigned?.customer_phone).toBe('555-2000');
+    expect(unassigned?.work_context_label).toBeNull();
     expect(unassigned?.assignments).toEqual([]);
 
     expect(result.scheduledAttentionWindowJobs.map((job) => job.id)).toEqual([

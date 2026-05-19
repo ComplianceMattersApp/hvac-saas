@@ -597,6 +597,7 @@ export default function CalendarDispatchGrid(props: Props) {
               const initials = assignees.slice(0, 2).map((a) => initialsFromName(a.display_name)).join(" ");
               const assigneeSummary = assignees.map((a) => a.display_name).filter(Boolean).join(", ");
               const lifecycle = getCalendarDisplayStatus(job);
+              const workContextLabel = String(job.work_context_label ?? "").trim();
               const statusBadgeLabel = lifecycle === "cancelled" || lifecycle === "on_my_way" || lifecycle === "in_progress" ? formatCalendarDisplayStatus(lifecycle) : null;
               const statusBadgeClass = lifecycle === "cancelled" ? "border-slate-300 bg-slate-200 text-slate-600" : lifecycle === "on_my_way" ? "border-blue-300 bg-blue-100 text-blue-950" : "border-indigo-300 bg-indigo-100 text-indigo-900";
 
@@ -643,6 +644,7 @@ export default function CalendarDispatchGrid(props: Props) {
                   {statusBadgeLabel ? <span className={`ml-1 inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${statusBadgeClass}`}>{statusBadgeLabel}</span> : null}
                   {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? <span className="ml-2 inline-block rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">No tech assigned</span> : null}
                   {assigneeSummary ? <p className="truncate text-[10px] font-medium leading-4 text-slate-700/85">Assigned: {assigneeSummary}</p> : null}
+                  {workContextLabel ? <p className="truncate text-[10px] font-medium leading-4 text-slate-600">Work: {workContextLabel}</p> : null}
                   <p className="truncate text-[11px] leading-4 text-slate-700/90">{job.city || job.contractor_name || "No city or contractor"}</p>
                   <div className="mt-1 flex items-center justify-between gap-2">
                     <p className="truncate rounded-full bg-white/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-700/90">{blockTimeLabel(row.start, row.end)}</p>

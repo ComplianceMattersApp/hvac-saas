@@ -283,6 +283,7 @@ function calendarJobTooltip(job: DispatchJob) {
   ];
 
   if (job.contractor_name) summary.push(`Contractor: ${job.contractor_name}`);
+  if (String(job.work_context_label ?? '').trim()) summary.push(`Work: ${String(job.work_context_label ?? '').trim()}`);
   if (job.scheduled_date && (!job.assignments || job.assignments.length === 0)) summary.push('No tech assigned');
 
   return summary.filter((line) => String(line ?? '').trim()).join('\n');
@@ -446,6 +447,9 @@ function AgendaList(props: {
                           </span>
                         ) : null}
                       </div>
+                      {String(job.work_context_label ?? '').trim() ? (
+                        <div className="mt-1 truncate text-[11px] text-slate-500">Work: {String(job.work_context_label ?? '').trim()}</div>
+                      ) : null}
                       <div className="mt-1 truncate text-[11px] text-slate-500">{job.job_address || customerName(job) || job.job_type || normalizeRetestLinkedJobTitle(job.title)}</div>
                     </div>
                   </div>
@@ -507,6 +511,7 @@ function DetailPanel(props: {
   const lifecycleDotClass = lifecycle ? calendarStatusDotClass(lifecycle) : 'bg-slate-300';
   const normalizedTitle = normalizeRetestLinkedJobTitle(job.title) || `Job ${job.id.slice(0, 8)}`;
   const overviewChips = [job.job_type, job.contractor_name].map((value) => String(value ?? '').trim()).filter(Boolean);
+  const workContextLabel = String(job.work_context_label ?? '').trim();
 
   return (
     <aside className={`overflow-y-auto bg-white p-4 sm:p-5 ${className}`}>
@@ -534,6 +539,11 @@ function DetailPanel(props: {
                 </span>
               ))}
             </div>
+            {workContextLabel ? (
+              <div className="mt-2 text-xs text-slate-500">
+                <span className="font-medium text-slate-600">Work included:</span> {workContextLabel}
+              </div>
+            ) : null}
           </div>
           <Link
             href={closeHref}
@@ -603,6 +613,15 @@ function DetailPanel(props: {
             )}
           </div>
           <p className="mt-2 text-xs text-slate-500">Logs communication attempts only; does not confirm carrier delivery.</p>
+        </div>
+
+        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Work included</p>
+          {workContextLabel ? (
+            <p className="mt-2 text-sm text-slate-700">{workContextLabel}</p>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">No visit scope items added.</p>
+          )}
         </div>
 
         <div className="mt-4 flex flex-wrap gap-2">
@@ -772,6 +791,9 @@ function MonthInspectorDaySummary(props: {
                 <div className="truncate text-xs font-semibold text-slate-900">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>
                 <div className="mt-0.5 truncate text-[11px] text-slate-700">{job.city || 'City not available'}</div>
                 <div className="truncate text-[11px] text-slate-500">{customerName(job)}</div>
+                {String(job.work_context_label ?? '').trim() ? (
+                  <div className="mt-0.5 truncate text-[11px] text-slate-500">Work: {String(job.work_context_label ?? '').trim()}</div>
+                ) : null}
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{cueParts.filter(Boolean).join(' · ')}</span>
                   {needsTech ? (

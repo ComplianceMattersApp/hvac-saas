@@ -3,6 +3,7 @@
 import { requireInternalUser } from '@/lib/auth/internal-user';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveJobAssignmentDisplayMap, getAssignableInternalUsers } from '@/lib/staffing/human-layer';
+import { buildVisitScopeIncludesReadModel } from '@/lib/jobs/visit-scope';
 import { displayDateLA, displayTimeLA, laDateTimeToUtcIso } from '@/lib/utils/schedule-la';
 
 export type DispatchViewMode = 'day' | 'week';
@@ -26,6 +27,7 @@ export type DispatchJob = {
   customer_phone: string | null;
   contractor_id: string | null;
   contractor_name?: string | null;
+  work_context_label: string | null;
   assignments: Array<{
     user_id: string;
     display_name: string;
@@ -97,6 +99,8 @@ type JobDispatchRow = {
   contractors: { name: string | null } | { name: string | null }[] | null;
   customers: { phone: string | null } | { phone: string | null }[] | null;
   locations: { city: string | null } | { city: string | null }[] | null;
+  visit_scope_summary?: string | null;
+  visit_scope_items?: unknown;
   created_at: string | null;
 };
 
@@ -216,6 +220,11 @@ function mergeJobRow(params: {
     : String(row.customers?.phone ?? '').trim();
   const snapshotCity = String(row?.city ?? '').trim();
   const snapshotPhone = String(row?.customer_phone ?? '').trim();
+  const workContext = buildVisitScopeIncludesReadModel(
+    row?.visit_scope_summary,
+    row?.visit_scope_items,
+    { leadMaxLength: 48 },
+  );
 
   return {
     id: jobId,
@@ -238,6 +247,7 @@ function mergeJobRow(params: {
     contractor_name: Array.isArray(row.contractors)
       ? (row.contractors[0]?.name ? String(row.contractors[0].name) : null)
       : (row.contractors?.name ? String(row.contractors.name) : null),
+    work_context_label: workContext.label || null,
     assignments: assignment.assignments,
     assignment_names: assignment.assignment_names,
     assignment_primary_name: assignment.assignment_primary_name,
@@ -414,6 +424,8 @@ export async function getDispatchCalendarData(params: {
     'contractors(name)',
     'customers:customer_id(phone)',
     'locations:location_id(city)',
+    'visit_scope_summary',
+    'visit_scope_items',
     'created_at',
     'deleted_at',
   ].join(', ');
