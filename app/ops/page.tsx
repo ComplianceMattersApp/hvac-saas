@@ -1904,37 +1904,6 @@ function displayOpsCardTitle(value: unknown) {
   return normalizeRetestLinkedJobTitle(value) || "Job";
 }
 
-function scheduledWithoutTechRow(j: any) {
-  const scheduleDateText = j?.scheduled_date ? formatBusinessDateUS(String(j.scheduled_date)) : "Not scheduled";
-  const scheduleWindowText = displayWindowLA(j.window_start, j.window_end) || "Window TBD";
-
-  return (
-    <div
-      key={`scheduled-without-tech:${String(j?.id ?? "")}`}
-      className="rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-[0_8px_16px_-20px_rgba(15,23,42,0.24)]"
-    >
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <Link
-            href={`/jobs/${j.id}?tab=ops`}
-            className="text-[13px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline"
-          >
-            {displayOpsCardTitle(j?.title)}
-          </Link>
-          <div className="text-[12px] font-medium text-slate-900">{formatPersonNamePart(customerNameOnly(j))}</div>
-          <div className="text-[11px] leading-4 text-slate-600">{addressLine(j)}</div>
-          <div className="mt-1 text-[11px] font-medium text-slate-700">
-            {scheduleDateText} - {scheduleWindowText}
-          </div>
-        </div>
-        <Link href={`/jobs/${j.id}?tab=ops`} className={inlineSectionLinkClass}>
-          View Job
-        </Link>
-      </div>
-    </div>
-  );
-}
-
 function contractorResponseBadgeLabelForJob(jobId: string) {
   const unreadNotification = latestUnreadContractorUpdateNotificationByJob.get(jobId);
   const unreadType = String(unreadNotification?.notification_type ?? "").trim().toLowerCase();
@@ -2474,6 +2443,29 @@ return (
               </div>
             )}
 
+            <div className={`mt-2 rounded-lg border px-2.5 py-2 ${scheduledWithoutTechSnapshot.count === 0 ? "border-slate-200 bg-slate-50/80" : "border-amber-200/80 bg-amber-50/55"}`}>
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Scheduled Without Tech</div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm font-semibold tabular-nums ${scheduledWithoutTechSnapshot.count === 0 ? "text-slate-600" : "text-amber-800"}`}>
+                    {scheduledWithoutTechSnapshot.count}
+                  </span>
+                  <Link
+                    href={`/ops${buildQueryString({
+                      bucket: "scheduled",
+                      contractor: contractorScopeFilter ?? "",
+                      q: q ?? "",
+                      sort: sort ?? "",
+                      signal: "",
+                    })}#ops-queues`}
+                    className={inlineSectionLinkClass}
+                  >
+                    View scheduled queue
+                  </Link>
+                </div>
+              </div>
+            </div>
+
             <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Work by Technician</div>
               {workByTechnicianRows.length === 0 ? (
@@ -2674,7 +2666,7 @@ return (
       sort={sort}
     />
 
-    <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-4">
+    <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
       <div className={`rounded-2xl border ${callListVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">Unscheduled Work</div>
@@ -2707,41 +2699,6 @@ return (
           quietSectionEmptyState("No unscheduled work right now.")
         ) : (
           <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true))}</div>
-        )}
-      </div>
-
-      <div className={`rounded-2xl border ${scheduledWithoutTechSnapshot.count === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Scheduled Without Tech</div>
-          <div className="flex items-center gap-3">
-            {sectionCountPill(
-              scheduledWithoutTechSnapshot.count,
-              scheduledWithoutTechSnapshot.count > 0 ? "danger" : "neutral"
-            )}
-            <Link
-              href={`/ops${buildQueryString({
-                bucket: "scheduled",
-                contractor: contractorScopeFilter ?? "",
-                q: q ?? "",
-                sort: sort ?? "",
-                signal: "",
-              })}#ops-queues`}
-              className={inlineSectionLinkClass}
-            >
-              View Scheduled Queue
-            </Link>
-          </div>
-        </div>
-
-        {scheduledWithoutTechSnapshot.count === 0 ? (
-          quietSectionEmptyState("All scheduled jobs have assigned techs.", "success")
-        ) : (
-          <div className="space-y-2">
-            {scheduledWithoutTechSnapshot.preview.map((job) => scheduledWithoutTechRow(job))}
-            {scheduledWithoutTechSnapshot.hasMore ? (
-              <div className="text-[11px] text-slate-600">Showing first {scheduledWithoutTechSnapshot.preview.length} jobs.</div>
-            ) : null}
-          </div>
         )}
       </div>
 

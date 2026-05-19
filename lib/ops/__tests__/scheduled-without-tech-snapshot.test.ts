@@ -21,7 +21,7 @@ describe("buildScheduledWithoutTechSnapshot", () => {
     expect(result.preview.map((job) => job.id)).toEqual(["job-1"]);
   });
 
-  it("excludes scheduled open job with primary assigned tech", () => {
+  it("excludes scheduled open job with active assigned tech", () => {
     const result = buildScheduledWithoutTechSnapshot({
       jobs: [
         {
@@ -59,7 +59,7 @@ describe("buildScheduledWithoutTechSnapshot", () => {
     expect(result.preview).toEqual([]);
   });
 
-  it("treats jobs with assignments but no primary tech as scheduled without tech", () => {
+  it("excludes scheduled open job with active assigned tech and no primary", () => {
     const result = buildScheduledWithoutTechSnapshot({
       jobs: [
         {
@@ -72,6 +72,26 @@ describe("buildScheduledWithoutTechSnapshot", () => {
       ],
       assignmentDisplayMap: {
         "job-1": [{ is_primary: false }],
+      },
+    });
+
+    expect(result.count).toBe(0);
+    expect(result.preview).toEqual([]);
+  });
+
+  it("includes scheduled open job when only inactive assignments exist", () => {
+    const result = buildScheduledWithoutTechSnapshot({
+      jobs: [
+        {
+          id: "job-1",
+          ops_status: "scheduled",
+          status: "open",
+          scheduled_date: "2026-05-20",
+          window_start: "09:00:00",
+        },
+      ],
+      assignmentDisplayMap: {
+        "job-1": [{ is_primary: true, is_active: false }],
       },
     });
 

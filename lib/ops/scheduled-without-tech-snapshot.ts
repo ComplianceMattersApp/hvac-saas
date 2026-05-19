@@ -1,5 +1,8 @@
 type AssignmentDisplayInput = {
   is_primary?: boolean;
+  is_active?: boolean;
+  deleted_at?: string | null;
+  removed_at?: string | null;
 };
 
 type ScheduledWithoutTechJobInput = {
@@ -32,8 +35,21 @@ function compareScheduledJobs(left: ScheduledWithoutTechJobInput, right: Schedul
   return leftWindow.localeCompare(rightWindow);
 }
 
-function hasPrimaryTech(assignments: AssignmentDisplayInput[]) {
-  return assignments.some((assignment) => assignment?.is_primary === true);
+function isActiveAssignment(assignment: AssignmentDisplayInput | null | undefined) {
+  if (!assignment) return false;
+  if (assignment.is_active === false) return false;
+
+  const deletedAt = String(assignment.deleted_at ?? "").trim();
+  if (deletedAt) return false;
+
+  const removedAt = String(assignment.removed_at ?? "").trim();
+  if (removedAt) return false;
+
+  return true;
+}
+
+function hasAnyActiveTechAssignment(assignments: AssignmentDisplayInput[]) {
+  return assignments.some((assignment) => isActiveAssignment(assignment));
 }
 
 function isScheduledOpenJob(job: ScheduledWithoutTechJobInput) {
@@ -63,7 +79,7 @@ export function buildScheduledWithoutTechSnapshot(params: {
     if (!isScheduledOpenJob(job)) return false;
 
     const assignments = Array.isArray(assignmentDisplayMap[jobId]) ? assignmentDisplayMap[jobId] : [];
-    return !hasPrimaryTech(assignments);
+    return !hasAnyActiveTechAssignment(assignments);
   });
 
   const sorted = [...filtered].sort(compareScheduledJobs);
