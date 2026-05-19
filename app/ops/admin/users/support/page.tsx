@@ -115,7 +115,7 @@ export default async function SupportConsolePage({
             href="/ops/admin/users"
             className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
           >
-            Back to Directory &amp; Access Recovery
+            Back to People &amp; Access
           </Link>
         </div>
       </div>

@@ -473,7 +473,10 @@ export default async function AdminContractorsPage({
               Manage contractor companies, primary contacts, and contractor-scoped member access from one clean workspace.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Organization setup lives here. Directory &amp; Access Recovery handles broader account recovery work.
+              Contractors are external ECC/HERS workflow partners.
+            </div>
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+              Use People &amp; Access for broader invite and recovery actions across all account users.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -501,7 +504,7 @@ export default async function AdminContractorsPage({
 
       {productMode === "hvac_service" ? (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 shadow-sm">
-          Optional collaboration tool for HVAC Service accounts. Use this workspace only when outside contractor collaboration is needed.
+          Optional collaboration tool for HVAC Service accounts. Core service dispatch can run without ECC contractor relationships.
         </div>
       ) : null}
 
@@ -554,7 +557,7 @@ export default async function AdminContractorsPage({
             <div className="space-y-1">
               <h2 className="text-lg font-semibold tracking-[-0.02em] text-sky-950">Active contractors</h2>
               <p className="text-sm leading-6 text-slate-600">
-                Primary operational list. Active contractors can be assigned, invited, and participate in portal workflows.
+                Primary operational list for external ECC/HERS partners. Active contractors can be assigned, invited, and participate in portal workflows.
               </p>
             </div>
 

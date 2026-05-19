@@ -192,7 +192,7 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
               href="/ops/admin/users"
               className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Directory &amp; Access Recovery
+              People &amp; Access
             </Link>
           </div>
         </div>
@@ -310,7 +310,7 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
           <section className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-5 shadow-[0_18px_32px_-30px_rgba(15,23,42,0.18)] sm:p-6">
             <h2 className="text-sm font-semibold text-slate-900">Where to make other changes</h2>
             <p className="mt-2 text-sm text-slate-600">
-              Edit profile details here. Use Internal Roles &amp; Team Setup for role changes and Directory &amp; Access Recovery for broader invite or password work.
+              Edit profile details here. Use Internal Roles &amp; Team Setup for role changes and People &amp; Access for broader invite or password work.
             </p>
           </section>
         </aside>

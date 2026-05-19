@@ -192,7 +192,10 @@ export default async function AdminInternalUsersPage({
               Manage internal role assignments, profile details, and day-to-day access changes for office and field staff.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Team setup and role management for internal users.
+              Internal Team members are users inside your company account.
+            </div>
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+              Use People &amp; Access for broader invite, contractor, and recovery actions.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -206,7 +209,7 @@ export default async function AdminInternalUsersPage({
               href="/ops/admin/users"
               className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Directory &amp; Access Recovery
+              People &amp; Access
             </Link>
           </div>
         </div>

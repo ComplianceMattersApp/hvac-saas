@@ -350,12 +350,15 @@ export default async function AdminUsersCommandCenterPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
-            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Directory &amp; Access Recovery</h1>
+            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">People &amp; Access</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Search internal and contractor user accounts, resend setup emails, and handle recovery actions from one place.
+              Broader account access workspace for internal users, contractor-linked users, invites, and recovery actions.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Directory lookup plus invite and access recovery actions.
+              Internal Team members are users inside your company. Contractors are external ECC/HERS workflow partners.
+            </div>
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+              Portal access controls who can view or submit job information outside your internal team.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
