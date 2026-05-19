@@ -187,7 +187,7 @@ export default async function AdminInternalUsersPage({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
-            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal Roles &amp; Team Setup</h1>
+            <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal Team</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
               Manage internal role assignments, profile details, and day-to-day access changes for office and field staff.
             </p>
@@ -195,7 +195,7 @@ export default async function AdminInternalUsersPage({
               Internal Team members are users inside your company account.
             </div>
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Use People &amp; Access for broader invite, contractor, and recovery actions.
+              Use People &amp; Access for broader invite, contractor, and Portal Access recovery actions.
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">

@@ -62,19 +62,19 @@ export default async function OpsAdminPage() {
       badge: "HVAC Service",
       heroHint: "Service/work-order-first workspace. Contractor tools remain optional and unchanged.",
       peopleCopy:
-        "Start with People & Access, then move into Internal Roles & Team Setup. Contractor tools stay optional and are only needed for outside ECC/HERS-style collaboration.",
+        "Start with People & Access, then move into Internal Team. Contractor tools stay optional and are only needed for outside ECC/HERS-style collaboration.",
     },
     ecc_hers: {
       badge: "ECC/HERS",
       heroHint: "Compliance and contractor collaboration remain relevant in this workspace.",
       peopleCopy:
-        "Start with People & Access, then step into Internal Roles & Team Setup and contractor collaboration tools when needed.",
+        "Start with People & Access, then step into Internal Team and contractor collaboration tools when needed.",
     },
     hybrid: {
       badge: "All-in-One",
       heroHint: "Owner all-in-one workspace. Service and compliance tools remain available together.",
       peopleCopy:
-        "Start with People & Access, then step into Internal Roles & Team Setup and optional contractor tools when needed.",
+        "Start with People & Access, then step into Internal Team and optional contractor tools when needed.",
     },
   };
 
@@ -93,7 +93,7 @@ export default async function OpsAdminPage() {
     {
       section: "people",
       eyebrow: "People",
-      title: "Internal Roles & Team Setup",
+      title: "Internal Team",
       description: "Internal Team members are users inside your company account. Manage roles, active status, and team-setup confirmation.",
       href: "/ops/admin/internal-users",
       ctaLabel: "Open workspace",
@@ -120,7 +120,7 @@ export default async function OpsAdminPage() {
           ? "Optional external partner proposal review for service accounts that use outside collaboration lanes."
           : "Optional contractor-submitted work review for accounts that use contractor intake.",
       href: "/ops/admin/contractor-intake-submissions",
-      ctaLabel: productMode === "hvac_service" ? "Optional workspace" : "Review proposals",
+      ctaLabel: productMode === "hvac_service" ? "Optional workspace" : "Review contractor proposals",
       enabled: true,
     },
     {
@@ -188,7 +188,7 @@ export default async function OpsAdminPage() {
     productMode === "hvac_service" ? "Service team and access workspaces" : "People & access workspaces";
   const peopleSectionDescription =
     productMode === "hvac_service"
-      ? "Start with People & Access and Internal Roles & Team Setup. Optional outside collaboration tools are moved below so this page stays service/work-order first."
+      ? "Start with People & Access and Internal Team. Optional outside collaboration tools are moved below so this page stays service/work-order first."
       : modeContext.peopleCopy;
 
   return (
@@ -297,6 +297,9 @@ export default async function OpsAdminPage() {
           </p>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
               Portal access controls who can view or submit job information outside your internal team.
+            </p>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+              Use People &amp; Access for broad user access workflows. Use Internal Team for company employee setup.
             </p>
         </div>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">

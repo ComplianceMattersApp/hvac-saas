@@ -372,7 +372,7 @@ export default async function AdminUsersCommandCenterPage({
               href="/ops/admin/internal-users"
               className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3.5 py-2 text-sm font-medium text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_24px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
             >
-              Internal Roles &amp; Team Setup
+              Internal Team
             </Link>
             <Link
               href="/ops/admin/contractors"

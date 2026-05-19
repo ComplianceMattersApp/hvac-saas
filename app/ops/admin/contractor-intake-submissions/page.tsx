@@ -91,13 +91,24 @@ export default async function ContractorIntakeSubmissionsPage() {
             <p className="mt-1 text-sm text-slate-600">
               Review pending external partner proposals and finalize into canonical job creation.
             </p>
+            <p className="mt-1 text-sm text-slate-600">
+              Contractors are external ECC/HERS workflow partners in these lanes.
+            </p>
           </div>
-          <Link
-            href="/ops/admin"
-            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
-          >
-            Admin Center
-          </Link>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href="/ops/admin"
+              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+            >
+              Admin Center
+            </Link>
+            <Link
+              href="/ops/admin/users"
+              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+            >
+              People &amp; Access
+            </Link>
+          </div>
         </div>
       </div>
 

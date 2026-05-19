@@ -478,6 +478,9 @@ export default async function AdminContractorsPage({
             <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
               Use People &amp; Access for broader invite and recovery actions across all account users.
             </div>
+            <div className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50/90 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
+              Portal Access controls outside-internal-team participation.
+            </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link
@@ -557,7 +560,7 @@ export default async function AdminContractorsPage({
             <div className="space-y-1">
               <h2 className="text-lg font-semibold tracking-[-0.02em] text-sky-950">Active contractors</h2>
               <p className="text-sm leading-6 text-slate-600">
-                Primary operational list for external ECC/HERS partners. Active contractors can be assigned, invited, and participate in portal workflows.
+                Primary operational list for external ECC/HERS partners. Active contractors can be assigned, invited, and participate in Portal Access workflows.
               </p>
             </div>
 
