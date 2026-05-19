@@ -11,6 +11,7 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 - Completion status matrix for all owner-release areas
 - Locked release scope
 - Deferred and parked items
+- Remaining-work register with category/unlock mapping (Section 4.1)
 - Runbook-gated items
 - Support V0/V1/V2 model
 - Post-launch roadmap order

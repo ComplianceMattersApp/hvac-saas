@@ -447,6 +447,36 @@ Product Mode V2 production migration execution closeout note:
    - no Support Console behavior changes
    - no Vercel/env flag changes
 
+### 4.1 Remaining Work Register (Current)
+
+This register captures only still-open lanes. Completed lanes listed in this document remain closed and are not reopened by this section.
+
+Category key:
+- `1` Active monitoring
+- `2` Runbook-gated
+- `3` Field-feedback gated
+- `4` Future expansion
+- `5` Deferred until provider/payment/setup
+
+| Lane | Category | Why parked/deferred | Unlock condition |
+|---|---:|---|---|
+| Support V0 manual support operations | 1 | V0 is the intentional launch posture and stays manual while support load is still manageable. | Ongoing monitoring of support volume, response-time, and escalation quality. |
+| Support V1 read-only Support Console | 2 | Console remains controlled and dormant by default to minimize operational/security risk during early adoption. | Runbook-approved enablement window and gate checks pass. |
+| Support V2 in-app Report Issue intake | 4 | Planned intake expansion is intentionally later so V0/V1 are proven first. | Post-launch prioritization after validated support workflow need. |
+| Estimates full customer-facing flow (public/customer conversion/payment-facing expansion) | 2 | Internal baseline exists, but external/customer-facing expansion remains incomplete and intentionally gated behind runbook/design decisions. | Explicit expansion decision plus runbook/design approval beyond internal-only scope. |
+| Tenant customer payment execution (invoice payment acceptance) | 5 | Payment-ready foundation is present, but live tenant customer payment execution is intentionally deferred. | Explicit approval to pull forward tenant execution phase with processor-backed controls. |
+| SMS/Twilio provider-powered messaging | 5 | Current posture is explicitly non-sending; provider-powered SMS remains deferred behind compliance/provider readiness gates. | Consent/suppression/readiness gates complete, provider/legal review complete, explicit activation decision made. |
+| Product mode/tier/add-on/per-seat expansion (admin mutation, tier enforcement, full mode-aware surfaces) | 4 | Baseline product-mode foundation exists; broader packaging/enforcement and full mode-aware behavior are intentionally future slices. | Future Product Mode and packaging roadmap slices explicitly approved. |
+| Customer portal | 4 | Out of current release scope; requires a separate customer/location visibility and authority model. | Explicit reopen decision with dedicated portal design and scope approval. |
+| QBO integration | 5 | QBO remains optional downstream and intentionally last-last, not source-of-truth or launch-critical. | Later explicit downstream accounting integration decision after core payment lanes mature. |
+| PWA/native/offline/app-store packaging | 4 | Installability baseline is complete, but offline/native packaging is intentionally deferred. | Later roadmap slot after core operational/commercial lanes stabilize. |
+| Service Plans V2/expansion | 3 | Service Plans lane is closed for now; additional capability is intentionally blocked unless field evidence justifies reopen. | Real workflow bugs or strongly validated field feedback to reopen scope. |
+| Performance measured follow-up backlog | 1 | Broad campaign is intentionally parked; only measured regressions should trigger further work. | Measured evidence on real daily-use surfaces with benchmark-backed follow-up slices. |
+| Pre-launch hardening checklist items | 2 | Hardening items are intentionally staged for controlled pre-launch execution rather than ad-hoc implementation. | Pre-launch checklist/runbook execution window and sign-off. |
+| Tech dispatch notifications follow-up hardening | 3 | Core notifications/push lanes are complete; remaining work is future hardening and should be field-signal driven. | Field feedback indicates quality gaps or clear hardening opportunities; existing push quality remains monitored. |
+| Contact recipient write/edit workflow | 3 | Recipient write/edit remains intentionally deferred unless field usage proves real operational need. | Repeated field demand with validated workflow need and bounded design proposal. |
+| Closeout Queue V2 | 3 | V1 is complete and intentionally held as the active lane while real usage feedback is collected. | Owner field feedback after V1 daily use indicates prioritized V2 improvements. |
+
 ---
 
 ## 5) Runbook-Gated / Controlled Enablement Items
