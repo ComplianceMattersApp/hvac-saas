@@ -47,6 +47,7 @@ import {
   buildLatestCustomerAttemptByJob,
   resolveRecentAttemptDisplay,
 } from "@/lib/ops/recent-attempt-display";
+import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -513,6 +514,20 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
 
   callListQ = applyCommonFilters(callListQ);
 
+  // Scheduled queue snapshot for jobs that still need technician assignment visibility.
+  let scheduledSnapshotQ = supabase
+    .from("jobs")
+    .select(baseSelect)
+    .is("deleted_at", null)
+    .neq("status", "cancelled")
+    .eq("status", "open")
+    .eq("ops_status", "scheduled")
+    .order("scheduled_date", { ascending: true })
+    .order("window_start", { ascending: true })
+    .limit(50);
+
+  scheduledSnapshotQ = applyCommonFilters(scheduledSnapshotQ);
+
     // 4) CLOSEOUT COMMAND BOARD (derived from field_complete + remaining office obligations)
     let closeoutQ = supabase
       .from("jobs")
@@ -624,6 +639,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
     const [
       fieldWorkRes,
       callListRes,
+      scheduledSnapshotRes,
       closeoutRes,
       stillOpenRes,
       attentionRes,
@@ -638,6 +654,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
         "ops:primaryQueueReads:callList",
         trackOpsTiming("ops:callList:fetch", callListQ)
       ),
+      trackOpsTiming("ops:primaryQueueReads:scheduledSnapshot", scheduledSnapshotQ),
       trackOpsTiming("ops:primaryQueueReads:closeoutSource", closeoutQ),
       trackOpsTiming("ops:primaryQueueReads:stillOpenExceptions", stillOpenQ),
       trackOpsTiming("ops:primaryQueueReads:attention", attentionQ),
@@ -647,6 +664,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
 
   if (fieldWorkRes.error) throw fieldWorkRes.error;
   if (callListRes.error) throw callListRes.error;
+  if (scheduledSnapshotRes.error) throw scheduledSnapshotRes.error;
   if (closeoutRes.error) throw closeoutRes.error;
   if (stillOpenRes.error) throw stillOpenRes.error;
   if (attentionRes.error) throw attentionRes.error;
@@ -664,6 +682,9 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
   if (opsTimingEnabled) console.log(`[ops:callList:postFilter] ${Date.now() - _t_callListPostFilter}ms`);
+  const scheduledSnapshotJobs = (scheduledSnapshotRes.data ?? []).filter(
+    (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
+  );
   const closeoutSourceJobs = (closeoutRes.data ?? []).filter(
     (j: any) => !shouldHideFailedParentJob(j) && matchesOpsSearch(j)
   );
@@ -809,6 +830,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
 const allJobs = [
   ...(fieldWorkJobs ?? []),
   ...(callListJobs ?? []),
+  ...(scheduledSnapshotJobs ?? []),
   ...(closeoutSourceJobs ?? []),
   ...(stillOpenJobs ?? []),
   ...(attentionJobs ?? []),
@@ -1497,6 +1519,12 @@ const sortedBucketJobs = sortJobs(signalFilteredBucketJobs, sort);
 const sortedCallListJobs = sortJobs(callListJobs ?? [], sort === "default" ? "created" : sort);
 const sortedFieldWorkJobs = sortJobs(fieldWorkJobs ?? [], sort);
 
+const scheduledWithoutTechSnapshot = buildScheduledWithoutTechSnapshot({
+  jobs: scheduledSnapshotJobs,
+  assignmentDisplayMap: activeAssignmentDisplayMap,
+  previewLimit: 5,
+});
+
 function dateOnlyDayNumber(value?: string | null) {
   const s = String(value ?? "").trim();
   const m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
@@ -1874,6 +1902,37 @@ function prioritizeActionableJobs<T>(jobs: T[]) {
 
 function displayOpsCardTitle(value: unknown) {
   return normalizeRetestLinkedJobTitle(value) || "Job";
+}
+
+function scheduledWithoutTechRow(j: any) {
+  const scheduleDateText = j?.scheduled_date ? formatBusinessDateUS(String(j.scheduled_date)) : "Not scheduled";
+  const scheduleWindowText = displayWindowLA(j.window_start, j.window_end) || "Window TBD";
+
+  return (
+    <div
+      key={`scheduled-without-tech:${String(j?.id ?? "")}`}
+      className="rounded-xl border border-slate-200/90 bg-white px-3 py-2 shadow-[0_8px_16px_-20px_rgba(15,23,42,0.24)]"
+    >
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <Link
+            href={`/jobs/${j.id}?tab=ops`}
+            className="text-[13px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline"
+          >
+            {displayOpsCardTitle(j?.title)}
+          </Link>
+          <div className="text-[12px] font-medium text-slate-900">{formatPersonNamePart(customerNameOnly(j))}</div>
+          <div className="text-[11px] leading-4 text-slate-600">{addressLine(j)}</div>
+          <div className="mt-1 text-[11px] font-medium text-slate-700">
+            {scheduleDateText} - {scheduleWindowText}
+          </div>
+        </div>
+        <Link href={`/jobs/${j.id}?tab=ops`} className={inlineSectionLinkClass}>
+          View Job
+        </Link>
+      </div>
+    </div>
+  );
 }
 
 function contractorResponseBadgeLabelForJob(jobId: string) {
@@ -2615,7 +2674,7 @@ return (
       sort={sort}
     />
 
-    <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-3">
+    <section className="grid grid-cols-1 gap-2.5 lg:grid-cols-4">
       <div className={`rounded-2xl border ${callListVisibleJobs.length === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="text-[15px] font-semibold tracking-tight text-slate-950">Unscheduled Work</div>
@@ -2648,6 +2707,41 @@ return (
           quietSectionEmptyState("No unscheduled work right now.")
         ) : (
           <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true))}</div>
+        )}
+      </div>
+
+      <div className={`rounded-2xl border ${scheduledWithoutTechSnapshot.count === 0 ? "border-slate-300/75 bg-slate-50/85 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Scheduled Without Tech</div>
+          <div className="flex items-center gap-3">
+            {sectionCountPill(
+              scheduledWithoutTechSnapshot.count,
+              scheduledWithoutTechSnapshot.count > 0 ? "danger" : "neutral"
+            )}
+            <Link
+              href={`/ops${buildQueryString({
+                bucket: "scheduled",
+                contractor: contractorScopeFilter ?? "",
+                q: q ?? "",
+                sort: sort ?? "",
+                signal: "",
+              })}#ops-queues`}
+              className={inlineSectionLinkClass}
+            >
+              View Scheduled Queue
+            </Link>
+          </div>
+        </div>
+
+        {scheduledWithoutTechSnapshot.count === 0 ? (
+          quietSectionEmptyState("All scheduled jobs have assigned techs.", "success")
+        ) : (
+          <div className="space-y-2">
+            {scheduledWithoutTechSnapshot.preview.map((job) => scheduledWithoutTechRow(job))}
+            {scheduledWithoutTechSnapshot.hasMore ? (
+              <div className="text-[11px] text-slate-600">Showing first {scheduledWithoutTechSnapshot.preview.length} jobs.</div>
+            ) : null}
+          </div>
         )}
       </div>
 
