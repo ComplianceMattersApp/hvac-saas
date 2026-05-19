@@ -256,6 +256,14 @@ export default async function EstimateDetailPage({
           <span className="font-mono text-slate-700">{documentView.identity.estimateNumber}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href={`/estimates/${estimate.id}/print`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+          >
+            Print / Save PDF
+          </Link>
           {estimate.customer_id && (
             <Link
               href={`/customers/${estimate.customer_id}`}
