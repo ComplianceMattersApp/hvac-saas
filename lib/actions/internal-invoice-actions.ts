@@ -7,11 +7,11 @@ import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
 import {
   resolveBillingModeByAccountOwnerId,
-  resolveInternalBusinessIdentityByAccountOwnerId,
 } from '@/lib/business/internal-business-profile';
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { INTERNAL_INVOICE_EMAIL_NOTIFICATION_TYPE } from '@/lib/business/internal-invoice-delivery';
 import { resolveJobBillingSource } from '@/lib/business/job-billing-source';
+import { resolveOperationalTenantIdentity } from '@/lib/email/operational-tenant-branding';
 import {
   normalizeInternalInvoiceItemType,
   resolveInternalInvoiceByJobId,
@@ -20,7 +20,7 @@ import {
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from '@/lib/actions/job-evaluator';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import { reconcileServiceCaseStatusAfterJobChange } from '@/lib/actions/service-case-reconciliation';
-import { renderOperationalEmailLayout, renderSystemEmailLayout, escapeHtml } from '@/lib/email/layout';
+import { escapeHtml } from '@/lib/email/layout';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { resolveNotificationAccountOwnerUserId } from '@/lib/notifications/account-owner';
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/visit-scope';
@@ -89,6 +89,49 @@ function formatCurrencyFromCents(cents: number) {
     style: 'currency',
     currency: 'USD',
   }).format((Number(cents ?? 0) || 0) / 100);
+}
+
+function formatInvoiceDateForDisplay(value: string | null | undefined) {
+  const normalized = String(value ?? '').trim();
+  const match = normalized.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return normalized || 'N/A';
+  return `${match[2]}-${match[3]}-${match[1]}`;
+}
+
+function normalizeJobContextForSentence(value: string | null | undefined) {
+  const normalized = String(value ?? '').trim().replace(/\s+/g, ' ');
+  if (!normalized) return 'your service visit';
+  return normalized.replace(/[.!?\s]+$/g, '') || 'your service visit';
+}
+
+function resolveSafeEmailLogoUrl(rawUrl: string | null | undefined) {
+  const normalized = String(rawUrl ?? '').trim();
+  if (!normalized) return null;
+
+  try {
+    const parsed = new URL(normalized);
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null;
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function buildContactLine(args: {
+  businessName: string;
+  supportEmail: string | null;
+  supportPhone: string | null;
+}) {
+  const contactBits = [args.supportEmail, args.supportPhone].filter((value) => String(value ?? '').trim().length > 0);
+  if (contactBits.length === 0) {
+    return `Questions? Contact ${args.businessName}.`;
+  }
+
+  if (contactBits.length === 1) {
+    return `Questions? Contact ${args.businessName} at ${contactBits[0]}.`;
+  }
+
+  return `Questions? Contact ${args.businessName} at ${contactBits[0]} or ${contactBits[1]}.`;
 }
 
 function formatScaledInt(value: number, scale: number) {
@@ -505,7 +548,19 @@ function buildInternalInvoiceEmailBody(args: {
   jobTitle: string | null;
   serviceLocation: string | null;
 }) {
-  const lineItemsHtml = (args.invoice.line_items ?? [])
+  const lineItems = args.invoice.line_items ?? [];
+  const totalDisplay = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
+  const safeLogoUrl = resolveSafeEmailLogoUrl(args.companyLogoUrl);
+  const companyName = String(args.businessName ?? '').trim() || 'Compliance Matters';
+  const recipientName = String(args.customerName ?? args.invoice.billing_name ?? '').trim() || 'Customer';
+  const jobContext = normalizeJobContextForSentence(args.jobTitle);
+  const contactLine = buildContactLine({
+    businessName: companyName,
+    supportEmail: args.supportEmail,
+    supportPhone: args.supportPhone,
+  });
+  const invoiceDateDisplay = formatInvoiceDateForDisplay(args.invoice.invoice_date);
+  const lineItemsHtml = lineItems
     .map((lineItem) => {
       const name = escapeHtml(String(lineItem.item_name_snapshot ?? '').trim() || 'Line item');
       const description = escapeHtml(String(lineItem.description_snapshot ?? '').trim());
@@ -525,50 +580,94 @@ function buildInternalInvoiceEmailBody(args: {
         </tr>`;
     })
     .join('');
-
   const invoiceNumber = escapeHtml(String(args.invoice.invoice_number ?? '').trim());
-  const invoiceDate = escapeHtml(String(args.invoice.invoice_date ?? '').trim());
-  const recipientName = escapeHtml(String(args.customerName ?? args.invoice.billing_name ?? '').trim() || 'Customer');
-  const jobTitle = escapeHtml(String(args.jobTitle ?? '').trim() || 'Service visit');
+  const invoiceDate = escapeHtml(invoiceDateDisplay);
   const serviceLocation = escapeHtml(String(args.serviceLocation ?? '').trim());
-  const total = escapeHtml(formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0)));
-  const supportLine = [args.supportEmail, args.supportPhone].filter(Boolean).map((value) => escapeHtml(String(value))).join(' • ');
+  const total = escapeHtml(totalDisplay);
   const notes = escapeHtml(String(args.invoice.notes ?? '').trim());
 
-  return renderOperationalEmailLayout({
-    title: `Invoice ${invoiceNumber}`,
-    companyDisplayName: args.businessName,
-    companyLogoUrl: args.companyLogoUrl,
-    supportEmail: args.supportEmail,
-    supportPhone: args.supportPhone,
-    bodyHtml: `
-      <p style="margin: 0 0 12px 0;">Hi ${recipientName},</p>
-      <p style="margin: 0 0 16px 0;">Your invoice for ${jobTitle} is ready.</p>
-      <div style="margin: 0 0 18px 0; border: 1px solid #e5e7eb; border-radius: 12px; padding: 14px 16px; background: #f8fafc;">
-        <div style="font-size: 13px; color: #475569; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700;">Invoice Summary</div>
-        <div style="margin-top: 10px; color: #111827;"><strong>Invoice #:</strong> ${invoiceNumber}</div>
-        <div style="margin-top: 6px; color: #111827;"><strong>Invoice Date:</strong> ${invoiceDate}</div>
-        ${serviceLocation ? `<div style="margin-top: 6px; color: #111827;"><strong>Service Location:</strong> ${serviceLocation}</div>` : ''}
-        <div style="margin-top: 6px; color: #111827;"><strong>Total:</strong> ${total}</div>
-      </div>
-      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 0 0 18px 0; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
-        <thead>
-          <tr style="background: #f8fafc;">
-            <th align="left" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Description</th>
-            <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Qty</th>
-            <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Unit Price</th>
-            <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #475569;">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${lineItemsHtml || `<tr><td colspan="4" style="padding: 12px; color: #475569;">No billed line items were recorded.</td></tr>`}
-        </tbody>
+  return `
+    <div style="margin: 0; padding: 0; background: #f3f6fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #0f172a;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; margin: 0; padding: 24px 12px;">
+        <tr>
+          <td align="center" style="padding: 0;">
+            <table role="presentation" width="640" cellspacing="0" cellpadding="0" style="width: 100%; max-width: 640px; border-collapse: collapse; border: 1px solid #dbe4f0; border-radius: 16px; overflow: hidden; background: #ffffff; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);">
+              <tr>
+                <td style="padding: 18px 20px 10px 20px; border-bottom: 1px solid #e2e8f0; background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);">
+                  <div style="font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: #1d4ed8; font-weight: 700; margin: 0 0 8px 0;">Invoice</div>
+                  ${safeLogoUrl
+                    ? `<img src="${escapeHtml(safeLogoUrl)}" alt="" width="180" height="48" style="display: block; max-width: 180px; max-height: 48px; width: auto; height: auto; object-fit: contain; border: 0; outline: none; text-decoration: none;" />`
+                    : `<div style="font-size: 22px; line-height: 1.2; font-weight: 700; color: #0f172a;">${escapeHtml(companyName)}</div>`}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 18px 20px 0 20px;">
+                  <h1 style="margin: 0; font-size: 24px; line-height: 1.25; color: #0f172a;">Invoice ${invoiceNumber}</h1>
+                  <p style="margin: 10px 0 0 0; font-size: 15px; line-height: 1.6; color: #334155;">Hi ${escapeHtml(recipientName)},</p>
+                  <p style="margin: 2px 0 0 0; font-size: 15px; line-height: 1.6; color: #334155;">Your invoice for ${escapeHtml(jobContext)} is ready.</p>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 16px 20px 0 20px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; border: 1px solid #dbe4f0; border-radius: 12px; overflow: hidden; background: #f8fbff;">
+                    <tr>
+                      <td colspan="2" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155; font-weight: 700; border-bottom: 1px solid #dbe4f0;">Invoice Summary</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Invoice #</td>
+                      <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${invoiceNumber}</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Invoice Date</td>
+                      <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${invoiceDate}</td>
+                    </tr>
+                    ${serviceLocation ? `<tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Service Location</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${serviceLocation}</td></tr>` : ''}
+                    <tr>
+                      <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Status</td>
+                      <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">Issued</td>
+                    </tr>
+                    <tr>
+                      <td style="padding: 10px 12px; font-size: 13px; color: #0f172a; font-weight: 700; border-top: 1px solid #dbe4f0;">Total Due</td>
+                      <td align="right" style="padding: 10px 12px; font-size: 16px; color: #0b3b87; font-weight: 800; border-top: 1px solid #dbe4f0;">${total}</td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding: 16px 20px 0 20px;">
+                  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; border: 1px solid #dbe4f0; border-radius: 12px; overflow: hidden; background: #ffffff;">
+                    <thead>
+                      <tr style="background: #f1f5f9;">
+                        <th align="left" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Description</th>
+                        <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Qty</th>
+                        <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Unit Price</th>
+                        <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      ${lineItemsHtml || `<tr><td colspan="4" style="padding: 12px; color: #475569;">No billed line items were recorded.</td></tr>`}
+                      <tr>
+                        <td colspan="3" align="right" style="padding: 10px 12px; border-top: 1px solid #dbe4f0; font-size: 13px; color: #334155; font-weight: 700;">Total</td>
+                        <td align="right" style="padding: 10px 12px; border-top: 1px solid #dbe4f0; font-size: 14px; color: #0f172a; font-weight: 800;">${total}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </td>
+              </tr>
+              ${notes ? `<tr><td style="padding: 16px 20px 0 20px;"><div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc;"><div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155; font-weight: 700; margin: 0 0 6px 0;">Notes</div><div style="font-size: 14px; line-height: 1.55; color: #334155;">${notes.replace(/\n/g, '<br />')}</div></div></td></tr>` : ''}
+              <tr>
+                <td style="padding: 16px 20px 20px 20px;">
+                  <p style="margin: 0 0 8px 0; font-size: 14px; line-height: 1.6; color: #334155;">Please contact us with any billing questions or payment instructions.</p>
+                  <p style="margin: 0 0 4px 0; font-size: 13px; line-height: 1.6; color: #475569;">${escapeHtml(contactLine)}</p>
+                  <p style="margin: 0; font-size: 12px; line-height: 1.5; color: #94a3b8;">This invoice was sent by ${escapeHtml(companyName)}.</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
       </table>
-      ${notes ? `<div style="margin: 0 0 16px 0;"><strong>Notes:</strong><br />${notes.replace(/\n/g, '<br />')}</div>` : ''}
-      <p style="margin: 0 0 14px 0; color: #374151;">Please contact us with any billing questions.</p>
-      ${supportLine ? `<p style="margin: 0; color: #4b5563;">Questions? Contact ${escapeHtml(args.businessName)} at ${supportLine}.</p>` : ''}
-    `,
-  });
+    </div>
+  `;
 }
 
 function buildInternalInvoiceEmailText(args: {
@@ -581,12 +680,16 @@ function buildInternalInvoiceEmailText(args: {
   serviceLocation: string | null;
 }) {
   const invoiceNumber = String(args.invoice.invoice_number ?? '').trim();
-  const invoiceDate = String(args.invoice.invoice_date ?? '').trim();
+  const invoiceDate = formatInvoiceDateForDisplay(args.invoice.invoice_date);
   const recipientName = String(args.customerName ?? args.invoice.billing_name ?? '').trim() || 'Customer';
-  const jobTitle = String(args.jobTitle ?? '').trim() || 'Service visit';
+  const jobTitle = normalizeJobContextForSentence(args.jobTitle);
   const serviceLocation = String(args.serviceLocation ?? '').trim();
   const total = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
-  const supportLine = [args.supportEmail, args.supportPhone].filter(Boolean).join(' | ');
+  const contactLine = buildContactLine({
+    businessName: args.businessName,
+    supportEmail: args.supportEmail,
+    supportPhone: args.supportPhone,
+  });
 
   const lineItems = (args.invoice.line_items ?? [])
     .map((lineItem, index) => {
@@ -609,15 +712,46 @@ function buildInternalInvoiceEmailText(args: {
     `Invoice #: ${invoiceNumber}`,
     `Invoice Date: ${invoiceDate}`,
     ...(serviceLocation ? [`Service Location: ${serviceLocation}`] : []),
+    'Status: Issued',
     `Total: ${total}`,
     '',
     'CHARGES',
     lineItems || 'No billed line items were recorded.',
     ...(notes ? ['', 'NOTES', notes] : []),
     '',
-    'Please contact us with any billing questions.',
-    ...(supportLine ? [`Contact: ${args.businessName} | ${supportLine}`] : []),
+    'Please contact us with any billing questions or payment instructions.',
+    contactLine,
+    `This invoice was sent by ${args.businessName}.`,
   ].join('\n');
+}
+
+async function resolveServiceLocationLabelForInvoiceEmail(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  locationId: string | null | undefined;
+}) {
+  const locationId = String(params.locationId ?? '').trim();
+  if (!locationId) return null;
+
+  const { data, error } = await params.supabase
+    .from('locations')
+    .select('address_line1, address_line2, city, state, zip, postal_code')
+    .eq('id', locationId)
+    .eq('owner_user_id', params.accountOwnerUserId)
+    .maybeSingle();
+
+  if (error) return null;
+  if (!data) return null;
+
+  const line1 = getOptionalText(data.address_line1);
+  const line2 = getOptionalText(data.address_line2);
+  const city = getOptionalText(data.city);
+  const state = getOptionalText(data.state);
+  const zip = getOptionalText(data.zip) ?? getOptionalText(data.postal_code);
+  const locality = [city, state, zip].filter(Boolean).join(' ');
+
+  const label = [line1, line2, locality].filter(Boolean).join(', ');
+  return label || null;
 }
 
 async function listInternalInvoiceEmailNotifications(params: {
@@ -1716,32 +1850,36 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
   const attemptKind: InternalInvoiceEmailAttemptKind = successfulSendExists ? 'resent' : 'sent';
   const attemptNumber = sendHistory.length + 1;
 
-  const businessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+  const tenantIdentity = await resolveOperationalTenantIdentity({
     supabase: context.supabase,
     accountOwnerUserId: context.internalUser.account_owner_user_id,
   });
 
-  const serviceLocation = null;
+  const serviceLocation = await resolveServiceLocationLabelForInvoiceEmail({
+    supabase: context.supabase,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    locationId: context.job.location_id,
+  });
   const customerName = [context.job.customer_first_name, context.job.customer_last_name]
     .map((value) => getOptionalText(value))
     .filter(Boolean)
     .join(' ');
 
-  const subject = `Invoice ${context.invoice.invoice_number} from ${businessIdentity.display_name}`;
+  const subject = `Invoice ${context.invoice.invoice_number} from ${tenantIdentity.displayName}`;
   const body = buildInternalInvoiceEmailBody({
-    businessName: businessIdentity.display_name,
-    companyLogoUrl: businessIdentity.logo_url,
-    supportEmail: businessIdentity.support_email,
-    supportPhone: businessIdentity.support_phone,
+    businessName: tenantIdentity.displayName,
+    companyLogoUrl: tenantIdentity.logoUrl,
+    supportEmail: tenantIdentity.supportEmail,
+    supportPhone: tenantIdentity.supportPhone,
     invoice: context.invoice,
     customerName: customerName || context.invoice.billing_name || null,
     jobTitle: context.job.title ?? null,
     serviceLocation: serviceLocation || null,
   });
   const textBody = buildInternalInvoiceEmailText({
-    businessName: businessIdentity.display_name,
-    supportEmail: businessIdentity.support_email,
-    supportPhone: businessIdentity.support_phone,
+    businessName: tenantIdentity.displayName,
+    supportEmail: tenantIdentity.supportEmail,
+    supportPhone: tenantIdentity.supportPhone,
     invoice: context.invoice,
     customerName: customerName || context.invoice.billing_name || null,
     jobTitle: context.job.title ?? null,
