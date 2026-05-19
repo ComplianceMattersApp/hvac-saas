@@ -16,6 +16,24 @@ export function buildEstimateNumber(): string {
   return `EST-${datePart}-${suffix}`;
 }
 
+function isMissingOptionPackageSchemaError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as { code?: string | null; message?: string | null };
+  const code = String(maybeError.code ?? "").trim();
+  const message = String(maybeError.message ?? "").toLowerCase();
+
+  if (code === "PGRST205" || code === "42P01") {
+    return true;
+  }
+
+  return (
+    message.includes("estimate_options") ||
+    message.includes("estimate_option_line_items") ||
+    message.includes("schema cache")
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Same-account entity validation helpers
 // Rules mirror internal-invoice-actions + internal-job-scope patterns.
@@ -214,7 +232,10 @@ async function loadEstimateOption(params: {
     .eq("id", params.optionId)
     .eq("estimate_id", params.estimateId)
     .maybeSingle();
-  if (optionErr) throw optionErr;
+  if (optionErr) {
+    if (isMissingOptionPackageSchemaError(optionErr)) return null;
+    throw optionErr;
+  }
   if (!option?.id) return null;
 
   const { data: lineItems, error: linesErr } = await params.supabase
@@ -225,7 +246,10 @@ async function loadEstimateOption(params: {
     .eq("estimate_option_id", params.optionId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
-  if (linesErr) throw linesErr;
+  if (linesErr) {
+    if (isMissingOptionPackageSchemaError(linesErr)) return null;
+    throw linesErr;
+  }
 
   return { ...option, line_items: lineItems ?? [] };
 }
@@ -246,7 +270,11 @@ async function loadEstimateOptions(params: {
     .eq("estimate_id", params.estimateId)
     .order("sort_order", { ascending: true })
     .order("created_at", { ascending: true });
-  if (optionsErr) throw optionsErr;
+  if (optionsErr) {
+    // Backward-compatible fallback for environments without option schema migration.
+    if (isMissingOptionPackageSchemaError(optionsErr)) return [];
+    throw optionsErr;
+  }
 
   if (!options || options.length === 0) {
     return [];
@@ -263,7 +291,12 @@ async function loadEstimateOptions(params: {
         .eq("estimate_option_id", opt.id)
         .order("sort_order", { ascending: true })
         .order("created_at", { ascending: true });
-      if (linesErr) throw linesErr;
+      if (linesErr) {
+        if (isMissingOptionPackageSchemaError(linesErr)) {
+          return { ...opt, line_items: [] };
+        }
+        throw linesErr;
+      }
       return { ...opt, line_items: lineItems ?? [] };
     })
   );
