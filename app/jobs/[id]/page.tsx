@@ -135,6 +135,7 @@ import {
 import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
 import { equipmentRoleLabel } from "@/lib/utils/equipment-display";
+import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -1323,7 +1324,46 @@ export default async function JobDetailPage({
     }),
   );
 
-  setPhaseValue("customerAttemptSummary", 0);
+  const customerAttemptSummaryPromise = timedPhase("customerAttemptSummary", async () => {
+    try {
+      const [attemptCountRes, latestAttemptRes] = await Promise.all([
+        supabase
+          .from("job_events")
+          .select("id", { count: "exact", head: true })
+          .eq("job_id", jobId)
+          .eq("event_type", "customer_attempt"),
+        supabase
+          .from("job_events")
+          .select("created_at")
+          .eq("job_id", jobId)
+          .eq("event_type", "customer_attempt")
+          .order("created_at", { ascending: false })
+          .limit(1),
+      ]);
+
+      if (attemptCountRes.error || latestAttemptRes.error) {
+        return {
+          attemptCount: null as number | null,
+          lastAttemptLabel: "Recent attempts unavailable",
+        };
+      }
+
+      const attemptCount = Number(attemptCountRes.count ?? 0) || 0;
+      const latestAttempt = latestAttemptRes.data?.[0]?.created_at
+        ? formatRecentAttemptDateTime(String(latestAttemptRes.data[0].created_at))
+        : "";
+
+      return {
+        attemptCount,
+        lastAttemptLabel: attemptCount > 0 && latestAttempt ? latestAttempt : "No recent attempts yet",
+      };
+    } catch {
+      return {
+        attemptCount: null as number | null,
+        lastAttemptLabel: "Recent attempts unavailable",
+      };
+    }
+  });
 
   const onTheWayUndoEligibilityPromise = timedPhase("undoEligibility", async () =>
     getOnTheWayUndoEligibility(jobId),
@@ -1523,6 +1563,7 @@ export default async function JobDetailPage({
     visitScopePricebookTemplates,
     customerRoleContacts,
     jobRoleContacts,
+    customerAttemptSummary,
   ] = await Promise.all([
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
@@ -1533,6 +1574,7 @@ export default async function JobDetailPage({
     visitScopePricebookTemplatesPromise,
     customerRoleContactsPromise,
     jobRoleContactsPromise,
+    customerAttemptSummaryPromise,
   ]);
 
   const contractorBilling = billingPartyReads.contractorBilling;
@@ -1558,8 +1600,8 @@ export default async function JobDetailPage({
   const contractorResponseLabel: string | null = null;
   const contractorResponseSubLabel: string | null = null;
 
-  const attemptCount: number | null = null;
-  const lastAttemptLabel = "Recent attempts loading";
+  const attemptCount: number | null = customerAttemptSummary.attemptCount;
+  const lastAttemptLabel = customerAttemptSummary.lastAttemptLabel;
 
   const customerName =
   (customerBilling?.full_name ||
@@ -2069,6 +2111,9 @@ const jobStatusSummaryText = activeWaitingState
   : onHoldActive
   ? `On Hold${onHoldReasonText ? ` • ${truncateSummaryText(onHoldReasonText, 72)}` : ""}`
   : `Current lifecycle: ${formatOpsStatusLabel(job.ops_status)}`;
+const currentStateDetailText = jobStatusSummaryText === `Current lifecycle: ${formatOpsStatusLabel(job.ops_status)}`
+  ? "Lifecycle status"
+  : jobStatusSummaryText;
 const followUpSummaryText = hasFollowUpReminder
   ? [
       followUpOwnerLabel ? `For ${followUpOwnerLabel}` : null,
@@ -2092,7 +2137,7 @@ const headerJobTypeLabel = String(job.job_type ?? "service")
   .filter(Boolean)
   .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
   .join(" ");
-const headerMetaLine = [headerJobTypeLabel, serviceCity, formatOpsStatusLabel(job.ops_status)]
+const headerMetaLine = [headerJobTypeLabel, serviceCity]
   .filter((part) => String(part ?? "").trim().length > 0)
   .join(" • ");
 const showSharedNotesCard = !isHvacServiceMode;
@@ -2996,7 +3041,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
             <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Current State</div>
             <div className="mt-0.5 text-sm font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</div>
-            <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{jobStatusSummaryText}</div>
+            <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{currentStateDetailText}</div>
           </div>
         </div>
 
@@ -3018,7 +3063,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">
           <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Schedule</div>
           <div className={`mt-0.5 text-sm font-semibold ${job.scheduled_date ? "text-emerald-800" : "text-slate-700"}`}>
-            {job.scheduled_date ? "Scheduled" : "Unscheduled"}
+            {job.scheduled_date ? "Date set" : "Needs scheduling"}
           </div>
         </div>
         <div className="rounded-lg border border-slate-200/80 bg-white/80 px-3 py-2">

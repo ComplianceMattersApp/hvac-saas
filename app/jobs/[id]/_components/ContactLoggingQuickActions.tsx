@@ -85,6 +85,11 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
   const summaryText = hasAttemptSummary
     ? `${attemptCount} attempt${attemptCount === 1 ? "" : "s"} • last: ${String(lastAttemptLabel ?? "—").trim() || "—"}`
     : "Recent attempts loading";
+  const resolvedSummaryText = hasAttemptSummary
+    ? attemptCount > 0
+      ? `${attemptCount} attempt${attemptCount === 1 ? "" : "s"} - Last attempt ${String(lastAttemptLabel ?? "unavailable").trim() || "unavailable"}`
+      : "No recent attempts yet"
+    : String(lastAttemptLabel ?? "").trim() || summaryText;
 
   return (
     <div ref={sectionRef} id="contact-logging" className="mt-4 border-t border-slate-200/80 pt-4 scroll-mt-24">
@@ -117,7 +122,7 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
         </form>
       </div>
       <div className="mt-2 text-[11px] text-slate-500">
-        {summaryText}
+        {resolvedSummaryText}
       </div>
       <div className="mt-1 text-[11px] text-slate-500">
         Logs communication attempts only; does not confirm carrier delivery.
