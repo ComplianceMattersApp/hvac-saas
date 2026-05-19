@@ -197,6 +197,131 @@ export async function recomputeEstimateTotals(params: {
 // Read: get estimate by ID
 // ---------------------------------------------------------------------------
 
+/**
+ * Load an estimate option and its nested line items.
+ * Returns null if option not found.
+ */
+async function loadEstimateOption(params: {
+  optionId: string;
+  estimateId: string;
+  supabase: any;
+}): Promise<EstimateOptionReadResult | null> {
+  const { data: option, error: optionErr } = await params.supabase
+    .from("estimate_options")
+    .select(
+      "id, estimate_id, slot_index, default_label_key, label, sort_order, summary, notes, subtotal_cents, total_cents, created_at, updated_at"
+    )
+    .eq("id", params.optionId)
+    .eq("estimate_id", params.estimateId)
+    .maybeSingle();
+  if (optionErr) throw optionErr;
+  if (!option?.id) return null;
+
+  const { data: lineItems, error: linesErr } = await params.supabase
+    .from("estimate_option_line_items")
+    .select(
+      "id, estimate_option_id, estimate_id, sort_order, source_pricebook_item_id, item_name_snapshot, description_snapshot, item_type_snapshot, category_snapshot, unit_label_snapshot, quantity, unit_price_cents, line_subtotal_cents, created_at, updated_at"
+    )
+    .eq("estimate_option_id", params.optionId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (linesErr) throw linesErr;
+
+  return { ...option, line_items: lineItems ?? [] };
+}
+
+/**
+ * Load all estimate options for an estimate with their nested line items.
+ * Returns empty array if no options exist.
+ */
+async function loadEstimateOptions(params: {
+  estimateId: string;
+  supabase: any;
+}): Promise<EstimateOptionReadResult[]> {
+  const { data: options, error: optionsErr } = await params.supabase
+    .from("estimate_options")
+    .select(
+      "id, estimate_id, slot_index, default_label_key, label, sort_order, summary, notes, subtotal_cents, total_cents, created_at, updated_at"
+    )
+    .eq("estimate_id", params.estimateId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true });
+  if (optionsErr) throw optionsErr;
+
+  if (!options || options.length === 0) {
+    return [];
+  }
+
+  // Load line items for each option in parallel
+  const optionsWithLineItems = await Promise.all(
+    options.map(async (opt: Omit<EstimateOptionReadResult, "line_items">) => {
+      const { data: lineItems, error: linesErr } = await params.supabase
+        .from("estimate_option_line_items")
+        .select(
+          "id, estimate_option_id, estimate_id, sort_order, source_pricebook_item_id, item_name_snapshot, description_snapshot, item_type_snapshot, category_snapshot, unit_label_snapshot, quantity, unit_price_cents, line_subtotal_cents, created_at, updated_at"
+        )
+        .eq("estimate_option_id", opt.id)
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      if (linesErr) throw linesErr;
+      return { ...opt, line_items: lineItems ?? [] };
+    })
+  );
+
+  return optionsWithLineItems;
+}
+
+export type EstimateLineReadResult = {
+  id: string;
+  estimate_id: string;
+  sort_order: number;
+  source_pricebook_item_id: string | null;
+  item_name_snapshot: string;
+  description_snapshot: string | null;
+  item_type_snapshot: string;
+  category_snapshot: string | null;
+  unit_label_snapshot: string | null;
+  quantity: number;
+  unit_price_cents: number;
+  line_subtotal_cents: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EstimateOptionLineReadResult = {
+  id: string;
+  estimate_option_id: string;
+  estimate_id: string;
+  sort_order: number;
+  source_pricebook_item_id: string | null;
+  item_name_snapshot: string;
+  description_snapshot: string | null;
+  item_type_snapshot: string;
+  category_snapshot: string | null;
+  unit_label_snapshot: string | null;
+  quantity: number;
+  unit_price_cents: number;
+  line_subtotal_cents: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EstimateOptionReadResult = {
+  id: string;
+  estimate_id: string;
+  slot_index: number;
+  default_label_key: string | null;
+  label: string;
+  sort_order: number;
+  summary: string | null;
+  notes: string | null;
+  subtotal_cents: number;
+  total_cents: number;
+  created_at: string;
+  updated_at: string;
+  line_items: EstimateOptionLineReadResult[];
+};
+
 export type EstimateReadResult = {
   id: string;
   account_owner_user_id: string;
@@ -220,30 +345,19 @@ export type EstimateReadResult = {
   updated_by_user_id: string;
   created_at: string;
   updated_at: string;
+  proposalMode: "single_option_flat" | "multi_option_packages";
   line_items: EstimateLineReadResult[];
-};
-
-export type EstimateLineReadResult = {
-  id: string;
-  estimate_id: string;
-  sort_order: number;
-  source_pricebook_item_id: string | null;
-  item_name_snapshot: string;
-  description_snapshot: string | null;
-  item_type_snapshot: string;
-  category_snapshot: string | null;
-  unit_label_snapshot: string | null;
-  quantity: number;
-  unit_price_cents: number;
-  line_subtotal_cents: number;
-  created_at: string;
-  updated_at: string;
+  options?: EstimateOptionReadResult[];
 };
 
 /**
- * Load an estimate with its ordered line items.
+ * Load an estimate with its ordered line items and option packages.
  * Internal-user scoped: returns null if estimate is not found or belongs to
  * a different account.
+ *
+ * Sets proposalMode based on presence of option rows:
+ * - "single_option_flat": no option packages exist (flat estimate_line_items)
+ * - "multi_option_packages": option packages exist (nested line items per option)
  */
 export async function getEstimateById(params: {
   estimateId: string;
@@ -259,6 +373,7 @@ export async function getEstimateById(params: {
   if (estimateErr) throw estimateErr;
   if (!estimate?.id) return null;
 
+  // Load flat line items (current/V1A behavior)
   const { data: lines, error: linesErr } = await params.supabase
     .from("estimate_line_items")
     .select(
@@ -269,8 +384,29 @@ export async function getEstimateById(params: {
     .order("created_at", { ascending: true });
   if (linesErr) throw linesErr;
 
-  return { ...estimate, line_items: lines ?? [] };
+  // Load option packages (V1B multi-option behavior)
+  const options = await loadEstimateOptions({
+    estimateId: params.estimateId,
+    supabase: params.supabase,
+  });
+
+  // Discriminate proposal mode based on presence of options
+  const proposalMode = options.length > 0 ? "multi_option_packages" : "single_option_flat";
+
+  const result: EstimateReadResult = {
+    ...estimate,
+    proposalMode,
+    line_items: lines ?? [],
+  };
+
+  // Include options only if they exist (multi-option mode)
+  if (options.length > 0) {
+    result.options = options;
+  }
+
+  return result;
 }
+
 
 // ---------------------------------------------------------------------------
 // Read: list estimates by account

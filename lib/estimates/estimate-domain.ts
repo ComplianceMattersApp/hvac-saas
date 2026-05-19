@@ -142,6 +142,43 @@ export type EstimateLineItemRow = {
   updated_at:               string;
 };
 
+export type EstimateOptionRow = {
+  id:                 string;
+  estimate_id:        string;
+  slot_index:         number;
+  default_label_key:  string | null;
+  label:              string;
+  sort_order:         number;
+  summary:            string | null;
+  notes:              string | null;
+  subtotal_cents:     number;
+  total_cents:        number;
+  created_by_user_id: string;
+  updated_by_user_id: string;
+  created_at:         string;
+  updated_at:         string;
+};
+
+export type EstimateOptionLineItemRow = {
+  id:                       string;
+  estimate_option_id:       string;
+  estimate_id:              string;
+  sort_order:               number;
+  source_pricebook_item_id: string | null;
+  item_name_snapshot:       string;
+  description_snapshot:     string | null;
+  item_type_snapshot:       string;
+  category_snapshot:        string | null;
+  unit_label_snapshot:      string | null;
+  quantity:                 number;
+  unit_price_cents:         number;
+  line_subtotal_cents:      number;
+  created_by_user_id:       string;
+  updated_by_user_id:       string;
+  created_at:               string;
+  updated_at:               string;
+};
+
 export type EstimateEventRow = {
   id:          string;
   estimate_id: string;
