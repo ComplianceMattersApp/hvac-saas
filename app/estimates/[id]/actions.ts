@@ -162,6 +162,8 @@ export async function addEstimateOptionLineItemFromForm(formData: FormData) {
 
   const estimateId = String(formData.get("estimate_id") ?? "").trim();
   const estimateOptionId = String(formData.get("estimate_option_id") ?? "").trim();
+  const sourcePricebookItemId =
+    String(formData.get("source_pricebook_item_id") ?? "").trim() || null;
   const itemName = String(formData.get("item_name") ?? "").trim();
   const itemType = String(formData.get("item_type") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim() || null;
@@ -175,6 +177,7 @@ export async function addEstimateOptionLineItemFromForm(formData: FormData) {
   const result = await addEstimateOptionLineItem({
     estimateId,
     estimateOptionId,
+    sourcePricebookItemId,
     itemName,
     itemType,
     quantity,

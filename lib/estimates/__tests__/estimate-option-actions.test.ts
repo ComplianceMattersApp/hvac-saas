@@ -15,12 +15,13 @@ import {
 // ---------------------------------------------------------------------------
 
 const createClientMock = vi.fn();
+const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const isEstimatesEnabledMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
-  createAdminClient: vi.fn(),
+  createAdminClient: (...args: unknown[]) => createAdminClientMock(...args),
 }));
 
 vi.mock("@/lib/auth/internal-user", () => ({
@@ -58,6 +59,41 @@ function makeThenableResult(result: unknown) {
     then: (resolve: any, reject: any) => Promise.resolve(result).then(resolve, reject),
   };
   return chain;
+}
+
+function makePricebookAdminClient(pricebookItem: Record<string, unknown> | null = null) {
+  return {
+    from: vi.fn((table: string) => {
+      if (table !== "pricebook_items") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      return {
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: pricebookItem,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+        })),
+      };
+    }),
+  } as any;
 }
 
 function makeSupabaseClient(
@@ -782,6 +818,133 @@ describe("addEstimateOptionLineItem", () => {
         event_type: "estimate_option_line_item_added",
         user_id: USER_ID,
       }),
+    });
+  });
+
+  it("adds a pricebook-backed line with source provenance, overrides, and fallback snapshots", async () => {
+    const supabase = makeOptionLineSupabaseClient({ optionLineSubtotals: [1000] });
+    const admin = makePricebookAdminClient({
+      id: "pb-1",
+      item_name: "Catalog Compressor",
+      item_type: "material",
+      default_description: "Catalog description",
+      category: "HVAC",
+      unit_label: "ea",
+      default_unit_price: 2500,
+    });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      sourcePricebookItemId: "pb-1",
+      itemName: "  Installed Compressor  ",
+      quantity: 2,
+      unitPriceCents: 2500,
+      description: "  Installed with startup  ",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.subtotal_cents).toBe(6000);
+      expect(result.total_cents).toBe(6000);
+    }
+
+    const lineInsert = supabase.__insertedRows.find(
+      (row: any) => row.table === "estimate_option_line_items"
+    );
+    expect(lineInsert?.payload).toMatchObject({
+      estimate_option_id: OPTION_ID,
+      estimate_id: ESTIMATE_ID,
+      source_pricebook_item_id: "pb-1",
+      item_name_snapshot: "Installed Compressor",
+      description_snapshot: "Installed with startup",
+      item_type_snapshot: "material",
+      category_snapshot: "HVAC",
+      unit_label_snapshot: "ea",
+      quantity: 2,
+      unit_price_cents: 2500,
+      line_subtotal_cents: 5000,
+    });
+
+    expect(supabase.__estimateUpdates).toHaveLength(0);
+    expect(supabase.__insertedRows).toContainEqual({
+      table: "estimate_events",
+      payload: expect.objectContaining({
+        estimate_id: ESTIMATE_ID,
+        event_type: "estimate_option_line_item_added",
+        user_id: USER_ID,
+        meta: expect.objectContaining({
+          estimate_option_id: OPTION_ID,
+          source: "pricebook",
+          source_pricebook_item_id: "pb-1",
+          item_name: "Installed Compressor",
+          line_subtotal_cents: 5000,
+          option_total_cents: 6000,
+        }),
+      }),
+    });
+  });
+
+  it("rejects missing pricebook item", async () => {
+    const supabase = makeOptionLineSupabaseClient({ optionLineSubtotals: [1000] });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makePricebookAdminClient(null));
+
+    const result = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      sourcePricebookItemId: "pb-missing",
+      quantity: 1,
+      unitPriceCents: 1000,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Pricebook item not found in this account or is inactive.",
+    });
+  });
+
+  it("rejects inactive pricebook item", async () => {
+    const supabase = makeOptionLineSupabaseClient({ optionLineSubtotals: [1000] });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makePricebookAdminClient(null));
+
+    const result = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      sourcePricebookItemId: "pb-inactive",
+      quantity: 1,
+      unitPriceCents: 1000,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Pricebook item not found in this account or is inactive.",
+    });
+  });
+
+  it("rejects cross-account or out-of-scope pricebook item", async () => {
+    const supabase = makeOptionLineSupabaseClient({ optionLineSubtotals: [1000] });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makePricebookAdminClient(null));
+
+    const result = await addEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      sourcePricebookItemId: "pb-other-account",
+      quantity: 1,
+      unitPriceCents: 1000,
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Pricebook item not found in this account or is inactive.",
     });
   });
 

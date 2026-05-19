@@ -707,10 +707,11 @@ export async function recomputeEstimateOptionTotals(params: {
 export type AddEstimateOptionLineItemParams = {
   estimateId: string;
   estimateOptionId: string;
-  itemName: string;
-  itemType: string;
+  itemName?: string;
+  itemType?: string;
   quantity: number;
   unitPriceCents: number;
+  sourcePricebookItemId?: string | null;
   description?: string | null;
   category?: string | null;
   unitLabel?: string | null;
@@ -742,22 +743,8 @@ export async function addEstimateOptionLineItem(
 
   const estimateId = String(params.estimateId ?? "").trim();
   const estimateOptionId = String(params.estimateOptionId ?? "").trim();
-  const itemName = String(params.itemName ?? "").trim();
-  const itemType = String(params.itemType ?? "").trim();
-  const description = String(params.description ?? "").trim() || null;
-  const category = String(params.category ?? "").trim() || null;
-  const unitLabel = String(params.unitLabel ?? "").trim() || null;
-
   if (!estimateId || !estimateOptionId) {
     return { success: false, error: "estimate_id and estimate_option_id are required." };
-  }
-
-  if (!itemName) {
-    return { success: false, error: "item_name is required." };
-  }
-
-  if (!itemType) {
-    return { success: false, error: "item_type is required." };
   }
 
   const quantity = Number(params.quantity);
@@ -771,6 +758,55 @@ export async function addEstimateOptionLineItem(
   }
 
   const lineSubtotalCents = Math.floor(quantity * unitPriceCents);
+
+  let itemNameSnapshot: string;
+  let descriptionSnapshot: string | null;
+  let itemTypeSnapshot: string;
+  let categorySnapshot: string | null;
+  let unitLabelSnapshot: string | null;
+  let sourcePricebookItemId: string | null = null;
+
+  const rawPricebookId = params.sourcePricebookItemId?.trim() || null;
+
+  if (rawPricebookId) {
+    const admin = createAdminClient();
+    const pbItem = await loadScopedPricebookItemForEstimate({
+      pricebookItemId: rawPricebookId,
+      accountOwnerUserId,
+      admin,
+    });
+    if (!pbItem) {
+      return { success: false, error: "Pricebook item not found in this account or is inactive." };
+    }
+
+    sourcePricebookItemId = pbItem.id;
+    itemNameSnapshot = String(params.itemName ?? "").trim() || pbItem.item_name;
+    itemTypeSnapshot = String(params.itemType ?? "").trim() || pbItem.item_type;
+    descriptionSnapshot = params.description?.trim() ?? pbItem.default_description;
+    categorySnapshot = params.category?.trim() ?? pbItem.category;
+    unitLabelSnapshot = params.unitLabel?.trim() ?? pbItem.unit_label;
+
+    if (!itemNameSnapshot) {
+      return { success: false, error: "item_name is required for pricebook line items." };
+    }
+    if (!itemTypeSnapshot) {
+      return { success: false, error: "item_type is required for pricebook line items." };
+    }
+  } else {
+    itemNameSnapshot = String(params.itemName ?? "").trim();
+    if (!itemNameSnapshot) {
+      return { success: false, error: "item_name is required for manual line items." };
+    }
+
+    itemTypeSnapshot = String(params.itemType ?? "").trim();
+    if (!itemTypeSnapshot) {
+      return { success: false, error: "item_type is required for manual line items." };
+    }
+
+    descriptionSnapshot = String(params.description ?? "").trim() || null;
+    categorySnapshot = String(params.category ?? "").trim() || null;
+    unitLabelSnapshot = String(params.unitLabel ?? "").trim() || null;
+  }
 
   const { data: estimate, error: estErr } = await supabase
     .from("estimates")
@@ -828,12 +864,12 @@ export async function addEstimateOptionLineItem(
       estimate_option_id: estimateOptionId,
       estimate_id: estimateId,
       sort_order: sortOrder,
-      source_pricebook_item_id: null,
-      item_name_snapshot: itemName,
-      description_snapshot: description,
-      item_type_snapshot: itemType,
-      category_snapshot: category,
-      unit_label_snapshot: unitLabel,
+      source_pricebook_item_id: sourcePricebookItemId,
+      item_name_snapshot: itemNameSnapshot,
+      description_snapshot: descriptionSnapshot,
+      item_type_snapshot: itemTypeSnapshot,
+      category_snapshot: categorySnapshot,
+      unit_label_snapshot: unitLabelSnapshot,
       quantity,
       unit_price_cents: unitPriceCents,
       line_subtotal_cents: lineSubtotalCents,
@@ -854,16 +890,22 @@ export async function addEstimateOptionLineItem(
     supabase,
   });
 
+  const eventMeta: Record<string, unknown> = {
+    estimate_option_id: estimateOptionId,
+    line_item_id: lineItem.id,
+    item_name: itemNameSnapshot,
+    line_subtotal_cents: lineSubtotalCents,
+    option_total_cents: totals.total_cents,
+    source: sourcePricebookItemId ? "pricebook" : "manual",
+  };
+  if (sourcePricebookItemId) {
+    eventMeta.source_pricebook_item_id = sourcePricebookItemId;
+  }
+
   await supabase.from("estimate_events").insert({
     estimate_id: estimateId,
     event_type: "estimate_option_line_item_added",
-    meta: {
-      estimate_option_id: estimateOptionId,
-      line_item_id: lineItem.id,
-      item_name: itemName,
-      line_subtotal_cents: lineSubtotalCents,
-      source: "manual",
-    },
+    meta: eventMeta,
     user_id: userId,
   });
 

@@ -243,6 +243,7 @@ describe("estimate route action guards", () => {
     expect(addEstimateOptionLineItemMock).toHaveBeenCalledWith({
       estimateId: "est-1",
       estimateOptionId: "opt-1",
+      sourcePricebookItemId: null,
       itemName: "Repair Labor",
       itemType: "service",
       quantity: 2,
@@ -252,6 +253,70 @@ describe("estimate route action guards", () => {
       unitLabel: null,
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
+  });
+
+  it("addEstimateOptionLineItemFromForm passes sourcePricebookItemId through when present", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    addEstimateOptionLineItemMock.mockResolvedValue({
+      success: true,
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      lineItemId: "opt-line-2",
+      subtotal_cents: 2000,
+      total_cents: 2000,
+    });
+
+    const { addEstimateOptionLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("estimate_option_id", "opt-1");
+    fd.set("source_pricebook_item_id", "pb-1");
+    fd.set("item_name", "");
+    fd.set("item_type", "");
+    fd.set("quantity", "1");
+    fd.set("unit_price", "20");
+
+    await addEstimateOptionLineItemFromForm(fd);
+
+    expect(addEstimateOptionLineItemMock).toHaveBeenCalledWith({
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      sourcePricebookItemId: "pb-1",
+      itemName: "",
+      itemType: "",
+      quantity: 1,
+      unitPriceCents: 2000,
+      description: null,
+      category: null,
+      unitLabel: null,
+    });
+  });
+
+  it("addEstimateOptionLineItemFromForm does not revalidate on failure", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    addEstimateOptionLineItemMock.mockResolvedValue({
+      success: false,
+      error: "Option package not found on this estimate.",
+    });
+
+    const { addEstimateOptionLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("estimate_option_id", "opt-1");
+    fd.set("item_name", "Repair Labor");
+    fd.set("item_type", "service");
+    fd.set("quantity", "1");
+    fd.set("unit_price", "10");
+
+    const result = await addEstimateOptionLineItemFromForm(fd);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Option package not found on this estimate.",
+    });
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
   it("removeEstimateOptionLineItemFromForm short-circuits when feature flag disabled", async () => {
