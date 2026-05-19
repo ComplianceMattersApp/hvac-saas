@@ -48,6 +48,7 @@ describe("createContractorIntakeProposalAwarenessNotification", () => {
       p_body: "A contractor submitted an intake proposal pending internal finalization.",
       p_payload: {
         source: "contractor_intake_submissions",
+        contractor_intake_submission_id: "proposal-1",
         contractor_id: "contractor-1",
         submitted_by_user_id: "actor-1",
         account_owner_user_id: "owner-1",

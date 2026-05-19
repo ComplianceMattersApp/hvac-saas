@@ -39,6 +39,7 @@ type SubmissionRow = {
   proposed_customer_last_name?: string | null;
   proposed_address_line1?: string | null;
   proposed_city?: string | null;
+  proposed_state?: string | null;
   proposed_zip?: string | null;
   proposed_location_nickname?: string | null;
   proposed_job_type?: string | null;
@@ -216,6 +217,7 @@ describe("internal notification readers", () => {
             proposed_customer_last_name: "Lopez",
             proposed_address_line1: "100 Main St",
             proposed_city: "Pasadena",
+            proposed_state: "CA",
             proposed_zip: "91101",
             proposed_location_nickname: "Front Unit",
             proposed_job_type: "ecc",
@@ -248,6 +250,7 @@ describe("internal notification readers", () => {
     expect(notifications[0]?.proposal_enrichment?.contractor_name).toBe("Rapid Comfort");
     expect(notifications[0]?.proposal_enrichment?.customer_name).toBe("Maya Lopez");
     expect(notifications[0]?.proposal_enrichment?.address_summary).toContain("100 Main St");
+    expect(notifications[0]?.proposal_enrichment?.address_summary).toContain("Pasadena, CA 91101");
     expect(notifications[0]?.proposal_enrichment?.job_type_label).toBe("ECC");
     expect(unreadCount).toBe(1);
     expect(unreadBadgeCount).toBe(1);

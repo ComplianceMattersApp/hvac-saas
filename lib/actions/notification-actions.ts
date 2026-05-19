@@ -310,6 +310,7 @@ export async function createContractorIntakeProposalAwarenessNotification(
     body: "A contractor submitted an intake proposal pending internal finalization.",
     payload: {
       source: "contractor_intake_submissions",
+      contractor_intake_submission_id: contractorIntakeSubmissionId,
       contractor_id: contractorId,
       submitted_by_user_id: actorUserId,
       account_owner_user_id: accountOwnerUserId,

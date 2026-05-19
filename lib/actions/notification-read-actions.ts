@@ -110,7 +110,7 @@ async function buildProposalEnrichmentMap(
   const { data: submissions } = await supabase
     .from("contractor_intake_submissions")
     .select(
-      "id, contractor_id, proposed_customer_first_name, proposed_customer_last_name, proposed_address_line1, proposed_city, proposed_zip, proposed_location_nickname, proposed_job_type, proposed_project_type, proposed_job_notes, proposed_permit_number, proposed_jurisdiction, proposed_permit_date"
+      "id, contractor_id, proposed_customer_first_name, proposed_customer_last_name, proposed_address_line1, proposed_city, proposed_state, proposed_zip, proposed_location_nickname, proposed_job_type, proposed_project_type, proposed_job_notes, proposed_permit_number, proposed_jurisdiction, proposed_permit_date"
     )
     .in("id", uniqueSubmissionIds);
 
@@ -156,8 +156,11 @@ async function buildProposalEnrichmentMap(
 
     const addressLine = String(sub?.proposed_address_line1 ?? "").trim();
     const city = String(sub?.proposed_city ?? "").trim();
+    const state = String(sub?.proposed_state ?? "").trim();
     const zip = String(sub?.proposed_zip ?? "").trim();
-    const addressSummary = [addressLine, city, zip].filter(Boolean).join(", ") || null;
+    const cityState = [city, state].filter(Boolean).join(", ");
+    const localitySummary = [cityState, zip].filter(Boolean).join(" ");
+    const addressSummary = [addressLine, localitySummary].filter(Boolean).join(", ") || localitySummary || null;
 
     const locationNickname = String(sub?.proposed_location_nickname ?? "").trim() || null;
 

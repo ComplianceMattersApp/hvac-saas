@@ -290,7 +290,7 @@ function ProposalCard({
   onMarkAsRead,
 }: ProposalCardProps) {
   const contractorName = String(enrichment?.contractor_name ?? "").trim();
-  const customerName = String(enrichment?.customer_name ?? "").trim() || "Unknown customer";
+  const customerName = String(enrichment?.customer_name ?? "").trim() || "Customer not provided";
   const locationSummary =
     String(enrichment?.location_nickname ?? "").trim() ||
     String(enrichment?.address_summary ?? "").trim() ||
