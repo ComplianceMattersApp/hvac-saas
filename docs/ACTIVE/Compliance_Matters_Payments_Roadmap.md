@@ -394,6 +394,37 @@ Not introduced in V1A-3E:
 - No QBO
 - No production Stripe/Supabase/env changes
 
+### Tenant Customer Payments V1A-3F (Issued Invoice Email Includes Eligible Pay Link)
+
+**Status**: V1A-3F implemented (server-side invoice send flow).
+
+- Updated internal invoice send action `sendInternalInvoiceEmailFromForm` in `lib/actions/internal-invoice-actions.ts`.
+- Email behavior:
+	- attempts Checkout Session URL generation server-side during invoice send via `createTenantInvoiceCheckoutSession`
+	- injects `Pay Invoice` link into HTML/text email only when Checkout Session is successfully created
+	- uses copy: "You can pay this invoice securely online using the button below."
+	- includes Stripe processing disclosure line in email
+- Eligibility is inherited from existing checkout helper and send-context gates:
+	- invoice exists
+	- invoice status is issued
+	- balance due > 0
+	- tenant Stripe Connect readiness is ready
+	- internal invoicing mode + operational entitlement access already enforced by send context
+- Failure/ineligible behavior:
+	- send continues without online payment link when helper reports ineligible/not-ready states
+	- invoice send workflow, notification row lifecycle, and job events remain intact
+- Payment truth preserved:
+	- send flow does not insert `internal_invoice_payments`
+	- send flow does not mark invoices paid
+	- webhook remains collected-payment truth
+
+Not introduced in V1A-3F:
+- No customer portal
+- No QBO
+- No refunds/disputes/saved cards/partial payments
+- No platform seat billing behavior changes
+- No production Stripe/Supabase/env changes
+
 ---
 
 ## 6. Payment foundation requirements (build now)

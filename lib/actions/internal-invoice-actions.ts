@@ -17,6 +17,7 @@ import {
   resolveInternalInvoiceByJobId,
   type InternalInvoiceRecord,
 } from '@/lib/business/internal-invoice';
+import { createTenantInvoiceCheckoutSession } from '@/lib/business/internal-invoice-payments';
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from '@/lib/actions/job-evaluator';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import { reconcileServiceCaseStatusAfterJobChange } from '@/lib/actions/service-case-reconciliation';
@@ -543,6 +544,7 @@ function buildInternalInvoiceEmailBody(args: {
   companyLogoUrl: string | null;
   supportEmail: string | null;
   supportPhone: string | null;
+  paymentUrl: string | null;
   invoice: InternalInvoiceRecord;
   customerName: string | null;
   jobTitle: string | null;
@@ -585,6 +587,22 @@ function buildInternalInvoiceEmailBody(args: {
   const serviceLocation = escapeHtml(String(args.serviceLocation ?? '').trim());
   const total = escapeHtml(totalDisplay);
   const notes = escapeHtml(String(args.invoice.notes ?? '').trim());
+  const paymentUrl = String(args.paymentUrl ?? '').trim();
+  const safePaymentUrl = paymentUrl ? escapeHtml(paymentUrl) : null;
+  const paymentSection = safePaymentUrl
+    ? `
+              <tr>
+                <td style="padding: 16px 20px 0 20px;">
+                  <div style="border: 1px solid #dbe4f0; border-radius: 12px; background: #f8fbff; padding: 14px;">
+                    <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #334155;">You can pay this invoice securely online using the button below.</p>
+                    <div style="margin-top: 12px;">
+                      <a href="${safePaymentUrl}" style="display: inline-block; background: #0b3b87; color: #ffffff; text-decoration: none; font-weight: 700; font-size: 14px; line-height: 1; padding: 12px 16px; border-radius: 10px;">Pay Invoice</a>
+                    </div>
+                    <p style="margin: 10px 0 0 0; font-size: 12px; line-height: 1.5; color: #64748b;">Payment is processed securely by Stripe.</p>
+                  </div>
+                </td>
+              </tr>`
+    : '';
 
   return `
     <div style="margin: 0; padding: 0; background: #f3f6fb; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif; color: #0f172a;">
@@ -654,6 +672,7 @@ function buildInternalInvoiceEmailBody(args: {
                   </table>
                 </td>
               </tr>
+              ${paymentSection}
               ${notes ? `<tr><td style="padding: 16px 20px 0 20px;"><div style="border: 1px solid #e2e8f0; border-radius: 12px; padding: 12px; background: #f8fafc;"><div style="font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155; font-weight: 700; margin: 0 0 6px 0;">Notes</div><div style="font-size: 14px; line-height: 1.55; color: #334155;">${notes.replace(/\n/g, '<br />')}</div></div></td></tr>` : ''}
               <tr>
                 <td style="padding: 16px 20px 20px 20px;">
@@ -674,6 +693,7 @@ function buildInternalInvoiceEmailText(args: {
   businessName: string;
   supportEmail: string | null;
   supportPhone: string | null;
+  paymentUrl: string | null;
   invoice: InternalInvoiceRecord;
   customerName: string | null;
   jobTitle: string | null;
@@ -685,6 +705,7 @@ function buildInternalInvoiceEmailText(args: {
   const jobTitle = normalizeJobContextForSentence(args.jobTitle);
   const serviceLocation = String(args.serviceLocation ?? '').trim();
   const total = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
+  const paymentUrl = String(args.paymentUrl ?? '').trim();
   const contactLine = buildContactLine({
     businessName: args.businessName,
     supportEmail: args.supportEmail,
@@ -714,6 +735,16 @@ function buildInternalInvoiceEmailText(args: {
     ...(serviceLocation ? [`Service Location: ${serviceLocation}`] : []),
     'Status: Issued',
     `Total: ${total}`,
+    ...(paymentUrl
+      ? [
+          '',
+          'ONLINE PAYMENT',
+          'You can pay this invoice securely online using the button below.',
+          'Pay Invoice:',
+          paymentUrl,
+          'Payment is processed securely by Stripe.',
+        ]
+      : []),
     '',
     'CHARGES',
     lineItems || 'No billed line items were recorded.',
@@ -865,6 +896,35 @@ async function markInternalInvoiceEmailNotification(params: {
     .eq('id', params.notificationId);
 
   if (error) throw error;
+}
+
+async function resolveInvoicePaymentLinkForEmail(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  jobId: string;
+  invoice: InternalInvoiceRecord;
+}) {
+  if (!params.invoice?.id) return null;
+  if (String(params.invoice.status ?? '').trim().toLowerCase() !== 'issued') return null;
+
+  try {
+    const checkoutSession = await createTenantInvoiceCheckoutSession({
+      accountOwnerUserId: params.accountOwnerUserId,
+      jobId: params.jobId,
+      invoiceId: params.invoice.id,
+      supabase: params.supabase,
+    });
+
+    return String(checkoutSession.checkoutSessionUrl ?? '').trim() || null;
+  } catch (error) {
+    console.warn('Invoice email payment link unavailable', {
+      accountOwnerUserId: params.accountOwnerUserId,
+      jobId: params.jobId,
+      invoiceId: params.invoice.id,
+      message: error instanceof Error ? error.message : 'unknown_error',
+    });
+    return null;
+  }
 }
 
 async function requireDraftInvoiceContext(formData: FormData) {
@@ -1864,6 +1924,12 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     .map((value) => getOptionalText(value))
     .filter(Boolean)
     .join(' ');
+  const paymentUrl = await resolveInvoicePaymentLinkForEmail({
+    supabase: context.supabase,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    jobId: context.jobId,
+    invoice: context.invoice,
+  });
 
   const subject = `Invoice ${context.invoice.invoice_number} from ${tenantIdentity.displayName}`;
   const body = buildInternalInvoiceEmailBody({
@@ -1871,6 +1937,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     companyLogoUrl: tenantIdentity.logoUrl,
     supportEmail: tenantIdentity.supportEmail,
     supportPhone: tenantIdentity.supportPhone,
+    paymentUrl,
     invoice: context.invoice,
     customerName: customerName || context.invoice.billing_name || null,
     jobTitle: context.job.title ?? null,
@@ -1880,6 +1947,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     businessName: tenantIdentity.displayName,
     supportEmail: tenantIdentity.supportEmail,
     supportPhone: tenantIdentity.supportPhone,
+    paymentUrl,
     invoice: context.invoice,
     customerName: customerName || context.invoice.billing_name || null,
     jobTitle: context.job.title ?? null,
