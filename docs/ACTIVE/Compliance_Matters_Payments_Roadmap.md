@@ -100,7 +100,11 @@ Platform subscription onboarding status (separate from tenant payment execution)
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.
 - Live confirmation includes: live Stripe Product/Price, Vercel production env, deployed webhook endpoint, successful live checkout completion on a normal non-owner test account, webhook `200` handling, billing-customer linkage, active subscription sync, populated period end, and billing portal availability.
 - Sync target is limited to `platform_account_entitlements`.
-- Live launch billing decision is flat account subscription with unlimited users; active user count remains visible and per-seat enforcement is deferred.
+- Live launch billing decision remains flat account subscription for unlimited/comped accounts, and V1C finite-seat enforcement is now implemented for internal seat-increase mutations only (`createInternalUserFromForm`, `inviteInternalUserFromForm`, `activateInternalUserFromForm`) when `seat_limit` is finite and at capacity.
+- Unlimited/comped allowance remains unchanged (`seat_limit = null` and `internal_comped_v1` accounts are not blocked).
+- Stripe quantity sync and subscription quantity reconciliation remain deferred to V1D.
+- Checkout quantity remains unchanged.
+- Proration behavior remains deferred.
 - Internal/comped owner protection is complete through `internal_comped_v1` detection and comped-safe entitlement rows with no Stripe linkage.
 - This does not introduce tenant invoice checkout, tenant customer payment links, Pay Now/Charge Card, refunds/disputes/payout execution, Connect, or QBO sync.
 

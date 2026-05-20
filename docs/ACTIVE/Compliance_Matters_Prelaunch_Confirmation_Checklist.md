@@ -771,8 +771,12 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 ### 2.6 Launch billing decision (confirmed)
 - V1/live launch uses a flat platform account subscription with unlimited users.
 - Active user count remains visible.
-- Per-seat billing remains a desired later track, but is not enforced in V1/live launch.
-- Future per-seat work should include seat-limit enforcement, Stripe quantity sync, proration handling, and customer portal quantity rules.
+- V1C closeout: finite-seat-limit enforcement is now implemented server-side for internal seat-increase mutations only (`createInternalUserFromForm`, `inviteInternalUserFromForm`, `activateInternalUserFromForm`) when `seat_limit` is finite and at capacity.
+- Unlimited and comped accounts remain unblocked (`seat_limit = null`, `internal_comped_v1`).
+- Contractors/external users remain excluded from billable internal seat count.
+- Stripe quantity sync remains deferred to V1D; checkout quantity remains unchanged.
+- Proration and customer portal quantity rules remain deferred.
+- Authenticated click smoke caveat: admin-auth session was unavailable in shared browser context; route verification reached login redirect.
 
 ### 2.6.1 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.

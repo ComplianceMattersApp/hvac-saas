@@ -1,11 +1,41 @@
 # Platform Seat Billing V1B: Billable Seat Policy Lock + Mutation Gate Audit
 
-**Status**: ACTIVE audit / policy lock  
+**Status**: ACTIVE audit / policy lock (V1B complete; V1C closeout recorded)
 **Date**: 2026-05-19  
 **Authority**: Subordinate to Competitive_Packaging_and_Tier_Spec.md and Release_Scope_Lock_and_Post_Launch_Roadmap.md  
 **Previous Slice**: Platform Seat Audit Preview V1 (committed, pushed, browser-smoked)  
 **Current Scope**: Policy lock + mutation path audit (read-only, no enforcement)  
-**Next Slice**: V1C (enforcement insertion points), V1D (Stripe quantity reconciliation)
+**Next Slice**: V1D (Stripe quantity reconciliation)
+
+## V1C Closeout Addendum (2026-05-19)
+
+V1C is implemented and pushed in commit `78a06c2`.
+
+Implemented in V1C:
+- Server-side seat-limit enforcement gate via `assertInternalSeatAvailableForIncrease`.
+- Enforcement applies only to internal seat-increase mutations:
+  - `createInternalUserFromForm`
+  - `inviteInternalUserFromForm`
+  - `activateInternalUserFromForm`
+- Enforcement applies only when `seat_limit` is finite and `activeSeatCount >= seatLimit`.
+- Unlimited and comped accounts remain allowed:
+  - `seat_limit = null` allows as before
+  - internal comped accounts (`internal_comped_v1`) allow as before
+- Contractors/external users remain excluded from billable seat count.
+
+Explicit non-goals preserved in V1C:
+- No Stripe quantity sync (deferred to V1D).
+- No checkout quantity change.
+- No proration behavior changes (deferred).
+- No tenant customer invoice payment execution changes.
+- No QBO behavior changes.
+
+Browser smoke caveat (recorded honestly):
+- Authenticated click smoke for admin seat-limit interactions was blocked by unavailable admin-auth session in the shared browser context.
+- Route verification reached login redirect successfully.
+
+Historical note:
+- References below that describe V1C as "proposed" are historical V1B planning context and are superseded by this addendum.
 
 ---
 
