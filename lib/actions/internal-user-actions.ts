@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
+import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 import {
   requireInternalRole,
   type InternalRole,
@@ -54,6 +55,15 @@ function normalizePhone(raw: FormDataEntryValue | null) {
 
 function buildInternalUserProfileNoticeHref(userId: string, notice: string) {
   return `/ops/admin/internal-users/${encodeURIComponent(userId)}?profile_status=${encodeURIComponent(notice)}`;
+}
+
+const INTERNAL_USERS_SEAT_LIMIT_REACHED = "INTERNAL_USERS_SEAT_LIMIT_REACHED";
+
+function isSeatLimitReachedError(error: unknown) {
+  return (
+    error instanceof Error &&
+    String(error.message ?? "").trim() === INTERNAL_USERS_SEAT_LIMIT_REACHED
+  );
 }
 
 function isForeignKeyViolation(error: any) {
@@ -220,6 +230,23 @@ async function assertNotLastActiveAdmin(
   }
 }
 
+async function assertInternalSeatAvailableForIncrease(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}) {
+  const entitlement = await resolveAccountEntitlement(
+    params.accountOwnerUserId,
+    params.supabase,
+  );
+
+  if (entitlement.isInternalComped) return;
+  if (entitlement.seatLimit == null) return;
+
+  if (entitlement.activeSeatCount >= entitlement.seatLimit) {
+    throw new Error(INTERNAL_USERS_SEAT_LIMIT_REACHED);
+  }
+}
+
 export async function createInternalUserFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const {
@@ -239,6 +266,10 @@ export async function createInternalUserFromForm(formData: FormData): Promise<vo
     admin,
     accountOwnerUserId: actorInternalUser.account_owner_user_id,
     targetUserId,
+  });
+  await assertInternalSeatAvailableForIncrease({
+    supabase,
+    accountOwnerUserId: actorInternalUser.account_owner_user_id,
   });
 
   const { error } = await admin
@@ -329,6 +360,18 @@ export async function activateInternalUserFromForm(formData: FormData): Promise<
     targetUserId,
   );
 
+  try {
+    await assertInternalSeatAvailableForIncrease({
+      supabase,
+      accountOwnerUserId: actorInternalUser.account_owner_user_id,
+    });
+  } catch (error) {
+    if (isSeatLimitReachedError(error)) {
+      redirect("/ops/admin/internal-users?invite_status=seat_limit_reached");
+    }
+    throw error;
+  }
+
   const { error } = await admin
     .from("internal_users")
     .update({ is_active: true })
@@ -404,6 +447,18 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
     ) {
       redirect("/ops/admin/internal-users?invite_status=already_internal_other_owner");
     }
+  }
+
+  try {
+    await assertInternalSeatAvailableForIncrease({
+      supabase,
+      accountOwnerUserId: actorInternalUser.account_owner_user_id,
+    });
+  } catch (error) {
+    if (isSeatLimitReachedError(error)) {
+      redirect("/ops/admin/internal-users?invite_status=seat_limit_reached");
+    }
+    throw error;
   }
 
   const { data: inviteData, error: inviteError } = await admin.auth.admin.inviteUserByEmail(email, {

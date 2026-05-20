@@ -105,6 +105,11 @@ const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; m
     message:
       "Invite email limit reached. Please wait a few minutes and try again.",
   },
+  seat_limit_reached: {
+    tone: "warn",
+    message:
+      "Seat limit reached for this account. Deactivate an internal user or move to an unlimited plan before adding or reactivating staff.",
+  },
   already_internal_other_owner: {
     tone: "error",
     message: "That auth user is already linked to a different internal account owner.",
