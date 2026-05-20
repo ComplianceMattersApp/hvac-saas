@@ -110,6 +110,22 @@ Platform subscription onboarding status (separate from tenant payment execution)
 - Internal/comped owner protection is complete through `internal_comped_v1` detection and comped-safe entitlement rows with no Stripe linkage.
 - This does not introduce tenant invoice checkout, tenant customer payment links, Pay Now/Charge Card, refunds/disputes/payout execution, Connect, or QBO sync.
 
+---
+
+### Tenant Customer Payments V1A-1 (Foundation)
+
+**Status**: V1A-1 schema foundation and helpers implemented (not live UI yet).
+
+- V1A-1 foundation: Stripe webhook idempotency fields added to `internal_invoice_payments` table
+- Fields added: `stripe_checkout_session_id`, `stripe_event_id` (UNIQUE), `stripe_payment_intent_id`, `stripe_charged_at`
+- Payment method added: `card_stripe_online` to payment methods enum alongside existing manual/off-platform methods
+- Helpers implemented: `isStripeEventAlreadyRecorded()` for idempotency, `validateInvoiceEligibleForOnlinePayment()` for eligibility, `buildStripePaymentReference()` for charge normalization
+- All existing manual payment recording and balance derivation logic preserved and tested
+- Architecture locked: Checkout Session over Payment Link, issued invoices only, full balance only, no customer portal
+- Webhook idempotency using Stripe `event.id` as unique key (prevents double-crediting on webhook retry)
+- No live Checkout UI yet; no customer-facing payment link creation; no Stripe API calls; all changes schema/test/helper-only
+- Next slice (V1A-2): Webhook receiver for `charge.succeeded` and `charge.failed` events
+
 Locked direction:
 - billed truth and payment/collection truth remain separate
 - invoice reporting does not imply live payment execution

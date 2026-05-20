@@ -780,7 +780,23 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - V1D-B reconciliation uses `proration_behavior: "none"`; customer portal quantity editing remains deferred.
 - Authenticated click smoke caveat: admin-auth session was unavailable in shared browser context; route verification reached login redirect.
 
-### 2.6.1 Operational entitlement mutation guard rollout closeout (production-promoted)
+### 2.6.1 Tenant Customer Payment V1A-1 Foundation (schema only)
+- Completed: V1A-1 schema foundation and helpers are implemented (not live Checkout UI yet).
+- Completed: migration adds `stripe_checkout_session_id`, `stripe_event_id` (UNIQUE), `stripe_payment_intent_id`, `stripe_charged_at` to `internal_invoice_payments`.
+- Completed: payment method `card_stripe_online` added to allowed methods enum.
+- Completed: helpers implemented: `isStripeEventAlreadyRecorded()`, `validateInvoiceEligibleForOnlinePayment()`, `buildStripePaymentReference()`.
+- Completed: all tests pass (22 total: existing payment tests + new Stripe helpers + idempotency + eligibility validation).
+- Verified: existing manual payment recording logic preserved and tested; Stripe-recorded payments flow through same balance derivation.
+- Verified: webhook idempotency pattern (event ID UNIQUE key) prevents double-crediting on webhook retry.
+- Verified: `card_stripe_online` payments correctly counted in balance calculations alongside manual methods.
+- Deferred: live Checkout Session creation (V1A-2).
+- Deferred: webhook receiver for `charge.succeeded` / `charge.failed` (V1A-2).
+- Deferred: no customer portal, no refunds/disputes, no partial payments, no saved cards, no QBO.
+- Confirmed: no production Supabase commands run; migration only.
+- Confirmed: no production Stripe API calls; no Stripe changes.
+- Confirmed: no env/secret changes.
+
+### 2.6.2 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
 - Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.
 - Confirmed: production smoke passed.

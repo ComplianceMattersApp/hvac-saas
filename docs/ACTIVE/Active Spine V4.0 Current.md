@@ -2301,6 +2301,29 @@ Current implementation truth:
 - live processor-based tenant customer payment acceptance is not yet enabled
 - the platform remains payment-ready by design but not yet payment-active for tenant invoice execution
 
+---
+
+### Tenant Customer Payment V1A-1 (Schema Foundation)
+
+**Status**: V1A-1 schema and helpers implemented; foundation for future Checkout UI (V1A-2+).
+
+- V1A-1 foundation: Stripe webhook fields added to `internal_invoice_payments` table
+- Fields added: `stripe_checkout_session_id` (session reference), `stripe_event_id` (idempotency key, UNIQUE), `stripe_payment_intent_id`, `stripe_charged_at` (Stripe timestamp)
+- Payment method added: `card_stripe_online` alongside existing cash/check/ACH/other methods
+- Helpers: `isStripeEventAlreadyRecorded(eventId)` for webhook idempotency, `validateInvoiceEligibleForOnlinePayment(invoice, summary)` for eligibility checks, `buildStripePaymentReference(charge)` for Stripe charge normalization
+- Balance derivation unchanged: collected = recorded payments only, balance = total - recorded sum
+- Issued invoices only eligible (status = "issued", balance > 0)
+- Full balance only (no partial payment UI in V1A-1)
+- Webhook idempotency pattern: Stripe `event.id` stored as unique key; webhook retry with same event skipped safely (deduplication)
+- No live Checkout Session creation in V1A-1; no customer payment UI yet; all changes schema/test/helper
+- Checkout Session architecture locked: one session per internal user action, full amount, customer cannot modify
+- No Payment Link in V1A-1; Checkout Session for tighter coupling and metadata control
+- No saved payment methods, refunds, disputes, partial payments, QBO, or customer portal in V1A-1
+- Manual payment recording preserved and tested alongside future Stripe-collected payments in same table
+- Next slice: V1A-2 webhook receiver (`charge.succeeded`, `charge.failed`)
+
+---
+
 19.2 Core payment direction (locked)
 
 Payment P1 foundation is now complete.

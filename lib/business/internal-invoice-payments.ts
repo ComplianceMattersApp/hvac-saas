@@ -12,6 +12,7 @@ export const INTERNAL_INVOICE_PAYMENT_METHODS = [
   "card_off_platform",
   "bank_transfer",
   "other",
+  "card_stripe_online",
 ] as const;
 
 export type InternalInvoicePaymentStatus =
@@ -34,6 +35,10 @@ export type InternalInvoicePaymentRow = {
   recorded_by_user_id: string;
   created_at: string;
   updated_at: string;
+  stripe_checkout_session_id?: string | null;
+  stripe_event_id?: string | null;
+  stripe_payment_intent_id?: string | null;
+  stripe_charged_at?: string | null;
 };
 
 export type InternalInvoiceCollectedPaymentSummary = {
@@ -58,6 +63,10 @@ const INTERNAL_INVOICE_PAYMENT_SELECT = [
   "recorded_by_user_id",
   "created_at",
   "updated_at",
+  "stripe_checkout_session_id",
+  "stripe_event_id",
+  "stripe_payment_intent_id",
+  "stripe_charged_at",
 ].join(", ");
 
 function normalizePaymentStatus(value: unknown): InternalInvoicePaymentStatus {
@@ -75,6 +84,7 @@ function normalizePaymentMethod(value: unknown): InternalInvoicePaymentMethod {
   if (normalized === "card_off_platform") return "card_off_platform";
   if (normalized === "bank_transfer") return "bank_transfer";
   if (normalized === "other") return "other";
+  if (normalized === "card_stripe_online") return "card_stripe_online";
   return "cash";
 }
 
@@ -93,6 +103,10 @@ function normalizePaymentRow(row: any): InternalInvoicePaymentRow {
     recorded_by_user_id: String(row?.recorded_by_user_id ?? "").trim(),
     created_at: String(row?.created_at ?? "").trim(),
     updated_at: String(row?.updated_at ?? "").trim(),
+    stripe_checkout_session_id: String(row?.stripe_checkout_session_id ?? "").trim() || null,
+    stripe_event_id: String(row?.stripe_event_id ?? "").trim() || null,
+    stripe_payment_intent_id: String(row?.stripe_payment_intent_id ?? "").trim() || null,
+    stripe_charged_at: String(row?.stripe_charged_at ?? "").trim() || null,
   };
 }
 
@@ -201,5 +215,84 @@ export async function resolveInvoiceCollectedPaymentLedger(
   return {
     summary,
     rows,
+  };
+}
+
+/**
+ * Checks if a Stripe webhook event has already been recorded as a payment.
+ * Uses stripe_event_id as idempotency key.
+ */
+export async function isStripeEventAlreadyRecorded(
+  eventId: string,
+  supabase: any,
+): Promise<boolean> {
+  const normalizedEventId = String(eventId ?? "").trim();
+  if (!normalizedEventId) return false;
+
+  const { data, error } = await supabase
+    .from("internal_invoice_payments")
+    .select("id")
+    .eq("stripe_event_id", normalizedEventId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Failed to check Stripe event idempotency: ${error.message ?? "unknown error"}`,
+    );
+  }
+
+  return Boolean(data?.id);
+}
+
+/**
+ * Validates that an invoice is eligible for online payment.
+ * Requirements: issued status, positive balance, active account
+ */
+export function validateInvoiceEligibleForOnlinePayment(
+  invoice: any,
+  paymentSummary: InternalInvoiceCollectedPaymentSummary,
+): { eligible: boolean; reason?: string } {
+  if (!invoice) {
+    return { eligible: false, reason: "Invoice not found" };
+  }
+
+  const status = String(invoice.status ?? "").trim().toLowerCase();
+  if (status !== "issued") {
+    return { eligible: false, reason: "Invoice must be issued to accept online payment" };
+  }
+
+  if (paymentSummary.balanceDueCents <= 0) {
+    return { eligible: false, reason: "Invoice balance must be greater than zero" };
+  }
+
+  return { eligible: true };
+}
+
+/**
+ * Builds normalized Stripe payment reference from Stripe charge object.
+ * Extracts key payment details for internal_invoice_payments row.
+ */
+export function buildStripePaymentReference(charge: any): {
+  processor_name: string;
+  processor_payment_reference: string | null;
+  processor_charge_id: string | null;
+  stripe_payment_intent_id: string | null;
+  stripe_charged_at: string | null;
+} {
+  const chargeId = String(charge?.id ?? "").trim() || null;
+  const intentId = String(charge?.payment_intent ?? "").trim() || null;
+  const chargedAtUnix = Number(charge?.created) || null;
+
+  let stripe_charged_at: string | null = null;
+  if (chargedAtUnix && Number.isFinite(chargedAtUnix)) {
+    stripe_charged_at = new Date(chargedAtUnix * 1000).toISOString();
+  }
+
+  return {
+    processor_name: "stripe",
+    processor_payment_reference: chargeId,
+    processor_charge_id: chargeId,
+    stripe_payment_intent_id: intentId,
+    stripe_charged_at,
   };
 }
