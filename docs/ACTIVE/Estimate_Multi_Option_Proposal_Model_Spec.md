@@ -36,6 +36,16 @@ Internal authoring closeout notes (2026-05-19):
 - Option line authoring, option delete/reorder, readiness scoring, approval/response, conversion, portal, email, payment, add-ons, QBO, and SMS remain deferred.
 
 Print rendering closeout note (2026-05-19):
+Approval Response V1 closeout note (2026-05-20):
+
+- Migration `supabase/migrations/20260520110000_estimate_approval_response_v1.sql` adds 4 nullable columns to `estimates`: `selected_option_id`, `selected_option_label_snapshot`, `selected_option_total_cents`, `response_note`.
+- `recordEstimateApprovalResponse` server action handles flat (no option required) and multi-option (option required; snapshots label + total at approval time).
+- `buildEstimateApprovalViewModel` helper added to `estimate-domain.ts` for read model consumers; includes `isFlatEstimate` convenience field.
+- Internal UI: `EstimateApprovalResponseForm` on the estimate detail page replaces the simple "Mark Approved" button with an option-selector dropdown (multi-option) or a confirm button (flat), plus an optional response note field.
+- Approval response panel added to `app/estimates/[id]/page.tsx` showing selected option label, total, timestamp, and note when estimate is `approved`.
+- `estimate_approved` event enriched with `proposal_mode`, `selected_option_id`, `selected_option_label_snapshot`, `selected_option_total_cents`, `response_note`, `response_source: "internal"` meta fields.
+- No public/portal/email/conversion/payment/QBO/SMS/e-signature/stored PDF behavior introduced.
+
 
 - Internal authenticated browser print route (`/estimates/[id]/print`) branches on `proposalMode`: single-option flat renders as before; multi-option renders option package sections (label, summary, line items, per-option total) with no parent "Proposed Total" shown.
 - Option notes are excluded from the print view model; option summaries are included.

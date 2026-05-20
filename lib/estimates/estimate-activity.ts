@@ -85,8 +85,19 @@ export function formatEstimateEventSummary(
     }
     case "estimate_sent":
       return "Marked sent internally. No customer email or PDF was generated.";
-    case "estimate_approved":
+    case "estimate_approved": {
+      const mode = String(meta?.proposal_mode ?? "").trim();
+      const label = String(meta?.selected_option_label_snapshot ?? "").trim();
+      const totalCents = meta?.selected_option_total_cents;
+      if (mode === "multi_option_packages" && label) {
+        const totalStr =
+          typeof totalCents === "number"
+            ? ` (${new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(totalCents / 100)})`
+            : "";
+        return `Option approved internally: ${label}${totalStr}. No job, invoice, payment, or conversion record was created.`;
+      }
       return "Approved internally. No job, invoice, payment, or conversion record was created.";
+    }
     case "estimate_declined":
       return "Declined internally. This estimate is terminal for V1.";
     case "estimate_expired":

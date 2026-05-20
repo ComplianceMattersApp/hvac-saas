@@ -374,6 +374,11 @@ export type EstimateReadResult = {
   expired_at: string | null;
   cancelled_at: string | null;
   converted_at: string | null;
+  // Approval response projection (V1 — set during recordEstimateApprovalResponse)
+  selected_option_id: string | null;
+  selected_option_label_snapshot: string | null;
+  selected_option_total_cents: number | null;
+  response_note: string | null;
   created_by_user_id: string;
   updated_by_user_id: string;
   created_at: string;

@@ -117,11 +117,89 @@ export type EstimateRow = {
   expired_at:            string | null;
   cancelled_at:          string | null;
   converted_at:          string | null;
-  created_by_user_id:    string;
-  updated_by_user_id:    string;
-  created_at:            string;
-  updated_at:            string;
+  selected_option_id:              string | null;
+  selected_option_label_snapshot:  string | null;
+  selected_option_total_cents:     number | null;
+  response_note:                   string | null;
+  created_by_user_id:              string;
+  updated_by_user_id:              string;
+  created_at:                      string;
+  updated_at:                      string;
 };
+
+// ---------------------------------------------------------------------------
+// Approval / response read model
+// ---------------------------------------------------------------------------
+
+export type EstimateApprovalStatus =
+  | "no_response"
+  | "approved"
+  | "declined"
+  | "expired"
+  | "cancelled"
+  | "converted";
+
+export type EstimateApprovalViewModel = {
+  approvalStatus:            EstimateApprovalStatus;
+  proposalMode:              "single_option_flat" | "multi_option_packages";
+  /** ID of the option package that was approved; null for flat estimates or no response. */
+  selectedOptionId:          string | null;
+  /** Frozen label at approval time; null if no option was selected. */
+  selectedOptionLabel:       string | null;
+  /** Frozen total (cents) at approval time; null if no option was selected. */
+  selectedOptionTotalCents:  number | null;
+  approvedAt:                string | null;
+  declinedAt:                string | null;
+  /** Optional note recorded by the internal operator at response time. */
+  responseNote:              string | null;
+  /** For V1, all responses are internal-operator initiated. */
+  responseSource:            "internal" | null;
+  /** Convenience alias: true when proposalMode is single_option_flat. */
+  isFlatEstimate:            boolean;
+};
+
+/**
+ * Build a safe approval view model from a loaded estimate row (plus proposal mode).
+ * Returns a deterministic, fully-typed read model for UI and reporting consumers.
+ */
+export function buildEstimateApprovalViewModel(params: {
+  estimate: Pick<
+    EstimateRow,
+    | "status"
+    | "approved_at"
+    | "declined_at"
+    | "selected_option_id"
+    | "selected_option_label_snapshot"
+    | "selected_option_total_cents"
+    | "response_note"
+  >;
+  proposalMode: "single_option_flat" | "multi_option_packages";
+}): EstimateApprovalViewModel {
+  const { estimate, proposalMode } = params;
+
+  const approvalStatus: EstimateApprovalStatus =
+    estimate.status === "approved"  ? "approved"  :
+    estimate.status === "declined"  ? "declined"  :
+    estimate.status === "expired"   ? "expired"   :
+    estimate.status === "cancelled" ? "cancelled" :
+    estimate.status === "converted" ? "converted" :
+    "no_response";
+
+  const hasResponse = approvalStatus !== "no_response";
+
+  return {
+    approvalStatus,
+    proposalMode,
+    selectedOptionId:         estimate.selected_option_id ?? null,
+    selectedOptionLabel:      estimate.selected_option_label_snapshot ?? null,
+    selectedOptionTotalCents: estimate.selected_option_total_cents ?? null,
+    approvedAt:               estimate.approved_at ?? null,
+    declinedAt:               estimate.declined_at ?? null,
+    responseNote:             estimate.response_note ?? null,
+    responseSource:           hasResponse ? "internal" : null,
+    isFlatEstimate:           proposalMode === "single_option_flat",
+  };
+}
 
 export type EstimateLineItemRow = {
   id:                       string;

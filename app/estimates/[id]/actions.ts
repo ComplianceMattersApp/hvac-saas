@@ -13,6 +13,7 @@ import {
   transitionEstimateStatus,
   createDefaultEstimateOptions,
   updateEstimateOptionMetadata,
+  recordEstimateApprovalResponse,
   type AddEstimateLineItemParams,
   type AddEstimateOptionLineItemParams,
   type UpdateEstimateOptionMetadataParams,
@@ -220,4 +221,30 @@ export async function removeEstimateOptionLineItemFromForm(formData: FormData) {
   }
 
   return result;
+}
+
+/**
+ * Record an internal approval response for a sent estimate.
+ * Reads estimate_id, selected_option_id (optional), and response_note (optional) from FormData.
+ * For multi-option proposals, selected_option_id is required.
+ * Does NOT send email, create a job, invoice, payment, or conversion record.
+ */
+export async function recordEstimateApprovalResponseFromForm(formData: FormData) {
+  if (!isEstimatesEnabled()) return;
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  if (!estimateId) return;
+
+  const selectedOptionId = String(formData.get("selected_option_id") ?? "").trim() || null;
+  const responseNote = String(formData.get("response_note") ?? "").trim() || null;
+
+  const result = await recordEstimateApprovalResponse({
+    estimateId,
+    selectedOptionId,
+    responseNote,
+  });
+
+  if (result.success) {
+    revalidatePath(`/estimates/${estimateId}`);
+  }
 }

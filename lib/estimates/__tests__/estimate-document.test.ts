@@ -72,6 +72,10 @@ function buildMultiOptionEstimateFixture(): EstimateReadResult {
     created_at: "2026-05-01T10:00:00.000Z",
     updated_at: "2026-05-01T10:00:00.000Z",
     proposalMode: "multi_option_packages",
+    selected_option_id: null,
+    selected_option_label_snapshot: null,
+    selected_option_total_cents: null,
+    response_note: null,
     line_items: [],
     options: [
       buildOptionFixture({ id: "opt-1", slot_index: 1, label: "Good", sort_order: 1, total_cents: 30000 }),
@@ -146,6 +150,10 @@ function buildEstimateFixture(): EstimateReadResult {
     created_at: "2026-05-01T10:00:00.000Z",
     updated_at: "2026-05-01T12:00:00.000Z",
     proposalMode: "single_option_flat",
+    selected_option_id: null,
+    selected_option_label_snapshot: null,
+    selected_option_total_cents: null,
+    response_note: null,
     line_items: [
       {
         id: "line-1",
@@ -298,7 +306,7 @@ describe("buildEstimateQuoteReadinessChecklist", () => {
   });
 });
 
-describe("buildEstimateDocumentViewModel – proposalMode", () => {
+describe("buildEstimateDocumentViewModel ï¿½ proposalMode", () => {
   it("single_option_flat estimate has proposalMode 'single_option_flat' and empty options array", () => {
     const vm = buildEstimateDocumentViewModel({
       estimate: buildEstimateFixture(),

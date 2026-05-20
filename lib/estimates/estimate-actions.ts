@@ -1498,3 +1498,203 @@ export async function updateEstimateOptionMetadata(
     summary,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Record estimate approval response (V1 internal-only)
+// ---------------------------------------------------------------------------
+
+export type RecordEstimateApprovalResponseParams = {
+  estimateId: string;
+  /**
+   * Required for multi-option proposals. Must be an option_id belonging to this
+   * estimate. Ignored (and must be omitted/null) for flat single-option estimates.
+   */
+  selectedOptionId?: string | null;
+  /** Optional internal note to record alongside the approval. */
+  responseNote?: string | null;
+};
+
+export type RecordEstimateApprovalResponseResult =
+  | {
+      success: true;
+      estimateId: string;
+      previousStatus: string;
+      proposalMode: "single_option_flat" | "multi_option_packages";
+      selectedOptionId: string | null;
+      selectedOptionLabelSnapshot: string | null;
+      selectedOptionTotalCents: number | null;
+      responseNote: string | null;
+    }
+  | { success: false; error: string };
+
+/**
+ * Record an internal approval response for a sent estimate.
+ *
+ * Flat estimate (single_option_flat):
+ *   - selectedOptionId must be null/omitted
+ *   - Transitions estimate to approved, sets approved_at
+ *
+ * Multi-option estimate (multi_option_packages):
+ *   - selectedOptionId is required and must belong to this estimate
+ *   - Snapshots option label and total_cents at approval time
+ *   - Transitions estimate to approved, sets approved_at + option projection fields
+ *
+ * In both cases:
+ *   - Estimate must be in 'sent' status
+ *   - Writes an enriched estimate_approved event
+ *   - Does NOT create a job, invoice, payment, or conversion record
+ *   - Does NOT send email or generate a PDF
+ */
+export async function recordEstimateApprovalResponse(
+  params: RecordEstimateApprovalResponseParams
+): Promise<RecordEstimateApprovalResponseResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const accountOwnerUserId = internalUser.account_owner_user_id;
+  const userId = internalUser.user_id;
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  if (!estimateId) return { success: false, error: "estimate_id is required." };
+
+  // Load and scope-check the estimate
+  const { data: estimate, error: estErr } = await supabase
+    .from("estimates")
+    .select("id, status, account_owner_user_id")
+    .eq("id", estimateId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (estErr) throw estErr;
+  if (!estimate?.id) {
+    return { success: false, error: "Estimate not found in this account." };
+  }
+
+  // Approval is only valid from 'sent' status
+  if (estimate.status !== "sent") {
+    return {
+      success: false,
+      error: `Approval response requires estimate status 'sent'; current status is '${estimate.status}'.`,
+    };
+  }
+
+  // Determine proposal mode by counting option packages
+  const { data: optionRows, error: optionCountErr } = await supabase
+    .from("estimate_options")
+    .select("id")
+    .eq("estimate_id", estimateId)
+    .limit(1);
+  if (optionCountErr) throw optionCountErr;
+
+  const isMultiOption = (optionRows ?? []).length > 0;
+  const proposalMode: "single_option_flat" | "multi_option_packages" = isMultiOption
+    ? "multi_option_packages"
+    : "single_option_flat";
+
+  const rawSelectedOptionId = params.selectedOptionId?.trim() || null;
+  const responseNote = params.responseNote?.trim() || null;
+
+  let selectedOptionId: string | null = null;
+  let selectedOptionLabelSnapshot: string | null = null;
+  let selectedOptionTotalCents: number | null = null;
+
+  if (isMultiOption) {
+    // Multi-option: require exactly one selected option
+    if (!rawSelectedOptionId) {
+      return {
+        success: false,
+        error: "selected_option_id is required for multi-option proposals.",
+      };
+    }
+
+    // Load option to snapshot label and total
+    const { data: option, error: optionErr } = await supabase
+      .from("estimate_options")
+      .select("id, label, total_cents")
+      .eq("id", rawSelectedOptionId)
+      .eq("estimate_id", estimateId)
+      .maybeSingle();
+
+    if (optionErr) throw optionErr;
+    if (!option?.id) {
+      return {
+        success: false,
+        error: "selected_option_id not found on this estimate.",
+      };
+    }
+
+    selectedOptionId = option.id;
+    selectedOptionLabelSnapshot = String(option.label ?? "").trim() || null;
+    selectedOptionTotalCents = typeof option.total_cents === "number" ? option.total_cents : null;
+
+    if (!selectedOptionLabelSnapshot) {
+      return { success: false, error: "Selected option label is missing; cannot snapshot." };
+    }
+    if (selectedOptionTotalCents === null) {
+      return { success: false, error: "Selected option total is missing; cannot snapshot." };
+    }
+  } else {
+    // Flat estimate: selectedOptionId must not be provided
+    if (rawSelectedOptionId) {
+      return {
+        success: false,
+        error: "selected_option_id must not be provided for flat single-option estimates.",
+      };
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+
+  const updatePayload: Record<string, unknown> = {
+    status: "approved",
+    approved_at: nowIso,
+    response_note: responseNote,
+    updated_by_user_id: userId,
+    updated_at: nowIso,
+  };
+
+  if (selectedOptionId !== null) {
+    updatePayload.selected_option_id = selectedOptionId;
+    updatePayload.selected_option_label_snapshot = selectedOptionLabelSnapshot;
+    updatePayload.selected_option_total_cents = selectedOptionTotalCents;
+  }
+
+  const { error: updateErr } = await supabase
+    .from("estimates")
+    .update(updatePayload)
+    .eq("id", estimateId);
+
+  if (updateErr) throw updateErr;
+
+  // Write enriched estimate_approved event
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: "estimate_approved",
+    meta: {
+      previous_status: "sent",
+      next_status: "approved",
+      proposal_mode: proposalMode,
+      selected_option_id: selectedOptionId,
+      selected_option_label_snapshot: selectedOptionLabelSnapshot,
+      selected_option_total_cents: selectedOptionTotalCents,
+      response_note: responseNote,
+      response_source: "internal",
+    },
+    user_id: userId,
+  });
+
+  return {
+    success: true,
+    estimateId,
+    previousStatus: "sent",
+    proposalMode,
+    selectedOptionId,
+    selectedOptionLabelSnapshot,
+    selectedOptionTotalCents,
+    responseNote,
+  };
+}

@@ -22,9 +22,10 @@ import {
 } from "@/lib/estimates/estimate-document";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
-import { removeLineItemFromForm, transitionEstimateStatusFromForm, sendEstimateFromForm } from "./actions";
+import { removeLineItemFromForm, transitionEstimateStatusFromForm, sendEstimateFromForm, recordEstimateApprovalResponseFromForm } from "./actions";
 import AddLineItemForm from "./AddLineItemForm";
 import EstimateStatusActionForm from "./EstimateStatusActionForm";
+import EstimateApprovalResponseForm from "./EstimateApprovalResponseForm";
 import SendEstimateForm from "./SendEstimateForm";
 import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
 import EditEstimateOptionForm from "./EditEstimateOptionForm";
@@ -534,14 +535,15 @@ export default async function EstimateDetailPage({
 
             {isSent && (
               <>
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
+                <EstimateApprovalResponseForm
+                  action={recordEstimateApprovalResponseFromForm}
                   estimateId={estimate.id}
-                  nextStatus="approved"
-                  label="Mark Approved"
-                  helperText="Terminal for V1. Does not create a job, invoice, payment, or conversion."
-                  confirmMessage="Approve this estimate? This records an internal V1 outcome only and does not create a job, invoice, payment, customer approval, or conversion record."
-                  className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-[background-color,border-color,transform] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-[0.5px]"
+                  proposalMode={estimate.proposalMode}
+                  options={(estimate.options ?? []).map((o) => ({
+                    id: o.id,
+                    label: o.label,
+                    total_cents: o.total_cents,
+                  }))}
                 />
                 <EstimateStatusActionForm
                   action={transitionEstimateStatusFromForm}
@@ -575,6 +577,49 @@ export default async function EstimateDetailPage({
           </div>
         </div>
       </div>
+
+      {/* Estimate proposal rendering */}
+      {/* Approval response panel — visible on approved terminal state */}
+      {estimate.status === "approved" && (
+        <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
+          <h2 className="text-base font-semibold text-emerald-900">Approval Response</h2>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">
+            Internally approved
+          </p>
+          {estimate.approved_at && (
+            <p className="mt-1 text-sm text-slate-600">
+              Approved on {formatDateTime(estimate.approved_at)}.
+            </p>
+          )}
+          {isMultiOptionProposal && estimate.selected_option_id ? (
+            <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-4 py-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                Selected option
+              </p>
+              <p className="mt-1 text-sm font-semibold text-slate-950">
+                {estimate.selected_option_label_snapshot ?? "—"}
+              </p>
+              {typeof estimate.selected_option_total_cents === "number" && (
+                <p className="mt-0.5 text-sm text-slate-700">
+                  Approval amount:{" "}
+                  <span className="font-semibold">{formatCents(estimate.selected_option_total_cents)}</span>
+                </p>
+              )}
+            </div>
+          ) : isMultiOptionProposal ? (
+            <p className="mt-2 text-sm text-slate-500">No selected option was recorded at approval time.</p>
+          ) : null}
+          {estimate.response_note && (
+            <div className="mt-3">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Internal note</p>
+              <p className="mt-1 text-sm text-slate-700">{estimate.response_note}</p>
+            </div>
+          )}
+          <p className="mt-3 text-[11px] text-slate-400">
+            Internal V1 record only. No job, invoice, payment, customer approval record, or conversion was created.
+          </p>
+        </div>
+      )}
 
       {/* Estimate proposal rendering */}
       <div className="space-y-3 print:space-y-2">
