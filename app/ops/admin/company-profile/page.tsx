@@ -601,9 +601,11 @@ function TenantStripePaymentsSection({
   readiness: Awaited<ReturnType<typeof resolveTenantStripeConnectReadiness>>;
 }) {
   const hasConnectedAccountId = Boolean(String(readiness.connectedAccountId ?? "").trim());
-  const setupActionLabel = hasConnectedAccountId
-    ? "Continue Stripe Setup"
-    : "Connect Stripe Account";
+  const setupActionLabel = readiness.isReady
+    ? "Manage Stripe Account"
+    : hasConnectedAccountId
+      ? "Continue Stripe Setup"
+      : "Connect Stripe Account";
 
   return (
     <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
@@ -663,7 +665,7 @@ function TenantStripePaymentsSection({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-600">
-          Customer payment links and invoice Checkout Session creation are not part of this slice.
+          Customer payment links are available from issued invoice workspaces when Stripe setup is ready.
         </div>
       </div>
     </div>
