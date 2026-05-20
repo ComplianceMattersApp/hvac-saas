@@ -14,6 +14,10 @@ import {
   resolveInvoiceCollectedPaymentSummary,
 } from '@/lib/business/internal-invoice-payments';
 import { insertJobEvent } from '@/lib/actions/job-actions';
+import {
+  type TenantInvoiceCheckoutSessionActionState,
+  INITIAL_TENANT_INVOICE_CHECKOUT_SESSION_ACTION_STATE,
+} from '@/lib/actions/internal-invoice-payment-actions-state';
 
 const INTERNAL_INVOICE_PANEL_HASH = 'internal-invoice-panel';
 
@@ -368,19 +372,7 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
   }
 }
 
-export type TenantInvoiceCheckoutSessionActionState = {
-  status: 'idle' | 'success' | 'error';
-  message: string;
-  checkoutSessionId: string | null;
-  checkoutSessionUrl: string | null;
-};
-
-export const INITIAL_TENANT_INVOICE_CHECKOUT_SESSION_ACTION_STATE: TenantInvoiceCheckoutSessionActionState = {
-  status: 'idle',
-  message: '',
-  checkoutSessionId: null,
-  checkoutSessionUrl: null,
-};
+export type { TenantInvoiceCheckoutSessionActionState } from '@/lib/actions/internal-invoice-payment-actions-state';
 
 export async function createTenantInvoiceCheckoutSessionFromFormState(
   _prevState: TenantInvoiceCheckoutSessionActionState,

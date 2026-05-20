@@ -4,9 +4,9 @@ import { useActionState, useState } from "react";
 import SubmitButton from "@/components/SubmitButton";
 import {
   INITIAL_TENANT_INVOICE_CHECKOUT_SESSION_ACTION_STATE,
-  createTenantInvoiceCheckoutSessionFromFormState,
   type TenantInvoiceCheckoutSessionActionState,
-} from "@/lib/actions/internal-invoice-payment-actions";
+} from "@/lib/actions/internal-invoice-payment-actions-state";
+import { createTenantInvoiceCheckoutSessionFromFormState } from "@/lib/actions/internal-invoice-payment-actions";
 
 type TenantInvoicePaymentLinkPanelProps = {
   jobId: string;
