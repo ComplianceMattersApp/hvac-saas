@@ -3,7 +3,7 @@ import { Mail, MapPin, Phone, UserRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { searchScopedCustomers } from "@/lib/customers/visibility";
-import { CustomersSearchHero } from "@/app/customers/_components/CustomersSearchHero";
+import { CustomerSearchPanel } from "@/app/customers/_components/CustomerSearchPanel";
 
 export default async function CustomersPage(props: {
   searchParams: Promise<{ q?: string }>;
@@ -33,7 +33,7 @@ export default async function CustomersPage(props: {
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 bg-slate-50 p-3 text-slate-900 sm:p-6">
-      <CustomersSearchHero initialQuery={q} />
+      <CustomerSearchPanel initialQuery={q} />
 
       {!hasQuery ? (
         <div className="rounded-lg border border-dashed border-slate-300 bg-white px-5 py-8 text-sm leading-6 text-slate-600 shadow-sm shadow-slate-950/5">

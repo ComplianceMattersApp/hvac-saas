@@ -61,7 +61,7 @@ function detectSearchIntent(query: string) {
   };
 }
 
-export function CustomersSearchHero({ initialQuery }: { initialQuery: string }) {
+export function CustomerSearchPanel({ initialQuery }: { initialQuery: string }) {
   const [query, setQuery] = useState(initialQuery);
   const [suggestions, setSuggestions] = useState<CustomerSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
