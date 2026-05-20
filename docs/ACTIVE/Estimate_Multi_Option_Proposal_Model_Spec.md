@@ -367,3 +367,73 @@ This spec does not implement or authorize:
 - SMS/Twilio behavior
 
 This is a model lock only.
+
+## 2) Section 2D Model Lock: Estimate → Invoice Draft Conversion
+
+### Locked Model
+
+1. **V1 requires Section 2C first**:
+   - Invoice conversion requires `estimates.converted_job_id`.
+   - V1 does not convert approved estimates directly to invoices without a converted job.
+   - This preserves the chain: estimate → job → invoice.
+
+2. **Invoice conversion creates draft invoice only**:
+   - No issuing.
+   - No sending.
+   - No payment collection.
+   - No Stripe tenant payment execution.
+   - No QBO.
+   - No SMS.
+   - No portal/public behavior.
+
+3. **Preconditions**:
+   - Estimate status may be `converted`.
+   - `converted_job_id` must exist.
+   - Job must belong to the same account.
+   - Internal invoicing mode must allow internal invoice creation.
+   - External-billing mode blocks invoice conversion.
+   - Job must not already have an active non-void invoice.
+   - Multi-option estimate must already have selected option captured from Section 2A/2C flow.
+
+4. **Line item source**:
+   - Invoice conversion reads from converted job `visit_scope_items`, not directly from estimate lines.
+   - `source_kind = visit_scope`.
+   - Preserve `source_visit_scope_item_id` when present.
+   - Preserve `source_pricebook_item_id`, item type, category, unit label, quantity, and unit price snapshots as available.
+   - No live Pricebook re-resolution.
+
+5. **Schema needed for future implementation**:
+   - `internal_invoices.source_estimate_id`.
+   - `estimates.converted_invoice_id`.
+   - Partial unique index on `internal_invoices(source_estimate_id)` where `source_estimate_id is not null and status != 'void'`.
+   - Do not add `converted_invoice_by_user_id` in V1; actor truth lives in `estimate_events`.
+
+6. **Idempotency**:
+   - Block if `estimates.converted_invoice_id` points to an active invoice.
+   - Block if an active non-void `internal_invoices.source_estimate_id` already exists.
+   - Voided invoice replacement may be allowed later through a deliberate replacement/void-aware flow.
+
+7. **Status**:
+   - Action B does not change estimate status if already `converted`.
+   - Action B does not update `converted_at`.
+   - Action B only links `converted_invoice_id` after draft invoice creation.
+
+8. **Audit**:
+   - Write `estimate_converted_to_invoice`.
+   - Metadata should include:
+     - `invoice_id`.
+     - `job_id`.
+     - `source_estimate_id`.
+     - `converted_by_user_id`.
+     - `proposal_mode`.
+     - `approved_total_cents`.
+     - `selected_option_id` / selected option label when multi-option.
+
+9. **Boundaries**:
+   - No payment execution.
+   - No invoice issue/send.
+   - No QBO.
+   - No SMS.
+   - No email/provider changes.
+   - No portal/public behavior.
+   - No production Supabase commands.
