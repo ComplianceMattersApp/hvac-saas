@@ -796,7 +796,27 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Confirmed: no production Stripe API calls; no Stripe changes.
 - Confirmed: no env/secret changes.
 
-### 2.6.2 Operational entitlement mutation guard rollout closeout (production-promoted)
+### 2.6.2 Tenant Customer Payment V1A-2 (Webhook Receiver)
+- Completed: V1A-2 webhook receiver for charge events implemented.
+- Completed: webhook handlers created: `recordTenantInvoicePaymentFromStripeCharge()` (charge.succeeded), `recordTenantInvoicePaymentFailureFromStripeCharge()` (charge.failed).
+- Completed: webhook route extended to route charge events by metadata (`invoice_id` presence determines tenant vs. platform billing path).
+- Completed: idempotency enforcement: checks Stripe `event.id` UNIQUE key before recording, prevents duplicate on webhook retry.
+- Completed: validation implemented: metadata (`account_owner_user_id`, `invoice_id`), invoice (exists, belongs to owner, status='issued'), charge amount (positive, ≤ balance_due_cents).
+- Completed: payment recording: status='recorded', method='card_stripe_online', Stripe fields stored (event_id, charged_at, payment_intent_id, session_id).
+- Completed: failure recording: status='failed' (does NOT affect balance calculation), failure_reason logged for debugging.
+- Completed: job event logging: payment/failure records logged via `insertJobEvent` for audit trail.
+- Verified: all webhook handler tests pass (7 tests: metadata validation, idempotency, amount validation, handler contract).
+- Verified: internal-invoice-payments tests still pass (22 tests: backward compat, balance calculation, Stripe helpers).
+- Verified: platform billing webhook behavior unchanged; charge events without `invoice_id` safely ignored.
+- Verified: TypeScript compilation clean; no type errors.
+- Deferred: live Checkout Session creation UI (V1A-3).
+- Deferred: customer payment success/failure UI feedback.
+- Deferred: no customer portal, no refunds/disputes, no partial payments, no saved cards, no QBO.
+- Confirmed: no production Supabase mutations (webhook handlers use admin client for read/insert only).
+- Confirmed: no new production Stripe API calls (webhook handler only consumes existing Stripe events).
+- Confirmed: no env/secret changes; uses existing Stripe webhook endpoint.
+
+### 2.6.3 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
 - Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.
 - Confirmed: production smoke passed.

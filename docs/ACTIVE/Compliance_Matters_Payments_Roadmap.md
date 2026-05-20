@@ -142,6 +142,39 @@ Not supported now:
 
 ---
 
+### Tenant Customer Payments V1A-2 (Webhook Receiver)
+
+**Status**: V1A-2 webhook receiver for charge events implemented (not live UI yet).
+
+- V1A-2 webhook handlers: `recordTenantInvoicePaymentFromStripeCharge()` for `charge.succeeded` events, `recordTenantInvoicePaymentFailureFromStripeCharge()` for `charge.failed` events
+- Webhook integration: Extended `app/api/stripe/webhook/route.ts` to route charge events based on metadata presence
+  - Charge events with `metadata.invoice_id` routed to tenant invoice payment handlers
+  - Charge events without `invoice_id` safely ignored (platform subscription charges, no tenant action needed)
+- Idempotency enforcement: Checks `stripe_event_id` UNIQUE constraint before recording, prevents duplicate payment on webhook replay
+- Validation logic: Metadata validation (`account_owner_user_id`, `invoice_id`), invoice validation (exists, belongs to owner, status='issued'), amount validation (positive, ≤ balance_due_cents)
+- Payment recording: Inserts row with `payment_status='recorded'`, `payment_method='card_stripe_online'`, all Stripe reference fields (`stripe_checkout_session_id`, `stripe_event_id`, `stripe_payment_intent_id`, `stripe_charged_at`)
+- Failure recording: Inserts row with `payment_status='failed'` (does NOT count toward collected balance), logs failure_reason from charge
+- Audit logging: Job events (`payment_recorded`) logged with full metadata for audit trail, failure reasons included for debugging
+- Test coverage: 7 unit tests covering metadata validation, idempotency, charge eligibility, contract verification
+- Platform billing preserved: Existing subscription webhook behavior unchanged, charge events without invoice_id pass through safely
+- No live Checkout UI yet; no customer-facing payment link creation; no Stripe API calls for charges
+- Next slice (V1A-3): Checkout Session creation UI for tenant customers to initiate payment
+
+Locked direction:
+- Webhook handlers use same idempotency and validation pattern as platform billing
+- Charge metadata drives routing decision between platform and tenant invoice workflows
+- Failed payments recorded separately with status='failed' to preserve audit trail without affecting balance
+- Job event logging provides operational visibility into all payment attempts
+
+Not supported now:
+- Payment success/failure UI feedback to customer
+- Automatic retry on transient failures
+- Partial charge handling
+- Webhook filtering by processor type
+- Multiple concurrent payment attempts
+
+---
+
 ## 6. Payment foundation requirements (build now)
 
 ### 6.1 Data model rule

@@ -2324,6 +2324,26 @@ Current implementation truth:
 
 ---
 
+### Tenant Customer Payment V1A-2 (Webhook Receiver)
+
+**Status**: V1A-2 webhook receiver implemented; enables charge event processing (Checkout UI in V1A-3).
+
+- V1A-2 webhook handlers: `recordTenantInvoicePaymentFromStripeCharge()` (charge.succeeded), `recordTenantInvoicePaymentFailureFromStripeCharge()` (charge.failed)
+- Webhook routing: Extended webhook endpoint to route charge events by metadata
+  - If `metadata.invoice_id` present: route to tenant invoice payment handler
+  - If `metadata.invoice_id` absent: safely ignore (platform subscription charge, no tenant action)
+- Idempotency: Checks Stripe `event.id` UNIQUE key before recording; webhook replay deduplicated safely
+- Validation: Metadata fields (`account_owner_user_id`, `invoice_id`), invoice exists/belongs/issued status, charge amount (positive, ≤ balance_due_cents)
+- Payment recording: Status='recorded', method='card_stripe_online', Stripe fields populated (`stripe_event_id`, `stripe_charged_at`, `stripe_payment_intent_id`, `stripe_checkout_session_id`)
+- Failure recording: Status='failed', failure_reason from Stripe charge message (does NOT affect balance calculation)
+- Audit logging: Job events logged with payment/failure metadata for operational visibility
+- Test coverage: 7 unit tests validating metadata validation, idempotency, handler contract
+- Platform billing unchanged: Existing subscription webhook behavior preserved; charge events without invoice_id pass through
+- No live Checkout Session creation in V1A-2; no customer UI yet; webhook-receiver-only
+- Next slice: V1A-3 Checkout Session creation UI for customer-initiated payments
+
+---
+
 19.2 Core payment direction (locked)
 
 Payment P1 foundation is now complete.
