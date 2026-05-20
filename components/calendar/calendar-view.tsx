@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { X } from 'lucide-react';
+import { CalendarPlus, X } from 'lucide-react';
 import { endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
 import CalendarMonthGrid from './CalendarMonthGrid';
@@ -1197,23 +1197,24 @@ export async function CalendarView(props: Props) {
               </div>
             ) : (uiView === 'day' || uiView === 'week' || uiView === 'month') ? (
               <details id="calendar-add-block" className="group rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
-                <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded-lg px-3 py-3 text-left transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Block Time</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      {uiView === 'month'
-                        ? 'Create an internal time block for the selected day only when needed.'
-                        : 'Create an internal time block only when needed.'}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
-                      Internal only
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border-l-4 border-l-emerald-500 px-3 py-3 text-left transition hover:border-slate-300 hover:bg-emerald-50/40 [&::-webkit-details-marker]:hidden">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700">
+                      <CalendarPlus className="h-4 w-4" aria-hidden="true" />
                     </span>
-                    <span aria-hidden="true" className="inline-block text-xs font-semibold text-slate-400 transition-transform group-open:rotate-90">
-                      {'>'}
-                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-950">Add blocked time</p>
+                      <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
+                        {uiView === 'month'
+                          ? 'Hold the selected day for travel, lunch, parts pickup, or office time.'
+                          : 'Hold a schedule window for travel, lunch, parts pickup, or office time.'}
+                      </p>
+                    </div>
                   </div>
+                  <span className="shrink-0 rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition group-open:bg-emerald-700">
+                    <span className="group-open:hidden">Add</span>
+                    <span className="hidden group-open:inline">Open</span>
+                  </span>
                 </summary>
                 <div className="border-t border-slate-200 px-3 pb-3 pt-3">
                   <form action={createCalendarBlockEventFromForm} className="grid gap-2">
