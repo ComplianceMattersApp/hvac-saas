@@ -44,6 +44,7 @@ The latest clean-run Estimates rehearsal closed the earlier enabled-mode render-
 - Estimate Internal Quote Readiness Checklist V1 is complete on the guarded internal baseline: estimate detail now includes a read-only internal checklist for customer/location context, title/scope notes readiness, line-item presence, total readiness, recipient email-on-file readiness for manual send-attempt recording, and explicit proposed-scope/internal-only boundary reminders.
 - Estimate Multi-Option Proposal Model Lock is documented in `docs/ACTIVE/Estimate_Multi_Option_Proposal_Model_Spec.md`: future Good / Better / Best proposals must use one parent Estimate / Proposal with child Option Packages; fake option headers inside flat estimate line items and three linked estimates remain rejected. This is docs/model only and does not change runbook gates or current production behavior.
 - Estimate Approval Response V1 closeout is complete on the guarded internal baseline: `recordEstimateApprovalResponse` server action handles flat (no option selection required) and multi-option (option selection required; label and total snapshots captured at approval time). `buildEstimateApprovalViewModel` helper added to `estimate-domain.ts`. `EstimateApprovalResponseForm` component on estimate detail page replaces the simple "Mark Approved" button with an option-selector dropdown (multi-option) or confirm button (flat) plus optional response note. An approval response display panel is rendered when the estimate reaches `approved` status, showing selected option label, total, timestamp, and note. Migration `20260520110000_estimate_approval_response_v1.sql` adds 4 nullable columns to `estimates` (`selected_option_id`, `selected_option_label_snapshot`, `selected_option_total_cents`, `response_note`) — not yet applied to production. `estimate_approved` event enriched with full option snapshot and `response_source: "internal"` meta. No public/portal/email/conversion/payment/QBO/SMS/e-signature/stored PDF behavior was added. `ENABLE_ESTIMATES` and `ENABLE_ESTIMATE_EMAIL_SEND` remain unchanged.
+- Estimate Conversion Contract Model Lock V1 is docs/model-only (Section 2B audit completed May 20, 2026): conversion is defined as two durable internal actions (estimate → job, then estimate → invoice draft), both require estimate `approved` status, and both are approval-gated / historically-only / not reversible in V1. Status transitions permit invoice conversion when estimate status is `approved` **OR** `converted`, enforcing that `approved` remains valid pre-conversion and `converted` becomes terminal only after at least one conversion completes. Selected-option requirement for multi-option, flat-option-only for single-option, all scope lines carry pricebook/manual provenance snapshots, durable linkage via `converted_job_id` and `converted_invoice_id` on estimates plus `origin_estimate_id` on jobs and `source_estimate_id` on invoices, audit trail via new `estimate_events` entry types (`estimate_converted_to_job`, `estimate_converted_to_invoice`), and idempotency guards via unique constraints on linkage fields. This is docs/contract only and does not change current production behavior or implement conversion actions. Schema additions, first implementation slice, and conversion behavior remain deferred to a separate approval and implementation window.
 - Estimate Multi-Option Schema Foundation V1 is migration/test/docs only: `20260519110000_estimate_option_packages_foundation.sql` adds dormant option package tables for future use, preserves current flat `estimate_line_items`, and does not alter UI, print, actions, email, approval, conversion, portal, payment, QBO, SMS, or production behavior.
 - Estimate Option Metadata Editing V1 is internal draft-only authoring: operators can create the default Good / Better / Best packages for eligible empty draft estimates and edit option label/summary after creation. Option notes, option line authoring, readiness scoring, approval/response, conversion, portal, outbound email, payment, add-ons, QBO, and SMS remain deferred.
 - Estimate Manual Option Line Add/Remove V1 is internal draft-only authoring: operators can manually add and remove option line items inside Good / Better / Best packages, option totals recompute per option package only, and parent estimate totals remain unchanged. This slice remains blocked when legacy flat `estimate_line_items` exist on the estimate, with no readiness scoring, approval/response, conversion, portal, outbound email, payment, add-ons, QBO, or SMS behavior introduced.
@@ -313,6 +314,108 @@ Boundaries preserved during enablement/smoke:
 
 Warning/watch item:
 - Intermittent `net::ERR_ABORTED` browser-log events appeared during navigation/action transitions, but required smoke outcomes persisted successfully.
+
+### 1.5 Section 2B: Estimate Conversion Contract Model Lock (completed May 20, 2026)
+
+Audit-only status: Model lock complete, no implementation performed, no schema changes, no code behavior changes, no production Supabase commands.
+
+#### Conversion definition
+
+Estimate conversion is defined as **two durable internal actions**, not one hard dependency:
+
+1. **Action A:** Estimate → Job (operational truth creation)
+2. **Action B:** Estimate → Invoice Draft (billing truth creation; requires Action A or existing job)
+
+Both actions are:
+- Internal-only (no customer-facing, portal, email, PDF, payment, or provider behavior)
+- Approval-gated (require estimate `approved` status for initial conversion)
+- Historically-only (not reversible in V1; downstream job/invoice can be voided separately)
+- Schema-anchored (durable linkage via foreign keys, not reversible through status transitions)
+
+#### Flat estimate conversion rules
+
+- All flat `estimate_line_items` map to `visit_scope_items` in the created job.
+- All flat `estimate_line_items` map to `internal_invoice_line_items` in the created invoice.
+- Flat approved amount snapshot is captured as `total_cents` in conversion audit event metadata.
+- No live Pricebook re-fetch; use snapshots only.
+
+#### Multi-option estimate conversion rules
+
+- **Requirement:** `selected_option_id` must exist and reference a valid approved option.
+- **Rule:** Only selected option `estimate_option_line_items` convert.
+- **Rule:** Unselected options remain historical-only (never converted).
+- **Rule:** No grand total fallback; use selected option subtotal only.
+
+#### Job conversion contract
+
+From estimate → job, carry:
+- `customer_id` (required)
+- `location_id` (required)
+- `origin_estimate_id` (new linkage, required)
+- `service_case_id` (if present on estimate)
+- Selected option summary in `job_notes` (multi-option only)
+- `visit_scope_items` from conversion scope with provenance:
+  - `source_pricebook_item_id` (if available)
+  - `item_type`, `category`, `unit_label`, `expected_unit_price` (snapshots)
+
+#### Invoice conversion contract
+
+From estimate → invoice draft, require:
+- Job linkage (via `converted_job_id` or parameter)
+- `source_estimate_id` on invoice (new linkage)
+- `status = 'draft'` (ready for issue after manual review/adjustment)
+- `internal_invoice_line_items` from conversion scope with provenance:
+  - `source_kind` (pricebook or manual)
+  - `source_pricebook_item_id` (if applicable)
+  - All snapshot fields: `item_type`, `category`, `unit_label`, `unit_price_cents`, `expected_unit_price`
+
+#### Status transition contract (corrected for conversion consistency)
+
+**Critical correction:** This contract allows invoice conversion to proceed after job conversion without blocking.
+
+- **Gating for Action A (Estimate → Job):**
+  - Require estimate status = `approved`
+  - Block if `converted_job_id` already set (idempotency)
+
+- **Status after Action A:** Estimate status moves to `converted` and remains terminal for normal status transitions.
+
+- **Gating for Action B (Estimate → Invoice Draft):**
+  - Allow estimate status = `approved` **OR** `converted` (this permits invoice conversion after job conversion)
+  - Require `converted_job_id` is set (Action A must complete first or job must exist)
+  - Block if `converted_invoice_id` already set (idempotency)
+  - Block if target job already has active (non-void) invoice (enforce one-active-per-job)
+
+- **Terminal behavior:** `converted` status is terminal for regular estimate transitions (cannot move back to `approved`), but both conversion actions remain callable when `converted` because they operate on durable linkage fields, not status progression.
+
+- **Conversion is historical-only:** To reverse conversion in V1, manually void the created job or invoice; the estimate remains `converted`.
+
+#### Audit & idempotency contract
+
+**Conversion linkage on `estimates` (source-owned):**
+- `converted_job_id` uuid null (unique where not null)
+- `converted_invoice_id` uuid null (unique where not null)
+- `converted_by_user_id` uuid null
+- `converted_at` (already exists)
+
+**Target-side origin references (for duplicate prevention):**
+- `jobs.origin_estimate_id` uuid null (unique where not null)
+- `internal_invoices.source_estimate_id` uuid null (partial unique index where not null and status != 'void')
+
+**Audit events:**
+- `estimate_events` entry type `estimate_converted_to_job` with meta: `{ job_id, converted_by_user_id, approved_total_cents }`
+- `estimate_events` entry type `estimate_converted_to_invoice` with meta: `{ invoice_id, job_id, converted_by_user_id }`
+
+#### Implementation scope boundaries (locked)
+
+✋ Conversion implementation must NOT introduce:
+- Payment collection
+- Stripe tenant customer payment execution
+- QBO sync
+- SMS send
+- Public/customer portal conversion controls
+- Customer-facing email changes
+- Contractor estimate access expansion
+- Any behavior beyond operational (visit scope) and billing (invoice line item) scope linkage
 
 ---
 

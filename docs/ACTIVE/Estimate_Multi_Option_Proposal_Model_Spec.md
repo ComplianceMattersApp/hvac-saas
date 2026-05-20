@@ -242,6 +242,8 @@ Internal status transitions may continue to exist for the current internal-only 
 
 ## 9) Future Conversion Expectations
 
+**Status: Model locked (May 20, 2026 audit) — documented in `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md` Section 1.5.**
+
 Future conversion must anchor from selected option id.
 
 Conversion should not infer selected scope from:
@@ -255,12 +257,25 @@ Conversion should not infer selected scope from:
 Future conversion paths should explicitly consume:
 
 - parent estimate id
-- selected option id
+- selected option id (for multi-option)
 - selected option line-item snapshots
 - selected option total snapshot
 - optional add-on selections only after add-ons are designed
 
-Estimate-to-job and estimate-to-invoice conversion remain deferred and are not implemented by this spec.
+**Conversion model specifics (from locked audit, May 20, 2026):**
+
+- Conversion is two durable internal actions: estimate → job (Action A), then estimate → invoice draft (Action B).
+- Both actions require estimate `approved` status for initial conversion.
+- After Action A, estimate becomes `converted` (terminal for regular status transitions).
+- Action B is callable when estimate status is `approved` **OR** `converted`, permitting invoice creation after job creation without blocking.
+- Selected-option requirement for multi-option; all selected-option line items only (no grand total fallback).
+- Flat estimates: all lines convert, total snapshot captured.
+- Durable linkage via `converted_job_id`, `converted_invoice_id` on estimates; `origin_estimate_id` on jobs; `source_estimate_id` on invoices.
+- Audit trail via `estimate_events` with `estimate_converted_to_job` and `estimate_converted_to_invoice` entry types.
+- Idempotency via unique constraints on all linkage fields; one active invoice per job enforced.
+- Conversion is historically-only; not reversible in V1 through status transitions.
+
+Estimate-to-job and estimate-to-invoice conversion remain deferred and are not implemented by this spec. Schema additions and Action A/B implementation require a separate approval and implementation window.
 
 ---
 
@@ -292,7 +307,7 @@ Recommended future sequence:
 5. Add internal print/readiness presentation for multi-option proposals.
 6. Add internal response/selection recording model only after approval semantics are reviewed.
 7. Add customer-facing approval/e-signature/public/portal surfaces only after separate authority and security design.
-8. Add conversion from selected option id only after response and snapshot semantics are locked.
+8. (**Section 2B locked, May 20, 2026**) Add conversion from selected option id following the locked two-action model: Action A (estimate → job), then Action B (estimate → invoice draft). Both require `approved` status; `converted` status permits invoice conversion after job conversion. See `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md` Section 1.5 for full conversion contract. This slice includes schema additions (`converted_job_id`, `converted_invoice_id`, `origin_estimate_id`, `source_estimate_id`, unique linkage constraints) and implementation of both durable internal actions with full audit trail and idempotency guards.
 9. Add optional add-ons as a separate model after primary options are proven.
 10. Add versioned template system after proposal content/revision semantics are mature enough to freeze safely.
 
