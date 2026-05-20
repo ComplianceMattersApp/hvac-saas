@@ -367,24 +367,31 @@ export async function buildReportCenterDashboardReadModel(params: {
   return {
     topCards: [
       {
-        label: "Open Visits",
-        value: getMetricValue(metricMap, "active_open_visits"),
-        helperText: "Current active visit workload.",
-        href: "/reports/jobs?scope=active",
-        tone: "slate",
-      },
-      {
         label: "Need to Schedule",
         value: getMetricValue(metricMap, "need_to_schedule_backlog"),
-        helperText: "Visits ready for office scheduling.",
+        helperText: "Visits ready for dispatch placement.",
         href: "/reports/jobs?scope=active&ops_status=need_to_schedule",
         tone: "amber",
+      },
+      {
+        label: "Unassigned Open Visits",
+        value: new Intl.NumberFormat("en-US").format(unassignedOpenVisits),
+        helperText: "Active visits with no assigned team member.",
+        href: "/reports/jobs?assignee=unassigned",
+        tone: "sky",
       },
       {
         label: "Closeout Backlog",
         value: getMetricValue(metricMap, "closeout_backlog"),
         helperText: "Field-complete visits needing admin closeout.",
         href: "/reports/closeout?closeout_only=1",
+        tone: "orange",
+      },
+      {
+        label: "Closeout Aging 7+ Days",
+        value: getMetricValue(metricMap, "closeout_aging_7_plus_days"),
+        helperText: "Older closeout work that is starting to drag.",
+        href: "/reports/closeout?closeout_only=1&sort=aging_desc",
         tone: "orange",
       },
       {
@@ -400,13 +407,6 @@ export async function buildReportCenterDashboardReadModel(params: {
         helperText: "Multi-visit cases with active work still open.",
         href: "/reports/service-cases?repeat_only=1&active_repeat_visits=1",
         tone: "emerald",
-      },
-      {
-        label: "Billed This Period",
-        value: formatCurrencyCents(billedThisPeriodCents),
-        helperText: "Issued invoice totals only. Payments are tracked separately.",
-        href: null,
-        tone: "slate",
       },
     ],
     operations: {
