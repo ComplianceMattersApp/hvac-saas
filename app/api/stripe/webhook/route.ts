@@ -102,6 +102,9 @@ export async function POST(request: Request) {
 
     if (event.type === "charge.succeeded") {
       const charge = event.data.object as Stripe.Charge;
+      const connectedAccountId = typeof event.account === "string"
+        ? event.account.trim()
+        : "";
 
       // Charge.succeeded can come from multiple sources (subscriptions, payment intents, etc).
       // We only process if metadata includes invoice_id (tenant customer invoice payment).
@@ -114,12 +117,16 @@ export async function POST(request: Request) {
         await recordTenantInvoicePaymentFromStripeCharge({
           charge,
           eventId: event.id,
+          connectedAccountId,
         });
       }
     }
 
     if (event.type === "charge.failed") {
       const charge = event.data.object as Stripe.Charge;
+      const connectedAccountId = typeof event.account === "string"
+        ? event.account.trim()
+        : "";
 
       // Similar to charge.succeeded, only process if this is a tenant invoice payment
       const invoiceId = typeof charge.metadata?.invoice_id === "string"
@@ -130,6 +137,7 @@ export async function POST(request: Request) {
         await recordTenantInvoicePaymentFailureFromStripeCharge({
           charge,
           eventId: event.id,
+          connectedAccountId,
         });
       }
     }

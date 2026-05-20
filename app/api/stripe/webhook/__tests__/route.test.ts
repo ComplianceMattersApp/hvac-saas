@@ -1,7 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import Stripe from 'stripe';
 
-// Mock the webhook handlers
 const mockRecordTenantInvoicePaymentFromStripeCharge = vi.fn();
 const mockRecordTenantInvoicePaymentFailureFromStripeCharge = vi.fn();
 
@@ -20,150 +18,118 @@ vi.mock('@/lib/business/platform-billing-stripe', () => ({
   })),
   getStripeServerClient: vi.fn(() => ({
     webhooks: {
-      constructEvent: vi.fn((payload, signature, secret) => {
-        // For testing, just parse the payload
-        return JSON.parse(payload);
-      }),
+      constructEvent: vi.fn((payload: string) => JSON.parse(payload)),
     },
   })),
   requireStripeWebhookSecret: vi.fn(() => 'whsec_test_secret'),
-  syncPlatformEntitlementFromCheckoutSession: vi.fn(),
-  syncPlatformEntitlementFromStripeSubscriptionEvent: vi.fn(),
+  syncPlatformEntitlementFromCheckoutSession: vi.fn(async () => null),
+  syncPlatformEntitlementFromStripeSubscriptionEvent: vi.fn(async () => null),
 }));
+
+async function postWebhook(event: Record<string, unknown>) {
+  const { POST } = await import('@/app/api/stripe/webhook/route');
+  const request = new Request('http://localhost:3000/api/stripe/webhook', {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'stripe-signature': 'sig_test',
+    },
+    body: JSON.stringify(event),
+  });
+
+  return POST(request);
+}
 
 describe('Stripe webhook route — charge events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  describe('charge.succeeded event', () => {
-    it('routes charge.succeeded to tenant payment handler when invoice_id metadata present', async () => {
-      mockRecordTenantInvoicePaymentFromStripeCharge.mockResolvedValue({
-        recorded: true,
-        paymentId: 'payment-1',
-      });
-
-      const chargeEvent = {
-        id: 'evt_test_123',
-        type: 'charge.succeeded',
-        data: {
-          object: {
-            id: 'ch_test_123',
-            amount: 10000,
-            created: 1747756800,
-            metadata: {
-              account_owner_user_id: 'owner-1',
-              invoice_id: 'inv-1',
-              job_id: 'job-1',
-            },
-          },
-        },
-      };
-
-      // In a real test, you would make the HTTP request to the webhook endpoint
-      // and verify the handler was called. For now, we verify the handler contract.
-      expect(chargeEvent.type).toBe('charge.succeeded');
-      expect(chargeEvent.data.object.metadata.invoice_id).toBe('inv-1');
+  it('routes charge.succeeded with invoice_id and forwards connected account context', async () => {
+    mockRecordTenantInvoicePaymentFromStripeCharge.mockResolvedValue({
+      recorded: true,
+      paymentId: 'payment-1',
     });
 
-    it('ignores charge.succeeded without invoice_id metadata (platform billing)', async () => {
-      const chargeEvent = {
-        id: 'evt_platform_sub',
-        type: 'charge.succeeded',
-        data: {
-          object: {
-            id: 'ch_platform_123',
-            amount: 99900,
-            created: 1747756800,
-            metadata: {} as Record<string, any>, // No invoice_id, so platform subscription charge
+    const response = await postWebhook({
+      id: 'evt_test_123',
+      account: 'acct_connected_1',
+      type: 'charge.succeeded',
+      data: {
+        object: {
+          id: 'ch_test_123',
+          amount: 10000,
+          created: 1747756800,
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            job_id: 'job-1',
           },
         },
-      };
-
-      // Handler should NOT be called for charges without invoice_id
-      expect((chargeEvent.data.object.metadata as any).invoice_id).toBeUndefined();
+      },
     });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordTenantInvoicePaymentFromStripeCharge).toHaveBeenCalledTimes(1);
+    expect(mockRecordTenantInvoicePaymentFromStripeCharge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'evt_test_123',
+        connectedAccountId: 'acct_connected_1',
+      }),
+    );
   });
 
-  describe('charge.failed event', () => {
-    it('routes charge.failed to tenant payment failure handler when invoice_id metadata present', async () => {
-      mockRecordTenantInvoicePaymentFailureFromStripeCharge.mockResolvedValue({
-        recorded: true,
-        paymentId: 'payment-1',
-      });
-
-      const chargeEvent = {
-        id: 'evt_fail_123',
-        type: 'charge.failed',
-        data: {
-          object: {
-            id: 'ch_fail_123',
-            amount: 5000,
-            created: 1747756800,
-            failure_message: 'Card declined',
-            metadata: {
-              account_owner_user_id: 'owner-1',
-              invoice_id: 'inv-1',
-              job_id: 'job-1',
-            },
-          },
+  it('ignores charge.succeeded without invoice_id (platform subscription preservation)', async () => {
+    const response = await postWebhook({
+      id: 'evt_platform_sub',
+      account: 'acct_connected_1',
+      type: 'charge.succeeded',
+      data: {
+        object: {
+          id: 'ch_platform_123',
+          amount: 99900,
+          created: 1747756800,
+          metadata: {},
         },
-      };
-
-      expect(chargeEvent.type).toBe('charge.failed');
-      expect(chargeEvent.data.object.metadata.invoice_id).toBe('inv-1');
+      },
     });
 
-    it('ignores charge.failed without invoice_id metadata', async () => {
-      const chargeEvent = {
-        id: 'evt_fail_no_inv',
-        type: 'charge.failed',
-        data: {
-          object: {
-            id: 'ch_fail_no_meta',
-            amount: 5000,
-            created: 1747756800,
-            failure_message: 'Card declined',
-            metadata: {} as Record<string, any>,
-          },
-        },
-      };
-
-      // Handler should NOT be called for charges without invoice_id
-      expect((chargeEvent.data.object.metadata as any).invoice_id).toBeUndefined();
-    });
+    expect(response.status).toBe(200);
+    expect(mockRecordTenantInvoicePaymentFromStripeCharge).not.toHaveBeenCalled();
   });
 
-  describe('webhook event type routing', () => {
-    it('recognizes charge events in HANDLED_EVENT_TYPES', () => {
-      const handledEvents = [
-        'checkout.session.completed',
-        'customer.subscription.created',
-        'customer.subscription.updated',
-        'customer.subscription.deleted',
-        'charge.succeeded',
-        'charge.failed',
-      ];
-
-      expect(handledEvents).toContain('charge.succeeded');
-      expect(handledEvents).toContain('charge.failed');
+  it('routes charge.failed with invoice_id and forwards connected account context', async () => {
+    mockRecordTenantInvoicePaymentFailureFromStripeCharge.mockResolvedValue({
+      recorded: true,
+      paymentId: 'payment-2',
     });
 
-    it('ignores unrelated charge events', () => {
-      const ignoredEvents = ['charge.dispute.created', 'charge.refunded', 'charge.capture'];
-
-      const handledEvents = [
-        'checkout.session.completed',
-        'customer.subscription.created',
-        'customer.subscription.updated',
-        'customer.subscription.deleted',
-        'charge.succeeded',
-        'charge.failed',
-      ];
-
-      for (const event of ignoredEvents) {
-        expect(handledEvents).not.toContain(event);
-      }
+    const response = await postWebhook({
+      id: 'evt_fail_123',
+      account: 'acct_connected_2',
+      type: 'charge.failed',
+      data: {
+        object: {
+          id: 'ch_fail_123',
+          amount: 5000,
+          created: 1747756800,
+          failure_message: 'Card declined',
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            job_id: 'job-1',
+          },
+        },
+      },
     });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordTenantInvoicePaymentFailureFromStripeCharge).toHaveBeenCalledTimes(1);
+    expect(mockRecordTenantInvoicePaymentFailureFromStripeCharge).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'evt_fail_123',
+        connectedAccountId: 'acct_connected_2',
+      }),
+    );
   });
 });

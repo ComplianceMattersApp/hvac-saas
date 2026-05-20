@@ -9,6 +9,7 @@ import {
   buildStripePaymentReference,
   resolveInvoiceCollectedPaymentSummary,
 } from '@/lib/business/internal-invoice-payments';
+import { resolveTenantStripeConnectReadiness } from '@/lib/business/tenant-stripe-connect-readiness';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 
 function toCleanString(value: unknown): string {
@@ -22,6 +23,7 @@ function toCleanString(value: unknown): string {
 export async function recordTenantInvoicePaymentFromStripeCharge(params: {
   charge: Stripe.Charge;
   eventId: string;
+  connectedAccountId?: string | null;
   admin?: any;
   stripe?: any;
 }): Promise<{
@@ -32,6 +34,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
   const admin = params.admin ?? createAdminClient();
   const charge = params.charge;
   const eventId = toCleanString(params.eventId);
+  const eventConnectedAccountId = toCleanString(params.connectedAccountId);
 
   if (!eventId) {
     return {
@@ -78,6 +81,60 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     return {
       recorded: false,
       reason: 'Invoice does not belong to account owner',
+    };
+  }
+
+  if (!eventConnectedAccountId) {
+    console.warn('Tenant invoice webhook skipped: missing connected account context', {
+      eventId,
+      chargeId: toCleanString(charge.id) || null,
+      accountOwnerUserId,
+      invoiceId,
+      jobId,
+    });
+    return {
+      recorded: false,
+      reason: 'Missing connected account context',
+    };
+  }
+
+  const connectReadiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, admin);
+  const expectedConnectedAccountId = toCleanString(connectReadiness.connectedAccountId);
+
+  if (!connectReadiness.isReady || !expectedConnectedAccountId) {
+    console.warn('Tenant invoice webhook skipped: tenant connected account not ready', {
+      eventId,
+      chargeId: toCleanString(charge.id) || null,
+      accountOwnerUserId,
+      invoiceId,
+      jobId,
+      onboardingStatus: connectReadiness.onboardingStatus,
+      chargesEnabled: connectReadiness.chargesEnabled,
+      payoutsEnabled: connectReadiness.payoutsEnabled,
+      detailsSubmitted: connectReadiness.detailsSubmitted,
+      disabledReason: connectReadiness.disabledReason,
+      expectedConnectedAccountId: expectedConnectedAccountId || null,
+      eventConnectedAccountId,
+    });
+    return {
+      recorded: false,
+      reason: 'Tenant connected account is not ready',
+    };
+  }
+
+  if (expectedConnectedAccountId !== eventConnectedAccountId) {
+    console.warn('Tenant invoice webhook skipped: connected account mismatch', {
+      eventId,
+      chargeId: toCleanString(charge.id) || null,
+      accountOwnerUserId,
+      invoiceId,
+      jobId,
+      expectedConnectedAccountId,
+      eventConnectedAccountId,
+    });
+    return {
+      recorded: false,
+      reason: 'Connected account mismatch',
     };
   }
 
@@ -179,6 +236,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
 export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: {
   charge: Stripe.Charge;
   eventId: string;
+  connectedAccountId?: string | null;
   admin?: any;
 }): Promise<{
   recorded: boolean;
@@ -188,6 +246,7 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
   const admin = params.admin ?? createAdminClient();
   const charge = params.charge;
   const eventId = toCleanString(params.eventId);
+  const eventConnectedAccountId = toCleanString(params.connectedAccountId);
 
   if (!eventId) {
     return {
@@ -227,6 +286,60 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
     return {
       recorded: false,
       reason: 'Invoice not found or does not belong to account owner',
+    };
+  }
+
+  if (!eventConnectedAccountId) {
+    console.warn('Tenant invoice failure webhook skipped: missing connected account context', {
+      eventId,
+      chargeId: toCleanString(charge.id) || null,
+      accountOwnerUserId,
+      invoiceId,
+      jobId,
+    });
+    return {
+      recorded: false,
+      reason: 'Missing connected account context',
+    };
+  }
+
+  const connectReadiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, admin);
+  const expectedConnectedAccountId = toCleanString(connectReadiness.connectedAccountId);
+
+  if (!connectReadiness.isReady || !expectedConnectedAccountId) {
+    console.warn('Tenant invoice failure webhook skipped: tenant connected account not ready', {
+      eventId,
+      chargeId: toCleanString(charge.id) || null,
+      accountOwnerUserId,
+      invoiceId,
+      jobId,
+      onboardingStatus: connectReadiness.onboardingStatus,
+      chargesEnabled: connectReadiness.chargesEnabled,
+      payoutsEnabled: connectReadiness.payoutsEnabled,
+      detailsSubmitted: connectReadiness.detailsSubmitted,
+      disabledReason: connectReadiness.disabledReason,
+      expectedConnectedAccountId: expectedConnectedAccountId || null,
+      eventConnectedAccountId,
+    });
+    return {
+      recorded: false,
+      reason: 'Tenant connected account is not ready',
+    };
+  }
+
+  if (expectedConnectedAccountId !== eventConnectedAccountId) {
+    console.warn('Tenant invoice failure webhook skipped: connected account mismatch', {
+      eventId,
+      chargeId: toCleanString(charge.id) || null,
+      accountOwnerUserId,
+      invoiceId,
+      jobId,
+      expectedConnectedAccountId,
+      eventConnectedAccountId,
+    });
+    return {
+      recorded: false,
+      reason: 'Connected account mismatch',
     };
   }
 

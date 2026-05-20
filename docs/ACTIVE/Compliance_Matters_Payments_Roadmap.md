@@ -166,6 +166,13 @@ V1A-3A correction lock (charge type):
 	- Verify event/account context maps to the expected connected account for the tenant owner.
 	- Reject charge events where connected-account context does not match tenant ownership.
 
+V1A-2A completion update (connected-account verification gate):
+- Webhook route now forwards Stripe connected-account event context (`event.account`) into tenant invoice charge handlers.
+- Tenant invoice charge handlers now require connected-account readiness and exact connected-account id match with `internal_business_profiles.stripe_connected_account_id` before recording.
+- Missing/mismatched/unready connected-account context is acknowledged safely (no local payment record) with warning logs for diagnostics.
+- Platform subscription charge events without `invoice_id` remain ignored.
+- Checkout Session creation and customer payment UI remain deferred; no live tenant payment activation in this slice.
+
 Locked direction:
 - Webhook handlers use same idempotency and validation pattern as platform billing
 - Charge metadata drives routing decision between platform and tenant invoice workflows

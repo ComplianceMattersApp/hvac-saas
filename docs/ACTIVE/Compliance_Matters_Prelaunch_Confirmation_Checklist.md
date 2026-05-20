@@ -816,6 +816,10 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Confirmed: no new production Stripe API calls (webhook handler only consumes existing Stripe events).
 - Confirmed: no env/secret changes; uses existing Stripe webhook endpoint.
 - V1A-3A correction lock: webhook idempotency/validation logic remains valid, but production tenant payment processing must also verify connected-account ownership (event/account context must match stored tenant connected account).
+- V1A-2A completed: webhook route now passes connected-account context and tenant invoice charge handlers enforce connected-account readiness + id match against `internal_business_profiles.stripe_connected_account_id` before recording.
+- V1A-2A behavior: missing/mismatched/unready connected-account context is acknowledged safely and does not record payment rows.
+- Preserved: platform subscription charges without `invoice_id` are still ignored by tenant payment handlers.
+- Deferred remains unchanged: no Checkout Session creation changes and no live tenant payment UI activation in this slice.
 
 ### 2.6.3 Tenant Customer Payment V1A-3 (Checkout Session Creation UI)
 - Completed: V1A-3 Stripe Checkout Session helper and invoice workspace UI implemented.

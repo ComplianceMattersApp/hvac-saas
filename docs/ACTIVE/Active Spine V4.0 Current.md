@@ -2342,6 +2342,9 @@ Current implementation truth:
 - No live Checkout Session creation in V1A-2; no customer UI yet; webhook-receiver-only
 - Next slice: V1A-3 Checkout Session creation UI for customer-initiated payments
 - V1A-3A correction lock: V1A-2 handler flow remains valid but requires connected-account ownership verification before production tenant payment use (event/account context must match tenant connected account).
+- V1A-2A completion update: webhook route now forwards `event.account` context and tenant invoice charge handlers enforce connected-account readiness + exact id match with `internal_business_profiles.stripe_connected_account_id` before any payment row insert.
+- V1A-2A safe-fail behavior: missing/mismatched/unready connected-account context is acknowledged without recording tenant payment rows.
+- Platform subscription charge events without `invoice_id` remain ignored in tenant payment path.
 
 ### Tenant Customer Payment V1A-3 (Checkout Session Creation UI)
 
