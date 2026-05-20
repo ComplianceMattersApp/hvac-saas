@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Mail, MapPin, Phone, UserRound } from "lucide-react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { searchScopedCustomers } from "@/lib/customers/visibility";
@@ -31,30 +32,34 @@ export default async function CustomersPage(props: {
   const hasQuery = q.length > 0;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 text-slate-900 sm:space-y-8 sm:p-6">
+    <div className="mx-auto max-w-6xl space-y-5 bg-slate-50 p-3 text-slate-900 sm:p-6">
       <CustomersSearchHero initialQuery={q} />
 
       {!hasQuery ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-5 py-8 text-sm leading-6 text-slate-600">
-          Enter a search term to begin. This tool is best when you know even one useful fragment, like part of a phone number, a city, or a street name.
+        <div className="rounded-lg border border-dashed border-slate-300 bg-white px-5 py-8 text-sm leading-6 text-slate-600 shadow-sm shadow-slate-950/5">
+          <div className="font-semibold text-slate-950">Search to open a customer record.</div>
+          <div className="mt-1">One useful fragment is enough: part of a phone number, city, street, email, or customer name.</div>
         </div>
       ) : results.length === 0 ? (
-        <div className="rounded-2xl border border-slate-200/80 bg-white px-5 py-8 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.22)]">
+        <div className="rounded-lg border border-slate-200 bg-white px-5 py-8 shadow-sm shadow-slate-950/5">
           <div className="space-y-1">
             <h2 className="text-base font-semibold text-slate-950">No customer matches</h2>
             <p className="text-sm leading-6 text-slate-600">
-              No matches for “{q}”. Try a broader name fragment, fewer phone digits, or part of the address or city.
+              No matches for "{q}". Try a broader name fragment, fewer phone digits, or part of the address or city.
             </p>
           </div>
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Search results</h2>
+              <h2 className="text-lg font-semibold tracking-tight text-slate-950">Search Results</h2>
               <p className="text-sm leading-6 text-slate-600">
-                {results.length} match{results.length === 1 ? "" : "es"} for “{q}”.
+                {results.length} match{results.length === 1 ? "" : "es"} for "{q}".
               </p>
+            </div>
+            <div className="w-fit rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600">
+              Showing up to 25
             </div>
           </div>
 
@@ -66,27 +71,40 @@ export default async function CustomersPage(props: {
                 <Link
                   key={r.customer_id}
                   href={`/customers/${r.customer_id}`}
-                  className="block rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.16)] transition-[background-color,box-shadow,transform] hover:bg-slate-50/70 hover:shadow-[0_18px_30px_-24px_rgba(15,23,42,0.2)] active:translate-y-[0.5px]"
+                  className="block rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:translate-y-[0.5px]"
                 >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <div className="font-medium text-slate-950">{displayName}</div>
-                      <div className="text-sm text-slate-500">
-                        {r.phone ?? "No phone"} {r.email ? `• ${r.email}` : ""}
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 font-semibold text-slate-950">
+                        <UserRound className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
+                        <span className="truncate">{displayName}</span>
                       </div>
-                      <div className="mt-1 text-sm text-slate-700">
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm text-slate-500">
+                        <span className="inline-flex min-w-0 items-center gap-1">
+                          <Phone className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                          <span className="truncate">{r.phone ?? "No phone"}</span>
+                        </span>
+                        {r.email ? (
+                          <span className="inline-flex min-w-0 items-center gap-1">
+                            <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                            <span className="truncate">{r.email}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                      <div className="mt-2 flex min-w-0 items-center gap-1 text-sm text-slate-700">
+                        <MapPin className="h-4 w-4 shrink-0 text-slate-400" aria-hidden="true" />
                         {r.sample_address ? (
-                          <>
+                          <span className="truncate">
                             {r.sample_address}
                             {r.sample_city ? `, ${r.sample_city}` : ""}
-                          </>
+                          </span>
                         ) : (
                           <span className="text-slate-500">No address on file yet</span>
                         )}
                       </div>
                     </div>
 
-                    <div className="whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-sm font-medium text-slate-700">
+                    <div className="w-fit whitespace-nowrap rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-sm font-semibold text-blue-800">
                       {r.locations_count} location
                       {r.locations_count === 1 ? "" : "s"}
                     </div>
