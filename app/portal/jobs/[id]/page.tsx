@@ -10,6 +10,14 @@ import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import {
+  portalInputClass,
+  portalInsetClass,
+  portalNarrowPageClass,
+  portalPanelClass,
+  portalPrimaryButtonClass,
+  portalSecondaryButtonClass,
+} from "@/components/portal/PortalChrome";
+import {
   extractFailureReasons,
   finalRunPass,
   resolveContractorIssues,
@@ -106,7 +114,7 @@ function summarizePlainText(value?: string | null, maxLength = 140) {
   const normalized = String(value ?? "").replace(/\s+/g, " ").trim();
   if (!normalized) return "";
   if (normalized.length <= maxLength) return normalized;
-  return `${normalized.slice(0, maxLength - 1).trimEnd()}…`;
+  return `${normalized.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
 function readContractorFailureSummaryV1(meta: any) {
@@ -203,17 +211,6 @@ function normalizeMessageForCompare(value?: string | null) {
 function digitsOnly(value?: string | null) {
   return String(value ?? "").replace(/\D/g, "");
 }
-
-const portalPanelClass =
-  "rounded-[26px] border border-slate-200/80 bg-white/96 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] dark:border-slate-800 dark:bg-slate-950/85 sm:p-6";
-const portalInsetClass =
-  "rounded-xl border border-slate-200/80 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-900/55";
-const portalPrimaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_26px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_16px_28px_-20px_rgba(37,99,235,0.46)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
-const portalSecondaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800";
-const portalInputClass =
-  "w-full rounded-xl border border-slate-300/80 bg-white px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500";
 
 function portalIssueTheme(group: string) {
   if (group === "failed") {
@@ -355,7 +352,7 @@ export default async function PortalJobDetailPage({
     supabase,
     accountOwnerUserId,
   });
-  const supportLabel = [supportIdentity.support_phone, supportIdentity.support_email].filter(Boolean).join(" • ");
+  const supportLabel = [supportIdentity.support_phone, supportIdentity.support_email].filter(Boolean).join(" / ");
 
   const rootJobId = (job as any)?.parent_job_id ?? jobId;
 
@@ -757,7 +754,7 @@ export default async function PortalJobDetailPage({
   }
 
   return (
-    <div className="mx-auto max-w-4xl space-y-7 text-gray-900 dark:text-gray-100">
+    <div className={portalNarrowPageClass}>
       {banner === "job_created" ? (
         <FlashBanner type="success" message="Job created." />
       ) : null}
@@ -767,7 +764,7 @@ export default async function PortalJobDetailPage({
       ) : null}
 
       {banner === "note_saved" ? (
-        <FlashBanner type="success" message="Note received — our team will review it." />
+        <FlashBanner type="success" message="Note received. Our team will review it." />
       ) : null}
 
       {banner === "note_duplicate" ? (
@@ -794,7 +791,7 @@ export default async function PortalJobDetailPage({
         <FlashBanner type="warning" message="That action could not be completed. Please open the job again and try once more." />
       ) : null}
 
-      <section className="rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_60%,rgba(239,246,255,0.68))] p-5 shadow-[0_24px_48px_-34px_rgba(15,23,42,0.28)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(17,24,39,0.96)_62%,rgba(15,23,42,0.92))] sm:p-6 space-y-5">
+      <section className={`${portalPanelClass} space-y-5`}>
         <div className="flex items-start justify-between gap-4">
           <Link
             href="/portal"
@@ -802,16 +799,16 @@ export default async function PortalJobDetailPage({
           >
             Back to portal
           </Link>
-          <div className={`inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] ${statusBadge.badgeClass}`}>
+          <div className={`inline-flex min-h-8 items-center rounded-lg border px-3 py-1.5 text-xs font-semibold ${statusBadge.badgeClass}`}>
             {statusBadge.label}
           </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-[300px_1fr] gap-4 md:items-stretch">
           <div className="space-y-3">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">Customer / Site Contact</div>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Customer / site contact</div>
 
-            <div className="text-[clamp(1.7rem,4vw,2.35rem)] font-semibold tracking-[-0.03em] leading-tight text-slate-950 dark:text-slate-100">{customerName}</div>
+            <div className="text-2xl font-semibold leading-tight text-slate-950 dark:text-slate-100 sm:text-3xl">{customerName}</div>
             <div className="text-base font-semibold text-slate-700 dark:text-slate-300">{String((job as any).title ?? "Job")}</div>
             {heroStatusPreview ? (
               <div className="max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
@@ -848,7 +845,7 @@ export default async function PortalJobDetailPage({
 
         <div className={`grid grid-cols-1 ${showPermitField ? "md:grid-cols-4" : "md:grid-cols-3"} gap-3 text-sm`}>
           <div className={portalInsetClass}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Customer Phone</div>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Customer phone</div>
             <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">{customerPhone}</div>
             {customerPhoneHref ? (
               <a href={customerPhoneHref} className={`mt-3 ${portalSecondaryButtonClass}`}>
@@ -858,7 +855,7 @@ export default async function PortalJobDetailPage({
           </div>
 
           <div className={`rounded-xl border p-4 ${issueTheme.surfaceClass}`}>
-            <div className={`text-[11px] font-semibold uppercase tracking-[0.12em] ${issueTheme.eyebrowClass}`}>Current Status</div>
+            <div className={`text-xs font-semibold ${issueTheme.eyebrowClass}`}>Current status</div>
             <div className="mt-1 flex flex-wrap items-center gap-2">
               <span className="font-semibold text-slate-950 dark:text-slate-100">{displayStatusHeadline}</span>
               {isPendingInfoOps ? (
@@ -873,7 +870,7 @@ export default async function PortalJobDetailPage({
           </div>
 
           <div className={portalInsetClass}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Service Date</div>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Service date</div>
             <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">
               {serviceDatePrimary}
             </div>
@@ -882,7 +879,7 @@ export default async function PortalJobDetailPage({
 
           {showPermitField ? (
           <div className={portalInsetClass}>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Permit Number</div>
+              <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Permit number</div>
               <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">{permitDisplayValue || "Still needed"}</div>
               <div className="mt-2 text-sm leading-6 text-slate-600 dark:text-slate-300">{permitSupportText}</div>
             </div>
@@ -893,8 +890,8 @@ export default async function PortalJobDetailPage({
       <section className={`${portalPanelClass} space-y-5`}>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="max-w-2xl">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Current status</div>
-            <div className="mt-2 text-[1.55rem] font-semibold tracking-[-0.025em] text-slate-950 dark:text-slate-100">{displayStatusHeadline}</div>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Current status</div>
+            <div className="mt-2 text-2xl font-semibold text-slate-950 dark:text-slate-100">{displayStatusHeadline}</div>
           </div>
         </div>
         {displayStatusExplanation ? (
@@ -903,7 +900,7 @@ export default async function PortalJobDetailPage({
 
         {(statusDetailLines ?? []).slice(0, 4).length > 0 ? (
           <div className={`${portalInsetClass} space-y-2 text-sm leading-6 text-slate-700 dark:text-slate-200`}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">What to address</div>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">What to address</div>
             {(statusDetailLines ?? []).slice(0, 4).map((reason: string, idx: number) => (
               <div key={`${reason}-${idx}`}>{reason}</div>
             ))}
@@ -912,20 +909,20 @@ export default async function PortalJobDetailPage({
 
         {statusNextStep ? (
           <div className="rounded-xl border border-blue-200 bg-blue-50/70 p-4 text-sm text-blue-950 dark:border-blue-800 dark:bg-blue-950/20 dark:text-blue-100">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700 dark:text-blue-300">Next step</div>
+            <div className="text-xs font-semibold text-blue-700 dark:text-blue-300">Next step</div>
             <div className="mt-1 font-medium leading-6">{statusNextStep}</div>
           </div>
         ) : null}
 
         {hasRetestReadyRequest ? (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50/80 p-4 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-950/20 dark:text-emerald-300">
-            Retest request received — we&apos;ll schedule it shortly.
+            Retest request received. We&apos;ll schedule it shortly.
           </div>
         ) : null}
 
         {latestRaterNote ? (
           <div className={portalInsetClass}>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Latest update</div>
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Latest update</div>
             <div className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               Most recent note from our team.
             </div>
@@ -941,19 +938,19 @@ export default async function PortalJobDetailPage({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-3 text-sm">
               {permitDisplayValue ? (
                 <div className={portalInsetClass}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Permit #</div>
+                  <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Permit #</div>
                   <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">{permitDisplayValue}</div>
                 </div>
               ) : null}
               {jurisdictionDisplayValue ? (
                 <div className={portalInsetClass}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Jurisdiction</div>
+                  <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Jurisdiction</div>
                   <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">{jurisdictionDisplayValue}</div>
                 </div>
               ) : null}
               {permitDateDisplayValue ? (
                 <div className={portalInsetClass}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:text-slate-400">Permit Date</div>
+                  <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">Permit date</div>
                   <div className="mt-1 font-medium text-slate-900 dark:text-slate-100">{formatDateLA(permitDateDisplayValue)}</div>
                 </div>
               ) : null}
@@ -1108,7 +1105,7 @@ export default async function PortalJobDetailPage({
                     {n.event_type === "contractor_correction_submission"
                       ? "Correction submission"
                       : "Contractor note"}
-                    {" • "}
+                    {" / "}
                     {n.created_at ? formatDateLA(String(n.created_at)) : "-"}
                   </div>
                   <div className="mt-1 whitespace-pre-wrap text-sm leading-6 text-slate-800 dark:text-slate-200">{n.note}</div>
@@ -1171,7 +1168,7 @@ export default async function PortalJobDetailPage({
         )}
       </section>
 
-      <div className="rounded-[24px] border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9),rgba(255,255,255,0.98))] px-6 py-4 text-center text-sm leading-6 text-slate-600 shadow-[0_16px_32px_-30px_rgba(15,23,42,0.22)] dark:border-slate-800 dark:bg-slate-950/85 dark:text-slate-300">
+      <div className="rounded-lg border border-slate-200 bg-slate-50 px-6 py-4 text-center text-sm leading-6 text-slate-600 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.22)] dark:border-slate-800 dark:bg-slate-950 dark:text-slate-300">
         If you need help, contact {supportIdentity.display_name}
         {supportLabel ? (
           <>

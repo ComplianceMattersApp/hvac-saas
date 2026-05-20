@@ -10,7 +10,7 @@ export default function PortalError({
 }) {
   return (
     <div className="mx-auto max-w-3xl px-4 py-16">
-      <div className="rounded-xl border border-amber-200 bg-amber-50 p-6 text-amber-900">
+      <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.22)]">
         <h2 className="text-lg font-semibold">We could not load this portal page.</h2>
         <p className="mt-2 text-sm">
           Please try again. If this keeps happening, return to your jobs list and reopen the job.

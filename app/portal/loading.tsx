@@ -1,23 +1,21 @@
 export default function PortalLoading() {
   return (
     <div
-      className="mx-auto max-w-3xl space-y-4 px-4 py-6"
+      className="mx-auto max-w-4xl space-y-4 px-3 py-6 sm:px-4"
       aria-busy="true"
       aria-live="polite"
     >
-      {/* Header card */}
-      <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-950/5">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.28)]">
         <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
         <div className="mt-3 h-7 w-48 animate-pulse rounded bg-slate-200" />
         <div className="mt-2 h-4 w-64 max-w-full animate-pulse rounded bg-slate-100" />
       </div>
 
-      {/* Job list skeleton */}
       <div className="space-y-3">
         {Array.from({ length: 5 }).map((_, index) => (
           <div
             key={index}
-            className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5"
+            className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.2)]"
           >
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 space-y-2">

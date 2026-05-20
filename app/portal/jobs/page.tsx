@@ -1,4 +1,4 @@
-// app/portal/jobs/page.tsx — View all contractor jobs (uncapped)
+// app/portal/jobs/page.tsx - View all contractor jobs (uncapped)
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
@@ -28,6 +28,11 @@ import {
   formatStatusAgeCompact,
   resolveStatusAgeDays,
 } from "@/lib/utils/status-aging";
+import {
+  PortalStat,
+  portalPageClass,
+  portalPanelClass,
+} from "@/components/portal/PortalChrome";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -53,11 +58,6 @@ type SP = Record<string, string | string[] | undefined>;
 function sp1(v: string | string[] | undefined) {
   return Array.isArray(v) ? v[0] : v;
 }
-
-const portalSecondaryButtonClass =
-  "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:border-slate-600 dark:hover:bg-slate-800";
-const portalMetricChipClass =
-  "inline-flex items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em]";
 
 export default async function PortalAllJobsPage({
   searchParams,
@@ -232,7 +232,7 @@ export default async function PortalAllJobsPage({
       fallbackUpdatedAt: String(input.job?.created_at ?? "").trim() || null,
     });
     if (statusAgeDays == null) return meta;
-    return { ...meta, label: `${meta.label} · ${formatStatusAgeCompact(statusAgeDays)}` };
+    return { ...meta, label: `${meta.label} / ${formatStatusAgeCompact(statusAgeDays)}` };
   }
 
   const { data: attachmentCounts } = await supabase
@@ -287,7 +287,7 @@ export default async function PortalAllJobsPage({
   });
 
   // Exclude parent jobs that have an active (non-closed) retest child.
-  // Exclude parent jobs that have any retest child — active or resolved.
+  // Exclude parent jobs that have any retest child, active or resolved.
   // The retest child is the actionable/outcome unit; the parent must not appear in active portal views.
   const activeResolvedJobs = resolvedJobs.filter(
     ({ job }) =>
@@ -395,7 +395,7 @@ export default async function PortalAllJobsPage({
   }
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 text-gray-900 dark:text-gray-100">
+    <div className={portalPageClass}>
       {banner === "invalid_request" ? (
         <FlashBanner
           type="warning"
@@ -403,47 +403,35 @@ export default async function PortalAllJobsPage({
         />
       ) : null}
 
-      <div className="rounded-[30px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_60%,rgba(239,246,255,0.68))] p-5 shadow-[0_26px_52px_-36px_rgba(15,23,42,0.28)] dark:border-slate-800 dark:bg-[linear-gradient(135deg,rgba(15,23,42,0.92),rgba(17,24,39,0.96)_62%,rgba(15,23,42,0.92))] sm:p-6 lg:p-6">
+      <div className={portalPanelClass}>
         <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_240px] lg:items-start lg:gap-5">
           <div className="max-w-2xl">
             <div className="text-sm text-slate-500 dark:text-slate-400">
               <Link href="/portal" className="hover:underline">
-                ← Portal
+                Back to portal
               </Link>
             </div>
-            <div className="mt-4 inline-flex items-center rounded-full border border-slate-200/80 bg-white/92 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.24)] dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+            <div className="mt-4 inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
               {contractorName}
             </div>
-            <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500 dark:text-slate-400">
+            <div className="mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">
               Contractor Jobs
             </div>
-            <h1 className="mt-1 text-[clamp(1.7rem,3vw,2.4rem)] font-semibold tracking-[-0.03em] text-slate-950 dark:text-slate-100">
-              Portal jobs portfolio
+            <h1 className="mt-1 text-2xl font-semibold text-slate-950 dark:text-slate-100 sm:text-3xl">
+              All portal jobs
             </h1>
             <p className="mt-1.5 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
-              Every portal-visible job, grouped by honest current state for faster review.
+              Review every visible job by current status so follow-up and completed work stay easy to find.
             </p>
           </div>
 
           <div className="flex flex-wrap gap-2 lg:max-w-[240px] lg:justify-end">
-            <div className={`${portalMetricChipClass} border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300`}>
-              {actionRequiredJobs.length} attention
-            </div>
-            <div className={`${portalMetricChipClass} border-slate-200 bg-slate-50 text-slate-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200`}>
-              {upcomingScheduledJobs.length} upcoming
-            </div>
-            <div className={`${portalMetricChipClass} border-blue-200 bg-blue-50 text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-300`}>
-              {activeWorkJobs.length} active
-            </div>
-            <div className={`${portalMetricChipClass} border-slate-300 bg-slate-100 text-slate-800 dark:border-slate-700 dark:bg-slate-900/80 dark:text-slate-200`}>
-              {waitingCards.length} waiting
-            </div>
-            <div className={`${portalMetricChipClass} border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300`}>
-              {passedJobs.length} passed
-            </div>
-            <div className="inline-flex items-center rounded-full border border-slate-200/80 bg-white/92 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
-              {activeResolvedJobs.length} total
-            </div>
+            <PortalStat label="attention" value={actionRequiredJobs.length} tone="amber" />
+            <PortalStat label="upcoming" value={upcomingScheduledJobs.length} />
+            <PortalStat label="active" value={activeWorkJobs.length} tone="blue" />
+            <PortalStat label="waiting" value={waitingCards.length} tone="neutral" />
+            <PortalStat label="passed" value={passedJobs.length} tone="emerald" />
+            <PortalStat label="total" value={activeResolvedJobs.length} />
           </div>
         </div>
       </div>
@@ -452,10 +440,10 @@ export default async function PortalAllJobsPage({
       <section className="space-y-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Priority Queue
             </div>
-          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
+          <h2 className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
             {labelWithCount("Action Needed", actionRequiredJobs.length)}
           </h2>
           </div>
@@ -464,7 +452,7 @@ export default async function PortalAllJobsPage({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_14px_34px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {actionRequiredJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
@@ -505,10 +493,10 @@ export default async function PortalAllJobsPage({
       <section className="space-y-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Upcoming Scheduled
             </div>
-          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
+          <h2 className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
             {labelWithCount("Upcoming Scheduled", upcomingScheduledJobs.length)}
           </h2>
           </div>
@@ -517,7 +505,7 @@ export default async function PortalAllJobsPage({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_14px_34px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {upcomingScheduledJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
@@ -558,10 +546,10 @@ export default async function PortalAllJobsPage({
       <section className="space-y-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Active Work
             </div>
-          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
+          <h2 className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
             {labelWithCount("Active Work", activeWorkJobs.length)}
           </h2>
           </div>
@@ -570,7 +558,7 @@ export default async function PortalAllJobsPage({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_14px_34px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {activeWorkJobs.map(({ job: j, resolved }) => {
               const openRetestChild = openRetestChildByParentId.get(String(j.id));
@@ -611,10 +599,10 @@ export default async function PortalAllJobsPage({
       <section className="space-y-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Waiting States
             </div>
-          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
+          <h2 className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
             {labelWithCount("Waiting", waitingCards.length)}
           </h2>
           </div>
@@ -623,7 +611,7 @@ export default async function PortalAllJobsPage({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_14px_34px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {waitingCards.map((card) => {
               if (card.kind === "proposal") {
@@ -683,10 +671,10 @@ export default async function PortalAllJobsPage({
       <section className="space-y-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500 dark:text-slate-400">
+            <div className="text-xs font-semibold text-slate-500 dark:text-slate-400">
               Completed Outcomes
             </div>
-          <h2 className="mt-0.5 text-[1.1rem] font-semibold tracking-[-0.02em] text-gray-900 dark:text-gray-100">
+          <h2 className="mt-0.5 text-lg font-semibold text-gray-900 dark:text-gray-100">
             {labelWithCount("Passed", passedJobs.length)}
           </h2>
           </div>
@@ -695,7 +683,7 @@ export default async function PortalAllJobsPage({
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white/96 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950/80">
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_14px_34px_-30px_rgba(15,23,42,0.24)] dark:border-slate-800 dark:bg-slate-950">
           <div className="divide-y divide-gray-200 dark:divide-gray-800">
             {passedJobs.map(({ job: j, resolved }) => {
               const resolvedAt = j.data_entry_completed_at ?? j.created_at;
