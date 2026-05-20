@@ -1,6 +1,7 @@
 import Stripe from "stripe";
 import { createAdminClient } from "@/lib/supabase/server";
 import type { EntitlementStatus, PlatformPlanKey } from "@/lib/business/platform-entitlement";
+import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 
 type PlatformEntitlementStripeRow = {
   account_owner_user_id: string;
@@ -87,6 +88,14 @@ function extractStripeCustomerId(
 ) {
   if (typeof customer === "string") return toCleanString(customer) || null;
   return toCleanString(customer?.id) || null;
+}
+
+export function derivePlatformCheckoutSeatQuantity(activeInternalSeatCount: number) {
+  const normalizedCount = Number.isFinite(activeInternalSeatCount)
+    ? Math.max(0, Math.trunc(activeInternalSeatCount))
+    : 0;
+
+  return Math.max(normalizedCount, 1);
 }
 
 export function mapStripeSubscriptionStatusToEntitlementStatus(
@@ -417,13 +426,28 @@ export async function createPlatformSubscriptionCheckoutSession(params: {
   accountOwnerUserId: string;
   successUrl?: string;
   cancelUrl?: string;
+  admin?: any;
+  stripe?: Stripe;
 }) {
   const appUrl = resolvePlatformBillingAppUrl();
   if (!appUrl) throw new Error("Platform billing app URL is not configured.");
 
-  const stripe = getStripeServerClient();
-  const admin = createAdminClient();
+  const stripe = params.stripe ?? getStripeServerClient();
+  const admin = params.admin ?? createAdminClient();
   const priceId = requireStripePriceId();
+
+  const entitlement = await resolveAccountEntitlement(
+    params.accountOwnerUserId,
+    admin,
+  );
+
+  if (entitlement.isInternalComped) {
+    throw new Error("Platform subscription checkout is unavailable for internal comped accounts.");
+  }
+
+  const checkoutSeatQuantity = derivePlatformCheckoutSeatQuantity(
+    entitlement.activeSeatCount,
+  );
 
   const { stripeCustomerId } = await ensureStripeCustomerForAccountOwner({
     accountOwnerUserId: params.accountOwnerUserId,
@@ -437,7 +461,7 @@ export async function createPlatformSubscriptionCheckoutSession(params: {
     line_items: [
       {
         price: priceId,
-        quantity: 1,
+        quantity: checkoutSeatQuantity,
       },
     ],
     metadata: {
