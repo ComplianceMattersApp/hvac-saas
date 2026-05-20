@@ -31,6 +31,10 @@ vi.mock("@/lib/business/tenant-stripe-connect-onboarding", () => ({
     createTenantStripeConnectOnboardingLinkMock(...args),
   syncTenantStripeConnectReadinessForAccountOwner: (...args: unknown[]) =>
     syncTenantStripeConnectReadinessForAccountOwnerMock(...args),
+  normalizeStripeConnectError: (error: unknown, stage: string) => ({
+    stage,
+    message: error instanceof Error ? error.message : "unknown_error",
+  }),
 }));
 
 function buildAdmin(preflightAllowed = true) {
@@ -99,6 +103,41 @@ describe("internal business profile Stripe Connect actions", () => {
     expect(createTenantStripeConnectOnboardingLinkMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1" }),
     );
+  });
+
+  it("rethrows NEXT_REDIRECT control-flow errors without mapping to failed notice", async () => {
+    createAdminClientMock.mockReturnValue(buildAdmin(true));
+    const nextRedirectError = Object.assign(new Error("NEXT_REDIRECT"), {
+      digest: "NEXT_REDIRECT;replace;/ops/admin/company-profile;307;",
+    });
+    createTenantStripeConnectOnboardingLinkMock.mockRejectedValue(nextRedirectError);
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { startTenantStripeConnectOnboardingFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    await expect(startTenantStripeConnectOnboardingFromForm()).rejects.toBe(nextRedirectError);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("maps real onboarding errors to failed notice", async () => {
+    createAdminClientMock.mockReturnValue(buildAdmin(true));
+    createTenantStripeConnectOnboardingLinkMock.mockRejectedValue(
+      new Error("StripeInvalidRequestError: account invalid"),
+    );
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { startTenantStripeConnectOnboardingFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    await expect(startTenantStripeConnectOnboardingFromForm()).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=stripe_connect_onboarding_failed",
+    );
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it("refreshes readiness for same-account admin and redirects with success notice", async () => {

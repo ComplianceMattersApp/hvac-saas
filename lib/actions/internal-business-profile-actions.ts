@@ -45,6 +45,22 @@ function withNotice(notice: string) {
   return `/ops/admin/company-profile?notice=${encodeURIComponent(notice)}`;
 }
 
+function isRedirectControlFlowError(error: unknown) {
+  if (!error) return false;
+
+  const message = error instanceof Error ? String(error.message ?? "") : "";
+  const digest =
+    typeof error === "object" && error !== null && "digest" in error
+      ? String((error as { digest?: unknown }).digest ?? "")
+      : "";
+
+  return (
+    message.startsWith("REDIRECT:") ||
+    message.includes("NEXT_REDIRECT") ||
+    digest.startsWith("NEXT_REDIRECT")
+  );
+}
+
 async function requireScopedInternalBusinessProfileMutationContext(params: {
   admin: any;
   actorUserId: string;
@@ -245,7 +261,7 @@ export async function startTenantStripeConnectOnboardingFromForm(): Promise<void
     revalidatePath("/ops/admin/company-profile");
     redirect(onboarding.url);
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith("REDIRECT:")) {
+    if (isRedirectControlFlowError(error)) {
       throw error;
     }
 
