@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { saveInternalBusinessProfileFromForm } from "@/lib/actions/internal-business-profile-actions";
+import {
+  refreshTenantStripeConnectReadinessFromForm,
+  saveInternalBusinessProfileFromForm,
+  startTenantStripeConnectOnboardingFromForm,
+} from "@/lib/actions/internal-business-profile-actions";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import {
   DEFAULT_BILLING_MODE,
@@ -22,6 +26,7 @@ import {
   requireInternalRole,
 } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
+import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -32,6 +37,23 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   invalid_logo_file: { tone: "error", message: "Upload an image file for your logo." },
   logo_too_large: { tone: "error", message: "Logo files must be 5 MB or smaller." },
   save_failed: { tone: "error", message: "We couldn't save your company details. Please try again." },
+  stripe_connect_status_refreshed: { tone: "success", message: "Stripe payment readiness was refreshed." },
+  stripe_connect_onboarding_returned: {
+    tone: "warn",
+    message: "Returned from Stripe setup. Refresh Stripe status to see current readiness.",
+  },
+  stripe_connect_onboarding_refresh: {
+    tone: "warn",
+    message: "Stripe setup was not completed. Continue setup when ready.",
+  },
+  stripe_connect_onboarding_failed: {
+    tone: "error",
+    message: "We couldn't start Stripe setup. Please try again.",
+  },
+  stripe_connect_status_refresh_failed: {
+    tone: "error",
+    message: "We couldn't refresh Stripe status right now. Please try again.",
+  },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {
@@ -88,6 +110,10 @@ export default async function AdminCompanyProfilePage({
       supabase,
     }),
   ]);
+  const tenantStripeReadiness = await resolveTenantStripeConnectReadiness(
+    internalUser.account_owner_user_id,
+    supabase,
+  );
   const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase);
   const incompleteRequiredItems = readiness.items.filter((item) => item.status === "incomplete");
   const currentLogoUrl = await resolveInternalBusinessProfileLogoUrl({
@@ -353,6 +379,8 @@ export default async function AdminCompanyProfilePage({
         availability={platformBillingAvailability}
         seatAuditPreview={seatAuditPreview}
       />
+
+      <TenantStripePaymentsSection readiness={tenantStripeReadiness} />
     </div>
   );
 }
@@ -562,6 +590,81 @@ function PlatformAccountSection({
             Platform subscription setup is unavailable until Stripe server configuration is added.
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function TenantStripePaymentsSection({
+  readiness,
+}: {
+  readiness: Awaited<ReturnType<typeof resolveTenantStripeConnectReadiness>>;
+}) {
+  const hasConnectedAccountId = Boolean(String(readiness.connectedAccountId ?? "").trim());
+  const setupActionLabel = hasConnectedAccountId
+    ? "Continue Stripe Setup"
+    : "Connect Stripe Account";
+
+  return (
+    <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
+      <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
+        <div className="text-sm font-semibold text-slate-950">Tenant customer invoice payments</div>
+        <div className="mt-1 text-sm text-slate-600">
+          Stripe Connect setup controls online invoice payment readiness for this company.
+        </div>
+      </div>
+
+      <div className="space-y-4 px-5 py-4">
+        {readiness.isReady ? (
+          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm leading-6 text-emerald-900">
+            <div className="font-semibold">Online invoice payments ready</div>
+            <div>Stripe Connect requirements are complete for direct-charge tenant payments.</div>
+          </div>
+        ) : (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-900">
+            <div className="font-semibold">Online invoice payments not ready</div>
+            <div>
+              Online invoice payments require Stripe Connect setup for this company before payment collection can go live.
+            </div>
+          </div>
+        )}
+
+        <dl className="grid grid-cols-1 gap-px rounded-2xl border border-slate-200 bg-slate-100/70 sm:grid-cols-2 lg:grid-cols-3">
+          <PlatformAccountField label="Connected account" value={readiness.connectedAccountId ?? "Not connected"} />
+          <PlatformAccountField label="Onboarding status" value={readiness.onboardingStatus} />
+          <PlatformAccountField label="Charges enabled" value={readiness.chargesEnabled ? "Yes" : "No"} />
+          <PlatformAccountField label="Payouts enabled" value={readiness.payoutsEnabled ? "Yes" : "No"} />
+          <PlatformAccountField label="Details submitted" value={readiness.detailsSubmitted ? "Yes" : "No"} />
+          <PlatformAccountField label="Disabled reason" value={readiness.disabledReason ?? "-"} />
+        </dl>
+
+        <div className="text-xs text-slate-500">
+          Last synced: {readiness.lastSyncedAt ? new Date(readiness.lastSyncedAt).toLocaleString() : "Never"}
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          <form action={startTenantStripeConnectOnboardingFromForm}>
+            <button
+              type="submit"
+              className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-300 active:translate-y-[0.5px]"
+            >
+              {setupActionLabel}
+            </button>
+          </form>
+
+          <form action={refreshTenantStripeConnectReadinessFromForm}>
+            <button
+              type="submit"
+              className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-[background-color,box-shadow,transform] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 active:translate-y-[0.5px]"
+            >
+              Refresh Stripe Status
+            </button>
+          </form>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-600">
+          Customer payment links and invoice Checkout Session creation are not part of this slice.
+        </div>
       </div>
     </div>
   );

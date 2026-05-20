@@ -9,6 +9,10 @@ import {
   normalizeBillingMode,
   parseInternalBusinessProfileLogoStorageRef,
 } from "@/lib/business/internal-business-profile";
+import {
+  createTenantStripeConnectOnboardingLink,
+  syncTenantStripeConnectReadinessForAccountOwner,
+} from "@/lib/business/tenant-stripe-connect-onboarding";
 
 const MAX_LOGO_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -212,4 +216,80 @@ export async function confirmTeamSetupFromForm(): Promise<void> {
   revalidatePath("/ops/admin");
   revalidatePath("/ops/admin/internal-users");
   redirect("/ops/admin/internal-users?team_confirm=confirmed");
+}
+
+export async function startTenantStripeConnectOnboardingFromForm(): Promise<void> {
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalRole("admin", { supabase });
+
+  const admin = createAdminClient();
+  try {
+    await requireScopedInternalBusinessProfileMutationContext({
+      admin,
+      actorUserId: userId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect("/forbidden");
+  }
+
+  try {
+    const onboarding = await createTenantStripeConnectOnboardingLink({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      admin,
+    });
+
+    revalidatePath("/ops");
+    revalidatePath("/ops/admin");
+    revalidatePath("/ops/admin/company-profile");
+    redirect(onboarding.url);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("REDIRECT:")) {
+      throw error;
+    }
+
+    console.warn("Stripe Connect onboarding start failed", {
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
+    redirect(withNotice("stripe_connect_onboarding_failed"));
+  }
+}
+
+export async function refreshTenantStripeConnectReadinessFromForm(): Promise<void> {
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalRole("admin", { supabase });
+
+  const admin = createAdminClient();
+  try {
+    await requireScopedInternalBusinessProfileMutationContext({
+      admin,
+      actorUserId: userId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect("/forbidden");
+  }
+
+  try {
+    await syncTenantStripeConnectReadinessForAccountOwner({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      admin,
+    });
+
+    revalidatePath("/ops");
+    revalidatePath("/ops/admin");
+    revalidatePath("/ops/admin/company-profile");
+    redirect(withNotice("stripe_connect_status_refreshed"));
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("REDIRECT:")) {
+      throw error;
+    }
+
+    console.warn("Stripe Connect readiness refresh failed", {
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      message: error instanceof Error ? error.message : "unknown_error",
+    });
+    redirect(withNotice("stripe_connect_status_refresh_failed"));
+  }
 }

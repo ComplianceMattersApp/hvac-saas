@@ -874,6 +874,22 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Deferred: live tenant customer payment activation.
 - Deferred: no QBO, no customer portal, no refunds/disputes/saved cards/partial payments.
 
+### 2.6.3B Tenant Customer Payment V1A-3A-2 (Stripe Connect Onboarding + Readiness Sync)
+- Completed: server onboarding helper creates/reuses tenant connected account and creates Stripe-hosted onboarding link for internal admin use.
+- Completed: connected account id persisted in `internal_business_profiles.stripe_connected_account_id` when missing.
+- Completed: readiness sync helper retrieves Stripe connected account and updates:
+  - `stripe_charges_enabled`
+  - `stripe_payouts_enabled`
+  - `stripe_details_submitted`
+  - `stripe_connect_onboarding_status`
+  - `stripe_connect_disabled_reason`
+  - `stripe_connect_last_synced_at`
+- Completed: account-owner/admin-scoped internal actions added for start/continue onboarding and refresh readiness.
+- Completed: company profile internal admin UI now surfaces tenant Stripe readiness state and setup/refresh controls.
+- Verified: ready state remains gated by connected account id + charges/payouts/details true + complete-equivalent onboarding status.
+- Confirmed: direct-charge connected-account model remains the locked tenant invoice payment funds-flow.
+- Confirmed deferred boundaries unchanged: no invoice Checkout Session creation changes, no live payment link UI, no customer portal, no QBO, no refunds/disputes/saved cards/partial payments.
+
 ### 2.6.4 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
 - Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.

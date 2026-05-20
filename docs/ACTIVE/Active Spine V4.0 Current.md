@@ -2413,6 +2413,37 @@ Not introduced in V1A-3A-1:
 - Live tenant customer payment activation
 - QBO, customer portal, refunds/disputes/saved cards/partial payments
 
+### Tenant Customer Payment V1A-3A-2 (Stripe Connect Onboarding + Readiness Sync)
+
+**Status**: V1A-3A-2 onboarding/readiness sync implemented with internal-admin controls on company profile.
+
+- Added Connect onboarding helper path:
+  - create connected account only when missing
+  - reuse existing connected account id when present
+  - create Stripe-hosted onboarding link
+  - persist connected account id on `internal_business_profiles`
+- Added readiness sync helper path:
+  - retrieve Stripe connected account
+  - update `stripe_charges_enabled`, `stripe_payouts_enabled`, `stripe_details_submitted`, `stripe_connect_onboarding_status`, `stripe_connect_disabled_reason`, `stripe_connect_last_synced_at`
+  - preserve existing ready gate semantics via tenant readiness helper
+- Added account-owner/admin scoped internal actions:
+  - start/continue Stripe Connect onboarding
+  - refresh Stripe readiness
+- Added minimal internal admin company profile UI:
+  - readiness state visibility
+  - Connect Stripe Account / Continue Stripe Setup button
+  - Refresh Stripe Status button
+  - explicit not-ready and ready messaging for online invoice payments
+
+Not introduced in V1A-3A-2:
+- No invoice Checkout Session creation changes
+- No live payment link UI
+- No customer portal
+- No QBO
+- No refunds/disputes/saved cards/partial payments
+- No platform seat billing behavior changes
+- No manual payment recording behavior changes
+
 ---
 
 19.2 Core payment direction (locked)
