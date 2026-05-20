@@ -21,6 +21,9 @@ import {
   isEstimateToJobConversionSchemaReady,
   getEstimateToJobConversionSchemaReady,
   getEstimateConvertedJobId,
+  isEstimateToInvoiceConversionSchemaReady,
+  getEstimateToInvoiceConversionSchemaReady,
+  getEstimateConvertedInvoiceId,
 } from "@/lib/estimates/estimate-read";
 import {
   canTransitionEstimateStatus,
@@ -2077,5 +2080,420 @@ export async function convertApprovedEstimateToJob(params: {
     jobId,
     previousStatus: "approved",
     nextStatus: "converted",
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Action B: Estimate → Invoice Draft Conversion
+// Schema-safe invoice draft creation from converted estimate/job.
+// Draft only; no issue, send, payment, QBO, SMS, email, or provider behavior.
+// ---------------------------------------------------------------------------
+
+export type RecordEstimateToInvoiceDraftConversionResult =
+  | {
+      success: true;
+      estimateId: string;
+      invoiceId: string;
+      jobId: string;
+    }
+  | {
+      success: false;
+      error: string;
+      existingInvoiceId?: string;
+    };
+
+export async function recordEstimateToInvoiceDraftConversion(params: {
+  estimateId: string;
+}): Promise<RecordEstimateToInvoiceDraftConversionResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  if (!estimateId) {
+    return { success: false, error: "estimate_id is required." };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  const userId = String(internalUser.user_id ?? "").trim();
+
+  const invoiceConversionSchemaReady = await getEstimateToInvoiceConversionSchemaReady({ supabase });
+  if (!invoiceConversionSchemaReady) {
+    return { success: false, error: "invoice_conversion_schema_unavailable" };
+  }
+
+  let estimate: any = null;
+  try {
+    const { data, error } = await supabase
+      .from("estimates")
+      .select(
+        "id, account_owner_user_id, estimate_number, status, title, customer_id, location_id, total_cents, selected_option_id, selected_option_label_snapshot, selected_option_total_cents, converted_job_id, converted_invoice_id"
+      )
+      .eq("id", estimateId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+    if (error) throw error;
+    estimate = data;
+  } catch (error) {
+    if (isEstimateConversionSchemaUnavailableError(error)) {
+      return { success: false, error: "invoice_conversion_schema_unavailable" };
+    }
+    throw error;
+  }
+
+  if (!estimate?.id) {
+    return { success: false, error: "Estimate not found in this account." };
+  }
+
+  if (!isEstimateToInvoiceConversionSchemaReady(estimate)) {
+    return { success: false, error: "invoice_conversion_schema_unavailable" };
+  }
+
+  const status = String(estimate.status ?? "").trim();
+  if (status !== "converted" && status !== "approved") {
+    return {
+      success: false,
+      error: "Only converted (or approved with converted job linkage) estimates can convert to invoice draft.",
+    };
+  }
+
+  const convertedJobId = getEstimateConvertedJobId(estimate);
+  if (!convertedJobId) {
+    return {
+      success: false,
+      error: "Estimate must be converted to a job first (converted_job_id required).",
+    };
+  }
+
+  const alreadyConvertedInvoiceId = getEstimateConvertedInvoiceId(estimate);
+  if (alreadyConvertedInvoiceId) {
+    const { data: linkedInvoice, error: linkedInvoiceErr } = await supabase
+      .from("internal_invoices")
+      .select("id, status")
+      .eq("id", alreadyConvertedInvoiceId)
+      .maybeSingle();
+    if (linkedInvoiceErr) throw linkedInvoiceErr;
+
+    if (linkedInvoice?.id && String(linkedInvoice.status ?? "").trim() !== "void") {
+      return {
+        success: false,
+        error: "Estimate already has a converted invoice.",
+        existingInvoiceId: alreadyConvertedInvoiceId,
+      };
+    }
+  }
+
+  let job: any = null;
+  try {
+    const { data, error } = await supabase
+      .from("jobs")
+      .select(
+        "id, account_owner_user_id, customer_id, location_id, status, visit_scope_items, origin_estimate_id"
+      )
+      .eq("id", convertedJobId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+    if (error) throw error;
+    job = data;
+  } catch (error) {
+    if (isEstimateConversionSchemaUnavailableError(error)) {
+      return { success: false, error: "invoice_conversion_schema_unavailable" };
+    }
+    throw error;
+  }
+
+  if (!job?.id) {
+    return { success: false, error: "Converted job not found or cross-account." };
+  }
+
+  const jobOriginEstimateId = String(job.origin_estimate_id ?? "").trim() || null;
+  if (jobOriginEstimateId && jobOriginEstimateId !== estimateId) {
+    return {
+      success: false,
+      error: "Job origin_estimate_id does not match this estimate.",
+    };
+  }
+
+  const visitScopeItems = (job.visit_scope_items ?? []) as VisitScopeItem[];
+  if (visitScopeItems.length === 0) {
+    return {
+      success: false,
+      error: "Converted job has no visit scope items to invoice.",
+    };
+  }
+
+  let existingInvoice: any = null;
+  try {
+    const { data, error } = await supabase
+      .from("internal_invoices")
+      .select("id, status")
+      .eq("job_id", convertedJobId)
+      .neq("status", "void")
+      .maybeSingle();
+    if (error) throw error;
+    existingInvoice = data;
+  } catch (error) {
+    throw error;
+  }
+
+  if (existingInvoice?.id) {
+    return {
+      success: false,
+      error: "Job already has an active non-void invoice.",
+      existingInvoiceId: existingInvoice.id,
+    };
+  }
+
+  let existingSourceEstimateInvoice: any = null;
+  try {
+    const { data, error } = await supabase
+      .from("internal_invoices")
+      .select("id, status")
+      .eq("source_estimate_id", estimateId)
+      .neq("status", "void")
+      .maybeSingle();
+    if (error) throw error;
+    existingSourceEstimateInvoice = data;
+  } catch (error) {
+    if (isEstimateConversionSchemaUnavailableError(error)) {
+      return { success: false, error: "invoice_conversion_schema_unavailable" };
+    }
+    throw error;
+  }
+
+  if (existingSourceEstimateInvoice?.id) {
+    return {
+      success: false,
+      error: "An active non-void invoice already exists for this estimate.",
+      existingInvoiceId: existingSourceEstimateInvoice.id,
+    };
+  }
+
+  const proposalMode: "single_option_flat" | "multi_option_packages" =
+    estimate.selected_option_id ? "multi_option_packages" : "single_option_flat";
+
+  const approvedTotalCents =
+    proposalMode === "multi_option_packages"
+      ? Number(estimate.selected_option_total_cents ?? 0)
+      : Number(estimate.total_cents ?? 0);
+
+  function buildInternalInvoiceNumber() {
+    const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const suffix = crypto.randomUUID().slice(0, 8).toUpperCase();
+    return `INV-${datePart}-${suffix}`;
+  }
+
+  let invoiceId = "";
+  let invoiceSubtotalCents = 0;
+  let invoiceLineItems: Array<{
+    invoice_id: string;
+    sort_order: number;
+    source_kind: "visit_scope";
+    source_visit_scope_item_id: string | null;
+    source_pricebook_item_id: string | null;
+    item_name_snapshot: string;
+    description_snapshot: string | null;
+    item_type_snapshot: string;
+    category_snapshot: string | null;
+    unit_label_snapshot: string | null;
+    quantity: string;
+    unit_price: string;
+    line_subtotal: string;
+    created_by_user_id: string;
+    updated_by_user_id: string;
+  }> = [];
+
+  try {
+    const invoicePayload = {
+      account_owner_user_id: accountOwnerUserId,
+      job_id: convertedJobId,
+      customer_id: estimate.customer_id,
+      location_id: estimate.location_id,
+      invoice_number: buildInternalInvoiceNumber(),
+      status: "draft",
+      invoice_date: new Date().toISOString().slice(0, 10),
+      source_type: "estimate",
+      source_estimate_id: estimateId,
+      subtotal_cents: 0,
+      total_cents: 0,
+      notes: null,
+      billing_name: null,
+      billing_email: null,
+      billing_phone: null,
+      billing_address_line1: null,
+      billing_address_line2: null,
+      billing_city: null,
+      billing_state: null,
+      billing_zip: null,
+      created_by_user_id: userId,
+      updated_by_user_id: userId,
+    };
+
+    const { data: insertedInvoice, error: createInvoiceErr } = await supabase
+      .from("internal_invoices")
+      .insert(invoicePayload)
+      .select("id")
+      .single();
+
+    if (createInvoiceErr) {
+      const code = String(createInvoiceErr.code ?? "").trim();
+      const msg = String(createInvoiceErr.message ?? "").toLowerCase();
+      if (isEstimateConversionSchemaUnavailableError(createInvoiceErr)) {
+        return { success: false, error: "invoice_conversion_schema_unavailable" };
+      }
+      if (code === "23505" || msg.includes("source_estimate_id")) {
+        const { data: existingEstimate } = await supabase
+          .from("estimates")
+          .select("converted_invoice_id")
+          .eq("id", estimateId)
+          .maybeSingle();
+        const existingInvoiceId = getEstimateConvertedInvoiceId(existingEstimate);
+        return {
+          success: false,
+          error: "An invoice has already been created for this estimate.",
+          existingInvoiceId: existingInvoiceId ?? undefined,
+        };
+      }
+      throw createInvoiceErr;
+    }
+
+    invoiceId = String(insertedInvoice?.id ?? "").trim();
+    if (!invoiceId) {
+      return { success: false, error: "Failed to create invoice from estimate." };
+    }
+
+    const formatScaledInt = (value: number, scale: number) => {
+      const divisor = Math.pow(10, scale);
+      return (value / divisor).toFixed(scale);
+    };
+
+    invoiceLineItems = visitScopeItems.map((item, index) => {
+      const itemName = String((item as { title?: unknown }).title ?? "")
+        .trim()
+        .slice(0, 500);
+      const description = String((item as { details?: unknown }).details ?? "").trim() || null;
+      const itemType = String((item as { item_type?: unknown }).item_type ?? "").trim() || "service";
+      const category = String((item as { category?: unknown }).category ?? "").trim() || null;
+      const unitLabel = String((item as { unit_label?: unknown }).unit_label ?? "").trim() || null;
+      const expectedUnitPrice = Number((item as { expected_unit_price?: unknown }).expected_unit_price ?? 0);
+      const unitPriceCents = Number.isFinite(expectedUnitPrice)
+        ? Math.max(0, Math.round(expectedUnitPrice * 100))
+        : 0;
+      const quantityHundredths = 100;
+      const lineSubtotalCents = Math.round((quantityHundredths * unitPriceCents) / 100);
+      invoiceSubtotalCents += lineSubtotalCents;
+
+      return {
+        invoice_id: invoiceId,
+        sort_order: index + 1,
+        source_kind: "visit_scope" as const,
+        source_visit_scope_item_id: String(item.id ?? "").trim() || null,
+        source_pricebook_item_id: String(item.source_pricebook_item_id ?? "").trim() || null,
+        item_name_snapshot: itemName || "Visit Scope Item",
+        description_snapshot: description,
+        item_type_snapshot: itemType,
+        category_snapshot: category,
+        unit_label_snapshot: unitLabel,
+        quantity: formatScaledInt(quantityHundredths, 2),
+        unit_price: formatScaledInt(unitPriceCents, 2),
+        line_subtotal: formatScaledInt(lineSubtotalCents, 2),
+        created_by_user_id: userId,
+        updated_by_user_id: userId,
+      };
+    });
+
+    if (invoiceLineItems.length > 0) {
+      const { error: insertLinesErr } = await supabase
+        .from("internal_invoice_line_items")
+        .insert(invoiceLineItems);
+
+      if (insertLinesErr) throw insertLinesErr;
+    }
+
+    const { error: syncTotalsErr } = await supabase
+      .from("internal_invoices")
+      .update({
+        subtotal_cents: invoiceSubtotalCents,
+        total_cents: invoiceSubtotalCents,
+        updated_by_user_id: userId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", invoiceId)
+      .eq("account_owner_user_id", accountOwnerUserId);
+    if (syncTotalsErr) throw syncTotalsErr;
+  } catch (error) {
+    if (isEstimateConversionSchemaUnavailableError(error)) {
+      return { success: false, error: "invoice_conversion_schema_unavailable" };
+    }
+    throw error;
+  }
+
+  try {
+    const nowIso = new Date().toISOString();
+    const { error: updateEstimateErr } = await supabase
+      .from("estimates")
+      .update({
+        converted_invoice_id: invoiceId,
+        updated_by_user_id: userId,
+        updated_at: nowIso,
+      })
+      .eq("id", estimateId)
+      .eq("account_owner_user_id", accountOwnerUserId);
+
+    if (updateEstimateErr) {
+      const code = String(updateEstimateErr.code ?? "").trim();
+      const msg = String(updateEstimateErr.message ?? "").toLowerCase();
+      if (isEstimateConversionSchemaUnavailableError(updateEstimateErr)) {
+        return { success: false, error: "invoice_conversion_schema_unavailable" };
+      }
+      if (code === "23505" || msg.includes("converted_invoice_id")) {
+        const { data: existingEstimate } = await supabase
+          .from("estimates")
+          .select("converted_invoice_id")
+          .eq("id", estimateId)
+          .maybeSingle();
+        const existingInvoiceId = getEstimateConvertedInvoiceId(existingEstimate);
+        return {
+          success: false,
+          error: "An invoice has already been created for this estimate.",
+          existingInvoiceId: existingInvoiceId ?? undefined,
+        };
+      }
+      throw updateEstimateErr;
+    }
+  } catch (error) {
+    if (isEstimateConversionSchemaUnavailableError(error)) {
+      return { success: false, error: "invoice_conversion_schema_unavailable" };
+    }
+    throw error;
+  }
+
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: "estimate_converted_to_invoice",
+    meta: {
+      invoice_id: invoiceId,
+      job_id: convertedJobId,
+      source_estimate_id: estimateId,
+      converted_by_user_id: userId,
+      approved_total_cents: Number.isFinite(approvedTotalCents) ? approvedTotalCents : 0,
+      proposal_mode: proposalMode,
+      selected_option_id: proposalMode === "multi_option_packages" ? estimate.selected_option_id : null,
+      selected_option_label_snapshot:
+        proposalMode === "multi_option_packages"
+          ? String(estimate.selected_option_label_snapshot ?? "").trim() || null
+          : null,
+    },
+    user_id: userId,
+  });
+
+  return {
+    success: true,
+    estimateId,
+    invoiceId,
+    jobId: convertedJobId,
   };
 }

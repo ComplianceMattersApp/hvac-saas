@@ -5,6 +5,8 @@ const requireInternalUserMock = vi.fn();
 const isEstimatesEnabledMock = vi.fn();
 const getEstimateToJobConversionSchemaReadyMock = vi.fn();
 const isEstimateToJobConversionSchemaReadyMock = vi.fn();
+const getEstimateToInvoiceConversionSchemaReadyMock = vi.fn();
+const isEstimateToInvoiceConversionSchemaReadyMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -37,10 +39,18 @@ vi.mock("@/lib/estimates/estimate-read", () => ({
     row && Object.prototype.hasOwnProperty.call(row, "converted_job_id")
       ? row.converted_job_id ?? null
       : null,
+  getEstimateConvertedInvoiceId: (row: any) =>
+    row && Object.prototype.hasOwnProperty.call(row, "converted_invoice_id")
+      ? row.converted_invoice_id ?? null
+      : null,
   isEstimateToJobConversionSchemaReady: (...args: unknown[]) =>
     isEstimateToJobConversionSchemaReadyMock(...args),
   getEstimateToJobConversionSchemaReady: (...args: unknown[]) =>
     getEstimateToJobConversionSchemaReadyMock(...args),
+  isEstimateToInvoiceConversionSchemaReady: (...args: unknown[]) =>
+    isEstimateToInvoiceConversionSchemaReadyMock(...args),
+  getEstimateToInvoiceConversionSchemaReady: (...args: unknown[]) =>
+    getEstimateToInvoiceConversionSchemaReadyMock(...args),
 }));
 
 function makeInternalUser() {
@@ -274,6 +284,8 @@ describe("convertApprovedEstimateToJob", () => {
     requireInternalUserMock.mockResolvedValue(makeInternalUser());
     getEstimateToJobConversionSchemaReadyMock.mockResolvedValue(true);
     isEstimateToJobConversionSchemaReadyMock.mockReturnValue(true);
+    getEstimateToInvoiceConversionSchemaReadyMock.mockResolvedValue(true);
+    isEstimateToInvoiceConversionSchemaReadyMock.mockReturnValue(true);
   });
 
   it("converts flat approved estimate into job and writes audit event", async () => {
@@ -406,5 +418,612 @@ describe("convertApprovedEstimateToJob", () => {
 
     expect(result.success).toBe(true);
     expect(captured.tables).not.toContain("internal_invoices");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Action B: Estimate → Invoice Draft Conversion (Section 2F)
+// ---------------------------------------------------------------------------
+
+describe("recordEstimateToInvoiceDraftConversion", () => {
+  beforeEach(() => {
+    createClientMock.mockClear();
+    requireInternalUserMock.mockClear();
+    isEstimatesEnabledMock.mockClear();
+    getEstimateToJobConversionSchemaReadyMock.mockClear();
+    isEstimateToJobConversionSchemaReadyMock.mockClear();
+    getEstimateToInvoiceConversionSchemaReadyMock.mockClear();
+    isEstimateToInvoiceConversionSchemaReadyMock.mockClear();
+    getEstimateToInvoiceConversionSchemaReadyMock.mockResolvedValue(true);
+    isEstimateToInvoiceConversionSchemaReadyMock.mockReturnValue(true);
+  });
+
+  it("blocks when feature flag is disabled", async () => {
+    isEstimatesEnabledMock.mockReturnValue(false);
+    const { recordEstimateToInvoiceDraftConversion } = await import(
+      "@/lib/estimates/estimate-actions"
+    );
+    const result = await recordEstimateToInvoiceDraftConversion({ estimateId: "est-1" });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe("Estimates are currently unavailable.");
+    }
+  });
+
+  it("blocks when invoice conversion schema is unavailable", async () => {
+    isEstimatesEnabledMock.mockReturnValue(true);
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: { user_id: "user-1", account_owner_user_id: "owner-1" },
+    });
+    getEstimateToInvoiceConversionSchemaReadyMock.mockResolvedValue(false);
+
+    const { recordEstimateToInvoiceDraftConversion } = await import(
+      "@/lib/estimates/estimate-actions"
+    );
+    const result = await recordEstimateToInvoiceDraftConversion({ estimateId: "est-1" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toBe("invoice_conversion_schema_unavailable");
+    }
+  });
+
+  it("blocks when estimate has no converted_job_id", async () => {
+    isEstimatesEnabledMock.mockReturnValue(true);
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: { user_id: "user-1", account_owner_user_id: "owner-1" },
+    });
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "estimates") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "est-1",
+                status: "converted",
+                converted_job_id: null,
+                converted_invoice_id: null,
+              },
+              error: null,
+            }),
+          };
+        }
+        return {};
+      }),
+    };
+
+    createClientMock.mockResolvedValue(supabase);
+
+    const { recordEstimateToInvoiceDraftConversion } = await import(
+      "@/lib/estimates/estimate-actions"
+    );
+    const result = await recordEstimateToInvoiceDraftConversion({ estimateId: "est-1" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("converted to a job first");
+    }
+  });
+
+  it("creates draft internal invoice from converted job visit_scope_items", async () => {
+    isEstimatesEnabledMock.mockReturnValue(true);
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: { user_id: "user-1", account_owner_user_id: "owner-1" },
+    });
+
+    const visitScopeItems = [
+      {
+        id: "vsi-1",
+        title: "HVAC Service",
+        details: "Annual maintenance",
+        item_type: "service",
+        category: "HVAC",
+        unit_label: "visit",
+        expected_unit_price: 500,
+        source_pricebook_item_id: "pb-1",
+      },
+    ];
+
+    let insertedInvoice: any = null;
+    let insertedLines: any[] = [];
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "estimates") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "est-1",
+                status: "converted",
+                title: "Test Proposal",
+                customer_id: "cust-1",
+                location_id: "loc-1",
+                total_cents: 50000,
+                selected_option_id: null,
+                selected_option_label_snapshot: null,
+                selected_option_total_cents: null,
+                converted_job_id: "job-1",
+                converted_invoice_id: null,
+              },
+              error: null,
+            }),
+            update: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnValue({
+                eq: vi.fn().mockReturnThis(),
+                maybeSingle: vi.fn().mockResolvedValue({ error: null }),
+              }),
+          };
+        } else if (table === "jobs") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            neq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "job-1",
+                account_owner_user_id: "owner-1",
+                customer_id: "cust-1",
+                location_id: "loc-1",
+                status: "open",
+                visit_scope_items: visitScopeItems,
+                origin_estimate_id: "est-1",
+              },
+              error: null,
+            }),
+          };
+        } else if (table === "internal_invoices") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            neq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            insert: vi.fn((payload: any) => {
+              insertedInvoice = payload;
+              return {
+                select: vi.fn().mockReturnThis(),
+                single: vi.fn().mockResolvedValue({
+                  data: { id: "inv-1" },
+                  error: null,
+                }),
+              };
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnThis(),
+            }),
+          };
+        } else if (table === "internal_invoice_line_items") {
+          return {
+            insert: vi.fn((items: any[]) => {
+              insertedLines = items;
+              return Promise.resolve({ error: null });
+            }),
+          };
+        } else if (table === "estimate_events") {
+          return {
+            insert: vi.fn().mockResolvedValue({ error: null }),
+          };
+        }
+        return {};
+      }),
+    };
+
+    createClientMock.mockResolvedValue(supabase);
+
+    const { recordEstimateToInvoiceDraftConversion } = await import(
+      "@/lib/estimates/estimate-actions"
+    );
+    const result = await recordEstimateToInvoiceDraftConversion({ estimateId: "est-1" });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.invoiceId).toBe("inv-1");
+    }
+    expect(insertedInvoice).toMatchObject({
+      status: "draft",
+      source_type: "estimate",
+      source_estimate_id: "est-1",
+      job_id: "job-1",
+    });
+    expect(insertedLines).toHaveLength(1);
+    expect(insertedLines[0]).toMatchObject({
+      source_kind: "visit_scope",
+      source_visit_scope_item_id: "vsi-1",
+      source_pricebook_item_id: "pb-1",
+      item_name_snapshot: "HVAC Service",
+    });
+  });
+
+  it("blocks when job already has active non-void invoice", async () => {
+    isEstimatesEnabledMock.mockReturnValue(true);
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: { user_id: "user-1", account_owner_user_id: "owner-1" },
+    });
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "estimates") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "est-1",
+                status: "converted",
+                converted_job_id: "job-1",
+                converted_invoice_id: null,
+              },
+              error: null,
+            }),
+          };
+        } else if (table === "jobs") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "job-1",
+                account_owner_user_id: "owner-1",
+                visit_scope_items: [{ id: "vsi-1" }],
+                origin_estimate_id: "est-1",
+              },
+              error: null,
+            }),
+          };
+        } else if (table === "internal_invoices") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            neq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: { id: "inv-existing", status: "draft" },
+              error: null,
+            }),
+          };
+        }
+        return {};
+      }),
+    };
+
+    createClientMock.mockResolvedValue(supabase);
+
+    const { recordEstimateToInvoiceDraftConversion } = await import(
+      "@/lib/estimates/estimate-actions"
+    );
+    const result = await recordEstimateToInvoiceDraftConversion({ estimateId: "est-1" });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("active non-void invoice");
+      expect(result.existingInvoiceId).toBe("inv-existing");
+    }
+  });
+
+  it("does not change estimate status or converted_at when updating converted_invoice_id", async () => {
+    isEstimatesEnabledMock.mockReturnValue(true);
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: { user_id: "user-1", account_owner_user_id: "owner-1" },
+    });
+
+    let updatePayload: any = null;
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "estimates") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "est-1",
+                status: "converted",
+                title: "Test",
+                customer_id: "cust-1",
+                location_id: "loc-1",
+                total_cents: 50000,
+                selected_option_id: null,
+                selected_option_label_snapshot: null,
+                selected_option_total_cents: null,
+                converted_job_id: "job-1",
+                converted_invoice_id: null,
+                converted_at: "2026-05-20T10:00:00Z",
+              },
+              error: null,
+            }),
+            update: vi.fn((payload: any) => {
+              updatePayload = payload;
+              return {
+                eq: vi.fn().mockReturnThis(),
+                maybeSingle: vi.fn().mockResolvedValue({ error: null }),
+              };
+            }),
+          };
+        } else if (table === "jobs") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "job-1",
+                account_owner_user_id: "owner-1",
+                visit_scope_items: [{ id: "vsi-1", title: "Scope 1", expected_unit_price: 500 }],
+              },
+              error: null,
+            }),
+          };
+        } else if (table === "internal_invoices") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            neq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({ data: { id: "inv-1" }, error: null }),
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnThis(),
+            }),
+          };
+        } else if (table === "internal_invoice_line_items") {
+          return { insert: vi.fn().mockResolvedValue({ error: null }) };
+        } else if (table === "estimate_events") {
+          return { insert: vi.fn().mockResolvedValue({ error: null }) };
+        }
+        return {};
+      }),
+    };
+
+    createClientMock.mockResolvedValue(supabase);
+
+    const { recordEstimateToInvoiceDraftConversion } = await import(
+      "@/lib/estimates/estimate-actions"
+    );
+    await recordEstimateToInvoiceDraftConversion({ estimateId: "est-1" });
+
+    expect(updatePayload).toBeDefined();
+    expect(updatePayload).not.toHaveProperty("status");
+    expect(updatePayload).not.toHaveProperty("converted_at");
+    expect(updatePayload).toHaveProperty("converted_invoice_id", "inv-1");
+  });
+
+  it("writes estimate_converted_to_invoice event with full metadata", async () => {
+    isEstimatesEnabledMock.mockReturnValue(true);
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: { user_id: "user-1", account_owner_user_id: "owner-1" },
+    });
+
+    let eventPayload: any = null;
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "estimates") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "est-1",
+                status: "converted",
+                title: "Test",
+                customer_id: "cust-1",
+                location_id: "loc-1",
+                total_cents: 50000,
+                selected_option_id: "opt-1",
+                selected_option_label_snapshot: "Better",
+                selected_option_total_cents: 50000,
+                converted_job_id: "job-1",
+                converted_invoice_id: null,
+              },
+              error: null,
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({ error: null }),
+            }),
+          };
+        } else if (table === "jobs") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "job-1",
+                account_owner_user_id: "owner-1",
+                visit_scope_items: [{ id: "vsi-1", title: "Scope 1", expected_unit_price: 500 }],
+              },
+              error: null,
+            }),
+          };
+        } else if (table === "internal_invoices") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            neq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({ data: { id: "inv-1" }, error: null }),
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnThis(),
+            }),
+          };
+        } else if (table === "internal_invoice_line_items") {
+          return { insert: vi.fn().mockResolvedValue({ error: null }) };
+        } else if (table === "estimate_events") {
+          return {
+            insert: vi.fn((payload: any) => {
+              eventPayload = payload;
+              return Promise.resolve({ error: null });
+            }),
+          };
+        }
+        return {};
+      }),
+    };
+
+    createClientMock.mockResolvedValue(supabase);
+
+    const { recordEstimateToInvoiceDraftConversion } = await import(
+      "@/lib/estimates/estimate-actions"
+    );
+    await recordEstimateToInvoiceDraftConversion({ estimateId: "est-1" });
+
+    expect(eventPayload).toBeDefined();
+    expect(eventPayload.event_type).toBe("estimate_converted_to_invoice");
+    expect(eventPayload.meta).toMatchObject({
+      invoice_id: "inv-1",
+      job_id: "job-1",
+      source_estimate_id: "est-1",
+      converted_by_user_id: "user-1",
+      proposal_mode: "multi_option_packages",
+      selected_option_id: "opt-1",
+      selected_option_label_snapshot: "Better",
+    });
+  });
+
+  it("does not perform issue/send/payment/QBO/SMS behavior", async () => {
+    isEstimatesEnabledMock.mockReturnValue(true);
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: { user_id: "user-1", account_owner_user_id: "owner-1" },
+    });
+
+    const captured = { tables: new Set<string>() };
+    const supabase = {
+      from: vi.fn((table: string) => {
+        captured.tables.add(table);
+
+        if (table === "estimates") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "est-1",
+                status: "converted",
+                title: "Test",
+                customer_id: "cust-1",
+                location_id: "loc-1",
+                total_cents: 50000,
+                selected_option_id: null,
+                selected_option_label_snapshot: null,
+                selected_option_total_cents: null,
+                converted_job_id: "job-1",
+                converted_invoice_id: null,
+              },
+              error: null,
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnThis(),
+              maybeSingle: vi.fn().mockResolvedValue({ error: null }),
+            }),
+          };
+        } else if (table === "jobs") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                id: "job-1",
+                account_owner_user_id: "owner-1",
+                visit_scope_items: [{ id: "vsi-1", title: "Scope 1", expected_unit_price: 500 }],
+              },
+              error: null,
+            }),
+          };
+        } else if (table === "internal_invoices") {
+          return {
+            select: vi.fn().mockReturnThis(),
+            eq: vi
+              .fn()
+              .mockReturnThis()
+              .mockReturnThis(),
+            neq: vi.fn().mockReturnThis(),
+            maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
+            insert: vi.fn().mockReturnValue({
+              select: vi.fn().mockReturnThis(),
+              single: vi.fn().mockResolvedValue({ data: { id: "inv-1" }, error: null }),
+            }),
+            update: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnThis(),
+            }),
+          };
+        } else if (table === "internal_invoice_line_items") {
+          return { insert: vi.fn().mockResolvedValue({ error: null }) };
+        } else if (table === "estimate_events") {
+          return { insert: vi.fn().mockResolvedValue({ error: null }) };
+        }
+        return {};
+      }),
+    };
+
+    createClientMock.mockResolvedValue(supabase);
+
+    const { recordEstimateToInvoiceDraftConversion } = await import(
+      "@/lib/estimates/estimate-actions"
+    );
+    const result = await recordEstimateToInvoiceDraftConversion({ estimateId: "est-1" });
+
+    expect(result.success).toBe(true);
+    expect(captured.tables).not.toContain("internal_invoice_payments");
+    expect(captured.tables).not.toContain("stripe");
+    expect(captured.tables).not.toContain("qbo");
+    expect(captured.tables).not.toContain("sms");
+    expect(captured.tables).not.toContain("email");
   });
 });

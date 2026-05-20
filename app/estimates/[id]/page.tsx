@@ -28,6 +28,7 @@ import {
   sendEstimateFromForm,
   recordEstimateApprovalResponseFromForm,
   convertEstimateToJobFromForm,
+  convertEstimateToInvoiceDraftFromForm,
 } from "./actions";
 import AddLineItemForm from "./AddLineItemForm";
 import EstimateStatusActionForm from "./EstimateStatusActionForm";
@@ -174,6 +175,7 @@ export default async function EstimateDetailPage({
   const isConverted = estimate.status === "converted";
   const canConvertToJob =
     isApproved && estimate.conversionSchemaReady && !estimate.converted_job_id;
+  let hasActiveNonVoidInvoiceForConvertedJob = false;
 
   async function submitRemoveOptionLine(formData: FormData) {
     "use server";
@@ -192,6 +194,20 @@ export default async function EstimateDetailPage({
     }
 
     redirect(`/estimates/${estimateId}?notice=estimate_converted_to_job`);
+  }
+
+  async function submitConvertEstimateToInvoiceDraft(formData: FormData) {
+    "use server";
+    const estimateId = String(formData.get("estimate_id") ?? "").trim();
+    if (!estimateId) return;
+
+    const result = await convertEstimateToInvoiceDraftFromForm(formData);
+    if (!result?.success) {
+      const encoded = encodeURIComponent(String(result?.error ?? "estimate_invoice_conversion_failed"));
+      redirect(`/estimates/${estimateId}?notice=${encoded}`);
+    }
+
+    redirect(`/estimates/${estimateId}?notice=estimate_converted_to_invoice_draft`);
   }
 
   const statusMessage = statusGuidanceMessage(estimate.status);
@@ -286,6 +302,9 @@ export default async function EstimateDetailPage({
   });
 
   let convertedJobTitle: string | null = null;
+  let convertedInvoiceId: string | null =
+    String(estimate.converted_invoice_id ?? "").trim() || null;
+  let convertedInvoiceNumber: string | null = null;
   if (estimate.converted_job_id) {
     const { data: convertedJob } = await supabase
       .from("jobs")
@@ -296,7 +315,33 @@ export default async function EstimateDetailPage({
     if (convertedJob?.id) {
       convertedJobTitle = String(convertedJob.title ?? "").trim() || "Converted Job";
     }
+
+    const { data: activeInvoice } = await supabase
+      .from("internal_invoices")
+      .select("id, invoice_number, source_estimate_id, status")
+      .eq("job_id", estimate.converted_job_id)
+      .neq("status", "void")
+      .maybeSingle();
+
+    if (activeInvoice?.id) {
+      hasActiveNonVoidInvoiceForConvertedJob = true;
+      if (!convertedInvoiceId) {
+        convertedInvoiceId = String(activeInvoice.id ?? "").trim() || null;
+      }
+      convertedInvoiceNumber = String(activeInvoice.invoice_number ?? "").trim() || null;
+    }
   }
+
+  const canConvertToInvoiceDraft =
+    (isConverted || isApproved) &&
+    Boolean(estimate.converted_job_id) &&
+    Boolean(estimate.invoiceConversionSchemaReady) &&
+    !convertedInvoiceId &&
+    !hasActiveNonVoidInvoiceForConvertedJob;
+
+  const invoiceWorkspaceHref = estimate.converted_job_id
+    ? `/jobs/${estimate.converted_job_id}/invoice`
+    : null;
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
@@ -304,8 +349,12 @@ export default async function EstimateDetailPage({
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 print:hidden">
           {notice === "estimate_converted_to_job"
             ? "Estimate converted to job successfully."
+            : notice === "estimate_converted_to_invoice_draft"
+              ? "Estimate converted to invoice draft successfully."
             : notice === "estimate_conversion_schema_unavailable"
               ? "Estimate conversion is unavailable until the conversion schema migration is applied."
+              : notice === "invoice_conversion_schema_unavailable"
+                ? "Invoice conversion is unavailable until the invoice conversion schema migration is applied."
               : notice === "selected_option_id is required before converting multi-option estimates."
                 ? "Select an approved option before converting this multi-option estimate."
                 : `Estimate conversion notice: ${notice}`}
@@ -718,6 +767,33 @@ export default async function EstimateDetailPage({
             </Link>
             .
           </p>
+
+          {canConvertToInvoiceDraft && (
+            <form action={submitConvertEstimateToInvoiceDraft} className="mt-4">
+              <input type="hidden" name="estimate_id" value={estimate.id} />
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 transition-[background-color,border-color,transform] hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 active:translate-y-[0.5px]"
+              >
+                Convert to Invoice Draft
+              </button>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Internal-only Action B: converted estimate/job to draft internal invoice. No issue/send/payment/QBO/SMS/email/portal behavior.
+              </p>
+            </form>
+          )}
+
+          {!estimate.invoiceConversionSchemaReady && (
+            <p className="mt-3 text-[11px] text-amber-700">
+              Invoice conversion action is hidden until invoice conversion schema migration is available in this environment.
+            </p>
+          )}
+
+          {convertedInvoiceId && invoiceWorkspaceHref && (
+            <p className="mt-3 text-sm text-slate-700">
+              Linked invoice draft: <Link href={invoiceWorkspaceHref} className="font-semibold text-violet-700 hover:underline">{convertedInvoiceNumber ?? convertedInvoiceId}</Link>
+            </p>
+          )}
         </div>
       )}
 

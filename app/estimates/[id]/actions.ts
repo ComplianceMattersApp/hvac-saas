@@ -15,6 +15,7 @@ import {
   updateEstimateOptionMetadata,
   recordEstimateApprovalResponse,
   convertApprovedEstimateToJob,
+  recordEstimateToInvoiceDraftConversion,
   type AddEstimateLineItemParams,
   type AddEstimateOptionLineItemParams,
   type UpdateEstimateOptionMetadataParams,
@@ -265,6 +266,26 @@ export async function convertEstimateToJobFromForm(formData: FormData) {
     revalidatePath(`/estimates/${estimateId}`);
     revalidatePath(`/jobs/${result.jobId}`);
     revalidatePath("/jobs");
+  }
+
+  return result;
+}
+
+/**
+ * Convert a converted estimate to an internal invoice draft (Section 2F Action B).
+ * Requires Section 2C conversion to job first.
+ * Draft only; no issue, send, payment, QBO, SMS, email, or provider behavior.
+ * Safe no-op when estimates are disabled or form payload is missing.
+ */
+export async function convertEstimateToInvoiceDraftFromForm(formData: FormData) {
+  if (!isEstimatesEnabled()) return;
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  if (!estimateId) return;
+
+  const result = await recordEstimateToInvoiceDraftConversion({ estimateId });
+  if (result.success) {
+    revalidatePath(`/estimates/${estimateId}`);
   }
 
   return result;

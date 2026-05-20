@@ -469,3 +469,25 @@ Section 2E implements schema and read-model compatibility for future Action B (e
 - No issue/send/payment/QBO/SMS/email/provider/portal behavior.
 - No production Supabase command was run in this slice.
 - Migration activation remains environment-gated; V1 Action B requires a separate approval window after Section 2D behavior is proven live.
+
+## 4) Section 2F: Estimate -> Invoice Draft Conversion V1 (Action B)
+
+**Status: Implementation complete (2026-05-20) — internal-only Action B behavior.**
+
+Section 2F implements converted estimate/job -> draft internal invoice conversion only.
+
+- Requires Section 2C first (`converted_job_id` required).
+- Requires invoice conversion schema readiness (`invoiceConversionSchemaReady = true`).
+- Creates draft invoice only (`status = draft`, `source_type = estimate`, `source_estimate_id = estimate.id`, `job_id = converted_job_id`).
+- Invoice line items are created from converted job `visit_scope_items` only (not estimate lines).
+- Visit-scope provenance is preserved (`source_kind = visit_scope`, `source_visit_scope_item_id`, `source_pricebook_item_id` when present) with frozen snapshots.
+- Idempotency guards block active duplicates by `converted_invoice_id`, active non-void job invoice, and active non-void `source_estimate_id` invoice.
+- Estimate is updated with `converted_invoice_id` only; no status change and no `converted_at` mutation.
+- Audit event `estimate_converted_to_invoice` is written with invoice/job/source/actor/proposal metadata.
+
+**Boundaries preserved**:
+
+- No issue/send/payment execution.
+- No Stripe tenant payment execution, QBO, SMS, email/provider, portal/public behavior.
+- No production Supabase command was run in this slice.
+- Migration activation remains environment-gated by target environment migration windows.

@@ -24,6 +24,8 @@ function isMissingEstimateToJobConversionSchemaError(error: unknown): boolean {
   return (
     message.includes("converted_job_id") ||
     message.includes("converted_by_user_id") ||
+    message.includes("converted_invoice_id") ||
+    message.includes("source_estimate_id") ||
     message.includes("origin_estimate_id") ||
     message.includes("schema cache") ||
     (message.includes("column") && message.includes("does not exist"))
@@ -92,6 +94,37 @@ export async function getEstimateToJobConversionSchemaReady(params: {
 
 export function isEstimateToJobConversionSchemaReady(estimateRow: unknown): boolean {
   return hasOwn(estimateRow, "converted_job_id") && hasOwn(estimateRow, "converted_by_user_id");
+}
+
+export async function getEstimateToInvoiceConversionSchemaReady(params: {
+  supabase: any;
+}): Promise<boolean> {
+  try {
+    const { error: estimateSchemaErr } = await params.supabase
+      .from("estimates")
+      .select("id, converted_invoice_id")
+      .maybeSingle();
+
+    if (estimateSchemaErr) {
+      if (isMissingEstimateToJobConversionSchemaError(estimateSchemaErr)) return false;
+      throw estimateSchemaErr;
+    }
+
+    const { error: invoiceSchemaErr } = await params.supabase
+      .from("internal_invoices")
+      .select("id, source_estimate_id")
+      .maybeSingle();
+
+    if (invoiceSchemaErr) {
+      if (isMissingEstimateToJobConversionSchemaError(invoiceSchemaErr)) return false;
+      throw invoiceSchemaErr;
+    }
+
+    return true;
+  } catch (error) {
+    if (isMissingEstimateToJobConversionSchemaError(error)) return false;
+    throw error;
+  }
 }
 
 
@@ -466,6 +499,7 @@ export type EstimateReadResult = {
   converted_at: string | null;
   converted_job_id: string | null;
   converted_by_user_id: string | null;
+  converted_invoice_id: string | null;
   // Approval response projection (V1 — set during recordEstimateApprovalResponse)
   selected_option_id: string | null;
   selected_option_label_snapshot: string | null;
@@ -480,6 +514,7 @@ export type EstimateReadResult = {
   options?: EstimateOptionReadResult[];
   approvalResponseSchemaReady: boolean;
   conversionSchemaReady: boolean;
+  invoiceConversionSchemaReady: boolean;
 };
 
 /**
