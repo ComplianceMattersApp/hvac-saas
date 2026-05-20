@@ -71,11 +71,16 @@ function statusBadgeClass(status: string) {
 
 function statusLabel(status: string) {
   const s = String(status ?? "").trim();
-  if (!s) return "—";
+  if (!s) return "-";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-type CustomerRow = { id: string; full_name: string | null; first_name: string | null; last_name: string | null };
+type CustomerRow = {
+  id: string;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+};
 
 export default async function EstimatesPage({
   searchParams,
@@ -109,7 +114,6 @@ export default async function EstimatesPage({
     supabase,
   });
 
-  // Load customer names for display context
   const customerIds = [
     ...new Set(estimates.map((e) => e.customer_id).filter(Boolean) as string[]),
   ];
@@ -129,64 +133,100 @@ export default async function EstimatesPage({
   }
 
   const filterLinkBase = "/estimates";
+  const draftCount = estimates.filter((e) => e.status === "draft").length;
+  const sentCount = estimates.filter((e) => e.status === "sent").length;
+  const multiOptionCount = estimates.filter((e) => e.proposalMode === "multi_option_packages").length;
 
   return (
-    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-xl font-semibold tracking-[-0.02em] text-slate-950">Estimates</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Draft and manage quotes for customers.</p>
+    <div className="mx-auto max-w-6xl space-y-6 p-4 text-slate-950 sm:p-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.28)] sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Estimate workspace</div>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-950 sm:text-3xl">Estimates</h1>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+              Draft, review, and print customer proposals without mixing quote totals into job, invoice, or payment truth.
+            </p>
+          </div>
+          <Link
+            href="/estimates/new"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-18px_rgba(37,99,235,0.48)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_14px_26px_-18px_rgba(37,99,235,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
+          >
+            + New Estimate
+          </Link>
         </div>
-        <Link
-          href="/estimates/new"
-          className="inline-flex shrink-0 items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_22px_-18px_rgba(37,99,235,0.58)] transition-all hover:-translate-y-px hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0"
-        >
-          + New Estimate
-        </Link>
+
+        <div className="mt-5 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+            <div className="text-2xl font-semibold text-slate-950">{estimates.length}</div>
+            <div className="mt-0.5 text-xs font-semibold text-slate-500">Showing now</div>
+          </div>
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-900">
+            <div className="text-2xl font-semibold">{draftCount + sentCount}</div>
+            <div className="mt-0.5 text-xs font-semibold">Draft or sent</div>
+          </div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900">
+            <div className="text-2xl font-semibold">{multiOptionCount}</div>
+            <div className="mt-0.5 text-xs font-semibold">Multi-option</div>
+          </div>
+        </div>
       </div>
 
-      {/* Status filter tabs */}
-      <div className="flex flex-wrap gap-2">
-        <Link
-          href={filterLinkBase}
-          className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-            !statusFilter
-              ? "bg-slate-900 text-white"
-              : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-          }`}
-        >
-          All
-        </Link>
-        {ESTIMATE_STATUSES.map((s) => (
+      <section className="space-y-3">
+        <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-xs font-semibold text-slate-500">Status filter</div>
+            <h2 className="mt-0.5 text-lg font-semibold text-slate-950">
+              {statusFilter ? statusLabel(statusFilter) : "All estimates"}
+            </h2>
+          </div>
+          <div className="text-sm text-slate-600">
+            {statusFilter ? "Filtered list" : "Every estimate in your account scope"}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-[0_10px_28px_-28px_rgba(15,23,42,0.2)]">
           <Link
-            key={s}
-            href={`${filterLinkBase}?status=${s}`}
-            className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-              statusFilter === s
+            href={filterLinkBase}
+            className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+              !statusFilter
                 ? "bg-slate-900 text-white"
-                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                : "bg-slate-50 text-slate-600 hover:bg-slate-100"
             }`}
           >
-            {statusLabel(s)}
+            All
           </Link>
-        ))}
-      </div>
+          {ESTIMATE_STATUSES.map((s) => (
+            <Link
+              key={s}
+              href={`${filterLinkBase}?status=${s}`}
+              className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
+                statusFilter === s
+                  ? "bg-slate-900 text-white"
+                  : "bg-slate-50 text-slate-600 hover:bg-slate-100"
+              }`}
+            >
+              {statusLabel(s)}
+            </Link>
+          ))}
+        </div>
+      </section>
 
-      {/* List */}
       {estimates.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 px-5 py-12 text-center">
-          <div className="text-base font-semibold text-slate-700">No estimates yet</div>
-          <p className="mt-1 text-sm leading-6 text-slate-500">
+        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center">
+          <div className="text-base font-semibold text-slate-800">
+            {statusFilter ? "No estimates match this status" : "No estimates yet"}
+          </div>
+          <p className="mx-auto mt-1 max-w-md text-sm leading-6 text-slate-500">
             {statusFilter
-              ? `No estimates with status "${statusLabel(statusFilter)}".`
-              : "Create your first estimate to get started."}
+              ? `No estimates with status "${statusLabel(statusFilter)}". Try another status or clear the filter.`
+              : "Create the first estimate when you are ready to prepare a customer proposal."}
           </p>
           {!statusFilter && (
             <div className="mt-5">
               <Link
                 href="/estimates/new"
-                className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_22px_-18px_rgba(37,99,235,0.55)] transition-all hover:-translate-y-px hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0"
+                className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_24px_-18px_rgba(37,99,235,0.48)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
               >
                 + New Estimate
               </Link>
@@ -194,55 +234,58 @@ export default async function EstimatesPage({
           )}
         </div>
       ) : (
-        <div className="grid gap-3">
-          {estimates.map((est) => {
-            const customerName = est.customer_id ? customerMap[est.customer_id] ?? "Unknown Customer" : null;
-            const isMultiOptionProposal = est.proposalMode === "multi_option_packages";
-            return (
-              <Link
-                key={est.id}
-                href={`/estimates/${est.id}`}
-                className="block rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.16)] transition-[background-color,box-shadow,transform] hover:bg-slate-50/70 hover:shadow-[0_18px_30px_-24px_rgba(15,23,42,0.2)] active:translate-y-[0.5px]"
-              >
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-xs text-slate-500">{est.estimate_number}</span>
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${statusBadgeClass(est.status)}`}
-                      >
-                        {statusLabel(est.status)}
-                      </span>
+        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_14px_34px_-30px_rgba(15,23,42,0.24)]">
+          <div className="divide-y divide-slate-200">
+            {estimates.map((est) => {
+              const customerName = est.customer_id ? customerMap[est.customer_id] ?? "Unknown Customer" : null;
+              const isMultiOptionProposal = est.proposalMode === "multi_option_packages";
+              return (
+                <Link
+                  key={est.id}
+                  href={`/estimates/${est.id}`}
+                  className="block px-4 py-4 transition-colors hover:bg-slate-50 sm:px-5"
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="font-mono text-xs text-slate-500">{est.estimate_number}</span>
+                        <span
+                          className={`inline-flex min-h-7 items-center rounded-lg px-2.5 py-1 text-xs font-semibold capitalize ${statusBadgeClass(est.status)}`}
+                        >
+                          {statusLabel(est.status)}
+                        </span>
+                        {isMultiOptionProposal && (
+                          <span className="inline-flex min-h-7 items-center rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                            Multi-option
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-2 truncate text-base font-semibold text-slate-950">{est.title}</div>
+                      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-sm text-slate-500">
+                        {customerName ? <span>{customerName}</span> : <span>No customer attached</span>}
+                        <span>Created {formatDate(est.created_at)}</span>
+                      </div>
                     </div>
-                    <div className="mt-1 truncate font-semibold text-slate-950">{est.title}</div>
-                    {customerName && (
-                      <div className="mt-0.5 text-sm text-slate-500">{customerName}</div>
-                    )}
-                    {isMultiOptionProposal && (
-                      <div className="mt-2 inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-                        Multi-option proposal
-                      </div>
-                    )}
+                    <div className="shrink-0 text-left sm:text-right">
+                      {isMultiOptionProposal ? (
+                        <>
+                          <div className="text-sm font-semibold text-slate-950">Option totals</div>
+                          <div className="mt-1 text-xs text-slate-500">Open estimate to review packages</div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-lg font-semibold text-slate-950">
+                            {formatCents(est.total_cents)}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">Proposal total</div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div className="shrink-0 text-right">
-                    {isMultiOptionProposal ? (
-                      <>
-                        <div className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
-                          Multi-option
-                        </div>
-                        <div className="mt-1 text-sm font-semibold text-slate-700">See option totals</div>
-                      </>
-                    ) : (
-                      <div className="text-base font-semibold text-slate-950">
-                        {formatCents(est.total_cents)}
-                      </div>
-                    )}
-                    <div className="mt-0.5 text-xs text-slate-400">{formatDate(est.created_at)}</div>
-                  </div>
-                </div>
-              </Link>
-            );
-          })}
+                </Link>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
