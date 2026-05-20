@@ -190,8 +190,8 @@ function JobAwareNotificationCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border bg-white transition ${
-        notif.is_unread ? "border-blue-200 shadow-sm" : "border-slate-200 opacity-80"
+      className={`relative overflow-hidden rounded-lg border bg-white transition hover:-translate-y-px hover:shadow-md ${
+        notif.is_unread ? "border-blue-200 shadow-sm shadow-blue-950/5" : "border-slate-200 opacity-85 shadow-sm shadow-slate-950/5"
       }`}
     >
       {notif.is_unread && (
@@ -250,7 +250,7 @@ function JobAwareNotificationCard({
           {jobHref && (
             <Link
               href={jobHref}
-              className="inline-flex items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              className="inline-flex min-h-9 items-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-200"
             >
               {type === "internal_note_tag" ? "Open job" : "View job"}
             </Link>
@@ -259,7 +259,7 @@ function JobAwareNotificationCard({
             <button
               onClick={() => void onMarkAsRead(notif.id)}
               disabled={pendingReadId === notif.id}
-              className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-9 items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {pendingReadId === notif.id ? "Saving..." : "Mark read"}
             </button>
@@ -308,10 +308,10 @@ function ProposalCard({
 
   return (
     <div
-      className={`relative overflow-hidden rounded-xl border bg-white transition ${
+      className={`relative overflow-hidden rounded-lg border bg-white transition hover:-translate-y-px hover:shadow-md ${
         notif.is_unread
-          ? "border-blue-200 shadow-sm shadow-blue-50"
-          : "border-slate-200 opacity-75"
+          ? "border-blue-200 shadow-sm shadow-blue-950/5"
+          : "border-slate-200 opacity-85 shadow-sm shadow-slate-950/5"
       }`}
     >
       {notif.is_unread && (
@@ -381,7 +381,7 @@ function ProposalCard({
           {proposalId && (
             <Link
               href={`/ops/admin/contractor-intake-submissions/${proposalId}`}
-              className="inline-flex items-center rounded-md bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="inline-flex min-h-9 items-center rounded-md bg-blue-600 px-3.5 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               Review proposal
             </Link>
@@ -390,7 +390,7 @@ function ProposalCard({
             <button
               onClick={() => void onMarkAsRead(notif.id)}
               disabled={pendingReadId === notif.id}
-              className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-9 items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {pendingReadId === notif.id ? "Saving..." : "Mark read"}
             </button>
@@ -414,8 +414,8 @@ type GenericCardProps = {
 function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
   return (
     <div
-      className={`relative overflow-hidden rounded-lg border bg-white transition ${
-        notif.is_unread ? "border-blue-200 shadow-sm" : "border-slate-200 opacity-80"
+      className={`relative overflow-hidden rounded-lg border bg-white transition hover:-translate-y-px hover:shadow-md ${
+        notif.is_unread ? "border-blue-200 shadow-sm shadow-blue-950/5" : "border-slate-200 opacity-85 shadow-sm shadow-slate-950/5"
       }`}
     >
       {notif.is_unread && (
@@ -455,7 +455,7 @@ function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
           {notif.job_id && (
             <Link
               href={`/jobs/${notif.job_id}`}
-              className="inline-flex items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-medium text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
+              className="inline-flex min-h-9 items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
               View job
             </Link>
@@ -464,7 +464,7 @@ function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
             <button
               onClick={() => void onMarkAsRead(notif.id)}
               disabled={pendingReadId === notif.id}
-              className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-9 items-center rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {pendingReadId === notif.id ? "Saving..." : "Mark read"}
             </button>
@@ -486,9 +486,9 @@ export function NotificationListClient({
 }: NotificationListClientProps) {
   if (notifications.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
-        <p className="text-base font-semibold text-slate-800">No notifications</p>
-        <p className="mt-1 text-sm text-slate-500">You are all caught up right now.</p>
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white px-6 py-14 text-center shadow-sm shadow-slate-950/5">
+        <p className="text-base font-semibold text-slate-900">No notifications here.</p>
+        <p className="mt-1 text-sm text-slate-500">You are caught up for this view.</p>
       </div>
     );
   }

@@ -34,7 +34,7 @@ export function DeviceNotificationsDeviceList({
 }: DeviceNotificationsDeviceListProps) {
   if (subscriptions.length === 0) {
     return (
-      <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-center">
+      <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-center">
         <p className="text-xs text-slate-600">No enrolled devices yet.</p>
       </div>
     );
@@ -42,7 +42,7 @@ export function DeviceNotificationsDeviceList({
 
   return (
     <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-3">
-      <p className="text-xs font-medium text-slate-600 uppercase tracking-wide">Enrolled Devices</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">Enrolled Devices</p>
 
       <div className="space-y-2">
         {subscriptions.map((subscription) => {
@@ -55,21 +55,21 @@ export function DeviceNotificationsDeviceList({
           return (
             <div
               key={subscription.id}
-              className={`rounded-md border ${statusColor} p-2 text-xs`}
+              className={`rounded-lg border ${statusColor} p-3 text-xs`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-medium text-slate-900">
+                    <span className="font-semibold text-slate-900">
                       {subscription.device_label || "Unknown Device"}
                     </span>
                     {isCurrent && (
-                      <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
+                      <span className="rounded-full bg-blue-100 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">
                         This device
                       </span>
                     )}
                     <span
-                      className={`rounded px-1.5 py-0.5 text-[10px] font-semibold ${
+                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${
                         subscription.is_active
                           ? "bg-emerald-100 text-emerald-700"
                           : "bg-slate-200 text-slate-600"

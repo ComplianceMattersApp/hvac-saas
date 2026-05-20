@@ -294,9 +294,9 @@ export function DeviceNotificationsCard({
 
   if (isUnsupported || isDenied) {
     return (
-      <section className="mb-6 rounded-lg border border-slate-200 bg-slate-50 p-4 shadow-sm">
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
         <div className="flex gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600">
             <Smartphone className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0 flex-1">
@@ -314,36 +314,36 @@ export function DeviceNotificationsCard({
   }
 
   return (
-    <section className="mb-6 space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex min-w-0 gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-blue-50 text-blue-700">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700">
             <Smartphone className="h-5 w-5" aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-semibold text-slate-900">{promptTitle}</h2>
+              <h2 className="text-sm font-semibold text-slate-950">{promptTitle}</h2>
               {state === "enabled" && (
-                <span className="rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
                   Active
                 </span>
               )}
               {state !== "enabled" && activeCount > 0 && (
-                <span className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-medium text-slate-500">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
                   {activeCount} other {activeCount === 1 ? "device" : "devices"} active
                 </span>
               )}
             </div>
-            <p className="mt-1 text-sm text-slate-600">{statusText}</p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">{statusText}</p>
           </div>
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
           {canDisable ? (
             <button
               type="button"
               onClick={() => void handleDisable()}
-              className="inline-flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3.5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <BellOff className="h-4 w-4" aria-hidden="true" />
               Not now
@@ -352,7 +352,7 @@ export function DeviceNotificationsCard({
             <button
               type="button"
               onClick={() => void handleEnable()}
-              className="inline-flex items-center gap-2 rounded-md border border-blue-700 bg-blue-700 px-3.5 py-2 text-sm font-medium text-white transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-blue-700 bg-blue-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={!canEnable}
             >
               <Bell className="h-4 w-4" aria-hidden="true" />
@@ -368,7 +368,7 @@ export function DeviceNotificationsCard({
           <button
             type="button"
             onClick={() => setShowDeviceList(!showDeviceList)}
-            className="inline-flex items-center gap-2 rounded-md px-2 py-1 text-sm font-medium text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
+            className="inline-flex min-h-9 items-center gap-2 rounded-md px-2 py-1 text-sm font-semibold text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300"
           >
             {showDeviceList ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             <span>
