@@ -7,12 +7,18 @@ import {
   syncPlatformEntitlementFromCheckoutSession,
   syncPlatformEntitlementFromStripeSubscriptionEvent,
 } from "@/lib/business/platform-billing-stripe";
+import {
+  recordTenantInvoicePaymentFromStripeCharge,
+  recordTenantInvoicePaymentFailureFromStripeCharge,
+} from "@/lib/business/tenant-invoice-stripe-webhooks";
 
 const HANDLED_EVENT_TYPES = new Set([
   "checkout.session.completed",
   "customer.subscription.created",
   "customer.subscription.updated",
   "customer.subscription.deleted",
+  "charge.succeeded",
+  "charge.failed",
 ]);
 
 function getStripeSignature(request: Request) {
@@ -92,6 +98,40 @@ export async function POST(request: Request) {
         subscription: event.data.object as Stripe.Subscription,
         eventId: event.id,
       });
+    }
+
+    if (event.type === "charge.succeeded") {
+      const charge = event.data.object as Stripe.Charge;
+
+      // Charge.succeeded can come from multiple sources (subscriptions, payment intents, etc).
+      // We only process if metadata includes invoice_id (tenant customer invoice payment).
+      // Platform subscription charges have no invoice_id, so they're safely ignored.
+      const invoiceId = typeof charge.metadata?.invoice_id === "string"
+        ? charge.metadata.invoice_id.trim()
+        : "";
+
+      if (invoiceId) {
+        await recordTenantInvoicePaymentFromStripeCharge({
+          charge,
+          eventId: event.id,
+        });
+      }
+    }
+
+    if (event.type === "charge.failed") {
+      const charge = event.data.object as Stripe.Charge;
+
+      // Similar to charge.succeeded, only process if this is a tenant invoice payment
+      const invoiceId = typeof charge.metadata?.invoice_id === "string"
+        ? charge.metadata.invoice_id.trim()
+        : "";
+
+      if (invoiceId) {
+        await recordTenantInvoicePaymentFailureFromStripeCharge({
+          charge,
+          eventId: event.id,
+        });
+      }
     }
 
     return NextResponse.json({ received: true });
