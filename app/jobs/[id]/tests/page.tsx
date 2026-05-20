@@ -103,7 +103,7 @@ function getRequiredTestStatusForSystem(job: any, systemId: string, testType: Ec
     return {
       state: "required" as const,
       label: "Required",
-      tone: "border-amber-200 bg-amber-50 text-amber-700",
+      tone: "border-sky-200 bg-sky-50 text-sky-700",
       run,
     };
   }
@@ -171,23 +171,76 @@ function getRequiredTestStatusForSystem(job: any, systemId: string, testType: Ec
 }
 
 const eccPageShellClass =
-  "mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden space-y-5 px-3 py-4 text-slate-900 sm:px-5 lg:px-6 print:max-w-none print:p-0";
+  "mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden space-y-4 bg-slate-50 px-3 py-4 text-slate-900 sm:px-5 lg:px-6 print:max-w-none print:bg-white print:p-0";
 const eccPanelClass =
-  "min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.34)] sm:p-5";
+  "min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.34)] sm:p-5";
 const eccSoftPanelClass =
-  "rounded-xl border border-slate-200 bg-slate-50/70 p-3 sm:p-4";
+  "rounded-lg border border-slate-200 bg-slate-50/80 p-3 sm:p-4";
 const eccWorkspaceCardClass =
-  "min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.32)] space-y-4 sm:p-5";
+  "min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.32)] space-y-4 sm:p-5";
 const eccOfficeCardClass =
-  "min-w-0 rounded-xl border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))] p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.32)] space-y-4 sm:p-5";
+  "min-w-0 rounded-lg border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))] p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.32)] space-y-4 sm:p-5";
 const eccUtilityLabelClass =
   "text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const eccActionRowClass =
-  "flex flex-col gap-2 border-t border-slate-200 pt-3 sm:flex-row sm:flex-wrap sm:items-center";
+  "sticky bottom-2 z-10 -mx-1 flex flex-col gap-2 rounded-lg border border-slate-200 bg-white/95 p-2 shadow-[0_18px_44px_-30px_rgba(15,23,42,0.42)] backdrop-blur sm:static sm:mx-0 sm:flex-row sm:flex-wrap sm:items-center sm:border-t sm:border-x-0 sm:border-b-0 sm:rounded-none sm:bg-transparent sm:p-0 sm:pt-3 sm:shadow-none print:static print:shadow-none";
 const eccSecondaryButtonClass =
-  "inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 sm:w-auto";
+  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:w-auto";
 const eccPrimaryButtonClass =
-  "inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 sm:w-auto";
+  "inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:w-auto";
+
+function getTestStatusTone(state: string) {
+  if (state === "pass" || state === "pass_override" || state === "attestation") {
+    return {
+      card: "border-emerald-200 bg-emerald-50/80",
+      dot: "bg-emerald-500",
+      text: "text-emerald-800",
+    };
+  }
+
+  if (state === "fail" || state === "fail_override") {
+    return {
+      card: "border-red-200 bg-red-50/80",
+      dot: "bg-red-500",
+      text: "text-red-800",
+    };
+  }
+
+  if (state === "required") {
+    return {
+      card: "border-sky-200 bg-sky-50/80",
+      dot: "bg-sky-500",
+      text: "text-sky-800",
+    };
+  }
+
+  if (state === "saved" || state === "open") {
+    return {
+      card: "border-blue-200 bg-blue-50/80",
+      dot: "bg-blue-500",
+      text: "text-blue-800",
+    };
+  }
+
+  return {
+    card: "border-slate-200 bg-white",
+    dot: "bg-slate-400",
+    text: "text-slate-700",
+  };
+}
+
+function getTestStatusHelp(state: string, carriedForward: boolean) {
+  if (carriedForward) return "Passed on parent visit. No new retest entry needed.";
+  if (state === "required") return "Not started yet.";
+  if (state === "open") return "Run is open. Add readings when ready.";
+  if (state === "saved") return "Draft readings are saved. Complete when verified.";
+  if (state === "pass_override") return "Completed with pass override.";
+  if (state === "fail_override") return "Completed with fail override.";
+  if (state === "attestation") return "Completed by Photo Taken attestation.";
+  if (state === "pass") return "Completed and passed.";
+  if (state === "fail") return "Completed and failed.";
+  return "Needs review before closeout.";
+}
 
 function pickRunForSystem(job: any, testType: string, systemId: string) {
   const runs = (job?.ecc_test_runs ?? []).filter(
@@ -897,6 +950,52 @@ export default async function JobTestsPage({
 
   const visibleFieldTestTypes = visibleTestTypes.filter((testType) => testType !== "ahri_verification");
 
+  const selectedSystemStatusRows = selectedSystemId
+    ? visibleFieldTestTypes.map((testType: EccTestType) => {
+        const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
+        const parentRun = pickParentRunForSelectedSystem(testType);
+        const parentOutcome = getEffectiveResultState(parentRun);
+        const carriedForward = isRetestChild && !status.run && parentOutcome === "pass";
+        const isRequired = requiredTests.includes(testType);
+        const state = carriedForward ? "carried_forward" : status.state;
+        const complete =
+          carriedForward ||
+          status.state === "pass" ||
+          status.state === "fail" ||
+          status.state === "pass_override" ||
+          status.state === "fail_override" ||
+          status.state === "attestation";
+
+        return {
+          testType,
+          status,
+          parentRun,
+          parentOutcome,
+          carriedForward,
+          isRequired,
+          state,
+          complete,
+        };
+      })
+    : [];
+
+  const selectedCompletedCount = selectedSystemStatusRows.filter((row) => row.complete).length;
+  const selectedNotStartedCount = selectedSystemStatusRows.filter((row) => row.status.state === "required").length;
+  const selectedDraftCount = selectedSystemStatusRows.filter((row) =>
+    row.status.state === "open" || row.status.state === "saved"
+  ).length;
+  const selectedAttentionCount = selectedSystemStatusRows.filter((row) =>
+    row.status.state === "fail" || row.status.state === "fail_override" || row.status.state === "unknown"
+  ).length;
+  const selectedRequiredRemainingCount = selectedSystemStatusRows.filter(
+    (row) => row.isRequired && !row.complete
+  ).length;
+  const selectedTotalCount = selectedSystemStatusRows.length;
+  const selectedCompletionLabel =
+    selectedTotalCount > 0
+      ? `${selectedCompletedCount}/${selectedTotalCount} completed`
+      : "No active tests";
+
   const focusedCustomTestType =
     focusedType &&
     focusedType !== "custom" &&
@@ -1185,35 +1284,75 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     return (
       <div className={eccPageShellClass}>
         {notice === "rc_exempt_reason_required" && (
-          <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Select <span className="font-semibold">Package unit</span> or{" "}
-            <span className="font-semibold">Conditions not met</span> before marking
-            refrigerant charge exempt.
+          <div className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950 shadow-sm">
+            <div className="font-semibold">Refrigerant exemption needs one more choice.</div>
+            <div className="mt-1">
+              Select <span className="font-semibold">Package unit</span> or{" "}
+              <span className="font-semibold">Conditions not met</span> before marking
+              refrigerant charge exempt.
+            </div>
           </div>
         )}
         {(notice === "override_reason_required" || notice === "airflow_override_reason_required") && (
-          <div className="mb-4 rounded-md border border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-            Enter an <span className="font-semibold">override reason</span> before completing this test.
+          <div className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950 shadow-sm">
+            <div className="font-semibold">Manual override needs a reason.</div>
+            <div className="mt-1">
+              Enter an <span className="font-semibold">override reason</span> before completing this test.
+            </div>
           </div>
         )}
-      <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5 print:hidden">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0">
-          <div className={eccUtilityLabelClass}>ECC Workspace</div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
-          <div className="mt-1 text-sm text-slate-600">{job.city ?? "N/A"}</div>
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5 print:hidden">
+      <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0 space-y-3">
+          <div>
+            <div className={eccUtilityLabelClass}>Field Testing Workspace</div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              <span>{job.city ?? "N/A"}</span>
+              <span className="hidden text-slate-300 sm:inline">|</span>
+              <span>{selectedSystemName}</span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                {selectedCompletionLabel}
+              </span>
+            </div>
+          </div>
+
+          <div className="grid gap-2 sm:grid-cols-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Required left</div>
+              <div className="mt-1 text-xl font-semibold text-slate-950">{selectedRequiredRemainingCount}</div>
+            </div>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-700">Completed</div>
+              <div className="mt-1 text-xl font-semibold text-emerald-950">{selectedCompletedCount}</div>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">Drafts</div>
+              <div className="mt-1 text-xl font-semibold text-blue-950">{selectedDraftCount}</div>
+            </div>
+            <div className="rounded-lg border border-sky-200 bg-sky-50 px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-sky-700">Not started</div>
+              <div className="mt-1 text-xl font-semibold text-sky-950">{selectedNotStartedCount}</div>
+            </div>
+          </div>
+
+          {selectedAttentionCount > 0 ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+              {selectedAttentionCount} result needs attention on this system before closeout decisions.
+            </div>
+          ) : null}
         </div>
 
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
           <label htmlFor="completion-report-toggle" className={eccSecondaryButtonClass}>
-            View Completion Report
+            Completion Report
           </label>
           <PrintButton className={eccSecondaryButtonClass} />
           <Link href={`/jobs/${job.id}/info?f=equipment`} className={eccSecondaryButtonClass}>
-            Add / View Equipment
+            Equipment
           </Link>
           <Link href={`/jobs/${job.id}`} className={eccSecondaryButtonClass}>
-            &larr; Back to Job
+            Back to Job
           </Link>
         </div>
       </div>
@@ -1221,8 +1360,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       </div>
 
       <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
-      <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
-        Completion output is collapsed so the workspace stays focused.
+      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
+        Completion report is tucked away while you enter field readings.
         <label htmlFor="completion-report-toggle" className="ml-1 cursor-pointer font-medium text-slate-900 underline">
           Expand report
         </label>
@@ -1640,32 +1779,65 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       </div>
 
       <section className={`${eccPanelClass} space-y-5 print:hidden`}>
-        <div>
-          <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">ECC Tests</h2>
-          <p className="text-sm text-slate-600">
-            Capture tests in any order. “Save” stores readings; “Complete” locks the test for the visit workflow.
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+          <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">Tests to Run</h2>
+          <p className="text-sm leading-6 text-slate-600">
+            Pick a system, start the needed tests, save drafts as you go, then complete only when the readings are verified.
           </p>
+          </div>
+          <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+            {selectedCompletionLabel}
+          </div>
         </div>
 
         {/* System selector */}
         <div className={`${eccSoftPanelClass} space-y-3`}>
-          <div className={eccUtilityLabelClass}>Selected System</div>
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className={eccUtilityLabelClass}>System</div>
+              <div className="mt-1 text-sm font-semibold text-slate-950">{selectedSystemName}</div>
+            </div>
+            <Link
+              href={`/jobs/${job.id}/info?f=equipment`}
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              Equipment
+            </Link>
+          </div>
 
           <div className="-mx-1 overflow-x-auto pb-1 sm:mx-0 sm:overflow-visible sm:pb-0">
-            <div className="flex w-max min-w-full gap-2 px-1 sm:w-auto sm:min-w-0 sm:flex-wrap sm:px-0">
+            <div className="grid w-max min-w-full grid-cols-1 gap-2 px-1 sm:w-auto sm:min-w-0 sm:grid-cols-2 sm:px-0 lg:grid-cols-3">
               {systems.map((sys: any) => {
                 const isActive = String(sys.id) === String(selectedSystemId);
+                const systemEquipmentCount = equipmentBySystemId.get(canonicalId(sys.id))?.length ?? 0;
                 return (
                   <Link
                     key={sys.id}
                     href={withS(focusedType || undefined, String(sys.id))}
-                    className={`whitespace-nowrap rounded-full border px-3 py-2 text-sm font-semibold transition-colors ${
+                    className={`min-w-[15rem] rounded-lg border px-3 py-3 text-sm transition-colors ${
                       isActive
                         ? "border-slate-900 bg-slate-900 text-white shadow-sm"
                         : "border-slate-300 bg-white text-slate-800 hover:border-slate-400 hover:bg-slate-50"
                     }`}
                   >
-                    {sys.name}
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate font-semibold">{sys.name}</div>
+                        <div className={`mt-1 text-xs ${isActive ? "text-slate-200" : "text-slate-500"}`}>
+                          {systemEquipmentCount} equipment record{systemEquipmentCount === 1 ? "" : "s"}
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full border px-2 py-0.5 text-[11px] font-semibold ${
+                          isActive
+                            ? "border-white/30 bg-white/10 text-white"
+                            : "border-slate-200 bg-slate-50 text-slate-600"
+                        }`}
+                      >
+                        {isActive ? "Open" : "Select"}
+                      </span>
+                    </div>
                   </Link>
                 );
               })}
@@ -1741,12 +1913,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 )}
 
                 {selectedSystemId ? (
-          <div className={`${eccPanelClass} space-y-4`}>
-            <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.34)] sm:p-5">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="text-base font-semibold tracking-tight text-slate-950">Required and Active Tests</div>
-                <div className="mt-1 text-xs text-slate-500">
-                  Required tests plus any selected add-ons for this system:{" "}
+                <div className="text-base font-semibold tracking-tight text-slate-950">Ready Queue</div>
+                <div className="mt-1 text-sm leading-6 text-slate-600">
+                  Required tests and selected add-ons for this system. Profile:{" "}
                   <span className="font-medium">
                     {normalizedProfile === "alteration"
                       ? "Alteration"
@@ -1757,17 +1929,28 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
 
-              <div className="text-xs font-medium text-slate-500">
-                {systems.find((s: any) => String(s.id) === String(selectedSystemId))?.name ?? "Selected system"}
+              <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[18rem]">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
+                  <div className="text-lg font-semibold text-slate-950">{selectedTotalCount}</div>
+                  <div className="text-[11px] font-medium text-slate-500">Total</div>
+                </div>
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-2">
+                  <div className="text-lg font-semibold text-emerald-950">{selectedCompletedCount}</div>
+                  <div className="text-[11px] font-medium text-emerald-700">Done</div>
+                </div>
+                <div className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-2">
+                  <div className="text-lg font-semibold text-sky-950">{selectedRequiredRemainingCount}</div>
+                  <div className="text-[11px] font-medium text-sky-700">Left</div>
+                </div>
               </div>
             </div>
 
-            {visibleFieldTestTypes.length === 0 ? (
-              <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            {selectedSystemStatusRows.length === 0 ? (
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
                 {isPlanDrivenNewConstruction
                   ? "New Construction is currently plan-driven/custom. No default required tests are preloaded yet. Use Add Test to build the custom set."
                   : "No default required tests for this profile. Use Add Test to build the custom set."}
-                <div className="text-xs text-muted-foreground">
+                <div className="mt-1 text-xs text-muted-foreground">
                   Required for this project type:{" "}
                   <span className="font-medium">
                     {normalizedProfile === "alteration"
@@ -1783,60 +1966,45 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
             ) : (
               <div className="grid gap-2">
-                {visibleFieldTestTypes.map((testType: EccTestType) => {
-  const status = getRequiredTestStatusForSystem(job, selectedSystemId, testType);
-  const parentRun = pickParentRunForSelectedSystem(testType);
-  const parentOutcome = getEffectiveResultState(parentRun);
-  const carriedForward = isRetestChild && !status.run && parentOutcome === "pass";
+                {selectedSystemStatusRows.map((row) => {
+  const { testType, status, carriedForward, isRequired } = row;
   const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
-  const isRequired = requiredTests.includes(testType);
+  const tone = getTestStatusTone(String(row.state));
+  const isOpen = focusedType === testType;
 
   return (
       <div
       key={testType}
-      className="flex min-w-0 flex-col gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 hover:bg-slate-50/60 sm:flex-row sm:items-center sm:justify-between sm:px-4"
+      className={`flex min-w-0 flex-col gap-3 rounded-lg border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:flex-row sm:items-center sm:justify-between sm:px-4 ${isOpen ? "ring-2 ring-slate-300" : ""} ${tone.card}`}
     >
-      <div className="min-w-0">
+      <div className="flex min-w-0 gap-3">
+        <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${carriedForward ? "bg-emerald-500" : tone.dot}`} />
+        <div className="min-w-0">
         <div className="font-semibold text-slate-950">
           {getTestDisplayLabel(testType, packageSystem)}
           {carriedForward ? (
-            <span className="ml-2 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+            <span className="ml-2 rounded-full border border-emerald-200 bg-white/70 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
               Carried Forward
             </span>
           ) : isRequired ? (
-            <span className="ml-2 rounded-full border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+            <span className="ml-2 rounded-full border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] font-medium text-slate-600">
               Required
             </span>
           ) : (
-            <span className="ml-2 rounded-full border border-slate-300 px-2 py-0.5 text-[11px] font-medium text-slate-600">
+            <span className="ml-2 rounded-full border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] font-medium text-slate-600">
               Added
             </span>
           )}
         </div>
-        <div className="mt-1 text-xs leading-5 text-slate-500">
-          {carriedForward
-            ? "Passed on parent visit; no retest entry required"
-            : status.state === "required"
-            ? "Required test is not started yet"
-            : status.state === "open"
-            ? "Run opened and ready for readings"
-            : status.state === "saved"
-            ? "Readings saved, waiting for completion"
-            : status.state === "pass_override"
-            ? "Completed with pass override"
-            : status.state === "fail_override"
-            ? "Completed with fail override"
-            : status.state === "pass"
-            ? "Completed and passed"
-            : status.state === "fail"
-            ? "Completed and failed"
-            : "Needs review before closeout"}
+        <div className={`mt-1 text-xs leading-5 ${carriedForward ? "text-emerald-700" : tone.text}`}>
+          {getTestStatusHelp(String(status.state), carriedForward)}
+        </div>
         </div>
       </div>
 
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
         {carriedForward ? (
-            <span className="inline-flex w-full items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 sm:w-auto">
+            <span className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 sm:w-auto">
             No retest needed
           </span>
         ) : status.state === "required" ? (
@@ -1844,22 +2012,22 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="system_id" value={selectedSystemId} />
             <input type="hidden" name="test_type" value={testType} />
-            <SubmitButton loadingText="Starting..." className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 sm:w-auto">
+            <SubmitButton loadingText="Starting..." className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800 sm:w-auto">
               Start Test
             </SubmitButton>
           </form>
         ) : (
           <Link
             href={testHref}
-            className="inline-flex w-full items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
+            className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800 shadow-sm transition-colors hover:bg-slate-50 sm:w-auto"
           >
-            Open Workspace
+            {isOpen ? "Workspace Open" : "Open Workspace"}
           </Link>
         )}
 
         <div
-          className={`rounded-full border px-2.5 py-1 text-xs font-medium ${
-            carriedForward ? "border-emerald-200 bg-emerald-50 text-emerald-700" : status.tone
+          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+            carriedForward ? "border-emerald-200 bg-white text-emerald-700" : status.tone
           }`}
         >
           {carriedForward ? "Pass (parent)" : status.label}
@@ -1894,7 +2062,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 {scenarioNotes.map((note) => (
                   <div
                     key={note}
-                    className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800"
+                    className="rounded-md border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-800"
                   >
                     {note}
                   </div>
@@ -1910,10 +2078,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
         {/* Add Test panel */}
         {selectedSystemId && focusedType === "custom" ? (
-          <div className={`${eccPanelClass} space-y-3`}>
+          <div className={`${eccWorkspaceCardClass}`}>
             <div>
-              <div className="text-sm font-semibold text-slate-950">Add Test</div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
+              <div className={eccUtilityLabelClass}>Add Test</div>
+              <div className="mt-1 text-base font-semibold text-slate-950">Add a system-specific run</div>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
                 Add selected tests when the project scope requires extra documentation for this system.
               </p>
             </div>
@@ -1929,7 +2098,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <select
                   id="system_id"
                   name="system_id"
-                  className="w-full rounded-md border px-3 py-2"
+                  className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2"
                   defaultValue={selectedSystemId}
                   required
                 >
@@ -1956,7 +2125,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 <select
                   id="test_type"
                   name="test_type"
-                  className="w-full rounded-md border px-3 py-2"
+                  className="min-h-11 w-full rounded-lg border border-slate-300 px-3 py-2"
                   defaultValue=""
                   required
                 >
@@ -1989,26 +2158,32 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         {selectedSystemId ? (
           <Link
             href={focusedType === "custom" ? withS(undefined) : withS("custom")}
-            className={`flex w-full items-center justify-between rounded-xl border px-4 py-3 shadow-sm transition-colors ${
+            className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 shadow-sm transition-colors ${
               focusedType === "custom"
                 ? "border-slate-900 bg-slate-900 text-white"
                 : "border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50"
             }`}
           >
-            <div className="font-semibold">Add Test</div>
-            <span className="text-xs">{focusedType === "custom" ? "▲" : "▼"}</span>
+            <div>
+              <div className="font-semibold">Add another test</div>
+              <div className={`mt-0.5 text-xs ${focusedType === "custom" ? "text-slate-200" : "text-slate-500"}`}>
+                Use when the field scope needs an extra run for this system.
+              </div>
+            </div>
+            <span className="text-xs">{focusedType === "custom" ? "Hide" : "Open"}</span>
           </Link>
         ) : (
-          <div className="w-full rounded border px-4 py-3 text-sm text-muted-foreground">
+          <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
             Select a system first to add tests.
           </div>
         )}
 
         {focusedCustomTestType ? (
-          <div className="rounded-md border p-3 space-y-3">
+          <div className={eccWorkspaceCardClass}>
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="font-medium">
+                <div className={eccUtilityLabelClass}>Ad Hoc Test</div>
+                <div className="mt-1 text-base font-semibold text-slate-950">
                   {getTestDisplayLabel(focusedCustomTestType, packageSystem)}
                 </div>
                 <div className="mt-1 text-sm">
@@ -2033,24 +2208,24 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </SubmitButton>
               </form>
             ) : (
-              <div className="flex flex-wrap gap-2 items-center border-t pt-3">
+              <div className={eccActionRowClass}>
                 <form action={completeEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={focusedCustomRun.id} />
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <button
                     type="submit"
-                    className="px-3 py-2 rounded border text-sm"
+                    className={eccPrimaryButtonClass}
                     disabled={!!focusedCustomRun.is_completed}
                   >
-                    {focusedCustomRun.is_completed ? "Completed ✅" : "Complete Test"}
+                    {focusedCustomRun.is_completed ? "Completed" : "Complete Test"}
                   </button>
                 </form>
 
                 <form action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={focusedCustomRun.id} />
-                  <button type="submit" className="rounded-md border px-3 py-2 text-sm">
+                  <button type="submit" className={eccSecondaryButtonClass}>
                     Delete
                   </button>
                 </form>
@@ -2912,12 +3087,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <div className="mt-1 grid gap-1">
                     {ahriModelReadinessRows.map((row) => (
                       <div key={row.label}>
-                        {row.label}: <span className={row.value ? "text-slate-900" : "text-amber-700"}>{row.value || "Missing"}</span>
+                        {row.label}: <span className={row.value ? "text-slate-900" : "text-rose-700"}>{row.value || "Missing"}</span>
                       </div>
                     ))}
                   </div>
                   {ahriMissingModelRows.length > 0 ? (
-                    <div className="mt-2 text-amber-700">
+                    <div className="mt-2 text-rose-700">
                       Missing model information may prevent AHRI verification.
                     </div>
                   ) : (
