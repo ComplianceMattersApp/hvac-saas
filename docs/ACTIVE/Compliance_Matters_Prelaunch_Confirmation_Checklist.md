@@ -907,6 +907,22 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Verified: no invoice paid-state mutation during session creation.
 - Confirmed deferred boundaries unchanged: no UI/live payment link button, no customer portal, no QBO, no refunds/disputes/saved cards/partial payments.
 
+### 2.6.3D-2 Tenant Customer Payment V1A-3D-2 (Checkout Session Server Action Wrapper)
+- Completed: internal server action wrapper `createTenantInvoiceCheckoutSessionFromForm` added.
+- Completed action gates:
+  - authenticated internal user required
+  - same-account scoped job mutation required
+  - operational entitlement gate required
+  - internal-invoicing billing mode required
+  - scoped invoice/account-owner consistency required
+- Completed action behavior:
+  - calls `createTenantInvoiceCheckoutSession` using scoped account/job/invoice context
+  - supports typed success return (`no_redirect=1`) and redirect-based success state with Checkout Session details
+  - maps helper blocked states to safe banners (issued/no-balance/connect-not-ready)
+- Verified: wrapper does not insert `internal_invoice_payments`.
+- Verified: wrapper does not mark invoice paid.
+- Confirmed deferred boundaries unchanged: no invoice workspace UI button, no customer portal, no QBO, no refunds/disputes/saved cards/partial payments.
+
 ### 2.6.4 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
 - Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.

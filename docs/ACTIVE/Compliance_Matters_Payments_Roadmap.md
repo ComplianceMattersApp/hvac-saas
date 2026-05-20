@@ -336,6 +336,36 @@ Not introduced in V1A-3D-1:
 - No refunds/disputes/saved cards/partial payments
 - No platform-account checkout session usage for tenant invoice charge creation
 
+### Tenant Customer Payments V1A-3D-2 (Checkout Session Server Action Wrapper)
+
+**Status**: V1A-3D-2 server action wrapper implemented (wrapper-only, no UI).
+
+- Added internal server action wrapper: `createTenantInvoiceCheckoutSessionFromForm`.
+- Action behavior:
+	- requires authenticated internal user
+	- enforces same account-owner scoped job mutation boundary
+	- enforces operational entitlement gate and internal invoicing billing mode
+	- resolves scoped invoice context and blocks account/invoice mismatch
+	- calls `createTenantInvoiceCheckoutSession` with account owner, job, invoice context
+	- returns typed success payload when `no_redirect=1` for action-level workflows/tests
+	- otherwise redirects with safe success banner and Checkout Session id/url in return state
+- Action blocked-state mapping:
+	- not issued invoice -> `internal_invoice_payment_requires_issued`
+	- no balance due -> `internal_invoice_payment_no_balance_due`
+	- Stripe setup not ready -> `internal_invoice_payment_connect_not_ready`
+	- forbidden/account mismatch -> `not_authorized`
+- Preserves webhook-only payment truth:
+	- action does not insert `internal_invoice_payments`
+	- action does not mark invoices paid
+
+Not introduced in V1A-3D-2:
+- No invoice workspace UI button
+- No customer portal
+- No QBO
+- No refunds/disputes/saved cards/partial payments
+- No platform seat billing behavior changes
+- No manual/off-platform payment recording behavior changes
+
 ---
 
 ## 6. Payment foundation requirements (build now)

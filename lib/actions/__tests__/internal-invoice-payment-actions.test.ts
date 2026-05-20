@@ -6,6 +6,7 @@ const loadScopedInternalJobForMutationMock = vi.fn();
 const resolveBillingModeByAccountOwnerIdMock = vi.fn();
 const resolveInternalInvoiceByJobIdMock = vi.fn();
 const resolveInvoiceCollectedPaymentSummaryMock = vi.fn();
+const createTenantInvoiceCheckoutSessionMock = vi.fn();
 const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
@@ -58,6 +59,8 @@ vi.mock('@/lib/business/internal-invoice-payments', () => ({
   ],
   resolveInvoiceCollectedPaymentSummary: (...args: unknown[]) =>
     resolveInvoiceCollectedPaymentSummaryMock(...args),
+  createTenantInvoiceCheckoutSession: (...args: unknown[]) =>
+    createTenantInvoiceCheckoutSessionMock(...args),
 }));
 
 vi.mock('@/lib/actions/job-actions', () => ({
@@ -148,6 +151,12 @@ describe('recordInternalInvoicePaymentFromForm', () => {
       reason: 'allowed_active',
     });
     insertJobEventMock.mockResolvedValue(undefined);
+    createTenantInvoiceCheckoutSessionMock.mockResolvedValue({
+      checkoutSessionId: 'cs_123',
+      checkoutSessionUrl: 'https://checkout.stripe.com/c/pay/cs_123',
+      connectedAccountId: 'acct_123',
+      balanceDueCents: 8000,
+    });
   });
 
   it('allows issued internal invoice payment record and writes job event', async () => {
@@ -376,5 +385,147 @@ describe('recordInternalInvoicePaymentFromForm', () => {
     await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toEqual({
       message: 'insert failed',
     });
+  });
+});
+
+describe('createTenantInvoiceCheckoutSessionFromForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+
+    requireInternalUserMock.mockResolvedValue({
+      userId: 'user-1',
+      internalUser: {
+        user_id: 'user-1',
+        role: 'office',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValue('internal_invoicing');
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: 'allowed_active',
+    });
+    resolveInternalInvoiceByJobIdMock.mockResolvedValue({
+      id: 'inv-1',
+      account_owner_user_id: 'owner-1',
+      job_id: 'job-1',
+      invoice_number: 'INV-1',
+      status: 'issued',
+      total_cents: 10000,
+    });
+    createTenantInvoiceCheckoutSessionMock.mockResolvedValue({
+      checkoutSessionId: 'cs_123',
+      checkoutSessionUrl: 'https://checkout.stripe.com/c/pay/cs_123',
+      connectedAccountId: 'acct_123',
+      balanceDueCents: 8000,
+    });
+
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+  });
+
+  function buildCheckoutFormData(overrides: Partial<Record<string, string>> = {}) {
+    const formData = new FormData();
+    formData.set('job_id', 'job-1');
+    formData.set('invoice_id', 'inv-1');
+    formData.set('tab', 'info');
+    formData.set('return_to', '/jobs/job-1/invoice#invoice-workspace');
+
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value != null) {
+        formData.set(key, value);
+      }
+    }
+
+    return formData;
+  }
+
+  it('blocks unauthenticated/unauthorized access via scope before helper call', async () => {
+    loadScopedInternalJobForMutationMock.mockResolvedValueOnce(null);
+
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData())).rejects.toThrow(
+      'banner=not_authorized',
+    );
+
+    expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('passes correct account/job/invoice context to helper', async () => {
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData({ no_redirect: '1' })),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        checkoutSessionId: 'cs_123',
+      }),
+    );
+
+    expect(createTenantInvoiceCheckoutSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: 'owner-1',
+        jobId: 'job-1',
+        invoiceId: 'inv-1',
+      }),
+    );
+  });
+
+  it('issued invoice with ready connect redirects success with session details', async () => {
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_checkout_session_created',
+    );
+  });
+
+  it('not-ready connect maps to safe notice', async () => {
+    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+      new Error('Tenant Stripe Connect account is not ready for checkout session creation.'),
+    );
+
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_connect_not_ready',
+    );
+  });
+
+  it('draft/void/paid helper errors map to safe notices', async () => {
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+      new Error('Invoice must be issued to accept online payment'),
+    );
+    await expect(createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_requires_issued',
+    );
+
+    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+      new Error('Invoice balance must be greater than zero'),
+    );
+    await expect(createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_no_balance_due',
+    );
+  });
+
+  it('does not insert payment rows via checkout action', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData({ no_redirect: '1' })),
+    ).resolves.toEqual(expect.objectContaining({ ok: true }));
+
+    expect(fixture.writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(false);
+    expect(insertJobEventMock).not.toHaveBeenCalled();
   });
 });

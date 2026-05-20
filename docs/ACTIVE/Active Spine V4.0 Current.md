@@ -2469,6 +2469,35 @@ Not introduced in V1A-3D-1:
 - No refunds/disputes/saved cards/partial payments
 - No platform-account checkout creation path for tenant invoice direct-charge
 
+### Tenant Customer Payment V1A-3D-2 (Checkout Session Server Action Wrapper)
+
+**Status**: V1A-3D-2 server action wrapper implemented (no UI changes).
+
+- Added action wrapper `createTenantInvoiceCheckoutSessionFromForm`.
+- Wrapper behavior:
+  - requires authenticated internal user
+  - enforces same-account scoped job mutation boundary
+  - enforces entitlement + internal invoicing mode gates
+  - resolves scoped invoice context and account consistency
+  - calls `createTenantInvoiceCheckoutSession`
+  - returns typed success payload for non-redirect flow (`no_redirect=1`)
+  - otherwise redirects with safe success state carrying Checkout Session details
+- Wrapper-safe blocked states:
+  - invoice not issued
+  - no balance due
+  - Stripe Connect not ready
+  - forbidden/account mismatch
+- Webhook payment truth preserved:
+  - no local payment row insertion by wrapper
+  - no invoice paid-state mutation by wrapper
+
+Not introduced in V1A-3D-2:
+- No invoice workspace UI button
+- No customer portal
+- No QBO
+- No refunds/disputes/saved cards/partial payments
+- No platform seat billing changes
+
 ---
 
 19.2 Core payment direction (locked)
