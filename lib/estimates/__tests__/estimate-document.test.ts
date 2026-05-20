@@ -43,6 +43,7 @@ function buildOptionFixture(overrides: Partial<EstimateOptionReadResult> = {}): 
         updated_at: "2026-05-01T10:00:00.000Z",
       },
     ],
+    // approvalResponseSchemaReady: true, // Not part of EstimateOptionReadResult
     ...overrides,
   };
 }
@@ -122,6 +123,7 @@ function buildMultiOptionEstimateFixture(): EstimateReadResult {
         line_items: [],
       }),
     ],
+    approvalResponseSchemaReady: true,
   };
 }
 
@@ -136,7 +138,7 @@ function buildEstimateFixture(): EstimateReadResult {
     origin_job_id: null,
     status: "sent",
     title: "Spring rooftop package",
-    notes: "Internal proposed package",
+    notes: null,
     subtotal_cents: 80000,
     total_cents: 80000,
     sent_at: "2026-05-01T12:00:00.000Z",
@@ -188,6 +190,8 @@ function buildEstimateFixture(): EstimateReadResult {
         updated_at: "2026-05-01T10:00:00.000Z",
       },
     ],
+    options: [],
+    approvalResponseSchemaReady: true,
   };
 }
 

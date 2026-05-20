@@ -1663,12 +1663,25 @@ export async function recordEstimateApprovalResponse(
     updatePayload.selected_option_total_cents = selectedOptionTotalCents;
   }
 
-  const { error: updateErr } = await supabase
-    .from("estimates")
-    .update(updatePayload)
-    .eq("id", estimateId);
-
-  if (updateErr) throw updateErr;
+  let updateErr: any = null;
+  try {
+    const updateRes = await supabase
+      .from("estimates")
+      .update(updatePayload)
+      .eq("id", estimateId);
+    updateErr = updateRes.error;
+  } catch (err: any) {
+    updateErr = err;
+  }
+  if (updateErr) {
+    // PostgREST: 42703 undefined_column, or message includes "column does not exist"
+    const code = String(updateErr.code ?? "");
+    const msg = String(updateErr.message ?? "").toLowerCase();
+    if (code === "42703" || msg.includes("column") && msg.includes("does not exist")) {
+      return { success: false, error: "approval_response_schema_unavailable" };
+    }
+    throw updateErr;
+  }
 
   // Write enriched estimate_approved event
   await supabase.from("estimate_events").insert({

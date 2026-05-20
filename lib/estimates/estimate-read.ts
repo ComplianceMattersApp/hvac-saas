@@ -386,6 +386,7 @@ export type EstimateReadResult = {
   proposalMode: "single_option_flat" | "multi_option_packages";
   line_items: EstimateLineReadResult[];
   options?: EstimateOptionReadResult[];
+  approvalResponseSchemaReady: boolean;
 };
 
 /**
@@ -411,6 +412,23 @@ export async function getEstimateById(params: {
   if (estimateErr) throw estimateErr;
   if (!estimate?.id) return null;
 
+  // Schema-missing compatibility: normalize approval response fields
+  const approvalFields = [
+    "selected_option_id",
+    "selected_option_label_snapshot",
+    "selected_option_total_cents",
+    "response_note",
+  ];
+  const approvalResponseSchemaReady = approvalFields.every((field) =>
+    Object.prototype.hasOwnProperty.call(estimate, field)
+  );
+  // Always provide the fields, defaulting to null if missing
+  for (const field of approvalFields) {
+    if (!Object.prototype.hasOwnProperty.call(estimate, field)) {
+      estimate[field] = null;
+    }
+  }
+
   // Load flat line items (current/V1A behavior)
   const { data: lines, error: linesErr } = await params.supabase
     .from("estimate_line_items")
@@ -435,6 +453,7 @@ export async function getEstimateById(params: {
     ...estimate,
     proposalMode,
     line_items: lines ?? [],
+    approvalResponseSchemaReady,
   };
 
   // Include options only if they exist (multi-option mode)

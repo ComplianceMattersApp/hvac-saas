@@ -482,6 +482,227 @@ describe("recordEstimateApprovalResponse — multi-option proposal", () => {
 // ---------------------------------------------------------------------------
 
 describe("buildEstimateApprovalViewModel", () => {
+  describe("estimate read schema-missing compatibility", () => {
+    it("normalizes missing approval columns to null and readiness false", async () => {
+      const { getEstimateById } = await import("@/lib/estimates/estimate-read");
+      // Simulate a row missing the new columns
+      const fakeRow = {
+        id: ESTIMATE_ID,
+        account_owner_user_id: ACCOUNT_OWNER,
+        status: "sent",
+        approved_at: null,
+        declined_at: null,
+        // no selected_option_id, selected_option_label_snapshot, selected_option_total_cents, response_note
+      };
+      // Mock supports .from().select().eq().eq().maybeSingle()
+      const supabase = {
+        from: (table: string) => {
+          if (table === "estimates") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    maybeSingle: async () => ({ data: fakeRow, error: null }),
+                  }),
+                }),
+              }),
+            };
+          }
+          // For options/line_items, must support .select().eq().order().order()
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => ({
+                  order: () => ({
+                    // Simulate no options/line_items
+                    data: [],
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        },
+      };
+      const result = await getEstimateById({ estimateId: ESTIMATE_ID, internalUser: { account_owner_user_id: ACCOUNT_OWNER }, supabase });
+      expect(result).not.toBeNull();
+      // @ts-expect-error test: result is not null
+      expect(result.selected_option_id).toBeNull();
+      // @ts-expect-error test: result is not null
+      expect(result.selected_option_label_snapshot).toBeNull();
+      // @ts-expect-error test: result is not null
+      expect(result.selected_option_total_cents).toBeNull();
+      // @ts-expect-error test: result is not null
+      expect(result.response_note).toBeNull();
+      // @ts-expect-error test: result is not null
+      expect(result.approvalResponseSchemaReady).toBe(false);
+    });
+
+    it("sets approvalResponseSchemaReady true when all columns present", async () => {
+      const { getEstimateById } = await import("@/lib/estimates/estimate-read");
+      const fakeRow = {
+        id: ESTIMATE_ID,
+        account_owner_user_id: ACCOUNT_OWNER,
+        status: "sent",
+        approved_at: null,
+        declined_at: null,
+        selected_option_id: null,
+        selected_option_label_snapshot: null,
+        selected_option_total_cents: null,
+        response_note: null,
+      };
+      // Mock supports .from().select().eq().eq().maybeSingle()
+      const supabase = {
+        from: (table: string) => {
+          if (table === "estimates") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    maybeSingle: async () => ({ data: fakeRow, error: null }),
+                  }),
+                }),
+              }),
+            };
+          }
+          // For options/line_items, must support .select().eq().order().order()
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => ({
+                  order: () => ({
+                    // Simulate no options/line_items
+                    data: [],
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        },
+      };
+      const result = await getEstimateById({ estimateId: ESTIMATE_ID, internalUser: { account_owner_user_id: ACCOUNT_OWNER }, supabase });
+      expect(result).not.toBeNull();
+      // @ts-expect-error test: result is not null
+      expect(result.approvalResponseSchemaReady).toBe(true);
+    });
+  });
+
+  describe("recordEstimateApprovalResponse — schema-missing error handling", () => {
+    beforeEach(() => {
+      vi.resetAllMocks();
+      isEstimatesEnabledMock.mockReturnValue(true);
+      requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    });
+
+    it("returns approval_response_schema_unavailable on missing-column error (42703)", async () => {
+      createClientMock.mockResolvedValue({
+        from(table: string) {
+          if (table === "estimates") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    maybeSingle: async () => ({ data: { id: ESTIMATE_ID, status: "sent", account_owner_user_id: ACCOUNT_OWNER }, error: null }),
+                  }),
+                }),
+              }),
+              update: () => ({
+                eq: () => ({
+                  error: { code: "42703", message: "column does not exist" },
+                }),
+              }),
+            };
+          }
+          if (table === "estimate_options") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  limit: () => ({
+                    then: (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve),
+                  }),
+                  order: () => ({
+                    order: () => ({
+                      data: [],
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            };
+          }
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => ({
+                  order: () => ({
+                    data: [],
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        },
+      });
+      const result = await recordEstimateApprovalResponse({ estimateId: ESTIMATE_ID });
+      expect(result).toEqual({ success: false, error: "approval_response_schema_unavailable" });
+    });
+
+    it("returns approval_response_schema_unavailable on missing-column error (message only)", async () => {
+      createClientMock.mockResolvedValue({
+        from(table: string) {
+          if (table === "estimates") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  eq: () => ({
+                    maybeSingle: async () => ({ data: { id: ESTIMATE_ID, status: "sent", account_owner_user_id: ACCOUNT_OWNER }, error: null }),
+                  }),
+                }),
+              }),
+              update: () => ({
+                eq: () => ({
+                  error: { message: "column selected_option_id does not exist" },
+                }),
+              }),
+            };
+          }
+          if (table === "estimate_options") {
+            return {
+              select: () => ({
+                eq: () => ({
+                  limit: () => ({
+                    then: (resolve: any) => Promise.resolve({ data: [], error: null }).then(resolve),
+                  }),
+                  order: () => ({
+                    order: () => ({
+                      data: [],
+                      error: null,
+                    }),
+                  }),
+                }),
+              }),
+            };
+          }
+          return {
+            select: () => ({
+              eq: () => ({
+                order: () => ({
+                  order: () => ({
+                    data: [],
+                    error: null,
+                  }),
+                }),
+              }),
+            }),
+          };
+        },
+      });
+      const result = await recordEstimateApprovalResponse({ estimateId: ESTIMATE_ID });
+      expect(result).toEqual({ success: false, error: "approval_response_schema_unavailable" });
+    });
+  });
   it("returns no_response for draft estimate", async () => {
     const { buildEstimateApprovalViewModel } = await import(
       "@/lib/estimates/estimate-domain"
