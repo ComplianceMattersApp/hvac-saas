@@ -11,6 +11,7 @@ import {
 } from "@/lib/business/internal-business-profile";
 import {
   createTenantStripeConnectOnboardingLink,
+  normalizeStripeConnectError,
   syncTenantStripeConnectReadinessForAccountOwner,
 } from "@/lib/business/tenant-stripe-connect-onboarding";
 
@@ -250,7 +251,7 @@ export async function startTenantStripeConnectOnboardingFromForm(): Promise<void
 
     console.warn("Stripe Connect onboarding start failed", {
       accountOwnerUserId: internalUser.account_owner_user_id,
-      message: error instanceof Error ? error.message : "unknown_error",
+      ...normalizeStripeConnectError(error, "startTenantStripeConnectOnboardingFromForm"),
     });
     redirect(withNotice("stripe_connect_onboarding_failed"));
   }

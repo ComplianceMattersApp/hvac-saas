@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createTenantStripeConnectOnboardingLink,
   ensureTenantStripeConnectedAccount,
+  normalizeStripeConnectError,
   syncTenantStripeConnectReadinessForAccountOwner,
 } from "@/lib/business/tenant-stripe-connect-onboarding";
 
@@ -70,6 +71,32 @@ function buildAdmin(profile: ProfileRow) {
 }
 
 describe("tenant Stripe Connect onboarding helper", () => {
+  it("normalizes stripe-like errors without secrets", () => {
+    const diagnostic = normalizeStripeConnectError(
+      {
+        name: "StripeInvalidRequestError",
+        type: "StripeInvalidRequestError",
+        code: "parameter_invalid_string_empty",
+        decline_code: "do_not_honor",
+        statusCode: 400,
+        requestId: "req_123",
+        message: "Missing required param: refresh_url",
+      },
+      "stripe.accountLinks.create",
+    );
+
+    expect(diagnostic).toEqual({
+      stage: "stripe.accountLinks.create",
+      name: "StripeInvalidRequestError",
+      type: "StripeInvalidRequestError",
+      code: "parameter_invalid_string_empty",
+      declineCode: "do_not_honor",
+      httpStatus: 400,
+      requestId: "req_123",
+      message: "Missing required param: refresh_url",
+    });
+  });
+
   it("creates connected account only when missing and stores connected account id", async () => {
     const fixture = buildAdmin({
       account_owner_user_id: "owner-1",

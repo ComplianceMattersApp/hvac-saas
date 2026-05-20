@@ -12,8 +12,75 @@ type InternalBusinessProfileConnectRow = {
   stripe_connected_account_id: string | null;
 };
 
+export type StripeConnectErrorDiagnostic = {
+  stage: string;
+  name: string;
+  type: string | null;
+  code: string | null;
+  declineCode: string | null;
+  httpStatus: number | null;
+  requestId: string | null;
+  message: string;
+};
+
 function toCleanString(value: unknown) {
   return String(value ?? "").trim();
+}
+
+function toNullableString(value: unknown) {
+  const normalized = toCleanString(value);
+  return normalized || null;
+}
+
+function toNullableNumber(value: unknown) {
+  return Number.isFinite(value) ? Number(value) : null;
+}
+
+export function normalizeStripeConnectError(
+  error: unknown,
+  stage: string,
+): StripeConnectErrorDiagnostic {
+  const stripeLike = (error ?? {}) as {
+    name?: unknown;
+    type?: unknown;
+    rawType?: unknown;
+    code?: unknown;
+    decline_code?: unknown;
+    declineCode?: unknown;
+    statusCode?: unknown;
+    status?: unknown;
+    requestId?: unknown;
+    request_id?: unknown;
+    message?: unknown;
+  };
+
+  return {
+    stage: toCleanString(stage) || "unknown_stage",
+    name: toCleanString(stripeLike.name) || "Error",
+    type: toNullableString(stripeLike.type) ?? toNullableString(stripeLike.rawType),
+    code: toNullableString(stripeLike.code),
+    declineCode: toNullableString(stripeLike.decline_code) ?? toNullableString(stripeLike.declineCode),
+    httpStatus: toNullableNumber(stripeLike.statusCode) ?? toNullableNumber(stripeLike.status),
+    requestId: toNullableString(stripeLike.requestId) ?? toNullableString(stripeLike.request_id),
+    message:
+      toCleanString(stripeLike.message) ||
+      (error instanceof Error ? toCleanString(error.message) : "unknown_error"),
+  };
+}
+
+function logStripeConnectDiagnostic(params: {
+  event: string;
+  accountOwnerUserId: string;
+  error: unknown;
+  stage: string;
+  connectedAccountId?: string | null;
+}) {
+  const diagnostic = normalizeStripeConnectError(params.error, params.stage);
+  console.warn(params.event, {
+    accountOwnerUserId: toCleanString(params.accountOwnerUserId),
+    connectedAccountId: toNullableString(params.connectedAccountId),
+    ...diagnostic,
+  });
 }
 
 function deriveOnboardingStatusFromStripeAccount(account: Stripe.Account) {
@@ -119,23 +186,45 @@ export async function ensureTenantStripeConnectedAccount(params: {
     };
   }
 
-  const account = await stripe.accounts.create({
-    type: "express",
-    metadata: {
-      account_owner_user_id: ownerId,
-      tenant_payments_model: "direct_charge_connected_account",
-    },
-  });
+  let account: Stripe.Account;
+  try {
+    account = await stripe.accounts.create({
+      type: "express",
+      metadata: {
+        account_owner_user_id: ownerId,
+        tenant_payments_model: "direct_charge_connected_account",
+      },
+    });
+  } catch (error) {
+    logStripeConnectDiagnostic({
+      event: "Stripe Connect account create failed",
+      accountOwnerUserId: ownerId,
+      error,
+      stage: "stripe.accounts.create",
+    });
+    throw error;
+  }
 
-  await updateInternalBusinessProfileConnectFields({
-    admin,
-    accountOwnerUserId: ownerId,
-    patch: {
-      stripe_connected_account_id: account.id,
-      stripe_connect_onboarding_status: "pending",
-      stripe_connect_last_synced_at: new Date().toISOString(),
-    },
-  });
+  try {
+    await updateInternalBusinessProfileConnectFields({
+      admin,
+      accountOwnerUserId: ownerId,
+      patch: {
+        stripe_connected_account_id: account.id,
+        stripe_connect_onboarding_status: "pending",
+        stripe_connect_last_synced_at: new Date().toISOString(),
+      },
+    });
+  } catch (error) {
+    logStripeConnectDiagnostic({
+      event: "Stripe Connect account persistence failed",
+      accountOwnerUserId: ownerId,
+      error,
+      stage: "internal_business_profiles.update_connected_account",
+      connectedAccountId: account.id,
+    });
+    throw error;
+  }
 
   return {
     connectedAccountId: account.id,
@@ -167,12 +256,24 @@ export async function createTenantStripeConnectOnboardingLink(params: {
     stripe,
   });
 
-  const accountLink = await stripe.accountLinks.create({
-    account: ensured.connectedAccountId,
-    type: "account_onboarding",
-    refresh_url: `${appUrl}/ops/admin/company-profile?notice=stripe_connect_onboarding_refresh`,
-    return_url: `${appUrl}/ops/admin/company-profile?notice=stripe_connect_onboarding_returned`,
-  });
+  let accountLink: Stripe.AccountLink;
+  try {
+    accountLink = await stripe.accountLinks.create({
+      account: ensured.connectedAccountId,
+      type: "account_onboarding",
+      refresh_url: `${appUrl}/ops/admin/company-profile?notice=stripe_connect_onboarding_refresh`,
+      return_url: `${appUrl}/ops/admin/company-profile?notice=stripe_connect_onboarding_returned`,
+    });
+  } catch (error) {
+    logStripeConnectDiagnostic({
+      event: "Stripe Connect onboarding link create failed",
+      accountOwnerUserId: ownerId,
+      error,
+      stage: "stripe.accountLinks.create",
+      connectedAccountId: ensured.connectedAccountId,
+    });
+    throw error;
+  }
 
   return {
     url: accountLink.url,
@@ -217,7 +318,19 @@ export async function syncTenantStripeConnectReadinessForAccountOwner(params: {
     return resolveTenantStripeConnectReadiness(ownerId, admin);
   }
 
-  const account = await stripe.accounts.retrieve(connectedAccountId);
+  let account: Stripe.Account;
+  try {
+    account = await stripe.accounts.retrieve(connectedAccountId);
+  } catch (error) {
+    logStripeConnectDiagnostic({
+      event: "Stripe Connect account retrieve failed",
+      accountOwnerUserId: ownerId,
+      error,
+      stage: "stripe.accounts.retrieve",
+      connectedAccountId,
+    });
+    throw error;
+  }
   const disabledReason = toCleanString(account.requirements?.disabled_reason) || null;
 
   await updateInternalBusinessProfileConnectFields({
