@@ -858,6 +858,18 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - V1 tenant customer funds-flow must use Stripe Connect direct charges created in connected-account context; platform destination/on_behalf_of model is not the locked V1 model for tenant invoice collection.
 - Until direct-charge context is enforced, V1A-3 is not the approved production tenant-customer payment execution path.
 
+### 2.6.3A Tenant Customer Payment V1A-3A-1 (Connected Account Schema + Readiness Foundation)
+- Completed: additive tenant connected-account readiness fields added to `internal_business_profiles`.
+- Completed fields: `stripe_connected_account_id`, `stripe_connect_onboarding_status`, `stripe_charges_enabled`, `stripe_payouts_enabled`, `stripe_details_submitted`, `stripe_connect_disabled_reason`, `stripe_connect_last_synced_at`.
+- Completed: readiness helpers added: `resolveTenantStripeConnectReadiness()` and `isTenantStripePaymentReady()`.
+- Verified gate behavior: ready only when connected account id exists and charges/payouts/details are true with complete-equivalent onboarding status.
+- Confirmed: direct-charge connected-account model remains locked for tenant invoice payment funds-flow.
+- Confirmed: V1A-2A follow-up still required before live activation (webhook hard connected-account ownership verification).
+- Deferred: Stripe OAuth onboarding.
+- Deferred: Checkout Session creation changes.
+- Deferred: live tenant customer payment activation.
+- Deferred: no QBO, no customer portal, no refunds/disputes/saved cards/partial payments.
+
 ### 2.6.4 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
 - Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.

@@ -240,6 +240,33 @@ Not supported now:
 
 ---
 
+### Tenant Customer Payments V1A-3A-1 (Connected Account Schema + Readiness Foundation)
+
+**Status**: V1A-3A-1 schema/readiness foundation implemented (no onboarding or live payment activation).
+
+- Additive schema fields added to `internal_business_profiles` for tenant connected-account readiness:
+	- `stripe_connected_account_id`
+	- `stripe_connect_onboarding_status` (default `not_started`)
+	- `stripe_charges_enabled` (default `false`)
+	- `stripe_payouts_enabled` (default `false`)
+	- `stripe_details_submitted` (default `false`)
+	- `stripe_connect_disabled_reason`
+	- `stripe_connect_last_synced_at`
+- Helper added: `resolveTenantStripeConnectReadiness()` for read-only readiness state and `isTenantStripePaymentReady()` for final gate.
+- Ready gate requires: connected account id present, charges enabled, payouts enabled, details submitted, and onboarding status complete-equivalent.
+- Direct-charge model preserved: tenant invoice payments remain locked to connected-account direct-charge context.
+- V1A-2A follow-up remains required: webhook path must add hard connected-account ownership verification before live activation.
+
+Not supported in V1A-3A-1:
+- No Stripe OAuth onboarding flow
+- No Checkout Session creation changes
+- No live tenant customer payment activation
+- No QBO
+- No customer portal
+- No refunds/disputes/saved cards/partial payments
+
+---
+
 ## 6. Payment foundation requirements (build now)
 
 ### 6.1 Data model rule

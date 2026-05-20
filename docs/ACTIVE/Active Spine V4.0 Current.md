@@ -2387,6 +2387,29 @@ Current implementation truth:
 - V1A-3A correction lock: current checkout-session helper call lacks connected-account request context and therefore does not represent the locked V1 tenant funds-flow model.
 - Locked V1 tenant funds-flow model: direct charge in connected-account context; do not treat platform destination/on_behalf_of as equivalent for this scope.
 
+### Tenant Customer Payment V1A-3A-1 (Connected Account Schema + Readiness Foundation)
+
+**Status**: V1A-3A-1 schema/readiness foundation implemented; no onboarding or live payment execution changes.
+
+- Additive `internal_business_profiles` fields added for connected-account readiness:
+  - `stripe_connected_account_id`
+  - `stripe_connect_onboarding_status` (default `not_started`)
+  - `stripe_charges_enabled` (default `false`)
+  - `stripe_payouts_enabled` (default `false`)
+  - `stripe_details_submitted` (default `false`)
+  - `stripe_connect_disabled_reason`
+  - `stripe_connect_last_synced_at`
+- Helper layer added for tenant payment gate: `resolveTenantStripeConnectReadiness()` and `isTenantStripePaymentReady()`.
+- Ready requires connected-account id plus charges/payouts/details true and complete-equivalent onboarding status.
+- Direct-charge connected-account model remains locked for tenant invoice payment funds-flow.
+- V1A-2A follow-up remains required before live activation: webhook must enforce connected-account ownership verification.
+
+Not introduced in V1A-3A-1:
+- Stripe OAuth onboarding
+- Checkout Session creation changes
+- Live tenant customer payment activation
+- QBO, customer portal, refunds/disputes/saved cards/partial payments
+
 ---
 
 19.2 Core payment direction (locked)
