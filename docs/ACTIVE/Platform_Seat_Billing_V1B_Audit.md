@@ -1,11 +1,31 @@
 # Platform Seat Billing V1B: Billable Seat Policy Lock + Mutation Gate Audit
 
-**Status**: ACTIVE audit / policy lock (V1B complete; V1C closeout recorded)
+**Status**: ACTIVE audit / policy lock (V1B complete; V1C and V1D-A closeout recorded)
 **Date**: 2026-05-19  
 **Authority**: Subordinate to Competitive_Packaging_and_Tier_Spec.md and Release_Scope_Lock_and_Post_Launch_Roadmap.md  
 **Previous Slice**: Platform Seat Audit Preview V1 (committed, pushed, browser-smoked)  
 **Current Scope**: Policy lock + mutation path audit (read-only, no enforcement)  
-**Next Slice**: V1D (Stripe quantity reconciliation)
+**Next Slice**: V1D-B (post-mutation Stripe quantity reconciliation)
+
+## V1D-A Closeout Addendum (2026-05-19)
+
+V1D-A is implemented and pushed in commit `c13c410`.
+
+Implemented in V1D-A:
+- Added `derivePlatformCheckoutSeatQuantity(activeInternalSeatCount)` helper.
+- New platform Stripe Checkout sessions now set initial quantity as `max(activeInternalSeatCount, 1)`.
+- Initial quantity is derived from active internal seat truth through existing entitlement resolution (`resolveAccountEntitlement`).
+- Internal/comped account checkout protection remains in place (`internal_comped_v1` behavior unchanged).
+
+Explicit boundaries preserved in V1D-A:
+- No post-mutation Stripe subscription quantity reconciliation (deferred to V1D-B).
+- No Stripe proration behavior changes.
+- No billing portal quantity editing additions.
+- No tenant customer invoice payment execution changes.
+- No QBO behavior changes.
+
+Historical note:
+- References below that describe Stripe quantity as fixed at `1` are V1B-time context and are superseded by this addendum for current behavior.
 
 ## V1C Closeout Addendum (2026-05-19)
 
@@ -24,7 +44,7 @@ Implemented in V1C:
 - Contractors/external users remain excluded from billable seat count.
 
 Explicit non-goals preserved in V1C:
-- No Stripe quantity sync (deferred to V1D).
+- No post-mutation Stripe quantity sync (deferred to V1D-B).
 - No checkout quantity change.
 - No proration behavior changes (deferred).
 - No tenant customer invoice payment execution changes.
@@ -62,8 +82,8 @@ Historical note:
 - All internal user mutations properly scoped to account owner
 - Entitlement gating blocks suspended/cancelled subscriptions and expired trials
 - Internal comped accounts marked via `notes` field contain `"internal_comped_v1"` marker
-- Stripe quantity currently fixed at `1` (per-account subscription, not per-seat)
-- Seat limit enforcement not yet gated; field exposed for future V1C/V1D
+- V1D-A closeout: New platform checkout session quantity now derives from active internal seats with minimum `1`
+- V1C closeout: Seat limit enforcement gate is implemented for finite-seat internal seat-increase mutations
 
 ---
 

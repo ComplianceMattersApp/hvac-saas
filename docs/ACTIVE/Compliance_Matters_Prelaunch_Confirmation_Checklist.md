@@ -774,7 +774,8 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - V1C closeout: finite-seat-limit enforcement is now implemented server-side for internal seat-increase mutations only (`createInternalUserFromForm`, `inviteInternalUserFromForm`, `activateInternalUserFromForm`) when `seat_limit` is finite and at capacity.
 - Unlimited and comped accounts remain unblocked (`seat_limit = null`, `internal_comped_v1`).
 - Contractors/external users remain excluded from billable internal seat count.
-- Stripe quantity sync remains deferred to V1D; checkout quantity remains unchanged.
+- V1D-A closeout: new platform checkout sessions now set initial quantity to `max(activeInternalSeatCount, 1)` from active internal seat truth via existing entitlement resolution.
+- Stripe quantity sync and post-mutation subscription quantity reconciliation remain deferred to V1D-B.
 - Proration and customer portal quantity rules remain deferred.
 - Authenticated click smoke caveat: admin-auth session was unavailable in shared browser context; route verification reached login redirect.
 

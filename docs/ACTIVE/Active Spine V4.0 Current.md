@@ -2292,7 +2292,9 @@ Current implementation truth:
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed in production for platform account onboarding
 - live confirmation includes live Stripe Product/Price, deployed live env, live webhook processing at `/api/stripe/webhook`, successful non-owner checkout completion, billing-customer linkage, active subscription sync, populated period end, and billing portal availability
 - flat account subscription remains in place, and V1C finite-seat enforcement is implemented for internal seat-increase mutations only (create/invite/reactivate internal users) when `seat_limit` is finite and at capacity; unlimited/comped (`seat_limit = null` and `internal_comped_v1`) accounts remain unblocked
-- Stripe quantity sync remains deferred (V1D), checkout quantity is unchanged, and proration remains deferred
+- V1D-A closeout: platform checkout initial seat quantity now uses `max(activeInternalSeatCount, 1)` for new checkout sessions from active internal seat truth via existing entitlement resolution
+- Stripe quantity sync and post-mutation subscription quantity reconciliation remain deferred (V1D-B)
+- Proration remains deferred, and billing portal quantity editing remains deferred
 - internal/comped owner protection is complete through comped-safe `platform_account_entitlements` rows (`internal_comped_v1`, no Stripe linkage, unlimited users)
 - platform subscription sync writes only to `platform_account_entitlements`
 - live processor-based tenant customer payment acceptance is not yet enabled
