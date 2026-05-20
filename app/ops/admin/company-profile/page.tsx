@@ -8,6 +8,14 @@ import {
   resolveInternalBusinessProfileLogoUrl,
 } from "@/lib/business/internal-business-profile";
 import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib/business/platform-entitlement";
+import {
+  formatSeatAuditBillingExplanation,
+  formatSeatAuditBillingModeLabel,
+  formatSeatAuditKnownGapNote,
+  formatSeatAuditPendingInviteLabel,
+  formatSeatAuditSeatLimitLabel,
+  resolvePlatformSeatAuditPreviewCounts,
+} from "@/lib/business/platform-seat-audit-preview";
 import { getPlatformBillingAvailability } from "@/lib/business/platform-billing-stripe";
 import {
   isInternalAccessError,
@@ -69,12 +77,16 @@ export default async function AdminCompanyProfilePage({
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
-  const [profile, entitlement] = await Promise.all([
+  const [profile, entitlement, seatAuditPreview] = await Promise.all([
     getInternalBusinessProfileByAccountOwnerId({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
     }),
     resolveAccountEntitlement(internalUser.account_owner_user_id, supabase),
+    resolvePlatformSeatAuditPreviewCounts({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      supabase,
+    }),
   ]);
   const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase);
   const incompleteRequiredItems = readiness.items.filter((item) => item.status === "incomplete");
@@ -339,6 +351,7 @@ export default async function AdminCompanyProfilePage({
       <PlatformAccountSection
         entitlement={entitlement}
         availability={platformBillingAvailability}
+        seatAuditPreview={seatAuditPreview}
       />
     </div>
   );
@@ -365,9 +378,11 @@ const STATUS_LABELS: Record<string, string> = {
 function PlatformAccountSection({
   entitlement,
   availability,
+  seatAuditPreview,
 }: {
   entitlement: AccountEntitlementContext;
   availability: ReturnType<typeof getPlatformBillingAvailability>;
+  seatAuditPreview: Awaited<ReturnType<typeof resolvePlatformSeatAuditPreviewCounts>>;
 }) {
   const isInternalComped = entitlement.isInternalComped;
   const planLabel = isInternalComped
@@ -376,8 +391,19 @@ function PlatformAccountSection({
   const statusLabel = isInternalComped
     ? "Active"
     : STATUS_LABELS[entitlement.entitlementStatus] ?? entitlement.entitlementStatus;
-  const userLimitLabel =
-    entitlement.seatLimit != null ? String(entitlement.seatLimit) : "Unlimited";
+  const seatLimitLabel = formatSeatAuditSeatLimitLabel(entitlement);
+  const billingModeLabel = formatSeatAuditBillingModeLabel(entitlement);
+  const billingExplanation = formatSeatAuditBillingExplanation();
+  const pendingInviteLabel = formatSeatAuditPendingInviteLabel();
+  const knownGapNote = formatSeatAuditKnownGapNote();
+  const inactiveInternalUserCountLabel =
+    seatAuditPreview.inactiveInternalUserCount == null
+      ? "Unavailable"
+      : String(seatAuditPreview.inactiveInternalUserCount);
+  const contractorDirectoryCountLabel =
+    seatAuditPreview.contractorDirectoryCount == null
+      ? "Unavailable"
+      : String(seatAuditPreview.contractorDirectoryCount);
 
   const trialEndsLabel =
     entitlement.entitlementStatus === "trial" && entitlement.trialEndsAt
@@ -421,7 +447,7 @@ function PlatformAccountSection({
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
         <div className="text-sm font-semibold text-slate-950">Platform account</div>
         <div className="mt-1 text-sm text-slate-600">
-          Current access level and usage for this account.
+          Current access level and read-only seat audit preview for this account.
         </div>
         <div className="mt-1 text-sm text-slate-600">
           This is platform account subscription billing, not customer invoice payment collection.
@@ -430,9 +456,58 @@ function PlatformAccountSection({
       <dl className="grid grid-cols-2 gap-px bg-slate-100/70 sm:grid-cols-4">
         <PlatformAccountField label="Plan" value={planLabel} />
         <PlatformAccountField label="Account status" value={statusLabel} />
-        <PlatformAccountField label="Active seats used" value={String(entitlement.activeSeatCount)} />
-        <PlatformAccountField label="Seat limit" value={userLimitLabel} />
+        <PlatformAccountField label="Active internal seats" value={String(entitlement.activeSeatCount)} />
+        <PlatformAccountField label="Seat limit / comped" value={seatLimitLabel} />
       </dl>
+      <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-sm font-semibold text-slate-950">Seat audit preview</div>
+            <div className="mt-1 text-sm leading-6 text-slate-600">
+              Read-only seat usage preview for platform subscription billing. It does not update Stripe quantity,
+              enforce seat limits, or touch customer invoice payment collection.
+            </div>
+          </div>
+          <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Preview only
+          </div>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <SeatAuditStat
+            label="Active internal seats"
+            value={String(entitlement.activeSeatCount)}
+            note="Counted live from internal_users."
+          />
+          <SeatAuditStat
+            label="Inactive internal users excluded"
+            value={inactiveInternalUserCountLabel}
+            note="Inactive internal_users rows are excluded."
+          />
+          <SeatAuditStat
+            label="Contractor/external accounts excluded"
+            value={contractorDirectoryCountLabel}
+            note="Contractor directory records are excluded from platform seat usage."
+          />
+          <SeatAuditStat
+            label="Pending invites / not-yet-active users"
+            value={pendingInviteLabel}
+            note="Not separately modeled in the current read-only data."
+          />
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700">
+            <div className="font-semibold text-slate-950">Billing mode / status</div>
+            <div className="mt-1">{billingModeLabel}</div>
+            <div className="mt-2 text-slate-600">{billingExplanation}</div>
+          </div>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-900">
+            <div className="font-semibold">Known modeling gap</div>
+            <div className="mt-1">{knownGapNote}</div>
+          </div>
+        </div>
+      </div>
       <dl className="grid grid-cols-1 gap-px border-t border-slate-100 bg-slate-100/70 sm:grid-cols-3">
         <PlatformAccountField
           label="Billing customer"
@@ -488,6 +563,24 @@ function PlatformAccountSection({
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function SeatAuditStat({
+  label,
+  value,
+  note,
+}: {
+  label: string;
+  value: string;
+  note: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.16)]">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      <div className="mt-2 text-lg font-semibold tracking-[-0.02em] text-slate-950">{value}</div>
+      <div className="mt-1 text-sm leading-6 text-slate-600">{note}</div>
     </div>
   );
 }
