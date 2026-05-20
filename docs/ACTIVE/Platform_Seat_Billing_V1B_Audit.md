@@ -1,11 +1,38 @@
 # Platform Seat Billing V1B: Billable Seat Policy Lock + Mutation Gate Audit
 
-**Status**: ACTIVE audit / policy lock (V1B complete; V1C and V1D-A closeout recorded)
+**Status**: ACTIVE audit / policy lock (V1B complete; V1C, V1D-A, and V1D-B closeout recorded)
 **Date**: 2026-05-19  
 **Authority**: Subordinate to Competitive_Packaging_and_Tier_Spec.md and Release_Scope_Lock_and_Post_Launch_Roadmap.md  
 **Previous Slice**: Platform Seat Audit Preview V1 (committed, pushed, browser-smoked)  
 **Current Scope**: Policy lock + mutation path audit (read-only, no enforcement)  
-**Next Slice**: V1D-B (post-mutation Stripe quantity reconciliation)
+**Next Slice**: V1E (tiered seat limits per plan)
+
+## V1D-B Closeout Addendum (2026-05-19)
+
+V1D-B is implemented in this lane and records post-mutation Stripe quantity reconciliation for platform seats.
+
+Implemented in V1D-B:
+- Added `reconcilePlatformSubscriptionSeatQuantity` helper.
+- Internal-user seat-count mutations now trigger best-effort reconciliation after local success:
+  - `createInternalUserFromForm`
+  - `inviteInternalUserFromForm`
+  - `activateInternalUserFromForm`
+  - `deactivateInternalUserFromForm`
+  - `deleteInternalUserFromForm`
+- Reconciliation derives active-seat quantity from existing entitlement seat truth and applies `derivePlatformCheckoutSeatQuantity` minimum-1 behavior.
+- Reconciliation skips safely when account is internal/comped or no Stripe subscription is linked.
+- Reconciliation updates Stripe only when exactly one subscription item matches `STRIPE_PRICE_ID`; no guess path is used for zero/multiple matches.
+- Stripe update uses `proration_behavior: "none"`.
+- Stripe errors are handled as best-effort and do not roll back internal-user mutations.
+
+Explicit boundaries preserved in V1D-B:
+- No tenant customer invoice payment execution changes.
+- No QBO behavior changes.
+- No billing portal quantity editing changes.
+- No customer-editable quantity controls.
+
+Historical note:
+- Earlier V1B/V1C/V1D-A references that mark post-mutation Stripe quantity sync as deferred are superseded by this addendum.
 
 ## V1D-A Closeout Addendum (2026-05-19)
 

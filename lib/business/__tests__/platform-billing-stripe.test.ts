@@ -4,6 +4,7 @@ import {
   createPlatformSubscriptionCheckoutSession,
   derivePlatformCheckoutSeatQuantity,
   mapStripeSubscriptionStatusToEntitlementStatus,
+  reconcilePlatformSubscriptionSeatQuantity,
 } from "@/lib/business/platform-billing-stripe";
 
 describe("platform-billing-stripe", () => {
@@ -320,5 +321,367 @@ describe("platform-billing-stripe", () => {
     expect(checkoutCreateSpy).not.toHaveBeenCalled();
     expect(customerCreateSpy).not.toHaveBeenCalled();
     expect(subscriptionUpdateSpy).not.toHaveBeenCalled();
+  });
+
+  it("reconciles Stripe quantity when exactly one matching subscription item exists", async () => {
+    process.env.STRIPE_PRICE_ID = "price_123";
+
+    const admin = {
+      from: (table: string) => {
+        if (table === "internal_users") {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: async () => ({ data: null, count: 4, error: null }),
+              }),
+            }),
+          };
+        }
+
+        if (table === "platform_account_entitlements") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    account_owner_user_id: "owner_1",
+                    plan_key: "starter",
+                    entitlement_status: "active",
+                    seat_limit: 12,
+                    notes: null,
+                    stripe_customer_id: "cus_123",
+                    stripe_subscription_id: "sub_123",
+                    stripe_subscription_status: "active",
+                    stripe_current_period_end: null,
+                    stripe_cancel_at_period_end: false,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    };
+
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async () => ({
+          id: "sub_123",
+          items: {
+            data: [
+              { id: "si_123", price: { id: "price_123" } },
+              { id: "si_other", price: { id: "price_other" } },
+            ],
+          },
+        })),
+      },
+      subscriptionItems: {
+        update: vi.fn(async () => ({ id: "si_123", quantity: 4 })),
+      },
+    } as any;
+
+    const result = await reconcilePlatformSubscriptionSeatQuantity({
+      accountOwnerUserId: "owner_1",
+      admin,
+      stripe,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        skipped: false,
+        reason: "updated",
+        quantity: 4,
+      }),
+    );
+    expect(stripe.subscriptionItems.update).toHaveBeenCalledWith("si_123", {
+      quantity: 4,
+      proration_behavior: "none",
+    });
+  });
+
+  it("skips reconciliation when no matching subscription item exists", async () => {
+    process.env.STRIPE_PRICE_ID = "price_123";
+
+    const admin = {
+      from: (table: string) => {
+        if (table === "internal_users") {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: async () => ({ data: null, count: 2, error: null }),
+              }),
+            }),
+          };
+        }
+
+        if (table === "platform_account_entitlements") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    account_owner_user_id: "owner_1",
+                    plan_key: "starter",
+                    entitlement_status: "active",
+                    seat_limit: 6,
+                    notes: null,
+                    stripe_customer_id: "cus_123",
+                    stripe_subscription_id: "sub_123",
+                    stripe_subscription_status: "active",
+                    stripe_current_period_end: null,
+                    stripe_cancel_at_period_end: false,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    };
+
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async () => ({
+          id: "sub_123",
+          items: {
+            data: [{ id: "si_other", price: { id: "price_other" } }],
+          },
+        })),
+      },
+      subscriptionItems: {
+        update: vi.fn(async () => ({ id: "unused" })),
+      },
+    } as any;
+
+    const result = await reconcilePlatformSubscriptionSeatQuantity({
+      accountOwnerUserId: "owner_1",
+      admin,
+      stripe,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        skipped: true,
+        reason: "no_matching_subscription_item",
+      }),
+    );
+    expect(stripe.subscriptionItems.update).not.toHaveBeenCalled();
+  });
+
+  it("skips reconciliation when multiple matching subscription items exist", async () => {
+    process.env.STRIPE_PRICE_ID = "price_123";
+
+    const admin = {
+      from: (table: string) => {
+        if (table === "internal_users") {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: async () => ({ data: null, count: 2, error: null }),
+              }),
+            }),
+          };
+        }
+
+        if (table === "platform_account_entitlements") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    account_owner_user_id: "owner_1",
+                    plan_key: "starter",
+                    entitlement_status: "active",
+                    seat_limit: 6,
+                    notes: null,
+                    stripe_customer_id: "cus_123",
+                    stripe_subscription_id: "sub_123",
+                    stripe_subscription_status: "active",
+                    stripe_current_period_end: null,
+                    stripe_cancel_at_period_end: false,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    };
+
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async () => ({
+          id: "sub_123",
+          items: {
+            data: [
+              { id: "si_1", price: { id: "price_123" } },
+              { id: "si_2", price: { id: "price_123" } },
+            ],
+          },
+        })),
+      },
+      subscriptionItems: {
+        update: vi.fn(async () => ({ id: "unused" })),
+      },
+    } as any;
+
+    const result = await reconcilePlatformSubscriptionSeatQuantity({
+      accountOwnerUserId: "owner_1",
+      admin,
+      stripe,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        skipped: true,
+        reason: "multiple_matching_subscription_items",
+      }),
+    );
+    expect(stripe.subscriptionItems.update).not.toHaveBeenCalled();
+  });
+
+  it("skips reconciliation for comped/internal accounts", async () => {
+    process.env.STRIPE_PRICE_ID = "price_123";
+
+    const admin = {
+      from: (table: string) => {
+        if (table === "internal_users") {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: async () => ({ data: null, count: 8, error: null }),
+              }),
+            }),
+          };
+        }
+
+        if (table === "platform_account_entitlements") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    account_owner_user_id: "owner_1",
+                    plan_key: "starter",
+                    entitlement_status: "active",
+                    seat_limit: null,
+                    notes: "internal_comped_v1",
+                    stripe_customer_id: null,
+                    stripe_subscription_id: null,
+                    stripe_subscription_status: null,
+                    stripe_current_period_end: null,
+                    stripe_cancel_at_period_end: false,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    };
+
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async () => ({ id: "sub_unused", items: { data: [] } })),
+      },
+      subscriptionItems: {
+        update: vi.fn(async () => ({ id: "unused" })),
+      },
+    } as any;
+
+    const result = await reconcilePlatformSubscriptionSeatQuantity({
+      accountOwnerUserId: "owner_1",
+      admin,
+      stripe,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        skipped: true,
+        reason: "internal_comped",
+      }),
+    );
+    expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+    expect(stripe.subscriptionItems.update).not.toHaveBeenCalled();
+  });
+
+  it("skips reconciliation when no Stripe subscription is linked", async () => {
+    process.env.STRIPE_PRICE_ID = "price_123";
+
+    const admin = {
+      from: (table: string) => {
+        if (table === "internal_users") {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: async () => ({ data: null, count: 2, error: null }),
+              }),
+            }),
+          };
+        }
+
+        if (table === "platform_account_entitlements") {
+          return {
+            select: () => ({
+              eq: () => ({
+                maybeSingle: async () => ({
+                  data: {
+                    account_owner_user_id: "owner_1",
+                    plan_key: "starter",
+                    entitlement_status: "active",
+                    seat_limit: 5,
+                    notes: null,
+                    stripe_customer_id: "cus_123",
+                    stripe_subscription_id: null,
+                    stripe_subscription_status: null,
+                    stripe_current_period_end: null,
+                    stripe_cancel_at_period_end: false,
+                  },
+                  error: null,
+                }),
+              }),
+            }),
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    };
+
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async () => ({ id: "sub_unused", items: { data: [] } })),
+      },
+      subscriptionItems: {
+        update: vi.fn(async () => ({ id: "unused" })),
+      },
+    } as any;
+
+    const result = await reconcilePlatformSubscriptionSeatQuantity({
+      accountOwnerUserId: "owner_1",
+      admin,
+      stripe,
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        skipped: true,
+        reason: "missing_subscription",
+      }),
+    );
+    expect(stripe.subscriptions.retrieve).not.toHaveBeenCalled();
+    expect(stripe.subscriptionItems.update).not.toHaveBeenCalled();
   });
 });

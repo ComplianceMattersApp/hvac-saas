@@ -28,6 +28,7 @@ type PlatformStripeSubscriptionLike = {
   cancel_at_period_end?: boolean | null;
   items?: {
     data?: Array<{
+      id?: string | null;
       current_period_end?: number | null;
       price?: {
         id?: string | null;
@@ -513,6 +514,99 @@ export async function createPlatformBillingPortalSession(params: {
   return {
     session,
     url: session.url,
+  };
+}
+
+export async function reconcilePlatformSubscriptionSeatQuantity(params: {
+  accountOwnerUserId: string;
+  admin?: any;
+  stripe?: Stripe;
+}) {
+  const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
+  if (!accountOwnerUserId) {
+    return {
+      skipped: true,
+      reason: "missing_account_owner_user_id" as const,
+    };
+  }
+
+  const admin = params.admin ?? createAdminClient();
+  const stripe = params.stripe ?? getStripeServerClient();
+
+  const entitlement = await resolveAccountEntitlement(accountOwnerUserId, admin);
+  if (entitlement.isInternalComped) {
+    return {
+      skipped: true,
+      reason: "internal_comped" as const,
+    };
+  }
+
+  const entitlementRow = await getPlatformEntitlementByOwnerId(admin, accountOwnerUserId);
+  const subscriptionId = toCleanString(entitlementRow?.stripe_subscription_id);
+
+  if (!subscriptionId) {
+    return {
+      skipped: true,
+      reason: "missing_subscription" as const,
+    };
+  }
+
+  const priceId = toCleanString(process.env.STRIPE_PRICE_ID);
+  if (!priceId) {
+    return {
+      skipped: true,
+      reason: "missing_price_id" as const,
+    };
+  }
+
+  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  const matchingItems = (subscription.items?.data ?? []).filter(
+    (item) => toCleanString(item.price?.id) === priceId,
+  );
+
+  if (matchingItems.length !== 1) {
+    const reason =
+      matchingItems.length === 0
+        ? ("no_matching_subscription_item" as const)
+        : ("multiple_matching_subscription_items" as const);
+
+    console.warn("platform-billing: seat quantity reconciliation skipped", {
+      accountOwnerUserId,
+      subscriptionId,
+      reason,
+      matchingItemCount: matchingItems.length,
+    });
+
+    return {
+      skipped: true,
+      reason,
+    };
+  }
+
+  const subscriptionItemId = toCleanString(matchingItems[0]?.id);
+  if (!subscriptionItemId) {
+    console.warn("platform-billing: seat quantity reconciliation skipped", {
+      accountOwnerUserId,
+      subscriptionId,
+      reason: "missing_subscription_item_id",
+    });
+    return {
+      skipped: true,
+      reason: "missing_subscription_item_id" as const,
+    };
+  }
+
+  const quantity = derivePlatformCheckoutSeatQuantity(entitlement.activeSeatCount);
+
+  await stripe.subscriptionItems.update(subscriptionItemId, {
+    quantity,
+    proration_behavior: "none",
+  });
+
+  return {
+    skipped: false,
+    reason: "updated" as const,
+    quantity,
   };
 }
 

@@ -775,8 +775,9 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Unlimited and comped accounts remain unblocked (`seat_limit = null`, `internal_comped_v1`).
 - Contractors/external users remain excluded from billable internal seat count.
 - V1D-A closeout: new platform checkout sessions now set initial quantity to `max(activeInternalSeatCount, 1)` from active internal seat truth via existing entitlement resolution.
-- Stripe quantity sync and post-mutation subscription quantity reconciliation remain deferred to V1D-B.
-- Proration and customer portal quantity rules remain deferred.
+- V1D-B closeout: post-mutation platform Stripe seat quantity reconciliation now runs best-effort after successful internal-user seat mutations (`create`, `invite`, `activate`, `deactivate`, `delete`) using active-seat truth with minimum `1` behavior.
+- V1D-B reconciliation skips for internal/comped accounts and accounts with no linked Stripe subscription, and only updates when exactly one matching `STRIPE_PRICE_ID` subscription item exists.
+- V1D-B reconciliation uses `proration_behavior: "none"`; customer portal quantity editing remains deferred.
 - Authenticated click smoke caveat: admin-auth session was unavailable in shared browser context; route verification reached login redirect.
 
 ### 2.6.1 Operational entitlement mutation guard rollout closeout (production-promoted)

@@ -103,8 +103,9 @@ Platform subscription onboarding status (separate from tenant payment execution)
 - Live launch billing decision remains flat account subscription for unlimited/comped accounts, and V1C finite-seat enforcement is now implemented for internal seat-increase mutations only (`createInternalUserFromForm`, `inviteInternalUserFromForm`, `activateInternalUserFromForm`) when `seat_limit` is finite and at capacity.
 - Unlimited/comped allowance remains unchanged (`seat_limit = null` and `internal_comped_v1` accounts are not blocked).
 - V1D-A closeout: platform checkout initial seat quantity is now derived as `max(activeInternalSeatCount, 1)` for new checkout sessions, using active internal seat truth via existing entitlement resolution.
-- Stripe quantity sync and post-mutation subscription quantity reconciliation remain deferred to V1D-B.
-- Proration behavior remains deferred.
+- V1D-B closeout: post-mutation platform Stripe seat quantity reconciliation is now implemented as best-effort after successful internal-user seat mutations (`create`, `invite`, `activate`, `deactivate`, `delete`) using active-seat truth with minimum `1` behavior.
+- V1D-B reconciliation skips for internal/comped accounts and accounts with no linked Stripe subscription, and only updates Stripe when exactly one matching subscription item exists for `STRIPE_PRICE_ID`.
+- V1D-B reconciliation uses `proration_behavior: "none"` and does not roll back local internal-user mutations on Stripe failure.
 - Billing portal quantity editing remains deferred.
 - Internal/comped owner protection is complete through `internal_comped_v1` detection and comped-safe entitlement rows with no Stripe linkage.
 - This does not introduce tenant invoice checkout, tenant customer payment links, Pay Now/Charge Card, refunds/disputes/payout execution, Connect, or QBO sync.

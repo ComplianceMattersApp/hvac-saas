@@ -59,7 +59,7 @@ function actorAuth() {
   };
 }
 
-function buildTargetUserFormData() {
+function buildCreateOrUpdateFormData() {
   const formData = new FormData();
   formData.set("user_id", "target-user");
   formData.set("role", "office");
@@ -76,6 +76,8 @@ function buildInviteFormData() {
 function buildAdminFixture(options?: {
   internalUsersById?: Record<string, InternalUserRow>;
   profileByEmail?: Record<string, { id: string; email: string }>;
+  activeAdminCount?: number;
+  activeAssignmentCount?: number;
 }) {
   const internalUsersById = { ...(options?.internalUsersById ?? {}) };
   const profileByEmail = { ...(options?.profileByEmail ?? {}) };
@@ -83,6 +85,7 @@ function buildAdminFixture(options?: {
   const writes = {
     insertCount: 0,
     updateCount: 0,
+    deleteCount: 0,
     inviteCount: 0,
   };
 
@@ -90,9 +93,13 @@ function buildAdminFixture(options?: {
     from(table: string) {
       if (table === "internal_users") {
         const filters: Array<{ column: string; value: unknown }> = [];
+        let headCount = false;
 
         const query: any = {
-          select: vi.fn(() => query),
+          select: vi.fn((_columns: string, opts?: { head?: boolean }) => {
+            headCount = Boolean(opts?.head);
+            return query;
+          }),
           eq: vi.fn((column: string, value: unknown) => {
             filters.push({ column, value });
             return query;
@@ -101,9 +108,23 @@ function buildAdminFixture(options?: {
             const userId = String(
               filters.find((entry) => entry.column === "user_id")?.value ?? "",
             ).trim();
+            const accountOwnerFilter = String(
+              filters.find((entry) => entry.column === "account_owner_user_id")?.value ?? "",
+            ).trim();
             const row = userId ? internalUsersById[userId] ?? null : null;
+
+            if (row && accountOwnerFilter && row.account_owner_user_id !== accountOwnerFilter) {
+              return { data: null, error: null };
+            }
+
             return { data: row, error: null };
           }),
+          then: (onFulfilled: (value: any) => unknown, onRejected?: (reason: unknown) => unknown) =>
+            Promise.resolve(
+              headCount
+                ? { count: options?.activeAdminCount ?? 2, error: null }
+                : { data: null, error: null },
+            ).then(onFulfilled, onRejected),
         };
 
         return {
@@ -122,6 +143,18 @@ function buildAdminFixture(options?: {
                 select: vi.fn(() => ({
                   single: vi.fn(async () => {
                     writes.updateCount += 1;
+                    return { data: { user_id: "target-user" }, error: null };
+                  }),
+                })),
+              })),
+            })),
+          })),
+          delete: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                select: vi.fn(() => ({
+                  single: vi.fn(async () => {
+                    writes.deleteCount += 1;
                     return { data: { user_id: "target-user" }, error: null };
                   }),
                 })),
@@ -160,6 +193,16 @@ function buildAdminFixture(options?: {
         return query;
       }
 
+      if (table === "job_assignments") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(async () => ({ count: options?.activeAssignmentCount ?? 0, error: null })),
+            })),
+          })),
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     },
     auth: {
@@ -179,141 +222,169 @@ function buildAdminFixture(options?: {
   return { admin, writes };
 }
 
-describe("internal user seat limit enforcement gate (V1C)", () => {
+describe("internal user Stripe seat reconciliation wiring (V1D-B)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
 
     createClientMock.mockResolvedValue({});
     requireInternalRoleMock.mockResolvedValue(actorAuth());
+    resolveAccountEntitlementMock.mockResolvedValue({
+      seatLimit: null,
+      activeSeatCount: 0,
+      isInternalComped: false,
+    });
     reconcilePlatformSubscriptionSeatQuantityMock.mockResolvedValue({
       skipped: false,
       reason: "updated",
     });
   });
 
-  it("blocks createInternalUserFromForm when active seats reach finite seat limit", async () => {
+  it("calls reconciliation after createInternalUserFromForm succeeds", async () => {
     const fixture = buildAdminFixture();
     createAdminClientMock.mockReturnValue(fixture.admin);
 
-    resolveAccountEntitlementMock.mockResolvedValue({
-      seatLimit: 2,
-      activeSeatCount: 2,
-      isInternalComped: false,
-    });
-
     const mod = await import("@/lib/actions/internal-user-actions");
 
-    await expect(mod.createInternalUserFromForm(buildTargetUserFormData())).rejects.toThrow(
-      "INTERNAL_USERS_SEAT_LIMIT_REACHED",
-    );
-    expect(fixture.writes.insertCount).toBe(0);
-  });
+    await expect(mod.createInternalUserFromForm(buildCreateOrUpdateFormData())).resolves.toBeUndefined();
 
-  it("blocks inviteInternalUserFromForm when active seats reach finite seat limit", async () => {
-    const fixture = buildAdminFixture();
-    createAdminClientMock.mockReturnValue(fixture.admin);
-
-    resolveAccountEntitlementMock.mockResolvedValue({
-      seatLimit: 1,
-      activeSeatCount: 1,
-      isInternalComped: false,
-    });
-
-    const mod = await import("@/lib/actions/internal-user-actions");
-
-    await expect(mod.inviteInternalUserFromForm(buildInviteFormData())).rejects.toThrow(
-      "REDIRECT:/ops/admin/internal-users?invite_status=seat_limit_reached",
-    );
-    expect(fixture.writes.inviteCount).toBe(0);
-    expect(fixture.writes.insertCount).toBe(0);
-  });
-
-  it("blocks activateInternalUserFromForm when active seats reach finite seat limit", async () => {
-    const fixture = buildAdminFixture({
-      internalUsersById: {
-        "target-user": {
-          user_id: "target-user",
-          role: "office",
-          is_active: false,
-          account_owner_user_id: "owner-1",
-          created_by: null,
-        },
-      },
-    });
-    createAdminClientMock.mockReturnValue(fixture.admin);
-
-    resolveAccountEntitlementMock.mockResolvedValue({
-      seatLimit: 3,
-      activeSeatCount: 3,
-      isInternalComped: false,
-    });
-
-    const mod = await import("@/lib/actions/internal-user-actions");
-
-    await expect(mod.activateInternalUserFromForm(buildTargetUserFormData())).rejects.toThrow(
-      "REDIRECT:/ops/admin/internal-users?invite_status=seat_limit_reached",
-    );
-    expect(fixture.writes.updateCount).toBe(0);
-  });
-
-  it("allows createInternalUserFromForm when account is under finite seat limit", async () => {
-    const fixture = buildAdminFixture();
-    createAdminClientMock.mockReturnValue(fixture.admin);
-
-    resolveAccountEntitlementMock.mockResolvedValue({
-      seatLimit: 5,
-      activeSeatCount: 4,
-      isInternalComped: false,
-    });
-
-    const mod = await import("@/lib/actions/internal-user-actions");
-
-    await expect(mod.createInternalUserFromForm(buildTargetUserFormData())).resolves.toBeUndefined();
     expect(fixture.writes.insertCount).toBe(1);
+    expect(reconcilePlatformSubscriptionSeatQuantityMock).toHaveBeenCalledWith({
+      accountOwnerUserId: "owner-1",
+    });
   });
 
-  it("allows activateInternalUserFromForm when seat_limit is null", async () => {
-    const fixture = buildAdminFixture({
-      internalUsersById: {
-        "target-user": {
-          user_id: "target-user",
-          role: "office",
-          is_active: false,
-          account_owner_user_id: "owner-1",
-          created_by: null,
-        },
-      },
-    });
-    createAdminClientMock.mockReturnValue(fixture.admin);
-
-    resolveAccountEntitlementMock.mockResolvedValue({
-      seatLimit: null,
-      activeSeatCount: 999,
-      isInternalComped: false,
-    });
-
-    const mod = await import("@/lib/actions/internal-user-actions");
-
-    await expect(mod.activateInternalUserFromForm(buildTargetUserFormData())).resolves.toBeUndefined();
-    expect(fixture.writes.updateCount).toBe(1);
-  });
-
-  it("allows inviteInternalUserFromForm for comped internal accounts", async () => {
+  it("calls reconciliation after inviteInternalUserFromForm succeeds", async () => {
     const fixture = buildAdminFixture();
     createAdminClientMock.mockReturnValue(fixture.admin);
-
-    resolveAccountEntitlementMock.mockResolvedValue({
-      seatLimit: 1,
-      activeSeatCount: 999,
-      isInternalComped: true,
-    });
 
     const mod = await import("@/lib/actions/internal-user-actions");
 
     await expect(mod.inviteInternalUserFromForm(buildInviteFormData())).rejects.toThrow(
       "REDIRECT:/ops/admin/internal-users?invite_status=invited",
     );
-    expect(fixture.writes.inviteCount).toBe(1);
+
+    expect(fixture.writes.insertCount).toBe(1);
+    expect(reconcilePlatformSubscriptionSeatQuantityMock).toHaveBeenCalledWith({
+      accountOwnerUserId: "owner-1",
+    });
+  });
+
+  it("calls reconciliation after activateInternalUserFromForm succeeds", async () => {
+    const fixture = buildAdminFixture({
+      internalUsersById: {
+        "target-user": {
+          user_id: "target-user",
+          role: "office",
+          is_active: false,
+          account_owner_user_id: "owner-1",
+          created_by: null,
+        },
+      },
+    });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const mod = await import("@/lib/actions/internal-user-actions");
+
+    await expect(mod.activateInternalUserFromForm(buildCreateOrUpdateFormData())).resolves.toBeUndefined();
+
+    expect(fixture.writes.updateCount).toBe(1);
+    expect(reconcilePlatformSubscriptionSeatQuantityMock).toHaveBeenCalledWith({
+      accountOwnerUserId: "owner-1",
+    });
+  });
+
+  it("calls reconciliation after deactivateInternalUserFromForm succeeds", async () => {
+    const fixture = buildAdminFixture({
+      internalUsersById: {
+        "target-user": {
+          user_id: "target-user",
+          role: "office",
+          is_active: true,
+          account_owner_user_id: "owner-1",
+          created_by: null,
+        },
+      },
+      activeAdminCount: 2,
+    });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const mod = await import("@/lib/actions/internal-user-actions");
+
+    await expect(mod.deactivateInternalUserFromForm(buildCreateOrUpdateFormData())).resolves.toBeUndefined();
+
+    expect(fixture.writes.updateCount).toBe(1);
+    expect(reconcilePlatformSubscriptionSeatQuantityMock).toHaveBeenCalledWith({
+      accountOwnerUserId: "owner-1",
+    });
+  });
+
+  it("calls reconciliation after deleteInternalUserFromForm succeeds", async () => {
+    const fixture = buildAdminFixture({
+      internalUsersById: {
+        "target-user": {
+          user_id: "target-user",
+          role: "office",
+          is_active: true,
+          account_owner_user_id: "owner-1",
+          created_by: null,
+        },
+      },
+      activeAdminCount: 2,
+      activeAssignmentCount: 0,
+    });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const mod = await import("@/lib/actions/internal-user-actions");
+
+    await expect(mod.deleteInternalUserFromForm(buildCreateOrUpdateFormData())).resolves.toBeUndefined();
+
+    expect(fixture.writes.deleteCount).toBe(1);
+    expect(reconcilePlatformSubscriptionSeatQuantityMock).toHaveBeenCalledWith({
+      accountOwnerUserId: "owner-1",
+    });
+  });
+
+  it("does not call reconciliation for role-only updates", async () => {
+    const fixture = buildAdminFixture({
+      internalUsersById: {
+        "target-user": {
+          user_id: "target-user",
+          role: "office",
+          is_active: true,
+          account_owner_user_id: "owner-1",
+          created_by: null,
+        },
+      },
+      activeAdminCount: 2,
+    });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const mod = await import("@/lib/actions/internal-user-actions");
+
+    await expect(mod.updateInternalUserRoleFromForm(buildCreateOrUpdateFormData())).resolves.toBeUndefined();
+
+    expect(fixture.writes.updateCount).toBe(1);
+    expect(reconcilePlatformSubscriptionSeatQuantityMock).not.toHaveBeenCalled();
+  });
+
+  it("does not throw to caller when reconciliation fails after mutation", async () => {
+    const fixture = buildAdminFixture();
+    createAdminClientMock.mockReturnValue(fixture.admin);
+    reconcilePlatformSubscriptionSeatQuantityMock.mockRejectedValueOnce(
+      new Error("stripe down"),
+    );
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+
+    const mod = await import("@/lib/actions/internal-user-actions");
+
+    await expect(mod.createInternalUserFromForm(buildCreateOrUpdateFormData())).resolves.toBeUndefined();
+
+    expect(fixture.writes.insertCount).toBe(1);
+    expect(reconcilePlatformSubscriptionSeatQuantityMock).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalled();
+
+    warnSpy.mockRestore();
   });
 });

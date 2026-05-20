@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
 import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
+import { reconcilePlatformSubscriptionSeatQuantity } from "@/lib/business/platform-billing-stripe";
 import {
   requireInternalRole,
   type InternalRole,
@@ -247,6 +248,23 @@ async function assertInternalSeatAvailableForIncrease(params: {
   }
 }
 
+async function reconcileSeatQuantityAfterInternalUserMutation(params: {
+  accountOwnerUserId: string;
+  mutation: "create" | "invite" | "activate" | "deactivate" | "delete";
+}) {
+  try {
+    await reconcilePlatformSubscriptionSeatQuantity({
+      accountOwnerUserId: params.accountOwnerUserId,
+    });
+  } catch (error) {
+    console.warn("internal-user-actions: Stripe seat quantity reconciliation failed", {
+      mutation: params.mutation,
+      accountOwnerUserId: params.accountOwnerUserId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 export async function createInternalUserFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const {
@@ -295,6 +313,11 @@ export async function createInternalUserFromForm(formData: FormData): Promise<vo
 
     throw error;
   }
+
+  await reconcileSeatQuantityAfterInternalUserMutation({
+    mutation: "create",
+    accountOwnerUserId: actorInternalUser.account_owner_user_id,
+  });
 
   revalidateInternalUserViews();
 }
@@ -382,6 +405,11 @@ export async function activateInternalUserFromForm(formData: FormData): Promise<
 
   if (error) throw error;
 
+  await reconcileSeatQuantityAfterInternalUserMutation({
+    mutation: "activate",
+    accountOwnerUserId: actorInternalUser.account_owner_user_id,
+  });
+
   revalidateInternalUserViews();
 }
 
@@ -416,6 +444,11 @@ export async function deactivateInternalUserFromForm(formData: FormData): Promis
     .single();
 
   if (error) throw error;
+
+  await reconcileSeatQuantityAfterInternalUserMutation({
+    mutation: "deactivate",
+    accountOwnerUserId: actorInternalUser.account_owner_user_id,
+  });
 
   revalidateInternalUserViews();
 }
@@ -509,6 +542,12 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
         .single();
 
       if (updateError) throw updateError;
+
+      await reconcileSeatQuantityAfterInternalUserMutation({
+        mutation: "invite",
+        accountOwnerUserId: actorInternalUser.account_owner_user_id,
+      });
+
       revalidateInternalUserViews();
       redirect("/ops/admin/internal-users?invite_status=attached_existing_auth");
     }
@@ -537,6 +576,11 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
     }
     throw insertError;
   }
+
+  await reconcileSeatQuantityAfterInternalUserMutation({
+    mutation: "invite",
+    accountOwnerUserId: actorInternalUser.account_owner_user_id,
+  });
 
   revalidateInternalUserViews();
 
@@ -603,6 +647,11 @@ export async function deleteInternalUserFromForm(formData: FormData): Promise<vo
     .single();
 
   if (deleteError) throw deleteError;
+
+  await reconcileSeatQuantityAfterInternalUserMutation({
+    mutation: "delete",
+    accountOwnerUserId: actorInternalUser.account_owner_user_id,
+  });
 
   revalidateInternalUserViews();
 }
