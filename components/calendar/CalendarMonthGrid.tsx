@@ -110,10 +110,10 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
       <div className="mb-3 grid grid-cols-7 gap-2">
         {weekdayLabels.map((label) => (
-          <div key={label} className="rounded-xl bg-slate-50 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <div key={label} className="rounded-md bg-slate-50 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             {label}
           </div>
         ))}
@@ -169,7 +169,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                   { scroll: false },
                 );
               }}
-              className={`min-h-28 overflow-visible rounded-2xl border p-3 transition ${
+              className={`min-h-28 overflow-visible rounded-lg border p-3 transition ${
                 isToday(day)
                   ? 'border-blue-200 bg-blue-50/70'
                   : isAdjacentMonthDay
@@ -187,7 +187,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                   {format(day, 'd')}
                 </Link>
                 {dayJobs.length > 0 ? (
-                  <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                  <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold text-blue-800">
                     {dayJobs.length} job{dayJobs.length > 1 ? 's' : ''}
                   </span>
                 ) : null}
@@ -217,7 +217,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                           event.dataTransfer.setData('application/x-cm-job-id', job.id);
                           event.dataTransfer.effectAllowed = 'move';
                         }}
-                        className={`flex min-h-[36px] min-w-0 items-start gap-2 overflow-hidden rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm shadow-slate-950/5 transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
+                        className={`flex min-h-[36px] min-w-0 items-start gap-2 overflow-hidden rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm shadow-slate-950/5 transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
                         scroll={false}
                       >
                         <div className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
@@ -232,7 +232,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                           ) : null}
                         </div>
                         {needsTech ? (
-                          <span className="mt-0.5 max-w-[7rem] truncate rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[9px] font-semibold text-amber-800">
+                          <span className="mt-0.5 max-w-[7rem] truncate rounded-full border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[9px] font-semibold text-rose-700">
                             No tech assigned
                           </span>
                         ) : null}
@@ -268,7 +268,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                         </div>
 
                         {needsTech ? (
-                          <div className="mt-1 inline-block rounded border border-amber-200 bg-amber-100 px-1 py-0.5 text-[10px] font-semibold text-amber-800">
+                          <div className="mt-1 inline-block rounded border border-rose-200 bg-rose-50 px-1 py-0.5 text-[10px] font-semibold text-rose-700">
                             No tech assigned
                           </div>
                         ) : null}
@@ -279,7 +279,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
 
                 {visibleBlockEvents.map((event) => (
                   <div key={event.id} className="group relative overflow-visible">
-                    <div className={`flex min-h-[28px] min-w-0 items-center gap-2 overflow-hidden rounded-xl border border-emerald-200 border-dashed bg-emerald-50/70 px-2.5 py-1.5 text-[11px] text-emerald-950 shadow-sm shadow-emerald-950/5 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}>
+                    <div className={`flex min-h-[28px] min-w-0 items-center gap-2 overflow-hidden rounded-lg border border-emerald-200 border-dashed bg-emerald-50/70 px-2.5 py-1.5 text-[11px] text-emerald-950 shadow-sm shadow-emerald-950/5 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}>
                       <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                         Block
                       </span>

@@ -95,13 +95,13 @@ function colorClassForUserId(userId: string) {
     "bg-blue-500",
     "bg-emerald-500",
     "bg-violet-500",
-    "bg-orange-500",
+    "bg-rose-500",
     "bg-teal-500",
     "bg-cyan-500",
     "bg-lime-500",
     "bg-sky-500",
     "bg-fuchsia-500",
-    "bg-amber-500",
+    "bg-slate-500",
   ];
   let hash = 0;
   const raw = String(userId ?? "");
@@ -369,19 +369,19 @@ export default function CalendarDispatchGrid(props: Props) {
   return (
     <>
       {dropError ? (
-        <div className="mb-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">{dropError}</div>
+        <div className="mb-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700">{dropError}</div>
       ) : null}
 
       {isSavingDrop ? (
-        <div className="mb-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-700">Saving schedule...</div>
+        <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">Saving schedule...</div>
       ) : null}
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
         <div className="grid" style={{ gridTemplateColumns: "84px minmax(0, 1fr)" }}>
           <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Time</div>
           <div className="border-b border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-3">
             <p className="truncate text-sm font-semibold text-slate-900">Appointment timeline</p>
-            <p className="mt-0.5 truncate text-[11px] text-slate-500">Assigned techs stay as card metadata. Drag/drop schedules by date and time only.</p>
+            <p className="mt-0.5 truncate text-[11px] text-slate-500">Drag changes date and time only. Technician assignment stays attached to the job.</p>
           </div>
 
           <div className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
@@ -540,7 +540,7 @@ export default function CalendarDispatchGrid(props: Props) {
                 }}
               >
                 <p className="truncate text-xs font-semibold leading-4">{optimisticDrop.title}</p>
-                {optimisticDrop.hasNoTechAssigned ? <span className="ml-1 inline-block rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">No tech assigned</span> : null}
+                {optimisticDrop.hasNoTechAssigned ? <span className="ml-1 inline-block rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">No tech assigned</span> : null}
                 {optimisticDrop.assigneeSummary ? <p className="truncate text-[10px] font-medium leading-4">Assigned: {optimisticDrop.assigneeSummary}</p> : null}
                 {optimisticDrop.city ? <p className="truncate text-[11px] leading-4">{optimisticDrop.city}</p> : null}
                 <div className="mt-1 flex items-center justify-between gap-2">
@@ -563,7 +563,7 @@ export default function CalendarDispatchGrid(props: Props) {
                 return (
                   <div
                     key={`block-${row.id}`}
-                    className="absolute left-1 right-1 overflow-hidden rounded-xl border border-emerald-300 border-dashed bg-emerald-50/95 px-2.5 py-1.5 text-emerald-950 shadow-sm shadow-emerald-950/5"
+                    className="absolute left-1 right-1 overflow-hidden rounded-lg border border-emerald-300 border-dashed bg-emerald-50/95 px-2.5 py-1.5 text-emerald-950 shadow-sm shadow-emerald-950/5"
                     style={{
                       top: `${top}px`,
                       height: `${height}px`,
@@ -625,7 +625,7 @@ export default function CalendarDispatchGrid(props: Props) {
                     event.dataTransfer.effectAllowed = "move";
                   }}
                   scroll={false}
-                  className={`absolute left-1 right-1 rounded-xl border py-1 pr-2 pl-5 shadow-sm shadow-slate-950/5 transition hover:cursor-pointer hover:-translate-y-px hover:shadow-md hover:brightness-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${dispatchBlockClass(lifecycle)} ${lifecycle === "cancelled" ? "cursor-default opacity-70" : "cursor-grab active:cursor-grabbing"} ${isSelected ? "ring-2 ring-slate-800/45 border-slate-700 shadow-md" : ""}`}
+                  className={`absolute left-1 right-1 rounded-lg border py-1 pr-2 pl-5 shadow-sm shadow-slate-950/5 transition hover:cursor-pointer hover:-translate-y-px hover:shadow-md hover:brightness-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${dispatchBlockClass(lifecycle)} ${lifecycle === "cancelled" ? "cursor-default opacity-70" : "cursor-grab active:cursor-grabbing"} ${isSelected ? "ring-2 ring-slate-800/45 border-slate-700 shadow-md" : ""}`}
                   style={{
                     top: `${top}px`,
                     height: `${height}px`,
@@ -642,7 +642,7 @@ export default function CalendarDispatchGrid(props: Props) {
                   </div>
                   <p className="truncate text-xs font-semibold leading-4 text-slate-950">{shortTitle(job)}</p>
                   {statusBadgeLabel ? <span className={`ml-1 inline-block rounded-full border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${statusBadgeClass}`}>{statusBadgeLabel}</span> : null}
-                  {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? <span className="ml-2 inline-block rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">No tech assigned</span> : null}
+                  {job.scheduled_date && (!job.assignments || job.assignments.length === 0) ? <span className="ml-2 inline-block rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">No tech assigned</span> : null}
                   {assigneeSummary ? <p className="truncate text-[10px] font-medium leading-4 text-slate-700/85">Assigned: {assigneeSummary}</p> : null}
                   {workContextLabel ? <p className="truncate text-[10px] font-medium leading-4 text-slate-600">Work: {workContextLabel}</p> : null}
                   <p className="truncate text-[11px] leading-4 text-slate-700/90">{job.city || job.contractor_name || "No city or contractor"}</p>
@@ -655,8 +655,10 @@ export default function CalendarDispatchGrid(props: Props) {
             })}
 
             {!rows.length ? (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-2 text-xs text-slate-500">No appointments or blocks for this {mode}.</div>
+              <div className="absolute inset-0 flex items-center justify-center px-4">
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-3 text-center text-xs text-slate-500">
+                  No appointments or blocks for this {mode}. Drag a job here to schedule it.
+                </div>
               </div>
             ) : null}
           </div>

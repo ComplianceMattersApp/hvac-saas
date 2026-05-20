@@ -52,7 +52,7 @@ export default async function CalendarPage({
   const hadExplicitViewParam = requestedView.length > 0;
 
   return (
-    <div className="min-h-screen w-full bg-gray-50 px-3 py-4 sm:px-6 sm:py-5">
+    <div className="min-h-screen w-full bg-slate-50 px-3 py-4 text-slate-950 sm:px-6 sm:py-5">
       <CalendarResponsiveDefaultView hadExplicitViewParam={hadExplicitViewParam} disableAutoReplace={!hadExplicitViewParam} />
       <CalendarView view={view} date={date} banner={sp.banner} job={sp.job} block={sp.block} tech={sp.tech} inspector={sp.inspector} prefillDate={sp.prefill_date} />
     </div>

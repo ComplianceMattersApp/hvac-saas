@@ -331,18 +331,18 @@ function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | n
       : today;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-slate-200 bg-white px-2 py-2 shadow-sm shadow-slate-950/5">
-      <Link href={buildCalendarHref(view, prev, { tech })} className="rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+    <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm shadow-slate-950/5 sm:w-auto">
+      <Link href={buildCalendarHref(view, prev, { tech })} className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
         Previous
       </Link>
-      <Link href={buildCalendarHref(view, todayTarget, { tech })} className="rounded-xl border border-slate-200 bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+      <Link href={buildCalendarHref(view, todayTarget, { tech })} className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
         Today
       </Link>
-      <Link href={buildCalendarHref(view, next, { tech })} className="rounded-xl border border-transparent px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+      <Link href={buildCalendarHref(view, next, { tech })} className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
         Next
       </Link>
       {showDateJump ? (
-        <form action="/calendar" method="get" className="ml-1 flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
+        <form action="/calendar" method="get" className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 sm:ml-1 sm:w-auto">
           <input type="hidden" name="view" value={view} />
           {tech ? <input type="hidden" name="tech" value={tech} /> : null}
           <label htmlFor={`calendar-jump-${view}`} className="text-xs font-medium text-slate-500">
@@ -353,12 +353,12 @@ function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | n
             type="date"
             name="date"
             defaultValue={date}
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm shadow-slate-950/5"
+            className="min-h-9 min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm shadow-slate-950/5 sm:flex-none"
             aria-label={view === 'week' ? 'Jump to week containing date' : 'Jump to date'}
           />
           <button
             type="submit"
-            className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+            className="min-h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
           >
             Go
           </button>
@@ -395,16 +395,21 @@ function AgendaList(props: {
   const sortedDates = Array.from(new Set([...grouped.keys(), ...groupedBlocks.keys()])).sort();
 
   if (!sortedDates.length) {
-    return <div className="py-8 text-sm text-slate-500">No scheduled jobs or blocks for this month.</div>;
+    return (
+      <div className="rounded-lg border border-dashed border-slate-300 bg-white px-4 py-10 text-center shadow-sm shadow-slate-950/5">
+        <p className="text-sm font-semibold text-slate-900">No scheduled work in this range.</p>
+        <p className="mt-1 text-sm text-slate-500">Use the planner queue to open an unscheduled job and place it on the calendar.</p>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {sortedDates.map((dateKey) => (
-        <div key={dateKey} className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/5">
-          <div className="mb-3 flex flex-wrap items-center gap-2">
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">{formatDayDateHeader(dateKey)}</span>
-            <span className="text-xs text-slate-400">
+        <div key={dateKey} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/5">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-slate-950">{formatDayDateHeader(dateKey)}</span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
               {(() => {
                 const jobCount = grouped.get(dateKey)?.length ?? 0;
                 const blockCount = groupedBlocks.get(dateKey)?.length ?? 0;
@@ -428,7 +433,7 @@ function AgendaList(props: {
                   href={buildCalendarHref('list', date, { job: job.id, tech })}
                   title={calendarJobTooltip(job)}
                   scroll={false}
-                  className={`block rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${faded}`}
+                  className={`block rounded-lg border border-slate-200 bg-white px-3.5 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${faded}`}
                 >
                   <div className="flex items-start gap-3">
                     <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${dotClass}`} />
@@ -436,13 +441,13 @@ function AgendaList(props: {
                       <div className="truncate text-sm font-semibold text-slate-900">{shortTitle(job)}</div>
                       <div className="mt-0.5 truncate text-[11px] text-slate-600">{job.city || 'No city'}</div>
                       <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px]">
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-medium text-slate-700">{listTimeWindowLabel(job.window_start, job.window_end)}</span>
+                        <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 font-semibold text-blue-800">{listTimeWindowLabel(job.window_start, job.window_end)}</span>
                         <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-slate-600">
                           <span className={`h-1.5 w-1.5 rounded-full ${dotClass}`} />
                           {formatCalendarDisplayStatus(lifecycle)}
                         </span>
                         {needsTech ? (
-                          <span className="inline-block rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">
+                          <span className="inline-block rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 text-[10px] font-semibold text-rose-700">
                             No tech assigned
                           </span>
                         ) : null}
@@ -460,7 +465,7 @@ function AgendaList(props: {
             {(groupedBlocks.get(dateKey) ?? []).map((event) => (
               <div
                 key={event.id}
-                className={`flex items-center gap-3 rounded-xl border border-emerald-200 border-dashed bg-emerald-50/70 px-3.5 py-3 text-[13px] text-emerald-950 shadow-sm shadow-emerald-950/5 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}
+                className={`flex items-center gap-3 rounded-lg border border-emerald-200 border-dashed bg-emerald-50/70 px-3.5 py-3 text-[13px] text-emerald-950 shadow-sm shadow-emerald-950/5 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}
               >
                 <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                   Block
@@ -519,8 +524,8 @@ function DetailPanel(props: {
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 space-y-3">
             <div className="space-y-1.5">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Job Details</p>
-              <h3 className="text-lg font-semibold leading-tight text-slate-900">{normalizedTitle}</h3>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Job Inspector</p>
+              <h3 className="text-lg font-semibold leading-tight text-slate-950">{normalizedTitle}</h3>
               <div className="flex flex-wrap items-center gap-2 text-xs text-slate-600">
                 <span className="font-medium text-slate-700">{customerName(job)}</span>
                 <span className="text-slate-300">•</span>
@@ -555,7 +560,7 @@ function DetailPanel(props: {
           </Link>
         </div>
 
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+        <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
           <div className="space-y-1.5">
             <p className="truncate text-sm font-medium text-slate-800">{customerAddressLine1(job)}</p>
             <p className="truncate text-xs text-slate-500">{customerAddressLine2(job)}</p>
@@ -563,19 +568,19 @@ function DetailPanel(props: {
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
             {hasPhone ? (
-              <a href={`tel:${phoneHref}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100">
+              <a href={`tel:${phoneHref}`} className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100">
                 Call Customer
               </a>
             ) : (
-              <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-400">Call Customer</span>
+              <span className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-400">Call Customer</span>
             )}
 
             {hasPhone ? (
-              <a href={`sms:${phoneHref}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100">
+              <a href={`sms:${phoneHref}`} className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100">
                 Open SMS App
               </a>
             ) : (
-              <span className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-400">Open SMS App</span>
+              <span className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-400">Open SMS App</span>
             )}
 
             {isCancelledJob ? (
@@ -595,7 +600,7 @@ function DetailPanel(props: {
                   <input type="hidden" name="result" value="spoke" />
                   <input type="hidden" name="return_to" value={buildCalendarHref(view, date, { job: job.id, tech })} />
                   <input type="hidden" name="success_banner" value="contact_attempt_logged_call" />
-                  <SubmitButton className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100" loadingText="...">
+                  <SubmitButton className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100" loadingText="...">
                     Called
                   </SubmitButton>
                 </form>
@@ -605,7 +610,7 @@ function DetailPanel(props: {
                   <input type="hidden" name="result" value="sent" />
                   <input type="hidden" name="return_to" value={buildCalendarHref(view, date, { job: job.id, tech })} />
                   <input type="hidden" name="success_banner" value="contact_attempt_logged_text" />
-                  <SubmitButton className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-100" loadingText="...">
+                  <SubmitButton className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100" loadingText="...">
                     Log Text Attempt
                   </SubmitButton>
                 </form>
@@ -615,7 +620,7 @@ function DetailPanel(props: {
           <p className="mt-2 text-xs text-slate-500">Logs communication attempts only; does not confirm carrier delivery.</p>
         </div>
 
-        <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+        <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
           <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Work included</p>
           {workContextLabel ? (
             <p className="mt-2 text-sm text-slate-700">{workContextLabel}</p>
@@ -627,18 +632,18 @@ function DetailPanel(props: {
         <div className="mt-4 flex flex-wrap gap-2">
           <CalendarOpenJobButton
             href={`/jobs/${job.id}`}
-            className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            className="inline-flex min-h-10 items-center rounded-md border border-slate-900 bg-slate-900 px-3 py-2 text-xs font-semibold text-white transition hover:bg-slate-800"
             loadingLabel="Opening..."
           >
             Open Job
           </CalendarOpenJobButton>
           {customerId ? (
-            <Link href={`/customers/${customerId}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+            <Link href={`/customers/${customerId}`} className="inline-flex min-h-10 items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
               Open Customer
             </Link>
           ) : null}
           {locationId ? (
-            <Link href={`/locations/${locationId}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
+            <Link href={`/locations/${locationId}`} className="inline-flex min-h-10 items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50">
               Open Location
             </Link>
           ) : null}
@@ -655,11 +660,11 @@ function DetailPanel(props: {
           </section>
         ) : (
           <>
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
           <div className="mb-3 flex items-center justify-between gap-3">
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Appointment</p>
-              <p className="mt-1 text-xs text-slate-500">Adjust appointment date and window without leaving calendar.</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Appointment</p>
+              <p className="mt-1 text-xs text-slate-500">Set the visit date and arrival window.</p>
             </div>
             {job.scheduled_date ? (
               <p className="rounded-full border border-sky-200 bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-800">
@@ -673,12 +678,21 @@ function DetailPanel(props: {
           <form action={updateJobScheduleFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="return_to" value={returnTo} />
-            <input type="date" name="scheduled_date" defaultValue={prefillDate ?? job.scheduled_date ?? ''} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900" />
+            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+              Date
+              <input type="date" name="scheduled_date" defaultValue={prefillDate ?? job.scheduled_date ?? ''} className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900" />
+            </label>
             <div className="grid grid-cols-2 gap-2">
-              <input type="time" name="window_start" defaultValue={job.window_start ?? ''} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900" />
-              <input type="time" name="window_end" defaultValue={job.window_end ?? ''} className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900" />
+              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                Start
+                <input type="time" name="window_start" defaultValue={job.window_start ?? ''} className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900" />
+              </label>
+              <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                End
+                <input type="time" name="window_end" defaultValue={job.window_end ?? ''} className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900" />
+              </label>
             </div>
-            <SubmitButton className="rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700" loadingText="Saving...">
+            <SubmitButton className="min-h-11 rounded-md bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700" loadingText="Saving...">
               Save Schedule
             </SubmitButton>
           </form>
@@ -687,23 +701,23 @@ function DetailPanel(props: {
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="return_to" value={returnTo} />
               <input type="hidden" name="unschedule" value="1" />
-              <SubmitButton className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-medium text-slate-500 transition hover:border-red-200 hover:text-red-700" loadingText="Removing...">
+              <SubmitButton className="w-full rounded-md border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-500 transition hover:border-red-200 hover:text-red-700" loadingText="Removing...">
                 Unschedule
               </SubmitButton>
             </form>
           ) : null}
         </section>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
           <div className="mb-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Field team</p>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Team</p>
             <p className="mt-1 text-xs text-slate-500">Assign or remove internal technicians for this visit.</p>
           </div>
           <form action={assignJobAssigneeFromForm} className="grid gap-3">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="tab" value="ops" />
             <input type="hidden" name="return_to" value={returnTo} />
-            <select name="user_id" className="rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900" defaultValue="" required>
+            <select name="user_id" className="min-h-11 rounded-md border border-slate-200 px-3 py-2 text-sm text-slate-900" defaultValue="" required>
               <option value="" disabled>
                 Select internal user
               </option>
@@ -713,7 +727,7 @@ function DetailPanel(props: {
                 </option>
               ))}
             </select>
-            <SubmitButton className="rounded-lg bg-gray-900 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-black" loadingText="Assigning...">
+            <SubmitButton className="min-h-11 rounded-md bg-slate-900 px-3 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800" loadingText="Assigning...">
               Assign Technician
             </SubmitButton>
           </form>
@@ -797,7 +811,7 @@ function MonthInspectorDaySummary(props: {
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
                   <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{cueParts.filter(Boolean).join(' · ')}</span>
                   {needsTech ? (
-                    <span className="rounded-full border border-amber-200 bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">
+                    <span className="rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-700">
                       No tech assigned
                     </span>
                   ) : null}
@@ -953,29 +967,40 @@ export async function CalendarView(props: Props) {
   }
 
   const unscheduledJobs = data.unassignedScheduledJobs;
+  const scheduledJobCount = filteredJobsForRange.length;
+  const noTechScheduledCount = filteredJobsForRange.filter(
+    (job) => job.scheduled_date && (!job.assignments || job.assignments.length === 0),
+  ).length;
+  const attentionCount = hiddenScheduledJobs.length + noTechScheduledCount;
+  const activeFilterLabel = activeUnassignedFilter
+    ? 'Unassigned scheduled jobs'
+    : activeTechnicianUserId
+    ? 'Single technician'
+    : 'All technicians';
 
   return (
     <div className="space-y-5 pb-8">
       {banner ? (
-        <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-base text-emerald-900 shadow-sm shadow-emerald-950/5">{banner}</div>
+        <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-sm shadow-emerald-950/5">{banner}</div>
       ) : null}
 
-      <div className="rounded-[28px] border border-slate-200 bg-white px-4 py-3.5 shadow-sm shadow-slate-950/5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">Operations</p>
-          <h2 className="mt-1 text-2xl font-bold text-gray-900">Dispatch Calendar</h2>
-          <p className="mt-1.5 text-sm font-medium text-slate-500">{headerLabel}</p>
-        </div>
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5">
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Dispatch Workspace</p>
+            <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Calendar</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+              {headerLabel}. Review scheduled work, drag jobs into place, and keep unassigned visits visible.
+            </p>
+          </div>
 
-        <div className="flex flex-col items-end gap-2.5">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <div className="inline-flex items-center rounded-2xl border border-slate-200 bg-slate-50 p-1.5 shadow-sm shadow-slate-950/5">
+          <div className="flex flex-col gap-2.5 xl:items-end">
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1.5 sm:flex">
               {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
                 <Link
                   key={viewValue}
                   href={buildCalendarHref(viewValue, targetDateForView(viewValue), { tech: activeTech, job: selectedJobId || null })}
-                  className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+                  className={`inline-flex min-h-10 items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition ${
                     uiView === viewValue ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-700 hover:bg-white hover:text-slate-900'
                   }`}
                 >
@@ -987,31 +1012,49 @@ export async function CalendarView(props: Props) {
             <Link
               href={inspectorToggleHref}
               scroll={false}
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+              className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:w-auto"
             >
               {inspectorOpen ? 'Hide Inspector' : 'Show Inspector'}
             </Link>
           </div>
         </div>
+
+        <div className="mt-5 grid gap-2 sm:grid-cols-4">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-800">Scheduled</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{scheduledJobCount}</p>
+          </div>
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-800">Needs Attention</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{attentionCount}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Unscheduled</p>
+            <p className="mt-1 text-2xl font-semibold text-slate-950">{unscheduledJobs.length}</p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Focus</p>
+            <p className="mt-1 truncate text-sm font-semibold text-slate-950">{activeFilterLabel}</p>
+          </div>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3 shadow-sm shadow-slate-950/5">
+        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 shadow-sm shadow-slate-950/5">
           {data.assignableUsers.length > 0 ? (
             <div>
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Technician Filter</p>
-                  <p className="mt-0.5 text-xs text-slate-500">Show all technicians, focus one technician, or isolate unassigned scheduled jobs.</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Dispatch Focus</p>
+                  <p className="mt-0.5 text-xs text-slate-500">Filter the board without changing the schedule or assignments.</p>
                 </div>
-                <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-medium text-slate-600">
-                  {activeUnassignedFilter ? 'Unassigned only' : activeTechnicianUserId ? 'Single technician view' : 'All technicians'}
+                <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                  {activeFilterLabel}
                 </div>
               </div>
 
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 <Link
                   href={buildCalendarHref(uiView, data.anchorDate)}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                     !activeTech
                       ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
                       : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
@@ -1021,10 +1064,10 @@ export async function CalendarView(props: Props) {
                 </Link>
                 <Link
                   href={buildCalendarHref(uiView, data.anchorDate, { tech: CALENDAR_TECH_FILTER_UNASSIGNED })}
-                  className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                     activeUnassignedFilter
-                      ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                      ? 'border-rose-800 bg-rose-700 text-white shadow-sm'
+                      : 'border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50'
                   }`}
                 >
                   Unassigned
@@ -1033,7 +1076,7 @@ export async function CalendarView(props: Props) {
                   <Link
                     key={user.user_id}
                     href={buildCalendarHref(uiView, data.anchorDate, { tech: user.user_id })}
-                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
                       activeTech === user.user_id
                         ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
                         : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
@@ -1064,7 +1107,7 @@ export async function CalendarView(props: Props) {
         <aside className="order-2 space-y-4 xl:order-1">
           {data.assignableUsers.length ? (
             selectedBlock ? (
-              <div className="rounded-2xl border border-emerald-200 bg-white p-3 shadow-sm shadow-slate-950/5">
+              <div className="rounded-lg border border-emerald-200 bg-white p-3 shadow-sm shadow-slate-950/5">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Edit Block</p>
@@ -1153,10 +1196,10 @@ export async function CalendarView(props: Props) {
                 </div>
               </div>
             ) : (uiView === 'day' || uiView === 'week' || uiView === 'month') ? (
-              <details id="calendar-add-block" className="group rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
-                <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded-2xl px-3 py-3 text-left transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+              <details id="calendar-add-block" className="group rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
+                <summary className="flex cursor-pointer list-none items-start justify-between gap-2 rounded-lg px-3 py-3 text-left transition hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
                   <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Add Block</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Block Time</p>
                     <p className="mt-0.5 text-[11px] text-slate-500">
                       {uiView === 'month'
                         ? 'Create an internal time block for the selected day only when needed.'
@@ -1235,11 +1278,11 @@ export async function CalendarView(props: Props) {
           ) : null}
 
           {hiddenScheduledJobs.length ? (
-            <section className="rounded-2xl border border-amber-200/70 bg-amber-50/60 p-3 shadow-sm shadow-slate-950/5">
+            <section className="rounded-lg border border-rose-200/80 bg-rose-50/70 p-3 shadow-sm shadow-slate-950/5">
               <div className="mb-3 flex items-center justify-between gap-2">
                 <div>
-                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-amber-800">Scheduled Jobs Needing Attention</h3>
-                  <p className="mt-0.5 text-[11px] text-amber-800/75">Scheduled but missing required info — open each job to resolve before dispatching.</p>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-800">Scheduled Jobs Needing Attention</h3>
+                  <p className="mt-0.5 text-[11px] text-rose-800/75">Scheduled but missing required info. Open each job before dispatching.</p>
                 </div>
               </div>
               <div className="max-h-[32vh] space-y-2 overflow-y-auto pr-1">
@@ -1262,12 +1305,12 @@ export async function CalendarView(props: Props) {
                       assigneeSummary={Array.isArray(job.assignments) ? job.assignments.map((a) => a.display_name).filter(Boolean).join(', ') : null}
                       hasNoTechAssigned={!job.assignments || job.assignments.length === 0}
                       scroll={false}
-                      className={`group block rounded-xl border border-amber-200 bg-white/90 px-3 py-3 shadow-sm shadow-amber-950/5 transition ${isCancelledJob ? 'cursor-default opacity-80' : 'cursor-grab hover:-translate-y-px hover:border-amber-300 hover:bg-white hover:shadow-md active:cursor-grabbing active:opacity-85'}`}
+                      className={`group block rounded-lg border border-rose-200 bg-white/90 px-3 py-3 shadow-sm shadow-rose-950/5 transition ${isCancelledJob ? 'cursor-default opacity-80' : 'cursor-grab hover:-translate-y-px hover:border-rose-300 hover:bg-white hover:shadow-md active:cursor-grabbing active:opacity-85'}`}
                     >
                       <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
                       <p className="mt-0.5 truncate text-[11px] text-slate-600">{formatBusinessDateUS(job.scheduled_date ?? data.anchorDate)}</p>
-                      <p className="mt-1 truncate text-[11px] font-medium text-amber-900">{issueSummary}</p>
-                      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-amber-700/90 group-hover:text-amber-800">
+                      <p className="mt-1 truncate text-[11px] font-medium text-rose-900">{issueSummary}</p>
+                      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-rose-700/90 group-hover:text-rose-800">
                         {isCancelledJob
                           ? 'Historical cancelled record'
                           : uiView === 'list'
@@ -1281,14 +1324,17 @@ export async function CalendarView(props: Props) {
             </section>
           ) : null}
 
-          <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/5">
+          <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/5">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-600">Unscheduled Jobs</h3>
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600">Needs Scheduling</h3>
               <p className="mt-0.5 text-[11px] text-slate-500">
-                {'Open a job to review and place it on the schedule.'}
+                {'Open or drag a job to place it on the schedule.'}
               </p>
             </div>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+              {unscheduledJobs.length}
+            </span>
           </div>
           <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
             {unscheduledJobs.length ? (
@@ -1312,7 +1358,7 @@ export async function CalendarView(props: Props) {
                     assigneeSummary={null}
                     hasNoTechAssigned={true}
                     scroll={false}
-                    className="group block cursor-grab rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:cursor-grabbing active:opacity-85"
+                    className="group block cursor-grab rounded-lg border border-slate-200 bg-white px-3 py-3 shadow-sm shadow-slate-950/5 transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:cursor-grabbing active:opacity-85"
                   >
                     <div className="flex items-start justify-between gap-2">
                       <p className="min-w-0 truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
@@ -1339,7 +1385,7 @@ export async function CalendarView(props: Props) {
                 );
               })
             ) : (
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-6 text-center text-xs text-slate-500">No unscheduled jobs.</div>
+              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-6 text-center text-xs text-slate-500">No unscheduled jobs.</div>
             )}
           </div>
           </section>
@@ -1371,8 +1417,8 @@ export async function CalendarView(props: Props) {
             <section className="space-y-2 overflow-x-auto">
               <div className="flex items-center justify-between px-1">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Day Schedule</p>
-                  <p className="mt-0.5 text-sm font-medium text-slate-700">{formatDayDateHeader(data.day.date)}</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Day Schedule</p>
+                  <p className="mt-0.5 text-sm font-semibold text-slate-950">{formatDayDateHeader(data.day.date)}</p>
                 </div>
               </div>
               <CalendarDispatchGrid
@@ -1393,7 +1439,7 @@ export async function CalendarView(props: Props) {
                 <div key={day.date} className="space-y-2">
                   <div className="flex items-center justify-between px-1">
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">Weekday Schedule</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Weekday Schedule</p>
                       <h3 className="mt-0.5 text-sm font-semibold text-slate-900">{formatDayDateHeader(day.date)}</h3>
                     </div>
                     <p className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-medium text-slate-600">{day.jobs.length} jobs</p>
