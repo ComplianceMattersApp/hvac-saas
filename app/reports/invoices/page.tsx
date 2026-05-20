@@ -5,6 +5,19 @@ import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-
 import { resolveBillingModeByAccountOwnerId, resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import ReportCenterTabs from "@/components/reports/ReportCenterTabs";
 import {
+  ReportFilterPanel,
+  ReportPageHeader,
+  ReportStatCard,
+  ReportStatGrid,
+  ReportTableShell,
+  reportActionClass,
+  reportControlClass,
+  reportLabelClass,
+  reportPageClass,
+  reportTableHeadClass,
+  reportTableRowClass,
+} from "@/components/reports/ReportLedgerChrome";
+import {
   INVOICE_LEDGER_COMMUNICATION_STATE_OPTIONS,
   INVOICE_LEDGER_DATE_FIELD_OPTIONS,
   INVOICE_LEDGER_EXPORT_LIMIT,
@@ -81,38 +94,28 @@ export default async function InvoiceLedgerPage({
     : [{ customers: [], contractors: [] }, { rows: [], totalCount: 0, truncated: false }];
 
   const exportHref = `/reports/invoices/export?${buildInvoiceLedgerSearchParams(filters).toString()}`;
+  const issuedVisible = ledger.rows.filter((row) => row.invoiceStatusLabel.toLowerCase() === "issued").length;
+  const draftVisible = ledger.rows.filter((row) => row.invoiceStatusLabel.toLowerCase() === "draft").length;
+  const balanceVisible = ledger.rows.filter((row) => row.balanceDueDisplay !== "$0").length;
+  const paidVisible = ledger.rows.filter((row) => row.paymentStatusLabel.toLowerCase() === "paid").length;
 
   return (
-    <div className="mx-auto max-w-[1720px] space-y-5 px-2 py-3 text-slate-900">
-      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            {internalBusinessIdentity.display_name}
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Report Center</h1>
-          <p className="mt-1 text-sm text-slate-600">Invoices Report</p>
-          <p className="text-sm text-slate-600">Recorded payment tracking only; no card processing from this surface.</p>
-        </div>
-        <div className="max-w-[28rem] text-sm text-slate-600 md:text-right">
-          {usesInternalInvoicing ? (
-            <>
-              <div>Showing {ledger.rows.length} of {ledger.totalCount} invoice rows</div>
-              {ledger.truncated ? (
-                <div className="text-xs text-slate-500">Page view is capped at {INVOICE_LEDGER_PAGE_LIMIT} rows. Export includes up to {INVOICE_LEDGER_EXPORT_LIMIT} rows.</div>
-              ) : null}
-            </>
-          ) : (
-            <div>External billing mode: no internal billed-truth invoices report is available for this company.</div>
-          )}
-        </div>
-      </header>
+    <div className={reportPageClass}>
+      <ReportPageHeader
+        businessName={internalBusinessIdentity.display_name}
+        title="Invoices report"
+        description="Billed-truth invoice ledger for internal invoices, communication state, issued totals, and recorded payment tracking."
+        countSummary={usesInternalInvoicing ? `Showing ${ledger.rows.length} of ${ledger.totalCount} invoice rows` : "External billing mode"}
+        truncatedNote={usesInternalInvoicing && ledger.truncated ? `Page view is capped at ${INVOICE_LEDGER_PAGE_LIMIT} rows. Export includes up to ${INVOICE_LEDGER_EXPORT_LIMIT} rows.` : null}
+        truthNote="This report shows internal invoice truth only. Recorded payments are tracking fields; no card processing or customer payment execution happens here."
+      />
 
       <ReportCenterTabs current="invoices" />
 
       {!usesInternalInvoicing ? (
-        <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/80 p-6 shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
+        <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm shadow-slate-950/5">
           <div className="max-w-2xl space-y-3">
-            <h2 className="text-lg font-semibold tracking-tight text-slate-950">No internal invoices report in this billing mode</h2>
+            <h2 className="text-lg font-semibold text-slate-950">No internal invoices report in this billing mode</h2>
             <p className="text-sm leading-6 text-slate-600">
               This company is configured for external billing. The invoices report only shows real rows from the internal invoice domain, so this surface stays empty rather than inventing billed totals, open invoice counts, or payment-style finance signals.
             </p>
@@ -120,11 +123,22 @@ export default async function InvoiceLedgerPage({
         </section>
       ) : (
         <>
-          <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/80 p-5 shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
+          <ReportStatGrid>
+            <ReportStatCard label="Visible invoices" value={ledger.rows.length} helperText="Invoice rows currently rendered with the active filters." />
+            <ReportStatCard label="Issued visible" value={issuedVisible} helperText="Visible invoices already marked issued." tone="emerald" />
+            <ReportStatCard label="Draft visible" value={draftVisible} helperText="Visible invoices still prepared but unissued." tone="blue" />
+            <ReportStatCard label="Balance visible" value={balanceVisible} helperText="Visible invoices with a non-zero tracked balance." tone="rose" />
+            <ReportStatCard label="Paid visible" value={paidVisible} helperText="Visible invoices marked paid by recorded payment entries." />
+          </ReportStatGrid>
+
+          <ReportFilterPanel
+            title="Filter invoice rows"
+            description="Narrow internal invoice truth by status, customer, contractor, source type, communication state, date field, and sort order."
+          >
             <form action="/reports/invoices" method="get" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Invoice status</span>
-                <select name="status" defaultValue={filters.status} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Invoice status</span>
+                <select name="status" defaultValue={filters.status} className={reportControlClass}>
                   <option value="">All statuses</option>
                   {INVOICE_LEDGER_STATUS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -133,8 +147,8 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Date field</span>
-                <select name="date_field" defaultValue={filters.dateField} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Date field</span>
+                <select name="date_field" defaultValue={filters.dateField} className={reportControlClass}>
                   {INVOICE_LEDGER_DATE_FIELD_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
@@ -142,18 +156,18 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">From</span>
-                <input name="from" type="date" defaultValue={filters.fromDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                <span className={reportLabelClass}>From</span>
+                <input name="from" type="date" defaultValue={filters.fromDate} className={reportControlClass} />
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">To</span>
-                <input name="to" type="date" defaultValue={filters.toDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+                <span className={reportLabelClass}>To</span>
+                <input name="to" type="date" defaultValue={filters.toDate} className={reportControlClass} />
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Customer</span>
-                <select name="customer" defaultValue={filters.customerId} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Customer</span>
+                <select name="customer" defaultValue={filters.customerId} className={reportControlClass}>
                   <option value="">All customers</option>
                   {filterOptions.customers.map((customer) => (
                     <option key={customer.id} value={customer.id}>{customer.name}</option>
@@ -162,8 +176,8 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Contractor</span>
-                <select name="contractor" defaultValue={filters.contractorId} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Contractor</span>
+                <select name="contractor" defaultValue={filters.contractorId} className={reportControlClass}>
                   <option value="">All contractors</option>
                   {filterOptions.contractors.map((contractor) => (
                     <option key={contractor.id} value={contractor.id}>{contractor.name}</option>
@@ -172,8 +186,8 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Source type</span>
-                <select name="source_type" defaultValue={filters.sourceType} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Source type</span>
+                <select name="source_type" defaultValue={filters.sourceType} className={reportControlClass}>
                   <option value="">All source types</option>
                   {INVOICE_LEDGER_SOURCE_TYPE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -182,8 +196,8 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Communication state</span>
-                <select name="communication_state" defaultValue={filters.communicationState} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Communication state</span>
+                <select name="communication_state" defaultValue={filters.communicationState} className={reportControlClass}>
                   <option value="">All states</option>
                   {INVOICE_LEDGER_COMMUNICATION_STATE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -192,8 +206,8 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Sort</span>
-                <select name="sort" defaultValue={filters.sort} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Sort</span>
+                <select name="sort" defaultValue={filters.sort} className={reportControlClass}>
                   {INVOICE_LEDGER_SORT_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
@@ -201,25 +215,23 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <div className="flex flex-wrap items-end gap-2 xl:col-span-2 xl:justify-end">
-                <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+                <button type="submit" className={reportActionClass("primary")}>
                   Apply filters
                 </button>
-                <Link href="/reports/invoices" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+                <Link href="/reports/invoices" className={reportActionClass()}>
                   Reset
                 </Link>
-                <Link href={exportHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+                <Link href={exportHref} className={reportActionClass()}>
                   Export CSV
                 </Link>
               </div>
             </form>
-          </section>
+          </ReportFilterPanel>
 
-          <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
-            <p className="border-b border-slate-200/80 bg-slate-50/70 px-4 py-3 text-xs leading-5 text-slate-600">Scan left to right: invoice and visit identity first, communication status next, then billed totals and payment tracking fields.</p>
-            <div className="overflow-x-auto">
+          <ReportTableShell note="Scan left to right: invoice and visit identity first, communication status next, then billed totals and recorded payment tracking fields.">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50/90">
-                  <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                  <tr className={reportTableHeadClass}>
                     <th className="px-3 py-3">Invoice Ref</th>
                     <th className="px-3 py-3">Status</th>
                     <th className="px-3 py-3">Source</th>
@@ -255,7 +267,7 @@ export default async function InvoiceLedgerPage({
                     </tr>
                   ) : (
                     ledger.rows.map((row) => (
-                      <tr key={row.invoiceId} className="border-b border-slate-200/80 align-top transition-colors hover:bg-slate-50/60 last:border-b-0">
+                      <tr key={row.invoiceId} className={reportTableRowClass}>
                         <td className="px-3 py-3">
                           {row.jobHref ? (
                             <Link href={row.jobHref} className="font-medium text-blue-700 hover:underline">
@@ -296,8 +308,7 @@ export default async function InvoiceLedgerPage({
                   )}
                 </tbody>
               </table>
-            </div>
-          </section>
+          </ReportTableShell>
         </>
       )}
     </div>

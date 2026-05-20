@@ -5,6 +5,20 @@ import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import ReportCenterTabs from "@/components/reports/ReportCenterTabs";
 import {
+  ReportFilterPanel,
+  ReportPageHeader,
+  ReportStatCard,
+  ReportStatGrid,
+  ReportTableShell,
+  reportActionClass,
+  reportCheckboxClass,
+  reportControlClass,
+  reportLabelClass,
+  reportPageClass,
+  reportTableHeadClass,
+  reportTableRowClass,
+} from "@/components/reports/ReportLedgerChrome";
+import {
   SERVICE_CASE_CONTINUITY_DATE_FIELD_OPTIONS,
   SERVICE_CASE_CONTINUITY_EXPORT_LIMIT,
   SERVICE_CASE_CONTINUITY_KIND_OPTIONS,
@@ -68,33 +82,40 @@ export default async function ServiceCaseContinuityPage({
   ]);
 
   const exportHref = `/reports/service-cases/export?${buildServiceCaseContinuitySearchParams(filters).toString()}`;
+  const openVisible = ledger.rows.filter((row) => row.caseStatusLabel.toLowerCase() === "open").length;
+  const repeatVisible = ledger.rows.filter((row) => row.visitCount > 1).length;
+  const activeLinkedVisible = ledger.rows.reduce((total, row) => total + row.activeLinkedVisitCount, 0);
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-5 px-2 py-3 text-slate-900">
-      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            {internalBusinessIdentity.display_name}
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Report Center</h1>
-          <p className="mt-1 text-sm text-slate-600">Service Cases Report</p>
-        </div>
-        <div className="max-w-[24rem] text-sm text-slate-600 md:text-right">
-          <div>Showing {ledger.rows.length} of {ledger.totalCount} service cases</div>
-          {ledger.truncated ? (
-            <div className="text-xs text-slate-500">Page view is capped at {SERVICE_CASE_CONTINUITY_PAGE_LIMIT} rows. Export includes up to {SERVICE_CASE_CONTINUITY_EXPORT_LIMIT} rows.</div>
-          ) : null}
-        </div>
-      </header>
+    <div className={reportPageClass}>
+      <ReportPageHeader
+        businessName={internalBusinessIdentity.display_name}
+        title="Service cases report"
+        description="Continuity ledger for callbacks, repeat visits, unresolved cases, and case resolution history."
+        countSummary={`Showing ${ledger.rows.length} of ${ledger.totalCount} service cases`}
+        truncatedNote={ledger.truncated ? `Page view is capped at ${SERVICE_CASE_CONTINUITY_PAGE_LIMIT} rows. Export includes up to ${SERVICE_CASE_CONTINUITY_EXPORT_LIMIT} rows.` : null}
+        truthNote="Service case rows come from continuity records and linked jobs. This report does not turn linked visits into invoice or payment truth."
+      />
 
       <ReportCenterTabs current="service-cases" />
 
-      <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/80 p-5 shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
+      <ReportStatGrid>
+        <ReportStatCard label="Visible cases" value={ledger.rows.length} helperText="Cases currently rendered with the active filters." />
+        <ReportStatCard label="Total matches" value={ledger.totalCount} helperText="All matching service cases before the page cap." tone="blue" />
+        <ReportStatCard label="Open visible" value={openVisible} helperText="Visible cases that still need a continuity outcome." tone="rose" />
+        <ReportStatCard label="Active linked visits" value={activeLinkedVisible} helperText="Open linked visits across the visible service cases." tone="emerald" />
+        <ReportStatCard label="Repeat visible" value={repeatVisible} helperText="Visible cases with more than one linked visit." />
+      </ReportStatGrid>
+
+      <ReportFilterPanel
+        title="Filter service cases"
+        description="Narrow continuity work by status, case kind, repeat-visit state, contractor, date field, and sort order."
+      >
         <form action="/reports/service-cases" method="get" className="space-y-3">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.85fr_0.9fr_0.9fr_auto]">
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Case status</span>
-              <select name="case_status" defaultValue={filters.caseStatus} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <span className={reportLabelClass}>Case status</span>
+              <select name="case_status" defaultValue={filters.caseStatus} className={reportControlClass}>
                 <option value="">All statuses</option>
                 {SERVICE_CASE_CONTINUITY_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -103,8 +124,8 @@ export default async function ServiceCaseContinuityPage({
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Case kind</span>
-              <select name="case_kind" defaultValue={filters.caseKind} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <span className={reportLabelClass}>Case kind</span>
+              <select name="case_kind" defaultValue={filters.caseKind} className={reportControlClass}>
                 <option value="">All kinds</option>
                 {SERVICE_CASE_CONTINUITY_KIND_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -113,8 +134,8 @@ export default async function ServiceCaseContinuityPage({
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Date field</span>
-              <select name="date_field" defaultValue={filters.dateField} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <span className={reportLabelClass}>Date field</span>
+              <select name="date_field" defaultValue={filters.dateField} className={reportControlClass}>
                 {SERVICE_CASE_CONTINUITY_DATE_FIELD_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
@@ -122,22 +143,22 @@ export default async function ServiceCaseContinuityPage({
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">From</span>
-              <input name="from" type="date" defaultValue={filters.fromDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              <span className={reportLabelClass}>From</span>
+              <input name="from" type="date" defaultValue={filters.fromDate} className={reportControlClass} />
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">To</span>
-              <input name="to" type="date" defaultValue={filters.toDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              <span className={reportLabelClass}>To</span>
+              <input name="to" type="date" defaultValue={filters.toDate} className={reportControlClass} />
             </label>
 
             <div className="grid gap-2 xl:mt-6">
               <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <input type="checkbox" name="repeat_only" value="1" defaultChecked={filters.repeatOnly} className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300" />
+                <input type="checkbox" name="repeat_only" value="1" defaultChecked={filters.repeatOnly} className={reportCheckboxClass} />
                 <span>Multiple visits only</span>
               </label>
               <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                <input type="checkbox" name="active_repeat_visits" value="1" defaultChecked={Boolean(filters.activeRepeatOnly)} className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300" />
+                <input type="checkbox" name="active_repeat_visits" value="1" defaultChecked={Boolean(filters.activeRepeatOnly)} className={reportCheckboxClass} />
                 <span>Active repeat visits only</span>
               </label>
             </div>
@@ -146,8 +167,8 @@ export default async function ServiceCaseContinuityPage({
           <div className="flex flex-col gap-4 border-t border-slate-200/80 pt-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="grid gap-3 md:grid-cols-2 lg:min-w-[32rem] lg:grid-cols-[1.2fr_0.9fr]">
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Contractor</span>
-                <select name="contractor" defaultValue={filters.contractorId} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Contractor</span>
+                <select name="contractor" defaultValue={filters.contractorId} className={reportControlClass}>
                   <option value="">Any linked contractor</option>
                   {filterOptions.contractors.map((contractor) => (
                     <option key={contractor.id} value={contractor.id}>{contractor.name}</option>
@@ -156,8 +177,8 @@ export default async function ServiceCaseContinuityPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Sort</span>
-                <select name="sort" defaultValue={filters.sort} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Sort</span>
+                <select name="sort" defaultValue={filters.sort} className={reportControlClass}>
                   {SERVICE_CASE_CONTINUITY_SORT_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
@@ -166,26 +187,25 @@ export default async function ServiceCaseContinuityPage({
             </div>
 
             <div className="flex flex-wrap items-end gap-2 lg:justify-end">
-            <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <button type="submit" className={reportActionClass("primary")}>
               Apply filters
             </button>
-            <Link href="/reports/service-cases" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href="/reports/service-cases" className={reportActionClass()}>
               Reset
             </Link>
-            <Link href={exportHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href={exportHref} className={reportActionClass()}>
               Export CSV
             </Link>
           </div>
           </div>
         </form>
         <p className="text-xs leading-5 text-slate-600">Case status, kind, and repeat toggles define the scope of cases shown. Date field controls whether the From/To range applies to case creation or case resolution dates.</p>
-      </section>
+      </ReportFilterPanel>
 
-      <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
-        <div className="overflow-x-auto">
+      <ReportTableShell note="Scan left to right: case identity and status first, then customer/location, latest contractor, resolution, and linked-visit pressure.">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50/90">
-              <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+              <tr className={reportTableHeadClass}>
                 <th className="px-3 py-3">Case Ref</th>
                 <th className="px-3 py-3">Case Summary</th>
                 <th className="px-3 py-3">Kind</th>
@@ -215,7 +235,7 @@ export default async function ServiceCaseContinuityPage({
                 </tr>
               ) : (
                 ledger.rows.map((row) => (
-                  <tr key={row.serviceCaseId} className="border-b border-slate-200/80 align-top transition-colors hover:bg-slate-50/60 last:border-b-0">
+                  <tr key={row.serviceCaseId} className={reportTableRowClass}>
                     <td className="px-3 py-3">
                       <Link href={row.serviceCaseHref} className="font-medium text-blue-700 hover:underline" title={row.serviceCaseId}>
                         <span className="font-mono text-xs">{row.serviceCaseReference}</span>
@@ -260,8 +280,7 @@ export default async function ServiceCaseContinuityPage({
               )}
             </tbody>
           </table>
-        </div>
-      </section>
+      </ReportTableShell>
     </div>
   );
 }

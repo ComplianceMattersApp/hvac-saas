@@ -5,6 +5,20 @@ import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import ReportCenterTabs from "@/components/reports/ReportCenterTabs";
 import {
+  ReportFilterPanel,
+  ReportPageHeader,
+  ReportStatCard,
+  ReportStatGrid,
+  ReportTableShell,
+  reportActionClass,
+  reportCheckboxClass,
+  reportControlClass,
+  reportLabelClass,
+  reportPageClass,
+  reportTableHeadClass,
+  reportTableRowClass,
+} from "@/components/reports/ReportLedgerChrome";
+import {
   CLOSEOUT_FOLLOW_UP_LEDGER_DATE_FIELD_OPTIONS,
   CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT,
   CLOSEOUT_FOLLOW_UP_LEDGER_OPS_STATUS_OPTIONS,
@@ -81,48 +95,56 @@ export default async function CloseoutFollowUpLedgerPage({
   ]);
 
   const exportHref = `/reports/closeout/export?${buildCloseoutFollowUpLedgerSearchParams(filters).toString()}`;
+  const closeoutVisible = ledger.rows.filter((row) => row.closeoutQueue).length;
+  const paperworkVisible = ledger.rows.filter((row) => row.paperworkRequired).length;
+  const invoiceVisible = ledger.rows.filter((row) => row.invoiceRequired).length;
+  const agingSevenPlusVisible = ledger.rows.filter((row) => Number(row.agingDays ?? 0) >= 7).length;
 
   return (
-    <div className="mx-auto max-w-[1680px] space-y-5 px-2 py-3 text-slate-900">
-      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            {internalBusinessIdentity.display_name}
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Report Center</h1>
-          <p className="mt-1 text-sm text-slate-600">Closeout Report</p>
-        </div>
-        <div className="max-w-[24rem] text-sm text-slate-600 md:text-right">
-          <div>Showing {ledger.rows.length} of {ledger.totalCount} visit rows</div>
-          {ledger.truncated ? (
-            <div className="text-xs text-slate-500">Page view is capped at {CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT} rows. Export includes up to {CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT} rows.</div>
-          ) : null}
-        </div>
-      </header>
+    <div className={reportPageClass}>
+      <ReportPageHeader
+        businessName={internalBusinessIdentity.display_name}
+        title="Closeout report"
+        description="Admin follow-up ledger for field-complete work, paperwork needs, invoice follow-up, closeout ownership, and aging risk."
+        countSummary={`Showing ${ledger.rows.length} of ${ledger.totalCount} visit rows`}
+        truncatedNote={ledger.truncated ? `Page view is capped at ${CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT} rows. Export includes up to ${CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT} rows.` : null}
+        truthNote="Closeout rows are operational follow-up truth. They do not convert visits into invoice, payment, or service case truth."
+      />
 
       <ReportCenterTabs current="closeout" />
 
-      <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/80 p-5 shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
+      <ReportStatGrid>
+        <ReportStatCard label="Visible rows" value={ledger.rows.length} helperText="Rows currently rendered with the active filters." />
+        <ReportStatCard label="Closeout visible" value={closeoutVisible} helperText="Visible visits still in closeout follow-up." tone="rose" />
+        <ReportStatCard label="Invoice needed" value={invoiceVisible} helperText="Visible visits still waiting on invoice action." tone="blue" />
+        <ReportStatCard label="Aging 7+ days" value={agingSevenPlusVisible} helperText="Visible follow-up rows with seven or more aging days." tone="rose" />
+        <ReportStatCard label="Paperwork needed" value={paperworkVisible} helperText="Visible visits still showing paperwork requirements." />
+      </ReportStatGrid>
+
+      <ReportFilterPanel
+        title="Filter closeout rows"
+        description="Use the closeout, paperwork, invoice, assignee, contractor, status, scope, and date controls to find admin follow-up work."
+      >
         <form action="/reports/closeout" method="get" className="space-y-3">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[auto_auto_auto_1fr_0.9fr_0.9fr_0.9fr]">
             <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 xl:mt-6">
-              <input type="checkbox" name="closeout_only" value="1" defaultChecked={filters.closeoutOnly} className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300" />
+              <input type="checkbox" name="closeout_only" value="1" defaultChecked={filters.closeoutOnly} className={reportCheckboxClass} />
               <span>Closeout queue only</span>
             </label>
 
             <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 xl:mt-6">
-              <input type="checkbox" name="paperwork_only" value="1" defaultChecked={filters.paperworkOnly} className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300" />
+              <input type="checkbox" name="paperwork_only" value="1" defaultChecked={filters.paperworkOnly} className={reportCheckboxClass} />
               <span>Paperwork required</span>
             </label>
 
             <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 xl:mt-6">
-              <input type="checkbox" name="invoice_only" value="1" defaultChecked={filters.invoiceOnly} className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-300" />
+              <input type="checkbox" name="invoice_only" value="1" defaultChecked={filters.invoiceOnly} className={reportCheckboxClass} />
               <span>Invoice required</span>
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Ops status</span>
-              <select name="ops_status" defaultValue={filters.opsStatus} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <span className={reportLabelClass}>Ops status</span>
+              <select name="ops_status" defaultValue={filters.opsStatus} className={reportControlClass}>
                 <option value="">All statuses</option>
                 {CLOSEOUT_FOLLOW_UP_LEDGER_OPS_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
@@ -131,8 +153,8 @@ export default async function CloseoutFollowUpLedgerPage({
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Date field</span>
-              <select name="date_field" defaultValue={filters.dateField} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+              <span className={reportLabelClass}>Date field</span>
+              <select name="date_field" defaultValue={filters.dateField} className={reportControlClass}>
                 {CLOSEOUT_FOLLOW_UP_LEDGER_DATE_FIELD_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
@@ -140,21 +162,21 @@ export default async function CloseoutFollowUpLedgerPage({
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">From</span>
-              <input name="from" type="date" defaultValue={filters.fromDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              <span className={reportLabelClass}>From</span>
+              <input name="from" type="date" defaultValue={filters.fromDate} className={reportControlClass} />
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">To</span>
-              <input name="to" type="date" defaultValue={filters.toDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+              <span className={reportLabelClass}>To</span>
+              <input name="to" type="date" defaultValue={filters.toDate} className={reportControlClass} />
             </label>
           </div>
 
           <div className="flex flex-col gap-4 border-t border-slate-200/80 pt-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 xl:min-w-[60rem]">
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Contractor</span>
-                <select name="contractor" defaultValue={filters.contractorId} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Contractor</span>
+                <select name="contractor" defaultValue={filters.contractorId} className={reportControlClass}>
                   <option value="">All contractors</option>
                   {filterOptions.contractors.map((contractor) => (
                     <option key={contractor.id} value={contractor.id}>{contractor.name}</option>
@@ -163,8 +185,8 @@ export default async function CloseoutFollowUpLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Assigned tech</span>
-                <select name="assignee" defaultValue={filters.assigneeUserId} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Assigned tech</span>
+                <select name="assignee" defaultValue={filters.assigneeUserId} className={reportControlClass}>
                   <option value="">All assignees</option>
                   {filterOptions.assignees.map((assignee) => (
                     <option key={assignee.user_id} value={assignee.user_id}>{assignee.display_name}</option>
@@ -173,8 +195,8 @@ export default async function CloseoutFollowUpLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Scope</span>
-                <select name="scope" defaultValue={filters.scope} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Scope</span>
+                <select name="scope" defaultValue={filters.scope} className={reportControlClass}>
                   {CLOSEOUT_FOLLOW_UP_LEDGER_SCOPE_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
@@ -182,8 +204,8 @@ export default async function CloseoutFollowUpLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Sort</span>
-                <select name="sort" defaultValue={filters.sort} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+                <span className={reportLabelClass}>Sort</span>
+                <select name="sort" defaultValue={filters.sort} className={reportControlClass}>
                   {CLOSEOUT_FOLLOW_UP_LEDGER_SORT_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
                   ))}
@@ -192,26 +214,25 @@ export default async function CloseoutFollowUpLedgerPage({
             </div>
 
             <div className="flex flex-wrap items-end gap-2 lg:justify-end">
-              <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+              <button type="submit" className={reportActionClass("primary")}>
                 Apply filters
               </button>
-              <Link href="/reports/closeout" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+              <Link href="/reports/closeout" className={reportActionClass()}>
                 Reset
               </Link>
-              <Link href={exportHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+              <Link href={exportHref} className={reportActionClass()}>
                 Export CSV
               </Link>
             </div>
           </div>
         </form>
         <p className="text-xs leading-5 text-slate-600">Scope controls whether you are viewing active backlog, historical, or all closeout rows. Date field controls which closeout milestone date the From/To range filters.</p>
-      </section>
+      </ReportFilterPanel>
 
-      <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
-        <div className="overflow-x-auto">
+      <ReportTableShell note="Scan left to right: visit identity and assignment first, then closeout blockers, follow-up ownership, and aging.">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50/90">
-              <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+              <tr className={reportTableHeadClass}>
                 <th className="px-3 py-3">Job Ref</th>
                 <th className="px-3 py-3">Visit</th>
                 <th className="px-3 py-3">Type</th>
@@ -243,7 +264,7 @@ export default async function CloseoutFollowUpLedgerPage({
                 </tr>
               ) : (
                 ledger.rows.map((row) => (
-                  <tr key={row.jobId} className="border-b border-slate-200/80 align-top transition-colors hover:bg-slate-50/60 last:border-b-0">
+                  <tr key={row.jobId} className={reportTableRowClass}>
                     <td className="px-3 py-3">
                       <Link href={row.jobHref} className="font-medium text-blue-700 hover:underline" title={row.jobId}>
                         <span className="font-mono text-xs">{row.jobReference}</span>
@@ -288,8 +309,7 @@ export default async function CloseoutFollowUpLedgerPage({
               )}
             </tbody>
           </table>
-        </div>
-      </section>
+      </ReportTableShell>
     </div>
   );
 }

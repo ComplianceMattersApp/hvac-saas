@@ -1,6 +1,19 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import ReportCenterTabs from "@/components/reports/ReportCenterTabs";
+import {
+  ReportFilterPanel,
+  ReportPageHeader,
+  ReportStatCard,
+  ReportStatGrid,
+  ReportTableShell,
+  reportActionClass,
+  reportControlClass,
+  reportLabelClass,
+  reportPageClass,
+  reportTableHeadClass,
+  reportTableRowClass,
+} from "@/components/reports/ReportLedgerChrome";
 import { createClient } from "@/lib/supabase/server";
 import {
   isInternalAccessError,
@@ -90,34 +103,39 @@ export default async function JobsReportPage({
   ]);
 
   const exportHref = `/reports/job-visit-ledger/export?${buildJobVisitLedgerSearchParams(filters).toString()}`;
+  const unassignedVisible = ledger.rows.filter((row) => row.primaryAssigneeDisplay === "-").length;
+  const closeoutVisible = ledger.rows.filter((row) => row.closeoutQueue).length;
+  const paperworkVisible = ledger.rows.filter((row) => row.paperworkRequired).length;
 
   return (
-    <div className="mx-auto max-w-[1600px] space-y-5 px-2 py-3 text-slate-900">
-      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div className="space-y-1">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            {internalBusinessIdentity.display_name}
-          </div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">Report Center</h1>
-          <p className="mt-1 text-sm text-slate-600">Jobs Report</p>
-        </div>
-        <div className="max-w-[24rem] text-sm text-slate-600 md:text-right">
-          <div>
-            Showing {ledger.rows.length} of {ledger.totalCount} visit rows
-          </div>
-          {ledger.truncated ? (
-            <div className="text-xs text-slate-500">Page view is capped at {JOB_VISIT_LEDGER_PAGE_LIMIT} rows. Export includes up to {JOB_VISIT_LEDGER_EXPORT_LIMIT} rows.</div>
-          ) : null}
-        </div>
-      </header>
+    <div className={reportPageClass}>
+      <ReportPageHeader
+        businessName={internalBusinessIdentity.display_name}
+        title="Jobs report"
+        description="Operational visit ledger for scheduling, assignment, lifecycle, paperwork, invoice, and closeout review."
+        countSummary={`Showing ${ledger.rows.length} of ${ledger.totalCount} visit rows`}
+        truncatedNote={ledger.truncated ? `Page view is capped at ${JOB_VISIT_LEDGER_PAGE_LIMIT} rows. Export includes up to ${JOB_VISIT_LEDGER_EXPORT_LIMIT} rows.` : null}
+        truthNote="Visit rows come from the jobs ledger. This report does not merge invoice, payment, or service case truth beyond linked references."
+      />
 
       <ReportCenterTabs current="jobs" />
 
-      <section className="rounded-[24px] border border-slate-200/90 bg-slate-50/80 p-5 shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
+      <ReportStatGrid>
+        <ReportStatCard label="Visible rows" value={ledger.rows.length} helperText="Rows currently rendered with the active filters." />
+        <ReportStatCard label="Total matches" value={ledger.totalCount} helperText="All matching visit rows before the page cap." tone="blue" />
+        <ReportStatCard label="Unassigned visible" value={unassignedVisible} helperText="Visible visits with no assigned team member." tone="rose" />
+        <ReportStatCard label="Closeout visible" value={closeoutVisible} helperText="Visible visits currently marked for closeout follow-up." tone="emerald" />
+        <ReportStatCard label="Paperwork visible" value={paperworkVisible} helperText="Visible visits still showing paperwork requirements." />
+      </ReportStatGrid>
+
+      <ReportFilterPanel
+        title="Filter visit rows"
+        description="Use date field, status, assignment, contractor, and scope to narrow the operational visit ledger."
+      >
         <form action="/reports/jobs" method="get" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Date field</span>
-            <select name="date_field" defaultValue={filters.dateField} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+            <span className={reportLabelClass}>Date field</span>
+            <select name="date_field" defaultValue={filters.dateField} className={reportControlClass}>
               {JOB_VISIT_LEDGER_DATE_FIELD_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -125,18 +143,18 @@ export default async function JobsReportPage({
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">From</span>
-            <input name="from" type="date" defaultValue={filters.fromDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            <span className={reportLabelClass}>From</span>
+            <input name="from" type="date" defaultValue={filters.fromDate} className={reportControlClass} />
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">To</span>
-            <input name="to" type="date" defaultValue={filters.toDate} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300" />
+            <span className={reportLabelClass}>To</span>
+            <input name="to" type="date" defaultValue={filters.toDate} className={reportControlClass} />
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Ops status</span>
-            <select name="ops_status" defaultValue={filters.opsStatus} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+            <span className={reportLabelClass}>Ops status</span>
+            <select name="ops_status" defaultValue={filters.opsStatus} className={reportControlClass}>
               <option value="">All statuses</option>
               {JOB_VISIT_LEDGER_OPS_STATUS_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -145,8 +163,8 @@ export default async function JobsReportPage({
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Contractor</span>
-            <select name="contractor" defaultValue={filters.contractorId} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+            <span className={reportLabelClass}>Contractor</span>
+            <select name="contractor" defaultValue={filters.contractorId} className={reportControlClass}>
               <option value="">All contractors</option>
               {filterOptions.contractors.map((contractor) => (
                 <option key={contractor.id} value={contractor.id}>{contractor.name}</option>
@@ -155,8 +173,8 @@ export default async function JobsReportPage({
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Assigned Team</span>
-            <select name="assignee" defaultValue={filters.assigneeUserId} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+            <span className={reportLabelClass}>Assigned Team</span>
+            <select name="assignee" defaultValue={filters.assigneeUserId} className={reportControlClass}>
               <option value="">All team members</option>
               <option value="unassigned">Unassigned</option>
               {filterOptions.assignees.map((assignee) => (
@@ -166,8 +184,8 @@ export default async function JobsReportPage({
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Job type</span>
-            <select name="job_type" defaultValue={filters.jobType} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+            <span className={reportLabelClass}>Job type</span>
+            <select name="job_type" defaultValue={filters.jobType} className={reportControlClass}>
               <option value="">All types</option>
               {JOB_VISIT_LEDGER_JOB_TYPE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
@@ -176,8 +194,8 @@ export default async function JobsReportPage({
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Scope</span>
-            <select name="scope" defaultValue={filters.scope} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+            <span className={reportLabelClass}>Scope</span>
+            <select name="scope" defaultValue={filters.scope} className={reportControlClass}>
               {JOB_VISIT_LEDGER_SCOPE_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -185,8 +203,8 @@ export default async function JobsReportPage({
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Sort</span>
-            <select name="sort" defaultValue={filters.sort} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300">
+            <span className={reportLabelClass}>Sort</span>
+            <select name="sort" defaultValue={filters.sort} className={reportControlClass}>
               {JOB_VISIT_LEDGER_SORT_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
@@ -194,26 +212,24 @@ export default async function JobsReportPage({
           </label>
 
           <div className="flex flex-wrap items-end gap-2 xl:col-span-2 xl:justify-end">
-            <button type="submit" className="inline-flex min-h-10 items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <button type="submit" className={reportActionClass("primary")}>
               Apply filters
             </button>
-            <Link href="/reports/jobs" className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href="/reports/jobs" className={reportActionClass()}>
               Reset
             </Link>
-            <Link href={exportHref} className="inline-flex min-h-10 items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+            <Link href={exportHref} className={reportActionClass()}>
               Export CSV
             </Link>
           </div>
         </form>
         <p className="mt-3 text-xs leading-5 text-slate-600">Scope controls whether you are viewing active, historical, or all visits. Date field controls which visit date the From/To range uses (created, scheduled, or completed).</p>
-      </section>
+      </ReportFilterPanel>
 
-      <section className="overflow-hidden rounded-[24px] border border-slate-200/90 bg-white shadow-[0_20px_34px_-32px_rgba(15,23,42,0.35)]">
-        <p className="border-b border-slate-200/80 bg-slate-50/70 px-4 py-3 text-xs leading-5 text-slate-600">Scan left to right: visit identity and assignment first, then ops and lifecycle status, then paperwork, invoice, and closeout requirements.</p>
-        <div className="overflow-x-auto">
+      <ReportTableShell note="Scan left to right: visit identity and assignment first, then ops and lifecycle status, then paperwork, invoice, and closeout requirements.">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50/90">
-              <tr className="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+              <tr className={reportTableHeadClass}>
                 <th className="px-3 py-3">Job Ref</th>
                 <th className="px-3 py-3">Visit</th>
                 <th className="px-3 py-3">Type</th>
@@ -244,7 +260,7 @@ export default async function JobsReportPage({
                 </tr>
               ) : (
                 ledger.rows.map((row) => (
-                  <tr key={row.jobId} className="border-b border-slate-200/80 align-top transition-colors hover:bg-slate-50/60 last:border-b-0">
+                  <tr key={row.jobId} className={reportTableRowClass}>
                     <td className="px-3 py-3">
                       <Link href={row.jobHref} className="font-medium text-blue-700 hover:underline" title={row.jobId}>
                         <span className="font-mono text-xs">{row.jobReference}</span>
@@ -285,8 +301,7 @@ export default async function JobsReportPage({
               )}
             </tbody>
           </table>
-        </div>
-      </section>
+      </ReportTableShell>
     </div>
   );
 }
