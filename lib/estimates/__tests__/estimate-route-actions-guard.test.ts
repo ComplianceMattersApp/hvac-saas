@@ -7,6 +7,7 @@ const removeEstimateOptionLineItemMock = vi.fn();
 const transitionEstimateStatusMock = vi.fn();
 const createDefaultEstimateOptionsMock = vi.fn();
 const updateEstimateOptionMetadataMock = vi.fn();
+const convertApprovedEstimateToJobMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock("@/lib/estimates/estimate-actions", () => ({
@@ -18,6 +19,8 @@ vi.mock("@/lib/estimates/estimate-actions", () => ({
   transitionEstimateStatus: (...args: unknown[]) => transitionEstimateStatusMock(...args),
   createDefaultEstimateOptions: (...args: unknown[]) => createDefaultEstimateOptionsMock(...args),
   updateEstimateOptionMetadata: (...args: unknown[]) => updateEstimateOptionMetadataMock(...args),
+  convertApprovedEstimateToJob: (...args: unknown[]) =>
+    convertApprovedEstimateToJobMock(...args),
 }));
 
 vi.mock("next/cache", () => ({
@@ -365,5 +368,42 @@ describe("estimate route action guards", () => {
       lineItemId: "opt-line-1",
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
+  });
+
+  it("convertEstimateToJobFromForm short-circuits when feature flag disabled", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    const { convertEstimateToJobFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+
+    await convertEstimateToJobFromForm(fd);
+
+    expect(convertApprovedEstimateToJobMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("convertEstimateToJobFromForm delegates and revalidates when enabled", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    convertApprovedEstimateToJobMock.mockResolvedValue({
+      success: true,
+      estimateId: "est-1",
+      jobId: "job-1",
+      previousStatus: "approved",
+      nextStatus: "converted",
+    });
+
+    const { convertEstimateToJobFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+
+    const result = await convertEstimateToJobFromForm(fd);
+
+    expect(result?.success).toBe(true);
+    expect(convertApprovedEstimateToJobMock).toHaveBeenCalledWith({ estimateId: "est-1" });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/jobs");
   });
 });

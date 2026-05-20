@@ -275,7 +275,18 @@ Future conversion paths should explicitly consume:
 - Idempotency via unique constraints on all linkage fields; one active invoice per job enforced.
 - Conversion is historically-only; not reversible in V1 through status transitions.
 
-Estimate-to-job and estimate-to-invoice conversion remain deferred and are not implemented by this spec. Schema additions and Action A/B implementation require a separate approval and implementation window.
+Section 2C Action A closeout note (2026-05-20):
+
+- Internal-only approved estimate -> job conversion is implemented with durable linkage and idempotency guards.
+- Action A migration is staged as `supabase/migrations/20260520120000_estimate_to_job_conversion_v1.sql` and remains environment-activation gated.
+- Action A adds/uses: `estimates.converted_job_id`, `estimates.converted_by_user_id`, `jobs.origin_estimate_id`, plus unique partial indexes on both linkage fields.
+- Conversion action is schema-safe: when migration columns are unavailable, UI action is hidden and action returns `estimate_conversion_schema_unavailable`.
+- Flat estimates convert all flat estimate lines to job `visit_scope_items`; multi-option estimates require `selected_option_id` and convert selected option lines only.
+- Action A writes `estimate_events.estimate_converted_to_job` metadata with `job_id`, `converted_by_user_id`, `approved_total_cents`, `proposal_mode`, and selected-option snapshots for multi-option.
+- No invoice conversion is included in this slice.
+- No payment/Stripe tenant execution/QBO/SMS/email/customer portal/public-link/e-signature/stored-PDF behavior is introduced.
+
+Estimate-to-invoice conversion (Action B) remains deferred.
 
 ---
 
@@ -307,7 +318,7 @@ Recommended future sequence:
 5. Add internal print/readiness presentation for multi-option proposals.
 6. Add internal response/selection recording model only after approval semantics are reviewed.
 7. Add customer-facing approval/e-signature/public/portal surfaces only after separate authority and security design.
-8. (**Section 2B locked, May 20, 2026**) Add conversion from selected option id following the locked two-action model: Action A (estimate → job), then Action B (estimate → invoice draft). Both require `approved` status; `converted` status permits invoice conversion after job conversion. See `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md` Section 1.5 for full conversion contract. This slice includes schema additions (`converted_job_id`, `converted_invoice_id`, `origin_estimate_id`, `source_estimate_id`, unique linkage constraints) and implementation of both durable internal actions with full audit trail and idempotency guards.
+8. (**Section 2B locked, May 20, 2026**) Add conversion from selected option id following the locked two-action model: Action A (estimate → job), then Action B (estimate → invoice draft). Action A is now implemented internally (environment migration-gated) with durable linkage and audit trail. Action B remains deferred.
 9. Add optional add-ons as a separate model after primary options are proven.
 10. Add versioned template system after proposal content/revision semantics are mature enough to freeze safely.
 

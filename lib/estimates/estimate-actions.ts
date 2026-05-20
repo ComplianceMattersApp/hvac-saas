@@ -18,6 +18,9 @@ import {
   recomputeEstimateTotals,
   getEstimateById,
   listEstimatesByAccount,
+  isEstimateToJobConversionSchemaReady,
+  getEstimateToJobConversionSchemaReady,
+  getEstimateConvertedJobId,
 } from "@/lib/estimates/estimate-read";
 import {
   canTransitionEstimateStatus,
@@ -25,6 +28,7 @@ import {
   type EstimateStatus,
 } from "@/lib/estimates/estimate-domain";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { sanitizeVisitScopeItems, type VisitScopeItem } from "@/lib/jobs/visit-scope";
 
 export { getEstimateById, listEstimatesByAccount };
 
@@ -1709,5 +1713,369 @@ export async function recordEstimateApprovalResponse(
     selectedOptionLabelSnapshot,
     selectedOptionTotalCents,
     responseNote,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Convert approved estimate to job (Section 2C Action A, internal-only)
+// ---------------------------------------------------------------------------
+
+type EstimateConvertibleLine = {
+  id: string;
+  source_pricebook_item_id: string | null;
+  item_name_snapshot: string;
+  description_snapshot: string | null;
+  item_type_snapshot: string;
+  category_snapshot: string | null;
+  unit_label_snapshot: string | null;
+  unit_price_cents: number;
+};
+
+function isEstimateConversionSchemaUnavailableError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as { code?: string | null; message?: string | null };
+  const code = String(maybeError.code ?? "").trim();
+  const message = String(maybeError.message ?? "").toLowerCase();
+
+  if (code === "42703" || code === "42P01" || code === "PGRST205") {
+    return true;
+  }
+
+  return (
+    message.includes("converted_job_id") ||
+    message.includes("converted_by_user_id") ||
+    message.includes("origin_estimate_id") ||
+    message.includes("schema cache") ||
+    (message.includes("column") && message.includes("does not exist"))
+  );
+}
+
+function mapEstimateLineToVisitScopeItem(line: EstimateConvertibleLine): VisitScopeItem {
+  return {
+    title: String(line.item_name_snapshot ?? "").trim() || "Estimate item",
+    details: String(line.description_snapshot ?? "").trim() || null,
+    kind: "primary",
+    source_pricebook_item_id: line.source_pricebook_item_id,
+    expected_unit_price:
+      Number.isFinite(Number(line.unit_price_cents)) && Number(line.unit_price_cents) >= 0
+        ? Number((Number(line.unit_price_cents) / 100).toFixed(2))
+        : null,
+    unit_label: String(line.unit_label_snapshot ?? "").trim() || null,
+    item_type: String(line.item_type_snapshot ?? "").trim() || null,
+    category: String(line.category_snapshot ?? "").trim() || null,
+  };
+}
+
+export type ConvertApprovedEstimateToJobResult =
+  | {
+      success: true;
+      estimateId: string;
+      jobId: string;
+      previousStatus: "approved";
+      nextStatus: "converted";
+    }
+  | {
+      success: false;
+      error: string;
+      existingJobId?: string;
+    };
+
+export async function convertApprovedEstimateToJob(params: {
+  estimateId: string;
+}): Promise<ConvertApprovedEstimateToJobResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  if (!estimateId) {
+    return { success: false, error: "estimate_id is required." };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  const userId = String(internalUser.user_id ?? "").trim();
+
+  const conversionSchemaReady = await getEstimateToJobConversionSchemaReady({ supabase });
+  if (!conversionSchemaReady) {
+    return { success: false, error: "estimate_conversion_schema_unavailable" };
+  }
+
+  let estimate: any = null;
+  try {
+    const { data, error } = await supabase
+      .from("estimates")
+      .select(
+        "id, account_owner_user_id, estimate_number, status, title, customer_id, location_id, service_case_id, total_cents, selected_option_id, selected_option_label_snapshot, selected_option_total_cents, converted_job_id"
+      )
+      .eq("id", estimateId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+    if (error) throw error;
+    estimate = data;
+  } catch (error) {
+    if (isEstimateConversionSchemaUnavailableError(error)) {
+      return { success: false, error: "estimate_conversion_schema_unavailable" };
+    }
+    throw error;
+  }
+
+  if (!estimate?.id) {
+    return { success: false, error: "Estimate not found in this account." };
+  }
+
+  if (!isEstimateToJobConversionSchemaReady(estimate)) {
+    return { success: false, error: "estimate_conversion_schema_unavailable" };
+  }
+
+  const alreadyConvertedJobId = getEstimateConvertedJobId(estimate);
+  if (alreadyConvertedJobId) {
+    return {
+      success: false,
+      error: "Estimate already converted.",
+      existingJobId: alreadyConvertedJobId,
+    };
+  }
+
+  const status = String(estimate.status ?? "").trim();
+  if (status === "converted") {
+    return { success: false, error: "Estimate is already converted." };
+  }
+  if (status !== "approved") {
+    return {
+      success: false,
+      error: "Only approved estimates can be converted to a job.",
+    };
+  }
+
+  const { data: optionPresenceRows, error: optionPresenceErr } = await supabase
+    .from("estimate_options")
+    .select("id")
+    .eq("estimate_id", estimateId)
+    .limit(1);
+  if (optionPresenceErr) throw optionPresenceErr;
+
+  const proposalMode: "single_option_flat" | "multi_option_packages" =
+    (optionPresenceRows ?? []).length > 0 ? "multi_option_packages" : "single_option_flat";
+
+  const selectedOptionId = String(estimate.selected_option_id ?? "").trim() || null;
+
+  let lines: EstimateConvertibleLine[] = [];
+  if (proposalMode === "multi_option_packages") {
+    if (!selectedOptionId) {
+      return {
+        success: false,
+        error: "selected_option_id is required before converting multi-option estimates.",
+      };
+    }
+
+    const { data: selectedOption, error: selectedOptionErr } = await supabase
+      .from("estimate_options")
+      .select("id")
+      .eq("id", selectedOptionId)
+      .eq("estimate_id", estimateId)
+      .maybeSingle();
+    if (selectedOptionErr) throw selectedOptionErr;
+    if (!selectedOption?.id) {
+      return { success: false, error: "Selected option is not available on this estimate." };
+    }
+
+    const { data: optionLines, error: optionLinesErr } = await supabase
+      .from("estimate_option_line_items")
+      .select(
+        "id, source_pricebook_item_id, item_name_snapshot, description_snapshot, item_type_snapshot, category_snapshot, unit_label_snapshot, unit_price_cents"
+      )
+      .eq("estimate_id", estimateId)
+      .eq("estimate_option_id", selectedOptionId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (optionLinesErr) throw optionLinesErr;
+
+    lines = (optionLines ?? []) as EstimateConvertibleLine[];
+  } else {
+    const { data: flatLines, error: flatLinesErr } = await supabase
+      .from("estimate_line_items")
+      .select(
+        "id, source_pricebook_item_id, item_name_snapshot, description_snapshot, item_type_snapshot, category_snapshot, unit_label_snapshot, unit_price_cents"
+      )
+      .eq("estimate_id", estimateId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true });
+    if (flatLinesErr) throw flatLinesErr;
+
+    lines = (flatLines ?? []) as EstimateConvertibleLine[];
+  }
+
+  if (lines.length === 0) {
+    return { success: false, error: "Estimate has no convertible line items." };
+  }
+
+  const visitScopeItems = sanitizeVisitScopeItems(lines.map(mapEstimateLineToVisitScopeItem));
+
+  let customerSnapshot: {
+    first_name: string | null;
+    last_name: string | null;
+    email: string | null;
+    phone: string | null;
+  } | null = null;
+  if (estimate.customer_id) {
+    const { data: customerRow, error: customerErr } = await supabase
+      .from("customers")
+      .select("first_name, last_name, email, phone")
+      .eq("id", estimate.customer_id)
+      .eq("owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+    if (customerErr) throw customerErr;
+    customerSnapshot = customerRow;
+  }
+
+  let locationSnapshot: { address_line1: string | null; city: string | null } | null = null;
+  if (estimate.location_id) {
+    const { data: locationRow, error: locationErr } = await supabase
+      .from("locations")
+      .select("address_line1, city")
+      .eq("id", estimate.location_id)
+      .eq("owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+    if (locationErr) throw locationErr;
+    locationSnapshot = locationRow;
+  }
+
+  const createdAtIso = new Date().toISOString();
+  const conversionJobTitle = String(estimate.title ?? "").trim() || "Estimate conversion";
+  const approvedTotalCents =
+    proposalMode === "multi_option_packages"
+      ? Number(estimate.selected_option_total_cents ?? 0)
+      : Number(estimate.total_cents ?? 0);
+
+  let jobId = "";
+  try {
+    const { data: insertedJob, error: createJobErr } = await supabase
+      .from("jobs")
+      .insert({
+        title: conversionJobTitle,
+        status: "open",
+        job_type: "service",
+        project_type: "alteration",
+        ops_status: "need_to_schedule",
+        customer_id: estimate.customer_id,
+        location_id: estimate.location_id,
+        service_case_id: estimate.service_case_id,
+        origin_estimate_id: estimate.id,
+        customer_first_name: String(customerSnapshot?.first_name ?? "").trim() || null,
+        customer_last_name: String(customerSnapshot?.last_name ?? "").trim() || null,
+        customer_email: String(customerSnapshot?.email ?? "").trim() || null,
+        customer_phone: String(customerSnapshot?.phone ?? "").trim() || null,
+        job_address: String(locationSnapshot?.address_line1 ?? "").trim() || null,
+        city: String(locationSnapshot?.city ?? "").trim() || null,
+        visit_scope_summary: null,
+        visit_scope_items: visitScopeItems,
+        created_at: createdAtIso,
+      })
+      .select("id")
+      .single();
+
+    if (createJobErr) {
+      const code = String(createJobErr.code ?? "").trim();
+      const msg = String(createJobErr.message ?? "").toLowerCase();
+      if (isEstimateConversionSchemaUnavailableError(createJobErr)) {
+        return { success: false, error: "estimate_conversion_schema_unavailable" };
+      }
+      if (code === "23505" || msg.includes("origin_estimate_id")) {
+        const { data: existingEstimate } = await supabase
+          .from("estimates")
+          .select("converted_job_id")
+          .eq("id", estimateId)
+          .maybeSingle();
+        const existingJobId = getEstimateConvertedJobId(existingEstimate);
+        return {
+          success: false,
+          error: "Estimate already converted.",
+          existingJobId: existingJobId ?? undefined,
+        };
+      }
+      throw createJobErr;
+    }
+
+    jobId = String(insertedJob?.id ?? "").trim();
+    if (!jobId) {
+      return { success: false, error: "Failed to create job from estimate." };
+    }
+  } catch (error) {
+    if (isEstimateConversionSchemaUnavailableError(error)) {
+      return { success: false, error: "estimate_conversion_schema_unavailable" };
+    }
+    throw error;
+  }
+
+  const nowIso = new Date().toISOString();
+  try {
+    const { error: updateEstimateErr } = await supabase
+      .from("estimates")
+      .update({
+        status: "converted",
+        converted_at: nowIso,
+        converted_job_id: jobId,
+        converted_by_user_id: userId,
+        updated_by_user_id: userId,
+        updated_at: nowIso,
+      })
+      .eq("id", estimateId)
+      .eq("account_owner_user_id", accountOwnerUserId);
+
+    if (updateEstimateErr) {
+      const code = String(updateEstimateErr.code ?? "").trim();
+      const msg = String(updateEstimateErr.message ?? "").toLowerCase();
+      if (isEstimateConversionSchemaUnavailableError(updateEstimateErr)) {
+        return { success: false, error: "estimate_conversion_schema_unavailable" };
+      }
+      if (code === "23505" || msg.includes("converted_job_id")) {
+        const { data: existingEstimate } = await supabase
+          .from("estimates")
+          .select("converted_job_id")
+          .eq("id", estimateId)
+          .maybeSingle();
+        const existingJobId = getEstimateConvertedJobId(existingEstimate);
+        return {
+          success: false,
+          error: "Estimate already converted.",
+          existingJobId: existingJobId ?? undefined,
+        };
+      }
+      throw updateEstimateErr;
+    }
+  } catch (error) {
+    if (isEstimateConversionSchemaUnavailableError(error)) {
+      return { success: false, error: "estimate_conversion_schema_unavailable" };
+    }
+    throw error;
+  }
+
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: "estimate_converted_to_job",
+    meta: {
+      job_id: jobId,
+      converted_by_user_id: userId,
+      approved_total_cents: Number.isFinite(approvedTotalCents) ? approvedTotalCents : 0,
+      proposal_mode: proposalMode,
+      selected_option_id: proposalMode === "multi_option_packages" ? selectedOptionId : null,
+      selected_option_label_snapshot:
+        proposalMode === "multi_option_packages"
+          ? String(estimate.selected_option_label_snapshot ?? "").trim() || null
+          : null,
+    },
+    user_id: userId,
+  });
+
+  return {
+    success: true,
+    estimateId,
+    jobId,
+    previousStatus: "approved",
+    nextStatus: "converted",
   };
 }

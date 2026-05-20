@@ -22,7 +22,13 @@ import {
 } from "@/lib/estimates/estimate-document";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
-import { removeLineItemFromForm, transitionEstimateStatusFromForm, sendEstimateFromForm, recordEstimateApprovalResponseFromForm } from "./actions";
+import {
+  removeLineItemFromForm,
+  transitionEstimateStatusFromForm,
+  sendEstimateFromForm,
+  recordEstimateApprovalResponseFromForm,
+  convertEstimateToJobFromForm,
+} from "./actions";
 import AddLineItemForm from "./AddLineItemForm";
 import EstimateStatusActionForm from "./EstimateStatusActionForm";
 import EstimateApprovalResponseForm from "./EstimateApprovalResponseForm";
@@ -131,10 +137,14 @@ type PricebookPickerRow = {
 
 export default async function EstimateDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ notice?: string }>;
 }) {
   const { id } = await params;
+  const search = searchParams ? await searchParams : undefined;
+  const notice = String(search?.notice ?? "").trim();
 
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -160,9 +170,28 @@ export default async function EstimateDetailPage({
 
   const isDraft = estimate.status === "draft";
   const isSent = estimate.status === "sent";
+  const isApproved = estimate.status === "approved";
+  const isConverted = estimate.status === "converted";
+  const canConvertToJob =
+    isApproved && estimate.conversionSchemaReady && !estimate.converted_job_id;
+
   async function submitRemoveOptionLine(formData: FormData) {
     "use server";
     await removeEstimateOptionLineItemFromForm(formData);
+  }
+
+  async function submitConvertEstimateToJob(formData: FormData) {
+    "use server";
+    const estimateId = String(formData.get("estimate_id") ?? "").trim();
+    if (!estimateId) return;
+
+    const result = await convertEstimateToJobFromForm(formData);
+    if (!result?.success) {
+      const encoded = encodeURIComponent(String(result?.error ?? "estimate_conversion_failed"));
+      redirect(`/estimates/${estimateId}?notice=${encoded}`);
+    }
+
+    redirect(`/estimates/${estimateId}?notice=estimate_converted_to_job`);
   }
 
   const statusMessage = statusGuidanceMessage(estimate.status);
@@ -256,8 +285,33 @@ export default async function EstimateDetailPage({
     isEmailSendEnabled: emailSendEnabled,
   });
 
+  let convertedJobTitle: string | null = null;
+  if (estimate.converted_job_id) {
+    const { data: convertedJob } = await supabase
+      .from("jobs")
+      .select("id, title")
+      .eq("id", estimate.converted_job_id)
+      .maybeSingle();
+
+    if (convertedJob?.id) {
+      convertedJobTitle = String(convertedJob.title ?? "").trim() || "Converted Job";
+    }
+  }
+
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
+      {notice && (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 print:hidden">
+          {notice === "estimate_converted_to_job"
+            ? "Estimate converted to job successfully."
+            : notice === "estimate_conversion_schema_unavailable"
+              ? "Estimate conversion is unavailable until the conversion schema migration is applied."
+              : notice === "selected_option_id is required before converting multi-option estimates."
+                ? "Select an approved option before converting this multi-option estimate."
+                : `Estimate conversion notice: ${notice}`}
+        </div>
+      )}
+
       {/* Breadcrumb */}
       <nav className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500 print:hidden">
         <div>
@@ -592,7 +646,7 @@ export default async function EstimateDetailPage({
 
       {/* Estimate proposal rendering */}
       {/* Approval response panel — visible on approved terminal state */}
-      {estimate.status === "approved" && (
+      {isApproved && (
         <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
           <h2 className="text-base font-semibold text-emerald-900">Approval Response</h2>
           <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">
@@ -629,6 +683,40 @@ export default async function EstimateDetailPage({
           )}
           <p className="mt-3 text-[11px] text-slate-400">
             Internal V1 record only. No job, invoice, payment, customer approval record, or conversion was created.
+          </p>
+
+          {canConvertToJob && (
+            <form action={submitConvertEstimateToJob} className="mt-4">
+              <input type="hidden" name="estimate_id" value={estimate.id} />
+              <button
+                type="submit"
+                className="inline-flex items-center justify-center rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 transition-[background-color,border-color,transform] hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 active:translate-y-[0.5px]"
+              >
+                Convert to Job
+              </button>
+              <p className="mt-1 text-[11px] text-slate-500">
+                Internal-only Action A: approved estimate to job. No invoice/payment/QBO/SMS/email/portal behavior.
+              </p>
+            </form>
+          )}
+
+          {isApproved && !estimate.conversionSchemaReady && (
+            <p className="mt-3 text-[11px] text-amber-700">
+              Conversion action is hidden until conversion schema migration is available in this environment.
+            </p>
+          )}
+        </div>
+      )}
+
+      {isConverted && estimate.converted_job_id && (
+        <div className="rounded-2xl border border-violet-200 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
+          <h2 className="text-base font-semibold text-violet-900">Converted Job Linkage</h2>
+          <p className="mt-1 text-sm text-slate-700">
+            This estimate is linked to job{" "}
+            <Link href={`/jobs/${estimate.converted_job_id}`} className="font-semibold text-violet-700 hover:underline">
+              {convertedJobTitle ?? estimate.converted_job_id}
+            </Link>
+            .
           </p>
         </div>
       )}

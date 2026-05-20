@@ -68,6 +68,8 @@ function buildMultiOptionEstimateFixture(): EstimateReadResult {
     expired_at: null,
     cancelled_at: null,
     converted_at: null,
+    converted_job_id: null,
+    converted_by_user_id: null,
     created_by_user_id: "u-1",
     updated_by_user_id: "u-1",
     created_at: "2026-05-01T10:00:00.000Z",
@@ -124,6 +126,7 @@ function buildMultiOptionEstimateFixture(): EstimateReadResult {
       }),
     ],
     approvalResponseSchemaReady: true,
+    conversionSchemaReady: true,
   };
 }
 
@@ -147,6 +150,8 @@ function buildEstimateFixture(): EstimateReadResult {
     expired_at: null,
     cancelled_at: null,
     converted_at: null,
+    converted_job_id: null,
+    converted_by_user_id: null,
     created_by_user_id: "u-1",
     updated_by_user_id: "u-1",
     created_at: "2026-05-01T10:00:00.000Z",
@@ -192,6 +197,7 @@ function buildEstimateFixture(): EstimateReadResult {
     ],
     options: [],
     approvalResponseSchemaReady: true,
+    conversionSchemaReady: true,
   };
 }
 

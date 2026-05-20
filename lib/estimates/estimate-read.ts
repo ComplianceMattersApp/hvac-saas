@@ -2,8 +2,88 @@
 // Compliance Matters: Estimate V1B read boundary + helpers.
 // Internal-only. Account-owner scoped. No UI, no customer/contractor visibility.
 
+
 import { createAdminClient } from "@/lib/supabase/server";
 import type { InternalUserRow } from "@/lib/auth/internal-user";
+
+function hasOwn(obj: unknown, key: string): boolean {
+  return Boolean(obj && typeof obj === "object" && Object.prototype.hasOwnProperty.call(obj, key));
+}
+
+function isMissingEstimateToJobConversionSchemaError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+
+  const maybeError = error as { code?: string | null; message?: string | null };
+  const code = String(maybeError.code ?? "").trim();
+  const message = String(maybeError.message ?? "").toLowerCase();
+
+  if (code === "42703" || code === "42P01" || code === "PGRST205") {
+    return true;
+  }
+
+  return (
+    message.includes("converted_job_id") ||
+    message.includes("converted_by_user_id") ||
+    message.includes("origin_estimate_id") ||
+    message.includes("schema cache") ||
+    (message.includes("column") && message.includes("does not exist"))
+  );
+}
+
+// Normalize missing conversion fields to null for compatibility.
+export function getEstimateConvertedJobId(estimateRow: unknown): string | null {
+  if (!hasOwn(estimateRow, "converted_job_id")) return null;
+  const value = (estimateRow as Record<string, unknown>).converted_job_id;
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+export function getEstimateConvertedByUserId(estimateRow: unknown): string | null {
+  if (!hasOwn(estimateRow, "converted_by_user_id")) return null;
+  const value = (estimateRow as Record<string, unknown>).converted_by_user_id;
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+export function getJobOriginEstimateId(jobRow: unknown): string | null {
+  if (!hasOwn(jobRow, "origin_estimate_id")) return null;
+  const value = (jobRow as Record<string, unknown>).origin_estimate_id;
+  return typeof value === "string" && value.trim() ? value : null;
+}
+
+export async function getEstimateToJobConversionSchemaReady(params: {
+  supabase: any;
+}): Promise<boolean> {
+  try {
+    const { error: estimateSchemaErr } = await params.supabase
+      .from("estimates")
+      .select("id, converted_job_id, converted_by_user_id")
+      .maybeSingle();
+
+    if (estimateSchemaErr) {
+      if (isMissingEstimateToJobConversionSchemaError(estimateSchemaErr)) return false;
+      throw estimateSchemaErr;
+    }
+
+    const { error: jobSchemaErr } = await params.supabase
+      .from("jobs")
+      .select("id, origin_estimate_id")
+      .maybeSingle();
+
+    if (jobSchemaErr) {
+      if (isMissingEstimateToJobConversionSchemaError(jobSchemaErr)) return false;
+      throw jobSchemaErr;
+    }
+
+    return true;
+  } catch (error) {
+    if (isMissingEstimateToJobConversionSchemaError(error)) return false;
+    throw error;
+  }
+}
+
+export function isEstimateToJobConversionSchemaReady(estimateRow: unknown): boolean {
+  return hasOwn(estimateRow, "converted_job_id") && hasOwn(estimateRow, "converted_by_user_id");
+}
+
 
 // ---------------------------------------------------------------------------
 // Estimate number generation
@@ -374,6 +454,8 @@ export type EstimateReadResult = {
   expired_at: string | null;
   cancelled_at: string | null;
   converted_at: string | null;
+  converted_job_id: string | null;
+  converted_by_user_id: string | null;
   // Approval response projection (V1 — set during recordEstimateApprovalResponse)
   selected_option_id: string | null;
   selected_option_label_snapshot: string | null;
@@ -387,6 +469,7 @@ export type EstimateReadResult = {
   line_items: EstimateLineReadResult[];
   options?: EstimateOptionReadResult[];
   approvalResponseSchemaReady: boolean;
+  conversionSchemaReady: boolean;
 };
 
 /**
@@ -429,6 +512,15 @@ export async function getEstimateById(params: {
     }
   }
 
+  // Schema-missing compatibility: normalize conversion linkage fields
+  const conversionFields = ["converted_job_id", "converted_by_user_id"];
+  for (const field of conversionFields) {
+    if (!Object.prototype.hasOwnProperty.call(estimate, field)) {
+      estimate[field] = null;
+    }
+  }
+  const conversionSchemaReady = isEstimateToJobConversionSchemaReady(estimate);
+
   // Load flat line items (current/V1A behavior)
   const { data: lines, error: linesErr } = await params.supabase
     .from("estimate_line_items")
@@ -451,9 +543,12 @@ export async function getEstimateById(params: {
 
   const result: EstimateReadResult = {
     ...estimate,
+    converted_job_id: getEstimateConvertedJobId(estimate),
+    converted_by_user_id: getEstimateConvertedByUserId(estimate),
     proposalMode,
     line_items: lines ?? [],
     approvalResponseSchemaReady,
+    conversionSchemaReady,
   };
 
   // Include options only if they exist (multi-option mode)

@@ -14,6 +14,7 @@ import {
   createDefaultEstimateOptions,
   updateEstimateOptionMetadata,
   recordEstimateApprovalResponse,
+  convertApprovedEstimateToJob,
   type AddEstimateLineItemParams,
   type AddEstimateOptionLineItemParams,
   type UpdateEstimateOptionMetadataParams,
@@ -247,4 +248,24 @@ export async function recordEstimateApprovalResponseFromForm(formData: FormData)
   if (result.success) {
     revalidatePath(`/estimates/${estimateId}`);
   }
+}
+
+/**
+ * Convert an approved estimate to an internal job (Section 2C Action A).
+ * Safe no-op when estimates are disabled or form payload is missing.
+ */
+export async function convertEstimateToJobFromForm(formData: FormData) {
+  if (!isEstimatesEnabled()) return;
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  if (!estimateId) return;
+
+  const result = await convertApprovedEstimateToJob({ estimateId });
+  if (result.success) {
+    revalidatePath(`/estimates/${estimateId}`);
+    revalidatePath(`/jobs/${result.jobId}`);
+    revalidatePath("/jobs");
+  }
+
+  return result;
 }
