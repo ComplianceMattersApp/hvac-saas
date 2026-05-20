@@ -23,6 +23,7 @@ import {
   resolveInvoiceCollectedPaymentLedger,
   type InternalInvoicePaymentRow,
 } from "@/lib/business/internal-invoice-payments";
+import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import {
   addInternalInvoiceLineItemFromForm,
   addInternalInvoiceLineItemFromPricebookForm,
@@ -36,6 +37,7 @@ import {
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
 import { recordInternalInvoicePaymentFromForm } from "@/lib/actions/internal-invoice-payment-actions";
+import TenantInvoicePaymentLinkPanel from "./_components/TenantInvoicePaymentLinkPanel";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "../_components/InternalInvoiceLineItemsTable";
@@ -45,6 +47,7 @@ import {
 } from "@/lib/jobs/visit-scope";
 import { formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
+import { resolveInvoicePaymentLinkUiState } from "./invoice-payment-link-ui";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -159,6 +162,8 @@ export default async function InternalInvoiceWorkspacePage({
   const { id: jobId } = await params;
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const banner = firstSearchValue(sp.banner);
+  const checkoutSessionId = firstSearchValue(sp.checkout_session_id);
+  const checkoutSessionUrl = firstSearchValue(sp.checkout_session_url);
   const supabase = await createClient();
 
   const {
@@ -196,6 +201,11 @@ export default async function InternalInvoiceWorkspacePage({
   if (billingMode !== "internal_invoicing") {
     redirect(`/jobs/${jobId}?tab=info&banner=internal_invoicing_billing_pending#internal-invoice-panel`);
   }
+
+  const tenantStripeReadiness = await resolveTenantStripeConnectReadiness(
+    internalUser.account_owner_user_id,
+    supabase,
+  );
 
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
@@ -336,6 +346,14 @@ export default async function InternalInvoiceWorkspacePage({
     : "Unpaid";
   const returnTo = `/jobs/${jobId}/invoice#invoice-workspace`;
   const bannerText = bannerMessage(banner);
+  const invoicePaymentLinkUiState = resolveInvoicePaymentLinkUiState({
+    billingMode,
+    invoiceStatus: normalizeInternalInvoiceStatus(invoice?.status ?? null),
+    balanceDueCents: paymentSummary?.balanceDueCents ?? 0,
+    connectReady: tenantStripeReadiness.isReady,
+  });
+  const checkoutSessionUrlFromQuery = String(checkoutSessionUrl ?? "").trim() || null;
+  const checkoutSessionIdFromQuery = String(checkoutSessionId ?? "").trim() || null;
 
   return (
     <div id="invoice-workspace" className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6">
@@ -474,6 +492,39 @@ export default async function InternalInvoiceWorkspacePage({
                 </div>
               )}
             </section>
+
+            {invoicePaymentLinkUiState.showPanel ? (
+              <section className={`${panelClass} p-4 sm:p-5`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Customer Payment Link</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Create a Stripe-hosted checkout page</h2>
+
+                {invoicePaymentLinkUiState.showCreateButton ? (
+                  <TenantInvoicePaymentLinkPanel
+                    jobId={jobId}
+                    invoiceId={invoice.id}
+                    returnTo={returnTo}
+                    balanceDueDisplay={formatCurrencyFromCents(paymentSummary?.balanceDueCents ?? 0)}
+                    initialCheckoutSessionId={checkoutSessionIdFromQuery}
+                    initialCheckoutSessionUrl={checkoutSessionUrlFromQuery}
+                  />
+                ) : (
+                  <div className="mt-4 rounded-3xl border border-amber-200 bg-amber-50/70 px-5 py-4 text-sm leading-6 text-amber-900">
+                    <div className="font-semibold">Stripe Connect setup required</div>
+                    <div className="mt-1">
+                      Online customer payment links stay disabled until the company Stripe Connect account is ready.
+                    </div>
+                    <div className="mt-3">
+                      <Link
+                        href={invoicePaymentLinkUiState.setupHref}
+                        className="inline-flex min-h-10 items-center justify-center rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-950 transition-[background-color,box-shadow,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
+                      >
+                        Open company profile Stripe setup
+                      </Link>
+                    </div>
+                  </div>
+                )}
+              </section>
+            ) : null}
 
             {invoice.status === "issued" ? (
               <section className={`${panelClass} p-4 sm:p-5`}>

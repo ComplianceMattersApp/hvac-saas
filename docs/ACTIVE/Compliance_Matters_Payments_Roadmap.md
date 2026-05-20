@@ -366,6 +366,34 @@ Not introduced in V1A-3D-2:
 - No platform seat billing behavior changes
 - No manual/off-platform payment recording behavior changes
 
+### Tenant Customer Payments V1A-3E (Invoice Workspace Payment Link UI)
+
+**Status**: V1A-3E invoice workspace payment link UI implemented (internal users only).
+
+- Added invoice workspace UI in `app/jobs/[id]/invoice/page.tsx`.
+- UI behavior:
+	- shows only for issued invoices with balance due > 0
+	- shows setup-required guidance when Stripe Connect is not ready
+	- links safely to company profile Stripe setup
+	- renders `Create Customer Payment Link` only when Connect readiness is ready
+	- uses `createTenantInvoiceCheckoutSessionFromForm` with `no_redirect=1` so the returned Checkout URL can be displayed/copied on page
+- Success behavior:
+	- displays returned Checkout Session URL for copy/share
+	- does not redirect the customer
+	- does not insert `internal_invoice_payments`
+	- does not mark the invoice paid
+- Manual payment tracking remains visible and unchanged.
+- Webhook remains the collected-payment source of truth.
+
+Not introduced in V1A-3E:
+- No customer portal
+- No email sending
+- No SMS
+- No stored PDF/payment attachment
+- No refunds/disputes/saved cards/partial payments
+- No QBO
+- No production Stripe/Supabase/env changes
+
 ---
 
 ## 6. Payment foundation requirements (build now)

@@ -923,6 +923,28 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Verified: wrapper does not mark invoice paid.
 - Confirmed deferred boundaries unchanged: no invoice workspace UI button, no customer portal, no QBO, no refunds/disputes/saved cards/partial payments.
 
+### 2.6.3E Tenant Customer Payment V1A-3E (Invoice Workspace Payment Link UI)
+- Completed: invoice workspace customer payment link UI added on `app/jobs/[id]/invoice/page.tsx`.
+- UI gates:
+  - issued invoice required
+  - positive balance due required
+  - internal invoicing mode required
+  - Stripe Connect readiness required for the action button
+- UI behavior:
+  - shows setup-required messaging when Stripe Connect is not ready
+  - links safely to company profile Stripe setup
+  - shows `Create Customer Payment Link` only when eligible
+  - uses `no_redirect=1` so the Checkout URL can be displayed/copied on page
+- Verified: successful action result can surface Checkout URL for copy/share.
+- Verified: no local payment row insertion by UI/action.
+- Verified: manual payment recording section remains visible and unchanged.
+- Verified: webhook remains the collected-payment source of truth.
+- Confirmed deferred boundaries unchanged:
+  - no customer portal
+  - no QBO
+  - no refunds/disputes/saved cards/partial payments
+  - no production Stripe/Supabase/env changes
+
 ### 2.6.4 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
 - Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.

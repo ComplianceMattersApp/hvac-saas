@@ -367,3 +367,47 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
     throw error;
   }
 }
+
+export type TenantInvoiceCheckoutSessionActionState = {
+  status: 'idle' | 'success' | 'error';
+  message: string;
+  checkoutSessionId: string | null;
+  checkoutSessionUrl: string | null;
+};
+
+export const INITIAL_TENANT_INVOICE_CHECKOUT_SESSION_ACTION_STATE: TenantInvoiceCheckoutSessionActionState = {
+  status: 'idle',
+  message: '',
+  checkoutSessionId: null,
+  checkoutSessionUrl: null,
+};
+
+export async function createTenantInvoiceCheckoutSessionFromFormState(
+  _prevState: TenantInvoiceCheckoutSessionActionState,
+  formData: FormData,
+): Promise<TenantInvoiceCheckoutSessionActionState> {
+  const forwardedFormData = new FormData();
+
+  for (const [key, value] of formData.entries()) {
+    forwardedFormData.set(key, value);
+  }
+
+  forwardedFormData.set('no_redirect', '1');
+
+  const result = await createTenantInvoiceCheckoutSessionFromForm(forwardedFormData);
+
+  if (!result || result.ok !== true) {
+    return {
+      ...INITIAL_TENANT_INVOICE_CHECKOUT_SESSION_ACTION_STATE,
+      status: 'error',
+      message: 'We could not create the customer payment link.',
+    };
+  }
+
+  return {
+    status: 'success',
+    message: 'Customer payment link created.',
+    checkoutSessionId: String(result.checkoutSessionId ?? '').trim() || null,
+    checkoutSessionUrl: String(result.checkoutSessionUrl ?? '').trim() || null,
+  };
+}

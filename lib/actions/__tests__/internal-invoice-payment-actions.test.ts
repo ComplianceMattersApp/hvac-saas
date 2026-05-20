@@ -528,4 +528,26 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     expect(fixture.writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(false);
     expect(insertJobEventMock).not.toHaveBeenCalled();
   });
+
+  it('action-state wrapper forces no-redirect and returns checkout URL state', async () => {
+    const { createTenantInvoiceCheckoutSessionFromFormState } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      createTenantInvoiceCheckoutSessionFromFormState(
+        {
+          status: 'idle',
+          message: '',
+          checkoutSessionId: null,
+          checkoutSessionUrl: null,
+        },
+        buildCheckoutFormData(),
+      ),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        status: 'success',
+        checkoutSessionId: 'cs_123',
+        checkoutSessionUrl: 'https://checkout.stripe.com/c/pay/cs_123',
+      }),
+    );
+  });
 });
