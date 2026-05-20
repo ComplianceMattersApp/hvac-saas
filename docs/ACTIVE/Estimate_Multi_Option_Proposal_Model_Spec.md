@@ -437,3 +437,35 @@ This is a model lock only.
    - No email/provider changes.
    - No portal/public behavior.
    - No production Supabase commands.
+
+## 3) Section 2E: Estimate → Invoice Draft Conversion Schema Foundation
+
+**Status: Implementation complete (2026-05-20) — schema foundation and deploy-safety compatibility only.**
+
+Section 2E implements schema and read-model compatibility for future Action B (estimate → invoice draft conversion), without introducing any invoice conversion behavior, invoice draft creation, invoice line items, or production Supabase commands.
+
+**Schema foundation**:
+
+- Migration `supabase/migrations/20260520130000_estimate_invoice_conversion_foundation_v1.sql` adds:
+  - `estimates.converted_invoice_id` (nullable string).
+  - `internal_invoices.source_estimate_id` (nullable string).
+  - Unique partial index on `estimates(converted_invoice_id)` where `converted_invoice_id is not null`.
+  - Unique partial index on `internal_invoices(source_estimate_id)` where `source_estimate_id is not null and status != 'void'`.
+  - No RLS changes; internal/authenticated scope inherited from parent tables.
+
+**Read-model compatibility**:
+
+- `getEstimateConvertedInvoiceId()` normalizes missing `converted_invoice_id` to null for compatibility with older schema.
+- `isEstimateToInvoiceConversionSchemaReady()` returns `false` when the field is absent and `true` only when the field exists.
+- `EstimateReadResult` includes `converted_invoice_id` and `invoiceConversionSchemaReady` fields for consumers.
+- `EstimateListItem` includes `converted_invoice_id` for list operations.
+
+**Boundaries**:
+
+- No `recordEstimateToInvoiceConversion` action.
+- No invoice draft creation.
+- No invoice line item creation.
+- No "Convert to Invoice" button or UI.
+- No issue/send/payment/QBO/SMS/email/provider/portal behavior.
+- No production Supabase command was run in this slice.
+- Migration activation remains environment-gated; V1 Action B requires a separate approval window after Section 2D behavior is proven live.

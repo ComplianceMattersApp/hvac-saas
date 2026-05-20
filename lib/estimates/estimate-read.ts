@@ -36,6 +36,16 @@ export function getEstimateConvertedJobId(estimateRow: unknown): string | null {
   const value = (estimateRow as Record<string, unknown>).converted_job_id;
   return typeof value === "string" && value.trim() ? value : null;
 }
+  // Normalize missing converted_invoice_id for compatibility
+  export function getEstimateConvertedInvoiceId(estimateRow: unknown): string | null {
+    if (!hasOwn(estimateRow, "converted_invoice_id")) return null;
+    const value = (estimateRow as Record<string, unknown>).converted_invoice_id;
+    return typeof value === "string" && value.trim() ? value : null;
+  }
+
+  export function isEstimateToInvoiceConversionSchemaReady(estimateRow: unknown): boolean {
+    return hasOwn(estimateRow, "converted_invoice_id");
+  }
 
 export function getEstimateConvertedByUserId(estimateRow: unknown): string | null {
   if (!hasOwn(estimateRow, "converted_by_user_id")) return null;
@@ -519,6 +529,7 @@ export async function getEstimateById(params: {
       estimate[field] = null;
     }
   }
+    const invoiceConversionSchemaReady = isEstimateToInvoiceConversionSchemaReady(estimate);
   const conversionSchemaReady = isEstimateToJobConversionSchemaReady(estimate);
 
   // Load flat line items (current/V1A behavior)
@@ -545,10 +556,12 @@ export async function getEstimateById(params: {
     ...estimate,
     converted_job_id: getEstimateConvertedJobId(estimate),
     converted_by_user_id: getEstimateConvertedByUserId(estimate),
+      converted_invoice_id: getEstimateConvertedInvoiceId(estimate),
     proposalMode,
     line_items: lines ?? [],
     approvalResponseSchemaReady,
     conversionSchemaReady,
+      invoiceConversionSchemaReady,
   };
 
   // Include options only if they exist (multi-option mode)
@@ -576,8 +589,8 @@ export type EstimateListItem = {
   created_at: string;
   updated_at: string;
   proposalMode: "single_option_flat" | "multi_option_packages";
+  converted_invoice_id: string | null;
 };
-
 /**
  * List estimates for an account, most recent first.
  * Optional status filter.
