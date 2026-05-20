@@ -160,6 +160,12 @@ Not supported now:
 - No live Checkout UI yet; no customer-facing payment link creation; no Stripe API calls for charges
 - Next slice (V1A-3): Checkout Session creation UI for tenant customers to initiate payment
 
+V1A-3A correction lock (charge type):
+- V1 tenant customer payments must use Stripe Connect direct charges in connected-account context.
+- Current V1A-2 webhook routing remains valid for idempotent charge recording, but must add connected-account ownership verification before production use:
+	- Verify event/account context maps to the expected connected account for the tenant owner.
+	- Reject charge events where connected-account context does not match tenant ownership.
+
 Locked direction:
 - Webhook handlers use same idempotency and validation pattern as platform billing
 - Charge metadata drives routing decision between platform and tenant invoice workflows
@@ -172,6 +178,65 @@ Not supported now:
 - Partial charge handling
 - Webhook filtering by processor type
 - Multiple concurrent payment attempts
+
+---
+
+### Tenant Customer Payments V1A-3 (Checkout Session Creation UI)
+
+**Status**: V1A-3 helper and UI are implemented in platform-account context; V1A-3A correction now locks Connect direct-charge model before production tenant payment use.
+
+- V1A-3 helper: `createTenantInvoiceCheckoutSession()` creates Stripe Checkout Session for issued invoices with balance due
+  - Validates invoice exists, is issued, and has balance > 0
+  - Returns session ID and checkout URL for customer redirect
+  - Does NOT insert payment row locally; payment truth recorded only on webhook receipt
+  - Includes metadata for webhook routing: `account_owner_user_id`, `invoice_id`, `job_id`, `invoice_number`
+- V1A-3 server action: `createInvoicePaymentCheckoutSessionFromForm()` wraps helper with auth and scoping
+  - Verifies internal user auth via `requireInternalUser()`
+  - Verifies job scope via `loadScopedInternalJobForMutation()`
+  - Instantiates Stripe client from `STRIPE_SECRET_KEY`
+  - Redirects to Stripe checkout URL on success
+  - Redirects to invoice page with error banner on validation failure (4 banner types: invoice not found, not issued, no balance, ineligible)
+- V1A-3 UI integration: Green-themed "STRIPE-HOSTED PAYMENT" button in issued invoice workspace
+  - Placed above existing manual payment recording form
+  - Form action: `createInvoicePaymentCheckoutSessionFromForm`
+  - Disabled when: invoice not issued OR balance due ≤ 0
+  - Description: "Creates a Stripe-hosted payment page for this invoice balance. Payment is recorded after Stripe confirms it."
+  - Button text: "Create Customer Payment Link"
+  - Loading state: "Creating..."
+- Eligibility validation: Invokes `validateInvoiceEligibleForOnlinePayment()` to verify:
+  - Invoice status = 'issued' (not draft, void, or paid)
+  - Balance due > 0 (no overpayment or zero-balance invoices)
+  - Returns detailed reason for ineligibility if validation fails
+- Payment summary resolution: Calls `resolveInvoiceCollectedPaymentSummary()` to derive current balance from collected payments
+- Test coverage: 5 unit tests covering:
+  1. Successful Checkout Session creation with correct Stripe API params
+  2. Rejection of missing invoices
+  3. Rejection of ineligible invoices (draft, void, or invalid state)
+  4. No local database insert during session creation (webhook-only pattern verified)
+  5. Correct metadata inclusion for webhook routing
+- No live payment execution: Checkout Session creation only; actual charge happens at customer Stripe checkout, then webhook records payment
+- Next slice (V1A-4): Customer-facing payment link distribution and outcome feedback (future planning)
+
+V1A-3A correction lock (source-of-truth):
+- The current helper creates Checkout Sessions without connected-account request context.
+- For V1 tenant funds-flow, Checkout Session creation must execute in connected-account context (direct charge model), not platform destination/on_behalf_of model.
+- Until that correction slice is complete, current V1A-3 implementation is not the approved production tenant-customer payment path.
+
+Locked direction:
+- Helper pattern follows established `createTenantInvoiceCheckoutSession` architecture from platform billing
+- Server action uses job-scope gating consistent with internal invoice mutation actions
+- UI integrates cleanly into existing invoice workspace without disrupting manual payment workflow
+- Metadata-driven webhook routing allows Stripe events to reach correct handler without code changes
+- No local payment insert ensures webhook remains sole source of truth for payment recording
+
+Not supported now:
+- Customer portal / saved payment methods
+- Partial payments (full balance only)
+- Refunds / disputes through processor
+- Automatic retry on checkout failures
+- Payment success/failure email to customer
+- Payout/contract payment execution
+- Multiple concurrent checkouts per invoice
 
 ---
 

@@ -815,8 +815,50 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Confirmed: no production Supabase mutations (webhook handlers use admin client for read/insert only).
 - Confirmed: no new production Stripe API calls (webhook handler only consumes existing Stripe events).
 - Confirmed: no env/secret changes; uses existing Stripe webhook endpoint.
+- V1A-3A correction lock: webhook idempotency/validation logic remains valid, but production tenant payment processing must also verify connected-account ownership (event/account context must match stored tenant connected account).
 
-### 2.6.3 Operational entitlement mutation guard rollout closeout (production-promoted)
+### 2.6.3 Tenant Customer Payment V1A-3 (Checkout Session Creation UI)
+- Completed: V1A-3 Stripe Checkout Session helper and invoice workspace UI implemented.
+- Completed: helper `createTenantInvoiceCheckoutSession()` in `lib/business/tenant-invoice-stripe-checkout.ts`
+  - Loads invoice, validates issued status and balance > 0
+  - Resolves payment summary (accounts for prior payments)
+  - Creates Stripe Checkout Session with full balance as line_item amount
+  - Returns session ID and checkout URL
+  - Does NOT insert payment row locally (webhook-only truth)
+- Completed: server action `createInvoicePaymentCheckoutSessionFromForm()` in `lib/actions/internal-invoice-stripe-actions.ts`
+  - Verifies internal user auth via `requireInternalUser()`
+  - Verifies job scope via `loadScopedInternalJobForMutation()`
+  - Instantiates Stripe client from STRIPE_SECRET_KEY
+  - Redirects to checkout URL on success
+  - Redirects to invoice page with error banner on validation failure (4 banner types: not found, not issued, no balance, ineligible)
+- Completed: invoice workspace UI integration
+  - "STRIPE-HOSTED PAYMENT" button added (green-themed box)
+  - Placed above existing manual payment recording form
+  - Form action: createInvoicePaymentCheckoutSessionFromForm
+  - Button disabled when: invoice not issued OR balance ≤ 0
+  - Button text: "Create Customer Payment Link"
+  - Loading state: "Creating..."
+- Completed: eligibility validation
+  - Requires issued status (not draft, void, or paid)
+  - Requires balance > 0 (derived from invoice total minus collected payments)
+  - Returns descriptive reason if validation fails
+- Verified: TypeScript compilation clean; no type errors.
+- Verified: unit test suite passes (5 tests: successful creation, missing invoice rejection, ineligibility rejection, no local insert verification, metadata inclusion).
+- Verified: helper pattern follows platform billing architecture conventions.
+- Verified: server action uses established job-scope gating pattern.
+- Verified: UI button integrates cleanly with existing invoice workspace without disrupting manual payment workflow.
+- Deferred: customer payment link distribution.
+- Deferred: payment success/failure email notifications.
+- Deferred: no customer portal, no saved payment methods, no partial payments, no refunds/disputes, no payout execution.
+- Confirmed: no local payment row inserted during session creation (webhook-only truth maintained).
+- Confirmed: no production Supabase mutations during checkout session creation.
+- Confirmed: no new Stripe API calls beyond checkout.sessions.create (existing Stripe client used).
+- Confirmed: no env/secret changes; uses existing STRIPE_SECRET_KEY.
+- V1A-3A correction lock: current checkout-session helper runs without connected-account request context (platform-context behavior).
+- V1 tenant customer funds-flow must use Stripe Connect direct charges created in connected-account context; platform destination/on_behalf_of model is not the locked V1 model for tenant invoice collection.
+- Until direct-charge context is enforced, V1A-3 is not the approved production tenant-customer payment execution path.
+
+### 2.6.4 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
 - Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.
 - Confirmed: production smoke passed.

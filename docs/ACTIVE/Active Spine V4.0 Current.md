@@ -2341,6 +2341,51 @@ Current implementation truth:
 - Platform billing unchanged: Existing subscription webhook behavior preserved; charge events without invoice_id pass through
 - No live Checkout Session creation in V1A-2; no customer UI yet; webhook-receiver-only
 - Next slice: V1A-3 Checkout Session creation UI for customer-initiated payments
+- V1A-3A correction lock: V1A-2 handler flow remains valid but requires connected-account ownership verification before production tenant payment use (event/account context must match tenant connected account).
+
+### Tenant Customer Payment V1A-3 (Checkout Session Creation UI)
+
+**Status**: V1A-3 helper and invoice workspace UI implemented in platform-account context; V1A-3A correction locks direct-charge connected-account model for production tenant payment use.
+
+- V1A-3 helper: `createTenantInvoiceCheckoutSession()` in `lib/business/tenant-invoice-stripe-checkout.ts`
+  - Accepts stripe client, supabase admin client, jobId, appUrl
+  - Loads invoice via `resolveInternalInvoiceByJobId()` and validates existence
+  - Resolves payment summary via `resolveInvoiceCollectedPaymentSummary()` (accounts for prior payments)
+  - Validates eligibility: issued status only, balance > 0
+  - Creates Stripe Checkout Session with full balance as line_item amount
+  - Includes metadata for webhook routing: `account_owner_user_id`, `invoice_id`, `job_id`, `invoice_number`
+  - Returns `{ url, sessionId }` or throws descriptive error
+  - Does NOT insert payment row locally (webhook-only truth pattern)
+- V1A-3 server action: `createInvoicePaymentCheckoutSessionFromForm()` in `lib/actions/internal-invoice-stripe-actions.ts`
+  - Wraps helper with auth and job-scope verification
+  - Verifies internal user auth via `requireInternalUser()`
+  - Verifies job access via `loadScopedInternalJobForMutation({ jobId, accountOwnerUserId })`
+  - Instantiates Stripe client from `STRIPE_SECRET_KEY` env var
+  - Calls helper and redirects to checkout URL on success
+  - Redirects to invoice page with error banner on validation failure (4 banner types)
+- V1A-3 UI integration: Invoice workspace payment section now includes "STRIPE-HOSTED PAYMENT" button
+  - Location: Issued invoice workspace, above existing manual payment recording form
+  - Appearance: Green-themed box (border-green-200/80, bg-green-50/70)
+  - Label: "STRIPE-HOSTED PAYMENT" (11px uppercase semibold)
+  - Description: "Creates a Stripe-hosted payment page for this invoice balance. Payment is recorded after Stripe confirms it."
+  - Form: action=`createInvoicePaymentCheckoutSessionFromForm`, hidden inputs for job_id and tab
+  - Button: "Create Customer Payment Link", disabled when invoice not issued or balance ≤ 0
+  - Loading state: "Creating..."
+- Eligibility validation:
+  - Requires issued status (not draft, void, partial, or paid)
+  - Requires balance > 0 (derived from invoice total minus collected payments)
+  - Returns descriptive reason if validation fails
+- Test coverage: 5 unit tests
+  - Successful checkout session creation with correct Stripe API parameters
+  - Rejection of missing invoices
+  - Rejection of ineligible invoices (draft, void states)
+  - No local payment row insert during session creation (webhook-only pattern verified via mock)
+  - Correct metadata inclusion for webhook routing
+- No local payment insert: Payment truth recorded only after webhook receipt (one source of truth)
+- Next slice: V1A-4 (future) customer payment link distribution, outcome notifications
+- Locked boundaries preserved: No customer portal, no saved payment methods, no partial payments, no refunds/disputes through processor
+- V1A-3A correction lock: current checkout-session helper call lacks connected-account request context and therefore does not represent the locked V1 tenant funds-flow model.
+- Locked V1 tenant funds-flow model: direct charge in connected-account context; do not treat platform destination/on_behalf_of as equivalent for this scope.
 
 ---
 
