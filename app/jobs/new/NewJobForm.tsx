@@ -269,6 +269,46 @@ function validateContractorAttachmentFile(file: File) {
   return null;
 }
 
+function IntakeStepCard({
+  index,
+  label,
+  value,
+  tone = "slate",
+}: {
+  index: number;
+  label: string;
+  value: string;
+  tone?: "slate" | "ready" | "attention";
+}) {
+  const toneClass =
+    tone === "ready"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+      : tone === "attention"
+        ? "border-rose-200 bg-rose-50 text-rose-900"
+        : "border-slate-200 bg-white text-slate-800";
+
+  const badgeClass =
+    tone === "ready"
+      ? "border-emerald-200 bg-white text-emerald-700"
+      : tone === "attention"
+        ? "border-rose-200 bg-white text-rose-700"
+        : "border-slate-200 bg-slate-50 text-slate-500";
+
+  return (
+    <div className={`rounded-lg border px-3 py-3 shadow-sm shadow-slate-950/5 ${toneClass}`}>
+      <div className="flex items-start gap-3">
+        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${badgeClass}`}>
+          {index}
+        </span>
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase text-slate-500">{label}</p>
+          <p className="mt-1 truncate text-sm font-semibold">{value}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function formatLocationContext(location: LocationLookupRow | null | undefined) {
   if (!location) return "No saved address yet";
   const address = String(location.address_line1 ?? "").trim() || "Address";
@@ -1221,15 +1261,37 @@ const [billingRecipient, setBillingRecipient] = useState<
   }, [locationId, modeSafeJobType, selectedCustomerId, shouldShowRelationshipStep, startRelationshipTransition]);
 
   const secondaryButtonClass =
-    "rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-all duration-150 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60";
   const secondaryCompactButtonClass =
-    "rounded-md border border-slate-300 bg-white px-3 py-1 text-sm text-slate-700 transition-all duration-150 hover:bg-slate-100 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60";
+    "inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1 text-sm font-semibold text-slate-700 transition-all duration-150 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60";
   const dangerTextButtonClass =
     "text-sm text-red-600 transition-colors duration-150 hover:text-red-700 active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200";
   const primaryButtonClass =
-    `rounded-md px-4 py-2 text-sm font-semibold text-white transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-70 ${
+    `inline-flex min-h-10 items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-all duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 disabled:cursor-not-allowed disabled:opacity-70 ${
       canSubmit ? "bg-slate-900 hover:bg-slate-800 active:scale-[0.99]" : "bg-slate-400"
     }`;
+  const completedVisitScopeItemCount = visitScopeItems.filter((item) => item.title.trim() || item.details.trim()).length;
+  const customerProgressValue = createNewCustomer
+    ? ([newCustomerFirstName, newCustomerLastName].filter(Boolean).join(" ") || "New customer")
+    : selectedCustomer
+      ? customerDisplayName(selectedCustomer)
+      : existingCustomer?.id
+        ? customerDisplayName(existingCustomer)
+        : "Select or create";
+  const locationProgressValue = createNewCustomer || locationMode === "new"
+    ? (newLocationAddressLine1.trim() || "New location")
+    : selectedLocation?.address_line1
+      ? selectedLocation.address_line1
+      : locationId
+        ? "Selected"
+        : "Select location";
+  const jobProgressValue = jobType === "service" ? "Service" : `ECC / ${projectType.replaceAll("_", " ")}`;
+  const workProgressValue = completedVisitScopeItemCount > 0
+    ? `${completedVisitScopeItemCount} item${completedVisitScopeItemCount === 1 ? "" : "s"}`
+    : "Add scope";
+  const scheduleProgressValue = scheduledDate
+    ? `${scheduledDate}${windowStart && windowEnd ? ` ${windowStart}-${windowEnd}` : ""}`
+    : "Optional";
 
   function uploadProposalAttachments() {
     if (!submittedProposalId) {
@@ -1391,16 +1453,62 @@ const [billingRecipient, setBillingRecipient] = useState<
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
-      <div className="rounded-3xl border border-slate-200/90 bg-gradient-to-b from-white to-slate-50/35 p-5 shadow-[0_20px_45px_-35px_rgba(15,23,42,0.35)] sm:p-6">
-      <h1 className="text-2xl font-semibold text-slate-900 mb-1">
-        {isContractorMode ? "Intake Form" : internalPageTitle}
-      </h1>
-      <p className="mb-6 text-sm text-slate-600">
-        {isContractorMode
-          ? "Fill in the details below. Our team will review your submission and follow up to confirm scheduling."
-          : internalPageIntro}
-      </p>
+    <div className="mx-auto max-w-6xl px-3 py-4 sm:px-6 lg:px-8">
+      <div className="space-y-5">
+      <header className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5 sm:p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase text-slate-500">
+              {isContractorMode ? "Contractor intake" : "Internal intake"}
+            </p>
+            <h1 className="mt-1 text-2xl font-semibold text-slate-950">
+              {isContractorMode ? "New job intake" : internalPageTitle}
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              {isContractorMode
+                ? "Fill in customer, site, and work details. Our team will review the submission and confirm scheduling."
+                : internalPageIntro}
+            </p>
+          </div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-600 lg:max-w-[27rem]">
+            <span className="font-semibold text-slate-900">Workflow:</span>{" "}
+            confirm customer and location first, choose the job family, define the work, then schedule and create.
+          </div>
+        </div>
+      </header>
+
+      {isInternalMode ? (
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Intake progress">
+          <IntakeStepCard
+            index={1}
+            label="Customer"
+            value={customerProgressValue}
+            tone={internalResolutionReady || createNewCustomer || existingCustomer?.id ? "ready" : "attention"}
+          />
+          <IntakeStepCard
+            index={2}
+            label="Location"
+            value={locationProgressValue}
+            tone={internalResolutionReady || locationId || newLocationAddressLine1.trim() ? "ready" : "attention"}
+          />
+          <IntakeStepCard index={3} label="Job family" value={jobProgressValue} tone="ready" />
+          <IntakeStepCard
+            index={4}
+            label="Work items"
+            value={workProgressValue}
+            tone={completedVisitScopeItemCount > 0 || jobType !== "service" ? "ready" : "attention"}
+          />
+          <IntakeStepCard index={5} label="Schedule" value={scheduleProgressValue} />
+        </section>
+      ) : (
+        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Intake workflow">
+          <IntakeStepCard index={1} label="Customer" value="Contact details" />
+          <IntakeStepCard index={2} label="Site" value="Service address" />
+          <IntakeStepCard index={3} label="Work" value={jobProgressValue} />
+          <IntakeStepCard index={4} label="Notes" value="Photos optional" />
+          <IntakeStepCard index={5} label="Submit" value="Team review" />
+        </section>
+      )}
 
       <ActionFeedback
         type="warning"
@@ -1477,27 +1585,27 @@ const [billingRecipient, setBillingRecipient] = useState<
           <input type="hidden" name="intake_source" value={customerContextSource} />
         ) : null}
         {isInternalMode ? (
-          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800 px-5 py-5 text-white shadow-sm">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm shadow-slate-950/5">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="max-w-2xl">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-300">Internal job creation</p>
-                <h2 className="mt-2 text-lg font-semibold text-white">Create with confidence, not form fatigue.</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-300">
+                <p className="text-[11px] font-semibold uppercase text-slate-500">Internal job creation</p>
+                <h2 className="mt-1 text-lg font-semibold text-slate-950">Build the job in order.</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
                   {internalFlowSummary}
                 </p>
               </div>
               <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[26rem]">
-                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">1</p>
-                  <p className="mt-1 text-sm font-medium text-white">Customer and location</p>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase text-slate-500">1</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">Customer and location</p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">2</p>
-                  <p className="mt-1 text-sm font-medium text-white">{internalFlowStep2Label}</p>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase text-slate-500">2</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">{internalFlowStep2Label}</p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-slate-400">3</p>
-                  <p className="mt-1 text-sm font-medium text-white">Work items, schedule, finish</p>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase text-slate-500">3</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">Work items, schedule, finish</p>
                 </div>
               </div>
             </div>
@@ -3223,14 +3331,19 @@ const [billingRecipient, setBillingRecipient] = useState<
           {isSubmitting ? "Creating job. Please wait." : ""}
         </div>
 
-        <div className="mt-4 rounded-2xl border border-slate-200/80 bg-white/80 p-4">
+        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
           {draftMsg && !draftFound ? (
             <p className="text-right text-xs text-slate-500">{draftMsg}</p>
           ) : null}
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-slate-500">
-              {isInternalMode ? "Drafts stay on this device until the job is created." : "Save locally if you need to come back before submitting."}
-            </p>
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-950">
+                {isSubmitReady ? "Ready to create" : "Finish the required intake steps"}
+              </p>
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                {isInternalMode ? "Drafts stay on this device until the job is created." : "Save locally if you need to come back before submitting."}
+              </p>
+            </div>
             <div className="flex flex-wrap gap-2 sm:justify-end">
             <button
               type="button"
