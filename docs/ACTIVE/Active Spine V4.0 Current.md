@@ -2444,6 +2444,31 @@ Not introduced in V1A-3A-2:
 - No platform seat billing behavior changes
 - No manual payment recording behavior changes
 
+### Tenant Customer Payment V1A-3D-1 (Direct-Charge Checkout Session Helper)
+
+**Status**: V1A-3D-1 helper-only backend slice implemented.
+
+- Added helper `createTenantInvoiceCheckoutSession` for tenant invoice payment Checkout Session creation.
+- Helper behavior:
+  - requires account owner + job + invoice context
+  - requires invoice `issued` status and positive balance due
+  - requires tenant Stripe Connect readiness to be fully ready
+  - creates Checkout Session with connected-account request context via `stripeAccount`
+  - uses `mode: "payment"` with full-balance line item
+  - includes metadata: account owner, invoice id, job id, invoice number
+  - returns Checkout Session id + URL
+- Guardrails preserved:
+  - no local payment insert during session creation
+  - no invoice paid-state mutation during session creation
+  - webhook remains collected-payment truth
+
+Not introduced in V1A-3D-1:
+- No UI/live payment link button
+- No customer portal
+- No QBO
+- No refunds/disputes/saved cards/partial payments
+- No platform-account checkout creation path for tenant invoice direct-charge
+
 ---
 
 19.2 Core payment direction (locked)

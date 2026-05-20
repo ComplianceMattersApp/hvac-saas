@@ -1,3 +1,10 @@
+import type Stripe from "stripe";
+import {
+  getStripeServerClient,
+  resolvePlatformBillingAppUrl,
+} from "@/lib/business/platform-billing-stripe";
+import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+
 export const INTERNAL_INVOICE_PAYMENT_STATUSES = [
   "recorded",
   "pending",
@@ -47,6 +54,13 @@ export type InternalInvoiceCollectedPaymentSummary = {
   amountPaidCents: number;
   balanceDueCents: number;
   paymentStatus: "unpaid" | "partial" | "paid";
+};
+
+export type TenantInvoiceCheckoutSessionResult = {
+  checkoutSessionId: string;
+  checkoutSessionUrl: string;
+  connectedAccountId: string;
+  balanceDueCents: number;
 };
 
 const INTERNAL_INVOICE_PAYMENT_SELECT = [
@@ -294,5 +308,109 @@ export function buildStripePaymentReference(charge: any): {
     processor_charge_id: chargeId,
     stripe_payment_intent_id: intentId,
     stripe_charged_at,
+  };
+}
+
+export async function createTenantInvoiceCheckoutSession(params: {
+  accountOwnerUserId: string;
+  jobId: string;
+  invoiceId: string;
+  supabase: any;
+  stripe?: Stripe;
+  appUrl?: string | null;
+}) : Promise<TenantInvoiceCheckoutSessionResult> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  const jobId = String(params.jobId ?? "").trim();
+  const invoiceId = String(params.invoiceId ?? "").trim();
+
+  if (!accountOwnerUserId || !jobId || !invoiceId) {
+    throw new Error("accountOwnerUserId, jobId, and invoiceId are required.");
+  }
+
+  const { data: invoice, error: invoiceErr } = await params.supabase
+    .from("internal_invoices")
+    .select("id, account_owner_user_id, job_id, invoice_number, status, total_cents, billing_email")
+    .eq("id", invoiceId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("job_id", jobId)
+    .maybeSingle();
+
+  if (invoiceErr) {
+    throw new Error(`Failed to load invoice for checkout session: ${invoiceErr.message ?? "unknown error"}`);
+  }
+
+  if (!invoice?.id) {
+    throw new Error("Invoice not found for checkout session.");
+  }
+
+  const paymentSummary = await resolveInvoiceCollectedPaymentSummary(
+    accountOwnerUserId,
+    invoiceId,
+    params.supabase,
+  );
+
+  const eligibility = validateInvoiceEligibleForOnlinePayment(invoice, paymentSummary);
+  if (!eligibility.eligible) {
+    throw new Error(eligibility.reason ?? "Invoice is not eligible for online payment.");
+  }
+
+  const readiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, params.supabase);
+  if (!readiness.isReady || !readiness.connectedAccountId) {
+    throw new Error("Tenant Stripe Connect account is not ready for checkout session creation.");
+  }
+
+  const stripe = params.stripe ?? getStripeServerClient();
+  const appUrl = String(params.appUrl ?? resolvePlatformBillingAppUrl() ?? "").trim().replace(/\/$/, "");
+
+  if (!appUrl) {
+    throw new Error("APP_URL is not configured.");
+  }
+
+  const balanceDueCents = paymentSummary.balanceDueCents;
+
+  const session = await stripe.checkout.sessions.create(
+    {
+      mode: "payment",
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: balanceDueCents,
+            product_data: {
+              name: `Invoice ${String(invoice.invoice_number ?? "").trim() || invoiceId}`,
+            },
+          },
+        },
+      ],
+      success_url: `${appUrl}/jobs/${jobId}/invoice?banner=internal_invoice_payment_checkout_success#invoice-workspace`,
+      cancel_url: `${appUrl}/jobs/${jobId}/invoice?banner=internal_invoice_payment_checkout_cancelled#invoice-workspace`,
+      metadata: {
+        account_owner_user_id: accountOwnerUserId,
+        invoice_id: invoiceId,
+        job_id: jobId,
+        invoice_number: String(invoice.invoice_number ?? "").trim() || invoiceId,
+      },
+      ...(String(invoice.billing_email ?? "").trim()
+        ? { customer_email: String(invoice.billing_email).trim() }
+        : {}),
+    },
+    {
+      stripeAccount: readiness.connectedAccountId,
+    },
+  );
+
+  const checkoutSessionId = String(session.id ?? "").trim();
+  const checkoutSessionUrl = String(session.url ?? "").trim();
+
+  if (!checkoutSessionId || !checkoutSessionUrl) {
+    throw new Error("Stripe checkout session response was missing id or url.");
+  }
+
+  return {
+    checkoutSessionId,
+    checkoutSessionUrl,
+    connectedAccountId: readiness.connectedAccountId,
+    balanceDueCents,
   };
 }

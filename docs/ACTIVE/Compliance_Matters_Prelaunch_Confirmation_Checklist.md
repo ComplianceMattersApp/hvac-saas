@@ -890,6 +890,23 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Confirmed: direct-charge connected-account model remains the locked tenant invoice payment funds-flow.
 - Confirmed deferred boundaries unchanged: no invoice Checkout Session creation changes, no live payment link UI, no customer portal, no QBO, no refunds/disputes/saved cards/partial payments.
 
+### 2.6.3D-1 Tenant Customer Payment V1A-3D-1 (Direct-Charge Checkout Session Helper)
+- Completed: backend helper `createTenantInvoiceCheckoutSession` added for tenant invoice Checkout Session creation in connected-account context.
+- Completed helper gates:
+  - requires account owner/job/invoice context
+  - invoice status must be `issued`
+  - balance due must be > 0
+  - tenant Stripe Connect readiness must be ready
+- Completed Stripe call contract:
+  - `stripe.checkout.sessions.create(payload, { stripeAccount: connectedAccountId })`
+  - `mode: "payment"`
+  - full-balance line item only
+  - metadata includes account owner, invoice id, job id, invoice number
+- Completed return contract: helper returns Checkout Session id + URL.
+- Verified: no `internal_invoice_payments` insert during session creation (webhook remains collected-payment source of truth).
+- Verified: no invoice paid-state mutation during session creation.
+- Confirmed deferred boundaries unchanged: no UI/live payment link button, no customer portal, no QBO, no refunds/disputes/saved cards/partial payments.
+
 ### 2.6.4 Operational entitlement mutation guard rollout closeout (production-promoted)
 - Confirmed: operational entitlement mutation guard rollout is complete through Slice 16C and is production-promoted on `main` at commit `bf38eca`.
 - Confirmed: full validation passed â€” 89 test files, 1057 tests, TSC_OK.
