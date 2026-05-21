@@ -73,6 +73,21 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).toMatch(/>\s*Invoice Sent\s*</);
   });
 
+  it("uses a pending-aware submit button for Invoice Sent", () => {
+    expect(closeoutQueuePageSource).toContain("SubmitButton");
+    expect(closeoutQueuePageSource).toContain('loadingText="Marking..."');
+  });
+
+  it("adds a By Contractor sort option", () => {
+    expect(closeoutQueuePageSource).toContain("By Contractor");
+    expect(closeoutQueuePageSource).toContain('sort=contractor');
+  });
+
+  it("uses closeout-specific next step copy", () => {
+    expect(closeoutQueuePageSource).toContain("getCloseoutQueueNextStepLabel");
+    expect(closeoutQueuePageSource).not.toContain("Customer follow-up is required");
+  });
+
   it("gates Invoice Sent with external billing eligibility instead of internal invoicing rows", () => {
     expect(closeoutQueuePageSource).toContain("canShowExternalInvoiceSentAction");
     expect(closeoutQueuePageSource).toContain("projection.billingState");

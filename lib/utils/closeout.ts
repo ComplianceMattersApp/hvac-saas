@@ -49,3 +49,12 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
 
   return needs.needsInvoice || needs.needsCerts;
 }
+
+export function getCloseoutQueueNextStepLabel(job: CloseoutProjectionInput) {
+  const needs = getCloseoutNeeds(job);
+
+  if (needs.needsInvoice && needs.needsCerts) return "Invoice and send certs";
+  if (needs.needsCerts) return "Send certs";
+  if (needs.needsInvoice) return "Invoice";
+  return "Review closeout requirements";
+}

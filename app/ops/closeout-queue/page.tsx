@@ -4,16 +4,21 @@ import { redirect } from "next/navigation";
 import { markInvoiceCompleteFromForm } from "@/lib/actions/job-ops-actions";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
-import { canShowExternalInvoiceSentAction, listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
+import {
+  canShowExternalInvoiceSentAction,
+  listCloseoutQueueJobs,
+  sortCloseoutQueueJobs,
+} from "@/lib/ops/closeout-queue";
+import SubmitButton from "@/components/SubmitButton";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
-import { getCloseoutNeeds } from "@/lib/utils/closeout";
+import { getCloseoutNeeds, getCloseoutQueueNextStepLabel } from "@/lib/utils/closeout";
 import { formatBusinessDateUS, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 
 const baseSelect =
   "id, title, status, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, location_id, created_at, next_action_note, action_required_by, visit_scope_summary";
 
 type CloseoutFilter = "all" | "invoice_required" | "paperwork_required" | "failed_review";
-type CloseoutSort = "newest" | "oldest";
+type CloseoutSort = "newest" | "oldest" | "contractor";
 type CloseoutNotice = "external_invoice_sent" | "";
 
 function normalizeFilter(value?: string | null): CloseoutFilter {
@@ -25,6 +30,7 @@ function normalizeFilter(value?: string | null): CloseoutFilter {
 }
 
 function normalizeSort(value?: string | null): CloseoutSort {
+  if (String(value ?? "").trim().toLowerCase() === "contractor") return "contractor";
   return String(value ?? "").trim().toLowerCase() === "oldest" ? "oldest" : "newest";
 }
 
@@ -88,15 +94,8 @@ function closeoutReasonLabel(job: any, needs: ReturnType<typeof getCloseoutNeeds
   return "Closeout follow-up";
 }
 
-function followUpLabel(job: any) {
-  const requiredBy = String(job?.action_required_by ?? "").trim().toLowerCase();
-  const note = String(job?.next_action_note ?? "").trim();
-
-  if (note) return note;
-  if (requiredBy === "rater") return "Office review and complete closeout";
-  if (requiredBy === "contractor") return "Contractor follow-up is required";
-  if (requiredBy === "customer") return "Customer follow-up is required";
-  return "Review closeout requirements and proceed";
+function followUpLabel(projection: any) {
+  return getCloseoutQueueNextStepLabel(projection);
 }
 
 function parseDateOnlyYmd(value?: string | null): Date | null {
@@ -206,6 +205,23 @@ export default async function CloseoutQueuePage({
     };
   });
 
+  const visibleRows = sortCloseoutQueueJobs(
+    enriched.filter((row) => {
+      if (filter === "invoice_required") return row.needs.needsInvoice;
+      if (filter === "paperwork_required") return row.needs.needsCerts;
+      if (filter === "failed_review") {
+        return (
+          row.ops === "failed" || row.ops === "retest_needed" || row.ops === "pending_office_review"
+        );
+      }
+      return true;
+    }),
+    sort,
+    (row) => contractorDisplayName(row.job),
+    (row) => String(row.job?.created_at ?? ""),
+    (row) => String(row.job?.id ?? ""),
+  );
+
   const summary = {
     total: enriched.length,
     invoiceRequired: enriched.filter((row) => row.needs.needsInvoice).length,
@@ -216,17 +232,6 @@ export default async function CloseoutQueuePage({
     ).length,
     overdue: enriched.filter((row) => (row.overdueDays ?? -1) >= 1).length,
   };
-
-  const visibleRows = enriched.filter((row) => {
-    if (filter === "invoice_required") return row.needs.needsInvoice;
-    if (filter === "paperwork_required") return row.needs.needsCerts;
-    if (filter === "failed_review") {
-      return (
-        row.ops === "failed" || row.ops === "retest_needed" || row.ops === "pending_office_review"
-      );
-    }
-    return true;
-  });
 
   const baseHref = contractor ? `/ops/closeout-queue?contractor=${encodeURIComponent(contractor)}` : "/ops/closeout-queue";
   const currentQueueHref = `${baseHref}${contractor ? "&" : "?"}filter=${filter}&sort=${sort}`;
@@ -323,6 +328,12 @@ export default async function CloseoutQueuePage({
             >
               Oldest first
             </Link>
+            <Link
+              href={`${baseHref}${contractor ? "&" : "?"}filter=${filter}&sort=contractor`}
+              className={`inline-flex rounded-md border px-2.5 py-1 text-[11px] font-semibold transition-colors ${sort === "contractor" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
+            >
+              By Contractor
+            </Link>
           </div>
         </div>
       </section>
@@ -344,6 +355,7 @@ export default async function CloseoutQueuePage({
         <div className="space-y-3">
           {visibleRows.map(({ job, needs, overdueDays, canMarkExternalInvoiceSent }) => {
             const jobId = String(job?.id ?? "");
+            const projection = getProjection(job);
             const title = jobTitle(job);
             const customerName = customerDisplayName(job);
             const location = addressLine(job);
@@ -423,7 +435,7 @@ export default async function CloseoutQueuePage({
 
                   <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
                     <span className={labelClass}>Next Step</span>
-                    <p className="text-sm leading-5 text-slate-700">{followUpLabel(job)}</p>
+                    <p className="text-sm leading-5 text-slate-700">{followUpLabel(projection)}</p>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <Link href={`/jobs/${jobId}?tab=ops`} className={primaryActionClass}>
                         View Job
@@ -443,9 +455,9 @@ export default async function CloseoutQueuePage({
                           <input type="hidden" name="job_id" value={jobId} />
                           <input type="hidden" name="return_to" value={`${currentQueueHref}#job-${jobId}`} />
                           <input type="hidden" name="success_notice" value="external_invoice_sent" />
-                          <button type="submit" className={compactActionClass}>
+                          <SubmitButton className={compactActionClass} loadingText="Marking...">
                             Invoice Sent
-                          </button>
+                          </SubmitButton>
                         </form>
                       ) : null}
                     </div>

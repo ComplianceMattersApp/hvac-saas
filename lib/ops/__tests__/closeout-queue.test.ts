@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { canShowExternalInvoiceSentAction, listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
+import {
+  canShowExternalInvoiceSentAction,
+  listCloseoutQueueJobs,
+  sortCloseoutQueueJobs,
+} from "@/lib/ops/closeout-queue";
 
 describe("listCloseoutQueueJobs", () => {
   it("includes scheduled closeout-needed jobs via canonical closeout projection", () => {
@@ -104,5 +108,54 @@ describe("canShowExternalInvoiceSentAction", () => {
         },
       }),
     ).toBe(false);
+  });
+});
+
+describe("sortCloseoutQueueJobs", () => {
+  it("sorts contractors alphabetically and puts unnamed contractors after named contractors", () => {
+    const contractorNames: Record<string, string | null> = {
+      "job-a": "Zephyr HVAC",
+      "job-b": "Alpha Air",
+      "job-c": null,
+      "job-d": "alpha air",
+    };
+
+    const rows = sortCloseoutQueueJobs(
+      [
+        { id: "job-a", created_at: "2026-05-20T12:00:00Z" },
+        { id: "job-b", created_at: "2026-05-20T11:00:00Z" },
+        { id: "job-c", created_at: "2026-05-20T10:00:00Z" },
+        { id: "job-d", created_at: "2026-05-20T09:00:00Z" },
+      ],
+      "contractor",
+      (job) => contractorNames[job.id ?? ""] ?? null,
+      (job) => job.created_at,
+      (job) => job.id,
+    );
+
+    expect(rows.map((row) => row.id)).toEqual(["job-b", "job-d", "job-a", "job-c"]);
+  });
+
+  it("keeps newest and oldest sorting deterministic", () => {
+    const rows = [
+      { id: "job-a", created_at: "2026-05-20T09:00:00Z" },
+      { id: "job-b", created_at: "2026-05-20T11:00:00Z" },
+      { id: "job-c", created_at: "2026-05-20T10:00:00Z" },
+    ];
+
+    expect(
+      sortCloseoutQueueJobs(rows, "newest", () => null, (job) => job.created_at, (job) => job.id).map((row) => row.id),
+    ).toEqual([
+      "job-b",
+      "job-c",
+      "job-a",
+    ]);
+    expect(
+      sortCloseoutQueueJobs(rows, "oldest", () => null, (job) => job.created_at, (job) => job.id).map((row) => row.id),
+    ).toEqual([
+      "job-a",
+      "job-c",
+      "job-b",
+    ]);
   });
 });

@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
+import {
+  getCloseoutNeeds,
+  getCloseoutQueueNextStepLabel,
+  isInCloseoutQueue,
+} from "@/lib/utils/closeout";
 
 const failedEccJob = {
   field_complete: true,
@@ -97,5 +101,40 @@ describe("closeout queue projection", () => {
       needsCerts: true,
     });
     expect(isInCloseoutQueue(job)).toBe(true);
+  });
+
+  it("uses invoice and send certs copy when both blockers remain", () => {
+    expect(
+      getCloseoutQueueNextStepLabel({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "paperwork_required",
+        invoice_complete: false,
+        certs_complete: false,
+      }),
+    ).toBe("Invoice and send certs");
+  });
+
+  it("uses send certs copy when only paperwork remains", () => {
+    expect(
+      getCloseoutQueueNextStepLabel({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "paperwork_required",
+        invoice_complete: true,
+        certs_complete: false,
+      }),
+    ).toBe("Send certs");
+  });
+
+  it("uses invoice copy when only invoice remains", () => {
+    expect(
+      getCloseoutQueueNextStepLabel({
+        field_complete: true,
+        job_type: "service",
+        ops_status: "invoice_required",
+        invoice_complete: false,
+      }),
+    ).toBe("Invoice");
   });
 });
