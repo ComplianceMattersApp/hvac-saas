@@ -28,8 +28,11 @@ describe("New job Step 5 simplification wiring", () => {
   });
 
   it("shows immediate add confirmation and current scope preview near entry", () => {
-    expect(builderSource).toContain("Added to job scope.");
+    expect(builderSource).toContain("Added to job scope:");
     expect(builderSource).toContain("Current Job Scope");
+    expect(builderSource.indexOf("Current Job Scope")).toBeLessThan(
+      builderSource.indexOf("Browse saved work items"),
+    );
   });
 
   it("keeps advanced metadata collapsed by default under Details", () => {
@@ -41,5 +44,40 @@ describe("New job Step 5 simplification wiring", () => {
   it("uses softened Pricebook wording", () => {
     expect(builderSource).toContain("Use Pricebook defaults");
     expect(builderSource).toContain("Default from Pricebook");
+  });
+
+  it("keeps field-first quick choices compact and excludes generic maintenance", () => {
+    expect(builderSource).toContain("QUICK_SCOPE_CHOICES");
+    expect(builderSource).toContain('label: "Service Call"');
+    expect(builderSource).toContain('label: "Diagnostic"');
+    expect(builderSource).toContain('label: "Install"');
+    expect(builderSource).not.toContain('label: "Maintenance"');
+  });
+
+  it("adds quick choices through structured scope candidates", () => {
+    expect(builderSource).toContain("addScopeCandidate(choice.candidate)");
+    expect(builderSource).toContain("title: choice.label");
+    expect(builderSource).toContain("source_pricebook_item_id");
+  });
+
+  it("shows selected or added state for duplicate quick/default selections", () => {
+    expect(builderSource).toContain("findExistingScopeItem");
+    expect(builderSource).toContain("disabled={choice.isAdded}");
+    expect(builderSource).toContain("disabled={isAdded}");
+    expect(builderSource).toContain("Already in current job scope");
+  });
+
+  it("hides saved/default rows until search or browse", () => {
+    expect(builderSource).toContain("showSavedDefaults");
+    expect(builderSource).toContain("searchQuery.length > 0");
+    expect(builderSource).toContain("Browse saved work items");
+    expect(builderSource).toContain("shouldShowSavedDefaults");
+  });
+
+  it("supports typed custom scope adds", () => {
+    expect(builderSource).toContain("Add Custom Work");
+    expect(builderSource).toContain("addManualItemFromQuickEntry");
+    expect(builderSource).toContain('source_pricebook_item_id: null');
+    expect(builderSource).toContain('Add "${searchQuery');
   });
 });

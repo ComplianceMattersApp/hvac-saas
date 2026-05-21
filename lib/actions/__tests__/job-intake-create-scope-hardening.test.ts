@@ -272,6 +272,15 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
         };
       }
 
+      if (table === "job_events") {
+        return {
+          data: {
+            id: "event-1",
+          },
+          error: null,
+        };
+      }
+
       return { data: null, error: null };
     }
 

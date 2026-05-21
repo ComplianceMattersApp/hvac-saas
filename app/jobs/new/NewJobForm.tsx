@@ -2799,7 +2799,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     </p>
                     {jobType === "service" ? (
                       <p className="mt-1 text-xs text-slate-500">
-                        Use this to describe the visit, such as Diagnostic, Maintenance, or Duct Cleaning.
+                        Keep the title short. Use job scope below for the actual work to perform.
                       </p>
                     ) : null}
                     {jobType === "service" ? (
