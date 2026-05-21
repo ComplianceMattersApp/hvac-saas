@@ -27,15 +27,12 @@ export default function ContractorFilter({
   };
 
   return (
-    <div className="grid gap-1.5 min-w-[14rem]">
-      <div className="flex items-center gap-2">
-        <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">
-          Contractor
-        </label>
-        <span className="text-[10px] font-medium text-slate-400">(optional)</span>
-      </div>
+    <div className="flex flex-wrap items-center gap-2 min-w-[14rem] shrink-0">
+      <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">
+        Contractor
+      </label>
       <select
-        className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+        className="h-8 min-w-[11rem] rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
         value={selectedId}
         onChange={handleChange}
       >
