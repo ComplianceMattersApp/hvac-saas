@@ -1980,26 +1980,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         <div className="flex min-w-0 gap-3">
         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${carriedForward ? "bg-emerald-500" : tone.dot}`} />
         <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="font-semibold text-slate-950">
-                {getTestDisplayLabel(testType, packageSystem)}
-              </div>
-              <span
-                className={`inline-flex min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
-                  carriedForward
-                    ? "border-emerald-200 bg-white/70 text-emerald-700"
-                    : isRequired
-                    ? "border-slate-300 bg-white/70 text-slate-600"
-                    : "border-slate-300 bg-white/70 text-slate-600"
-                }`}
-              >
-                {carriedForward ? "Carried Forward" : isRequired ? "Required" : "Added"}
-              </span>
-              <span
-                className={`inline-flex min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${status.tone}`}
-              >
-                {carriedForward ? "Pass (parent)" : status.label}
-              </span>
+            <div className="font-semibold text-slate-950">
+              {getTestDisplayLabel(testType, packageSystem)}
             </div>
             <div className={`mt-1 text-xs leading-5 ${carriedForward ? "text-emerald-700" : tone.text}`}>
               {getTestStatusHelp(String(status.state), carriedForward)}
@@ -2007,7 +1989,25 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         </div>
       </div>
 
-      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center sm:justify-end">
+      <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+          <span
+            className={`inline-flex min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+              carriedForward
+                ? "border-emerald-200 bg-white/70 text-emerald-700"
+                : isRequired
+                ? "border-slate-300 bg-white/70 text-slate-600"
+                : "border-slate-300 bg-white/70 text-slate-600"
+            }`}
+          >
+            {carriedForward ? "Carried Forward" : isRequired ? "Required" : "Added"}
+          </span>
+          <span
+            className={`inline-flex min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${status.tone}`}
+          >
+            {carriedForward ? "Pass (parent)" : status.label}
+          </span>
+        </div>
         {carriedForward ? (
             <span className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-700 sm:w-auto">
             No retest needed

@@ -3236,91 +3236,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       </div>
 
-      <div id="assigned-team" className={`${workspaceSubtleCardClass} scroll-mt-24 border-slate-200/70 bg-white/92 p-4`}>
-        {assignmentBannerMessage ? (
-          <FlashBanner
-            type={assignmentBannerType as "success" | "warning"}
-            message={assignmentBannerMessage}
-          />
-        ) : null}
-
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
-            <div className="mt-1 text-sm text-slate-600">Field ownership for this visit.</div>
-          </div>
-          <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
-        </div>
-        {assignedTeam.length > 0 ? (
-          <div className="mt-3 flex min-w-0 flex-wrap gap-2">
-            {assignedTeam.map((assignee) => (
-              <div
-                key={`${assignee.job_id}-${assignee.user_id}`}
-                className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]"
-              >
-                <span className="max-w-full break-words">{formatPersonNamePart(assignee.display_name)}</span>
-                {assignee.is_primary ? (
-                  <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                    Primary
-                  </span>
-                ) : null}
-
-                {isInternalUser && !assignee.is_primary ? (
-                  <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="user_id" value={assignee.user_id} />
-                    <input type="hidden" name="tab" value={tab} />
-                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
-                    <SubmitButton
-                      loadingText="Updating..."
-                      className={workspaceUtilityControlClass}
-                    >
-                      Make Primary
-                    </SubmitButton>
-                  </form>
-                ) : null}
-
-                {isInternalUser ? (
-                  <form action={removeJobAssigneeFromForm} className="shrink-0">
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="user_id" value={assignee.user_id} />
-                    <input type="hidden" name="tab" value={tab} />
-                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
-                    <SubmitButton
-                      loadingText="Removing..."
-                      className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
-                    >
-                      Remove
-                    </SubmitButton>
-                  </form>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={`mt-3 ${workspaceEmptyStateClass}`}>
-            No team assigned yet.
-          </div>
-        )}
-
-        {isInternalUser ? (
-          <Suspense
-            fallback={
-              <div className="mt-3 flex min-w-0 animate-pulse flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-56" />
-                <div className="h-4 w-28 rounded bg-slate-100" />
-                <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-20" />
-              </div>
-            }
-          >
-            <DeferredAddAssigneeForm
-              jobId={String(job.id)}
-              tab={tab}
-              assignedUserIds={assignedUserIds}
-            />
-          </Suspense>
-        ) : null}
-      </div>
     </div>
 
     {/* Right: permit and equipment reference rail */}
@@ -3404,6 +3319,92 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         )}
       </div>
     </div>
+  </div>
+
+  <div id="assigned-team" className={`${workspaceSubtleCardClass} scroll-mt-24 border-slate-200/70 bg-white/92 p-4`}>
+    {assignmentBannerMessage ? (
+      <FlashBanner
+        type={assignmentBannerType as "success" | "warning"}
+        message={assignmentBannerMessage}
+      />
+    ) : null}
+
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
+        <div className="mt-1 text-sm text-slate-600">Field ownership for this visit.</div>
+      </div>
+      <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
+    </div>
+    {assignedTeam.length > 0 ? (
+      <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+        {assignedTeam.map((assignee) => (
+          <div
+            key={`${assignee.job_id}-${assignee.user_id}`}
+            className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]"
+          >
+            <span className="max-w-full break-words">{formatPersonNamePart(assignee.display_name)}</span>
+            {assignee.is_primary ? (
+              <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                Primary
+              </span>
+            ) : null}
+
+            {isInternalUser && !assignee.is_primary ? (
+              <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="user_id" value={assignee.user_id} />
+                <input type="hidden" name="tab" value={tab} />
+                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
+                <SubmitButton
+                  loadingText="Updating..."
+                  className={workspaceUtilityControlClass}
+                >
+                  Make Primary
+                </SubmitButton>
+              </form>
+            ) : null}
+
+            {isInternalUser ? (
+              <form action={removeJobAssigneeFromForm} className="shrink-0">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="user_id" value={assignee.user_id} />
+                <input type="hidden" name="tab" value={tab} />
+                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
+                <SubmitButton
+                  loadingText="Removing..."
+                  className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+                >
+                  Remove
+                </SubmitButton>
+              </form>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    ) : (
+      <div className={`mt-3 ${workspaceEmptyStateClass}`}>
+        No team assigned yet.
+      </div>
+    )}
+
+    {isInternalUser ? (
+      <Suspense
+        fallback={
+          <div className="mt-3 flex min-w-0 animate-pulse flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+            <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-56" />
+            <div className="h-4 w-28 rounded bg-slate-100" />
+            <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-20" />
+          </div>
+        }
+      >
+        <DeferredAddAssigneeForm
+          jobId={String(job.id)}
+          tab={tab}
+          assignedUserIds={assignedUserIds}
+        />
+      </Suspense>
+    ) : null}
   </div>
 
   {isInternalUser && job.job_type === "service" ? (
