@@ -7,6 +7,7 @@ import {
   sanitizeVisitScopeItemId,
   type VisitScopeItem,
 } from "@/lib/jobs/visit-scope";
+import { applyFieldIntakeScopeDefaults } from "@/lib/jobs/visit-scope-intake-defaults";
 
 export type VisitScopeDraftItem = Omit<VisitScopeItem, "details"> & {
   id: string;
@@ -201,17 +202,21 @@ export default function VisitScopeBuilder({
           availablePricebookTemplates.find(
             (item) => normalizeScopeComparable(item.item_name) === normalizeScopeComparable(choice.label),
           ) ?? null;
-        const candidate: ScopeCandidate = matchingTemplate
-          ? {
-              title: matchingTemplate.item_name,
-              details: matchingTemplate.default_description ?? "",
-              source_pricebook_item_id: matchingTemplate.id,
-              expected_unit_price: matchingTemplate.default_unit_price,
-              unit_label: matchingTemplate.unit_label,
-              item_type: matchingTemplate.item_type,
-              category: matchingTemplate.category,
-            }
-          : { title: choice.label };
+        const safeDefaults = applyFieldIntakeScopeDefaults({ title: choice.label });
+        const candidate: ScopeCandidate = {
+          title: choice.label,
+          details: matchingTemplate?.default_description ?? "",
+          source_pricebook_item_id: matchingTemplate?.id ?? null,
+          expected_unit_price:
+            matchingTemplate?.default_unit_price === null ||
+            matchingTemplate?.default_unit_price === undefined ||
+            !Number.isFinite(Number(matchingTemplate.default_unit_price))
+              ? null
+              : Math.max(0, Number(matchingTemplate.default_unit_price)),
+          unit_label: safeDefaults.unit_label,
+          item_type: safeDefaults.item_type,
+          category: safeDefaults.category,
+        };
 
         return {
           ...choice,
@@ -344,13 +349,15 @@ export default function VisitScopeBuilder({
     const title = searchQuery;
     if (!title) return;
 
+    const safeDefaults = applyFieldIntakeScopeDefaults({ title });
+
     const added = addScopeCandidate({
       title,
       source_pricebook_item_id: null,
       expected_unit_price: null,
-      unit_label: null,
-      item_type: null,
-      category: null,
+      unit_label: safeDefaults.unit_label,
+      item_type: safeDefaults.item_type,
+      category: safeDefaults.category,
     });
 
     if (added) setQuickEntryValue("");
@@ -694,7 +701,7 @@ export default function VisitScopeBuilder({
               <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
                 Details
               </summary>
-              <div className="mt-2.5 space-y-2.5">
+              <div className="mt-2.5 space-y-2">
                 <div className="space-y-1">
                   <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Description</label>
                   <textarea
@@ -705,75 +712,6 @@ export default function VisitScopeBuilder({
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
                     placeholder={jobType === "service" ? "What should the tech complete or verify before leaving?" : "Optional field note for the ECC trip"}
                   />
-                </div>
-
-                <div className="grid gap-2.5 md:grid-cols-4">
-                  <div className="space-y-1">
-                    <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Expected Price</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={item.expected_unit_price ?? ""}
-                      onChange={(event) => {
-                        const raw = event.target.value.trim();
-                        if (!raw) {
-                          patchItem(item.id, { expected_unit_price: null });
-                          return;
-                        }
-
-                        const parsed = Number.parseFloat(raw);
-                        if (!Number.isFinite(parsed) || parsed < 0) {
-                          patchItem(item.id, { expected_unit_price: null });
-                          return;
-                        }
-
-                        patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
-                      }}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Unit Label</label>
-                    <input
-                      type="text"
-                      value={item.unit_label ?? ""}
-                      onChange={(event) => patchItem(item.id, { unit_label: event.target.value || null })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                      placeholder="each"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Type</label>
-                    <input
-                      type="text"
-                      value={item.item_type ?? ""}
-                      onChange={(event) => patchItem(item.id, { item_type: event.target.value || null })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                      placeholder="service"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Category</label>
-                    <input
-                      type="text"
-                      value={item.category ?? ""}
-                      onChange={(event) => patchItem(item.id, { category: event.target.value || null })}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                      placeholder="Diagnostic"
-                    />
-                  </div>
-                </div>
-
-                <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600">
-                  <span className="font-semibold text-slate-700">Metadata:</span>{" "}
-                  {item.source_pricebook_item_id
-                    ? `Default from Pricebook (${item.source_pricebook_item_id}).`
-                    : "Manual scope entry."}
                 </div>
               </div>
             </details>

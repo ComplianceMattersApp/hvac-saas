@@ -35,10 +35,12 @@ describe("New job Step 5 simplification wiring", () => {
     );
   });
 
-  it("keeps advanced metadata collapsed by default under Details", () => {
+  it("keeps details field-first and hides metadata controls", () => {
     expect(builderSource).toContain("<details");
     expect(builderSource).toContain("Details");
-    expect(builderSource).toContain("Metadata:");
+    expect(builderSource).not.toContain("Expected Price");
+    expect(builderSource).not.toContain("Unit Label");
+    expect(builderSource).not.toContain("Metadata:");
   });
 
   it("uses softened Pricebook wording", () => {
@@ -77,7 +79,15 @@ describe("New job Step 5 simplification wiring", () => {
   it("supports typed custom scope adds", () => {
     expect(builderSource).toContain("Add Custom Work");
     expect(builderSource).toContain("addManualItemFromQuickEntry");
-    expect(builderSource).toContain('source_pricebook_item_id: null');
+    expect(builderSource).toContain("applyFieldIntakeScopeDefaults");
     expect(builderSource).toContain('Add "${searchQuery');
+  });
+
+  it("preserves hidden serialized metadata keys internally", () => {
+    expect(builderSource).toContain("unit_label");
+    expect(builderSource).toContain("item_type");
+    expect(builderSource).toContain("category");
+    expect(builderSource).toContain("source_pricebook_item_id");
+    expect(builderSource).toContain("serializedItems");
   });
 });
