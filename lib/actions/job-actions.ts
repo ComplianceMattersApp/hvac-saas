@@ -50,6 +50,7 @@ import {
   buildContractorScheduledEmailHtml,
   buildCustomerScheduledEmailHtml,
 } from "@/lib/email/operational-scheduled-email";
+import { buildInternalProposalAlertEmailHtml } from "@/lib/email/operational-proposal-alert-email";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
@@ -889,37 +890,6 @@ function buildContractorIntakeAlertEmailHtml(args: {
   });
 }
 
-function buildContractorIntakeProposalAlertEmailHtml(args: {
-  contractorName: string;
-  customerName: string;
-  proposedAddress: string;
-  serviceType: string;
-  submittedAtText: string;
-  proposalUrl: string | null;
-}) {
-  const details: string[] = [
-    `<li><strong>Contractor:</strong> ${escapeHtml(args.contractorName)}</li>`,
-    `<li><strong>Proposed Customer:</strong> ${escapeHtml(args.customerName)}</li>`,
-    `<li><strong>Proposed Address:</strong> ${escapeHtml(args.proposedAddress)}</li>`,
-    `<li><strong>Service/Test Type:</strong> ${escapeHtml(args.serviceType)}</li>`,
-    `<li><strong>Submitted:</strong> ${escapeHtml(args.submittedAtText)}</li>`,
-  ];
-
-  const linkBlock = args.proposalUrl
-    ? `<p style="margin: 0 0 12px 0;"><strong>Proposal Link:</strong> <a href="${escapeHtml(args.proposalUrl)}">${escapeHtml(args.proposalUrl)}</a></p>`
-    : "";
-
-  return renderSystemEmailLayout({
-    title: "New Contractor Intake Proposal",
-    bodyHtml: `
-      <p style="margin: 0 0 12px 0;">A contractor submitted a new intake proposal that requires internal review before canonical job creation.</p>
-      <ul style="margin: 0 0 12px 20px; padding: 0;">${details.join("")}</ul>
-      ${linkBlock}
-      <p style="margin: 0;">Please review and finalize or reject from the Admin intake proposals queue.</p>
-    `,
-  });
-}
-
 async function resolveInternalOpsRecipientEmails(params: {
   admin: any;
   accountOwnerUserId: string;
@@ -1125,6 +1095,8 @@ async function sendInternalContractorIntakeProposalAlertEmail(params: {
       proposed_zip,
       proposed_job_type,
       proposed_project_type,
+      proposed_title,
+      proposed_job_notes,
       contractors:contractor_id ( name )
       `,
     )
@@ -1167,15 +1139,27 @@ async function sendInternalContractorIntakeProposalAlertEmail(params: {
   const proposalUrl = appUrl
     ? `${appUrl}/ops/admin/contractor-intake-submissions/${proposalId}`
     : null;
+  const proposalTitle = String((proposal as any)?.proposed_title ?? "").trim() || null;
+  const proposalNotes = String((proposal as any)?.proposed_job_notes ?? "").trim() || null;
+  const tenantIdentity = await resolveOperationalTenantIdentity({
+    supabase: admin,
+    accountOwnerUserId,
+  });
 
-  const subject = `New Contractor Intake Proposal - ${customerName} - ${proposedAddress}`;
-  const html = buildContractorIntakeProposalAlertEmailHtml({
+  const subject = "New job proposal ready for review";
+  const html = buildInternalProposalAlertEmailHtml({
     contractorName,
     customerName,
     proposedAddress,
     serviceType,
     submittedAtText,
     proposalUrl,
+    proposalTitle,
+    proposalNotes,
+    companyDisplayName: tenantIdentity.displayName,
+    companyLogoUrl: tenantIdentity.logoUrl,
+    supportPhone: tenantIdentity.supportPhone,
+    supportEmail: tenantIdentity.supportEmail,
   });
 
   const { data: queuedDelivery, error: queueErr } = await admin
