@@ -17,6 +17,7 @@ describe("buildCustomerScheduledEmailHtml", () => {
       companyLogoUrl: "https://cdn.example.test/acme-logo.png",
       supportPhone: "555-1111",
       supportEmail: "support@acme.test",
+      variant: "scheduled",
     });
 
     expect(html).toContain('src="https://cdn.example.test/acme-logo.png"');
@@ -41,10 +42,35 @@ describe("buildCustomerScheduledEmailHtml", () => {
       companyLogoUrl: null,
       supportPhone: null,
       supportEmail: null,
+      variant: "scheduled",
     });
 
     expect(html).toContain("Northside Mechanical");
     expect(html).toContain("Need to make changes? Contact Northside Mechanical.");
     expect(html).not.toContain("Compliance Matters logo");
+  });
+
+  it("renders updated schedule wording for rescheduled appointments", () => {
+    const html = buildCustomerScheduledEmailHtml({
+      customerName: "Pat Lee",
+      customerPhone: "555-2222",
+      customerEmail: "pat@example.com",
+      serviceAddress: "123 Main St, Town, CA 90001",
+      scheduledDate: "May 13, 2026",
+      scheduledWindow: "8:00 AM-10:00 AM",
+      serviceType: "Maintenance",
+      companyName: "Acme HVAC",
+      supportDisplayName: "Acme HVAC",
+      companyLogoUrl: null,
+      supportPhone: "555-1111",
+      supportEmail: "support@acme.test",
+      variant: "updated",
+    });
+
+    expect(html).toContain("Appointment Updated");
+    expect(html).toContain("Your schedule has been updated");
+    expect(html).toContain("your appointment has been rescheduled");
+    expect(html).toContain("Updated Appointment Details");
+    expect(html).not.toContain("Your appointment is scheduled");
   });
 });

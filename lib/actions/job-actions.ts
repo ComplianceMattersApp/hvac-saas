@@ -1232,9 +1232,11 @@ async function sendInternalContractorIntakeProposalAlertEmail(params: {
 async function sendCustomerScheduledEmailForJob({
   supabase,
   jobId,
+  variant,
 }: {
   supabase: any;
   jobId: string;
+  variant?: "scheduled" | "updated";
 }): Promise<void> {
   const { data: scheduledJob, error: scheduledJobErr } = await supabase
     .from("jobs")
@@ -1303,7 +1305,11 @@ async function sendCustomerScheduledEmailForJob({
   const subjectDate = scheduledDateText && scheduledDateText !== "Not available"
     ? scheduledDateText
     : "Date TBD";
-  const subject = `Job Scheduled \u2013 ${customerName} \u2013 ${subjectDate}`;
+  const emailVariant = variant === "updated" ? "updated" : "scheduled";
+  const subject =
+    emailVariant === "updated"
+      ? `Appointment Updated \u2013 ${customerName} \u2013 ${subjectDate}`
+      : `Job Scheduled \u2013 ${customerName} \u2013 ${subjectDate}`;
   const scheduleSignature = buildScheduleSignature({
     scheduledDate: scheduledJob?.scheduled_date,
     windowStart: scheduledJob?.window_start,
@@ -1353,6 +1359,7 @@ async function sendCustomerScheduledEmailForJob({
         companyLogoUrl: tenantIdentity.logoUrl,
         supportPhone,
         supportEmail,
+        variant: emailVariant,
       }),
     });
 
@@ -9391,7 +9398,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
 
   if (event_type === "scheduled") {
     await runScheduleNotificationSafely("customer_job_scheduled_email", async () => {
-      await sendCustomerScheduledEmailForJob({ supabase, jobId: id });
+      await sendCustomerScheduledEmailForJob({ supabase, jobId: id, variant: "scheduled" });
     });
     await runScheduleNotificationSafely("contractor_job_scheduled_email", async () => {
       await sendContractorScheduledEmailForJob({ supabase, jobId: id });
@@ -9399,6 +9406,10 @@ export async function updateJobScheduleFromForm(formData: FormData) {
   }
 
   if (event_type === "schedule_updated" && didScheduleFieldsChange && isScheduled) {
+    await runScheduleNotificationSafely("customer_job_scheduled_email", async () => {
+      await sendCustomerScheduledEmailForJob({ supabase, jobId: id, variant: "updated" });
+    });
+
     const hasPriorContractorScheduleEmail = await hasOperationalEmailHistory({
       supabase,
       jobId: id,
