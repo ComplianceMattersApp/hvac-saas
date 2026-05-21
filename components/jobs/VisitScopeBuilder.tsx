@@ -97,6 +97,7 @@ export default function VisitScopeBuilder({
   const [summary, setSummary] = useState(String(initialSummary ?? ""));
   const [items, setItems] = useState<VisitScopeDraftItem[]>(() => toDraftItems(initialItems, jobType));
   const [quickEntryValue, setQuickEntryValue] = useState("");
+  const [recentAddFeedback, setRecentAddFeedback] = useState<string | null>(null);
   const [showEccOptionalScope, setShowEccOptionalScope] = useState(() => {
     const seededItems = toDraftItems(initialItems, jobType);
     const hasSummary = String(initialSummary ?? "").trim().length > 0;
@@ -138,12 +139,18 @@ export default function VisitScopeBuilder({
       .slice(0, 8);
   }, [availablePricebookTemplates, quickEntryValue]);
 
+  const completedItems = useMemo(
+    () => items.filter((item) => item.title.trim().length > 0 || item.details.trim().length > 0),
+    [items],
+  );
+
   useEffect(() => {
     const seededItems = toDraftItems(initialItems, jobType);
     const hasSummary = String(initialSummary ?? "").trim().length > 0;
     setSummary(String(initialSummary ?? ""));
     setItems(seededItems);
     setQuickEntryValue("");
+    setRecentAddFeedback(null);
     setShowEccOptionalScope(jobType === "service" || hasSummary || seededItems.length > 0);
   }, [jobType, resetKey]);
 
@@ -195,10 +202,11 @@ export default function VisitScopeBuilder({
 
   function addItem() {
     if (items.length >= VISIT_SCOPE_ITEM_LIMIT) return;
+    const nextId = createVisitScopeItemId();
     setItems((prev) => [
       ...prev,
       {
-        id: createVisitScopeItemId(),
+        id: nextId,
         title: "",
         details: "",
         kind: "primary",
@@ -209,6 +217,7 @@ export default function VisitScopeBuilder({
         category: null,
       },
     ]);
+    setRecentAddFeedback("Added to job scope.");
   }
 
   function addManualItemFromQuickEntry() {
@@ -224,6 +233,7 @@ export default function VisitScopeBuilder({
       );
 
       if (targetIndex >= 0) {
+        setRecentAddFeedback(`Added to job scope: ${title}`);
         return prev.map((item, index) =>
           index === targetIndex
             ? {
@@ -239,6 +249,7 @@ export default function VisitScopeBuilder({
         return prev;
       }
 
+      setRecentAddFeedback(`Added to job scope: ${title}`);
       return [
         ...prev,
         {
@@ -287,6 +298,7 @@ export default function VisitScopeBuilder({
       );
 
       if (targetIndex >= 0) {
+        setRecentAddFeedback(`Added to job scope: ${selectedTemplate.item_name}`);
         return prev.map((item, index) =>
           index === targetIndex
             ? {
@@ -310,6 +322,7 @@ export default function VisitScopeBuilder({
         return prev;
       }
 
+      setRecentAddFeedback(`Added to job scope: ${selectedTemplate.item_name}`);
       return [
         ...prev,
         {
@@ -379,16 +392,16 @@ export default function VisitScopeBuilder({
       <div className="space-y-2.5">
         <div className="space-y-1">
           <div className="text-sm font-medium text-slate-900">
-            {jobType === "service" ? "Work Items" : "Optional trip notes"}
+            {jobType === "service" ? "Work to perform" : "Optional job scope notes"}
           </div>
           <div className="text-xs text-slate-500">
             {jobType === "service"
-              ? "Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records."
+              ? "Job scope items define what belongs to this visit. They stay operational and do not create invoice charges."
               : "Use when you know companion work, field expectations, or a note worth carrying into dispatch."}
           </div>
           {availablePricebookTemplates.length > 0 ? (
             <div className="text-xs text-slate-500">
-              Pricebook is a starting template. Work Item is the actual work for this visit. Invoice Charges are reviewed billed copies created later.
+              Pricebook is optional. Use Pricebook defaults as a quick starter for job scope.
             </div>
           ) : null}
         </div>
@@ -396,27 +409,54 @@ export default function VisitScopeBuilder({
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
           <div className="space-y-2">
             <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-              Work Item Entry
+              Add To Job Scope
             </div>
             <input
               type="text"
               value={quickEntryValue}
               onChange={(event) => setQuickEntryValue(event.target.value)}
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-              placeholder={availablePricebookTemplates.length > 0 ? "Search Pricebook or type a manual Work Item" : "Type a Work Item"}
+              placeholder={availablePricebookTemplates.length > 0 ? "Search Pricebook defaults or type work to perform" : "Type work to perform"}
             />
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-xs text-slate-500">
-                Pick a match below or add the typed item as a new visit line.
+                Choose a Pricebook default or add the typed entry to job scope.
               </p>
               <button
                 type="button"
                 onClick={addManualItemFromQuickEntry}
                 className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100"
               >
-                Add Typed Item
+                Add To Job Scope
               </button>
             </div>
+
+            {recentAddFeedback ? (
+              <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">
+                {recentAddFeedback}
+              </p>
+            ) : null}
+
+            {completedItems.length > 0 ? (
+              <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Current Job Scope</p>
+                <div className="mt-1.5 flex flex-wrap gap-1.5">
+                  {completedItems.slice(0, 6).map((item) => (
+                    <span
+                      key={item.id}
+                      className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700"
+                    >
+                      {item.title.trim() || "Untitled scope item"}
+                    </span>
+                  ))}
+                  {completedItems.length > 6 ? (
+                    <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                      +{completedItems.length - 6} more
+                    </span>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
 
             {availablePricebookTemplates.length > 0 && filteredPricebookTemplates.length > 0 ? (
               <div className="space-y-2 pt-1">
@@ -431,7 +471,7 @@ export default function VisitScopeBuilder({
                       <div>
                         <div className="text-sm font-medium text-slate-900">{item.item_name}</div>
                         <div className="mt-0.5 text-xs text-slate-500">
-                          {[item.item_type, item.category, item.unit_label].filter(Boolean).join(" · ") || "Pricebook match"}
+                          {[item.item_type, item.category, item.unit_label].filter(Boolean).join(" · ") || "Default from Pricebook"}
                         </div>
                       </div>
                       {item.default_unit_price !== null && item.default_unit_price !== undefined ? (
@@ -455,7 +495,7 @@ export default function VisitScopeBuilder({
                 disabled={items.length >= VISIT_SCOPE_ITEM_LIMIT}
                 className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Add Work Item
+                Add Blank Scope Item
               </button>
             </div>
           </div>
@@ -465,9 +505,9 @@ export default function VisitScopeBuilder({
           <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.35)]">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Item {index + 1}</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Scope Item {index + 1}</div>
                 <div className="text-sm font-semibold text-slate-900">
-                  {item.title.trim() || "Untitled Work Item"}
+                  {item.title.trim() || "Untitled scope item"}
                   {item.expected_unit_price !== null && item.expected_unit_price !== undefined ? ` — $${Number(item.expected_unit_price).toFixed(2)}` : ""}
                 </div>
               </div>
@@ -483,7 +523,7 @@ export default function VisitScopeBuilder({
             <div className={jobType === "ecc" ? "grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_13rem] lg:items-start" : "space-y-2.5"}>
               <div className="space-y-1">
                 <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                  Work Item
+                  Work To Perform
                 </label>
                 <input
                   type="text"
@@ -516,79 +556,93 @@ export default function VisitScopeBuilder({
               ) : null}
             </div>
 
-            <div className="mt-2.5 space-y-1">
-              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Work Description</label>
-              <textarea
-                value={item.details}
-                onChange={(event) => patchItem(item.id, { details: event.target.value })}
-                rows={2}
-                maxLength={500}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                placeholder={jobType === "service" ? "What should the tech complete or verify before leaving?" : "Optional field note for the ECC trip"}
-              />
-            </div>
+            <details className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
+              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                Details
+              </summary>
+              <div className="mt-2.5 space-y-2.5">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Description</label>
+                  <textarea
+                    value={item.details}
+                    onChange={(event) => patchItem(item.id, { details: event.target.value })}
+                    rows={2}
+                    maxLength={500}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                    placeholder={jobType === "service" ? "What should the tech complete or verify before leaving?" : "Optional field note for the ECC trip"}
+                  />
+                </div>
 
-            <div className="mt-2.5 grid gap-2.5 md:grid-cols-4">
-              <div className="space-y-1">
-                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Expected Price</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={item.expected_unit_price ?? ""}
-                  onChange={(event) => {
-                    const raw = event.target.value.trim();
-                    if (!raw) {
-                      patchItem(item.id, { expected_unit_price: null });
-                      return;
-                    }
+                <div className="grid gap-2.5 md:grid-cols-4">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Expected Price</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={item.expected_unit_price ?? ""}
+                      onChange={(event) => {
+                        const raw = event.target.value.trim();
+                        if (!raw) {
+                          patchItem(item.id, { expected_unit_price: null });
+                          return;
+                        }
 
-                    const parsed = Number.parseFloat(raw);
-                    if (!Number.isFinite(parsed) || parsed < 0) {
-                      patchItem(item.id, { expected_unit_price: null });
-                      return;
-                    }
+                        const parsed = Number.parseFloat(raw);
+                        if (!Number.isFinite(parsed) || parsed < 0) {
+                          patchItem(item.id, { expected_unit_price: null });
+                          return;
+                        }
 
-                    patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
-                  }}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                  placeholder="0.00"
-                />
+                        patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
+                      }}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                      placeholder="0.00"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Unit Label</label>
+                    <input
+                      type="text"
+                      value={item.unit_label ?? ""}
+                      onChange={(event) => patchItem(item.id, { unit_label: event.target.value || null })}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                      placeholder="each"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Type</label>
+                    <input
+                      type="text"
+                      value={item.item_type ?? ""}
+                      onChange={(event) => patchItem(item.id, { item_type: event.target.value || null })}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                      placeholder="service"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Category</label>
+                    <input
+                      type="text"
+                      value={item.category ?? ""}
+                      onChange={(event) => patchItem(item.id, { category: event.target.value || null })}
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                      placeholder="Diagnostic"
+                    />
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs text-slate-600">
+                  <span className="font-semibold text-slate-700">Metadata:</span>{" "}
+                  {item.source_pricebook_item_id
+                    ? `Default from Pricebook (${item.source_pricebook_item_id}).`
+                    : "Manual scope entry."}
+                </div>
               </div>
-
-              <div className="space-y-1">
-                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Unit Label</label>
-                <input
-                  type="text"
-                  value={item.unit_label ?? ""}
-                  onChange={(event) => patchItem(item.id, { unit_label: event.target.value || null })}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                  placeholder="each"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Type</label>
-                <input
-                  type="text"
-                  value={item.item_type ?? ""}
-                  onChange={(event) => patchItem(item.id, { item_type: event.target.value || null })}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                  placeholder="service"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Category</label>
-                <input
-                  type="text"
-                  value={item.category ?? ""}
-                  onChange={(event) => patchItem(item.id, { category: event.target.value || null })}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                  placeholder="Diagnostic"
-                />
-              </div>
-            </div>
+            </details>
 
             <div className="mt-2 flex items-center justify-between gap-3">
               <div className="text-xs text-slate-500">

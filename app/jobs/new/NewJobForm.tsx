@@ -730,8 +730,8 @@ const [billingRecipient, setBillingRecipient] = useState<
         ? "ECC/HERS accounts use the ECC / Compliance Test family by default and presentation."
         : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";
   const internalFlowSummary = isHvacServiceMode
-    ? "Select the customer and location, classify the visit, then add Work Items below."
-    : "Select the customer and location, pick a job family, then add Work Items before scheduling.";
+    ? "Select the customer and location, classify the visit, then add job scope below."
+    : "Select the customer and location, pick a job family, then add job scope before scheduling.";
   const internalFlowStep2Label = isHvacServiceMode ? "Work order and relationship" : "Family and relationship";
   const jobFamilyStepTitle = isHvacServiceMode ? "Work Order Setup" : "Job family";
   const jobFamilyStepDescription = isHvacServiceMode
@@ -960,11 +960,11 @@ const [billingRecipient, setBillingRecipient] = useState<
     isInternalMode && (!internalResolutionReady || (shouldShowRelationshipStep && !relationshipDecisionReady));
   const internalNextStepMessage = !internalResolutionReady
     ? isHvacServiceMode
-      ? "Resolve customer and location to unlock work-order family, relationship review, Work Items, scheduling, billing, and optional details."
-      : "Resolve customer and location to unlock job family, relationship review, Work Items, scheduling, billing, and optional details."
+      ? "Resolve customer and location to unlock work-order family, relationship review, job scope, scheduling, billing, and optional details."
+      : "Resolve customer and location to unlock job family, relationship review, job scope, scheduling, billing, and optional details."
     : isHvacServiceMode
-      ? "Choose the work-order family and relationship path before defining the Work Items for this trip."
-      : "Choose the job family and relationship path before defining the Work Items for this trip.";
+      ? "Choose the work-order family and relationship path before defining the job scope for this trip."
+      : "Choose the job family and relationship path before defining the job scope for this trip.";
   const billingRecipientLabel =
     billingRecipient === "contractor"
       ? "Contractor"
@@ -1208,7 +1208,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       const serializedItems = String(formData.get("visit_scope_items_json") ?? "").trim();
       if (!hasStructuredVisitScopeItemsJson(serializedItems)) {
         event.preventDefault();
-        setVisitScopeError("Add at least one structured Work Item before creating a Service job.");
+        setVisitScopeError("Add at least one structured job scope item before creating a Service job.");
         window.requestAnimationFrame(() => {
           visitScopeSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
         });
@@ -1494,7 +1494,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           <IntakeStepCard index={3} label="Job family" value={jobProgressValue} tone="ready" />
           <IntakeStepCard
             index={4}
-            label="Work items"
+            label="Job scope"
             value={workProgressValue}
             tone={completedVisitScopeItemCount > 0 || jobType !== "service" ? "ready" : "attention"}
           />
@@ -1520,9 +1520,9 @@ const [billingRecipient, setBillingRecipient] = useState<
             : errorCode === "contractor_proposal_submit_failed"
             ? "Could not submit your job. Please try again, or contact us if the issue persists."
             : errorCode === "visit_scope_required"
-            ? "Service jobs require at least one Work Item."
+            ? "Service jobs require at least one job scope item."
             : errorCode === "visit_scope_invalid"
-            ? "Work Items could not be read. Please review the Work Items section and try again."
+            ? "Job scope entries could not be read. Please review Step 5 and try again."
             : null
         }
         className="mb-5"
@@ -1605,7 +1605,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
                   <p className="text-[10px] font-semibold uppercase text-slate-500">3</p>
-                  <p className="mt-1 text-sm font-medium text-slate-900">Work items, schedule, finish</p>
+                  <p className="mt-1 text-sm font-medium text-slate-900">Job scope, schedule, finish</p>
                 </div>
               </div>
             </div>
@@ -2770,11 +2770,11 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isInternalMode ? (
                 <div ref={visitScopeSectionRef}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 5</p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Visit Reason &amp; Work Items</h2>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Work To Perform &amp; Job Scope</h2>
                   <p className="mt-1 text-sm text-slate-500">
                     {jobType === "service"
-                      ? "Start with Reason for Visit to describe this visit, then add the structured Work Items for this trip."
-                      : "ECC testing can be created without work items; add optional companion work context only when this visit also includes service work."}
+                      ? "Start with Reason for Visit, then add the structured job scope for this trip."
+                      : "ECC testing can be created without job scope; add optional companion scope only when this visit also includes service work."}
                   </p>
                   {isHybridProductMode ? (
                     <p className="mt-1 text-xs text-slate-500">
@@ -2791,11 +2791,11 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isInternalMode ? (
                 <div className={`rounded-2xl border bg-white p-4 shadow-sm space-y-3 ${visitScopeError ? "border-red-300 ring-2 ring-red-100" : "border-slate-200/85"}`}>
                   <div>
-                    <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; Work Items</h3>
+                    <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; Job Scope</h3>
                     <p className="mt-1 text-sm text-slate-500">
                       {jobType === "service"
-                        ? "Reason for Visit describes the created visit title. After that, add at least one Work Item defining what belongs to this visit."
-                        : "ECC jobs don't require Work Items. Add companion work only if this visit includes service work."}
+                        ? "Reason for Visit describes the created visit title. After that, add at least one structured scope item defining work for this visit."
+                        : "ECC jobs don't require job scope. Add companion scope only if this visit includes service work."}
                     </p>
                     {jobType === "service" ? (
                       <p className="mt-1 text-xs text-slate-500">
@@ -2804,7 +2804,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     ) : null}
                     {jobType === "service" ? (
                       <p className="mt-1 text-xs text-slate-500">
-                        Work Items define what belongs to this visit. They can help build an invoice later, but they are not billing records.
+                        Job scope defines what belongs to this visit. Pricebook can supply defaults, but scope entries do not create invoice charges.
                       </p>
                     ) : null}
                   </div>
@@ -3315,7 +3315,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <p className="mt-1 font-medium text-slate-900">{billingRecipientLabel}</p>
               </div>
               <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Work Items</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Job Scope</p>
                 <p className="mt-1 font-medium text-slate-900">
                   {visitScopeSummary.trim() || visitScopeItems.find((item) => item.title.trim())?.title.trim() || "Needs review"}
                 </p>
