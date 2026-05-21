@@ -491,3 +491,35 @@ Section 2F implements converted estimate/job -> draft internal invoice conversio
 - No Stripe tenant payment execution, QBO, SMS, email/provider, portal/public behavior.
 - No production Supabase command was run in this slice.
 - Migration activation remains environment-gated by target environment migration windows.
+
+## 5) Section 2G: Internal Estimate Chain Closeout
+
+**Status: Chain closeout (2026-05-20) — internal chain code-complete and smoke-passed.**
+
+The Section 2 internal estimate chain is code-complete and pushed to main/origin.
+
+- Completed chain: Create estimate → approve/select option (Sections 2A/2B) → convert approved estimate to job (Section 2C) → convert to draft invoice (Sections 2E/2F).
+- Local Section 2G smoke passed for:
+  - flat estimate chain (single-option)
+  - multi-option selected-option chain (Good / Better / Best)
+- Hardening commit included in main/origin: `47f58af` — `fix(estimates): harden conversion smoke edge cases`
+- Environment-gated migrations not yet applied to production:
+  - `20260520110000_estimate_approval_response_v1.sql`
+  - `20260520120000_estimate_to_job_conversion_v1.sql`
+  - `20260520130000_estimate_invoice_conversion_foundation_v1.sql`
+- Production usability requires a controlled migration-and-smoke window.
+- No production Supabase command was run.
+- No production migration was applied.
+- No env/secret changes.
+
+**Still deferred**:
+
+- customer/public estimate approval link
+- customer portal approval
+- e-signature
+- stored/generated PDF artifact pipeline
+- automatic invoice issue/send from conversion
+- payment collection from estimate conversion
+- Stripe tenant payment execution
+- QBO
+- SMS
