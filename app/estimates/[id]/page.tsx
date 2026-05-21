@@ -429,79 +429,67 @@ export default async function EstimateDetailPage({
 
           {/* Totals */}
           <div className="shrink-0 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-right print:min-w-[14rem] print:rounded-lg print:border-slate-300 print:bg-white">
-                    </div> {/* end flex flex-col gap-4 ... */}
-                  </div> {/* end header card */}
-                  {/* The rest of the page content remains unchanged and is already properly closed. */}
+            {isMultiOptionProposal ? (
+              <>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Proposal mode
                 </div>
-              );
-
-            {isDraft && (
-              <>
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="sent"
-                  label="Mark Sent"
-                  helperText="Locks this proposal from further editing. No customer email, PDF, approval, invoice, payment, or conversion is created."
-                  confirmMessage="Mark this estimate sent? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
-                  className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition-[background-color,border-color,transform] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
-                />
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="cancelled"
-                  label="Cancel Estimate"
-                  helperText="Terminal for V1. Use when this proposal should be closed without approval."
-                  confirmMessage="Cancel this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
-                />
+                <div className="mt-0.5 text-2xl font-bold tracking-[-0.02em] text-slate-950">
+                  Multi-option
+                </div>
+                <div className="mt-1 text-xs text-slate-500">
+                  Totals are shown inside each option package.
+                </div>
               </>
-            )}
-            {isSent && (
+            ) : (
               <>
-                {estimate.approvalResponseSchemaReady ? (
-                  <EstimateApprovalResponseForm
-                    action={recordEstimateApprovalResponseFromForm}
-                    estimateId={estimate.id}
-                    proposalMode={estimate.proposalMode}
-                    options={(estimate.options ?? []).map((o) => ({
-                      id: o.id, label: o.label, total_cents: o.total_cents,
-                    }))}
-                  />
-                ) : (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-4 py-3 text-sm text-amber-700">
-                    Approval response capture is not available until the estimate approval response migration is applied.
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Total
+                </div>
+                <div className="mt-0.5 text-2xl font-bold tracking-[-0.02em] text-slate-950">
+                  {formatCents(documentView.totals.totalCents)}
+                </div>
+                {documentView.totals.subtotalCents !== documentView.totals.totalCents && (
+                  <div className="text-xs text-slate-500">
+                    Subtotal {formatCents(documentView.totals.subtotalCents)}
                   </div>
                 )}
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="declined"
-                  label="Mark Declined"
-                  helperText="Terminal for V1. Use when this proposal is declined by the customer or internally."
-                  confirmMessage="Decline this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
-                  className="inline-flex items-center justify-center rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition-[background-color,border-color,transform] hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200 active:translate-y-[0.5px]"
-                />
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="expired"
-                  label="Mark Expired"
-                  helperText="Terminal for V1. Use when this proposal is no longer valid."
-                  confirmMessage="Expire this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
-                  className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-[background-color,border-color,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
-                />
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="cancelled"
-                  label="Cancel Estimate"
-                  helperText="Terminal for V1. Use when this proposal should be closed without approval."
-                  confirmMessage="Cancel this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
-                />
               </>
             )}
+          </div>
+        </div>
+
+        {/* Context */}
+        <div className="mt-4 grid gap-2 border-t border-slate-100 pt-4 text-sm text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6">
+          <div>
+            <span className="font-medium text-slate-700">Proposal Mode:</span>{" "}
+            {isMultiOptionProposal ? "Multi-option packages" : "Single-option flat"}
+          </div>
+          {documentView.context.customerName && (
+            <div>
+              <span className="font-medium text-slate-700">Customer:</span> {documentView.context.customerName}
+            </div>
+          )}
+          {documentView.context.locationDisplay && (
+            <div>
+              <span className="font-medium text-slate-700">Location:</span> {documentView.context.locationDisplay}
+            </div>
+          )}
+          <div>
+            <span className="font-medium text-slate-700">Created:</span>{" "}
+            {formatDate(documentView.lifecycle.createdAt)}
+          </div>
+          {documentView.lifecycle.sentAt && (
+            <div>
+              <span className="font-medium text-slate-700">Sent:</span> {formatDate(documentView.lifecycle.sentAt)}
+            </div>
+          )}
+          <div>
+            <span className="font-medium text-slate-700">Status:</span> {documentView.identity.statusLabel}
+          </div>
+        </div>
+      </div>
+
       <details className="rounded-2xl border border-slate-200/80 bg-slate-50/70 text-sm text-slate-700 print:hidden">
         <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-slate-900 marker:content-none">
           <span className="flex items-center justify-between gap-3">

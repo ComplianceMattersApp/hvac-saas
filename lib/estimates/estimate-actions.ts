@@ -1812,7 +1812,7 @@ export async function convertApprovedEstimateToJob(params: {
     const { data, error } = await supabase
       .from("estimates")
       .select(
-        "id, account_owner_user_id, estimate_number, status, title, customer_id, location_id, service_case_id, total_cents, selected_option_id, selected_option_label_snapshot, selected_option_total_cents, converted_job_id"
+        "id, account_owner_user_id, estimate_number, status, title, customer_id, location_id, service_case_id, total_cents, selected_option_id, selected_option_label_snapshot, selected_option_total_cents, converted_job_id, converted_by_user_id"
       )
       .eq("id", estimateId)
       .eq("account_owner_user_id", accountOwnerUserId)
@@ -1962,6 +1962,9 @@ export async function convertApprovedEstimateToJob(params: {
         title: conversionJobTitle,
         status: "open",
         job_type: "service",
+        service_visit_type: "repair",
+        service_visit_reason: "estimate_conversion",
+        service_visit_outcome: "follow_up_required",
         project_type: "alteration",
         ops_status: "need_to_schedule",
         customer_id: estimate.customer_id,
@@ -2199,10 +2202,25 @@ export async function recordEstimateToInvoiceDraftConversion(params: {
     if (error) throw error;
     job = data;
   } catch (error) {
-    if (isEstimateConversionSchemaUnavailableError(error)) {
-      return { success: false, error: "invoice_conversion_schema_unavailable" };
+    if (!isEstimateConversionSchemaUnavailableError(error)) {
+      throw error;
     }
-    throw error;
+
+    // Compatibility fallback for schemas where jobs.account_owner_user_id is absent.
+    const { data: fallbackJob, error: fallbackJobErr } = await supabase
+      .from("jobs")
+      .select("id, customer_id, location_id, status, visit_scope_items, origin_estimate_id")
+      .eq("id", convertedJobId)
+      .maybeSingle();
+
+    if (fallbackJobErr) {
+      if (isEstimateConversionSchemaUnavailableError(fallbackJobErr)) {
+        return { success: false, error: "invoice_conversion_schema_unavailable" };
+      }
+      throw fallbackJobErr;
+    }
+
+    job = fallbackJob;
   }
 
   if (!job?.id) {

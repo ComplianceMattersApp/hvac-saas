@@ -68,7 +68,7 @@ export async function getEstimateToJobConversionSchemaReady(params: {
     const { error: estimateSchemaErr } = await params.supabase
       .from("estimates")
       .select("id, converted_job_id, converted_by_user_id")
-      .maybeSingle();
+      .limit(1);
 
     if (estimateSchemaErr) {
       if (isMissingEstimateToJobConversionSchemaError(estimateSchemaErr)) return false;
@@ -78,7 +78,7 @@ export async function getEstimateToJobConversionSchemaReady(params: {
     const { error: jobSchemaErr } = await params.supabase
       .from("jobs")
       .select("id, origin_estimate_id")
-      .maybeSingle();
+      .limit(1);
 
     if (jobSchemaErr) {
       if (isMissingEstimateToJobConversionSchemaError(jobSchemaErr)) return false;
@@ -103,7 +103,7 @@ export async function getEstimateToInvoiceConversionSchemaReady(params: {
     const { error: estimateSchemaErr } = await params.supabase
       .from("estimates")
       .select("id, converted_invoice_id")
-      .maybeSingle();
+      .limit(1);
 
     if (estimateSchemaErr) {
       if (isMissingEstimateToJobConversionSchemaError(estimateSchemaErr)) return false;
@@ -113,7 +113,7 @@ export async function getEstimateToInvoiceConversionSchemaReady(params: {
     const { error: invoiceSchemaErr } = await params.supabase
       .from("internal_invoices")
       .select("id, source_estimate_id")
-      .maybeSingle();
+      .limit(1);
 
     if (invoiceSchemaErr) {
       if (isMissingEstimateToJobConversionSchemaError(invoiceSchemaErr)) return false;
