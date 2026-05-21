@@ -12,6 +12,11 @@ const closeoutQueuePageSource = readFileSync(
   "utf-8",
 );
 
+const jobOpsActionsSource = readFileSync(
+  resolve(__dirname, "../../actions/job-ops-actions.ts"),
+  "utf-8",
+);
+
 describe("/ops closeout queue - Full Page link", () => {
   it("renders a dedicated link to /ops/closeout-queue from the closeout card header", () => {
     expect(opsPageSource).toContain("View Closeout Queue");
@@ -60,5 +65,22 @@ describe("/ops/closeout-queue page", () => {
   it("uses View Job as the primary action", () => {
     expect(closeoutQueuePageSource).toMatch(/>\s*View Job\s*</);
     expect(closeoutQueuePageSource).toContain("/jobs/${jobId}?tab=ops");
+  });
+
+  it("uses the existing external billing invoice-sent tracking action", () => {
+    expect(closeoutQueuePageSource).toContain("markInvoiceCompleteFromForm");
+    expect(closeoutQueuePageSource).toContain('name="success_notice" value="external_invoice_sent"');
+    expect(closeoutQueuePageSource).toMatch(/>\s*Invoice Sent\s*</);
+  });
+
+  it("gates Invoice Sent with external billing eligibility instead of internal invoicing rows", () => {
+    expect(closeoutQueuePageSource).toContain("canShowExternalInvoiceSentAction");
+    expect(closeoutQueuePageSource).toContain("projection.billingState");
+    expect(closeoutQueuePageSource).toContain("canMarkExternalInvoiceSent");
+  });
+
+  it("revalidates the closeout queue after lightweight invoice sent tracking", () => {
+    expect(jobOpsActionsSource).toContain('revalidatePath(`/ops/closeout-queue`)');
+    expect(jobOpsActionsSource).toContain("success_notice");
   });
 });

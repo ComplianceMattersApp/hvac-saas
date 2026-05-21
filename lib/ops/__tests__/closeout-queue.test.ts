@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
+import { canShowExternalInvoiceSentAction, listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
 
 describe("listCloseoutQueueJobs", () => {
   it("includes scheduled closeout-needed jobs via canonical closeout projection", () => {
@@ -63,5 +63,46 @@ describe("listCloseoutQueueJobs", () => {
 
     expect(rows.map((row) => row.id)).toEqual(["job-a", "job-c"]);
     expect(count).toBe(2);
+  });
+});
+
+describe("canShowExternalInvoiceSentAction", () => {
+  it("shows the action for external billing rows that still need invoice follow-up", () => {
+    expect(
+      canShowExternalInvoiceSentAction({
+        needsInvoice: true,
+        billingState: {
+          lightweightBillingAllowed: true,
+          usesInternalInvoicing: false,
+          jobInvoiceCompleteProjection: false,
+        },
+      }),
+    ).toBe(true);
+  });
+
+  it("hides the action when internal invoicing owns billing closeout", () => {
+    expect(
+      canShowExternalInvoiceSentAction({
+        needsInvoice: true,
+        billingState: {
+          lightweightBillingAllowed: false,
+          usesInternalInvoicing: true,
+          jobInvoiceCompleteProjection: false,
+        },
+      }),
+    ).toBe(false);
+  });
+
+  it("hides the action after invoice sent tracking is already satisfied", () => {
+    expect(
+      canShowExternalInvoiceSentAction({
+        needsInvoice: false,
+        billingState: {
+          lightweightBillingAllowed: true,
+          usesInternalInvoicing: false,
+          jobInvoiceCompleteProjection: true,
+        },
+      }),
+    ).toBe(false);
   });
 });

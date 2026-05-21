@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
+import { markInvoiceCompleteFromForm } from "@/lib/actions/job-ops-actions";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
-import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
+import { canShowExternalInvoiceSentAction, listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { getCloseoutNeeds } from "@/lib/utils/closeout";
 import { formatBusinessDateUS, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
@@ -13,6 +14,7 @@ const baseSelect =
 
 type CloseoutFilter = "all" | "invoice_required" | "paperwork_required" | "failed_review";
 type CloseoutSort = "newest" | "oldest";
+type CloseoutNotice = "external_invoice_sent" | "";
 
 function normalizeFilter(value?: string | null): CloseoutFilter {
   const normalized = String(value ?? "").trim().toLowerCase();
@@ -24,6 +26,12 @@ function normalizeFilter(value?: string | null): CloseoutFilter {
 
 function normalizeSort(value?: string | null): CloseoutSort {
   return String(value ?? "").trim().toLowerCase() === "oldest" ? "oldest" : "newest";
+}
+
+function normalizeNotice(value?: string | null): CloseoutNotice {
+  return String(value ?? "").trim().toLowerCase() === "external_invoice_sent"
+    ? "external_invoice_sent"
+    : "";
 }
 
 function digitsOnly(v?: string | null) {
@@ -126,7 +134,7 @@ const primaryActionClass =
 export default async function CloseoutQueuePage({
   searchParams,
 }: {
-  searchParams?: Promise<{ contractor?: string; filter?: string; sort?: string }>;
+  searchParams?: Promise<{ contractor?: string; filter?: string; sort?: string; notice?: string }>;
 }) {
   const actorContext = await getRequestActorContext();
   const supabase = actorContext.supabase;
@@ -140,6 +148,7 @@ export default async function CloseoutQueuePage({
   const contractor = (sp.contractor ?? "").trim() || null;
   const filter = normalizeFilter(sp.filter ?? null);
   const sort = normalizeSort(sp.sort ?? null);
+  const notice = normalizeNotice(sp.notice ?? null);
 
   let q = supabase
     .from("jobs")
@@ -183,12 +192,17 @@ export default async function CloseoutQueuePage({
     const needs = getCloseoutNeeds(projection);
     const ops = String(job?.ops_status ?? "").toLowerCase();
     const overdueDays = resolveOverdueDays(job);
+    const canMarkExternalInvoiceSent = canShowExternalInvoiceSentAction({
+      needsInvoice: needs.needsInvoice,
+      billingState: projection.billingState,
+    });
 
     return {
       job,
       needs,
       ops,
       overdueDays,
+      canMarkExternalInvoiceSent,
     };
   });
 
@@ -215,6 +229,7 @@ export default async function CloseoutQueuePage({
   });
 
   const baseHref = contractor ? `/ops/closeout-queue?contractor=${encodeURIComponent(contractor)}` : "/ops/closeout-queue";
+  const currentQueueHref = `${baseHref}${contractor ? "&" : "?"}filter=${filter}&sort=${sort}`;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -237,6 +252,12 @@ export default async function CloseoutQueuePage({
           </p>
         </div>
       </div>
+
+      {notice === "external_invoice_sent" ? (
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
+          Invoice sent was recorded for external billing closeout.
+        </div>
+      ) : null}
 
       <section className="mb-4 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.35)]">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -321,7 +342,7 @@ export default async function CloseoutQueuePage({
         </div>
       ) : (
         <div className="space-y-3">
-          {visibleRows.map(({ job, needs, overdueDays }) => {
+          {visibleRows.map(({ job, needs, overdueDays, canMarkExternalInvoiceSent }) => {
             const jobId = String(job?.id ?? "");
             const title = jobTitle(job);
             const customerName = customerDisplayName(job);
@@ -339,6 +360,7 @@ export default async function CloseoutQueuePage({
 
             return (
               <article
+                id={`job-${jobId}`}
                 key={jobId}
                 className="rounded-xl border border-l-4 border-slate-200 border-l-violet-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-violet-900/35 sm:px-5"
               >
@@ -415,6 +437,16 @@ export default async function CloseoutQueuePage({
                         <a href={smsHref(phone)} className={compactActionClass}>
                           Open SMS App
                         </a>
+                      ) : null}
+                      {canMarkExternalInvoiceSent ? (
+                        <form action={markInvoiceCompleteFromForm}>
+                          <input type="hidden" name="job_id" value={jobId} />
+                          <input type="hidden" name="return_to" value={`${currentQueueHref}#job-${jobId}`} />
+                          <input type="hidden" name="success_notice" value="external_invoice_sent" />
+                          <button type="submit" className={compactActionClass}>
+                            Invoice Sent
+                          </button>
+                        </form>
                       ) : null}
                     </div>
                   </div>

@@ -1271,6 +1271,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
   const jobId = formData.get("job_id");
   if (typeof jobId !== "string" || !jobId) throw new Error("Missing job_id");
   const returnToRaw = String(formData.get("return_to") || "").trim();
+  const successNotice = String(formData.get("success_notice") || "").trim();
 
   const redirectToJob = (params: { banner?: string; notice?: string }): never =>
     redirect(
@@ -1418,7 +1419,8 @@ if (!job.data_entry_completed_at && !updatedInvoiceRow.data_entry_completed_at) 
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirectToJob({});
+  revalidatePath(`/ops/closeout-queue`);
+  redirectToJob({ notice: successNotice || undefined });
 }
 export async function updateJobOpsDetailsFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();

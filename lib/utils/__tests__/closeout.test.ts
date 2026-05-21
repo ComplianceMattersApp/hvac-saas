@@ -82,4 +82,20 @@ describe("closeout queue projection", () => {
       })
     ).toBe(false);
   });
+
+  it("keeps paperwork blocker after invoice sent when ECC certs are still incomplete", () => {
+    const job = {
+      field_complete: true,
+      job_type: "ecc",
+      ops_status: "paperwork_required",
+      invoice_complete: true,
+      certs_complete: false,
+    };
+
+    expect(getCloseoutNeeds(job)).toMatchObject({
+      needsInvoice: false,
+      needsCerts: true,
+    });
+    expect(isInCloseoutQueue(job)).toBe(true);
+  });
 });
