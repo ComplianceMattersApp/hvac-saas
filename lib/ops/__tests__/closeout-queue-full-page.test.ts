@@ -88,6 +88,11 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).not.toContain("Customer follow-up is required");
   });
 
+  it("renders an in-page contractor filter for narrowing the queue", () => {
+    expect(closeoutQueuePageSource).toContain("ContractorFilter");
+    expect(closeoutQueuePageSource).toContain("All Contractors");
+  });
+
   it("gates Invoice Sent with external billing eligibility instead of internal invoicing rows", () => {
     expect(closeoutQueuePageSource).toContain("canShowExternalInvoiceSentAction");
     expect(closeoutQueuePageSource).toContain("projection.billingState");

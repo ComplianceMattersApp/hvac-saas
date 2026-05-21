@@ -10,6 +10,7 @@ import {
   sortCloseoutQueueJobs,
 } from "@/lib/ops/closeout-queue";
 import SubmitButton from "@/components/SubmitButton";
+import ContractorFilter from "./_components/ContractorFilter";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { getCloseoutNeeds, getCloseoutQueueNextStepLabel } from "@/lib/utils/closeout";
 import { formatBusinessDateUS, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
@@ -180,6 +181,21 @@ export default async function CloseoutQueuePage({
 
   const getProjection = (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job;
   const closeoutJobs = listCloseoutQueueJobs(sourceJobs, getProjection);
+  const contractorOptions = Array.from(
+    new Map(
+      closeoutJobs
+        .map((job: any) => {
+          const id = String(job?.contractor_id ?? "").trim();
+          const contractor = Array.isArray(job?.contractors) ? job.contractors[0] : job?.contractors;
+          const name = String(contractor?.name ?? "").trim();
+          return id && name ? [id, name] as const : null;
+        })
+        .filter(Boolean)
+        .map((entry) => entry as readonly [string, string]),
+    ).entries(),
+  )
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
 
   const assignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
     supabase,
@@ -289,6 +305,7 @@ export default async function CloseoutQueuePage({
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
+          <ContractorFilter contractors={contractorOptions} selectedId={contractor ?? ""} />
           <Link
             href={`${baseHref}${contractor ? "&" : "?"}filter=all&sort=${sort}`}
             className={`inline-flex rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${filter === "all" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
