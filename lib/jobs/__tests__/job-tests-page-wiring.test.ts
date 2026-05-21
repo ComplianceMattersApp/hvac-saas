@@ -1,0 +1,30 @@
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import { describe, expect, it } from "vitest";
+
+const jobTestsPageSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/tests/page.tsx"),
+  "utf8",
+);
+
+const jobPageSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/page.tsx"),
+  "utf8",
+);
+
+describe("job tests page wiring", () => {
+  it("exposes Asbestos as a manual override option and keeps override reason free-form", () => {
+    expect(jobTestsPageSource).toContain('<option value="pass">Smoke Test</option>');
+    expect(jobTestsPageSource).toContain('<option value="fail">Asbestos</option>');
+    expect(jobTestsPageSource).toContain('autoComplete="off"');
+    expect(jobTestsPageSource).not.toContain('<datalist id={`ovr-reason-list-${runDL.id}`}>');
+  });
+});
+
+describe("job detail field operations board layout", () => {
+  it("keeps the service location chip over the image area", () => {
+    expect(jobPageSource).toContain('className="bg-slate-100 p-3"');
+    expect(jobPageSource).toContain('Service Location');
+    expect(jobPageSource).not.toContain('bg-slate-100 p-3 pt-10');
+  });
+});

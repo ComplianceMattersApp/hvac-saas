@@ -3207,7 +3207,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             Service Location
           </div>
         </div>
-        <div className="bg-slate-100 p-3 pt-10">
+        <div className="bg-slate-100 p-3">
           <Suspense
             fallback={
               <JobLocationPreviewFallback

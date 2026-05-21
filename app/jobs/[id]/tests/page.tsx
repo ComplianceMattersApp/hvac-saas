@@ -1977,28 +1977,33 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       key={testType}
       className={`flex min-w-0 flex-col gap-3 rounded-lg border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:flex-row sm:items-center sm:justify-between sm:px-4 ${isOpen ? "ring-2 ring-slate-300" : ""} ${tone.card}`}
     >
-      <div className="flex min-w-0 gap-3">
+        <div className="flex min-w-0 gap-3">
         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${carriedForward ? "bg-emerald-500" : tone.dot}`} />
         <div className="min-w-0">
-        <div className="font-semibold text-slate-950">
-          {getTestDisplayLabel(testType, packageSystem)}
-          {carriedForward ? (
-            <span className="ml-2 rounded-full border border-emerald-200 bg-white/70 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-              Carried Forward
-            </span>
-          ) : isRequired ? (
-            <span className="ml-2 rounded-full border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-              Required
-            </span>
-          ) : (
-            <span className="ml-2 rounded-full border border-slate-300 bg-white/70 px-2 py-0.5 text-[11px] font-medium text-slate-600">
-              Added
-            </span>
-          )}
-        </div>
-        <div className={`mt-1 text-xs leading-5 ${carriedForward ? "text-emerald-700" : tone.text}`}>
-          {getTestStatusHelp(String(status.state), carriedForward)}
-        </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="font-semibold text-slate-950">
+                {getTestDisplayLabel(testType, packageSystem)}
+              </div>
+              <span
+                className={`inline-flex min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+                  carriedForward
+                    ? "border-emerald-200 bg-white/70 text-emerald-700"
+                    : isRequired
+                    ? "border-slate-300 bg-white/70 text-slate-600"
+                    : "border-slate-300 bg-white/70 text-slate-600"
+                }`}
+              >
+                {carriedForward ? "Carried Forward" : isRequired ? "Required" : "Added"}
+              </span>
+              <span
+                className={`inline-flex min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${status.tone}`}
+              >
+                {carriedForward ? "Pass (parent)" : status.label}
+              </span>
+            </div>
+            <div className={`mt-1 text-xs leading-5 ${carriedForward ? "text-emerald-700" : tone.text}`}>
+              {getTestStatusHelp(String(status.state), carriedForward)}
+            </div>
         </div>
       </div>
 
@@ -2025,13 +2030,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           </Link>
         )}
 
-        <div
-          className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
-            carriedForward ? "border-emerald-200 bg-white text-emerald-700" : status.tone
-          }`}
-        >
-          {carriedForward ? "Pass (parent)" : status.label}
-        </div>
       </div>
     </div>
   );
@@ -2381,7 +2379,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         }
                       >
                         <option value="none">None</option>
-                        <option value="pass">Smoke Test (Pass)</option>
+                      <option value="pass">Smoke Test</option>
+                      <option value="fail">Asbestos</option>
                       </select>
                     </div>
 
@@ -2395,12 +2394,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         className="w-full rounded-md border px-3 py-2"
                         defaultValue={runDL.override_reason ?? ""}
                         placeholder="Explain override"
-                        list={`ovr-reason-list-${runDL.id}`}
+                        autoComplete="off"
                       />
-                      <datalist id={`ovr-reason-list-${runDL.id}`}>
-                        <option value="Smoke Test" />
-                        <option value="Asbestos" />
-                      </datalist>
                     </div>
                   </div>
                 </form>
