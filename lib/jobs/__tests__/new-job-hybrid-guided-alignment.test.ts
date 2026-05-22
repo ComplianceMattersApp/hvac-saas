@@ -9,9 +9,9 @@ const formSource = readFileSync(
 
 describe("/jobs/new hybrid guided-builder alignment", () => {
   it("uses Job Type wording instead of Job Family for internal non-service mode", () => {
-    expect(formSource).toContain('const jobFamilyStepTitle = isHvacServiceMode ? "Work Order Setup" : "Job Type";');
+    expect(formSource).toMatch(/const jobFamilyStepTitle = isHvacServiceMode[\s\S]*: "Job Type";/);
     expect(formSource).toContain('const jobFamilyControlLabel = isHvacServiceMode ? "Service / Work Order" : "Job Type";');
-    expect(formSource).not.toContain('const jobFamilyStepTitle = isHvacServiceMode ? "Work Order Setup" : "Job family";');
+    expect(formSource).not.toContain(': "Job family";');
   });
 
   it("uses clear hybrid lane copy for Service and ECC choices", () => {

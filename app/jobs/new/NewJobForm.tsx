@@ -669,22 +669,32 @@ const [billingRecipient, setBillingRecipient] = useState<
   }, [customerPrimaryLocationMap, guidedCustomerQuery, guidedCustomers]);
   const hasMeaningfulCustomerQuery = guidedCustomerQuery.trim().length >= 2;
 
-  const internalPageTitle = productMode === "hvac_service" ? "New Work Order" : "New Job";
+  const internalPageTitle = productMode === "hvac_service"
+    ? "New Work Order"
+    : productMode === "ecc_hers"
+      ? "New ECC Job"
+      : "New Job";
   const isHvacServiceMode = productMode === "hvac_service";
   const compactHeaderHelper = isContractorMode
     ? "Enter customer and work details, then submit for review."
-    : "Select a customer, choose the work, then create the job.";
+    : productMode === "ecc_hers"
+      ? "Select the customer and location, define the compliance work, then create the job."
+      : "Select a customer, choose the work, then create the job.";
   const internalModeHint =
     isHvacServiceMode
       ? "HVAC Service accounts use the Service / Work Order family by default and presentation."
       : productMode === "ecc_hers"
         ? "ECC/HERS accounts use the ECC / Compliance Test family by default and presentation."
         : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";
-  const jobFamilyStepTitle = isHvacServiceMode ? "Work Order Setup" : "Job Type";
+  const jobFamilyStepTitle = isHvacServiceMode
+    ? "Work Order Setup"
+    : productMode === "ecc_hers"
+      ? "ECC Job Setup"
+      : "Job Type";
   const jobFamilyStepDescription = isHvacServiceMode
     ? "These fields classify the visit. Work instructions are added below."
     : productMode === "ecc_hers"
-      ? "ECC / Compliance is locked for this account. Review the setup fields below before continuing."
+      ? "ECC / Compliance is locked for this account. Review the compliance details below before continuing."
       : "What kind of job are you creating?";
   const jobFamilyControlLabel = isHvacServiceMode ? "Service / Work Order" : "Job Type";
   const serviceJobFamilyDescription = isHvacServiceMode
@@ -693,6 +703,25 @@ const [billingRecipient, setBillingRecipient] = useState<
   const eccJobFamilyDescription = isHvacServiceMode
     ? "Advanced compliance testing workflow"
     : "Energy code test workflow";
+  const createSectionTitle = isHvacServiceMode
+    ? "Create Work Order"
+    : productMode === "ecc_hers"
+      ? "Create ECC Job"
+      : "Create Work Order";
+  const createSectionDescription = isHvacServiceMode
+    ? "Review the work order summary, then create it when the required intake details are ready."
+    : productMode === "ecc_hers"
+      ? "Review the compliance job summary, then create it when the required intake details are ready."
+      : "Review the work order summary, then create it when the required intake details are ready.";
+  const createReadyLabel = productMode === "ecc_hers" ? "Ready to create this ECC job." : "Ready to create this work order.";
+  const createPendingLabel = productMode === "ecc_hers"
+    ? "Complete the required intake details to create this ECC job."
+    : "Complete the required intake details to create this work order.";
+  const customerSectionDescription = isHvacServiceMode
+    ? "Find the customer and confirm where the work order should happen."
+    : productMode === "ecc_hers"
+      ? "Find the customer and confirm where the compliance job should happen."
+      : "Find the customer and confirm where the work order should happen.";
 
   useEffect(() => {
     if (jobType === modeSafeJobType) return;
@@ -908,16 +937,21 @@ const [billingRecipient, setBillingRecipient] = useState<
   const internalNextStepMessage = !internalResolutionReady
     ? isHvacServiceMode
       ? "Resolve customer and location to unlock work-order family, relationship review, job scope, scheduling, billing, and optional details."
-      : "Resolve customer and location to unlock job family, relationship review, job scope, scheduling, billing, and optional details."
+      : productMode === "ecc_hers"
+        ? "Resolve customer and location to unlock ECC setup, compliance details, optional scope, scheduling, billing, and additional details."
+        : "Resolve customer and location to unlock job family, relationship review, job scope, scheduling, billing, and optional details."
     : isHvacServiceMode
       ? "Choose the work-order family and relationship path before defining the job scope for this trip."
-      : "Choose the job family and relationship path before defining the job scope for this trip.";
+      : productMode === "ecc_hers"
+        ? "Review the ECC setup, project details, optional scope, scheduling, billing, and additional details before creating the job."
+        : "Choose the job family and relationship path before defining the job scope for this trip.";
   const billingRecipientLabel =
     billingRecipient === "contractor"
       ? "Contractor"
       : billingRecipient === "customer"
         ? "Customer"
         : "Custom billing";
+  const createSectionSummary = isSubmitReady ? createReadyLabel : createPendingLabel;
 
   const equipmentJson = useMemo(() => {
     // Only send payload when something was actually selected.
@@ -1786,7 +1820,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           {renderGuidedSectionIntro({
             icon: <MapPinned className="h-4 w-4" aria-hidden="true" />,
             title: "Customer & Location",
-            description: "Find the customer and confirm where the work order should happen.",
+            description: customerSectionDescription,
             summary: internalResolutionReady ? `${selectedCustomerSummary} — ${selectedLocationSummary}` : "Find or create the customer, then confirm the service location.",
             tone: customerSectionTone,
             action:
@@ -2379,10 +2413,10 @@ const [billingRecipient, setBillingRecipient] = useState<
               tone: setupSectionTone,
             })}
             <div className={guidedSectionBodyClass}>
-              <div className={`${guidedSectionInsetClass} space-y-3`}>
-                <label className="block text-sm font-medium text-slate-900">{jobFamilyControlLabel}</label>
-                <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
-                  {isHybridProductMode ? (
+              {isHybridProductMode ? (
+                <div className={`${guidedSectionInsetClass} space-y-3`}>
+                  <label className="block text-sm font-medium text-slate-900">{jobFamilyControlLabel}</label>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
                     <>
                       <label className={[
                         "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition-all sm:flex-1",
@@ -2423,20 +2457,27 @@ const [billingRecipient, setBillingRecipient] = useState<
                         </span>
                       </label>
                     </>
-                  ) : (
-                    <div className="flex items-start gap-3 rounded-xl border border-slate-900 bg-slate-900 px-3 py-3 text-white sm:flex-1">
-                      <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border border-slate-200/90 bg-white/10 text-[10px] font-bold text-white">
+                  </div>
+                  <input type="hidden" name="job_type" value={modeSafeJobType} />
+                </div>
+              ) : (
+                <div className={`${guidedSectionInsetClass} space-y-3`}>
+                  <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                    <div className="flex items-start gap-3">
+                      <span className="mt-0.5 inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-slate-900 text-xs font-bold text-white">
                         ✓
                       </span>
-                      <span>
-                        <span className="block text-sm font-medium text-white">ECC / Compliance</span>
-                        <span className="mt-0.5 block text-xs text-slate-200">{eccJobFamilyDescription}</span>
-                      </span>
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">ECC / Compliance</p>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">
+                          This account stays in the ECC workflow. Project type, permit, and jurisdiction details stay visible below.
+                        </p>
+                      </div>
                     </div>
-                  )}
+                  </div>
+                  <input type="hidden" name="job_type" value={modeSafeJobType} />
                 </div>
-                <input type="hidden" name="job_type" value={modeSafeJobType} />
-              </div>
+              )}
 
               {jobType !== "service" ? (
                 <div className={`${guidedSectionInsetClass} space-y-2`}>
@@ -2992,7 +3033,9 @@ const [billingRecipient, setBillingRecipient] = useState<
               {renderGuidedSectionIntro({
                 icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
                 title: "Additional Details",
-                description: "Supporting information only. Add it when it helps this work order move forward.",
+                description: productMode === "ecc_hers"
+                  ? "Supporting information only. Add it when it helps the compliance job move forward."
+                  : "Supporting information only. Add it when it helps this work order move forward.",
                 summary: additionalDetailsSummary,
                 tone: additionalDetailsTone,
               })}
@@ -3312,9 +3355,9 @@ const [billingRecipient, setBillingRecipient] = useState<
           <div className={guidedSectionShellClass}>
             {renderGuidedSectionIntro({
               icon: <Sparkles className="h-4 w-4" aria-hidden="true" />,
-              title: "Create Work Order",
-              description: "Review the work order summary, then create it when the required intake details are ready.",
-              summary: isSubmitReady ? "Ready to create this work order." : "Complete the required intake details to create this work order.",
+              title: createSectionTitle,
+              description: createSectionDescription,
+              summary: createSectionSummary,
               tone: createSectionTone,
             })}
             <div className={guidedSectionBodyClass}>

@@ -14,11 +14,12 @@ describe("/jobs/new guided builder refresh", () => {
     expect(formSource).toContain('title: "Customer & Location"');
     expect(formSource).toContain('title: "Schedule"');
     expect(formSource).toContain('title: "Additional Details"');
-    expect(formSource).toContain('title: "Create Work Order"');
+    expect(formSource).toContain('title: createSectionTitle');
   });
 
   it("shows summary-first guided copy instead of final confidence copy", () => {
     expect(formSource).toContain("Find the customer and confirm where the work order should happen.");
+    expect(formSource).toContain("Find the customer and confirm where the compliance job should happen.");
     expect(formSource).toContain("Choose visit details and add the work scope.");
     expect(formSource).toContain("Leave unscheduled if timing is not set yet.");
     expect(formSource).toContain("Permit, equipment, photos, and comments stay secondary.");
