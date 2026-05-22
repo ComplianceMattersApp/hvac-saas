@@ -10,7 +10,7 @@ import {
   createJobFromForm,
   finalizeContractorProposalAttachments,
   getInternalIntakeRelationshipContext,
-} from "@/lib/actions";
+} from "@/lib/actions/job-actions";
 import JobCoreFields from "@/components/jobs/JobCoreFields";
 import ActionFeedback from "@/components/ui/ActionFeedback";
 import VisitScopeBuilder, {
