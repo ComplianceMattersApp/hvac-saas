@@ -35,10 +35,11 @@ describe("New job Step 5 simplification wiring", () => {
     );
   });
 
-  it("keeps details field-first and hides metadata controls", () => {
+  it("keeps details field-first, keeps optional price, and hides metadata controls", () => {
     expect(builderSource).toContain("<details");
     expect(builderSource).toContain("Details");
-    expect(builderSource).not.toContain("Expected Price");
+    expect(builderSource).toContain("Optional price");
+    expect(builderSource).toContain("does not create an invoice charge");
     expect(builderSource).not.toContain("Unit Label");
     expect(builderSource).not.toContain("Metadata:");
   });
@@ -81,6 +82,14 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("addManualItemFromQuickEntry");
     expect(builderSource).toContain("applyFieldIntakeScopeDefaults");
     expect(builderSource).toContain('Add "${searchQuery');
+  });
+
+  it("preserves matched default prices and falls back to 0.00 when needed", () => {
+    expect(builderSource).toContain("normalizeExpectedUnitPrice");
+    expect(builderSource).toContain("matchingTemplate?.default_unit_price");
+    expect(builderSource).toContain("safeDefaults.expected_unit_price");
+    expect(builderSource).toContain("selectedTemplate.default_unit_price");
+    expect(builderSource).toContain("? 0");
   });
 
   it("preserves hidden serialized metadata keys internally", () => {

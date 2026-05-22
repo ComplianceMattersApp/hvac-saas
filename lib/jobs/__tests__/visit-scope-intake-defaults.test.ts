@@ -11,6 +11,7 @@ describe("visit-scope-intake-defaults", () => {
       item_type: "service",
       category: "Installation",
       unit_label: "job",
+      expected_unit_price: 0,
     });
   });
 
@@ -19,6 +20,7 @@ describe("visit-scope-intake-defaults", () => {
       item_type: "service",
       category: "Diagnostic",
       unit_label: "job",
+      expected_unit_price: 0,
     });
   });
 
@@ -27,6 +29,7 @@ describe("visit-scope-intake-defaults", () => {
       item_type: "service",
       category: "Service Call",
       unit_label: "job",
+      expected_unit_price: 0,
     });
   });
 
@@ -35,6 +38,7 @@ describe("visit-scope-intake-defaults", () => {
       item_type: "service",
       category: "General",
       unit_label: "job",
+      expected_unit_price: 0,
     });
   });
 
@@ -45,11 +49,13 @@ describe("visit-scope-intake-defaults", () => {
         item_type: "service",
         category: "Custom Category",
         unit_label: "ea",
+        expected_unit_price: 149.99,
       }),
     ).toEqual({
       item_type: "service",
       category: "Custom Category",
       unit_label: "ea",
+      expected_unit_price: 149.99,
     });
   });
 });

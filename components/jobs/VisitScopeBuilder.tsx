@@ -66,6 +66,13 @@ const QUICK_SCOPE_CHOICES = [
   },
 ] as const;
 
+function normalizeExpectedUnitPrice(value: unknown, fallback = 0) {
+  if (value === null || value === undefined) return fallback;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(0, Number(parsed.toFixed(2)));
+}
+
 function normalizeScopeComparable(value: unknown) {
   return String(value ?? "")
     .trim()
@@ -207,12 +214,10 @@ export default function VisitScopeBuilder({
           title: choice.label,
           details: matchingTemplate?.default_description ?? "",
           source_pricebook_item_id: matchingTemplate?.id ?? null,
-          expected_unit_price:
-            matchingTemplate?.default_unit_price === null ||
-            matchingTemplate?.default_unit_price === undefined ||
-            !Number.isFinite(Number(matchingTemplate.default_unit_price))
-              ? null
-              : Math.max(0, Number(matchingTemplate.default_unit_price)),
+          expected_unit_price: normalizeExpectedUnitPrice(
+            matchingTemplate?.default_unit_price,
+            safeDefaults.expected_unit_price,
+          ),
           unit_label: safeDefaults.unit_label,
           item_type: safeDefaults.item_type,
           category: safeDefaults.category,
@@ -270,7 +275,7 @@ export default function VisitScopeBuilder({
         source_pricebook_item_id: sanitizeVisitScopeItemId(item.source_pricebook_item_id),
         expected_unit_price:
           item.expected_unit_price === null || item.expected_unit_price === undefined || Number.isNaN(Number(item.expected_unit_price))
-            ? null
+            ? 0
             : Math.max(0, Number(item.expected_unit_price)),
         unit_label: String(item.unit_label ?? "").trim() || null,
         item_type: String(item.item_type ?? "").trim() || null,
@@ -314,7 +319,7 @@ export default function VisitScopeBuilder({
         candidate.expected_unit_price === null ||
         candidate.expected_unit_price === undefined ||
         !Number.isFinite(Number(candidate.expected_unit_price))
-          ? null
+          ? 0
           : Math.max(0, Number(candidate.expected_unit_price)),
       unit_label: String(candidate.unit_label ?? "").trim() || null,
       item_type: String(candidate.item_type ?? "").trim() || null,
@@ -354,7 +359,7 @@ export default function VisitScopeBuilder({
     const added = addScopeCandidate({
       title,
       source_pricebook_item_id: null,
-      expected_unit_price: null,
+      expected_unit_price: safeDefaults.expected_unit_price,
       unit_label: safeDefaults.unit_label,
       item_type: safeDefaults.item_type,
       category: safeDefaults.category,
@@ -390,7 +395,7 @@ export default function VisitScopeBuilder({
       title: selectedTemplate.item_name,
       details: selectedTemplate.default_description ?? "",
       source_pricebook_item_id: selectedTemplate.id,
-      expected_unit_price: selectedTemplate.default_unit_price,
+      expected_unit_price: normalizeExpectedUnitPrice(selectedTemplate.default_unit_price, 0),
       unit_label: selectedTemplate.unit_label,
       item_type: selectedTemplate.item_type,
       category: selectedTemplate.category,
@@ -702,6 +707,34 @@ export default function VisitScopeBuilder({
                 Details
               </summary>
               <div className="mt-2.5 space-y-2">
+                <div className="space-y-1">
+                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Optional price</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.expected_unit_price ?? 0}
+                    onChange={(event) => {
+                      const raw = event.target.value.trim();
+                      if (!raw) {
+                        patchItem(item.id, { expected_unit_price: 0 });
+                        return;
+                      }
+
+                      const parsed = Number.parseFloat(raw);
+                      if (!Number.isFinite(parsed) || parsed < 0) {
+                        patchItem(item.id, { expected_unit_price: 0 });
+                        return;
+                      }
+
+                      patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
+                    }}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                    placeholder="0.00"
+                  />
+                  <p className="text-xs text-slate-500">This helps with upfront context only. It does not create an invoice charge.</p>
+                </div>
+
                 <div className="space-y-1">
                   <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Description</label>
                   <textarea
