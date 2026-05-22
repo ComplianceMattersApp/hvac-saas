@@ -7,6 +7,7 @@ import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope"
 import { createClient } from "@/lib/supabase/server";
 import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
+import { applyExternalBillingCompletionMutation } from "@/lib/actions/external-billing-completion";
 import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
@@ -279,41 +280,17 @@ export async function markInvoiceSent(jobIdOrFormData: string | FormData, return
     );
   }
 
-  const completedAt = job.data_entry_completed_at ?? new Date().toISOString();
-  let invoiceCompleteChanged = false;
-  let dataEntryCompletedChanged = false;
-
-  if (!job.invoice_complete || !job.data_entry_completed_at) {
-    const updatePayload: { invoice_complete?: boolean; data_entry_completed_at?: string } = {};
-
-    if (!job.invoice_complete) {
-      updatePayload.invoice_complete = true;
-    }
-
-    if (!job.data_entry_completed_at) {
-      updatePayload.data_entry_completed_at = completedAt;
-    }
-
-    const { data: updatedJob, error: updateErr } = await supabase
-      .from("jobs")
-      .update(updatePayload)
-      .eq("id", jobId)
-      .select("id, invoice_complete, data_entry_completed_at")
-      .maybeSingle();
-
-    if (updateErr) throw new Error(updateErr.message);
-
-    if (!updatedJob?.id || updatedJob.invoice_complete !== true) {
-      throw new Error("Invoice complete update failed (no row updated).");
-    }
-
-    if (!job.data_entry_completed_at && !updatedJob.data_entry_completed_at) {
-      throw new Error("Data entry completion update failed (timestamp missing).");
-    }
-
-    invoiceCompleteChanged = !job.invoice_complete;
-    dataEntryCompletedChanged = !job.data_entry_completed_at;
-  }
+  const completionResult = await applyExternalBillingCompletionMutation({
+    supabase,
+    jobId,
+    currentInvoiceComplete: job.invoice_complete,
+    currentDataEntryCompletedAt: job.data_entry_completed_at,
+    invoiceFieldMode: "if_missing",
+    dataEntryFieldMode: "if_missing",
+  });
+  const completedAt = completionResult.completedAt;
+  const invoiceCompleteChanged = completionResult.invoiceCompleteChanged;
+  const dataEntryCompletedChanged = completionResult.dataEntryCompletedChanged;
 
   const result = await setOpsStatusIfNotManual(jobId, "closed");
 

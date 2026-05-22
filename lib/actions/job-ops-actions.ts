@@ -33,6 +33,7 @@ import { resolveAppUrl, renderOperationalEmailLayout, renderSystemEmailLayout, e
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
+import { applyExternalBillingCompletionMutation } from "@/lib/actions/external-billing-completion";
 import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import {
   extractFailureDetails,
@@ -1319,28 +1320,15 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
     redirectToJob({ notice: "field_not_complete" });
   }
 
-  const completedAt = job.data_entry_completed_at ?? new Date().toISOString();
-
-// Mark invoice complete and stamp closeout metadata consistently.
-const { data: updatedInvoiceRow, error: updErr } = await supabase
-  .from("jobs")
-  .update({
-    invoice_complete: true,
-    ...(job.data_entry_completed_at ? {} : { data_entry_completed_at: completedAt }),
-  })
-  .eq("id", jobId)
-  .select("id, invoice_complete, data_entry_completed_at")
-  .maybeSingle();
-
-if (updErr) throw updErr;
-
-if (!updatedInvoiceRow?.id || updatedInvoiceRow.invoice_complete !== true) {
-  throw new Error("Invoice complete update failed (no row updated).");
-}
-
-if (!job.data_entry_completed_at && !updatedInvoiceRow.data_entry_completed_at) {
-  throw new Error("Data entry completion update failed (timestamp missing).");
-}
+  const completionResult = await applyExternalBillingCompletionMutation({
+    supabase,
+    jobId,
+    currentInvoiceComplete: job.invoice_complete,
+    currentDataEntryCompletedAt: job.data_entry_completed_at,
+    invoiceFieldMode: "always",
+    dataEntryFieldMode: "if_missing",
+  });
+  const completedAt = completionResult.completedAt;
 
   let nextOps = resolveOpsStatus({
     status: job.status,

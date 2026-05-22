@@ -3674,7 +3674,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               loadingText="Saving..."
               className={darkButtonClass}
             >
-              ✓ Mark Invoice Sent
+              ✓ Mark External Billing Complete
             </SubmitButton>
           </form>
         )}
@@ -4569,7 +4569,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </span>
         </div>
         <div className="mt-1 text-sm leading-5 text-amber-900">
-          Field work is complete. This job remains in closeout until invoice sending is confirmed.
+          Field work is complete. This job remains in closeout until external billing is confirmed complete.
         </div>
       </div>
 
@@ -4579,7 +4579,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           loadingText="Saving..."
           className={darkButtonClass}
         >
-          Mark Invoice Sent
+          Mark External Billing Complete
         </SubmitButton>
       </form>
     </div>
