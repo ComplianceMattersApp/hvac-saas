@@ -24,7 +24,7 @@ describe("New job Step 5 simplification wiring", () => {
   });
 
   it("uses compact top progress text", () => {
-    expect(formSource).toContain("Step 1 of 5");
+    expect(formSource).not.toContain("Step 1 of 5");
     expect(formSource).toContain("Select a customer, choose the work, then create the job.");
   });
 
@@ -81,7 +81,7 @@ describe("New job Step 5 simplification wiring", () => {
   });
 
   it("supports typed custom scope adds", () => {
-    expect(builderSource).toContain("Add Custom Work");
+    expect(builderSource).toContain("Search Pricebook Or Add Scope");
     expect(builderSource).toContain("Add another item");
     expect(builderSource).toContain("addManualItemFromQuickEntry");
     expect(builderSource).toContain("applyFieldIntakeScopeDefaults");
@@ -94,7 +94,17 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("Custom work");
     expect(builderSource).toContain('completedItems.length === 1 ? "item" : "items"');
     expect(builderSource).toContain("Optional price: $");
-    expect(builderSource).toContain("rounded-2xl border border-emerald-200 bg-emerald-50/80");
+    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-4 py-3");
+  });
+
+  it("flattens the service scope shell instead of nesting extra framed cards", () => {
+    expect(builderSource).toContain('className="space-y-3 border-t border-slate-200/80 pt-3"');
+    expect(builderSource).not.toContain('rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3');
+  });
+
+  it("auto-expands details for newly added service scope items", () => {
+    expect(builderSource).toContain("setItemExpanded(expandedItemId, true)");
+    expect(builderSource).toContain("open={expandedItemIds.has(item.id)}");
   });
 
   it("preserves matched default prices and falls back to 0.00 when needed", () => {

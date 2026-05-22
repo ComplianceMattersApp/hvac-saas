@@ -32,9 +32,22 @@ describe("/jobs/new guided builder refresh", () => {
     expect(formSource).toContain('name="job_notes"');
   });
 
+  it("exposes internal request-source selection during customer intake", () => {
+    expect(formSource).toContain("Request came from");
+    expect(formSource).toContain('name="intake_request_source"');
+    expect(formSource).toContain("Property Management Company");
+    expect(formSource).toContain("Home Warranty");
+  });
+
   it("folds internal billing controls into the guided Schedule section", () => {
     expect(formSource).toContain('title: "Schedule"');
     expect(formSource).toContain("Schedule the visit if needed, then confirm who gets billed later.");
     expect(formSource).toContain("Billing Recipient");
+  });
+
+  it("collapses customer and existing-location selectors after they are chosen", () => {
+    expect(formSource).toContain("!isCustomerContextInternalMode && !createNewCustomer && !selectedCustomerId");
+    expect(formSource).toContain("Change location");
+    expect(formSource).toContain("Selected service location");
   });
 });

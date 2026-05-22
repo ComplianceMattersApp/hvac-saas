@@ -32,7 +32,7 @@ describe("Visit scope visit-type suggestion UX", () => {
   it("keeps quick add behind Add more work instead of first visible state", () => {
     expect(builderSource).toContain("Add more work");
     expect(builderSource).toContain("Add another item");
-    expect(builderSource).toContain("Search saved work items or type custom work.");
+    expect(builderSource).toContain("Search Pricebook items or type custom scope");
     expect(builderSource).toContain('open={jobType !== "service" || !hasCompletedItems}');
     expect(builderSource).toContain('jobType !== "service" ? (');
     expect((builderSource.match(/Quick Add/g) || []).length).toBe(1);
@@ -42,6 +42,6 @@ describe("Visit scope visit-type suggestion UX", () => {
     expect(builderSource).toContain("Selected work appears here first so the active scope is always clear.");
     expect(builderSource).toContain("From saved work item");
     expect(builderSource).toContain("Custom work");
-    expect(builderSource).toContain("rounded-2xl border border-emerald-200 bg-emerald-50/80");
+    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-4 py-3");
   });
 });

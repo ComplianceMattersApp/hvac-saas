@@ -186,6 +186,7 @@ export default function VisitScopeBuilder({
   const [items, setItems] = useState<VisitScopeDraftItem[]>(() => toDraftItems(initialItems, jobType));
   const [quickEntryValue, setQuickEntryValue] = useState("");
   const [scopeFeedback, setScopeFeedback] = useState<ScopeFeedback | null>(null);
+  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [showSavedDefaults, setShowSavedDefaults] = useState(false);
   const [showEccOptionalScope, setShowEccOptionalScope] = useState(() => {
     const seededItems = toDraftItems(initialItems, jobType);
@@ -305,9 +306,22 @@ export default function VisitScopeBuilder({
     setItems(seededItems);
     setQuickEntryValue("");
     setScopeFeedback(null);
+    setExpandedItemIds(new Set());
     setShowSavedDefaults(false);
     setShowEccOptionalScope(jobType === "service" || hasSummary || seededItems.length > 0);
   }, [jobType, resetKey]);
+
+  function setItemExpanded(itemId: string, expanded: boolean) {
+    setExpandedItemIds((prev) => {
+      const next = new Set(prev);
+      if (expanded) {
+        next.add(itemId);
+      } else {
+        next.delete(itemId);
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     onSummaryChange?.(summary);
@@ -395,6 +409,9 @@ export default function VisitScopeBuilder({
       promoted_by_user_id: null,
     };
 
+    const blankDraftTargetId = items.find(isBlankScopeItem)?.id ?? null;
+    const expandedItemId = blankDraftTargetId || nextItem.id;
+
     setItems((prev) => {
       if (findExistingScopeItem(prev, candidate)) return prev;
 
@@ -408,6 +425,7 @@ export default function VisitScopeBuilder({
       if (prev.length >= VISIT_SCOPE_ITEM_LIMIT) return prev;
       return [...prev, nextItem];
     });
+    setItemExpanded(expandedItemId, true);
 
     if (jobType !== "service") {
       setScopeFeedback({
@@ -443,6 +461,7 @@ export default function VisitScopeBuilder({
   }
 
   function removeItem(itemId: string) {
+    setItemExpanded(itemId, false);
     setItems((prev) => {
       if (prev.length <= 1) {
         if (jobType === "ecc") {
@@ -475,7 +494,7 @@ export default function VisitScopeBuilder({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {jobType === "ecc" && !showEccOptionalScope ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3.5 py-3">
           <p className="text-sm text-slate-700">
@@ -518,7 +537,7 @@ export default function VisitScopeBuilder({
         ) : null}
       </div>
 
-      <div className="space-y-2.5">
+      <div className="space-y-3 border-t border-slate-200/80 pt-3">
         <div className="space-y-1">
           <div className="text-sm font-medium text-slate-900">
             {jobType === "service" ? "Work to perform" : "Optional job scope notes"}
@@ -535,8 +554,7 @@ export default function VisitScopeBuilder({
           ) : null}
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
-          <div className="space-y-3">
+        <div className="space-y-3">
             {scopeFeedback && (jobType !== "service" || scopeFeedback.tone !== "added") ? (
               <p
                 className={[
@@ -551,7 +569,7 @@ export default function VisitScopeBuilder({
               </p>
             ) : null}
 
-            <div className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+            <div className="space-y-3 rounded-xl border border-slate-200/85 bg-slate-50/45 px-3 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Current Job Scope</p>
@@ -569,7 +587,7 @@ export default function VisitScopeBuilder({
               </div>
 
               {jobType === "service" && visitTypeSuggestionCandidate ? (
-                <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5">
+                <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">
                     Suggested from Visit Type
                   </div>
@@ -599,7 +617,7 @@ export default function VisitScopeBuilder({
 
               {jobType === "service" ? (
                 hasCompletedItems ? (
-                  <div className="mt-3 space-y-3">
+                  <div className="space-y-3">
                     {completedItems.map((item) => {
                       const sourceLabel = getScopeSourceLabel(item, visitTypeSuggestionCandidate);
                       const priceLabel = formatOptionalPrice(item.expected_unit_price);
@@ -607,7 +625,7 @@ export default function VisitScopeBuilder({
                       return (
                         <div
                           key={item.id}
-                          className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 shadow-sm"
+                          className="rounded-xl border border-emerald-200 bg-white px-4 py-3"
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex items-start gap-3">
@@ -638,7 +656,13 @@ export default function VisitScopeBuilder({
                             </button>
                           </div>
 
-                          <details className="mt-3 rounded-xl border border-emerald-200 bg-white/80 px-3 py-2">
+                          <details
+                            className="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2"
+                            open={expandedItemIds.has(item.id)}
+                            onToggle={(event) =>
+                              setItemExpanded(item.id, (event.currentTarget as HTMLDetailsElement).open)
+                            }
+                          >
                             <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-700">
                               Details
                             </summary>
@@ -709,7 +733,7 @@ export default function VisitScopeBuilder({
                     })}
                   </div>
                 ) : (
-                  <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                     <p className="font-medium text-slate-700">No work added yet.</p>
                     <p className="mt-1 text-xs text-slate-500">
                       Search saved work items or type custom work to add the first item.
@@ -736,17 +760,13 @@ export default function VisitScopeBuilder({
             </div>
 
             <details
-              className="rounded-xl border border-slate-200 bg-white px-3 py-3"
+              className="rounded-xl border border-slate-200/85 bg-slate-50/45 px-3 py-3"
               open={jobType !== "service" || !hasCompletedItems}
             >
               <summary className="cursor-pointer text-sm font-semibold text-slate-900">
                 {jobType === "service" && hasCompletedItems ? "Add another item" : "Add more work"}
               </summary>
               <div className="mt-2.5 space-y-3">
-                <p className="text-xs text-slate-500">
-                  Search saved work items or type custom work.
-                </p>
-
                 {jobType !== "service" ? (
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
@@ -786,7 +806,7 @@ export default function VisitScopeBuilder({
 
                 <div className="space-y-2">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Add Custom Work
+                    Search Pricebook Or Add Scope
                   </div>
                   <input
                     type="text"
@@ -796,19 +816,16 @@ export default function VisitScopeBuilder({
                       if (scopeFeedback?.tone !== "added") setScopeFeedback(null);
                     }}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                    placeholder={availablePricebookTemplates.length > 0 ? "Search saved work items or type custom work" : "Type custom work to perform"}
+                    placeholder={availablePricebookTemplates.length > 0 ? "Search Pricebook items or type custom scope" : "Type custom scope to add"}
                   />
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs text-slate-500">
-                      Add typed work now, or search saved defaults when you need one.
-                    </p>
                     <button
                       type="button"
                       onClick={addManualItemFromQuickEntry}
                       disabled={!searchQuery}
-                      className="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-55"
+                      className="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-55 sm:ml-auto"
                     >
-                      {searchQuery ? `Add "${searchQuery.slice(0, 36)}${searchQuery.length > 36 ? "..." : ""}"` : "Add custom scope"}
+                      {searchQuery ? `Add "${searchQuery.slice(0, 36)}${searchQuery.length > 36 ? "..." : ""}"` : "Add scope item"}
                     </button>
                   </div>
                 </div>
@@ -880,7 +897,6 @@ export default function VisitScopeBuilder({
             ) : null}
               </div>
             </details>
-          </div>
         </div>
 
         {jobType !== "service" ? items.map((item, index) => (

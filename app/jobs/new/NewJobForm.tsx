@@ -3,6 +3,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
+import { BriefcaseBusiness, CalendarClock, Camera, ChevronDown, ClipboardList, FileText, MapPinned, MessageSquare, Plus, Sparkles, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import {
   createContractorProposalAttachmentUploadToken,
@@ -90,6 +91,13 @@ type MaintenanceAgreementPrefill = {
     category?: string | null;
   }>;
 };
+type IntakeRequestSource =
+  | "homeowner"
+  | "tenant_or_occupant"
+  | "landlord"
+  | "property_management"
+  | "home_warranty"
+  | "other";
 
 type ComponentType =
   | "condenser_ac"
@@ -459,6 +467,8 @@ export default function NewJobForm({
   const [newCustomerLastName, setNewCustomerLastName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [newCustomerEmail, setNewCustomerEmail] = useState("");
+  const [intakeRequestSource, setIntakeRequestSource] = useState<IntakeRequestSource>("homeowner");
+  const [intakeRequestSourceOther, setIntakeRequestSourceOther] = useState("");
 
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
@@ -1223,7 +1233,14 @@ const [billingRecipient, setBillingRecipient] = useState<
   const guidedSectionBodyClass = "space-y-4 px-4 pb-4 pt-4 sm:px-5 sm:pb-5";
   const guidedSectionInsetClass =
     "rounded-2xl border border-slate-200/85 bg-slate-50/70 p-4 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.32)]";
+  const supportingSectionIconWrapClass =
+    "flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200/85 bg-white text-slate-600 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.28)]";
+  const supportingSectionMetaClass =
+    "inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-slate-500";
   const selectedCustomerSummary = selectedCustomer ? customerDisplayName(selectedCustomer) : "Customer not selected";
+  const resolvedExistingLocation = locationMode === "existing"
+    ? (selectedLocation ?? (hasContextSingleLocation ? selectedCustomerLocations[0] ?? null : null))
+    : null;
   const selectedLocationSummary = createNewCustomer || locationMode === "new"
     ? (newLocationAddressLine1 || "New location")
     : (selectedLocation ? formatLocationContext(selectedLocation) : "Location not selected");
@@ -1275,12 +1292,14 @@ const [billingRecipient, setBillingRecipient] = useState<
   }
 
   function renderGuidedSectionIntro({
+    icon,
     title,
     description,
     summary,
     tone,
     action,
   }: {
+    icon?: ReactNode;
     title: string;
     description: string;
     summary?: string;
@@ -1288,22 +1307,52 @@ const [billingRecipient, setBillingRecipient] = useState<
     action?: ReactNode;
   }) {
     const toneClasses = guidedSectionToneClasses(tone);
+    const helperText = summary?.trim() || description;
 
     return (
       <div className={`flex flex-col gap-3 px-4 py-4 sm:px-5 ${toneClasses.header}`}>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
+              {icon ? (
+                <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/85 bg-white text-slate-600">
+                  {icon}
+                </span>
+              ) : null}
               <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
               <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${toneClasses.badge}`}>
                 {toneClasses.badgeText}
               </span>
             </div>
-            <p className="text-sm text-slate-600">{description}</p>
-            {summary ? <p className="text-sm font-medium text-slate-900">{summary}</p> : null}
+            <p className="text-sm text-slate-700">{helperText}</p>
           </div>
           {action ? <div className="flex flex-none items-center">{action}</div> : null}
         </div>
+      </div>
+    );
+  }
+
+  function renderSupportingSectionHeader({
+    icon,
+    title,
+    description,
+    trailing,
+  }: {
+    icon: ReactNode;
+    title: string;
+    description?: string;
+    trailing?: ReactNode;
+  }) {
+    return (
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <div className={supportingSectionIconWrapClass}>{icon}</div>
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+            {description ? <p className="mt-0.5 text-xs leading-5 text-slate-500">{description}</p> : null}
+          </div>
+        </div>
+        {trailing ? <div className="flex shrink-0 items-center gap-2">{trailing}</div> : null}
       </div>
     );
   }
@@ -1478,11 +1527,6 @@ const [billingRecipient, setBillingRecipient] = useState<
           {isContractorMode ? "New Job" : internalPageTitle}
         </h1>
         <p className="mt-1 text-sm text-slate-600">{compactHeaderHelper}</p>
-        <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
-          <span>Step 1 of 5</span>
-          <span aria-hidden="true">•</span>
-          <span>Customer</span>
-        </div>
       </header>
 
       <ActionFeedback
@@ -1746,6 +1790,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
         <section className={guidedSectionShellClass}>
           {renderGuidedSectionIntro({
+            icon: <MapPinned className="h-4 w-4" aria-hidden="true" />,
             title: "Customer & Location",
             description: "Find the customer and confirm where the work order should happen.",
             summary: internalResolutionReady ? `${selectedCustomerSummary} — ${selectedLocationSummary}` : "Find or create the customer, then confirm the service location.",
@@ -1768,8 +1813,32 @@ const [billingRecipient, setBillingRecipient] = useState<
           })}
           <div className={guidedSectionBodyClass}>
           {isInternalMode ? (
-            <div className="rounded-xl border border-blue-200/80 bg-blue-50/80 px-3.5 py-3 text-sm text-blue-900">
-              Who should be contacted for this job? If the tenant, property manager, or responsible party is different, include that in job notes for now.
+            <div className={`${guidedSectionInsetClass} space-y-2`}>
+              <label className="block text-sm font-medium text-slate-900">Request came from</label>
+              <p className="text-xs text-slate-500">Select request source for dispatch context.</p>
+              <select
+                name="intake_request_source"
+                value={intakeRequestSource}
+                onChange={(event) => setIntakeRequestSource(event.target.value as IntakeRequestSource)}
+                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-sm"
+              >
+                <option value="homeowner">Homeowner</option>
+                <option value="tenant_or_occupant">Tenant / Occupant</option>
+                <option value="landlord">Landlord</option>
+                <option value="property_management">Property Management Company</option>
+                <option value="home_warranty">Home Warranty</option>
+                <option value="other">Other</option>
+              </select>
+              {intakeRequestSource === "other" ? (
+                <input
+                  type="text"
+                  name="intake_request_source_other"
+                  value={intakeRequestSourceOther}
+                  onChange={(event) => setIntakeRequestSourceOther(event.target.value)}
+                  placeholder="Describe source (optional)"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              ) : null}
             </div>
           ) : null}
 
@@ -1784,14 +1853,14 @@ const [billingRecipient, setBillingRecipient] = useState<
 
           {isInternalMode ? (
             <>
-              {!isCustomerContextInternalMode && !createNewCustomer ? (
+              {!isCustomerContextInternalMode && !createNewCustomer && !selectedCustomerId ? (
                 <div className={`${guidedSectionInsetClass} space-y-4`}>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 1</p>
                     <h3 className="mt-1 text-lg font-semibold text-slate-950">Find or create customer</h3>
                     <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">
-                      Start by typing a customer name. Results update live with address context so you can select confidently.
+                      Type customer name to find the best match.
                     </p>
                   </div>
                     <div className="flex flex-col items-end gap-2 flex-none">
@@ -1933,91 +2002,43 @@ const [billingRecipient, setBillingRecipient] = useState<
                   </div>
 
                   <div className={`${guidedSectionInsetClass} space-y-3`}>
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 2</p>
-                      <p className="mt-1 text-base font-semibold text-slate-900">Choose service location</p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {selectedCustomerLocations.length} location{selectedCustomerLocations.length === 1 ? "" : "s"} on file for this customer.
-                      </p>
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 2</p>
+                        <p className="mt-1 text-base font-semibold text-slate-900">Choose service location</p>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {selectedCustomerLocations.length} location{selectedCustomerLocations.length === 1 ? "" : "s"} on file for this customer.
+                        </p>
+                      </div>
+                      {resolvedExistingLocation && !hasContextSingleLocation ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            resetRelationshipDecision();
+                            setLocationMode("existing");
+                            setLocationId("");
+                          }}
+                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
+                        >
+                          Change location
+                        </button>
+                      ) : null}
                     </div>
 
-                    {isCustomerContextInternalMode ? (
-                      <>
-                        {hasContextSingleLocation ? (
-                          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900">
-                            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Using saved location</p>
-                            <p className="mt-1 font-medium text-slate-900">{formatLocationContext(selectedCustomerLocations[0])}</p>
-                            {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
-                          </div>
-                        ) : null}
+                    {resolvedExistingLocation ? (
+                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                          {hasContextSingleLocation ? "Using saved location" : "Selected service location"}
+                        </p>
+                        <p className="mt-1 font-medium text-slate-900">{formatLocationContext(resolvedExistingLocation)}</p>
+                        {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
+                      </div>
+                    ) : null}
 
-                        {hasContextMultipleLocations ? (
-                          <>
-                            <select
-                              className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
-                              value={locationId}
-                              onChange={(e) => {
-                                resetRelationshipDecision();
-                                setLocationId(e.target.value);
-                              }}
-                            >
-                              <option value="">Select saved location...</option>
-                              {selectedCustomerLocations.map((l) => (
-                                <option key={l.id} value={l.id}>
-                                  {(l.nickname ? `${l.nickname} - ` : "") +
-                                    (l.address_line1 ?? "Address") +
-                                    ", " +
-                                    [l.city, l.state, l.zip || l.postal_code].filter(Boolean).join(" ")}
-                                </option>
-                              ))}
-                            </select>
-                            {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
-                          </>
-                        ) : null}
-
-                        {hasContextNoLocations ? (
-                          <div className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3 text-sm text-blue-900">
-                            No saved locations found. Add the first service location to continue.
-                          </div>
-                        ) : null}
-                      </>
-                    ) : (
-                      <>
-                        <div className="flex flex-wrap gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              resetRelationshipDecision();
-                              setLocationMode("existing");
-                            }}
-                            className={[
-                              "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
-                              locationMode === "existing"
-                                ? "border-slate-900 bg-slate-900 text-white"
-                                : "border-slate-300 bg-white text-slate-700",
-                            ].join(" ")}
-                          >
-                            Use existing location
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              resetRelationshipDecision();
-                              setLocationMode("new");
-                            }}
-                            className={[
-                              "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
-                              locationMode === "new"
-                                ? "border-slate-900 bg-slate-900 text-white"
-                                : "border-slate-300 bg-white text-slate-700",
-                            ].join(" ")}
-                          >
-                            Create new location
-                          </button>
-                        </div>
-
-                        {locationMode === "existing" ? (
-                          selectedCustomerLocations.length > 0 ? (
+                    {!resolvedExistingLocation ? (
+                      isCustomerContextInternalMode ? (
+                        <>
+                          {hasContextMultipleLocations ? (
                             <>
                               <select
                                 className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
@@ -2027,7 +2048,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                                   setLocationId(e.target.value);
                                 }}
                               >
-                                <option value="">Select existing location...</option>
+                                <option value="">Select saved location...</option>
                                 {selectedCustomerLocations.map((l) => (
                                   <option key={l.id} value={l.id}>
                                     {(l.nickname ? `${l.nickname} - ` : "") +
@@ -2039,12 +2060,79 @@ const [billingRecipient, setBillingRecipient] = useState<
                               </select>
                               {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
                             </>
-                          ) : (
-                            <p className="text-xs text-slate-500">No saved locations for this customer. Choose Create new location.</p>
-                          )
-                        ) : null}
-                      </>
-                    )}
+                          ) : null}
+
+                          {hasContextNoLocations ? (
+                            <div className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3 text-sm text-blue-900">
+                              No saved locations found. Add the first service location to continue.
+                            </div>
+                          ) : null}
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                resetRelationshipDecision();
+                                setLocationMode("existing");
+                              }}
+                              className={[
+                                "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
+                                locationMode === "existing"
+                                  ? "border-slate-900 bg-slate-900 text-white"
+                                  : "border-slate-300 bg-white text-slate-700",
+                              ].join(" ")}
+                            >
+                              Use existing location
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                resetRelationshipDecision();
+                                setLocationMode("new");
+                              }}
+                              className={[
+                                "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
+                                locationMode === "new"
+                                  ? "border-slate-900 bg-slate-900 text-white"
+                                  : "border-slate-300 bg-white text-slate-700",
+                              ].join(" ")}
+                            >
+                              Create new location
+                            </button>
+                          </div>
+
+                          {locationMode === "existing" ? (
+                            selectedCustomerLocations.length > 0 ? (
+                              <>
+                                <select
+                                  className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
+                                  value={locationId}
+                                  onChange={(e) => {
+                                    resetRelationshipDecision();
+                                    setLocationId(e.target.value);
+                                  }}
+                                >
+                                  <option value="">Select existing location...</option>
+                                  {selectedCustomerLocations.map((l) => (
+                                    <option key={l.id} value={l.id}>
+                                      {(l.nickname ? `${l.nickname} - ` : "") +
+                                        (l.address_line1 ?? "Address") +
+                                        ", " +
+                                        [l.city, l.state, l.zip || l.postal_code].filter(Boolean).join(" ")}
+                                    </option>
+                                  ))}
+                                </select>
+                                {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
+                              </>
+                            ) : (
+                              <p className="text-xs text-slate-500">No saved locations for this customer. Choose Create new location.</p>
+                            )
+                          ) : null}
+                        </>
+                      )
+                    ) : null}
 
                     {isNewLocation ? (
                       <div className="mt-1 space-y-2 rounded-xl bg-slate-50/70 p-3 ring-1 ring-slate-200/80">
@@ -2743,6 +2831,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isInternalMode ? (
                 <div className={guidedSectionShellClass} ref={visitScopeSectionRef}>
                   {renderGuidedSectionIntro({
+                    icon: <ClipboardList className="h-4 w-4" aria-hidden="true" />,
                     title: isHvacServiceMode ? "Work Order Details" : "Work To Perform & Job Scope",
                     description: isHvacServiceMode
                       ? "What kind of visit is this, and what work needs to be done?"
@@ -2758,24 +2847,14 @@ const [billingRecipient, setBillingRecipient] = useState<
                       Job type controls workflow/testing. Visit Scope can include additional work performed during the same visit.
                     </p>
                   ) : null}
-                  <div className={`${guidedSectionInsetClass} space-y-3 ${visitScopeError ? "border-red-300 ring-2 ring-red-100" : ""}`}>
+                  <div className={`space-y-3 ${visitScopeError ? "rounded-2xl border border-red-300 bg-red-50/40 p-4 ring-2 ring-red-100" : ""}`}>
                     <div>
                       <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; Job Scope</h3>
                       <p className="mt-1 text-sm text-slate-500">
                         {jobType === "service"
-                          ? "Reason for Visit describes the created visit title. After that, add at least one structured scope item defining work for this visit."
+                          ? "Reason for Visit sets the visit title, then add at least one scope item for the field work."
                           : "ECC jobs don't require job scope. Add companion scope only if this visit includes service work."}
                       </p>
-                      {jobType === "service" ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          Keep the title short. Use job scope below for the actual work to perform.
-                        </p>
-                      ) : null}
-                      {jobType === "service" ? (
-                        <p className="mt-1 text-xs text-slate-500">
-                          Job scope defines what belongs to this visit. Pricebook can supply defaults, but scope entries do not create invoice charges.
-                        </p>
-                      ) : null}
                     </div>
                     {isHvacServiceMode && jobType === "service" ? (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -2882,6 +2961,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             {!isContractorMode && (
               <section className={isInternalMode ? guidedSectionShellClass : "space-y-3"}>
                 {isInternalMode ? renderGuidedSectionIntro({
+                  icon: <CalendarClock className="h-4 w-4" aria-hidden="true" />,
                   title: "Schedule",
                   description: "Schedule the visit if needed, then confirm who gets billed later.",
                   summary: scheduleSectionSummary,
@@ -2902,7 +2982,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   />
 
                   <div className="pt-1 text-xs text-slate-600">
-                    Set a date and time now, or leave it for later.
+                    Set a date now, or leave unscheduled.
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -3186,6 +3266,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             {isInternalMode ? (
             <section className={guidedSectionShellClass}>
               {renderGuidedSectionIntro({
+                icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
                 title: "Additional Details",
                 description: "Supporting information only. Add it when it helps this work order move forward.",
                 summary: additionalDetailsSummary,
@@ -3193,9 +3274,21 @@ const [billingRecipient, setBillingRecipient] = useState<
               })}
               <div className={guidedSectionBodyClass}>
               {isHvacServiceMode ? (
-                <details className={`${guidedSectionInsetClass}`}>
-                  <summary className="cursor-pointer text-sm font-medium text-slate-900">Permit information</summary>
-                  <div className="mt-3 space-y-3">
+                <details className={`${guidedSectionInsetClass} group`}>
+                  <summary className="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
+                    {renderSupportingSectionHeader({
+                      icon: <FileText className="h-4 w-4" aria-hidden="true" />,
+                      title: "Permit information",
+                      description: "Add permit details if required.",
+                      trailing: (
+                        <>
+                          <span className={supportingSectionMetaClass}>Optional</span>
+                          <ChevronDown className="h-4 w-4 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+                        </>
+                      ),
+                    })}
+                  </summary>
+                  <div className="mt-4 space-y-3 border-t border-slate-200/80 pt-4">
                     <div className="space-y-1">
                       <label className="block text-sm font-medium text-slate-900">Permit Number</label>
                       <input
@@ -3227,16 +3320,21 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </details>
               ) : null}
               <div className={`${guidedSectionInsetClass} space-y-3`}>
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-xs text-slate-600">Add systems if needed. Use a clear label, such as Upstairs or Downstairs.</p>
-            <button
-              type="button"
-              className={secondaryCompactButtonClass}
-              onClick={addSystem}
-            >
-              + Add System
-            </button>
-          </div>
+          {renderSupportingSectionHeader({
+            icon: <Wrench className="h-4 w-4" aria-hidden="true" />,
+            title: "Equipment systems",
+            description: "Add systems only when needed.",
+            trailing: (
+              <button
+                type="button"
+                className={secondaryCompactButtonClass}
+                onClick={addSystem}
+              >
+                <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
+                Add System
+              </button>
+            ),
+          })}
 
           {systems.length === 0 && (
             <div className="text-sm text-slate-500">No systems added yet.</div>
@@ -3405,12 +3503,12 @@ const [billingRecipient, setBillingRecipient] = useState<
               <input type="hidden" name="equipment_json" value={equipmentJson} />
               </div>
               <div className={`${guidedSectionInsetClass} space-y-3`}>
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">Photos</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">
-                    Equipment photos, permit copies, or site images. JPG, PNG, WEBP, or PDF.
-                  </p>
-                </div>
+                {renderSupportingSectionHeader({
+                  icon: <Camera className="h-4 w-4" aria-hidden="true" />,
+                  title: "Photos",
+                  description: "Equipment photos, permit copies, or site images. JPG, PNG, WEBP, or PDF.",
+                  trailing: <span className={supportingSectionMetaClass}>Optional</span>,
+                })}
                 <input
                   type="file"
                   name="photos"
@@ -3420,10 +3518,12 @@ const [billingRecipient, setBillingRecipient] = useState<
                 />
               </div>
               <div className={`${guidedSectionInsetClass} space-y-3`}>
-                <div>
-                  <h3 className="text-base font-semibold text-slate-900">Additional Comments</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">Anything the next person should know before this work order moves forward.</p>
-                </div>
+                {renderSupportingSectionHeader({
+                  icon: <MessageSquare className="h-4 w-4" aria-hidden="true" />,
+                  title: "Additional Comments",
+                  description: "Add handoff notes only if needed.",
+                  trailing: <span className={supportingSectionMetaClass}>Optional</span>,
+                })}
                 <textarea
                   name="job_notes"
                   rows={4}
@@ -3487,6 +3587,7 @@ const [billingRecipient, setBillingRecipient] = useState<
         {isInternalMode && internalResolutionReady && canAdvancePastResolution ? (
           <div className={guidedSectionShellClass}>
             {renderGuidedSectionIntro({
+              icon: <Sparkles className="h-4 w-4" aria-hidden="true" />,
               title: "Create Work Order",
               description: "Review the work order summary, then create it when the required intake details are ready.",
               summary: isSubmitReady ? "Ready to create this work order." : "Complete the required intake details to create this work order.",
