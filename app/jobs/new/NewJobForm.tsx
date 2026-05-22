@@ -2726,6 +2726,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     initialSummary={visitScopeSummary}
                     initialItems={visitScopeItems}
                     jobType={jobType}
+                    serviceVisitType={serviceVisitType}
                     pricebookTemplateItems={pricebookTemplateItems}
                     resetKey={visitScopeResetKey}
                     onSummaryChange={setVisitScopeSummary}

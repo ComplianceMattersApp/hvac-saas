@@ -28,6 +28,7 @@ type Props = {
   initialSummary?: string | null;
   initialItems?: VisitScopeItem[];
   jobType: "ecc" | "service";
+  serviceVisitType?: string | null;
   pricebookTemplateItems?: VisitScopePricebookTemplateItem[];
   summaryName?: string;
   itemsName?: string;
@@ -65,6 +66,15 @@ const QUICK_SCOPE_CHOICES = [
     helper: "Install work",
   },
 ] as const;
+
+export function resolveVisitTypeScopeSuggestion(visitType: string | null | undefined) {
+  const normalized = String(visitType ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  if (normalized === "diagnostic") return "Diagnostic";
+  if (normalized === "repair") return "Service Call";
+  if (normalized === "install" || normalized === "installation") return "Install";
+  return null;
+}
 
 function normalizeExpectedUnitPrice(value: unknown, fallback = 0) {
   if (value === null || value === undefined) return fallback;
@@ -139,6 +149,7 @@ export default function VisitScopeBuilder({
   initialSummary = "",
   initialItems = [],
   jobType,
+  serviceVisitType,
   pricebookTemplateItems = [],
   summaryName = "visit_scope_summary",
   itemsName = "visit_scope_items_json",
@@ -230,6 +241,35 @@ export default function VisitScopeBuilder({
         };
       }),
     [availablePricebookTemplates, items],
+  );
+
+  const visitTypeSuggestionCandidate = useMemo(() => {
+    if (jobType !== "service") return null;
+    const suggestedLabel = resolveVisitTypeScopeSuggestion(serviceVisitType);
+    if (!suggestedLabel) return null;
+
+    const matchingTemplate =
+      availablePricebookTemplates.find(
+        (item) => normalizeScopeComparable(item.item_name) === normalizeScopeComparable(suggestedLabel),
+      ) ?? null;
+    const safeDefaults = applyFieldIntakeScopeDefaults({ title: suggestedLabel });
+
+    return {
+      title: suggestedLabel,
+      details: matchingTemplate?.default_description ?? "",
+      source_pricebook_item_id: matchingTemplate?.id ?? null,
+      expected_unit_price: normalizeExpectedUnitPrice(
+        matchingTemplate?.default_unit_price,
+        safeDefaults.expected_unit_price,
+      ),
+      unit_label: safeDefaults.unit_label,
+      item_type: safeDefaults.item_type,
+      category: safeDefaults.category,
+    } as ScopeCandidate;
+  }, [availablePricebookTemplates, jobType, serviceVisitType]);
+
+  const isVisitTypeSuggestionAdded = Boolean(
+    visitTypeSuggestionCandidate && findExistingScopeItem(items, visitTypeSuggestionCandidate),
   );
 
   useEffect(() => {
@@ -467,70 +507,6 @@ export default function VisitScopeBuilder({
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
           <div className="space-y-3">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Quick Add
-              </div>
-              <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                {quickChoices.map((choice) => (
-                  <button
-                    key={choice.label}
-                    type="button"
-                    onClick={() => addScopeCandidate(choice.candidate)}
-                    disabled={choice.isAdded}
-                    aria-pressed={choice.isAdded}
-                    className={[
-                      "min-h-14 rounded-xl border px-3 py-2 text-left text-sm shadow-sm transition-colors",
-                      choice.isAdded
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                        : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
-                    ].join(" ")}
-                  >
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="font-semibold">{choice.label}</span>
-                      {choice.isAdded ? (
-                        <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                          Added
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className={choice.isAdded ? "mt-0.5 block text-xs text-emerald-800" : "mt-0.5 block text-xs text-slate-500"}>
-                      {choice.helper}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                Add Custom Work
-              </div>
-              <input
-                type="text"
-                value={quickEntryValue}
-                onChange={(event) => {
-                  setQuickEntryValue(event.target.value);
-                  if (scopeFeedback?.tone !== "added") setScopeFeedback(null);
-                }}
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                placeholder={availablePricebookTemplates.length > 0 ? "Search saved work items or type custom work" : "Type custom work to perform"}
-              />
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs text-slate-500">
-                  Add typed work now, or search saved defaults when you need one.
-                </p>
-                <button
-                  type="button"
-                  onClick={addManualItemFromQuickEntry}
-                  disabled={!searchQuery}
-                  className="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-55"
-                >
-                  {searchQuery ? `Add "${searchQuery.slice(0, 36)}${searchQuery.length > 36 ? "..." : ""}"` : "Add custom scope"}
-                </button>
-              </div>
-            </div>
-
             {scopeFeedback ? (
               <p
                 className={[
@@ -553,7 +529,7 @@ export default function VisitScopeBuilder({
                     {completedItems.length > 0
                       ? "Add another item, expand Details if needed, then continue."
                       : jobType === "service"
-                        ? "Choose a quick item or add custom work to continue."
+                        ? "Use visit type suggestion or add more work to continue."
                         : "Optional for ECC. Add scope only when useful."}
                   </p>
                 </div>
@@ -561,6 +537,36 @@ export default function VisitScopeBuilder({
                   {completedItems.length} added
                 </span>
               </div>
+
+              {jobType === "service" && visitTypeSuggestionCandidate ? (
+                <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">
+                    Suggested from Visit Type
+                  </div>
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-semibold text-blue-900">
+                        {visitTypeSuggestionCandidate.title}
+                      </div>
+                      <div className="text-xs text-blue-800">From visit type</div>
+                    </div>
+                    {isVisitTypeSuggestionAdded ? (
+                      <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">
+                        Already added
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => addScopeCandidate(visitTypeSuggestionCandidate)}
+                        className="min-h-9 rounded-full border border-blue-300 bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-100"
+                      >
+                        Add to job scope
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
               {completedItems.length > 0 ? (
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {completedItems.slice(0, 6).map((item) => (
@@ -579,6 +585,77 @@ export default function VisitScopeBuilder({
                 </div>
               ) : null}
             </div>
+
+            <details className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-900">Add more work</summary>
+              <div className="mt-2.5 space-y-3">
+                <p className="text-xs text-slate-500">
+                  Search saved work items or type custom work.
+                </p>
+
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Quick Add
+                  </div>
+                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {quickChoices.map((choice) => (
+                      <button
+                        key={choice.label}
+                        type="button"
+                        onClick={() => addScopeCandidate(choice.candidate)}
+                        disabled={choice.isAdded}
+                        aria-pressed={choice.isAdded}
+                        className={[
+                          "min-h-14 rounded-xl border px-3 py-2 text-left text-sm shadow-sm transition-colors",
+                          choice.isAdded
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                            : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+                        ].join(" ")}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="font-semibold">{choice.label}</span>
+                          {choice.isAdded ? (
+                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                              Added
+                            </span>
+                          ) : null}
+                        </span>
+                        <span className={choice.isAdded ? "mt-0.5 block text-xs text-emerald-800" : "mt-0.5 block text-xs text-slate-500"}>
+                          {choice.helper}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Add Custom Work
+                  </div>
+                  <input
+                    type="text"
+                    value={quickEntryValue}
+                    onChange={(event) => {
+                      setQuickEntryValue(event.target.value);
+                      if (scopeFeedback?.tone !== "added") setScopeFeedback(null);
+                    }}
+                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                    placeholder={availablePricebookTemplates.length > 0 ? "Search saved work items or type custom work" : "Type custom work to perform"}
+                  />
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs text-slate-500">
+                      Add typed work now, or search saved defaults when you need one.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={addManualItemFromQuickEntry}
+                      disabled={!searchQuery}
+                      className="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-55"
+                    >
+                      {searchQuery ? `Add "${searchQuery.slice(0, 36)}${searchQuery.length > 36 ? "..." : ""}"` : "Add custom scope"}
+                    </button>
+                  </div>
+                </div>
 
             {availablePricebookTemplates.length > 0 ? (
               <div className="space-y-2">
@@ -645,6 +722,8 @@ export default function VisitScopeBuilder({
             ) : null}
               </div>
             ) : null}
+              </div>
+            </details>
           </div>
         </div>
 
