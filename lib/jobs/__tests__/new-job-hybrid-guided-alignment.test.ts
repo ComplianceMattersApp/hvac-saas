@@ -20,16 +20,17 @@ describe("/jobs/new hybrid guided-builder alignment", () => {
     expect(formSource).toContain("ECC / Compliance");
   });
 
-  it("renders non-service setup and relationship blocks with guided section shell instead of legacy gradient panels", () => {
-    expect(formSource).toContain("title: \"Relationship Path\"");
-    expect(formSource).toContain("tone: relationshipSectionTone");
+  it("renders non-service setup with guided section shell instead of legacy gradient panels", () => {
+    expect(formSource).toContain("title: jobFamilyStepTitle");
     expect(formSource).not.toContain("rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-5");
   });
 
-  it("keeps relationship path actions available in hybrid mode", () => {
-    expect(formSource).toContain("Open Active Job");
-    expect(formSource).toContain("Create Follow-Up Visit");
-    expect(formSource).toContain("Continue as New Case");
-    expect(formSource).toContain('shouldShowRelationshipStep && !isHvacServiceMode ?');
+  it("keeps hidden default relationship submission without rendering the chooser", () => {
+    expect(formSource).toContain('name="relationship_action" value={shouldShowRelationshipStep ? relationshipAction : "new_case"}');
+    expect(formSource).not.toContain("Relationship Path");
+    expect(formSource).not.toContain("Open Active Job");
+    expect(formSource).not.toContain("Create Follow-Up Visit");
+    expect(formSource).not.toContain("Continue as New Case");
+    expect(formSource).not.toContain("Continuing as a new case.");
   });
 });

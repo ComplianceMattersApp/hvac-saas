@@ -543,6 +543,37 @@ describe("job intake create same-account hardening", () => {
     });
   });
 
+  it("defaults missing relationship action to safe new case behavior", async () => {
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: true,
+      accountSettingsProductMode: "hybrid",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+    const formData = buildInternalServiceIntakeFormData({
+      visitScopeItemsJson: JSON.stringify([
+        { title: "Confirm thermostat issue", details: "Entry hall", kind: "primary" },
+      ]),
+    });
+    formData.delete("relationship_action");
+    formData.delete("relationship_job_id");
+
+    await expect(createJobFromForm(formData)).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    const jobsInsert = fixture.insertCalls.find((call) => call.table === "jobs");
+    expect(jobsInsert?.payload).toMatchObject({
+      job_type: "service",
+      service_visit_type: "diagnostic",
+    });
+  });
+
   it("creates maintenance agreement link row before post-create redirect", async () => {
     const previousMaintenanceFlag = process.env.ENABLE_MAINTENANCE_AGREEMENTS;
     process.env.ENABLE_MAINTENANCE_AGREEMENTS = "true";

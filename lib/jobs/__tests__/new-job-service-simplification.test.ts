@@ -20,8 +20,7 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
     );
   });
 
-  it("gates Step 4 Relationship Path off in HVAC Service mode", () => {
-    expect(formSource).toContain("shouldShowRelationshipStep && !isHvacServiceMode ?");
+  it("preserves hidden default relationship submission in HVAC Service mode", () => {
     expect(formSource).toContain("relationship_action");
     expect(formSource).toContain('shouldShowRelationshipStep ? relationshipAction : "new_case"');
   });
@@ -47,10 +46,10 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
     );
   });
 
-  it("does not render Relationship Path action labels in Service-mode-only intake branch", () => {
-    expect(formSource).toContain("shouldShowRelationshipStep && !isHvacServiceMode ?");
-    expect(formSource).toContain("Open Active Job");
-    expect(formSource).toContain("Create Follow-Up Visit");
-    expect(formSource).toContain("Continue as New Case");
+  it("does not keep legacy Relationship Path action labels in source", () => {
+    expect(formSource).not.toContain("Relationship Path");
+    expect(formSource).not.toContain("Open Active Job");
+    expect(formSource).not.toContain("Create Follow-Up Visit");
+    expect(formSource).not.toContain("Continue as New Case");
   });
 });
