@@ -23,8 +23,9 @@ describe("New job Step 5 simplification wiring", () => {
     expect(formSource).toContain("modeSafeJobType === \"service\"");
   });
 
-  it("updates intake progress label to Job scope", () => {
-    expect(formSource).toContain('label="Job scope"');
+  it("uses compact top progress text", () => {
+    expect(formSource).toContain("Step 1 of 5");
+    expect(formSource).toContain("Select a customer, choose the work, then create the job.");
   });
 
   it("shows immediate add confirmation and current scope preview near entry", () => {

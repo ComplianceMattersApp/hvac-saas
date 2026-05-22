@@ -269,46 +269,6 @@ function validateContractorAttachmentFile(file: File) {
   return null;
 }
 
-function IntakeStepCard({
-  index,
-  label,
-  value,
-  tone = "slate",
-}: {
-  index: number;
-  label: string;
-  value: string;
-  tone?: "slate" | "ready" | "attention";
-}) {
-  const toneClass =
-    tone === "ready"
-      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-      : tone === "attention"
-        ? "border-rose-200 bg-rose-50 text-rose-900"
-        : "border-slate-200 bg-white text-slate-800";
-
-  const badgeClass =
-    tone === "ready"
-      ? "border-emerald-200 bg-white text-emerald-700"
-      : tone === "attention"
-        ? "border-rose-200 bg-white text-rose-700"
-        : "border-slate-200 bg-slate-50 text-slate-500";
-
-  return (
-    <div className={`rounded-lg border px-3 py-3 shadow-sm shadow-slate-950/5 ${toneClass}`}>
-      <div className="flex items-start gap-3">
-        <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-xs font-semibold ${badgeClass}`}>
-          {index}
-        </span>
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase text-slate-500">{label}</p>
-          <p className="mt-1 truncate text-sm font-semibold">{value}</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function formatLocationContext(location: LocationLookupRow | null | undefined) {
   if (!location) return "No saved address yet";
   const address = String(location.address_line1 ?? "").trim() || "Address";
@@ -717,22 +677,15 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   const internalPageTitle = productMode === "hvac_service" ? "New Work Order" : "New Job";
   const isHvacServiceMode = productMode === "hvac_service";
-  const internalPageIntro =
-    isHvacServiceMode
-      ? "Create a new service work order in a few quick steps with service-first workflow language and defaults."
-      : productMode === "ecc_hers"
-        ? "Create a new job in a few quick steps with ECC/compliance workflow language and defaults."
-        : "Create a new job in a few quick steps. Service and ECC remain available together for all-in-one accounts.";
+  const compactHeaderHelper = isContractorMode
+    ? "Enter customer and work details, then submit for review."
+    : "Select a customer, choose the work, then create the job.";
   const internalModeHint =
     isHvacServiceMode
       ? "HVAC Service accounts use the Service / Work Order family by default and presentation."
       : productMode === "ecc_hers"
         ? "ECC/HERS accounts use the ECC / Compliance Test family by default and presentation."
         : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";
-  const internalFlowSummary = isHvacServiceMode
-    ? "Select the customer and location, classify the visit, then add job scope below."
-    : "Select the customer and location, pick a job family, then add job scope before scheduling.";
-  const internalFlowStep2Label = isHvacServiceMode ? "Work order and relationship" : "Family and relationship";
   const jobFamilyStepTitle = isHvacServiceMode ? "Work Order Setup" : "Job family";
   const jobFamilyStepDescription = isHvacServiceMode
     ? "These fields classify the visit. Work instructions are added below."
@@ -1271,27 +1224,6 @@ const [billingRecipient, setBillingRecipient] = useState<
       canSubmit ? "bg-slate-900 hover:bg-slate-800 active:scale-[0.99]" : "bg-slate-400"
     }`;
   const completedVisitScopeItemCount = visitScopeItems.filter((item) => item.title.trim() || item.details.trim()).length;
-  const customerProgressValue = createNewCustomer
-    ? ([newCustomerFirstName, newCustomerLastName].filter(Boolean).join(" ") || "New customer")
-    : selectedCustomer
-      ? customerDisplayName(selectedCustomer)
-      : existingCustomer?.id
-        ? customerDisplayName(existingCustomer)
-        : "Select or create";
-  const locationProgressValue = createNewCustomer || locationMode === "new"
-    ? (newLocationAddressLine1.trim() || "New location")
-    : selectedLocation?.address_line1
-      ? selectedLocation.address_line1
-      : locationId
-        ? "Selected"
-        : "Select location";
-  const jobProgressValue = jobType === "service" ? "Service" : `ECC / ${projectType.replaceAll("_", " ")}`;
-  const workProgressValue = completedVisitScopeItemCount > 0
-    ? `${completedVisitScopeItemCount} item${completedVisitScopeItemCount === 1 ? "" : "s"}`
-    : "Add scope";
-  const scheduleProgressValue = scheduledDate
-    ? `${scheduledDate}${windowStart && windowEnd ? ` ${windowStart}-${windowEnd}` : ""}`
-    : "Optional";
 
   function uploadProposalAttachments() {
     if (!submittedProposalId) {
@@ -1453,62 +1385,22 @@ const [billingRecipient, setBillingRecipient] = useState<
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-3 py-4 sm:px-6 lg:px-8">
-      <div className="space-y-5">
-      <header className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5 sm:p-5">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="min-w-0">
-            <p className="text-[11px] font-semibold uppercase text-slate-500">
-              {isContractorMode ? "Contractor intake" : "Internal intake"}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950">
-              {isContractorMode ? "New job intake" : internalPageTitle}
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              {isContractorMode
-                ? "Fill in customer, site, and work details. Our team will review the submission and confirm scheduling."
-                : internalPageIntro}
-            </p>
-          </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-600 lg:max-w-[27rem]">
-            <span className="font-semibold text-slate-900">Workflow:</span>{" "}
-            confirm customer and location first, choose the job family, define the work, then schedule and create.
-          </div>
+    <div className="mx-auto max-w-6xl px-3 py-3 sm:px-6 lg:px-8">
+      <div className="space-y-4">
+      <header className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm shadow-slate-950/5 sm:px-5 sm:py-4">
+        <p className="text-[11px] font-semibold uppercase text-slate-500">
+          {isContractorMode ? "Contractor intake" : "Internal intake"}
+        </p>
+        <h1 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">
+          {isContractorMode ? "New Job" : internalPageTitle}
+        </h1>
+        <p className="mt-1 text-sm text-slate-600">{compactHeaderHelper}</p>
+        <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">
+          <span>Step 1 of 5</span>
+          <span aria-hidden="true">•</span>
+          <span>Customer</span>
         </div>
       </header>
-
-      {isInternalMode ? (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Intake progress">
-          <IntakeStepCard
-            index={1}
-            label="Customer"
-            value={customerProgressValue}
-            tone={internalResolutionReady || createNewCustomer || existingCustomer?.id ? "ready" : "attention"}
-          />
-          <IntakeStepCard
-            index={2}
-            label="Location"
-            value={locationProgressValue}
-            tone={internalResolutionReady || locationId || newLocationAddressLine1.trim() ? "ready" : "attention"}
-          />
-          <IntakeStepCard index={3} label="Job family" value={jobProgressValue} tone="ready" />
-          <IntakeStepCard
-            index={4}
-            label="Job scope"
-            value={workProgressValue}
-            tone={completedVisitScopeItemCount > 0 || jobType !== "service" ? "ready" : "attention"}
-          />
-          <IntakeStepCard index={5} label="Schedule" value={scheduleProgressValue} />
-        </section>
-      ) : (
-        <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5" aria-label="Intake workflow">
-          <IntakeStepCard index={1} label="Customer" value="Contact details" />
-          <IntakeStepCard index={2} label="Site" value="Service address" />
-          <IntakeStepCard index={3} label="Work" value={jobProgressValue} />
-          <IntakeStepCard index={4} label="Notes" value="Photos optional" />
-          <IntakeStepCard index={5} label="Submit" value="Team review" />
-        </section>
-      )}
 
       <ActionFeedback
         type="warning"
@@ -1584,34 +1476,6 @@ const [billingRecipient, setBillingRecipient] = useState<
         {isCustomerContextInternalMode && customerContextSource ? (
           <input type="hidden" name="intake_source" value={customerContextSource} />
         ) : null}
-        {isInternalMode ? (
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm shadow-slate-950/5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="max-w-2xl">
-                <p className="text-[11px] font-semibold uppercase text-slate-500">Internal job creation</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-950">Build the job in order.</h2>
-                <p className="mt-1 text-sm leading-6 text-slate-600">
-                  {internalFlowSummary}
-                </p>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[26rem]">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase text-slate-500">1</p>
-                  <p className="mt-1 text-sm font-medium text-slate-900">Customer and location</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase text-slate-500">2</p>
-                  <p className="mt-1 text-sm font-medium text-slate-900">{internalFlowStep2Label}</p>
-                </div>
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase text-slate-500">3</p>
-                  <p className="mt-1 text-sm font-medium text-slate-900">Job scope, schedule, finish</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
         {/* Identity-tied contractor */}
         {myContractor?.id ? (
           <>
