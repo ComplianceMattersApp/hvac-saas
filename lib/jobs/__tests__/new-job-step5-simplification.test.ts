@@ -28,12 +28,13 @@ describe("New job Step 5 simplification wiring", () => {
     expect(formSource).toContain("Select a customer, choose the work, then create the job.");
   });
 
-  it("shows immediate add confirmation and current scope preview near entry", () => {
-    expect(builderSource).toContain("Added to job scope:");
+  it("prioritizes current job scope above add controls", () => {
     expect(builderSource).toContain("Current Job Scope");
     expect(builderSource.indexOf("Current Job Scope")).toBeLessThan(
       builderSource.indexOf("Browse saved work items"),
     );
+    expect(builderSource).toContain("No work added yet.");
+    expect(builderSource).toContain("Selected work appears here first so the active scope is always clear.");
   });
 
   it("keeps details field-first, keeps optional price, and hides metadata controls", () => {
@@ -50,7 +51,7 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("Default from Pricebook");
   });
 
-  it("keeps field-first quick choices compact and excludes generic maintenance", () => {
+  it("retains quick choices internally for non-service scope paths and excludes generic maintenance", () => {
     expect(builderSource).toContain("QUICK_SCOPE_CHOICES");
     expect(builderSource).toContain('label: "Service Call"');
     expect(builderSource).toContain('label: "Diagnostic"');
@@ -58,7 +59,8 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).not.toContain('label: "Maintenance"');
   });
 
-  it("adds quick choices through structured scope candidates", () => {
+  it("keeps structured quick-choice candidate support for non-service paths", () => {
+    expect(builderSource).toContain('jobType !== "service" ? (');
     expect(builderSource).toContain("addScopeCandidate(choice.candidate)");
     expect(builderSource).toContain("title: choice.label");
     expect(builderSource).toContain("source_pricebook_item_id");
@@ -80,9 +82,19 @@ describe("New job Step 5 simplification wiring", () => {
 
   it("supports typed custom scope adds", () => {
     expect(builderSource).toContain("Add Custom Work");
+    expect(builderSource).toContain("Add another item");
     expect(builderSource).toContain("addManualItemFromQuickEntry");
     expect(builderSource).toContain("applyFieldIntakeScopeDefaults");
     expect(builderSource).toContain('Add "${searchQuery');
+  });
+
+  it("renders service scope items as selected cards with source and details affordances", () => {
+    expect(builderSource).toContain("From saved work item");
+    expect(builderSource).toContain("From visit type");
+    expect(builderSource).toContain("Custom work");
+    expect(builderSource).toContain('completedItems.length === 1 ? "item" : "items"');
+    expect(builderSource).toContain("Optional price: $");
+    expect(builderSource).toContain("rounded-2xl border border-emerald-200 bg-emerald-50/80");
   });
 
   it("preserves matched default prices and falls back to 0.00 when needed", () => {

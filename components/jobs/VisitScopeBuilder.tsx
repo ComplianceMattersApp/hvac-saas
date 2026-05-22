@@ -94,6 +94,31 @@ function isBlankScopeItem(item: VisitScopeDraftItem) {
   return item.title.trim().length === 0 && item.details.trim().length === 0;
 }
 
+function formatOptionalPrice(value: number | null | undefined) {
+  if (value === null || value === undefined) return null;
+  const normalized = normalizeExpectedUnitPrice(value, 0);
+  if (normalized <= 0) return null;
+  return normalized.toFixed(2);
+}
+
+function getScopeSourceLabel(
+  item: VisitScopeDraftItem,
+  visitTypeSuggestionCandidate: ScopeCandidate | null,
+) {
+  if (sanitizeVisitScopeItemId(item.source_pricebook_item_id)) {
+    return "From saved work item";
+  }
+
+  if (
+    visitTypeSuggestionCandidate &&
+    normalizeScopeComparable(item.title) === normalizeScopeComparable(visitTypeSuggestionCandidate.title)
+  ) {
+    return "From visit type";
+  }
+
+  return "Custom work";
+}
+
 function findExistingScopeItem(items: VisitScopeDraftItem[], candidate: ScopeCandidate) {
   const candidateSourceId = sanitizeVisitScopeItemId(candidate.source_pricebook_item_id);
   const candidateTitle = normalizeScopeComparable(candidate.title);
@@ -271,6 +296,7 @@ export default function VisitScopeBuilder({
   const isVisitTypeSuggestionAdded = Boolean(
     visitTypeSuggestionCandidate && findExistingScopeItem(items, visitTypeSuggestionCandidate),
   );
+  const hasCompletedItems = completedItems.length > 0;
 
   useEffect(() => {
     const seededItems = toDraftItems(initialItems, jobType);
@@ -383,10 +409,14 @@ export default function VisitScopeBuilder({
       return [...prev, nextItem];
     });
 
-    setScopeFeedback({
-      tone: "added",
-      message: `Added to job scope: ${title}`,
-    });
+    if (jobType !== "service") {
+      setScopeFeedback({
+        tone: "added",
+        message: `Added to job scope: ${title}`,
+      });
+    } else {
+      setScopeFeedback(null);
+    }
     return true;
   }
 
@@ -507,7 +537,7 @@ export default function VisitScopeBuilder({
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3">
           <div className="space-y-3">
-            {scopeFeedback ? (
+            {scopeFeedback && (jobType !== "service" || scopeFeedback.tone !== "added") ? (
               <p
                 className={[
                   "rounded-lg border px-3 py-2 text-xs font-semibold",
@@ -527,14 +557,14 @@ export default function VisitScopeBuilder({
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Current Job Scope</p>
                   <p className="mt-1 text-xs text-slate-500">
                     {completedItems.length > 0
-                      ? "Add another item, expand Details if needed, then continue."
+                      ? "Selected work appears here first so the active scope is always clear."
                       : jobType === "service"
-                        ? "Use visit type suggestion or add more work to continue."
+                        ? "No work added yet. Search saved work items or type custom work to add the first item."
                         : "Optional for ECC. Add scope only when useful."}
                   </p>
                 </div>
                 <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                  {completedItems.length} added
+                  {completedItems.length} {completedItems.length === 1 ? "item" : "items"} added
                 </span>
               </div>
 
@@ -567,7 +597,126 @@ export default function VisitScopeBuilder({
                 </div>
               ) : null}
 
-              {completedItems.length > 0 ? (
+              {jobType === "service" ? (
+                hasCompletedItems ? (
+                  <div className="mt-3 space-y-3">
+                    {completedItems.map((item) => {
+                      const sourceLabel = getScopeSourceLabel(item, visitTypeSuggestionCandidate);
+                      const priceLabel = formatOptionalPrice(item.expected_unit_price);
+
+                      return (
+                        <div
+                          key={item.id}
+                          className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-4 py-3 shadow-sm"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex items-start gap-3">
+                              <span className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
+                                ✓
+                              </span>
+                              <div>
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <div className="text-sm font-semibold text-slate-900">
+                                    {item.title.trim() || "Untitled scope item"}
+                                  </div>
+                                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
+                                    Added
+                                  </span>
+                                </div>
+                                <div className="mt-1 text-xs text-slate-600">{sourceLabel}</div>
+                                {priceLabel ? (
+                                  <div className="mt-1 text-xs font-medium text-slate-700">Optional price: ${priceLabel}</div>
+                                ) : null}
+                              </div>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeItem(item.id)}
+                              className="text-xs font-semibold text-rose-700 transition-colors hover:text-rose-800"
+                            >
+                              Remove
+                            </button>
+                          </div>
+
+                          <details className="mt-3 rounded-xl border border-emerald-200 bg-white/80 px-3 py-2">
+                            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-700">
+                              Details
+                            </summary>
+                            <div className="mt-2.5 space-y-2">
+                              <div className="space-y-1">
+                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                  Work To Perform
+                                </label>
+                                <input
+                                  type="text"
+                                  value={item.title}
+                                  onChange={(event) => patchItem(item.id, { title: event.target.value })}
+                                  maxLength={160}
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                                  placeholder="Diagnose intermittent cooling issue"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                  Optional price
+                                </label>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  step="0.01"
+                                  value={item.expected_unit_price ?? 0}
+                                  onChange={(event) => {
+                                    const raw = event.target.value.trim();
+                                    if (!raw) {
+                                      patchItem(item.id, { expected_unit_price: 0 });
+                                      return;
+                                    }
+
+                                    const parsed = Number.parseFloat(raw);
+                                    if (!Number.isFinite(parsed) || parsed < 0) {
+                                      patchItem(item.id, { expected_unit_price: 0 });
+                                      return;
+                                    }
+
+                                    patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
+                                  }}
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                                  placeholder="0.00"
+                                />
+                                <p className="text-xs text-slate-500">
+                                  This helps with upfront context only. It does not create an invoice charge.
+                                </p>
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                  Description
+                                </label>
+                                <textarea
+                                  value={item.details}
+                                  onChange={(event) => patchItem(item.id, { details: event.target.value })}
+                                  rows={2}
+                                  maxLength={500}
+                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                                  placeholder="What should the tech complete or verify before leaving?"
+                                />
+                              </div>
+                            </div>
+                          </details>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                    <p className="font-medium text-slate-700">No work added yet.</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      Search saved work items or type custom work to add the first item.
+                    </p>
+                  </div>
+                )
+              ) : completedItems.length > 0 ? (
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {completedItems.slice(0, 6).map((item) => (
                     <span
@@ -586,47 +735,54 @@ export default function VisitScopeBuilder({
               ) : null}
             </div>
 
-            <details className="rounded-xl border border-slate-200 bg-white px-3 py-3">
-              <summary className="cursor-pointer text-sm font-semibold text-slate-900">Add more work</summary>
+            <details
+              className="rounded-xl border border-slate-200 bg-white px-3 py-3"
+              open={jobType !== "service" || !hasCompletedItems}
+            >
+              <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+                {jobType === "service" && hasCompletedItems ? "Add another item" : "Add more work"}
+              </summary>
               <div className="mt-2.5 space-y-3">
                 <p className="text-xs text-slate-500">
                   Search saved work items or type custom work.
                 </p>
 
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Quick Add
+                {jobType !== "service" ? (
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      Quick Add
+                    </div>
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {quickChoices.map((choice) => (
+                        <button
+                          key={choice.label}
+                          type="button"
+                          onClick={() => addScopeCandidate(choice.candidate)}
+                          disabled={choice.isAdded}
+                          aria-pressed={choice.isAdded}
+                          className={[
+                            "min-h-14 rounded-xl border px-3 py-2 text-left text-sm shadow-sm transition-colors",
+                            choice.isAdded
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                              : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+                          ].join(" ")}
+                        >
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="font-semibold">{choice.label}</span>
+                            {choice.isAdded ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                                Added
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className={choice.isAdded ? "mt-0.5 block text-xs text-emerald-800" : "mt-0.5 block text-xs text-slate-500"}>
+                            {choice.helper}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                    {quickChoices.map((choice) => (
-                      <button
-                        key={choice.label}
-                        type="button"
-                        onClick={() => addScopeCandidate(choice.candidate)}
-                        disabled={choice.isAdded}
-                        aria-pressed={choice.isAdded}
-                        className={[
-                          "min-h-14 rounded-xl border px-3 py-2 text-left text-sm shadow-sm transition-colors",
-                          choice.isAdded
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                            : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
-                        ].join(" ")}
-                      >
-                        <span className="flex items-center justify-between gap-2">
-                          <span className="font-semibold">{choice.label}</span>
-                          {choice.isAdded ? (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
-                              Added
-                            </span>
-                          ) : null}
-                        </span>
-                        <span className={choice.isAdded ? "mt-0.5 block text-xs text-emerald-800" : "mt-0.5 block text-xs text-slate-500"}>
-                          {choice.helper}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                ) : null}
 
                 <div className="space-y-2">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
@@ -727,7 +883,7 @@ export default function VisitScopeBuilder({
           </div>
         </div>
 
-        {items.map((item, index) => (
+        {jobType !== "service" ? items.map((item, index) => (
           <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.35)]">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -756,7 +912,7 @@ export default function VisitScopeBuilder({
                   onChange={(event) => patchItem(item.id, { title: event.target.value })}
                   maxLength={160}
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                  placeholder={jobType === "service" ? "Diagnose intermittent cooling issue" : "Optional: note companion work or field context"}
+                  placeholder="Optional: note companion work or field context"
                 />
               </div>
 
@@ -822,7 +978,7 @@ export default function VisitScopeBuilder({
                     rows={2}
                     maxLength={500}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                    placeholder={jobType === "service" ? "What should the tech complete or verify before leaving?" : "Optional field note for the ECC trip"}
+                    placeholder="Optional field note for the ECC trip"
                   />
                 </div>
               </div>
@@ -832,13 +988,11 @@ export default function VisitScopeBuilder({
               <div className="text-xs text-slate-500">
                 {jobType === "ecc" && item.kind === "companion_service"
                   ? "Same-trip service item under ECC."
-                  : jobType === "service"
-                  ? "For this trip."
                   : "Optional trip note."}
               </div>
             </div>
           </div>
-        ))}
+        )) : null}
       </div>
 
       <input type="hidden" name={itemsName} value={serializedItems} />
