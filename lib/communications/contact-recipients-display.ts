@@ -30,7 +30,7 @@ export function formatRoleForInternalDisplay(role: ContactRecipientRole | string
     case "responsible_party":
       return "Responsible Party";
     case "site_access_contact":
-      return "Site Contact";
+      return "Site / Access Contact";
     case "billing_contact":
       return "Billing Contact";
     case "third_party_oversight":

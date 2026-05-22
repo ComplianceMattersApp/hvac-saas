@@ -35,6 +35,7 @@ import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 import {
   listContactRecipientsForEntity,
 } from "@/lib/communications/contact-recipients-read";
+import { isDisplayableRole } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
 
 
@@ -77,6 +78,7 @@ type LocationRow = {
   state?: string | null;
   zip?: string | null;
   postal_code?: string | null;
+  notes?: string | null;
   equipment_count?: number | null;
   jobs_count?: number | null;
   last_scheduled_date?: string | null;
@@ -417,7 +419,8 @@ export default async function CustomerDetailPage(props: {
       city,
       state,
       zip,
-      postal_code
+      postal_code,
+      notes
     `,
     )
     .eq("customer_id", customerId)
@@ -547,6 +550,9 @@ export default async function CustomerDetailPage(props: {
   const callHref = makeTelHref(customer.phone);
   const smsHref = makeSmsHref(customer.phone);
   const customerBillingAddress = billingAddressLine(customer);
+  const hasDisplayableRoleContacts = customerRoleContacts.some((recipient) =>
+    isDisplayableRole(recipient.recipient_role),
+  );
 
   // Maintenance Agreements: load only for internal viewers when the flag is on
   // The maintenance_agreements table does not exist in production yet. The flag
@@ -647,7 +653,7 @@ export default async function CustomerDetailPage(props: {
                 {customerDisplayName(customer)}
               </h1>
               <p className="mt-1 text-sm text-slate-600">
-                Customer Command Center
+                Responsible Account Relationship Hub
               </p>
             </div>
 
@@ -700,15 +706,6 @@ export default async function CustomerDetailPage(props: {
 
         <div className="space-y-6 md:space-y-7">
 
-        {isInternalViewer ? (
-          <div id="role-contacts" className="space-y-3">
-            <RoleContactsCard
-              title="Role Contacts"
-              recipients={customerRoleContacts}
-            />
-          </div>
-        ) : null}
-
         {/* Open status summary */}
         <section className="rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -739,17 +736,31 @@ export default async function CustomerDetailPage(props: {
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-900">
-                Customer Overview
+                Account Summary
               </h2>
             </div>
             <p className="mb-4 text-sm text-slate-500">
-              This is the account/customer contact. Site contact or tenant details may differ by job.
+              Customer records represent the responsible account. Site/access contacts may differ by location or job.
             </p>
 
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-1">
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Phone
+                  Responsible Account
+                </div>
+                <div className="text-sm font-semibold text-slate-900">{customerDisplayName(customer)}</div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Account Contact
+                </div>
+                <div className="text-sm text-slate-900">{customerDisplayName(customer)}</div>
+              </div>
+
+              <div className="space-y-1">
+                <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
+                  Account Phone
                 </div>
                 <div className="text-sm text-slate-900">
                   {customer.phone ? formatPhone(customer.phone) : "—"}
@@ -758,7 +769,7 @@ export default async function CustomerDetailPage(props: {
 
               <div className="space-y-1">
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                  Email
+                  Account Email
                 </div>
                 <div className="text-sm text-slate-900 break-all">
                   {customer.email ?? "—"}
@@ -788,7 +799,26 @@ export default async function CustomerDetailPage(props: {
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-            <h2 className="text-lg font-semibold text-slate-900">Summary</h2>
+            <h2 className="text-lg font-semibold text-slate-900">Billing / Paperwork Defaults</h2>
+
+            <p className="mt-2 text-sm text-slate-600">
+              Invoices and paperwork default to the responsible account unless a job or invoice has its own billing recipient.
+            </p>
+
+            <div className="mt-4 space-y-2 text-sm text-slate-700">
+              <div>
+                <span className="font-semibold text-slate-900">Responsible Account:</span> {customerDisplayName(customer)}
+              </div>
+              <div>
+                <span className="font-semibold text-slate-900">Billing Address:</span> {customerBillingAddress || "Defaults to responsible account service address context"}
+              </div>
+              <div>
+                <span className="font-semibold text-slate-900">Billing Email:</span> {customer.email ?? "Defaults to account email when available"}
+              </div>
+              <div>
+                <span className="font-semibold text-slate-900">Billing Phone:</span> {customer.phone ? formatPhone(customer.phone) : "Defaults to account phone when available"}
+              </div>
+            </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
               {callHref ? (
@@ -796,7 +826,7 @@ export default async function CustomerDetailPage(props: {
                   href={callHref}
                   className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
                 >
-                  Call Customer
+                  Call Account Phone
                 </a>
               ) : null}
 
@@ -805,7 +835,7 @@ export default async function CustomerDetailPage(props: {
                   href={smsHref}
                   className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
                 >
-                  Open SMS App
+                  Text Account Phone
                 </a>
               ) : null}
 
@@ -814,7 +844,7 @@ export default async function CustomerDetailPage(props: {
                   href={`mailto:${customer.email}`}
                   className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
                 >
-                  Email Customer
+                  Email Account Contact
                 </a>
               ) : null}
             </div>
@@ -854,6 +884,27 @@ export default async function CustomerDetailPage(props: {
         </section>
 
         {isInternalViewer ? (
+          <section id="role-contacts" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-lg font-semibold text-slate-900">Account Contacts</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Role contacts linked to this responsible account, including billing, site/access, tenant/occupant, responsible party, third-party oversight, and homeowner roles.
+              </p>
+            </div>
+            {hasDisplayableRoleContacts ? (
+              <RoleContactsCard
+                title="Customer / Account Role Contacts"
+                recipients={customerRoleContacts}
+              />
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
+                No account role contacts are saved yet.
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {isInternalViewer ? (
           <section id="customer-notes" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-slate-900">Customer Notes</h2>
@@ -886,9 +937,9 @@ export default async function CustomerDetailPage(props: {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Locations</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Managed Locations</h2>
               <p className="text-sm text-slate-500">
-                All service addresses associated with this customer.
+                Service locations managed under this responsible account.
               </p>
             </div>
           </div>
@@ -918,6 +969,11 @@ export default async function CustomerDetailPage(props: {
                           <div className="mt-1 text-sm text-slate-600">
                             {address || "No address on file"}
                           </div>
+                          {isInternalViewer && String(loc.notes ?? "").trim() ? (
+                            <div className="mt-1 text-xs text-slate-500">
+                              Access / Notes: {String(loc.notes ?? "").trim()}
+                            </div>
+                          ) : null}
                         </div>
 
                         <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
@@ -959,7 +1015,7 @@ export default async function CustomerDetailPage(props: {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Job History</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Recent / Active Work</h2>
               <p className="text-sm text-slate-500">
                 {isInternalViewer
                   ? "All jobs for this customer across every location."

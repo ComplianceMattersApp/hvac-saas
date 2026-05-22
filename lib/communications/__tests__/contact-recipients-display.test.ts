@@ -39,7 +39,7 @@ describe("contact recipient display", () => {
     expect(formatRoleForInternalDisplay("homeowner")).toBe("Homeowner");
     expect(formatRoleForInternalDisplay("tenant_or_occupant")).toBe("Tenant / Occupant");
     expect(formatRoleForInternalDisplay("responsible_party")).toBe("Responsible Party");
-    expect(formatRoleForInternalDisplay("site_access_contact")).toBe("Site Contact");
+    expect(formatRoleForInternalDisplay("site_access_contact")).toBe("Site / Access Contact");
     expect(formatRoleForInternalDisplay("billing_contact")).toBe("Billing Contact");
     expect(formatRoleForInternalDisplay("third_party_oversight")).toBe("Third-Party Oversight");
   });
