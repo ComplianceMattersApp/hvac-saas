@@ -596,15 +596,9 @@ const [billingRecipient, setBillingRecipient] = useState<
   }, [existingCustomer?.id, isCustomerContextInternalMode, locationLookupRows, locations]);
 
   const filteredGuidedCustomers = useMemo(() => {
-    const q = guidedCustomerQuery.trim().toLowerCase();
-    if (!q) {
-      return guidedCustomers.slice(0, 8).map((c) => ({
-        ...c,
-        _score: 0,
-        _reasons: [] as string[],
-        _locationContext: formatLocationContext(customerPrimaryLocationMap.get(c.id)),
-      }));
-    }
+    const query = guidedCustomerQuery.trim();
+    if (query.length < 2) return [];
+    const q = query.toLowerCase();
 
     const qDigits = onlyDigits(q);
     const qParts = q.split(/\s+/).filter(Boolean);
@@ -656,12 +650,11 @@ const [billingRecipient, setBillingRecipient] = useState<
         };
       })
       .filter((row) => {
-        if (!q) return true;
-
         return (
           row.name.includes(q) ||
           row.email.includes(q) ||
           row.phone.includes(q) ||
+          row.locationContext.toLowerCase().includes(q) ||
           (qDigits.length >= 3 && row.phoneDigits.includes(qDigits))
         );
       })
@@ -674,6 +667,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       }))
       .slice(0, 10);
   }, [customerPrimaryLocationMap, guidedCustomerQuery, guidedCustomers]);
+  const hasMeaningfulCustomerQuery = guidedCustomerQuery.trim().length >= 2;
 
   const internalPageTitle = productMode === "hvac_service" ? "New Work Order" : "New Job";
   const isHvacServiceMode = productMode === "hvac_service";
@@ -1718,7 +1712,9 @@ const [billingRecipient, setBillingRecipient] = useState<
                         Customer Finder
                       </label>
                       <span className="text-[11px] font-medium text-slate-500">
-                        {filteredGuidedCustomers.length} match{filteredGuidedCustomers.length === 1 ? "" : "es"}
+                        {hasMeaningfulCustomerQuery
+                          ? `${filteredGuidedCustomers.length} match${filteredGuidedCustomers.length === 1 ? "" : "es"}`
+                          : "Type 2+ characters"}
                       </span>
                     </div>
                     <input
@@ -1726,15 +1722,15 @@ const [billingRecipient, setBillingRecipient] = useState<
                       type="search"
                       value={guidedCustomerQuery}
                       onChange={(e) => setGuidedCustomerQuery(e.target.value)}
-                      placeholder="Type name, phone, or email..."
+                      placeholder="Search customer name, phone, or address"
                       autoFocus
                       className="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
                     />
-                    <p className="mt-2 text-xs leading-5 text-slate-500">Name-first lookup is fastest. Phone and email still work when you need a quick confirmation.</p>
+                    <p className="mt-2 text-xs leading-5 text-slate-500">Start typing to find a customer.</p>
                   </div>
 
                   <div className="space-y-2">
-                    {filteredGuidedCustomers.length > 0 ? (
+                    {hasMeaningfulCustomerQuery && filteredGuidedCustomers.length > 0 ? (
                       filteredGuidedCustomers.map((c, index) => (
                         <button
                           key={c.id}
@@ -1780,9 +1776,9 @@ const [billingRecipient, setBillingRecipient] = useState<
                       ))
                     ) : (
                       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">
-                        {guidedCustomerQuery.trim().length >= 2
-                          ? "No customer matches found. You can create a new customer below."
-                          : "Start typing to search customers."}
+                        {hasMeaningfulCustomerQuery
+                          ? "No matching customers found."
+                          : "Start typing to find a customer."}
                       </div>
                     )}
                   </div>
