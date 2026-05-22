@@ -42,4 +42,11 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("No separate site/access contact saved");
     expect(jobPageSource).toContain("Defaults to responsible account");
   });
+
+  it("includes location-linked contacts in site/access resolution priority", () => {
+    expect(jobPageSource).toContain('linkedEntityType: "location"');
+    expect(jobPageSource).toContain('["job", 0]');
+    expect(jobPageSource).toContain('["location", 1]');
+    expect(jobPageSource).toContain('["customer", 2]');
+  });
 });

@@ -1407,6 +1407,16 @@ export default async function JobDetailPage({
       }).catch(() => [])
     : Promise.resolve([]);
 
+  const locationRoleContactsPromise = job.location_id
+    ? listContactRecipientsForEntity({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        linkedEntityType: "location",
+        linkedEntityId: String(job.location_id),
+        limit: 100,
+      }).catch(() => [])
+    : Promise.resolve([]);
+
   const contractorBillingPromise = contractorId
     ? supabase
         .from("contractors")
@@ -1582,6 +1592,7 @@ export default async function JobDetailPage({
     billingPartyReads,
     visitScopePricebookTemplates,
     customerRoleContacts,
+    locationRoleContacts,
     jobRoleContacts,
     customerAttemptSummary,
   ] = await Promise.all([
@@ -1593,6 +1604,7 @@ export default async function JobDetailPage({
     billingPartyReadsPromise(),
     visitScopePricebookTemplatesPromise,
     customerRoleContactsPromise,
+    locationRoleContactsPromise,
     jobRoleContactsPromise,
     customerAttemptSummaryPromise,
   ]);
@@ -1649,7 +1661,7 @@ export default async function JobDetailPage({
     jobLinkedContacts: jobRoleContacts,
   });
 
-  const allRoleContacts = [...jobRoleContacts, ...customerRoleContacts];
+  const allRoleContacts = [...jobRoleContacts, ...locationRoleContacts, ...customerRoleContacts];
   const siteAccessRolePriority = new Map<string, number>([
     ["site_access_contact", 0],
     ["tenant_or_occupant", 1],
@@ -1660,8 +1672,8 @@ export default async function JobDetailPage({
   ]);
   const siteAccessEntityPriority = new Map<string, number>([
     ["job", 0],
-    ["customer", 1],
-    ["location", 2],
+    ["location", 1],
+    ["customer", 2],
   ]);
 
   const siteAccessCandidates = allRoleContacts

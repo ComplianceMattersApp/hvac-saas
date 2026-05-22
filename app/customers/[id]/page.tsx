@@ -9,6 +9,10 @@ import {
   archiveCustomerFromForm,
   updateCustomerNotesFromForm,
 } from "@/lib/actions/customer-actions";
+import {
+  addCustomerRoleContactFromForm,
+  addLocationRoleContactFromForm,
+} from "@/lib/actions/contact-recipient-actions";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { listEstimatesByAccount, type EstimateListItem } from "@/lib/estimates/estimate-read";
@@ -33,9 +37,13 @@ import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 import {
+  listContactRecipientsForAccount,
   listContactRecipientsForEntity,
 } from "@/lib/communications/contact-recipients-read";
-import { isDisplayableRole } from "@/lib/communications/contact-recipients-display";
+import {
+  formatRoleForInternalDisplay,
+  isDisplayableRole,
+} from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
 
 
@@ -292,7 +300,16 @@ function summaryOrder() {
 
 export default async function CustomerDetailPage(props: {
   params: Promise<{ id: string }>;
-  searchParams?: Promise<{ err?: string; maSaved?: string; maError?: string; maFocus?: string }>;
+  searchParams?: Promise<{
+    err?: string;
+    maSaved?: string;
+    maError?: string;
+    maFocus?: string;
+    rcSaved?: string;
+    rcError?: string;
+    rcLocSaved?: string;
+    rcLocError?: string;
+  }>;
 }) {
   const supabase = await createClient();
 
@@ -314,6 +331,10 @@ export default async function CustomerDetailPage(props: {
   const maintenanceAgreementSaved = String(sp.maSaved ?? "").trim().toLowerCase();
   const maintenanceAgreementError = String(sp.maError ?? "").trim();
   const maintenanceAgreementFocusId = String(sp.maFocus ?? "").trim();
+  const roleContactSaved = String(sp.rcSaved ?? "").trim() === "1";
+  const roleContactError = String(sp.rcError ?? "").trim() === "1";
+  const locationRoleContactSaved = String(sp.rcLocSaved ?? "").trim() === "1";
+  const locationRoleContactError = String(sp.rcLocError ?? "").trim() === "1";
 
   if (!id || !isUuid(id)) {
     redirect("/customers");
@@ -394,6 +415,7 @@ export default async function CustomerDetailPage(props: {
   const customer = customerData as CustomerRow;
 
   let customerRoleContacts = [] as Awaited<ReturnType<typeof listContactRecipientsForEntity>>;
+  let locationRoleContacts = [] as Awaited<ReturnType<typeof listContactRecipientsForAccount>>;
   if (isInternalViewer && visibilityScope.kind === "internal") {
     customerRoleContacts = await listContactRecipientsForEntity({
       supabase,
@@ -401,6 +423,15 @@ export default async function CustomerDetailPage(props: {
       linkedEntityType: "customer",
       linkedEntityId: customerId,
       limit: 100,
+    }).catch(() => []);
+
+    locationRoleContacts = await listContactRecipientsForAccount({
+      supabase,
+      accountOwnerUserId: visibilityScope.accountOwnerUserId,
+      linkedEntityType: "location",
+      recipientRole: ["site_access_contact", "tenant_or_occupant", "responsible_party"],
+      status: ["active"],
+      limit: 250,
     }).catch(() => []);
   }
 
@@ -550,6 +581,16 @@ export default async function CustomerDetailPage(props: {
   const callHref = makeTelHref(customer.phone);
   const smsHref = makeSmsHref(customer.phone);
   const customerBillingAddress = billingAddressLine(customer);
+  const locationRoleContactsByLocationId = locationRoleContacts.reduce<Record<string, typeof locationRoleContacts>>(
+    (acc, recipient) => {
+      const key = String(recipient.linked_entity_id ?? "").trim();
+      if (!key) return acc;
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(recipient);
+      return acc;
+    },
+    {},
+  );
   const hasDisplayableRoleContacts = customerRoleContacts.some((recipient) =>
     isDisplayableRole(recipient.recipient_role),
   );
@@ -635,6 +676,26 @@ export default async function CustomerDetailPage(props: {
         {maintenanceAgreementError && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
             {safeDecodeMessage(maintenanceAgreementError)}
+          </div>
+        )}
+        {roleContactSaved && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Account contact saved.
+          </div>
+        )}
+        {roleContactError && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            Could not save account contact. Verify role, name, and phone/email.
+          </div>
+        )}
+        {locationRoleContactSaved && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Site/access contact saved.
+          </div>
+        )}
+        {locationRoleContactError && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            Could not save location contact. Verify role, name, and phone/email.
           </div>
         )}
         {/* Header */}
@@ -901,6 +962,69 @@ export default async function CustomerDetailPage(props: {
                 No account role contacts are saved yet.
               </div>
             )}
+
+            <details className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+              <summary className="cursor-pointer text-sm font-semibold text-slate-800">Add account contact</summary>
+              <form action={addCustomerRoleContactFromForm} className="mt-3 grid gap-2 sm:grid-cols-2">
+                <input type="hidden" name="customer_id" value={customerId} />
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Role</label>
+                  <select
+                    name="recipient_role"
+                    defaultValue="responsible_party"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="responsible_party">Responsible Party</option>
+                    <option value="billing_contact">Billing / Paperwork Contact</option>
+                    <option value="site_access_contact">Site / Access Contact</option>
+                    <option value="tenant_or_occupant">Tenant / Occupant</option>
+                    <option value="third_party_oversight">Third-Party Oversight</option>
+                    <option value="homeowner">Homeowner</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
+                  <input
+                    name="display_name"
+                    required
+                    maxLength={120}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
+                  <input
+                    name="phone"
+                    placeholder="(209) 555-1234"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Email</label>
+                  <input
+                    name="email"
+                    type="email"
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <label className="mb-1 block text-xs font-medium text-slate-600">Notes (optional)</label>
+                  <textarea
+                    name="notes"
+                    rows={2}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  />
+                </div>
+                <div className="sm:col-span-2">
+                  <button
+                    type="submit"
+                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                  >
+                    Save account contact
+                  </button>
+                </div>
+              </form>
+            </details>
           </section>
         ) : null}
 
@@ -954,10 +1078,12 @@ export default async function CustomerDetailPage(props: {
                 const locId = String(loc.id ?? loc.location_id ?? "");
                 const address = locationAddressLine(loc);
                 const mapsHref = makeMapsHref(address);
+                const locationContacts = locationRoleContactsByLocationId[locId] ?? [];
 
                 return (
                   <div
                     key={locId}
+                    id={`location-contacts-${locId}`}
                     className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
                   >
                     <div className="space-y-4 p-4">
@@ -981,6 +1107,100 @@ export default async function CustomerDetailPage(props: {
                           {(jobsByLocationCount.get(locId) ?? 0) === 1 ? "" : "s"}
                         </div>
                       </div>
+
+                      {isInternalViewer ? (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+                            Site / Access Contact
+                          </div>
+                          {locationContacts.length > 0 ? (
+                            <div className="mt-2 space-y-1.5 text-xs text-slate-700">
+                              {locationContacts.map((contact) => {
+                                const label =
+                                  formatRoleForInternalDisplay(contact.recipient_role) ?? "Contact";
+                                const contactSummary = [
+                                  String(contact.display_name ?? "").trim(),
+                                  String(contact.phone_e164 ?? "").trim(),
+                                  String(contact.email ?? "").trim(),
+                                ]
+                                  .filter(Boolean)
+                                  .join(" - ");
+
+                                return (
+                                  <div key={contact.id}>
+                                    <span className="font-semibold text-slate-800">{label}:</span>{" "}
+                                    {contactSummary || "Contact details unavailable"}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <div className="mt-1 text-xs text-slate-600">No separate site/access contact saved.</div>
+                          )}
+
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs font-semibold text-slate-700">
+                              Add site/access contact
+                            </summary>
+                            <form action={addLocationRoleContactFromForm} className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <input type="hidden" name="customer_id" value={customerId} />
+                              <input type="hidden" name="location_id" value={locId} />
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Role</label>
+                                <select
+                                  name="recipient_role"
+                                  defaultValue="site_access_contact"
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900"
+                                >
+                                  <option value="site_access_contact">Site / Access Contact</option>
+                                  <option value="tenant_or_occupant">Tenant / Occupant</option>
+                                  <option value="responsible_party">Responsible Party</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Name</label>
+                                <input
+                                  name="display_name"
+                                  required
+                                  maxLength={120}
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Phone</label>
+                                <input
+                                  name="phone"
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900"
+                                />
+                              </div>
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Email</label>
+                                <input
+                                  name="email"
+                                  type="email"
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900"
+                                />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <label className="mb-1 block text-xs font-medium text-slate-600">Notes (optional)</label>
+                                <textarea
+                                  name="notes"
+                                  rows={2}
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900"
+                                />
+                              </div>
+                              <div className="sm:col-span-2">
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 hover:bg-slate-100"
+                                >
+                                  Save site/access contact
+                                </button>
+                              </div>
+                            </form>
+                          </details>
+                        </div>
+                      ) : null}
 
                       <div className="flex flex-wrap gap-2">
                         {mapsHref ? (

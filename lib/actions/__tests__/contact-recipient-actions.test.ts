@@ -26,27 +26,56 @@ vi.mock("@/lib/auth/internal-user", () => ({
   isInternalAccessError: (...args: unknown[]) => isInternalAccessErrorMock(...args),
 }));
 
-function makeAdminClientFixture(options?: { customerInScope?: boolean }) {
+function makeAdminClientFixture(options?: {
+  customerInScope?: boolean;
+  locationInScope?: boolean;
+  locationCustomerId?: string;
+}) {
   const customerInScope = options?.customerInScope ?? true;
+  const locationInScope = options?.locationInScope ?? true;
+  const locationCustomerId = options?.locationCustomerId ?? "11111111-1111-4111-8111-111111111111";
 
   return {
     from(table: string) {
-      if (table !== "customers") {
-        throw new Error(`Unexpected admin table: ${table}`);
+      if (table === "customers") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: customerInScope ? { id: "cust-1" } : null,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
+        };
       }
 
-      return {
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
+      if (table === "locations") {
+        return {
+          select: vi.fn(() => ({
             eq: vi.fn(() => ({
               maybeSingle: vi.fn(async () => ({
-                data: customerInScope ? { id: "cust-1" } : null,
+                data: locationInScope
+                  ? {
+                      id: "loc-1",
+                      customer_id: locationCustomerId,
+                      owner_user_id: "owner-1",
+                    }
+                  : null,
                 error: null,
               })),
             })),
           })),
-        })),
-      };
+        };
+      }
+
+      if (table !== "customers" && table !== "locations") {
+        throw new Error(`Unexpected admin table: ${table}`);
+      }
+
+      return {};
     },
   };
 }
@@ -83,6 +112,23 @@ function makeFormData(overrides?: Record<string, string>) {
   form.set("display_name", "Jane Role Contact");
   form.set("phone", "(555) 123-4567");
   form.set("email", "jane@example.com");
+  form.set("preferred_contact_method", "phone");
+
+  Object.entries(overrides ?? {}).forEach(([key, value]) => {
+    form.set(key, value);
+  });
+
+  return form;
+}
+
+function makeLocationFormData(overrides?: Record<string, string>) {
+  const form = new FormData();
+  form.set("customer_id", "11111111-1111-4111-8111-111111111111");
+  form.set("location_id", "22222222-2222-4222-8222-222222222222");
+  form.set("recipient_role", "site_access_contact");
+  form.set("display_name", "Tenant Contact");
+  form.set("phone", "(555) 222-3344");
+  form.set("email", "tenant@example.com");
   form.set("preferred_contact_method", "phone");
 
   Object.entries(overrides ?? {}).forEach(([key, value]) => {
@@ -192,7 +238,7 @@ describe("addCustomerRoleContactFromForm", () => {
     const { addCustomerRoleContactFromForm } = await import("@/lib/actions/contact-recipient-actions");
 
     await expect(
-      addCustomerRoleContactFromForm(makeFormData({ recipient_role: "site_access_contact" })),
+      addCustomerRoleContactFromForm(makeFormData({ recipient_role: "contractor_contact" })),
     ).rejects.toThrow(
       "REDIRECT:/customers/11111111-1111-4111-8111-111111111111?rcError=1#role-contacts",
     );
@@ -228,5 +274,50 @@ describe("addCustomerRoleContactFromForm", () => {
     );
 
     expect(fromCalls.some((table) => /sms|email|push|notification/i.test(table))).toBe(false);
+  });
+
+  it("can create a location-linked site/access contact in same account", async () => {
+    const { supabase, insertCalls } = makeSessionClientFixture();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(
+      makeAdminClientFixture({
+        customerInScope: true,
+        locationInScope: true,
+      }),
+    );
+
+    const { addLocationRoleContactFromForm } = await import("@/lib/actions/contact-recipient-actions");
+
+    await expect(addLocationRoleContactFromForm(makeLocationFormData())).rejects.toThrow(
+      "REDIRECT:/customers/11111111-1111-4111-8111-111111111111?rcLocSaved=1#location-contacts-22222222-2222-4222-8222-222222222222",
+    );
+
+    expect(insertCalls).toHaveLength(1);
+    expect(insertCalls[0].values).toMatchObject({
+      account_owner_user_id: "owner-1",
+      linked_entity_type: "location",
+      linked_entity_id: "22222222-2222-4222-8222-222222222222",
+      recipient_role: "site_access_contact",
+      display_name: "Tenant Contact",
+    });
+  });
+
+  it("rejects out-of-scope location contact insert", async () => {
+    const { supabase, insertCalls } = makeSessionClientFixture();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(
+      makeAdminClientFixture({
+        customerInScope: true,
+        locationInScope: false,
+      }),
+    );
+
+    const { addLocationRoleContactFromForm } = await import("@/lib/actions/contact-recipient-actions");
+
+    await expect(addLocationRoleContactFromForm(makeLocationFormData())).rejects.toThrow(
+      "REDIRECT:/customers/11111111-1111-4111-8111-111111111111?rcLocError=1#location-contacts-22222222-2222-4222-8222-222222222222",
+    );
+
+    expect(insertCalls).toHaveLength(0);
   });
 });

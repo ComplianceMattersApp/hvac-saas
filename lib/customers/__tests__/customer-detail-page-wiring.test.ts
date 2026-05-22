@@ -22,6 +22,14 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("<RoleContactsCard");
   });
 
+  it("renders lightweight internal contact entry controls", () => {
+    expect(customerPageSource).toContain("Add account contact");
+    expect(customerPageSource).toContain("Save account contact");
+    expect(customerPageSource).toContain("Add site/access contact");
+    expect(customerPageSource).toContain("Save site/access contact");
+    expect(customerPageSource).toContain("isInternalViewer ? (");
+  });
+
   it("shows billing and paperwork defaults copy", () => {
     expect(customerPageSource).toContain("Billing / Paperwork Defaults");
     expect(customerPageSource).toContain(
@@ -33,11 +41,6 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Managed Locations");
     expect(customerPageSource).toContain("Recent / Active Work");
     expect(customerPageSource).toContain("View Location");
-  });
-
-  it("does not introduce new role-contact write controls", () => {
-    expect(customerPageSource).not.toContain("Add Role Contact");
-    expect(customerPageSource).not.toContain('name="recipient_role"');
-    expect(customerPageSource).not.toContain("Save Role Contact");
+    expect(customerPageSource).toContain("Site / Access Contact");
   });
 });
