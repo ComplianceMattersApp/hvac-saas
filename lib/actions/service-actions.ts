@@ -114,7 +114,7 @@ async function requireOperationalServiceCloseoutEntitlementAccessOrRedirect(para
  * Service jobs:
  * - When marked complete -> field_complete = true, status = completed,
  *   ops_status = invoice_required
- * - When invoice marked sent -> ops_status = closed
+ * - When external billing is marked complete -> ops_status = closed
  *
  * Guardrail for markInvoiceSent:
  * - Will NOT overwrite pending_info / on_hold (manual lock)
@@ -335,7 +335,7 @@ export async function markInvoiceSent(jobIdOrFormData: string | FormData, return
     const { error: eventErr } = await supabase.from("job_events").insert({
       job_id: jobId,
       event_type: "ops_update",
-      message: "Invoice marked sent",
+      message: "External billing marked complete",
       meta: {
         changes: changeSet,
         source: "service_invoice_sent_action",

@@ -67,7 +67,7 @@ describe("closeout queue projection", () => {
     ).toBe(false);
   });
 
-  it("preserves external invoice-sent tracking semantics through invoice_complete", () => {
+  it("preserves external billing completion tracking semantics through invoice_complete", () => {
     expect(
       isInCloseoutQueue({
         field_complete: true,
@@ -87,7 +87,7 @@ describe("closeout queue projection", () => {
     ).toBe(false);
   });
 
-  it("keeps paperwork blocker after invoice sent when ECC certs are still incomplete", () => {
+  it("keeps paperwork blocker after external billing completion when ECC certs are still incomplete", () => {
     const job = {
       field_complete: true,
       job_type: "ecc",

@@ -67,13 +67,13 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).toContain("/jobs/${jobId}?tab=ops");
   });
 
-  it("uses the existing external billing invoice-sent tracking action", () => {
+  it("uses the existing external billing completion tracking action", () => {
     expect(closeoutQueuePageSource).toContain("markInvoiceCompleteFromForm");
-    expect(closeoutQueuePageSource).toContain('name="success_notice" value="external_invoice_sent"');
-    expect(closeoutQueuePageSource).toMatch(/>\s*Invoice Sent\s*</);
+    expect(closeoutQueuePageSource).toContain('name="success_notice" value="external_billing_complete"');
+    expect(closeoutQueuePageSource).toMatch(/>\s*External Billing Complete\s*</);
   });
 
-  it("uses a pending-aware submit button for Invoice Sent", () => {
+  it("uses a pending-aware submit button for External Billing Complete", () => {
     expect(closeoutQueuePageSource).toContain("SubmitButton");
     expect(closeoutQueuePageSource).toContain('loadingText="Marking..."');
   });
@@ -90,16 +90,16 @@ describe("/ops/closeout-queue page", () => {
 
   it("renders an in-page contractor filter for narrowing the queue", () => {
     expect(closeoutQueuePageSource).toContain("ContractorFilter");
-    expect(closeoutQueuePageSource).toContain("All Contractors");
+    expect(closeoutQueuePageSource).toContain("contractorOptions");
   });
 
-  it("gates Invoice Sent with external billing eligibility instead of internal invoicing rows", () => {
+  it("gates External Billing Complete with external billing eligibility instead of internal invoicing rows", () => {
     expect(closeoutQueuePageSource).toContain("canShowExternalInvoiceSentAction");
     expect(closeoutQueuePageSource).toContain("projection.billingState");
     expect(closeoutQueuePageSource).toContain("canMarkExternalInvoiceSent");
   });
 
-  it("revalidates the closeout queue after lightweight invoice sent tracking", () => {
+  it("revalidates the closeout queue after lightweight external billing completion tracking", () => {
     expect(jobOpsActionsSource).toContain('revalidatePath(`/ops/closeout-queue`)');
     expect(jobOpsActionsSource).toContain("success_notice");
   });

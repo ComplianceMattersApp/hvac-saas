@@ -20,7 +20,7 @@ const baseSelect =
 
 type CloseoutFilter = "all" | "invoice_required" | "paperwork_required" | "failed_review";
 type CloseoutSort = "newest" | "oldest" | "contractor";
-type CloseoutNotice = "external_invoice_sent" | "";
+type CloseoutNotice = "external_billing_complete" | "external_invoice_sent" | "";
 
 function normalizeFilter(value?: string | null): CloseoutFilter {
   const normalized = String(value ?? "").trim().toLowerCase();
@@ -36,9 +36,10 @@ function normalizeSort(value?: string | null): CloseoutSort {
 }
 
 function normalizeNotice(value?: string | null): CloseoutNotice {
-  return String(value ?? "").trim().toLowerCase() === "external_invoice_sent"
-    ? "external_invoice_sent"
-    : "";
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "external_billing_complete") return "external_billing_complete";
+  if (normalized === "external_invoice_sent") return "external_invoice_sent";
+  return "";
 }
 
 function digitsOnly(v?: string | null) {
@@ -274,9 +275,9 @@ export default async function CloseoutQueuePage({
         </div>
       </div>
 
-      {notice === "external_invoice_sent" ? (
+      {notice === "external_billing_complete" || notice === "external_invoice_sent" ? (
         <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-900">
-          Invoice sent was recorded for external billing closeout.
+          External billing marked complete for closeout.
         </div>
       ) : null}
 
@@ -471,9 +472,9 @@ export default async function CloseoutQueuePage({
                         <form action={markInvoiceCompleteFromForm}>
                           <input type="hidden" name="job_id" value={jobId} />
                           <input type="hidden" name="return_to" value={`${currentQueueHref}#job-${jobId}`} />
-                          <input type="hidden" name="success_notice" value="external_invoice_sent" />
+                          <input type="hidden" name="success_notice" value="external_billing_complete" />
                           <SubmitButton className={compactActionClass} loadingText="Marking...">
-                            Invoice Sent
+                            External Billing Complete
                           </SubmitButton>
                         </form>
                       ) : null}

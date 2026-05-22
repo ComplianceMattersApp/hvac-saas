@@ -67,10 +67,10 @@ export default function ServiceStatusActions({
         {!isInternalInvoicing ? (
           <form action={invoiceSentAction}>
             <SubmitButton
-              loadingText="Marking sent..."
+              loadingText="Marking..."
               className="w-full rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
             >
-              Mark Invoice Sent → Closed
+              Mark External Billing Complete → Closed
             </SubmitButton>
           </form>
         ) : null}
@@ -79,7 +79,7 @@ export default function ServiceStatusActions({
 
       {!isInternalInvoicing ? (
         <p className="mt-2 text-xs text-neutral-500">
-          Using external billing tracking only.{" "}
+          Mark external billing as complete when billing was handled outside Compliance Matters.{" "}
           To create and send invoices directly from jobs, an account admin can switch to{" "}
           <b>Internal invoicing</b> in{" "}
           <a href="/ops/admin/company-profile" className="underline underline-offset-2">

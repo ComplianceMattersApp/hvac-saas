@@ -1393,7 +1393,7 @@ if (!job.data_entry_completed_at && !updatedInvoiceRow.data_entry_completed_at) 
   const { error: eventErr } = await supabase.from("job_events").insert({
     job_id: jobId,
     event_type: "ops_update",
-    message: "Invoice marked complete",
+    message: "External billing marked complete",
     meta: {
       changes: [
         { field: "invoice_complete", from: !!job.invoice_complete, to: true },

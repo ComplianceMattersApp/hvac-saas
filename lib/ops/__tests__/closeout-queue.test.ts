@@ -97,7 +97,7 @@ describe("canShowExternalInvoiceSentAction", () => {
     ).toBe(false);
   });
 
-  it("hides the action after invoice sent tracking is already satisfied", () => {
+  it("hides the action after external billing completion tracking is already satisfied", () => {
     expect(
       canShowExternalInvoiceSentAction({
         needsInvoice: false,
