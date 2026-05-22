@@ -1820,13 +1820,10 @@ const [billingRecipient, setBillingRecipient] = useState<
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 1</p>
                     <h3 className="mt-1 text-lg font-semibold text-slate-950">Find or create customer</h3>
                     <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">
-                      Type customer name to find the best match.
+                      Search customer name, phone, or address.
                     </p>
                   </div>
                     <div className="flex flex-col items-end gap-2 flex-none">
-                      <div className="rounded-full border border-blue-200 bg-white/80 px-3 py-1 text-[11px] font-medium text-blue-800 shadow-sm">
-                        Live recognition
-                      </div>
                       <button
                         type="button"
                         id="create-new-customer-shortcut"
@@ -1864,7 +1861,6 @@ const [billingRecipient, setBillingRecipient] = useState<
                       autoFocus
                       className="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
                     />
-                    <p className="mt-2 text-xs leading-5 text-slate-500">Start typing to find a customer.</p>
                   </div>
 
                   <div className="space-y-2">
@@ -1912,13 +1908,11 @@ const [billingRecipient, setBillingRecipient] = useState<
                           </p>
                         </button>
                       ))
-                    ) : (
+                    ) : hasMeaningfulCustomerQuery ? (
                       <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-4 text-sm text-slate-500">
-                        {hasMeaningfulCustomerQuery
-                          ? "No matching customers found."
-                          : "Start typing to find a customer."}
+                        No matching customers found.
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               ) : null}
@@ -2257,7 +2251,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
               {!internalResolutionReady ? (
                 <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900 shadow-sm">
-                  Complete customer and location selection to continue.
+                  Select customer and location to continue.
                 </div>
               ) : null}
 

@@ -14,9 +14,10 @@ describe("New job customer finder simplification", () => {
   });
 
   it("uses field-first customer finder copy", () => {
+    expect(formSource).toContain("Search customer name, phone, or address.");
     expect(formSource).toContain("Search customer name, phone, or address");
-    expect(formSource).toContain("Start typing to find a customer.");
     expect(formSource).toContain("No matching customers found.");
+    expect(formSource).not.toContain("Type customer name to find the best match.");
   });
 
   it("keeps create-new customer path available", () => {
