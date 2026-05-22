@@ -30,6 +30,7 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
     expect(formSource).toContain(
       "What kind of visit is this, and what work needs to be done?",
     );
+    expect(formSource).toContain('<option value="install">Install Visit</option>');
     expect(formSource).toMatch(
       /isHvacServiceMode && jobType === "service" \? \([\s\S]*name="service_case_kind"[\s\S]*name="service_visit_type"[\s\S]*\) : null\}\s*<VisitScopeBuilder/,
     );

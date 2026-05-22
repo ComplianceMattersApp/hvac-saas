@@ -13,6 +13,7 @@ describe("Visit scope visit-type suggestion UX", () => {
   it("maps supported visit types to safe scope suggestions", () => {
     expect(resolveVisitTypeScopeSuggestion("diagnostic")).toBe("Diagnostic");
     expect(resolveVisitTypeScopeSuggestion("repair")).toBe("Service Call");
+    expect(resolveVisitTypeScopeSuggestion("install")).toBe("Install");
     expect(resolveVisitTypeScopeSuggestion("maintenance")).toBeNull();
     expect(resolveVisitTypeScopeSuggestion("callback")).toBeNull();
   });

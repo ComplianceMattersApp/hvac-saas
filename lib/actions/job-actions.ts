@@ -2015,6 +2015,7 @@ const SERVICE_CASE_KINDS = new Set([
 const SERVICE_VISIT_TYPES = new Set([
   "diagnostic",
   "repair",
+  "install",
   "return_visit",
   "callback",
   "maintenance",

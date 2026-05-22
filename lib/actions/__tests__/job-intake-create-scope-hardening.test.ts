@@ -92,6 +92,7 @@ function buildInternalServiceIntakeFormData(options?: {
   visitScopeSummary?: string;
   visitScopeItemsJson?: string;
   maintenanceAgreementId?: string;
+  serviceVisitType?: "diagnostic" | "repair" | "install" | "return_visit" | "callback" | "maintenance";
 }) {
   const formData = new FormData();
   formData.set("job_type", "service");
@@ -100,6 +101,9 @@ function buildInternalServiceIntakeFormData(options?: {
   formData.set("location_id", "loc-1");
   formData.set("visit_scope_summary", options?.visitScopeSummary ?? "");
   formData.set("visit_scope_items_json", options?.visitScopeItemsJson ?? "[]");
+  if (options?.serviceVisitType) {
+    formData.set("service_visit_type", options.serviceVisitType);
+  }
   if (options?.maintenanceAgreementId) {
     formData.set("maintenance_agreement_id", options.maintenanceAgreementId);
     formData.set("service_case_kind", "maintenance");
@@ -510,6 +514,39 @@ describe("job intake create same-account hardening", () => {
     expect(jobsInsert?.payload).toMatchObject({
       job_type: "service",
       service_visit_type: "diagnostic",
+    });
+  });
+
+  it("accepts install service visit type in service intake", async () => {
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: true,
+      accountSettingsProductMode: "hybrid",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalServiceIntakeFormData({
+          serviceVisitType: "install",
+          visitScopeItemsJson: JSON.stringify([
+            { title: "Install condenser", details: "Back yard", kind: "primary" },
+          ]),
+        }),
+      ),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    const jobsInsert = fixture.insertCalls.find((call) => call.table === "jobs");
+    expect(jobsInsert?.payload).toMatchObject({
+      job_type: "service",
+      service_visit_type: "install",
     });
   });
 

@@ -140,7 +140,13 @@ type NewJobDraft = {
   contractorId?: string;
   jobType?: "ecc" | "service";
   serviceCaseKind?: "reactive" | "callback" | "warranty" | "maintenance";
-  serviceVisitType?: "diagnostic" | "repair" | "return_visit" | "callback" | "maintenance";
+  serviceVisitType?:
+    | "diagnostic"
+    | "repair"
+    | "install"
+    | "return_visit"
+    | "callback"
+    | "maintenance";
   serviceVisitOutcome?: "resolved" | "follow_up_required" | "no_issue_found";
   billingRecipient?: "contractor" | "customer" | "other";
   projectType?: "alteration" | "all_new" | "new_construction";
@@ -485,7 +491,7 @@ export default function NewJobForm({
     "reactive" | "callback" | "warranty" | "maintenance"
   >(maintenanceAgreementPrefill ? "maintenance" : "reactive");
   const [serviceVisitType, setServiceVisitType] = useState<
-    "diagnostic" | "repair" | "return_visit" | "callback" | "maintenance"
+    "diagnostic" | "repair" | "install" | "return_visit" | "callback" | "maintenance"
   >(maintenanceAgreementPrefill ? "maintenance" : "diagnostic");
   const [serviceVisitOutcome, setServiceVisitOutcome] = useState<
     "resolved" | "follow_up_required" | "no_issue_found"
@@ -1765,6 +1771,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                         e.target.value as
                           | "diagnostic"
                           | "repair"
+                          | "install"
                           | "return_visit"
                           | "callback"
                           | "maintenance",
@@ -1773,6 +1780,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   >
                     <option value="diagnostic">Diagnostic</option>
                     <option value="repair">Repair</option>
+                    <option value="install">Install</option>
                     <option value="return_visit">Return Visit</option>
                     <option value="callback">Callback</option>
                     <option value="maintenance">Maintenance</option>
@@ -2530,6 +2538,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                             e.target.value as
                               | "diagnostic"
                               | "repair"
+                              | "install"
                               | "return_visit"
                               | "callback"
                               | "maintenance",
@@ -2538,6 +2547,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                       >
                         <option value="diagnostic">Initial / Diagnostic Visit</option>
                         <option value="repair">Service Work Visit</option>
+                        <option value="install">Install Visit</option>
                         <option value="return_visit">Return Visit</option>
                         <option value="callback">Callback Visit</option>
                         <option value="maintenance">Maintenance Visit</option>
@@ -2652,6 +2662,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                                 e.target.value as
                                   | "diagnostic"
                                   | "repair"
+                                  | "install"
                                   | "return_visit"
                                   | "callback"
                                   | "maintenance",
@@ -2660,6 +2671,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                           >
                             <option value="diagnostic">Initial / Diagnostic Visit</option>
                             <option value="repair">Service Work Visit</option>
+                            <option value="install">Install Visit</option>
                             <option value="return_visit">Return Visit</option>
                             <option value="callback">Callback Visit</option>
                             <option value="maintenance">Maintenance Visit</option>

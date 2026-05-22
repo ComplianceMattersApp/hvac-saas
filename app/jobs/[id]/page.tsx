@@ -4642,12 +4642,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                           >
                             <option value="diagnostic">Diagnostic</option>
                             <option value="repair">Repair</option>
+                            <option value="install">Install</option>
                             <option value="return_visit">Return Visit</option>
                             <option value="callback">Callback</option>
                             <option value="maintenance">Maintenance</option>
                           </select>
                           <p className="text-[11px] leading-5 text-slate-500">
-                            Category of visit, such as diagnostic, repair, return visit, callback, or maintenance.
+                            Category of visit, such as diagnostic, repair, install, return visit, callback, or maintenance.
                           </p>
                         </div>
                       </div>
