@@ -2208,7 +2208,10 @@ const [billingRecipient, setBillingRecipient] = useState<
           )}
         </section>
 
-        {isInternalMode && internalResolutionReady ? (
+        {isInternalMode && internalResolutionReady && isHvacServiceMode ? (
+          <input type="hidden" name="job_type" value={modeSafeJobType} />
+        ) : null}
+        {isInternalMode && internalResolutionReady && !isHvacServiceMode ? (
           <section className="space-y-3">
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-5">
               <div>
@@ -2383,7 +2386,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           </section>
         ) : null}
 
-        {shouldShowRelationshipStep ? (
+        {shouldShowRelationshipStep && !isHvacServiceMode ? (
           <section className="space-y-3">
             <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-5">
               <div>
@@ -2630,9 +2633,14 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isInternalMode ? (
                 <div ref={visitScopeSectionRef}>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 5</p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Work To Perform &amp; Job Scope</h2>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">
+                    {isHvacServiceMode ? "Work Order Details" : "Work To Perform & Job Scope"}
+                  </h2>
+                  {/* legacy heading preserved for ECC/Hybrid: Work To Perform &amp; Job Scope */}
                   <p className="mt-1 text-sm text-slate-500">
-                    {jobType === "service"
+                    {isHvacServiceMode
+                      ? "What kind of visit is this, and what work needs to be done?"
+                      : jobType === "service"
                       ? "Start with Reason for Visit, then add the structured job scope for this trip."
                       : "ECC testing can be created without job scope; add optional companion scope only when this visit also includes service work."}
                   </p>
@@ -2668,6 +2676,52 @@ const [billingRecipient, setBillingRecipient] = useState<
                       </p>
                     ) : null}
                   </div>
+                  {isHvacServiceMode && jobType === "service" ? (
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
+                        <select
+                          name="service_case_kind"
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                          value={serviceCaseKind}
+                          onChange={(e) =>
+                            setServiceCaseKind(
+                              e.target.value as "reactive" | "callback" | "warranty" | "maintenance",
+                            )
+                          }
+                        >
+                          <option value="reactive">Standard Service</option>
+                          <option value="callback">Callback</option>
+                          <option value="warranty">Warranty</option>
+                          <option value="maintenance">Maintenance</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-slate-700">Visit Type</label>
+                        <select
+                          name="service_visit_type"
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                          value={serviceVisitType}
+                          onChange={(e) =>
+                            setServiceVisitType(
+                              e.target.value as
+                                | "diagnostic"
+                                | "repair"
+                                | "return_visit"
+                                | "callback"
+                                | "maintenance",
+                            )
+                          }
+                        >
+                          <option value="diagnostic">Initial / Diagnostic Visit</option>
+                          <option value="repair">Service Work Visit</option>
+                          <option value="return_visit">Return Visit</option>
+                          <option value="callback">Callback Visit</option>
+                          <option value="maintenance">Maintenance Visit</option>
+                        </select>
+                      </div>
+                    </div>
+                  ) : null}
                   <VisitScopeBuilder
                     initialSummary={visitScopeSummary}
                     initialItems={visitScopeItems}
@@ -2905,12 +2959,46 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isInternalMode ? (
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 7</p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Optional details</h2>
-                  <p className="mt-1 text-sm text-slate-500">Add equipment, photos, and notes only when helpful.</p>
+                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Additional details</h2>
+                  <p className="mt-1 text-sm text-slate-500">Helpful information, not required.</p>
                 </div>
               ) : (
                 <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Equipment (optional)</h2>
               )}
+              {isHvacServiceMode ? (
+                <details className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm">
+                  <summary className="cursor-pointer text-sm font-medium text-slate-900">Permit information</summary>
+                  <div className="mt-3 space-y-3">
+                    <div className="space-y-1">
+                      <label className="block text-sm font-medium text-slate-900">Permit Number</label>
+                      <input
+                        type="text"
+                        name="permit_number"
+                        className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                      />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-slate-900">Jurisdiction</label>
+                        <input
+                          type="text"
+                          name="jurisdiction"
+                          placeholder="City or county permit office"
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-sm font-medium text-slate-900">Permit Date</label>
+                        <input
+                          type="date"
+                          name="permit_date"
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </details>
+              ) : null}
               <div className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm space-y-3">
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-600">Add systems if needed. Use a clear label, such as Upstairs or Downstairs.</p>
