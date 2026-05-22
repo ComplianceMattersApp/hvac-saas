@@ -32,11 +32,9 @@ describe("/jobs/new guided builder refresh", () => {
     expect(formSource).toContain('name="job_notes"');
   });
 
-  it("exposes internal request-source selection during customer intake", () => {
-    expect(formSource).toContain("Request came from");
-    expect(formSource).toContain('name="intake_request_source"');
-    expect(formSource).toContain("Property Management Company");
-    expect(formSource).toContain("Home Warranty");
+  it("does not expose request-source selection during customer intake", () => {
+    expect(formSource).not.toContain("Request came from");
+    expect(formSource).not.toContain('name="intake_request_source"');
   });
 
   it("folds internal billing controls into the guided Schedule section", () => {

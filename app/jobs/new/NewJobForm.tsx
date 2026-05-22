@@ -91,14 +91,6 @@ type MaintenanceAgreementPrefill = {
     category?: string | null;
   }>;
 };
-type IntakeRequestSource =
-  | "homeowner"
-  | "tenant_or_occupant"
-  | "landlord"
-  | "property_management"
-  | "home_warranty"
-  | "other";
-
 type ComponentType =
   | "condenser_ac"
   | "coil"
@@ -467,8 +459,6 @@ export default function NewJobForm({
   const [newCustomerLastName, setNewCustomerLastName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
   const [newCustomerEmail, setNewCustomerEmail] = useState("");
-  const [intakeRequestSource, setIntakeRequestSource] = useState<IntakeRequestSource>("homeowner");
-  const [intakeRequestSourceOther, setIntakeRequestSourceOther] = useState("");
 
   const [windowStart, setWindowStart] = useState("");
   const [windowEnd, setWindowEnd] = useState("");
@@ -1812,36 +1802,6 @@ const [billingRecipient, setBillingRecipient] = useState<
               ) : undefined,
           })}
           <div className={guidedSectionBodyClass}>
-          {isInternalMode ? (
-            <div className={`${guidedSectionInsetClass} space-y-2`}>
-              <label className="block text-sm font-medium text-slate-900">Request came from</label>
-              <p className="text-xs text-slate-500">Select request source for dispatch context.</p>
-              <select
-                name="intake_request_source"
-                value={intakeRequestSource}
-                onChange={(event) => setIntakeRequestSource(event.target.value as IntakeRequestSource)}
-                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-sm"
-              >
-                <option value="homeowner">Homeowner</option>
-                <option value="tenant_or_occupant">Tenant / Occupant</option>
-                <option value="landlord">Landlord</option>
-                <option value="property_management">Property Management Company</option>
-                <option value="home_warranty">Home Warranty</option>
-                <option value="other">Other</option>
-              </select>
-              {intakeRequestSource === "other" ? (
-                <input
-                  type="text"
-                  name="intake_request_source_other"
-                  value={intakeRequestSourceOther}
-                  onChange={(event) => setIntakeRequestSourceOther(event.target.value)}
-                  placeholder="Describe source (optional)"
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
-                />
-              ) : null}
-            </div>
-          ) : null}
-
           {isContractorMode ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3.5 py-3 space-y-1.5">
               <p className="text-xs font-semibold text-amber-900">Reviewed by our team</p>

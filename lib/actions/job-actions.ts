@@ -6906,8 +6906,6 @@ const customerFirstNameRaw = String(formData.get("customer_first_name") || "").t
 const customerLastNameRaw = String(formData.get("customer_last_name") || "").trim();
 const customerEmailRaw = String(formData.get("customer_email") || "").trim();
 const jobNotesRaw = String(formData.get("job_notes") || "").trim();
-const intakeRequestSourceRaw = String(formData.get("intake_request_source") || "").trim().toLowerCase();
-const intakeRequestSourceOtherRaw = String(formData.get("intake_request_source_other") || "").trim();
 const visitScopeSummaryRaw = String(formData.get("visit_scope_summary") || "").trim();
 const visitScopeItemsRaw = String(formData.get("visit_scope_items_json") || "").trim();
 const jobAddressFormRaw = String(formData.get("job_address") || "").trim();
@@ -6966,33 +6964,7 @@ const scheduled_date = isContractorUser ? null : derived_scheduled_date;
 const window_start = isContractorUser ? null : derived_window_start;
 const window_end = isContractorUser ? null : derived_window_end;
 const ops_status = isContractorUser ? "need_to_schedule" : derived_ops_status;
-
-const intakeRequestSourceLabel =
-  intakeRequestSourceRaw === "homeowner"
-    ? "Homeowner"
-    : intakeRequestSourceRaw === "tenant_or_occupant"
-      ? "Tenant / Occupant"
-      : intakeRequestSourceRaw === "landlord"
-        ? "Landlord"
-        : intakeRequestSourceRaw === "property_management"
-          ? "Property Management Company"
-          : intakeRequestSourceRaw === "home_warranty"
-            ? "Home Warranty"
-            : intakeRequestSourceRaw === "other"
-              ? (intakeRequestSourceOtherRaw || "Other")
-              : "";
-
-const requestSourceContextLine = !isContractorUser && intakeRequestSourceLabel
-  ? `Request source: ${intakeRequestSourceLabel}`
-  : "";
-
-const jobNotesFinal = requestSourceContextLine
-  ? (jobNotesRaw
-      ? jobNotesRaw.toLowerCase().includes(requestSourceContextLine.toLowerCase())
-        ? jobNotesRaw
-        : `${requestSourceContextLine}\n${jobNotesRaw}`
-      : requestSourceContextLine)
-  : jobNotesRaw;
+const jobNotesFinal = jobNotesRaw;
 
 const visit_scope_summary = isContractorUser ? null : sanitizeVisitScopeSummary(visitScopeSummaryRaw);
 let visit_scope_items: VisitScopeItem[] = [];

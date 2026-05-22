@@ -76,12 +76,15 @@ vi.mock("@/lib/email/sendEmail", () => ({
   sendEmail: (...args: unknown[]) => sendEmailMock(...args),
 }));
 
-function buildIntakeFormData() {
+function buildIntakeFormData(options?: { jobNotes?: string }) {
   const formData = new FormData();
   formData.set("job_type", "ecc");
   formData.set("title", "Intake Smoke Test Job");
   formData.set("customer_id", "cust-1");
   formData.set("location_id", "loc-1");
+  if (typeof options?.jobNotes === "string") {
+    formData.set("job_notes", options.jobNotes);
+  }
   return formData;
 }
 
@@ -411,6 +414,37 @@ describe("job intake create same-account hardening", () => {
     expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1" }),
     );
+  });
+
+  it("persists normal job notes without request-source injection", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: true });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildIntakeFormData({
+          jobNotes: "Customer noted intermittent airflow issue.",
+        }),
+      ),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    const jobsInsertCall = fixture.insertCalls.find((call) => call.table === "jobs");
+    const jobsPayloadRaw = jobsInsertCall?.payload;
+    const jobsPayload = (
+      Array.isArray(jobsPayloadRaw) ? jobsPayloadRaw[0] : jobsPayloadRaw
+    ) as Record<string, unknown> | null | undefined;
+
+    expect(jobsPayload).toBeTruthy();
+    expect(jobsPayload?.job_notes).toBe("Customer noted intermittent airflow issue.");
+    expect(String(jobsPayload?.job_notes ?? "")).not.toContain("Request source:");
   });
 
   it("preserves service job type for service-plan intake under ecc_hers mode", async () => {
