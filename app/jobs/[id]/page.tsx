@@ -131,6 +131,7 @@ import MarkVisitCountedActionButton from "./_components/MarkVisitCountedActionBu
 import ConfirmNextDueDateActionButton from "./_components/ConfirmNextDueDateActionButton";
 import {
   listContactRecipientsForEntity,
+  type ContactRecipientRow,
 } from "@/lib/communications/contact-recipients-read";
 import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
@@ -1139,6 +1140,8 @@ export default async function JobDetailPage({
       billing_zip,
       locations:location_id (
         id,
+        nickname,
+        label,
         address_line1,
         address_line2,
         city,
@@ -1627,24 +1630,11 @@ export default async function JobDetailPage({
     "—");
 
   const customerDisplayName = formatPersonNamePart(customerName);
-  const roleContactSections = buildInternalJobRoleContactSections({
-    customerLinkedContacts: customerRoleContacts,
-    jobLinkedContacts: jobRoleContacts,
-  });
+  const customerPhone =
+    customerBilling?.phone ?? job.customer_phone ?? "—";
 
-const customerPhone =
-  customerBilling?.phone ?? job.customer_phone ?? "—";
-
-const customerEmail =
-  customerBilling?.email ?? job.customer_email ?? "—";
-
-  const resolvedContractorName =
-    contractors?.find((c: any) => c.id === contractorId)?.name ??
-    String(contractorBilling?.name ?? "").trim();
-
-  const contractorName = contractorId
-    ? (resolvedContractorName || "Assigned contractor")
-    : null;
+  const customerEmail =
+    customerBilling?.email ?? job.customer_email ?? "—";
 
   const firstNonEmpty = (...values: Array<unknown>) => {
     for (const v of values) {
@@ -1653,6 +1643,95 @@ const customerEmail =
     }
     return null;
   };
+
+  const roleContactSections = buildInternalJobRoleContactSections({
+    customerLinkedContacts: customerRoleContacts,
+    jobLinkedContacts: jobRoleContacts,
+  });
+
+  const allRoleContacts = [...jobRoleContacts, ...customerRoleContacts];
+  const siteAccessRolePriority = new Map<string, number>([
+    ["site_access_contact", 0],
+    ["tenant_or_occupant", 1],
+    ["responsible_party", 2],
+    ["homeowner", 3],
+    ["third_party_oversight", 4],
+    ["billing_contact", 5],
+  ]);
+  const siteAccessEntityPriority = new Map<string, number>([
+    ["job", 0],
+    ["customer", 1],
+    ["location", 2],
+  ]);
+
+  const siteAccessCandidates = allRoleContacts
+    .filter((contact) => String(contact.status ?? "").trim().toLowerCase() !== "inactive")
+    .filter((contact) => {
+      const role = String(contact.recipient_role ?? "").trim().toLowerCase();
+      return siteAccessRolePriority.has(role);
+    })
+    .sort((left, right) => {
+      const leftRole = String(left.recipient_role ?? "").trim().toLowerCase();
+      const rightRole = String(right.recipient_role ?? "").trim().toLowerCase();
+      const leftRoleRank = siteAccessRolePriority.get(leftRole) ?? 99;
+      const rightRoleRank = siteAccessRolePriority.get(rightRole) ?? 99;
+
+      if (leftRoleRank !== rightRoleRank) return leftRoleRank - rightRoleRank;
+
+      const leftEntity = String(left.linked_entity_type ?? "").trim().toLowerCase();
+      const rightEntity = String(right.linked_entity_type ?? "").trim().toLowerCase();
+      const leftEntityRank = siteAccessEntityPriority.get(leftEntity) ?? 99;
+      const rightEntityRank = siteAccessEntityPriority.get(rightEntity) ?? 99;
+
+      if (leftEntityRank !== rightEntityRank) return leftEntityRank - rightEntityRank;
+
+      return String(left.display_name ?? "").localeCompare(String(right.display_name ?? ""));
+    });
+
+  const primarySiteAccessContact: ContactRecipientRow | null =
+    siteAccessCandidates.find((contact) => String(contact.display_name ?? "").trim().length > 0) ??
+    siteAccessCandidates[0] ??
+    null;
+
+  const primarySiteAccessName = String(primarySiteAccessContact?.display_name ?? "").trim();
+  const primarySiteAccessPhone = String(primarySiteAccessContact?.phone_e164 ?? "").trim();
+  const primarySiteAccessEmail = String(primarySiteAccessContact?.email ?? "").trim();
+  const hasSeparateSiteAccessContact = Boolean(
+    primarySiteAccessName || primarySiteAccessPhone || primarySiteAccessEmail,
+  );
+  const siteAccessFallbackText =
+    customerPhone !== "—" || customerEmail !== "—"
+      ? "Same as responsible account"
+      : "No separate site/access contact saved";
+
+  const billingRecipientName = firstNonEmpty(
+    (job as any).billing_name,
+    (job as any).billing_recipient,
+  );
+  const billingRecipientEmail = String((job as any).billing_email ?? "").trim();
+  const billingRecipientPhone = String((job as any).billing_phone ?? "").trim();
+  const billingRecipientAddressParts = formatBillingAddress({
+    billing_address_line1: (job as any).billing_address_line1,
+    billing_address_line2: (job as any).billing_address_line2,
+    billing_city: (job as any).billing_city,
+    billing_state: (job as any).billing_state,
+    billing_zip: (job as any).billing_zip,
+  });
+  const billingRecipientAddress = billingRecipientAddressParts.join(", ");
+  const hasJobBillingRecipient = Boolean(
+    billingRecipientName ||
+      billingRecipientEmail ||
+      billingRecipientPhone ||
+      billingRecipientAddress,
+  );
+
+  const resolvedContractorName =
+    contractors?.find((c: any) => c.id === contractorId)?.name ??
+    String(contractorBilling?.name ?? "").trim();
+
+  const contractorName = contractorId
+    ? (resolvedContractorName || "Assigned contractor")
+    : null;
 
   const serviceLocation = Array.isArray((job as any).locations)
     ? (job as any).locations.find((location: any) => location) ?? null
@@ -1697,6 +1776,9 @@ const customerEmail =
 
   const serviceAddressDisplay =
     serviceAddressParts.length > 0 ? serviceAddressParts.join(", ") : "No address set";
+
+  const serviceLocationLabel =
+    firstNonEmpty(serviceLocation?.nickname, serviceLocation?.label) ?? "Service address";
 
     const hasFullSchedule =
     !!job.scheduled_date &&
@@ -2083,10 +2165,16 @@ const locationId = serviceLocation?.id ?? null;
 
 const digitsOnly = (v?: string | null) => String(v ?? "").replace(/\D/g, "");
 
+const accountPhoneDigits = customerPhone !== "—" ? digitsOnly(customerPhone) : "";
+const accessPhoneDigits = primarySiteAccessPhone ? digitsOnly(primarySiteAccessPhone) : "";
+const hasSeparateAccessPhone = Boolean(accessPhoneDigits && accessPhoneDigits !== accountPhoneDigits);
+
 const telLink =
-  customerPhone !== "—" && digitsOnly(customerPhone)
-    ? `tel:${digitsOnly(customerPhone)}`
+  customerPhone !== "—" && accountPhoneDigits
+    ? `tel:${accountPhoneDigits}`
     : "";
+
+const accessTelLink = hasSeparateAccessPhone ? `tel:${accessPhoneDigits}` : "";
 
 const serviceMapsLink =
   serviceAddressDisplay && serviceAddressDisplay !== "No address set"
@@ -3105,7 +3193,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {(job.job_type ? String(job.job_type).toUpperCase() : "SERVICE")}
         {serviceCity ? ` • ${serviceCity}` : ""}
       </div>
-      <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer</div>
+      <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Responsible Account</div>
 
       {job.customer_id ? (
         <Link
@@ -3118,33 +3206,89 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <h1 className="mt-1.5 text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950">{customerDisplayName}</h1>
       )}
 
-      <div className="mt-3 grid gap-x-5 gap-y-2.5 border-t border-slate-200/70 pt-3 text-sm sm:grid-cols-2">
+      <div className="mt-3 space-y-2.5 border-t border-slate-200/70 pt-3 text-sm">
+        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Responsible Account</div>
+          <div className="mt-1 font-semibold text-slate-900">{customerDisplayName}</div>
+          <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
+            {customerPhone !== "—" ? (
+              <div>
+                <span className="font-semibold text-slate-500">Account phone:</span> {customerPhone}
+              </div>
+            ) : null}
+            {customerEmail !== "—" ? (
+              <div className="break-all">
+                <span className="font-semibold text-slate-500">Account email:</span> {customerEmail}
+              </div>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Service Location</div>
+          <div className="mt-1 font-semibold text-slate-900">{serviceLocationLabel}</div>
+          <div className="mt-1 text-xs text-slate-600">{serviceAddressDisplay}</div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Site / Access Contact</div>
+          {hasSeparateSiteAccessContact ? (
+            <>
+              {primarySiteAccessName ? (
+                <div className="mt-1 font-semibold text-slate-900">{primarySiteAccessName}</div>
+              ) : null}
+              <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
+                {primarySiteAccessPhone ? (
+                  <div>
+                    <span className="font-semibold text-slate-500">Access phone:</span> {primarySiteAccessPhone}
+                  </div>
+                ) : null}
+                {primarySiteAccessEmail ? (
+                  <div className="break-all">
+                    <span className="font-semibold text-slate-500">Access email:</span> {primarySiteAccessEmail}
+                  </div>
+                ) : null}
+              </div>
+            </>
+          ) : (
+            <div className="mt-1 text-xs text-slate-600">{siteAccessFallbackText}</div>
+          )}
+        </div>
+
+        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing / Paperwork Recipient</div>
+          {hasJobBillingRecipient ? (
+            <>
+              {billingRecipientName ? (
+                <div className="mt-1 font-semibold text-slate-900">{billingRecipientName}</div>
+              ) : null}
+              <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
+                {billingRecipientPhone ? (
+                  <div>
+                    <span className="font-semibold text-slate-500">Billing phone:</span> {billingRecipientPhone}
+                  </div>
+                ) : null}
+                {billingRecipientEmail ? (
+                  <div className="break-all">
+                    <span className="font-semibold text-slate-500">Billing email:</span> {billingRecipientEmail}
+                  </div>
+                ) : null}
+              </div>
+              {billingRecipientAddress ? (
+                <div className="mt-1 text-xs text-slate-600">
+                  <span className="font-semibold text-slate-500">Billing address:</span> {billingRecipientAddress}
+                </div>
+              ) : null}
+            </>
+          ) : (
+            <div className="mt-1 text-xs text-slate-600">Defaults to responsible account</div>
+          )}
+        </div>
+
         {contractorId ? (
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contractor</div>
             <div className="mt-1 font-semibold text-slate-800">{contractorName}</div>
-          </div>
-        ) : null}
-        {customerPhone !== "—" ? (
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer Phone</div>
-            <div className="mt-1 font-semibold text-slate-800">{customerPhone}</div>
-          </div>
-        ) : null}
-        {customerEmail !== "—" ? (
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Customer Email</div>
-            <div className="mt-1 font-semibold text-slate-800 break-all">{customerEmail}</div>
-          </div>
-        ) : null}
-        {String((job as any).billing_name ?? "").trim() || String((job as any).billing_phone ?? "").trim() || String((job as any).billing_email ?? "").trim() || String((job as any).billing_recipient ?? "").trim() ? (
-          <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing Recipient</div>
-            <div className="mt-1 font-semibold text-slate-800 break-words">
-              {[String((job as any).billing_name ?? "").trim(), String((job as any).billing_phone ?? "").trim(), String((job as any).billing_email ?? "").trim()]
-                .filter(Boolean)
-                .join(" - ") || String((job as any).billing_recipient ?? "").trim()}
-            </div>
           </div>
         ) : null}
       </div>
@@ -3155,16 +3299,34 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             href={telLink}
             className={compactSecondaryButtonClass}
           >
-            Call
+            Call account phone
           </a>
         ) : null}
 
         {customerPhone !== "—" ? (
           <a
-            href={`sms:${digitsOnly(customerPhone)}`}
+            href={`sms:${accountPhoneDigits}`}
             className={compactSecondaryButtonClass}
           >
-            Open SMS App
+            Text account phone
+          </a>
+        ) : null}
+
+        {accessTelLink ? (
+          <a
+            href={accessTelLink}
+            className={compactSecondaryButtonClass}
+          >
+            Call access phone
+          </a>
+        ) : null}
+
+        {hasSeparateAccessPhone ? (
+          <a
+            href={`sms:${accessPhoneDigits}`}
+            className={compactSecondaryButtonClass}
+          >
+            Text access phone
           </a>
         ) : null}
 

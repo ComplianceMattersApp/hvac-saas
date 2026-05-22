@@ -27,4 +27,19 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain('Service Location');
     expect(jobPageSource).not.toContain('bg-slate-100 p-3 pt-10');
   });
+
+  it("labels account, access, and billing context clearly", () => {
+    expect(jobPageSource).toContain("Responsible Account");
+    expect(jobPageSource).toContain("Site / Access Contact");
+    expect(jobPageSource).toContain("Billing / Paperwork Recipient");
+    expect(jobPageSource).toContain("Account phone");
+    expect(jobPageSource).toContain("Access phone");
+    expect(jobPageSource).toContain("Billing email");
+  });
+
+  it("includes explicit fallback copy for access and billing defaults", () => {
+    expect(jobPageSource).toContain("Same as responsible account");
+    expect(jobPageSource).toContain("No separate site/access contact saved");
+    expect(jobPageSource).toContain("Defaults to responsible account");
+  });
 });
