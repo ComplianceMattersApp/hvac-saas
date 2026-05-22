@@ -680,13 +680,13 @@ const [billingRecipient, setBillingRecipient] = useState<
       : productMode === "ecc_hers"
         ? "ECC/HERS accounts use the ECC / Compliance Test family by default and presentation."
         : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";
-  const jobFamilyStepTitle = isHvacServiceMode ? "Work Order Setup" : "Job family";
+  const jobFamilyStepTitle = isHvacServiceMode ? "Work Order Setup" : "Job Type";
   const jobFamilyStepDescription = isHvacServiceMode
     ? "These fields classify the visit. Work instructions are added below."
     : productMode === "ecc_hers"
-      ? "ECC/HERS accounts stay in the ECC / Compliance Test family for internal intake."
-      : "Choose ECC or Service first so any relationship review stays inside the right intake lane.";
-  const jobFamilyControlLabel = isHvacServiceMode ? "Service / Work Order" : "Job Family";
+      ? "ECC / Compliance is locked for this account. Review the setup fields below before continuing."
+      : "What kind of job are you creating?";
+  const jobFamilyControlLabel = isHvacServiceMode ? "Service / Work Order" : "Job Type";
   const serviceJobFamilyDescription = isHvacServiceMode
     ? "Locked to Service"
     : "Standard service visit workflow";
@@ -1235,6 +1235,16 @@ const [billingRecipient, setBillingRecipient] = useState<
     ? (newLocationAddressLine1 || "New location")
     : (selectedLocation ? formatLocationContext(selectedLocation) : "Location not selected");
   const customerSectionTone = internalResolutionReady ? "complete" : "active";
+  const setupSectionTone = !canAdvancePastResolution
+    ? "pending"
+    : internalResolutionReady
+      ? "active"
+      : "pending";
+  const relationshipSectionTone = !shouldShowRelationshipStep
+    ? "pending"
+    : relationshipDecisionReady
+      ? "complete"
+      : "active";
   const workOrderSectionTone = !canAdvancePastResolution
     ? "pending"
     : completedVisitScopeItemCount > 0
@@ -2364,34 +2374,28 @@ const [billingRecipient, setBillingRecipient] = useState<
           <input type="hidden" name="job_type" value={modeSafeJobType} />
         ) : null}
         {isInternalMode && internalResolutionReady && !isHvacServiceMode ? (
-          <section className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 3</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">{jobFamilyStepTitle}</h2>
-                <p className="mt-1 text-sm text-slate-500">{jobFamilyStepDescription}</p>
-              </div>
-
-              <div className="space-y-3">
+          <section className={guidedSectionShellClass}>
+            {renderGuidedSectionIntro({
+              icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
+              title: jobFamilyStepTitle,
+              description: jobFamilyStepDescription,
+              summary: isHybridProductMode
+                ? `Choose ${jobType === "service" ? "Service / Work Order" : "ECC / Compliance"} to keep the right intake lane and fields visible.`
+                : "ECC / Compliance is locked for this account and keeps the required compliance fields visible.",
+              tone: setupSectionTone,
+            })}
+            <div className={guidedSectionBodyClass}>
+              <div className={`${guidedSectionInsetClass} space-y-3`}>
                 <label className="block text-sm font-medium text-slate-900">{jobFamilyControlLabel}</label>
                 <div className="flex flex-col gap-3 sm:flex-row sm:gap-6">
                   {isHybridProductMode ? (
                     <>
-                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
-                        <input
-                          type="radio"
-                          name="_jobTypeUi"
-                          value="ecc"
-                          checked={jobType === "ecc"}
-                          onChange={() => setJobType("ecc")}
-                          className="mt-0.5"
-                        />
-                        <span>
-                          <span className="block text-sm font-medium text-slate-900">ECC</span>
-                          <span className="mt-0.5 block text-xs text-slate-500">{eccJobFamilyDescription}</span>
-                        </span>
-                      </label>
-                      <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 transition-colors hover:bg-slate-100 sm:flex-1">
+                      <label className={[
+                        "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition-all sm:flex-1",
+                        jobType === "service"
+                          ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                          : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+                      ].join(" ")}>
                         <input
                           type="radio"
                           name="_jobTypeUi"
@@ -2401,42 +2405,47 @@ const [billingRecipient, setBillingRecipient] = useState<
                           className="mt-0.5"
                         />
                         <span>
-                          <span className="block text-sm font-medium text-slate-900">Service</span>
-                          <span className="mt-0.5 block text-xs text-slate-500">{serviceJobFamilyDescription}</span>
+                          <span className={jobType === "service" ? "block text-sm font-medium text-white" : "block text-sm font-medium text-slate-900"}>Service / Work Order</span>
+                          <span className={jobType === "service" ? "mt-0.5 block text-xs text-slate-200" : "mt-0.5 block text-xs text-slate-500"}>{serviceJobFamilyDescription}</span>
+                        </span>
+                      </label>
+                      <label className={[
+                        "flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 transition-all sm:flex-1",
+                        jobType === "ecc"
+                          ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                          : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+                      ].join(" ")}>
+                        <input
+                          type="radio"
+                          name="_jobTypeUi"
+                          value="ecc"
+                          checked={jobType === "ecc"}
+                          onChange={() => setJobType("ecc")}
+                          className="mt-0.5"
+                        />
+                        <span>
+                          <span className={jobType === "ecc" ? "block text-sm font-medium text-white" : "block text-sm font-medium text-slate-900"}>ECC / Compliance</span>
+                          <span className={jobType === "ecc" ? "mt-0.5 block text-xs text-slate-200" : "mt-0.5 block text-xs text-slate-500"}>{eccJobFamilyDescription}</span>
                         </span>
                       </label>
                     </>
-                  ) : isHvacServiceMode ? (
-                    <>
-                      <div className="flex items-start gap-3 rounded-xl border border-slate-900 bg-slate-900 px-3 py-3 text-white sm:flex-1">
-                        <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border border-slate-200/90 bg-white/10 text-[10px] font-bold text-white">
-                          ✓
-                        </span>
-                        <span>
-                          <span className="block text-sm font-medium text-white">Service</span>
-                          <span className="mt-0.5 block text-xs text-slate-200">{serviceJobFamilyDescription}</span>
-                        </span>
-                      </div>
-                    </>
                   ) : (
-                    <>
-                      <div className="flex items-start gap-3 rounded-xl border border-slate-900 bg-slate-900 px-3 py-3 text-white sm:flex-1">
-                        <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border border-slate-200/90 bg-white/10 text-[10px] font-bold text-white">
-                          ✓
-                        </span>
-                        <span>
-                          <span className="block text-sm font-medium text-white">ECC</span>
-                          <span className="mt-0.5 block text-xs text-slate-200">{eccJobFamilyDescription}</span>
-                        </span>
-                      </div>
-                    </>
+                    <div className="flex items-start gap-3 rounded-xl border border-slate-900 bg-slate-900 px-3 py-3 text-white sm:flex-1">
+                      <span className="mt-0.5 inline-flex h-4 w-4 flex-none items-center justify-center rounded-full border border-slate-200/90 bg-white/10 text-[10px] font-bold text-white">
+                        ✓
+                      </span>
+                      <span>
+                        <span className="block text-sm font-medium text-white">ECC / Compliance</span>
+                        <span className="mt-0.5 block text-xs text-slate-200">{eccJobFamilyDescription}</span>
+                      </span>
+                    </div>
                   )}
                 </div>
                 <input type="hidden" name="job_type" value={modeSafeJobType} />
               </div>
 
               {jobType !== "service" ? (
-                <div className="border-t border-slate-200/80 pt-4 space-y-2">
+                <div className={`${guidedSectionInsetClass} space-y-2`}>
                   <label className="block text-sm font-medium text-slate-900">Project Type (ECC)</label>
                   <select
                     name="project_type"
@@ -2452,7 +2461,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               ) : null}
 
               {jobType === "service" ? (
-                <div className="border-t border-slate-200/80 pt-4 space-y-3">
+                <div className={`${guidedSectionInsetClass} space-y-3`}>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
@@ -2500,11 +2509,10 @@ const [billingRecipient, setBillingRecipient] = useState<
                       </select>
                     </div>
                   </div>
-
                 </div>
               ) : null}
 
-              <div className="border-t border-slate-200/80 pt-4 space-y-3">
+              <div className={`${guidedSectionInsetClass} space-y-3`}>
                 <label className="block text-sm font-medium text-slate-900">Permit Information</label>
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-slate-900">Permit Number</label>
@@ -2539,13 +2547,22 @@ const [billingRecipient, setBillingRecipient] = useState<
         ) : null}
 
         {shouldShowRelationshipStep && !isHvacServiceMode ? (
-          <section className="space-y-3">
-            <div className="rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white p-5 shadow-sm space-y-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 4</p>
-                <h2 className="mt-1 text-lg font-semibold text-slate-900">Relationship path</h2>
-                <p className="mt-1 text-sm text-slate-500">Review existing {jobType === "service" ? "service" : "ECC"} work at this customer and location before creating another visit.</p>
-              </div>
+          <section className={guidedSectionShellClass}>
+            {renderGuidedSectionIntro({
+              icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
+              title: "Relationship Path",
+              description: `Review existing ${jobType === "service" ? "service" : "ECC / Compliance"} work at this customer and location before creating another visit.`,
+              summary: relationshipAction === "new_case"
+                ? "Continuing as a new case."
+                : relationshipAction === "open_active_job"
+                  ? "Open an active job instead of creating a new visit."
+                  : selectedRelationshipJob
+                    ? `Follow-up anchored to ${relationshipJobTitle(selectedRelationshipJob)}.`
+                    : "Choose how this intake should relate to existing work.",
+              tone: relationshipSectionTone,
+            })}
+            <div className={guidedSectionBodyClass}>
+              <div className={`${guidedSectionInsetClass} space-y-5`}>
 
               <div className="grid gap-3 lg:grid-cols-3">
                 <button
@@ -2766,6 +2783,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <p className="mt-1 text-xs text-emerald-800">Existing-work chooser panels are hidden. The normal intake flow continues below and will create a fresh case.</p>
                 </div>
               ) : null}
+              </div>
             </div>
           </section>
         ) : null}

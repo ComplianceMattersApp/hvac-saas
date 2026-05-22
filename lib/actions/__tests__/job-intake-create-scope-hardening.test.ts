@@ -481,6 +481,68 @@ describe("job intake create same-account hardening", () => {
     });
   });
 
+  it("preserves requested service lane create in hybrid mode", async () => {
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: true,
+      accountSettingsProductMode: "hybrid",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalServiceIntakeFormData({
+          visitScopeItemsJson: JSON.stringify([
+            { title: "Diagnose weak airflow", details: "Upstairs hall", kind: "primary" },
+          ]),
+        }),
+      ),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    const jobsInsert = fixture.insertCalls.find((call) => call.table === "jobs");
+    expect(jobsInsert?.payload).toMatchObject({
+      job_type: "service",
+      service_visit_type: "diagnostic",
+    });
+  });
+
+  it("preserves requested ECC lane create in hybrid mode", async () => {
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: true,
+      accountSettingsProductMode: "hybrid",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalEccIntakeFormData({
+          visitScopeSummary: "Hybrid ECC lane smoke",
+        }),
+      ),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    const jobsInsert = fixture.insertCalls.find((call) => call.table === "jobs");
+    expect(jobsInsert?.payload).toMatchObject({
+      job_type: "ecc",
+      project_type: "alteration",
+    });
+  });
+
   it("creates maintenance agreement link row before post-create redirect", async () => {
     const previousMaintenanceFlag = process.env.ENABLE_MAINTENANCE_AGREEMENTS;
     process.env.ENABLE_MAINTENANCE_AGREEMENTS = "true";
