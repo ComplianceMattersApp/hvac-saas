@@ -2,7 +2,7 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition, type FormEvent, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import {
   createContractorProposalAttachmentUploadToken,
@@ -1218,6 +1218,95 @@ const [billingRecipient, setBillingRecipient] = useState<
       canSubmit ? "bg-slate-900 hover:bg-slate-800 active:scale-[0.99]" : "bg-slate-400"
     }`;
   const completedVisitScopeItemCount = visitScopeItems.filter((item) => item.title.trim() || item.details.trim()).length;
+  const guidedSectionShellClass =
+    "rounded-[28px] border border-slate-200/85 bg-white shadow-[0_22px_60px_-42px_rgba(15,23,42,0.42)] overflow-hidden";
+  const guidedSectionBodyClass = "space-y-4 px-4 pb-4 pt-4 sm:px-5 sm:pb-5";
+  const guidedSectionInsetClass =
+    "rounded-2xl border border-slate-200/85 bg-slate-50/70 p-4 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.32)]";
+  const selectedCustomerSummary = selectedCustomer ? customerDisplayName(selectedCustomer) : "Customer not selected";
+  const selectedLocationSummary = createNewCustomer || locationMode === "new"
+    ? (newLocationAddressLine1 || "New location")
+    : (selectedLocation ? formatLocationContext(selectedLocation) : "Location not selected");
+  const customerSectionTone = internalResolutionReady ? "complete" : "active";
+  const workOrderSectionTone = !canAdvancePastResolution
+    ? "pending"
+    : completedVisitScopeItemCount > 0
+      ? "complete"
+      : "active";
+  const scheduleSectionTone = !canAdvancePastResolution
+    ? "pending"
+    : scheduledDate || windowStart || windowEnd
+      ? "complete"
+      : "pending";
+  const additionalDetailsTone = systems.length > 0 ? "complete" : "pending";
+  const createSectionTone = isSubmitReady ? "complete" : canAdvancePastResolution ? "active" : "pending";
+  const workOrderSectionSummary = completedVisitScopeItemCount > 0
+    ? `${visitScopeSummary.trim() || visitScopeItems.find((item) => item.title.trim())?.title.trim() || "Scope added"} • ${completedVisitScopeItemCount} item${completedVisitScopeItemCount === 1 ? "" : "s"}`
+    : "Choose visit details and add the work scope.";
+  const scheduleSectionSummary = scheduledDate
+    ? `${scheduledDate}${windowStart && windowEnd ? ` • ${windowStart}-${windowEnd}` : ""}`
+    : "Leave unscheduled if timing is not set yet.";
+  const additionalDetailsSummary = systems.length > 0
+    ? `${systems.length} system${systems.length === 1 ? "" : "s"} added`
+    : "Permit, equipment, photos, and comments stay secondary.";
+
+  function guidedSectionToneClasses(tone: "active" | "complete" | "pending") {
+    if (tone === "complete") {
+      return {
+        header: "border-b border-emerald-200 bg-emerald-50/80",
+        badge: "border border-emerald-200 bg-white text-emerald-700",
+        badgeText: "Complete",
+      };
+    }
+
+    if (tone === "active") {
+      return {
+        header: "border-b border-blue-200 bg-blue-50/80",
+        badge: "border border-blue-200 bg-white text-blue-700",
+        badgeText: "In progress",
+      };
+    }
+
+    return {
+      header: "border-b border-slate-200 bg-slate-50/80",
+      badge: "border border-slate-200 bg-white text-slate-600",
+      badgeText: "Up next",
+    };
+  }
+
+  function renderGuidedSectionIntro({
+    title,
+    description,
+    summary,
+    tone,
+    action,
+  }: {
+    title: string;
+    description: string;
+    summary?: string;
+    tone: "active" | "complete" | "pending";
+    action?: ReactNode;
+  }) {
+    const toneClasses = guidedSectionToneClasses(tone);
+
+    return (
+      <div className={`flex flex-col gap-3 px-4 py-4 sm:px-5 ${toneClasses.header}`}>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide ${toneClasses.badge}`}>
+                {toneClasses.badgeText}
+              </span>
+            </div>
+            <p className="text-sm text-slate-600">{description}</p>
+            {summary ? <p className="text-sm font-medium text-slate-900">{summary}</p> : null}
+          </div>
+          {action ? <div className="flex flex-none items-center">{action}</div> : null}
+        </div>
+      </div>
+    );
+  }
 
   function uploadProposalAttachments() {
     if (!submittedProposalId) {
@@ -1655,11 +1744,31 @@ const [billingRecipient, setBillingRecipient] = useState<
         </section>
         ) : null}
 
-        <section className="space-y-3">
-          <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Customer &amp; Location</h2>
-
+        <section className={guidedSectionShellClass}>
+          {renderGuidedSectionIntro({
+            title: "Customer & Location",
+            description: "Find the customer and confirm where the work order should happen.",
+            summary: internalResolutionReady ? `${selectedCustomerSummary} — ${selectedLocationSummary}` : "Find or create the customer, then confirm the service location.",
+            tone: customerSectionTone,
+            action:
+              selectedCustomerId && !createNewCustomer && !isCustomerContextInternalMode ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    resetRelationshipDecision();
+                    setSelectedCustomerId("");
+                    setLocationMode(null);
+                    setLocationId("");
+                  }}
+                  className={secondaryCompactButtonClass}
+                >
+                  Change
+                </button>
+              ) : undefined,
+          })}
+          <div className={guidedSectionBodyClass}>
           {isInternalMode ? (
-            <div className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3 text-sm text-blue-900">
+            <div className="rounded-xl border border-blue-200/80 bg-blue-50/80 px-3.5 py-3 text-sm text-blue-900">
               Who should be contacted for this job? If the tenant, property manager, or responsible party is different, include that in job notes for now.
             </div>
           ) : null}
@@ -1676,7 +1785,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           {isInternalMode ? (
             <>
               {!isCustomerContextInternalMode && !createNewCustomer ? (
-                <div className="rounded-[1.5rem] border border-blue-200/85 bg-gradient-to-b from-blue-50 via-white to-slate-50 p-5 shadow-[0_16px_35px_-30px_rgba(37,99,235,0.45)] ring-1 ring-blue-100/70 space-y-4">
+                <div className={`${guidedSectionInsetClass} space-y-4`}>
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 1</p>
@@ -1706,7 +1815,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     </div>
                   </div>
 
-                  <div className="rounded-xl bg-white/85 p-3 ring-1 ring-blue-200/80">
+                  <div className="rounded-xl border border-slate-200/85 bg-white p-3 shadow-sm">
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <label htmlFor="internal_customer_finder" className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
                         Customer Finder
@@ -1787,7 +1896,7 @@ const [billingRecipient, setBillingRecipient] = useState<
 
               {selectedCustomerId && !createNewCustomer ? (
                 <div className="space-y-3">
-                  <div className="rounded-2xl border border-emerald-200 bg-gradient-to-r from-emerald-50 to-white p-4 shadow-sm">
+                  <div className={guidedSectionInsetClass}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Selected customer</p>
@@ -1823,7 +1932,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                     <input type="hidden" name="customer_id" value={selectedCustomerId} />
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.4)] space-y-3">
+                  <div className={`${guidedSectionInsetClass} space-y-3`}>
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 2</p>
                       <p className="mt-1 text-base font-semibold text-slate-900">Choose service location</p>
@@ -1999,7 +2108,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               {!isCustomerContextInternalMode && createNewCustomer ? (
                 <div
                   ref={createNewCustomerCardRef}
-                  className="rounded-2xl border border-amber-200/85 bg-gradient-to-b from-amber-50 to-white p-4 shadow-[0_14px_28px_-28px_rgba(217,119,6,0.5)] space-y-3 scroll-mt-6"
+                  className={`${guidedSectionInsetClass} space-y-3 scroll-mt-6`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
@@ -2206,6 +2315,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               showNotesSection={false}
             />
           )}
+          </div>
         </section>
 
         {isInternalMode && internalResolutionReady && isHvacServiceMode ? (
@@ -2631,24 +2741,100 @@ const [billingRecipient, setBillingRecipient] = useState<
           <>
             <section className="space-y-3">
               {isInternalMode ? (
-                <div ref={visitScopeSectionRef}>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 5</p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">
-                    {isHvacServiceMode ? "Work Order Details" : "Work To Perform & Job Scope"}
-                  </h2>
-                  {/* legacy heading preserved for ECC/Hybrid: Work To Perform &amp; Job Scope */}
-                  <p className="mt-1 text-sm text-slate-500">
-                    {isHvacServiceMode
+                <div className={guidedSectionShellClass} ref={visitScopeSectionRef}>
+                  {renderGuidedSectionIntro({
+                    title: isHvacServiceMode ? "Work Order Details" : "Work To Perform & Job Scope",
+                    description: isHvacServiceMode
                       ? "What kind of visit is this, and what work needs to be done?"
                       : jobType === "service"
-                      ? "Start with Reason for Visit, then add the structured job scope for this trip."
-                      : "ECC testing can be created without job scope; add optional companion scope only when this visit also includes service work."}
-                  </p>
+                        ? "Start with Reason for Visit, then add the structured job scope for this trip."
+                        : "ECC testing can be created without job scope; add optional companion scope only when this visit also includes service work.",
+                    summary: workOrderSectionSummary,
+                    tone: workOrderSectionTone,
+                  })}
+                  <div className={guidedSectionBodyClass}>
                   {isHybridProductMode ? (
-                    <p className="mt-1 text-xs text-slate-500">
+                    <p className="text-xs text-slate-500">
                       Job type controls workflow/testing. Visit Scope can include additional work performed during the same visit.
                     </p>
                   ) : null}
+                  <div className={`${guidedSectionInsetClass} space-y-3 ${visitScopeError ? "border-red-300 ring-2 ring-red-100" : ""}`}>
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; Job Scope</h3>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {jobType === "service"
+                          ? "Reason for Visit describes the created visit title. After that, add at least one structured scope item defining work for this visit."
+                          : "ECC jobs don't require job scope. Add companion scope only if this visit includes service work."}
+                      </p>
+                      {jobType === "service" ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Keep the title short. Use job scope below for the actual work to perform.
+                        </p>
+                      ) : null}
+                      {jobType === "service" ? (
+                        <p className="mt-1 text-xs text-slate-500">
+                          Job scope defines what belongs to this visit. Pricebook can supply defaults, but scope entries do not create invoice charges.
+                        </p>
+                      ) : null}
+                    </div>
+                    {isHvacServiceMode && jobType === "service" ? (
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
+                          <select
+                            name="service_case_kind"
+                            className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                            value={serviceCaseKind}
+                            onChange={(e) =>
+                              setServiceCaseKind(
+                                e.target.value as "reactive" | "callback" | "warranty" | "maintenance",
+                              )
+                            }
+                          >
+                            <option value="reactive">Standard Service</option>
+                            <option value="callback">Callback</option>
+                            <option value="warranty">Warranty</option>
+                            <option value="maintenance">Maintenance</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-slate-700">Visit Type</label>
+                          <select
+                            name="service_visit_type"
+                            className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                            value={serviceVisitType}
+                            onChange={(e) =>
+                              setServiceVisitType(
+                                e.target.value as
+                                  | "diagnostic"
+                                  | "repair"
+                                  | "return_visit"
+                                  | "callback"
+                                  | "maintenance",
+                              )
+                            }
+                          >
+                            <option value="diagnostic">Initial / Diagnostic Visit</option>
+                            <option value="repair">Service Work Visit</option>
+                            <option value="return_visit">Return Visit</option>
+                            <option value="callback">Callback Visit</option>
+                            <option value="maintenance">Maintenance Visit</option>
+                          </select>
+                        </div>
+                      </div>
+                    ) : null}
+                    <VisitScopeBuilder
+                      initialSummary={visitScopeSummary}
+                      initialItems={visitScopeItems}
+                      jobType={jobType}
+                      serviceVisitType={serviceVisitType}
+                      pricebookTemplateItems={pricebookTemplateItems}
+                      resetKey={visitScopeResetKey}
+                      onSummaryChange={setVisitScopeSummary}
+                      onItemsChange={setVisitScopeItems}
+                    />
+                  </div>
+                  </div>
                 </div>
               ) : (
                 <div>
@@ -2656,84 +2842,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <p className="mt-2 text-sm text-slate-500">Tell our team what work you want reviewed, any notes they should know, and the job context that will help with intake review.</p>
                 </div>
               )}
-              {isInternalMode ? (
-                <div className={`rounded-2xl border bg-white p-4 shadow-sm space-y-3 ${visitScopeError ? "border-red-300 ring-2 ring-red-100" : "border-slate-200/85"}`}>
-                  <div>
-                    <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; Job Scope</h3>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {jobType === "service"
-                        ? "Reason for Visit describes the created visit title. After that, add at least one structured scope item defining work for this visit."
-                        : "ECC jobs don't require job scope. Add companion scope only if this visit includes service work."}
-                    </p>
-                    {jobType === "service" ? (
-                      <p className="mt-1 text-xs text-slate-500">
-                        Keep the title short. Use job scope below for the actual work to perform.
-                      </p>
-                    ) : null}
-                    {jobType === "service" ? (
-                      <p className="mt-1 text-xs text-slate-500">
-                        Job scope defines what belongs to this visit. Pricebook can supply defaults, but scope entries do not create invoice charges.
-                      </p>
-                    ) : null}
-                  </div>
-                  {isHvacServiceMode && jobType === "service" ? (
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
-                        <select
-                          name="service_case_kind"
-                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
-                          value={serviceCaseKind}
-                          onChange={(e) =>
-                            setServiceCaseKind(
-                              e.target.value as "reactive" | "callback" | "warranty" | "maintenance",
-                            )
-                          }
-                        >
-                          <option value="reactive">Standard Service</option>
-                          <option value="callback">Callback</option>
-                          <option value="warranty">Warranty</option>
-                          <option value="maintenance">Maintenance</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-slate-700">Visit Type</label>
-                        <select
-                          name="service_visit_type"
-                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
-                          value={serviceVisitType}
-                          onChange={(e) =>
-                            setServiceVisitType(
-                              e.target.value as
-                                | "diagnostic"
-                                | "repair"
-                                | "return_visit"
-                                | "callback"
-                                | "maintenance",
-                            )
-                          }
-                        >
-                          <option value="diagnostic">Initial / Diagnostic Visit</option>
-                          <option value="repair">Service Work Visit</option>
-                          <option value="return_visit">Return Visit</option>
-                          <option value="callback">Callback Visit</option>
-                          <option value="maintenance">Maintenance Visit</option>
-                        </select>
-                      </div>
-                    </div>
-                  ) : null}
-                  <VisitScopeBuilder
-                    initialSummary={visitScopeSummary}
-                    initialItems={visitScopeItems}
-                    jobType={jobType}
-                    serviceVisitType={serviceVisitType}
-                    pricebookTemplateItems={pricebookTemplateItems}
-                    resetKey={visitScopeResetKey}
-                    onSummaryChange={setVisitScopeSummary}
-                    onItemsChange={setVisitScopeItems}
-                  />
-                </div>
-              ) : (
+              {!isInternalMode ? (
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-4">
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900">
                     Your submission stays in review until our team confirms the details and creates the internal work record.
@@ -2754,7 +2863,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <input type="hidden" name="title" value={visitScopeSummary} />
                   <input type="hidden" name="job_notes" value={visitScopeSummary} />
                 </div>
-              )}
+              ) : null}
               <JobCoreFields
                 mode={myContractor?.id ? "external" : "internal"}
                 titleRequired={jobType === "service"}
@@ -2771,18 +2880,18 @@ const [billingRecipient, setBillingRecipient] = useState<
 
             {/* Scheduling - internal/staff only; hidden for contractor and customer intake */}
             {!isContractorMode && (
-              <section className="space-y-3">
-                {isInternalMode ? (
-                  <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 6</p>
-                    <h2 className="mt-1 text-lg font-semibold text-slate-900">Scheduling and billing</h2>
-                    <p className="mt-1 text-sm text-slate-500">Set timing for the visit and who gets billed later, then leave the rest for follow-up if needed.</p>
-                  </div>
-                ) : (
+              <section className={isInternalMode ? guidedSectionShellClass : "space-y-3"}>
+                {isInternalMode ? renderGuidedSectionIntro({
+                  title: "Schedule",
+                  description: "Schedule the visit if needed, then confirm who gets billed later.",
+                  summary: scheduleSectionSummary,
+                  tone: scheduleSectionTone,
+                }) : (
                   <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Scheduling</h2>
                 )}
 
-                <div className="rounded-2xl border border-slate-200/85 bg-white p-4 shadow-sm space-y-3">
+                <div className={isInternalMode ? guidedSectionBodyClass : "space-y-3"}>
+                <div className={`${isInternalMode ? guidedSectionInsetClass : "rounded-2xl border border-slate-200/85 bg-white p-4 shadow-sm"} space-y-3`}>
                   <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">Scheduled Date</label>
                   <input
                     type="date"
@@ -2833,10 +2942,128 @@ const [billingRecipient, setBillingRecipient] = useState<
                     </select>
                   </div>
                 </div>
+
+                {isInternalMode ? (
+                  <div className={`${guidedSectionInsetClass} space-y-3`}>
+                    <label className="block text-sm font-medium text-slate-900">Billing Recipient</label>
+
+                    <div className="flex flex-col gap-2">
+                      {!isHvacServiceInternalMode ? (
+                        <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                          <input
+                            type="radio"
+                            name="_billingRecipientUi"
+                            value="contractor"
+                            checked={billingRecipient === "contractor"}
+                            onChange={() => setBillingRecipient("contractor")}
+                            disabled={Boolean(!myContractor?.id && !contractorId)}
+                          />
+                          Contractor (company)
+                          {!myContractor?.id && !contractorId && (
+                            <span className="text-xs text-slate-500">(select contractor first)</span>
+                          )}
+                        </label>
+                      ) : null}
+
+                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                        <input
+                          type="radio"
+                          name="_billingRecipientUi"
+                          value="customer"
+                          checked={billingRecipient === "customer"}
+                          onChange={() => setBillingRecipient("customer")}
+                        />
+                        Customer / Homeowner
+                      </label>
+
+                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                        <input
+                          type="radio"
+                          name="_billingRecipientUi"
+                          value="other"
+                          checked={billingRecipient === "other"}
+                          onChange={() => setBillingRecipient("other")}
+                        />
+                        Other (custom)
+                      </label>
+                    </div>
+
+                    <input type="hidden" name="billing_recipient" value={billingRecipient} />
+
+                    {billingRecipient === "other" ? (
+                      <div className="mt-2 space-y-2 rounded-xl bg-white p-3 ring-1 ring-slate-200/80">
+                        <div className="text-xs text-slate-600">
+                          If billing is Other, please enter billing name + address.
+                        </div>
+
+                        <input
+                          className="w-full rounded-md border border-slate-300 bg-white p-2"
+                          name="billing_name"
+                          placeholder="Billing name"
+                          value={billingName}
+                          onChange={(e) => setBillingName(e.target.value)}
+                        />
+                        <input
+                          className="w-full rounded-md border border-slate-300 bg-white p-2"
+                          name="billing_email"
+                          placeholder="Billing email (optional)"
+                          value={billingEmail}
+                          onChange={(e) => setBillingEmail(e.target.value)}
+                        />
+                        <input
+                          className="w-full rounded-md border border-slate-300 bg-white p-2"
+                          name="billing_phone"
+                          placeholder="Billing phone (optional)"
+                          value={billingPhone}
+                          onChange={(e) => setBillingPhone(e.target.value)}
+                        />
+                        <input
+                          className="w-full rounded-md border border-slate-300 bg-white p-2"
+                          name="billing_address_line1"
+                          placeholder="Address line 1"
+                          value={billingAddr1}
+                          onChange={(e) => setBillingAddr1(e.target.value)}
+                        />
+                        <input
+                          className="w-full rounded-md border border-slate-300 bg-white p-2"
+                          name="billing_address_line2"
+                          placeholder="Address line 2 (optional)"
+                          value={billingAddr2}
+                          onChange={(e) => setBillingAddr2(e.target.value)}
+                        />
+                        <div className="grid grid-cols-3 gap-2">
+                          <input
+                            className="col-span-2 w-full rounded-md border border-slate-300 bg-white p-2"
+                            name="billing_city"
+                            placeholder="City"
+                            value={billingCity}
+                            onChange={(e) => setBillingCity(e.target.value)}
+                          />
+                          <input
+                            className="w-full rounded-md border border-slate-300 bg-white p-2"
+                            name="billing_state"
+                            placeholder="State"
+                            value={billingState}
+                            onChange={(e) => setBillingState(e.target.value)}
+                          />
+                        </div>
+                        <input
+                          className="w-full rounded-md border border-slate-300 bg-white p-2"
+                          name="billing_zip"
+                          placeholder="ZIP"
+                          value={billingZip}
+                          onChange={(e) => setBillingZip(e.target.value)}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+                </div>
               </section>
             )}
 
             {/* Billing Recipient */}
+            {!isInternalMode ? (
             <section className="space-y-3">
               {isInternalMode ? null : <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Billing</h2>}
               <div className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm space-y-3">
@@ -2953,21 +3180,20 @@ const [billingRecipient, setBillingRecipient] = useState<
             )}
               </div>
             </section>
+            ) : null}
 
             {/* Optional Equipment */}
             {isInternalMode ? (
-            <section className="space-y-3">
-              {isInternalMode ? (
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 7</p>
-                  <h2 className="mt-1 text-lg font-semibold text-slate-900">Additional details</h2>
-                  <p className="mt-1 text-sm text-slate-500">Helpful information, not required.</p>
-                </div>
-              ) : (
-                <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Equipment (optional)</h2>
-              )}
+            <section className={guidedSectionShellClass}>
+              {renderGuidedSectionIntro({
+                title: "Additional Details",
+                description: "Supporting information only. Add it when it helps this work order move forward.",
+                summary: additionalDetailsSummary,
+                tone: additionalDetailsTone,
+              })}
+              <div className={guidedSectionBodyClass}>
               {isHvacServiceMode ? (
-                <details className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm">
+                <details className={`${guidedSectionInsetClass}`}>
                   <summary className="cursor-pointer text-sm font-medium text-slate-900">Permit information</summary>
                   <div className="mt-3 space-y-3">
                     <div className="space-y-1">
@@ -3000,7 +3226,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   </div>
                 </details>
               ) : null}
-              <div className="rounded-2xl border border-slate-200/80 bg-white/75 p-4 shadow-sm space-y-3">
+              <div className={`${guidedSectionInsetClass} space-y-3`}>
           <div className="flex items-center justify-between gap-3">
             <p className="text-xs text-slate-600">Add systems if needed. Use a clear label, such as Upstairs or Downstairs.</p>
             <button
@@ -3178,9 +3404,38 @@ const [billingRecipient, setBillingRecipient] = useState<
               {/* equipment_json payload */}
               <input type="hidden" name="equipment_json" value={equipmentJson} />
               </div>
+              <div className={`${guidedSectionInsetClass} space-y-3`}>
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Photos</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Equipment photos, permit copies, or site images. JPG, PNG, WEBP, or PDF.
+                  </p>
+                </div>
+                <input
+                  type="file"
+                  name="photos"
+                  accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+                  multiple
+                  className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-slate-700"
+                />
+              </div>
+              <div className={`${guidedSectionInsetClass} space-y-3`}>
+                <div>
+                  <h3 className="text-base font-semibold text-slate-900">Additional Comments</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">Anything the next person should know before this work order moves forward.</p>
+                </div>
+                <textarea
+                  name="job_notes"
+                  rows={4}
+                  placeholder="Anything the next person should know before this job moves forward..."
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                />
+              </div>
+              </div>
             </section>
             ) : null}
 
+            {!isInternalMode ? (
             <section className="space-y-3">
               <div className="rounded-2xl border border-slate-200/85 bg-white p-4 shadow-sm">
                 <div>
@@ -3199,8 +3454,9 @@ const [billingRecipient, setBillingRecipient] = useState<
                 />
               </div>
             </section>
+            ) : null}
 
-            {isInternalMode ? (
+            {!isInternalMode ? (
             <section className="space-y-3">
               <div className="rounded-2xl border border-slate-200/85 bg-white p-4 shadow-sm">
                 <div>
@@ -3229,10 +3485,15 @@ const [billingRecipient, setBillingRecipient] = useState<
         )}
 
         {isInternalMode && internalResolutionReady && canAdvancePastResolution ? (
-          <div className="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-50 to-white px-5 py-4 shadow-sm">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Final confidence</p>
-            <p className="mt-1 text-sm text-slate-500">Quick internal check before you create the visit.</p>
-            <div className="mt-3 grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
+          <div className={guidedSectionShellClass}>
+            {renderGuidedSectionIntro({
+              title: "Create Work Order",
+              description: "Review the work order summary, then create it when the required intake details are ready.",
+              summary: isSubmitReady ? "Ready to create this work order." : "Complete the required intake details to create this work order.",
+              tone: createSectionTone,
+            })}
+            <div className={guidedSectionBodyClass}>
+            <div className="grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-3">
               <div className="rounded-xl border border-slate-200/85 bg-white/85 px-3 py-3">
                 <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">Job</p>
                 <p className="mt-1 font-medium text-slate-900">{jobType === "service" ? "Service" : `ECC (${projectType.replaceAll("_", " ")})`}</p>
@@ -3273,6 +3534,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </p>
               </div>
             </div>
+            </div>
           </div>
         ) : null}
 
@@ -3280,7 +3542,8 @@ const [billingRecipient, setBillingRecipient] = useState<
           {isSubmitting ? "Creating job. Please wait." : ""}
         </div>
 
-        <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+        <div className={`${guidedSectionShellClass} mt-4`}>
+          <div className={guidedSectionBodyClass}>
           {draftMsg && !draftFound ? (
             <p className="text-right text-xs text-slate-500">{draftMsg}</p>
           ) : null}
@@ -3336,6 +3599,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 : isSubmitting ? "Creating Job\u2026" : "Create Job \u2192"}
             </button>
             </div>
+          </div>
           </div>
         </div>
       </form>

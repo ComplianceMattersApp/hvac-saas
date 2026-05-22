@@ -37,7 +37,7 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
   });
 
   it("renames Step 7 Optional details to Additional details", () => {
-    expect(formSource).toContain("Additional details");
+    expect(formSource).toContain("Additional Details");
     expect(formSource).not.toMatch(/>Optional details</);
   });
 

@@ -14,7 +14,7 @@ const builderSource = readFileSync(
 
 describe("New job Step 5 simplification wiring", () => {
   it("uses plain-language Step 5 heading", () => {
-    expect(formSource).toContain("Work To Perform &amp; Job Scope");
+    expect(formSource).toContain("Work To Perform & Job Scope");
     expect(formSource).not.toContain("Visit Reason &amp; Work Items");
   });
 
