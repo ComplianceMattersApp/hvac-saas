@@ -35,6 +35,10 @@ import AddEstimateOptionLineForm from "./AddEstimateOptionLineForm";
 import ProposalLinkControls from "./ProposalLinkControls";
 import ProposalEmailControls from "./ProposalEmailControls";
 import { canRenderProposalEmailControls } from "./proposal-email-ui";
+import {
+  getDraftCustomerDeliveryHelperCopy,
+  getFinalizeProposalActionCopy,
+} from "./status-copy";
 import { removeEstimateOptionLineItemFromForm } from "./actions";
 
 export const metadata = { title: "Estimate" };
@@ -358,6 +362,8 @@ export default async function EstimateDetailPage({
       })
     : { schemaAvailable: true, activeLink: null };
 
+  const finalizeProposalCopy = getFinalizeProposalActionCopy({ isMultiOptionProposal });
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
       {notice && (
@@ -601,7 +607,7 @@ export default async function EstimateDetailPage({
           <div className="border-y border-slate-200/80 py-3">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
               <div className="min-w-0">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Status</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Customer Delivery</p>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
                   {statusMessage ? (
                     <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(documentView.identity.status)}`}>
@@ -609,6 +615,9 @@ export default async function EstimateDetailPage({
                     </span>
                   ) : null}
                 </div>
+                {isDraft ? (
+                  <p className="mt-1 max-w-md text-sm text-slate-500">{getDraftCustomerDeliveryHelperCopy()}</p>
+                ) : null}
               </div>
 
               <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -618,12 +627,8 @@ export default async function EstimateDetailPage({
                       action={transitionEstimateStatusFromForm}
                       estimateId={estimate.id}
                       nextStatus="sent"
-                      label="Mark Sent Manually"
-                      confirmMessage={
-                        isMultiOptionProposal
-                          ? "Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent, and no option will be selected or approved."
-                          : "Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent."
-                      }
+                      label={finalizeProposalCopy.label}
+                      confirmMessage={finalizeProposalCopy.confirmMessage}
                       className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
                     />
                     <EstimateStatusActionForm
