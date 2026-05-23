@@ -44,9 +44,9 @@ export default function EstimateApprovalResponseForm({
 
   const confirmMessage = isMultiOption
     ? selectedOption
-      ? `Record internal approval for option "${selectedOption.label}" (${formatCents(selectedOption.total_cents)})? This records an internal V1 outcome only and does not create a job, invoice, payment, customer approval, or conversion record.`
-      : "Record internal approval? This records an internal V1 outcome only."
-    : "Record internal approval for this estimate? This records an internal V1 outcome only and does not create a job, invoice, payment, customer approval, or conversion record.";
+      ? `Record approval for option "${selectedOption.label}" (${formatCents(selectedOption.total_cents)})? This records approval only and does not create a job or draft invoice.`
+      : "Record approval for this estimate?"
+    : "Record approval for this estimate? This records approval only and does not create a job or draft invoice.";
 
   return (
     <form
@@ -70,7 +70,7 @@ export default function EstimateApprovalResponseForm({
         </span>
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">Approval</p>
-          <p className="mt-0.5 text-xs text-slate-600">Record the internal approval outcome for this estimate.</p>
+          <p className="mt-0.5 text-xs text-slate-600">Record approval for this estimate.</p>
         </div>
       </div>
 
@@ -110,7 +110,7 @@ export default function EstimateApprovalResponseForm({
           htmlFor={`approval-note-${estimateId}`}
           className="block text-xs font-semibold text-slate-700"
         >
-          Internal note{" "}
+          Note{" "}
           <span className="font-normal text-slate-400">(optional)</span>
         </label>
         <textarea
@@ -118,7 +118,7 @@ export default function EstimateApprovalResponseForm({
           name="response_note"
           value={responseNote}
           onChange={(e) => setResponseNote(e.target.value)}
-          placeholder="Optional internal note about this approval…"
+          placeholder="Optional note about this approval…"
           rows={2}
           className="w-full resize-none rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 placeholder-slate-400 focus:border-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-200"
         />
@@ -134,8 +134,8 @@ export default function EstimateApprovalResponseForm({
         </button>
         <p className="max-w-64 text-[11px] leading-4 text-slate-500">
           {isMultiOption
-            ? "Terminal for V1. Records selected option and approval. No job, invoice, payment, or conversion is created."
-            : "Terminal for V1. Does not create a job, invoice, payment, or conversion."}
+            ? "Records selected option and approval only. No job or draft invoice is created."
+            : "Records approval only. No job or draft invoice is created."}
         </p>
       </div>
     </form>

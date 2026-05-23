@@ -4,29 +4,20 @@
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ClipboardList, Eye, Layers3, Link2, ListChecks, Shield, Sparkles, Workflow } from "lucide-react";
+import { ArrowLeft, ClipboardList, Eye, Layers3, Link2, ListChecks, Workflow } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireInternalUser,
   isInternalAccessError,
 } from "@/lib/auth/internal-user";
 import {
-  formatEstimateEventLabel,
-  formatEstimateEventSummary,
-} from "@/lib/estimates/estimate-activity";
-import {
   buildEstimateDocumentViewModel,
-  buildEstimateQuoteReadinessChecklist,
-  ESTIMATE_DOCUMENT_DISCLAIMERS,
-  ESTIMATE_DOCUMENT_READINESS_GUIDANCE,
-  ESTIMATE_REVISION_PLANNING_DEFAULTS,
 } from "@/lib/estimates/estimate-document";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import {
   removeLineItemFromForm,
   transitionEstimateStatusFromForm,
-  sendEstimateFromForm,
   recordEstimateApprovalResponseFromForm,
   convertEstimateToJobFromForm,
   convertEstimateToInvoiceDraftFromForm,
@@ -34,12 +25,10 @@ import {
 import AddLineItemForm from "./AddLineItemForm";
 import EstimateStatusActionForm from "./EstimateStatusActionForm";
 import EstimateApprovalResponseForm from "./EstimateApprovalResponseForm";
-import SendEstimateForm from "./SendEstimateForm";
 import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
 import EditEstimateOptionForm from "./EditEstimateOptionForm";
 import AddEstimateOptionLineForm from "./AddEstimateOptionLineForm";
 import { removeEstimateOptionLineItemFromForm } from "./actions";
-import { isEstimateEmailSendEnabled } from "@/lib/estimates/estimate-exposure";
 
 export const metadata = { title: "Estimate" };
 
@@ -117,16 +106,6 @@ function statusGuidanceMessage(status: string) {
 
 type CustomerRow = { id: string; full_name: string | null; first_name: string | null; last_name: string | null; email: string | null };
 type LocationRow = { id: string; address_line1: string | null; city: string | null; state: string | null; zip: string | null; nickname: string | null };
-type EventRow = { id: string; event_type: string; meta: Record<string, unknown> | null; user_id: string | null; created_at: string };
-type CommunicationRow = {
-  id: string;
-  recipient_email_snapshot: string;
-  subject_snapshot: string;
-  attempt_status: string;
-  attempt_error: string | null;
-  provider_name: string | null;
-  attempted_at: string;
-};
 type PricebookPickerRow = {
   id: string;
   item_name: string;
@@ -270,36 +249,10 @@ export default async function EstimateDetailPage({
     }
   }
 
-  // Load recent estimate events (last 10)
-  const { data: eventsRaw } = await supabase
-    .from("estimate_events")
-    .select("id, event_type, meta, user_id, created_at")
-    .eq("estimate_id", id)
-    .order("created_at", { ascending: false })
-    .limit(10);
-  const events = (eventsRaw ?? []) as EventRow[];
-
-  // Load recent communication attempts (last 10)
-  const { data: commsRaw } = await supabase
-    .from("estimate_communications")
-    .select("id, recipient_email_snapshot, subject_snapshot, attempt_status, attempt_error, provider_name, attempted_at")
-    .eq("estimate_id", id)
-    .eq("account_owner_user_id", internalUser.account_owner_user_id)
-    .order("attempted_at", { ascending: false })
-    .limit(10);
-  const communications = (commsRaw ?? []) as CommunicationRow[];
-
-  const emailSendEnabled = isEstimateEmailSendEnabled();
   const documentView = buildEstimateDocumentViewModel({
     estimate,
     customerName,
     locationDisplay,
-  });
-  const readinessChecklist = buildEstimateQuoteReadinessChecklist({
-    documentView,
-    scopeSummary: estimate.notes,
-    customerEmail,
-    isEmailSendEnabled: emailSendEnabled,
   });
 
   let convertedJobTitle: string | null = null;
@@ -353,9 +306,9 @@ export default async function EstimateDetailPage({
             : notice === "estimate_converted_to_invoice_draft"
               ? "Draft invoice created from this estimate successfully."
             : notice === "estimate_conversion_schema_unavailable"
-              ? "Estimate conversion is unavailable until the conversion schema migration is applied."
+              ? "Estimate conversion is currently unavailable in this environment."
               : notice === "invoice_conversion_schema_unavailable"
-                ? "Invoice conversion is unavailable until the invoice conversion schema migration is applied."
+                ? "Draft invoice conversion is currently unavailable in this environment."
               : notice === "selected_option_id is required before converting multi-option estimates."
                 ? "Select an approved option before converting this multi-option estimate."
                 : `Estimate conversion notice: ${notice}`}
@@ -562,7 +515,7 @@ export default async function EstimateDetailPage({
                   nextStatus="cancelled"
                   label="Cancel Estimate"
                   helperText="Closes this estimate without approval."
-                  confirmMessage="Cancel this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
+                  confirmMessage="Cancel this estimate? No job or draft invoice will be created from this estimate."
                   className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
                 />
               </>
@@ -586,7 +539,7 @@ export default async function EstimateDetailPage({
                   nextStatus="declined"
                   label="Mark Declined"
                   helperText="Closes this estimate as declined."
-                  confirmMessage="Decline this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
+                  confirmMessage="Mark this estimate declined? No job or draft invoice will be created from this estimate."
                   className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
                 />
                 <EstimateStatusActionForm
@@ -595,7 +548,7 @@ export default async function EstimateDetailPage({
                   nextStatus="expired"
                   label="Mark Expired"
                   helperText="Marks this estimate as no longer active."
-                  confirmMessage="Expire this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
+                  confirmMessage="Mark this estimate expired? No job or draft invoice will be created from this estimate."
                   className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-[background-color,border-color,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
                 />
                 <EstimateStatusActionForm
@@ -604,7 +557,7 @@ export default async function EstimateDetailPage({
                   nextStatus="cancelled"
                   label="Cancel Estimate"
                   helperText="Closes this estimate without approval."
-                  confirmMessage="Cancel this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
+                  confirmMessage="Cancel this estimate? No job or draft invoice will be created from this estimate."
                   className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
                 />
               </>
@@ -937,217 +890,6 @@ export default async function EstimateDetailPage({
           </>
         )}
       </div>
-
-      <details className="rounded-2xl border border-slate-200/80 bg-slate-50/70 text-sm text-slate-700 print:hidden">
-        <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-slate-900 marker:content-none">
-          <span className="flex items-center justify-between gap-3">
-            <span className="inline-flex items-center gap-2"><Shield className="h-4 w-4 text-slate-500" aria-hidden="true" />Advanced / Internal</span>
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-              Expand
-            </span>
-          </span>
-        </summary>
-        <div className="space-y-5 border-t border-slate-200/80 px-4 pb-4 pt-3">
-          <section className="rounded-xl border border-slate-200/80 bg-white p-4">
-            <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900"><Sparkles className="h-4 w-4 text-slate-500" aria-hidden="true" />Internal Readiness Notes</h2>
-            <ul className="mt-2 list-disc space-y-1 pl-5">
-              {ESTIMATE_DOCUMENT_READINESS_GUIDANCE.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-              <li>
-                {emailSendEnabled
-                  ? "Send/email is explicitly enabled for this environment."
-                  : "Send/email is currently disabled by feature flag in this environment."}
-              </li>
-            </ul>
-            <h3 className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Boundary Disclaimers
-            </h3>
-            <ul className="mt-1 list-disc space-y-1 pl-5 text-xs sm:text-sm">
-              {ESTIMATE_DOCUMENT_DISCLAIMERS.map((line) => (
-                <li key={line}>{line}</li>
-              ))}
-            </ul>
-            <p className="mt-2 text-xs text-slate-500">
-              Revision planning defaults: freeze trigger {ESTIMATE_REVISION_PLANNING_DEFAULTS.freezeTrigger}, history {ESTIMATE_REVISION_PLANNING_DEFAULTS.historyPolicy}, post-freeze edits {ESTIMATE_REVISION_PLANNING_DEFAULTS.postFreezeEditPolicy}.
-            </p>
-          </section>
-
-          <section className="rounded-xl border border-slate-200/80 bg-white p-4">
-            {isMultiOptionProposal ? (
-              <>
-                <h2 className="inline-flex items-center gap-2 text-base font-semibold text-slate-950"><ListChecks className="h-4 w-4 text-slate-500" aria-hidden="true" />Quote Readiness Checklist</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Multi-option readiness scoring is not defined in this slice. Flat checklist scoring remains unchanged for single-option estimates.
-                </p>
-                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-                  This estimate is in options mode. Review option cards as proposed commercial alternatives.
-                </div>
-              </>
-            ) : (
-              <>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div>
-                    <h2 className="inline-flex items-center gap-2 text-base font-semibold text-slate-950"><ListChecks className="h-4 w-4 text-slate-500" aria-hidden="true" />Quote Readiness Checklist</h2>
-                    <p className="mt-1 text-sm text-slate-600">
-                      Advisory checklist for internal review.
-                    </p>
-                  </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-right text-xs text-slate-600">
-                    <div>
-                      Ready: <span className="font-semibold text-slate-900">{readinessChecklist.readyCount}</span>
-                    </div>
-                    <div>
-                      Needs attention: <span className="font-semibold text-slate-900">{readinessChecklist.attentionCount}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-4 divide-y divide-slate-200/70 overflow-hidden rounded-xl border border-slate-200/80">
-                  {readinessChecklist.items.map((item) => (
-                    <div key={item.key} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-slate-900">{item.label}</div>
-                        <div className="mt-0.5 text-xs leading-5 text-slate-600">{item.detail}</div>
-                      </div>
-                      <span
-                        className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${
-                          item.status === "ready"
-                            ? "bg-emerald-100 text-emerald-700"
-                            : "bg-amber-100 text-amber-700"
-                        }`}
-                      >
-                        {item.status === "ready" ? "Ready" : "Attention"}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
-
-          {(isDraft || isSent) && (
-            <section className="rounded-xl border border-slate-200/80 bg-white p-4">
-              <h2 className="text-base font-semibold text-slate-950">Record Send Attempt</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                {isDraft
-                  ? "This estimate is still in draft. You can record a send attempt before or after marking it sent."
-                  : "This estimate is marked sent. Record a send attempt to log that you shared this estimate."}
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                Records an estimate communication attempt. This does not change the estimate lifecycle status.
-              </p>
-              <div className="mt-3">
-                <SendEstimateForm
-                  estimateId={estimate.id}
-                  action={sendEstimateFromForm}
-                  isEmailSendEnabled={emailSendEnabled}
-                  isMultiOptionProposal={isMultiOptionProposal}
-                  defaultRecipientEmail={customerEmail}
-                />
-              </div>
-            </section>
-          )}
-
-          <section className="rounded-xl border border-slate-200/80 bg-white p-4">
-            <h2 className="text-base font-semibold text-slate-950">Communication History</h2>
-            {communications.length === 0 ? (
-              <p className="mt-2 text-sm text-slate-500">No send attempts recorded for this estimate.</p>
-            ) : (
-              <div className="mt-3 divide-y divide-slate-200/60 overflow-hidden rounded-xl border border-slate-200/80">
-                {communications.map((comm) => (
-                  <div key={comm.id} className="px-4 py-3">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span
-                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
-                              comm.attempt_status === "accepted"
-                                ? "bg-emerald-100 text-emerald-700"
-                                : comm.attempt_status === "blocked"
-                                  ? "bg-slate-100 text-slate-600"
-                                  : comm.attempt_status === "failed"
-                                    ? "bg-red-100 text-red-700"
-                                    : "bg-amber-100 text-amber-700"
-                            }`}
-                          >
-                            {comm.attempt_status}
-                          </span>
-                          {comm.provider_name && (
-                            <span className="text-xs text-slate-500">via {comm.provider_name}</span>
-                          )}
-                        </div>
-                        <div className="mt-1 text-sm text-slate-800">
-                          {comm.recipient_email_snapshot}
-                        </div>
-                        {comm.attempt_error && (
-                          <div className="mt-0.5 text-xs text-red-600">{comm.attempt_error}</div>
-                        )}
-                        {comm.attempt_status === "accepted" && (
-                          <div className="mt-0.5 text-[11px] text-slate-400">
-                            Accepted by provider - not the same as delivered or read
-                          </div>
-                        )}
-                      </div>
-                      <div className="shrink-0 text-xs text-slate-400">
-                        {formatDateTime(comm.attempted_at)}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            <p className="mt-2 text-[11px] text-slate-400">
-              Delivery tracking is not available in V1H. Accepted by provider does not mean delivered or read.
-            </p>
-          </section>
-
-          {events.length > 0 && (
-            <section className="rounded-xl border border-slate-200/80 bg-white p-4">
-              <h2 className="text-base font-semibold text-slate-950">Activity</h2>
-              <div className="mt-3 overflow-hidden rounded-xl border border-slate-200/80 bg-white">
-                <div className="divide-y divide-slate-200/60">
-                  {events.map((event) => (
-                    <div key={event.id} className="px-5 py-3.5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-sm font-medium text-slate-800">
-                            {formatEstimateEventLabel(event.event_type)}
-                          </div>
-                          {formatEstimateEventSummary(event.event_type, event.meta) ? (
-                            <div className="mt-1 text-xs leading-5 text-slate-500">
-                              {formatEstimateEventSummary(event.event_type, event.meta)}
-                            </div>
-                          ) : null}
-                        </div>
-                        <div className="shrink-0 text-xs text-slate-400">
-                          {formatDateTime(event.created_at)}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
-          )}
-
-          {(!estimate.conversionSchemaReady || !estimate.invoiceConversionSchemaReady) && (
-            <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
-              <p className="font-semibold uppercase tracking-[0.12em] text-amber-900">Schema readiness</p>
-              {!estimate.conversionSchemaReady && (
-                <p className="mt-1">
-                  Job conversion action is hidden until the conversion schema migration is available in this environment.
-                </p>
-              )}
-              {!estimate.invoiceConversionSchemaReady && (
-                <p className="mt-1">
-                  Draft invoice conversion action is hidden until the invoice conversion schema migration is available in this environment.
-                </p>
-              )}
-            </section>
-          )}
-        </div>
-      </details>
 
       {/* Non-goal confirmation: no approval/conversion/payment/email/PDF UI */}
     </div>
