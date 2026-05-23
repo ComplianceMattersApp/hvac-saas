@@ -94,36 +94,49 @@ function buildProposalEmailHtml(params: {
   estimateTitle: string;
   proposalUrl: string;
 }) {
+  const supportDetails = [params.supportEmail, params.supportPhone].filter(Boolean).join(" | ");
+  const logoBlock = params.companyLogoUrl
+    ? `<p style="margin:0 0 14px 0;"><img src="${escapeHtml(params.companyLogoUrl)}" alt="${escapeHtml(params.companyDisplayName)} logo" width="132" height="52" style="display:inline-block;width:132px;max-width:100%;max-height:52px;height:auto;object-fit:contain;" /></p>`
+    : "";
+
   const bodyHtml = `
+    ${logoBlock}
     <p style="margin:0 0 12px 0;font-size:15px;color:#111827;">
-      Your proposal is ready to review.
+      Please review the proposal details and approve online when ready.
     </p>
-    <p style="margin:0 0 16px 0;font-size:14px;color:#374151;">
+    <p style="margin:0 0 18px 0;font-size:14px;color:#374151;">
       Proposal <strong>${escapeHtml(params.estimateNumber)}</strong>${
         params.estimateTitle
           ? `: ${escapeHtml(params.estimateTitle)}`
           : ""
       }
     </p>
-    <p style="margin:0 0 20px 0;font-size:14px;color:#374151;">
-      Use the secure link below to review and submit your proposal approval.
-    </p>
-    <p style="margin:0 0 20px 0;">
+    <p style="margin:0 0 18px 0;">
       <a href="${escapeHtml(params.proposalUrl)}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;">
         Review Proposal
       </a>
     </p>
-    <p style="margin:0;font-size:12px;color:#6b7280;word-break:break-all;">
-      If the button does not open, copy and paste this link:<br />
-      <a href="${escapeHtml(params.proposalUrl)}" style="color:#0f172a;">${escapeHtml(params.proposalUrl)}</a>
+    <p style="margin:0 0 4px 0;font-size:11px;line-height:1.5;color:#6b7280;">
+      If the button does not open, use this secure link:
     </p>
+    <p style="margin:0;font-size:11px;line-height:1.5;color:#6b7280;word-break:break-all;">
+      <a href="${escapeHtml(params.proposalUrl)}" style="color:#1f2937;text-decoration:underline;">${escapeHtml(params.proposalUrl)}</a>
+    </p>
+    <p style="margin:18px 0 0 0;color:#111827;font-size:13px;">
+      ${escapeHtml(params.companyDisplayName)}
+    </p>
+    ${
+      supportDetails
+        ? `<p style="margin:4px 0 0 0;color:#4b5563;font-size:12px;">Contact: ${escapeHtml(supportDetails)}</p>`
+        : ""
+    }
   `;
 
   return renderOperationalEmailLayout({
-    title: "Proposal Ready for Review",
+    title: "Your proposal is ready",
     bodyHtml,
     companyDisplayName: params.companyDisplayName,
-    companyLogoUrl: params.companyLogoUrl,
+    companyLogoUrl: null,
     supportEmail: params.supportEmail,
     supportPhone: params.supportPhone,
   });
@@ -140,17 +153,35 @@ function buildProposalEmailText(params: {
   const support = [params.supportEmail, params.supportPhone].filter(Boolean).join(" | ");
 
   return [
-    `${params.companyDisplayName} proposal ready for review`,
+    `Your proposal from ${params.companyDisplayName} is ready`,
     "",
     `Proposal: ${params.estimateNumber}${params.estimateTitle ? ` - ${params.estimateTitle}` : ""}`,
     "",
-    "Review and submit your approval using this secure link:",
+    "Please review the proposal details and approve online when ready:",
     params.proposalUrl,
     "",
     support ? `Questions: ${support}` : "",
   ]
     .filter(Boolean)
     .join("\n");
+}
+
+function buildProposalEmailSubject(params: {
+  estimateNumber: string;
+  estimateTitle: string;
+  companyDisplayName: string;
+}) {
+  const estimateTitle = String(params.estimateTitle ?? "").trim();
+  if (estimateTitle) {
+    return `Proposal Ready: ${estimateTitle}`;
+  }
+
+  const estimateNumber = String(params.estimateNumber ?? "").trim();
+  if (estimateNumber) {
+    return `Proposal Ready: ${estimateNumber}`;
+  }
+
+  return `Your Proposal from ${String(params.companyDisplayName ?? "").trim() || "Compliance Matters"}`;
 }
 
 async function loadSentEstimate(params: {
@@ -440,7 +471,11 @@ export async function sendEstimateProposalEmail(
     supabase,
   });
 
-  const subject = `Proposal ${estimateResult.estimate.estimateNumber} from ${tenantIdentity.displayName}`;
+  const subject = buildProposalEmailSubject({
+    estimateNumber: estimateResult.estimate.estimateNumber,
+    estimateTitle: estimateResult.estimate.title,
+    companyDisplayName: tenantIdentity.displayName,
+  });
   const html = buildProposalEmailHtml({
     companyDisplayName: tenantIdentity.displayName,
     companyLogoUrl: tenantIdentity.logoUrl,

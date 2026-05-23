@@ -288,6 +288,32 @@ describe("sendEstimateProposalEmail", () => {
     expect(result.success).toBe(true);
     expect(issueEstimateProposalLinkMock).toHaveBeenCalledTimes(1);
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    const sendArgs = sendEmailMock.mock.calls[0][0] as {
+      subject: string;
+      html: string;
+      text: string;
+      to: string;
+    };
+    expect(sendArgs.to).toBe("owner@client.com");
+    expect(sendArgs.subject).toBe("Proposal Ready: Spring Tune-up");
+    expect(sendArgs.html).toContain("Your proposal is ready");
+    expect(sendArgs.html).toContain("Please review the proposal details and approve online when ready.");
+    expect(sendArgs.html).toContain("Review Proposal");
+    expect(sendArgs.html).toContain("Acme Heating");
+    expect(sendArgs.html).toContain("support@acme.test");
+    expect(sendArgs.html).toContain("555-0000");
+    expect(sendArgs.html).toContain("http://localhost:3000/proposals/raw-token-new");
+    expect(sendArgs.text).toContain("Please review the proposal details and approve online when ready:");
+    expect(sendArgs.text).toContain("http://localhost:3000/proposals/raw-token-new");
+    expect(sendArgs.html.toLowerCase()).not.toContain("invoice");
+    expect(sendArgs.html.toLowerCase()).not.toContain("payment");
+    expect(sendArgs.html.toLowerCase()).not.toContain("sms");
+    expect(sendArgs.html.toLowerCase()).not.toContain("provider");
+    expect(sendArgs.text.toLowerCase()).not.toContain("invoice");
+    expect(sendArgs.text.toLowerCase()).not.toContain("payment");
+    expect(sendArgs.text.toLowerCase()).not.toContain("sms");
+    expect(sendArgs.text.toLowerCase()).not.toContain("provider");
+
     expect(regenerateEstimateProposalLinkMock).not.toHaveBeenCalled();
     expect(supabase._communicationInserts[0].attempt_status).toBe("accepted");
     expect(supabase._proposalLinkUpdates).toHaveLength(1);
@@ -302,6 +328,46 @@ describe("sendEstimateProposalEmail", () => {
     const allCommunicationPayloads = JSON.stringify(supabase._communicationInserts);
     expect(allCommunicationPayloads).not.toContain("raw-token");
     expect(allCommunicationPayloads).not.toContain("token_hash");
+  });
+
+  it("uses fallback subject style when estimate title is blank", async () => {
+    const supabase = makeSupabaseClient();
+    const originalFrom = supabase.from;
+    supabase.from = vi.fn((table: string) => {
+      if (table === "estimates") {
+        return {
+          select: vi.fn(() => {
+            const chain: any = {
+              eq: vi.fn(() => chain),
+              maybeSingle: vi.fn(async () => ({
+                data: {
+                  id: ESTIMATE_ID,
+                  estimate_number: "EST-1001",
+                  title: "",
+                  status: "sent",
+                  account_owner_user_id: ACCOUNT_OWNER,
+                },
+                error: null,
+              })),
+            };
+            return chain;
+          }),
+        };
+      }
+      return originalFrom(table);
+    });
+
+    createClientMock.mockResolvedValue(supabase);
+
+    const { sendEstimateProposalEmail } = await import("@/lib/estimates/estimate-proposal-email");
+    const result = await sendEstimateProposalEmail({
+      estimateId: ESTIMATE_ID,
+      recipientEmail: "owner@client.com",
+    });
+
+    expect(result.success).toBe(true);
+    const sendArgs = sendEmailMock.mock.calls[0][0] as { subject: string };
+    expect(sendArgs.subject).toBe("Proposal Ready: EST-1001");
   });
 
   it("reuses active link with cached raw token without issuing a new link", async () => {
