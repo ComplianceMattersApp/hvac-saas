@@ -31,11 +31,13 @@ type CapturedDbCalls = {
   tables: string[];
   estimateUpdatePayload: Record<string, unknown> | null;
   estimateEventPayload: Record<string, unknown> | null;
+  notificationInsertPayloads: Record<string, unknown>[];
 };
 
 function buildEstimate(overrides: Record<string, unknown> = {}) {
   return {
     id: ESTIMATE_ID,
+    estimate_number: "EST-1001",
     account_owner_user_id: ACCOUNT_OWNER,
     status: "sent",
     options: [],
@@ -49,11 +51,14 @@ function buildAdminClient(options?: {
   updateResultId?: string | null;
   updateError?: { code?: string; message?: string } | null;
   eventInsertError?: { code?: string; message?: string } | null;
+  existingProposalApprovalNotificationId?: string | null;
+  notificationInsertError?: { code?: string; message?: string } | null;
 }) {
   const captured: CapturedDbCalls = {
     tables: [],
     estimateUpdatePayload: null,
     estimateEventPayload: null,
+    notificationInsertPayloads: [],
   };
 
   const proposalLink = options?.proposalLink ?? null;
@@ -61,6 +66,9 @@ function buildAdminClient(options?: {
   const updateResultId = options?.updateResultId === undefined ? ESTIMATE_ID : options.updateResultId;
   const updateError = options?.updateError ?? null;
   const eventInsertError = options?.eventInsertError ?? null;
+  const existingProposalApprovalNotificationId =
+    options?.existingProposalApprovalNotificationId ?? null;
+  const notificationInsertError = options?.notificationInsertError ?? null;
 
   const admin = {
     from: vi.fn((table: string) => {
@@ -98,6 +106,34 @@ function buildAdminClient(options?: {
             return { data: null, error: eventInsertError };
           }),
         };
+      }
+
+      if (table === "notifications") {
+        const chain: any = {
+          select: vi.fn(() => chain),
+          eq: vi.fn(() => chain),
+          contains: vi.fn(() => chain),
+          order: vi.fn(() => chain),
+          limit: vi.fn(() => chain),
+          maybeSingle: vi.fn(async () => ({
+            data: existingProposalApprovalNotificationId
+              ? { id: existingProposalApprovalNotificationId }
+              : null,
+            error: null,
+          })),
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            captured.notificationInsertPayloads.push(payload);
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({
+                  data: notificationInsertError ? null : { id: "notif-1" },
+                  error: notificationInsertError,
+                })),
+              })),
+            };
+          }),
+        };
+        return chain;
       }
 
       return {
@@ -154,11 +190,27 @@ describe("approveEstimateFromProposalLink", () => {
       approver_name: "Taylor Customer",
       selected_option_id: null,
     });
-    expect(captured.tables).toEqual([
-      "estimate_proposal_links",
-      "estimates",
-      "estimate_events",
-    ]);
+    expect(captured.notificationInsertPayloads).toHaveLength(1);
+    expect(captured.notificationInsertPayloads[0]).toMatchObject({
+      account_owner_user_id: ACCOUNT_OWNER,
+      recipient_type: "internal",
+      recipient_ref: null,
+      channel: "in_app",
+      notification_type: "internal_estimate_proposal_approved",
+      subject: "Proposal Approved",
+      body: "Taylor Customer approved estimate EST-1001.",
+      status: "queued",
+      payload: {
+        source: "customer_proposal_link",
+        estimate_id: ESTIMATE_ID,
+        estimate_number: "EST-1001",
+        proposal_link_id: "plink-1",
+      },
+    });
+    expect(captured.tables).not.toContain("jobs");
+    expect(captured.tables).not.toContain("invoices");
+    expect(captured.tables).not.toContain("payments");
+    expect(captured.tables).not.toContain("sms_messages");
   });
 
   it("requires selected option for multi-option proposals", async () => {
@@ -248,6 +300,10 @@ describe("approveEstimateFromProposalLink", () => {
       selected_option_label_snapshot: "Best",
       selected_option_total_cents: 160000,
     });
+    expect(captured.notificationInsertPayloads).toHaveLength(1);
+    expect(captured.notificationInsertPayloads[0]?.body).toBe(
+      "Taylor Customer approved Best for estimate EST-1001."
+    );
   });
 
   it("blocks missing approver name", async () => {
@@ -432,6 +488,104 @@ describe("approveEstimateFromProposalLink", () => {
     const serializedMeta = JSON.stringify(eventMeta);
     expect(serializedMeta).not.toContain(rawToken);
     expect(serializedMeta).not.toContain("token_hash");
+
+    const notificationPayload =
+      (captured.notificationInsertPayloads[0]?.payload as Record<string, unknown> | undefined) ?? {};
+    const serializedNotificationPayload = JSON.stringify(notificationPayload);
+    expect(serializedNotificationPayload).not.toContain(rawToken);
+    expect(serializedNotificationPayload).not.toContain("token_hash");
+  });
+
+  it("does not create duplicate internal notification when dedupe key already exists", async () => {
+    const { admin, captured } = buildAdminClient({
+      proposalLink: {
+        id: "plink-1",
+        estimate_id: ESTIMATE_ID,
+        account_owner_user_id: ACCOUNT_OWNER,
+        status: "active",
+        expires_at: "2099-01-01T00:00:00.000Z",
+        revoked_at: null,
+      },
+      existingProposalApprovalNotificationId: "notif-existing",
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    getEstimateByIdMock.mockResolvedValue(buildEstimate());
+
+    const { approveEstimateFromProposalLink } = await import(
+      "@/lib/estimates/estimate-proposal-public-approval"
+    );
+    const result = await approveEstimateFromProposalLink({
+      rawToken: "abcdefghijklmnopqrstuvwxyzABCDEFG_0123456789",
+      approverName: "Taylor Customer",
+      selectedOptionSlotIndex: null,
+    });
+
+    expect(result.success).toBe(true);
+    expect(captured.notificationInsertPayloads).toHaveLength(0);
+  });
+
+  it("stale already-approved requests do not write duplicate notifications", async () => {
+    const { admin, captured } = buildAdminClient({
+      proposalLink: {
+        id: "plink-1",
+        estimate_id: ESTIMATE_ID,
+        account_owner_user_id: ACCOUNT_OWNER,
+        status: "active",
+        expires_at: "2099-01-01T00:00:00.000Z",
+        revoked_at: null,
+      },
+      updateResultId: null,
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    getEstimateByIdMock.mockResolvedValue(buildEstimate());
+
+    const { approveEstimateFromProposalLink } = await import(
+      "@/lib/estimates/estimate-proposal-public-approval"
+    );
+    const result = await approveEstimateFromProposalLink({
+      rawToken: "abcdefghijklmnopqrstuvwxyzABCDEFG_0123456789",
+      approverName: "Taylor Customer",
+      selectedOptionSlotIndex: null,
+    });
+
+    expect(result).toEqual({ success: false, error: "proposal_unavailable" });
+    expect(captured.notificationInsertPayloads).toHaveLength(0);
+  });
+
+  it("keeps approval truth when internal notification insert fails", async () => {
+    const { admin, captured } = buildAdminClient({
+      proposalLink: {
+        id: "plink-1",
+        estimate_id: ESTIMATE_ID,
+        account_owner_user_id: ACCOUNT_OWNER,
+        status: "active",
+        expires_at: "2099-01-01T00:00:00.000Z",
+        revoked_at: null,
+      },
+      notificationInsertError: {
+        code: "23505",
+        message: "duplicate key value violates unique constraint",
+      },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+    getEstimateByIdMock.mockResolvedValue(buildEstimate());
+
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { approveEstimateFromProposalLink } = await import(
+      "@/lib/estimates/estimate-proposal-public-approval"
+    );
+    const result = await approveEstimateFromProposalLink({
+      rawToken: "abcdefghijklmnopqrstuvwxyzABCDEFG_0123456789",
+      approverName: "Taylor Customer",
+      selectedOptionSlotIndex: null,
+    });
+
+    expect(result.success).toBe(true);
+    expect(captured.estimateUpdatePayload?.status).toBe("approved");
+    expect(captured.estimateEventPayload?.event_type).toBe("estimate_approved");
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 
   it("fails closed when proposal link schema is unavailable", async () => {

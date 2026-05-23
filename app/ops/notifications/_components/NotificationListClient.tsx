@@ -71,6 +71,18 @@ function jobIdFromNotification(notif: NotificationRowForUI): string | null {
   return null;
 }
 
+function estimateIdFromNotification(notif: NotificationRowForUI): string | null {
+  const payload = normalizePayload(notif.payload);
+  const candidates = [payload.estimate_id, payload.estimateId];
+
+  for (const candidate of candidates) {
+    const id = String(candidate ?? "").trim();
+    if (id) return id;
+  }
+
+  return null;
+}
+
 function formatSubmittedAt(value: string) {
   const submittedAt = new Date(value);
   if (!Number.isFinite(submittedAt.getTime())) return null;
@@ -125,6 +137,7 @@ function notificationTypeLabel(value?: string | null) {
     contractor_job_scheduled_email: "Contractor Scheduled Email",
     internal_contractor_job_intake_email: "Internal Intake Email",
     internal_contractor_intake_proposal_email: "Intake Proposal",
+    internal_estimate_proposal_approved: "Proposal Approved",
   };
   return labels[key] ?? "Notification";
 }
@@ -412,6 +425,14 @@ type GenericCardProps = {
 };
 
 function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
+  const type = String(notif.notification_type ?? "").trim().toLowerCase();
+  const estimateId = estimateIdFromNotification(notif);
+  const estimateHref =
+    type === "internal_estimate_proposal_approved" && estimateId
+      ? `/estimates/${estimateId}`
+      : null;
+  const jobId = jobIdFromNotification(notif);
+
   return (
     <div
       className={`relative overflow-hidden rounded-lg border bg-white transition hover:-translate-y-px hover:shadow-md ${
@@ -452,14 +473,22 @@ function GenericCard({ notif, pendingReadId, onMarkAsRead }: GenericCardProps) {
         </div>
 
         <div className="flex shrink-0 flex-col items-end gap-2">
-          {notif.job_id && (
+          {estimateHref ? (
             <Link
-              href={`/jobs/${notif.job_id}`}
+              href={estimateHref}
+              className="inline-flex min-h-9 items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
+            >
+              View estimate
+            </Link>
+          ) : null}
+          {!estimateHref && jobId ? (
+            <Link
+              href={`/jobs/${jobId}`}
               className="inline-flex min-h-9 items-center rounded-md border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 transition hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
             >
               View job
             </Link>
-          )}
+          ) : null}
           {notif.is_unread && (
             <button
               onClick={() => void onMarkAsRead(notif.id)}

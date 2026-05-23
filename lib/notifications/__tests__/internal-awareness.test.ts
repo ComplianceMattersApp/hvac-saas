@@ -37,7 +37,11 @@ describe("contractor awareness notification matching", () => {
   });
 
   it("internal assignment and mention alerts are included in new job notifications", () => {
-    const teamAlertTypes = ["internal_job_assigned", "internal_note_tag"];
+    const teamAlertTypes = [
+      "internal_job_assigned",
+      "internal_note_tag",
+      "internal_estimate_proposal_approved",
+    ];
 
     for (const type of teamAlertTypes) {
       expect(NEW_JOB_NOTIFICATION_TYPES).toContain(type);

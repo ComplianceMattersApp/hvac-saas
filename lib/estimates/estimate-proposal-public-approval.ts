@@ -2,6 +2,7 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { isEstimateProposalLinksEnabled } from "@/lib/estimates/estimate-exposure";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { findActiveProposalLinkByRawToken } from "@/lib/estimates/estimate-proposal-public-shared";
+import { insertInternalProposalApprovedNotification } from "@/lib/estimates/estimate-proposal-approval-notification";
 
 type PublicApprovalErrorCode =
   | "proposal_unavailable"
@@ -205,6 +206,29 @@ export async function approveEstimateFromProposalLink(
     },
     user_id: null,
   });
+
+  const estimateNumber = String((estimate as { estimate_number?: unknown })?.estimate_number ?? "").trim();
+  if (estimateNumber) {
+    try {
+      await insertInternalProposalApprovedNotification({
+        supabase: admin,
+        accountOwnerUserId: proposalLink.account_owner_user_id,
+        estimateId: estimate.id,
+        estimateNumber,
+        proposalLinkId: proposalLink.id,
+        approverName,
+        selectedOptionId,
+        selectedOptionLabelSnapshot,
+      });
+    } catch (error) {
+      console.warn("[estimate-proposal-public-approval] Proposal approval notification skipped", {
+        estimate_id: estimate.id,
+        proposal_link_id: proposalLink.id,
+        error_code: String((error as { code?: unknown } | null)?.code ?? ""),
+        error_message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
 
   return {
     success: true,
