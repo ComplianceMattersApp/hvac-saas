@@ -8,6 +8,8 @@ import { revalidatePath } from "next/cache";
 import {
   addEstimateLineItem,
   addEstimateOptionLineItem,
+  updateEstimateLineItem,
+  updateEstimateOptionLineItem,
   removeEstimateLineItem,
   removeEstimateOptionLineItem,
   transitionEstimateStatus,
@@ -18,6 +20,8 @@ import {
   recordEstimateToInvoiceDraftConversion,
   type AddEstimateLineItemParams,
   type AddEstimateOptionLineItemParams,
+  type UpdateEstimateLineItemParams,
+  type UpdateEstimateOptionLineItemParams,
   type UpdateEstimateOptionMetadataParams,
 } from "@/lib/estimates/estimate-actions";
 import { sendEstimateCommunication } from "@/lib/estimates/estimate-communication";
@@ -60,6 +64,48 @@ export async function removeLineItemFromForm(formData: FormData) {
 
   await removeEstimateLineItem({ estimateId, lineItemId });
   revalidatePath(`/estimates/${estimateId}`);
+}
+
+/**
+ * Update a draft line item on an estimate and revalidate the detail route.
+ */
+export async function updateLineItemFromForm(formData: FormData) {
+  if (!isEstimatesEnabled()) {
+    return {
+      success: false as const,
+      error: "Estimates are currently unavailable.",
+    };
+  }
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  const lineItemId = String(formData.get("line_item_id") ?? "").trim();
+  const itemName = String(formData.get("item_name") ?? "").trim();
+  const itemType = String(formData.get("item_type") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim() || null;
+  const category = String(formData.get("category") ?? "").trim() || null;
+  const unitLabel = String(formData.get("unit_label") ?? "").trim() || null;
+
+  const quantity = Number(formData.get("quantity") ?? "");
+  const unitPriceDollars = Number(formData.get("unit_price") ?? "");
+  const unitPriceCents = Math.round(unitPriceDollars * 100);
+
+  const result = await updateEstimateLineItem({
+    estimateId,
+    lineItemId,
+    itemName,
+    itemType,
+    description,
+    category,
+    unitLabel,
+    quantity,
+    unitPriceCents,
+  } satisfies UpdateEstimateLineItemParams);
+
+  if (result.success) {
+    revalidatePath(`/estimates/${estimateId}`);
+  }
+
+  return result;
 }
 
 /**
@@ -217,6 +263,50 @@ export async function removeEstimateOptionLineItemFromForm(formData: FormData) {
     estimateOptionId,
     lineItemId,
   });
+
+  if (result.success) {
+    revalidatePath(`/estimates/${estimateId}`);
+  }
+
+  return result;
+}
+
+/**
+ * Update a manual line item on a specific draft option package.
+ */
+export async function updateEstimateOptionLineItemFromForm(formData: FormData) {
+  if (!isEstimatesEnabled()) {
+    return {
+      success: false as const,
+      error: "Estimates are currently unavailable.",
+    };
+  }
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  const estimateOptionId = String(formData.get("estimate_option_id") ?? "").trim();
+  const lineItemId = String(formData.get("line_item_id") ?? "").trim();
+  const itemName = String(formData.get("item_name") ?? "").trim();
+  const itemType = String(formData.get("item_type") ?? "").trim();
+  const description = String(formData.get("description") ?? "").trim() || null;
+  const category = String(formData.get("category") ?? "").trim() || null;
+  const unitLabel = String(formData.get("unit_label") ?? "").trim() || null;
+
+  const quantity = Number(formData.get("quantity") ?? "");
+  const unitPriceDollars = Number(formData.get("unit_price") ?? "");
+  const unitPriceCents = Math.round(unitPriceDollars * 100);
+
+  const result = await updateEstimateOptionLineItem({
+    estimateId,
+    estimateOptionId,
+    lineItemId,
+    itemName,
+    itemType,
+    description,
+    category,
+    unitLabel,
+    quantity,
+    unitPriceCents,
+  } satisfies UpdateEstimateOptionLineItemParams);
 
   if (result.success) {
     revalidatePath(`/estimates/${estimateId}`);

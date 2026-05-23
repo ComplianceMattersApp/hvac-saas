@@ -252,6 +252,7 @@ const {
   createEstimateDraft,
   resolveEstimateCustomerLocationAssist,
   addEstimateLineItem,
+  updateEstimateLineItem,
   removeEstimateLineItem,
   transitionEstimateStatus,
   getEstimateById,
@@ -1132,6 +1133,233 @@ describe("addEstimateLineItem", () => {
       expect(requireInternalUserMock).not.toHaveBeenCalled();
     }
   );
+});
+
+// ---------------------------------------------------------------------------
+// updateEstimateLineItem
+// ---------------------------------------------------------------------------
+
+describe("updateEstimateLineItem", () => {
+  beforeEach(() => vi.resetAllMocks());
+  beforeEach(() => {
+    process.env.ENABLE_ESTIMATES = "true";
+  });
+
+  function setupLineUpdate(status: string = "draft", estimateExists = true) {
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+
+    const estimateRow = estimateExists
+      ? { id: "est-1", status, account_owner_user_id: ACCOUNT_OWNER }
+      : null;
+
+    const lineRows = [
+      {
+        id: "line-1",
+        estimate_id: "est-1",
+        item_name_snapshot: "Old Name",
+        category_snapshot: "hvac",
+        unit_label_snapshot: "ea",
+        line_subtotal_cents: 1000,
+      },
+      {
+        id: "line-2",
+        estimate_id: "est-1",
+        item_name_snapshot: "Other",
+        category_snapshot: null,
+        unit_label_snapshot: null,
+        line_subtotal_cents: 3000,
+      },
+    ];
+
+    const estimateUpdates: Array<Record<string, unknown>> = [];
+    const lineUpdates: Array<Record<string, unknown>> = [];
+    const insertedEvents: Array<Record<string, unknown>> = [];
+
+    function matches(row: Record<string, unknown>, filters: Record<string, unknown>) {
+      return Object.entries(filters).every(([k, v]) => row[k] === v);
+    }
+
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table === "estimates") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({ data: estimateRow, error: null })),
+                })),
+              })),
+            })),
+            update: vi.fn((payload: Record<string, unknown>) => {
+              estimateUpdates.push(payload);
+              return {
+                eq: vi.fn(() => Promise.resolve({ error: null })),
+              };
+            }),
+          };
+        }
+
+        if (table === "estimate_line_items") {
+          return {
+            select: vi.fn((selectClause: string) => {
+              const filters: Record<string, unknown> = {};
+              const chain: any = {
+                eq: vi.fn((k: string, v: unknown) => {
+                  filters[k] = v;
+                  return chain;
+                }),
+                maybeSingle: vi.fn(async () => {
+                  const row = lineRows.find((line) => matches(line, filters)) ?? null;
+                  if (!row) return { data: null, error: null };
+                  if (selectClause.includes("category_snapshot")) {
+                    return {
+                      data: {
+                        id: row.id,
+                        category_snapshot: row.category_snapshot,
+                        unit_label_snapshot: row.unit_label_snapshot,
+                      },
+                      error: null,
+                    };
+                  }
+                  return { data: row, error: null };
+                }),
+                then: (resolve: any, reject: any) => {
+                  const rows = lineRows
+                    .filter((line) => matches(line, filters))
+                    .map((line) =>
+                      selectClause.includes("line_subtotal_cents")
+                        ? { line_subtotal_cents: line.line_subtotal_cents }
+                        : line
+                    );
+                  return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+                },
+              };
+              return chain;
+            }),
+            update: vi.fn((payload: Record<string, unknown>) => {
+              const filters: Record<string, unknown> = {};
+              const chain: any = {
+                eq: vi.fn((k: string, v: unknown) => {
+                  filters[k] = v;
+                  return chain;
+                }),
+                then: (resolve: any, reject: any) => {
+                  lineUpdates.push(payload);
+                  for (const row of lineRows) {
+                    if (matches(row, filters)) {
+                      row.item_name_snapshot = String(payload.item_name_snapshot ?? row.item_name_snapshot);
+                      row.line_subtotal_cents = Number(payload.line_subtotal_cents ?? row.line_subtotal_cents);
+                    }
+                  }
+                  return Promise.resolve({ error: null }).then(resolve, reject);
+                },
+              };
+              return chain;
+            }),
+          };
+        }
+
+        if (table === "estimate_events") {
+          return {
+            insert: vi.fn(async (payload: Record<string, unknown>) => {
+              insertedEvents.push(payload);
+              return { data: null, error: null };
+            }),
+          };
+        }
+
+        return {};
+      }),
+      _lineUpdates: lineUpdates,
+      _estimateUpdates: estimateUpdates,
+      _insertedEvents: insertedEvents,
+    } as any;
+
+    createClientMock.mockResolvedValue(supabase);
+    return supabase;
+  }
+
+  it("updates a draft flat line and recomputes estimate totals", async () => {
+    const supabase = setupLineUpdate();
+
+    const result = await updateEstimateLineItem({
+      estimateId: "est-1",
+      lineItemId: "line-1",
+      itemName: "Updated Name",
+      itemType: "service",
+      quantity: 2,
+      unitPriceCents: 2500,
+      description: "updated",
+      category: "hvac",
+      unitLabel: "ea",
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.lineItemId).toBe("line-1");
+      expect(result.subtotal_cents).toBe(8000);
+      expect(result.total_cents).toBe(8000);
+    }
+
+    expect(supabase._lineUpdates[0]).toMatchObject({
+      item_name_snapshot: "Updated Name",
+      item_type_snapshot: "service",
+      quantity: 2,
+      unit_price_cents: 2500,
+      line_subtotal_cents: 5000,
+      updated_by_user_id: USER_ID,
+    });
+    expect(supabase._estimateUpdates[0]).toMatchObject({
+      subtotal_cents: 8000,
+      total_cents: 8000,
+      updated_by_user_id: USER_ID,
+    });
+    expect(supabase._insertedEvents).toContainEqual(
+      expect.objectContaining({
+        event_type: "estimate_line_updated",
+        meta: expect.objectContaining({ line_item_id: "line-1", line_subtotal_cents: 5000 }),
+      })
+    );
+  });
+
+  it.each(["sent", "approved", "converted"])(
+    "blocks update for %s estimate status",
+    async (status) => {
+      setupLineUpdate(status);
+
+      const result = await updateEstimateLineItem({
+        estimateId: "est-1",
+        lineItemId: "line-1",
+        itemName: "Updated Name",
+        itemType: "service",
+        quantity: 1,
+        unitPriceCents: 100,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toMatch(/draft/i);
+      }
+    }
+  );
+
+  it("blocks cross-account estimate access", async () => {
+    setupLineUpdate("draft", false);
+
+    const result = await updateEstimateLineItem({
+      estimateId: "est-1",
+      lineItemId: "line-1",
+      itemName: "Updated Name",
+      itemType: "service",
+      quantity: 1,
+      unitPriceCents: 100,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toMatch(/not found in this account/i);
+    }
+  });
 });
 
 // ---------------------------------------------------------------------------

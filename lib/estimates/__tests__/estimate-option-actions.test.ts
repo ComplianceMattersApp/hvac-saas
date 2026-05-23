@@ -7,6 +7,7 @@ import {
   addEstimateOptionLineItem,
   createDefaultEstimateOptions,
   removeEstimateOptionLineItem,
+  updateEstimateOptionLineItem,
   updateEstimateOptionMetadata,
 } from "@/lib/estimates/estimate-actions";
 
@@ -409,6 +410,28 @@ function makeOptionLineSupabaseClient(
                 const deleted = before - optionLines.length;
                 deletedRows.push({ table, filters: { ...filters }, deleted });
                 return Promise.resolve({ error: null }).then(resolve, reject);
+              },
+            };
+            return chain;
+          }),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            const filters: Record<string, unknown> = {};
+            const chain: any = {
+              eq: vi.fn((key: string, value: unknown) => {
+                filters[key] = value;
+                return chain;
+              }),
+              then: (resolve: any, reject: any) => {
+                optionLines = optionLines.map((line) => {
+                  if (!matchesFilters(line, filters)) return line;
+                  return {
+                    ...line,
+                    item_name_snapshot: String(payload.item_name_snapshot ?? line.item_name_snapshot),
+                    line_subtotal_cents: Number(payload.line_subtotal_cents ?? line.line_subtotal_cents),
+                  };
+                });
+                updatedRows.push({ table, payload });
+                return Promise.resolve({ data: null, error: null }).then(resolve, reject);
               },
             };
             return chain;
@@ -1140,5 +1163,105 @@ describe("removeEstimateOptionLineItem", () => {
       lineItemId: "opt-line-1",
     });
     expect(disabled.success).toBe(false);
+  });
+});
+
+describe("updateEstimateOptionLineItem", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    isEstimatesEnabledMock.mockReturnValue(true);
+  });
+
+  it("updates a draft option line and recomputes only option totals", async () => {
+    const supabase = makeOptionLineSupabaseClient({ optionLineSubtotals: [4000, 2000] });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await updateEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      lineItemId: "opt-line-2",
+      itemName: "Updated Option Line",
+      itemType: "service",
+      quantity: 3,
+      unitPriceCents: 1000,
+      description: "updated",
+      category: null,
+      unitLabel: null,
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.subtotal_cents).toBe(7000);
+      expect(result.total_cents).toBe(7000);
+    }
+
+    expect(supabase.__updatedRows).toContainEqual({
+      table: "estimate_option_line_items",
+      payload: expect.objectContaining({
+        item_name_snapshot: "Updated Option Line",
+        item_type_snapshot: "service",
+        quantity: 3,
+        unit_price_cents: 1000,
+        line_subtotal_cents: 3000,
+      }),
+    });
+    expect(supabase.__updatedRows).toContainEqual({
+      table: "estimate_options",
+      payload: expect.objectContaining({ subtotal_cents: 7000, total_cents: 7000 }),
+    });
+    expect(supabase.__estimateUpdates).toHaveLength(0);
+    expect(supabase.__insertedRows).toContainEqual({
+      table: "estimate_events",
+      payload: expect.objectContaining({
+        event_type: "estimate_option_line_updated",
+        meta: expect.objectContaining({ line_item_id: "opt-line-2", option_total_cents: 7000 }),
+      }),
+    });
+  });
+
+  it.each(["sent", "approved", "converted"])(
+    "blocks update for %s estimate status",
+    async (status) => {
+      const supabase = makeOptionLineSupabaseClient({ estimateStatus: status });
+      requireInternalUserMock.mockResolvedValue(makeInternalUser());
+      createClientMock.mockResolvedValue(supabase);
+
+      const result = await updateEstimateOptionLineItem({
+        estimateId: ESTIMATE_ID,
+        estimateOptionId: OPTION_ID,
+        lineItemId: "opt-line-1",
+        itemName: "Updated",
+        itemType: "service",
+        quantity: 1,
+        unitPriceCents: 100,
+      });
+
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error).toContain("draft");
+      }
+    }
+  );
+
+  it("blocks update for out-of-scope estimate", async () => {
+    const supabase = makeOptionLineSupabaseClient({ estimateExists: false });
+    requireInternalUserMock.mockResolvedValue(makeInternalUser());
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await updateEstimateOptionLineItem({
+      estimateId: ESTIMATE_ID,
+      estimateOptionId: OPTION_ID,
+      lineItemId: "opt-line-1",
+      itemName: "Updated",
+      itemType: "service",
+      quantity: 1,
+      unitPriceCents: 100,
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error).toContain("not found");
+    }
   });
 });

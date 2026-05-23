@@ -1,4 +1,4 @@
-// app/estimates/[id]/page.tsx
+﻿// app/estimates/[id]/page.tsx
 // Compliance Matters: Internal-only estimate detail page.
 // Account-owner scoped via getEstimateById. Draft-only line management.
 
@@ -17,6 +17,8 @@ import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import {
   removeLineItemFromForm,
+  updateLineItemFromForm,
+  updateEstimateOptionLineItemFromForm,
   transitionEstimateStatusFromForm,
   recordEstimateApprovalResponseFromForm,
   convertEstimateToJobFromForm,
@@ -79,7 +81,7 @@ function statusBadgeClass(status: string) {
 
 function statusLabel(status: string) {
   const s = String(status ?? "").trim();
-  if (!s) return "—";
+  if (!s) return "ΓÇö";
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
@@ -160,6 +162,16 @@ export default async function EstimateDetailPage({
   async function submitRemoveOptionLine(formData: FormData) {
     "use server";
     await removeEstimateOptionLineItemFromForm(formData);
+  }
+
+  async function submitUpdateLineItem(formData: FormData) {
+    "use server";
+    await updateLineItemFromForm(formData);
+  }
+
+  async function submitUpdateOptionLineItem(formData: FormData) {
+    "use server";
+    await updateEstimateOptionLineItemFromForm(formData);
   }
 
   async function submitConvertEstimateToJob(formData: FormData) {
@@ -321,7 +333,7 @@ export default async function EstimateDetailPage({
           <Link href="/estimates" className="hover:text-slate-900">
             Estimates
           </Link>
-          <span className="mx-1.5">›</span>
+          <span className="mx-1.5">ΓÇ║</span>
           <span className="font-mono text-slate-700">{documentView.identity.estimateNumber}</span>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -568,7 +580,7 @@ export default async function EstimateDetailPage({
       </div>
 
       {/* Estimate proposal rendering */}
-      {/* Approval response panel — visible on approved terminal state */}
+      {/* Approval response panel ΓÇö visible on approved terminal state */}
       {isApproved && (
         <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
           <h2 className="text-base font-semibold text-emerald-900">Approval</h2>
@@ -586,7 +598,7 @@ export default async function EstimateDetailPage({
                 Selected option
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-950">
-                {estimate.selected_option_label_snapshot ?? "—"}
+                {estimate.selected_option_label_snapshot ?? "ΓÇö"}
               </p>
               {typeof estimate.selected_option_total_cents === "number" && (
                 <p className="mt-0.5 text-sm text-slate-700">
@@ -719,7 +731,7 @@ export default async function EstimateDetailPage({
 
                             <div>
                               <div className="text-sm text-slate-700">
-                                {line.quantity % 1 === 0 ? line.quantity : line.quantity.toFixed(2)} × {formatCents(line.unit_price_cents)}
+                                {line.quantity % 1 === 0 ? line.quantity : line.quantity.toFixed(2)} ├ù {formatCents(line.unit_price_cents)}
                               </div>
                             </div>
 
@@ -728,7 +740,53 @@ export default async function EstimateDetailPage({
                             </div>
 
                             {isDraft && (
-                              <div className="flex justify-end print:hidden">
+                              <div className="flex justify-end gap-2 print:hidden">
+                                <details className="group">
+                                  <summary className="inline-flex cursor-pointer list-none items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
+                                    Edit
+                                  </summary>
+                                  <div className="mt-2 w-full min-w-[16rem] rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:min-w-[22rem]">
+                                    <form action={submitUpdateOptionLineItem} className="space-y-2.5">
+                                      <input type="hidden" name="estimate_id" value={estimate.id} />
+                                      <input type="hidden" name="estimate_option_id" value={option.id} />
+                                      <input type="hidden" name="line_item_id" value={line.id} />
+                                      <input type="hidden" name="category" value={line.category_snapshot ?? ""} />
+                                      <input type="hidden" name="unit_label" value={line.unit_label_snapshot ?? ""} />
+
+                                      <div>
+                                        <label htmlFor={`edit-option-name-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Item Name</label>
+                                        <input id={`edit-option-name-${line.id}`} name="item_name" defaultValue={line.item_name_snapshot ?? ""} required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                                      </div>
+
+                                      <div className="grid gap-2 sm:grid-cols-3">
+                                        <div>
+                                          <label htmlFor={`edit-option-type-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</label>
+                                          <input id={`edit-option-type-${line.id}`} name="item_type" defaultValue={line.item_type_snapshot ?? "service"} required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                                        </div>
+                                        <div>
+                                          <label htmlFor={`edit-option-qty-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Qty</label>
+                                          <input id={`edit-option-qty-${line.id}`} name="quantity" type="number" min="0.01" step="0.01" defaultValue={line.quantity} required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                                        </div>
+                                        <div>
+                                          <label htmlFor={`edit-option-price-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Unit Price ($)</label>
+                                          <input id={`edit-option-price-${line.id}`} name="unit_price" type="number" min="0" step="0.01" defaultValue={(line.unit_price_cents / 100).toFixed(2)} required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                                        </div>
+                                      </div>
+
+                                      <div>
+                                        <label htmlFor={`edit-option-description-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Description</label>
+                                        <textarea id={`edit-option-description-${line.id}`} name="description" defaultValue={line.description_snapshot ?? ""} rows={2} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                                      </div>
+
+                                      <div className="flex justify-end">
+                                        <button type="submit" className="inline-flex items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800">
+                                          Save
+                                        </button>
+                                      </div>
+                                    </form>
+                                  </div>
+                                </details>
+
                                 <form action={submitRemoveOptionLine}>
                                   <input type="hidden" name="estimate_id" value={estimate.id} />
                                   <input type="hidden" name="estimate_option_id" value={option.id} />
@@ -788,7 +846,7 @@ export default async function EstimateDetailPage({
                 Type
               </div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                Qty × Price
+                Qty ├ù Price
               </div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Subtotal
@@ -799,7 +857,7 @@ export default async function EstimateDetailPage({
             </div>
 
             <div className="divide-y divide-slate-200/60">
-              {documentView.lines.map((line, idx) => (
+              {estimate.line_items.map((line, idx) => (
                 <div key={line.id} className="bg-white/80 px-5 py-4 print:break-inside-avoid print:px-4 print:py-3">
                   <div className="grid gap-3 sm:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)_auto] sm:items-center print:grid-cols-[minmax(0,2.5fr)_minmax(6rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)]">
                     <div>
@@ -807,11 +865,11 @@ export default async function EstimateDetailPage({
                         Line {idx + 1}
                       </div>
                       <div className="font-semibold text-slate-950">
-                        {line.itemName}
+                        {line.item_name_snapshot}
                       </div>
-                      {line.description && (
+                      {line.description_snapshot && (
                         <div className="mt-0.5 text-xs leading-5 text-slate-500">
-                          {line.description}
+                          {line.description_snapshot}
                         </div>
                       )}
                     </div>
@@ -820,18 +878,16 @@ export default async function EstimateDetailPage({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:hidden">
                         Type
                       </div>
-                      <div className="text-sm capitalize text-slate-700">
-                        {line.itemType}
-                      </div>
+                      <div className="text-sm capitalize text-slate-700">{line.item_type_snapshot}</div>
                     </div>
 
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:hidden">
-                        Qty × Price
+                        Qty ├ù Price
                       </div>
                       <div className="text-sm text-slate-700">
                         {line.quantity % 1 === 0 ? line.quantity : line.quantity.toFixed(2)}{" "}
-                        × {formatCents(line.unitPriceCents)}
+                        ├ù {formatCents(line.unit_price_cents)}
                       </div>
                     </div>
 
@@ -839,13 +895,56 @@ export default async function EstimateDetailPage({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:hidden">
                         Subtotal
                       </div>
-                      <div className="font-semibold text-slate-950">
-                        {formatCents(line.lineSubtotalCents)}
-                      </div>
+                      <div className="font-semibold text-slate-950">{formatCents(line.line_subtotal_cents)}</div>
                     </div>
 
                     {isDraft && (
-                      <div className="flex justify-end print:hidden">
+                      <div className="flex justify-end gap-2 print:hidden">
+                        <details className="group">
+                          <summary className="inline-flex cursor-pointer list-none items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
+                            Edit
+                          </summary>
+                          <div className="mt-2 w-full min-w-[16rem] rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:min-w-[22rem]">
+                            <form action={submitUpdateLineItem} className="space-y-2.5">
+                              <input type="hidden" name="estimate_id" value={estimate.id} />
+                              <input type="hidden" name="line_item_id" value={line.id} />
+                              <input type="hidden" name="category" value={line.category_snapshot ?? ""} />
+                              <input type="hidden" name="unit_label" value={line.unit_label_snapshot ?? ""} />
+
+                              <div>
+                                <label htmlFor={`edit-line-name-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Item Name</label>
+                                <input id={`edit-line-name-${line.id}`} name="item_name" defaultValue={line.item_name_snapshot ?? ""} required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                              </div>
+
+                              <div className="grid gap-2 sm:grid-cols-3">
+                                <div>
+                                  <label htmlFor={`edit-line-type-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Type</label>
+                                  <input id={`edit-line-type-${line.id}`} name="item_type" defaultValue={line.item_type_snapshot ?? "service"} required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                                </div>
+                                <div>
+                                  <label htmlFor={`edit-line-qty-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Qty</label>
+                                  <input id={`edit-line-qty-${line.id}`} name="quantity" type="number" min="0.01" step="0.01" defaultValue={line.quantity} required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                                </div>
+                                <div>
+                                  <label htmlFor={`edit-line-price-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Unit Price ($)</label>
+                                  <input id={`edit-line-price-${line.id}`} name="unit_price" type="number" min="0" step="0.01" defaultValue={(line.unit_price_cents / 100).toFixed(2)} required className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                                </div>
+                              </div>
+
+                              <div>
+                                <label htmlFor={`edit-line-description-${line.id}`} className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Description</label>
+                                <textarea id={`edit-line-description-${line.id}`} name="description" defaultValue={line.description_snapshot ?? ""} rows={2} className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900" />
+                              </div>
+
+                              <div className="flex justify-end">
+                                <button type="submit" className="inline-flex items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800">
+                                  Save
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        </details>
+
                         <form action={removeLineItemFromForm}>
                           <input type="hidden" name="estimate_id" value={estimate.id} />
                           <input type="hidden" name="line_item_id" value={line.id} />
@@ -873,7 +972,7 @@ export default async function EstimateDetailPage({
           </div>
         )}
 
-        {/* Add line item — draft only */}
+        {/* Add line item ΓÇö draft only */}
         {isDraft && (
           <div className="pt-1 print:hidden">
             <AddLineItemForm estimateId={estimate.id} pricebookItems={pricebookItems} />

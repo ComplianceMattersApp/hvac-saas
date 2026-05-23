@@ -268,6 +268,72 @@ describe("estimate read helper - flat estimates (single_option_flat mode)", () =
 
     expect(result?.total_cents).toBe(mockEstimateBase.total_cents);
   });
+
+  it("reflects latest line snapshot values in read model", async () => {
+    const editedLine = {
+      ...mockLineItem,
+      item_name_snapshot: "Edited Service Item",
+      description_snapshot: "Edited description",
+      item_type_snapshot: "material",
+      quantity: 2,
+      unit_price_cents: 1750,
+      line_subtotal_cents: 3500,
+    };
+
+    const mockSupabase = {
+      from: vi.fn((table: string) => {
+        if (table === "estimates") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                eq: vi.fn().mockReturnValue({
+                  maybeSingle: vi.fn().mockResolvedValue({ data: mockEstimateBase, error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "estimate_line_items") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: [editedLine], error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+        if (table === "estimate_options") {
+          return {
+            select: vi.fn().mockReturnValue({
+              eq: vi.fn().mockReturnValue({
+                order: vi.fn().mockReturnValue({
+                  order: vi.fn().mockResolvedValue({ data: [], error: null }),
+                }),
+              }),
+            }),
+          };
+        }
+        return {};
+      }),
+    };
+
+    const result = await getEstimateById({
+      estimateId: "est-1",
+      internalUser: mockInternalUser,
+      supabase: mockSupabase,
+    });
+
+    expect(result?.line_items?.[0]).toMatchObject({
+      item_name_snapshot: "Edited Service Item",
+      description_snapshot: "Edited description",
+      item_type_snapshot: "material",
+      quantity: 2,
+      unit_price_cents: 1750,
+      line_subtotal_cents: 3500,
+    });
+  });
 });
 
 describe("estimate read helper - multi-option estimates (multi_option_packages mode)", () => {

@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const addEstimateLineItemMock = vi.fn();
 const removeEstimateLineItemMock = vi.fn();
+const updateEstimateLineItemMock = vi.fn();
 const addEstimateOptionLineItemMock = vi.fn();
 const removeEstimateOptionLineItemMock = vi.fn();
+const updateEstimateOptionLineItemMock = vi.fn();
 const transitionEstimateStatusMock = vi.fn();
 const createDefaultEstimateOptionsMock = vi.fn();
 const updateEstimateOptionMetadataMock = vi.fn();
@@ -13,9 +15,12 @@ const revalidatePathMock = vi.fn();
 vi.mock("@/lib/estimates/estimate-actions", () => ({
   addEstimateLineItem: (...args: unknown[]) => addEstimateLineItemMock(...args),
   removeEstimateLineItem: (...args: unknown[]) => removeEstimateLineItemMock(...args),
+  updateEstimateLineItem: (...args: unknown[]) => updateEstimateLineItemMock(...args),
   addEstimateOptionLineItem: (...args: unknown[]) => addEstimateOptionLineItemMock(...args),
   removeEstimateOptionLineItem: (...args: unknown[]) =>
     removeEstimateOptionLineItemMock(...args),
+  updateEstimateOptionLineItem: (...args: unknown[]) =>
+    updateEstimateOptionLineItemMock(...args),
   transitionEstimateStatus: (...args: unknown[]) => transitionEstimateStatusMock(...args),
   createDefaultEstimateOptions: (...args: unknown[]) => createDefaultEstimateOptionsMock(...args),
   updateEstimateOptionMetadata: (...args: unknown[]) => updateEstimateOptionMetadataMock(...args),
@@ -63,6 +68,59 @@ describe("estimate route action guards", () => {
 
     expect(removeEstimateLineItemMock).not.toHaveBeenCalled();
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("updateLineItemFromForm short-circuits when feature flag disabled", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    const { updateLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("line_item_id", "line-1");
+    fd.set("item_name", "Updated");
+    fd.set("item_type", "service");
+    fd.set("quantity", "1");
+    fd.set("unit_price", "10");
+
+    const result = await updateLineItemFromForm(fd);
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(updateEstimateLineItemMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("updateLineItemFromForm delegates and revalidates when enabled", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    updateEstimateLineItemMock.mockResolvedValue({
+      success: true,
+      lineItemId: "line-1",
+      subtotal_cents: 2500,
+      total_cents: 2500,
+    });
+
+    const { updateLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("line_item_id", "line-1");
+    fd.set("item_name", "Updated");
+    fd.set("item_type", "service");
+    fd.set("quantity", "2");
+    fd.set("unit_price", "12.50");
+
+    const result = await updateLineItemFromForm(fd);
+    expect(result.success).toBe(true);
+    expect(updateEstimateLineItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        estimateId: "est-1",
+        lineItemId: "line-1",
+        itemName: "Updated",
+        itemType: "service",
+        quantity: 2,
+        unitPriceCents: 1250,
+      })
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
   });
 
   it("addLineItemAction delegates when feature flag enabled", async () => {
@@ -367,6 +425,66 @@ describe("estimate route action guards", () => {
       estimateOptionId: "opt-1",
       lineItemId: "opt-line-1",
     });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
+  });
+
+  it("updateEstimateOptionLineItemFromForm short-circuits when feature flag disabled", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    const { updateEstimateOptionLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("estimate_option_id", "opt-1");
+    fd.set("line_item_id", "opt-line-1");
+    fd.set("item_name", "Updated");
+    fd.set("item_type", "service");
+    fd.set("quantity", "1");
+    fd.set("unit_price", "10");
+
+    const result = await updateEstimateOptionLineItemFromForm(fd);
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(updateEstimateOptionLineItemMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("updateEstimateOptionLineItemFromForm delegates and revalidates when enabled", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    updateEstimateOptionLineItemMock.mockResolvedValue({
+      success: true,
+      estimateId: "est-1",
+      estimateOptionId: "opt-1",
+      lineItemId: "opt-line-1",
+      subtotal_cents: 5000,
+      total_cents: 5000,
+    });
+
+    const { updateEstimateOptionLineItemFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("estimate_option_id", "opt-1");
+    fd.set("line_item_id", "opt-line-1");
+    fd.set("item_name", "Updated");
+    fd.set("item_type", "service");
+    fd.set("quantity", "2");
+    fd.set("unit_price", "25.00");
+
+    const result = await updateEstimateOptionLineItemFromForm(fd);
+    expect(result.success).toBe(true);
+    expect(updateEstimateOptionLineItemMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        estimateId: "est-1",
+        estimateOptionId: "opt-1",
+        lineItemId: "opt-line-1",
+        itemName: "Updated",
+        itemType: "service",
+        quantity: 2,
+        unitPriceCents: 2500,
+      })
+    );
     expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
   });
 
