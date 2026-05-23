@@ -73,6 +73,7 @@ export type ReadActiveEstimateProposalLinkForInternalResult = {
     proposalLinkId: string;
     recipientEmailSnapshot: string | null;
     expiresAt: string;
+    sentAt: string | null;
     status: typeof ESTIMATE_PROPOSAL_LINK_ACTIVE_STATUS;
   } | null;
 };
@@ -84,6 +85,37 @@ function normalizeRecipientEmail(value?: string | null) {
 
 function createProposalLinkToken() {
   return randomBytes(32).toString("base64url");
+}
+
+const proposalLinkRawTokenCache = new Map<string, { rawToken: string; expiresAtIso: string }>();
+
+function setCachedProposalLinkRawToken(params: {
+  proposalLinkId: string;
+  rawToken: string;
+  expiresAtIso: string;
+}) {
+  const proposalLinkId = String(params.proposalLinkId ?? "").trim();
+  const rawToken = String(params.rawToken ?? "").trim();
+  const expiresAtIso = String(params.expiresAtIso ?? "").trim();
+
+  if (!proposalLinkId || !rawToken || !expiresAtIso) return;
+  proposalLinkRawTokenCache.set(proposalLinkId, { rawToken, expiresAtIso });
+}
+
+export function readCachedEstimateProposalLinkRawToken(params: { proposalLinkId: string }) {
+  const proposalLinkId = String(params.proposalLinkId ?? "").trim();
+  if (!proposalLinkId) return null;
+
+  const cached = proposalLinkRawTokenCache.get(proposalLinkId);
+  if (!cached) return null;
+
+  const expiresAt = Date.parse(cached.expiresAtIso);
+  if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+    proposalLinkRawTokenCache.delete(proposalLinkId);
+    return null;
+  }
+
+  return cached.rawToken;
 }
 
 export function hashEstimateProposalLinkToken(rawToken: string) {
@@ -371,6 +403,12 @@ export async function issueEstimateProposalLink(params: {
       },
     });
 
+    setCachedProposalLinkRawToken({
+      proposalLinkId: insertResult.proposalLink.id,
+      rawToken,
+      expiresAtIso: insertResult.proposalLink.expiresAt,
+    });
+
     return {
       success: true,
       proposalLinkId: insertResult.proposalLink.id,
@@ -473,6 +511,12 @@ export async function regenerateEstimateProposalLink(params: {
         source: "internal",
         link_delivery_mode: "manual_link_foundation",
       },
+    });
+
+    setCachedProposalLinkRawToken({
+      proposalLinkId: insertResult.proposalLink.id,
+      rawToken,
+      expiresAtIso: insertResult.proposalLink.expiresAt,
     });
 
     return {
@@ -645,6 +689,7 @@ export async function readActiveEstimateProposalLinkForInternal(params: {
         proposalLinkId: activeLink.id,
         recipientEmailSnapshot: activeLink.recipient_email_snapshot,
         expiresAt: activeLink.expires_at,
+        sentAt: activeLink.sent_at,
         status: ESTIMATE_PROPOSAL_LINK_ACTIVE_STATUS,
       },
     };

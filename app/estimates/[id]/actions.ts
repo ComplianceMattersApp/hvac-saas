@@ -37,10 +37,15 @@ import {
   type EstimateProposalLinkActionState,
 } from "./proposal-link-action-state";
 import { sendEstimateCommunication } from "@/lib/estimates/estimate-communication";
+import { sendEstimateProposalEmail } from "@/lib/estimates/estimate-proposal-email";
 import {
   isEstimateProposalLinksEnabled,
   isEstimatesEnabled,
 } from "@/lib/estimates/estimate-exposure";
+import {
+  initialProposalEmailActionState,
+  type ProposalEmailActionState,
+} from "./proposal-email-action-state";
 
 type TransitionTargetStatus = "sent" | "approved" | "declined" | "expired" | "cancelled";
 
@@ -194,6 +199,64 @@ export async function sendEstimateFromForm(formData: FormData) {
 
   await sendEstimateCommunication({ estimateId, recipientEmail });
   revalidatePath(`/estimates/${estimateId}`);
+}
+
+/**
+ * Attempt proposal-email delivery for a sent estimate.
+ * Backend-only foundation wrapper; no UI contract yet.
+ */
+export async function sendEstimateProposalEmailFromForm(
+  formData: FormData
+): Promise<ProposalEmailActionState> {
+  if (!isEstimatesEnabled()) {
+    return {
+      ...initialProposalEmailActionState,
+      success: false,
+      error: "Estimates are currently unavailable.",
+      code: "estimates_unavailable",
+    };
+  }
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  const recipientEmail = String(formData.get("recipient_email") ?? "").trim();
+
+  if (!estimateId) {
+    return {
+      ...initialProposalEmailActionState,
+      success: false,
+      error: "Estimate not found.",
+      code: "estimate_not_found",
+    };
+  }
+
+  if (!recipientEmail) {
+    return {
+      ...initialProposalEmailActionState,
+      success: false,
+      error: "Recipient email is required.",
+      code: "recipient_required",
+    };
+  }
+
+  const result = await sendEstimateProposalEmail({ estimateId, recipientEmail });
+  if (result.success) {
+    revalidatePath(`/estimates/${estimateId}`);
+    return {
+      success: true,
+      error: null,
+      attemptStatus: result.attemptStatus,
+      communicationId: result.communicationId,
+      proposalLinkId: result.proposalLinkId,
+      providerMessageId: result.providerMessageId,
+      emailDisabled: result.emailDisabled,
+    };
+  }
+
+  return {
+    success: false,
+    error: result.error,
+    code: result.code,
+  };
 }
 
 /**
