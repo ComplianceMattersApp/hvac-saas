@@ -16,9 +16,9 @@ describe("/jobs/new ECC-only guided alignment", () => {
     expect(formSource).toContain('? "New Work Order"');
     expect(formSource).toContain('? "New ECC Job"');
     expect(formSource).toContain(
-      '"Select the customer and location, define the compliance work, then create the job."',
+      '"Select the responsible account and service location, define the compliance work, then create the job."',
     );
-    expect(formSource).toContain('"Find the customer and confirm where the compliance job should happen."');
+    expect(formSource).toContain('"Select the customer / responsible account and confirm where the compliance job should happen."');
   });
 
   it("uses ECC-specific create copy when the account is ecc_hers", () => {

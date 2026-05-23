@@ -71,6 +71,14 @@ type LocationLookupRow = {
   postal_code?: string | null;
 };
 
+type LocationSiteAccessHintRow = {
+  location_id: string;
+  display_name: string;
+  phone_e164: string | null;
+  email: string | null;
+  notes: string | null;
+};
+
 type MyContractor = { id: string; name: string } | null;
 
 type MaintenanceAgreementPrefill = {
@@ -158,6 +166,11 @@ type NewJobDraft = {
   billingCity?: string;
   billingState?: string;
   billingZip?: string;
+  siteAccessContactDifferent?: boolean;
+  siteAccessContactName?: string;
+  siteAccessContactPhone?: string;
+  siteAccessContactEmail?: string;
+  siteAccessContactNotes?: string;
   systems?: EquipmentSystem[];
   locationId?: string;
   visitScopeSummary?: string;
@@ -398,6 +411,7 @@ export default function NewJobForm({
   initialJobType,
   productMode = "hybrid",
   pricebookTemplateItems = [],
+  locationSiteAccessHints = [],
   maintenanceAgreementPrefill,
   maintenanceAgreementPrefillStatus = null,
 }: {
@@ -414,6 +428,7 @@ export default function NewJobForm({
   initialJobType?: "ecc" | "service";
   productMode?: ProductMode;
   pricebookTemplateItems?: VisitScopePricebookTemplateItem[];
+  locationSiteAccessHints?: LocationSiteAccessHintRow[];
   maintenanceAgreementPrefill?: MaintenanceAgreementPrefill | null;
   maintenanceAgreementPrefillStatus?: "unavailable" | null;
 }) {
@@ -461,6 +476,11 @@ export default function NewJobForm({
   const [newLocationCity, setNewLocationCity] = useState("");
   const [newLocationState, setNewLocationState] = useState("CA");
   const [newLocationZip, setNewLocationZip] = useState("");
+  const [siteAccessContactDifferent, setSiteAccessContactDifferent] = useState(false);
+  const [siteAccessContactName, setSiteAccessContactName] = useState("");
+  const [siteAccessContactPhone, setSiteAccessContactPhone] = useState("");
+  const [siteAccessContactEmail, setSiteAccessContactEmail] = useState("");
+  const [siteAccessContactNotes, setSiteAccessContactNotes] = useState("");
   const [newCustomerFirstName, setNewCustomerFirstName] = useState("");
   const [newCustomerLastName, setNewCustomerLastName] = useState("");
   const [newCustomerPhone, setNewCustomerPhone] = useState("");
@@ -500,6 +520,7 @@ export default function NewJobForm({
 const [billingRecipient, setBillingRecipient] = useState<
     "contractor" | "customer" | "other"
   >(myContractor?.id ? "contractor" : "customer");
+  const [billingRecipientDifferent, setBillingRecipientDifferent] = useState(false);
 
   const [projectType, setProjectType] = useState<
     "alteration" | "all_new" | "new_construction"
@@ -684,8 +705,8 @@ const [billingRecipient, setBillingRecipient] = useState<
   const compactHeaderHelper = isContractorMode
     ? "Enter customer and work details, then submit for review."
     : productMode === "ecc_hers"
-      ? "Select the customer and location, define the compliance work, then create the job."
-      : "Select a customer, choose the work, then create the job.";
+      ? "Select the responsible account and service location, define the compliance work, then create the job."
+      : "Select the responsible account, choose the work, then create the job.";
   const internalModeHint =
     isHvacServiceMode
       ? "HVAC Service accounts use the Service / Work Order family by default and presentation."
@@ -724,10 +745,10 @@ const [billingRecipient, setBillingRecipient] = useState<
     ? "Complete the required intake details to create this ECC job."
     : "Complete the required intake details to create this work order.";
   const customerSectionDescription = isHvacServiceMode
-    ? "Find the customer and confirm where the work order should happen."
+    ? "Select the customer / responsible account and confirm where the work order should happen."
     : productMode === "ecc_hers"
-      ? "Find the customer and confirm where the compliance job should happen."
-      : "Find the customer and confirm where the work order should happen.";
+      ? "Select the customer / responsible account and confirm where the compliance job should happen."
+      : "Select the customer / responsible account and confirm where the work order should happen.";
 
   useEffect(() => {
     if (jobType === modeSafeJobType) return;
@@ -746,6 +767,20 @@ const [billingRecipient, setBillingRecipient] = useState<
     }
   }, [billingRecipient, contractorId, isHvacServiceInternalMode]);
 
+  useEffect(() => {
+    if (!isInternalMode) return;
+    if (modeSafeJobType !== "service") return;
+
+    if (billingRecipientDifferent) {
+      if (billingRecipient !== "other") setBillingRecipient("other");
+      return;
+    }
+
+    if (billingRecipient !== "customer") {
+      setBillingRecipient("customer");
+    }
+  }, [billingRecipient, billingRecipientDifferent, isInternalMode, modeSafeJobType]);
+
   const selectedCustomer = useMemo(
     () => guidedCustomers.find((c) => c.id === selectedCustomerId) ?? null,
     [guidedCustomers, selectedCustomerId],
@@ -760,6 +795,21 @@ const [billingRecipient, setBillingRecipient] = useState<
     () => selectedCustomerLocations.find((l) => l.id === locationId) ?? null,
     [selectedCustomerLocations, locationId],
   );
+
+  const locationSiteAccessHintById = useMemo(() => {
+    const map = new Map<string, LocationSiteAccessHintRow>();
+    for (const row of locationSiteAccessHints) {
+      const locationIdValue = String(row.location_id ?? "").trim();
+      if (!locationIdValue || map.has(locationIdValue)) continue;
+      map.set(locationIdValue, row);
+    }
+    return map;
+  }, [locationSiteAccessHints]);
+
+  const selectedLocationSiteAccessHint = useMemo(() => {
+    if (!locationId) return null;
+    return locationSiteAccessHintById.get(locationId) ?? null;
+  }, [locationId, locationSiteAccessHintById]);
 
   const selectedCustomerPrimaryLocation = useMemo(
     () => selectedCustomerLocations[0] ?? customerPrimaryLocationMap.get(selectedCustomerId) ?? null,
@@ -865,21 +915,21 @@ const [billingRecipient, setBillingRecipient] = useState<
     if (!isInternalMode) return "";
     if (createNewCustomer) {
       if (hasNewCustomerDetails && hasNewLocationDetails) {
-        return "New customer and service location details are complete.";
+        return "New responsible account and service location details are complete.";
       }
-      return "Creating a new customer and service location. Complete the customer and address details to continue.";
+      return "Creating a new responsible account and service location. Complete the account and address details to continue.";
     }
     if (selectedCustomerId && locationMode === "new") {
       if (hasNewLocationDetails) {
-        return "Customer confirmed. New service location details are complete.";
+        return "Responsible account confirmed. New service location details are complete.";
       }
-      return "Customer confirmed. Complete the new service location details to continue.";
+      return "Responsible account confirmed. Complete the new service location details to continue.";
     }
     if (selectedCustomerId && locationMode === "existing" && locationId) {
-      return "Customer and service location confirmed.";
+      return "Responsible account and service location confirmed.";
     }
     if (selectedCustomerId && locationMode === "existing" && !locationId) {
-      return "Customer confirmed. Select a service location to continue.";
+      return "Responsible account confirmed. Select a service location to continue.";
     }
     return "Resolve customer and location";
   }, [
@@ -923,6 +973,10 @@ const [billingRecipient, setBillingRecipient] = useState<
     isInternalMode && !createNewCustomer && selectedCustomerId && locationMode === "existing" && locationId,
   );
 
+  const shouldShowSiteAccessToggle = Boolean(
+    isInternalMode && (createNewCustomer || selectedCustomerId),
+  );
+
   const relationshipJobs = useMemo(() => {
     return [...relationshipContext.activeJobs, ...relationshipContext.recentJobs];
   }, [relationshipContext.activeJobs, relationshipContext.recentJobs]);
@@ -952,11 +1006,15 @@ const [billingRecipient, setBillingRecipient] = useState<
         ? "Review the ECC setup, project details, optional scope, scheduling, billing, and additional details before creating the job."
         : "Choose the job family and relationship path before defining the job scope for this trip.";
   const billingRecipientLabel =
-    billingRecipient === "contractor"
-      ? "Contractor"
-      : billingRecipient === "customer"
-        ? "Customer"
-        : "Custom billing";
+    modeSafeJobType === "service"
+      ? billingRecipientDifferent
+        ? "Custom billing/paperwork"
+        : "Responsible account (default)"
+      : billingRecipient === "contractor"
+        ? "Contractor"
+        : billingRecipient === "customer"
+          ? "Customer"
+          : "Custom billing";
   const createSectionSummary = isSubmitReady ? createReadyLabel : createPendingLabel;
 
   const equipmentJson = useMemo(() => {
@@ -1018,6 +1076,11 @@ const [billingRecipient, setBillingRecipient] = useState<
         billingCity,
         billingState,
         billingZip,
+        siteAccessContactDifferent,
+        siteAccessContactName,
+        siteAccessContactPhone,
+        siteAccessContactEmail,
+        siteAccessContactNotes,
         systems,
         locationId,
         visitScopeSummary,
@@ -1084,6 +1147,12 @@ const [billingRecipient, setBillingRecipient] = useState<
     setBillingCity(d.billingCity ?? "");
     setBillingState(d.billingState ?? "CA");
     setBillingZip(d.billingZip ?? "");
+    setSiteAccessContactDifferent(Boolean(d.siteAccessContactDifferent));
+    setSiteAccessContactName(d.siteAccessContactName ?? "");
+    setSiteAccessContactPhone(d.siteAccessContactPhone ?? "");
+    setSiteAccessContactEmail(d.siteAccessContactEmail ?? "");
+    setSiteAccessContactNotes(d.siteAccessContactNotes ?? "");
+    setBillingRecipientDifferent((d.billingRecipient ?? "customer") === "other");
 
     setSystems(Array.isArray(d.systems) ? d.systems : []);
     setVisitScopeSummary(d.visitScopeSummary ?? "");
@@ -1660,8 +1729,10 @@ const [billingRecipient, setBillingRecipient] = useState<
                 const v = e.target.value;
                 setContractorId(v);
                 // Let server decide default, but keep UI sensible
-                if (v && billingRecipient === "customer") setBillingRecipient("contractor");
-                if (!v && billingRecipient === "contractor") setBillingRecipient("customer");
+                if (modeSafeJobType !== "service") {
+                  if (v && billingRecipient === "customer") setBillingRecipient("contractor");
+                  if (!v && billingRecipient === "contractor") setBillingRecipient("customer");
+                }
               }}
             >
               <option value="">- None -</option>
@@ -1827,9 +1898,9 @@ const [billingRecipient, setBillingRecipient] = useState<
         <section className={guidedSectionShellClass}>
           {renderGuidedSectionIntro({
             icon: <MapPinned className="h-4 w-4" aria-hidden="true" />,
-            title: "Customer & Location",
+            title: "Responsible Account & Service Location",
             description: customerSectionDescription,
-            summary: internalResolutionReady ? `${selectedCustomerSummary} — ${selectedLocationSummary}` : "Find or create the customer, then confirm the service location.",
+            summary: internalResolutionReady ? `${selectedCustomerSummary} — ${selectedLocationSummary}` : "Select or create the responsible account, then confirm the service location.",
             tone: customerSectionTone,
             action:
               selectedCustomerId && !createNewCustomer && !isCustomerContextInternalMode ? (
@@ -1864,9 +1935,9 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                     <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Step 1</p>
-                    <h3 className="mt-1 text-lg font-semibold text-slate-950">Find or create customer</h3>
+                    <h3 className="mt-1 text-lg font-semibold text-slate-950">Select or create responsible account</h3>
                     <p className="mt-1 max-w-xl text-sm leading-6 text-slate-600">
-                      Search customer name, phone, or address.
+                      Who is responsible for this work?
                     </p>
                   </div>
                     <div className="flex flex-col items-end gap-2 flex-none">
@@ -1882,7 +1953,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                         }}
                         className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-all duration-150 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                       >
-                        + New Customer
+                        + New Responsible Account
                       </button>
                     </div>
                   </div>
@@ -1890,7 +1961,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <div className="rounded-xl border border-slate-200/85 bg-white p-3 shadow-sm">
                     <div className="mb-2 flex items-center justify-between gap-3">
                       <label htmlFor="internal_customer_finder" className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
-                        Customer Finder
+                        Responsible Account Finder
                       </label>
                       <span className="text-[11px] font-medium text-slate-500">
                         {hasMeaningfulCustomerQuery
@@ -1903,7 +1974,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                       type="search"
                       value={guidedCustomerQuery}
                       onChange={(e) => setGuidedCustomerQuery(e.target.value)}
-                      placeholder="Search customer name, phone, or address"
+                      placeholder="Search responsible account name, phone, or address"
                       autoFocus
                       className="w-full rounded-xl border-2 border-slate-200 bg-white px-3 py-3 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-4 focus:ring-blue-100"
                     />
@@ -1968,7 +2039,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <div className={guidedSectionInsetClass}>
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Selected customer</p>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Selected responsible account</p>
                         <p className="mt-1 text-base font-semibold text-slate-900">{customerDisplayName(selectedCustomer as CustomerLookupRow)}</p>
                         <p className="mt-1 text-xs text-slate-500">
                           {String(selectedCustomer?.phone ?? "").trim() || "No phone"}
@@ -2200,7 +2271,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">Create new customer and location</p>
+                      <p className="text-sm font-semibold text-slate-900">Create new responsible account and location</p>
                       <p className="mt-0.5 text-xs text-slate-500">Use this only when a reliable existing match is not available.</p>
                     </div>
                     <button
@@ -2292,6 +2363,81 @@ const [billingRecipient, setBillingRecipient] = useState<
                       onChange={(e) => setNewLocationZip(e.target.value)}
                     />
                   </div>
+                </div>
+              ) : null}
+
+              {shouldShowSiteAccessToggle ? (
+                <div className={`${guidedSectionInsetClass} space-y-3`}>
+                  <div className="space-y-1.5">
+                    <label className="flex items-center gap-2 text-sm font-medium text-slate-900">
+                      <input
+                        type="checkbox"
+                        checked={siteAccessContactDifferent}
+                        onChange={(e) => setSiteAccessContactDifferent(e.target.checked)}
+                      />
+                      Different site/access contact?
+                    </label>
+                    <p className="text-xs leading-5 text-slate-600">
+                      Use this when the tech should contact a tenant, occupant, or on-site person instead of the responsible account.
+                    </p>
+                    {!siteAccessContactDifferent ? (
+                      <p className="text-xs text-slate-500">Defaults to responsible account contact details.</p>
+                    ) : null}
+                  </div>
+
+                  {selectedLocationSiteAccessHint && !siteAccessContactDifferent ? (
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs text-slate-700">
+                      <div className="font-semibold text-slate-900">Saved site/access contact on location</div>
+                      <div className="mt-1">{selectedLocationSiteAccessHint.display_name}</div>
+                      {selectedLocationSiteAccessHint.phone_e164 ? (
+                        <div className="mt-0.5">Phone: {selectedLocationSiteAccessHint.phone_e164}</div>
+                      ) : null}
+                      {selectedLocationSiteAccessHint.email ? (
+                        <div className="mt-0.5 break-all">Email: {selectedLocationSiteAccessHint.email}</div>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  <input
+                    type="hidden"
+                    name="site_access_contact_different"
+                    value={siteAccessContactDifferent ? "1" : "0"}
+                  />
+
+                  {siteAccessContactDifferent ? (
+                    <div className="space-y-2 rounded-xl bg-white p-3 ring-1 ring-slate-200/80">
+                      <input
+                        className="w-full rounded-md border border-slate-300 bg-white p-2"
+                        name="site_access_contact_name"
+                        placeholder="Name"
+                        value={siteAccessContactName}
+                        onChange={(e) => setSiteAccessContactName(e.target.value)}
+                      />
+                      <input
+                        className="w-full rounded-md border border-slate-300 bg-white p-2"
+                        name="site_access_contact_phone"
+                        placeholder="Phone"
+                        value={siteAccessContactPhone}
+                        onChange={(e) => setSiteAccessContactPhone(e.target.value)}
+                      />
+                      <input
+                        type="email"
+                        className="w-full rounded-md border border-slate-300 bg-white p-2"
+                        name="site_access_contact_email"
+                        placeholder="Email"
+                        value={siteAccessContactEmail}
+                        onChange={(e) => setSiteAccessContactEmail(e.target.value)}
+                      />
+                      <textarea
+                        className="w-full rounded-md border border-slate-300 bg-white p-2"
+                        name="site_access_contact_notes"
+                        rows={2}
+                        placeholder="Access notes (optional)"
+                        value={siteAccessContactNotes}
+                        onChange={(e) => setSiteAccessContactNotes(e.target.value)}
+                      />
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -2802,117 +2948,221 @@ const [billingRecipient, setBillingRecipient] = useState<
 
                 {isInternalMode ? (
                   <div className={`${guidedSectionInsetClass} space-y-3`}>
-                    <label className="block text-sm font-medium text-slate-900">Billing Recipient</label>
+                    <label className="block text-sm font-medium text-slate-900">Billing / Paperwork Recipient</label>
 
-                    <div className="flex flex-col gap-2">
-                      {!isHvacServiceInternalMode ? (
-                        <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                    {modeSafeJobType === "service" ? (
+                      <>
+                        <p className="text-xs leading-5 text-slate-600">
+                          Billing and paperwork default to the responsible account.
+                        </p>
+                        <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900">
                           <input
-                            type="radio"
-                            name="_billingRecipientUi"
-                            value="contractor"
-                            checked={billingRecipient === "contractor"}
-                            onChange={() => setBillingRecipient("contractor")}
-                            disabled={Boolean(!myContractor?.id && !contractorId)}
+                            type="checkbox"
+                            checked={billingRecipientDifferent}
+                            onChange={(e) => {
+                              const checked = e.target.checked;
+                              setBillingRecipientDifferent(checked);
+                              if (!checked) {
+                                setBillingName("");
+                                setBillingEmail("");
+                                setBillingPhone("");
+                                setBillingAddr1("");
+                                setBillingAddr2("");
+                                setBillingCity("");
+                                setBillingState("CA");
+                                setBillingZip("");
+                              }
+                            }}
                           />
-                          Contractor (company)
-                          {!myContractor?.id && !contractorId && (
-                            <span className="text-xs text-slate-500">(select contractor first)</span>
-                          )}
+                          Different billing/paperwork recipient?
                         </label>
-                      ) : null}
 
-                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
                         <input
-                          type="radio"
-                          name="_billingRecipientUi"
-                          value="customer"
-                          checked={billingRecipient === "customer"}
-                          onChange={() => setBillingRecipient("customer")}
+                          type="hidden"
+                          name="billing_recipient"
+                          value={billingRecipientDifferent ? "other" : "customer"}
                         />
-                        Customer / Homeowner
-                      </label>
 
-                      <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                        <input
-                          type="radio"
-                          name="_billingRecipientUi"
-                          value="other"
-                          checked={billingRecipient === "other"}
-                          onChange={() => setBillingRecipient("other")}
-                        />
-                        Other (custom)
-                      </label>
-                    </div>
+                        {billingRecipientDifferent ? (
+                          <div className="mt-2 space-y-2 rounded-xl bg-white p-3 ring-1 ring-slate-200/80">
+                            <div className="text-xs text-slate-600">
+                              Use this only when invoices or paperwork should go somewhere other than the responsible account.
+                            </div>
 
-                    <input type="hidden" name="billing_recipient" value={billingRecipient} />
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_name"
+                              placeholder="Billing name"
+                              value={billingName}
+                              onChange={(e) => setBillingName(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_email"
+                              placeholder="Billing email (optional)"
+                              value={billingEmail}
+                              onChange={(e) => setBillingEmail(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_phone"
+                              placeholder="Billing phone (optional)"
+                              value={billingPhone}
+                              onChange={(e) => setBillingPhone(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_address_line1"
+                              placeholder="Address line 1"
+                              value={billingAddr1}
+                              onChange={(e) => setBillingAddr1(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_address_line2"
+                              placeholder="Address line 2 (optional)"
+                              value={billingAddr2}
+                              onChange={(e) => setBillingAddr2(e.target.value)}
+                            />
+                            <div className="grid grid-cols-3 gap-2">
+                              <input
+                                className="col-span-2 w-full rounded-md border border-slate-300 bg-white p-2"
+                                name="billing_city"
+                                placeholder="City"
+                                value={billingCity}
+                                onChange={(e) => setBillingCity(e.target.value)}
+                              />
+                              <input
+                                className="w-full rounded-md border border-slate-300 bg-white p-2"
+                                name="billing_state"
+                                placeholder="State"
+                                value={billingState}
+                                onChange={(e) => setBillingState(e.target.value)}
+                              />
+                            </div>
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_zip"
+                              placeholder="ZIP"
+                              value={billingZip}
+                              onChange={(e) => setBillingZip(e.target.value)}
+                            />
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <>
+                        <div className="flex flex-col gap-2">
+                          {!isHvacServiceInternalMode ? (
+                            <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                              <input
+                                type="radio"
+                                name="_billingRecipientUi"
+                                value="contractor"
+                                checked={billingRecipient === "contractor"}
+                                onChange={() => setBillingRecipient("contractor")}
+                                disabled={Boolean(!myContractor?.id && !contractorId)}
+                              />
+                              Contractor (company)
+                              {!myContractor?.id && !contractorId && (
+                                <span className="text-xs text-slate-500">(select contractor first)</span>
+                              )}
+                            </label>
+                          ) : null}
 
-                    {billingRecipient === "other" ? (
-                      <div className="mt-2 space-y-2 rounded-xl bg-white p-3 ring-1 ring-slate-200/80">
-                        <div className="text-xs text-slate-600">
-                          If billing is Other, please enter billing name + address.
+                          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                            <input
+                              type="radio"
+                              name="_billingRecipientUi"
+                              value="customer"
+                              checked={billingRecipient === "customer"}
+                              onChange={() => setBillingRecipient("customer")}
+                            />
+                            Customer / Homeowner
+                          </label>
+
+                          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                            <input
+                              type="radio"
+                              name="_billingRecipientUi"
+                              value="other"
+                              checked={billingRecipient === "other"}
+                              onChange={() => setBillingRecipient("other")}
+                            />
+                            Other (custom)
+                          </label>
                         </div>
 
-                        <input
-                          className="w-full rounded-md border border-slate-300 bg-white p-2"
-                          name="billing_name"
-                          placeholder="Billing name"
-                          value={billingName}
-                          onChange={(e) => setBillingName(e.target.value)}
-                        />
-                        <input
-                          className="w-full rounded-md border border-slate-300 bg-white p-2"
-                          name="billing_email"
-                          placeholder="Billing email (optional)"
-                          value={billingEmail}
-                          onChange={(e) => setBillingEmail(e.target.value)}
-                        />
-                        <input
-                          className="w-full rounded-md border border-slate-300 bg-white p-2"
-                          name="billing_phone"
-                          placeholder="Billing phone (optional)"
-                          value={billingPhone}
-                          onChange={(e) => setBillingPhone(e.target.value)}
-                        />
-                        <input
-                          className="w-full rounded-md border border-slate-300 bg-white p-2"
-                          name="billing_address_line1"
-                          placeholder="Address line 1"
-                          value={billingAddr1}
-                          onChange={(e) => setBillingAddr1(e.target.value)}
-                        />
-                        <input
-                          className="w-full rounded-md border border-slate-300 bg-white p-2"
-                          name="billing_address_line2"
-                          placeholder="Address line 2 (optional)"
-                          value={billingAddr2}
-                          onChange={(e) => setBillingAddr2(e.target.value)}
-                        />
-                        <div className="grid grid-cols-3 gap-2">
-                          <input
-                            className="col-span-2 w-full rounded-md border border-slate-300 bg-white p-2"
-                            name="billing_city"
-                            placeholder="City"
-                            value={billingCity}
-                            onChange={(e) => setBillingCity(e.target.value)}
-                          />
-                          <input
-                            className="w-full rounded-md border border-slate-300 bg-white p-2"
-                            name="billing_state"
-                            placeholder="State"
-                            value={billingState}
-                            onChange={(e) => setBillingState(e.target.value)}
-                          />
-                        </div>
-                        <input
-                          className="w-full rounded-md border border-slate-300 bg-white p-2"
-                          name="billing_zip"
-                          placeholder="ZIP"
-                          value={billingZip}
-                          onChange={(e) => setBillingZip(e.target.value)}
-                        />
-                      </div>
-                    ) : null}
+                        <input type="hidden" name="billing_recipient" value={billingRecipient} />
+
+                        {billingRecipient === "other" ? (
+                          <div className="mt-2 space-y-2 rounded-xl bg-white p-3 ring-1 ring-slate-200/80">
+                            <div className="text-xs text-slate-600">
+                              If billing is Other, please enter billing name + address.
+                            </div>
+
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_name"
+                              placeholder="Billing name"
+                              value={billingName}
+                              onChange={(e) => setBillingName(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_email"
+                              placeholder="Billing email (optional)"
+                              value={billingEmail}
+                              onChange={(e) => setBillingEmail(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_phone"
+                              placeholder="Billing phone (optional)"
+                              value={billingPhone}
+                              onChange={(e) => setBillingPhone(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_address_line1"
+                              placeholder="Address line 1"
+                              value={billingAddr1}
+                              onChange={(e) => setBillingAddr1(e.target.value)}
+                            />
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_address_line2"
+                              placeholder="Address line 2 (optional)"
+                              value={billingAddr2}
+                              onChange={(e) => setBillingAddr2(e.target.value)}
+                            />
+                            <div className="grid grid-cols-3 gap-2">
+                              <input
+                                className="col-span-2 w-full rounded-md border border-slate-300 bg-white p-2"
+                                name="billing_city"
+                                placeholder="City"
+                                value={billingCity}
+                                onChange={(e) => setBillingCity(e.target.value)}
+                              />
+                              <input
+                                className="w-full rounded-md border border-slate-300 bg-white p-2"
+                                name="billing_state"
+                                placeholder="State"
+                                value={billingState}
+                                onChange={(e) => setBillingState(e.target.value)}
+                              />
+                            </div>
+                            <input
+                              className="w-full rounded-md border border-slate-300 bg-white p-2"
+                              name="billing_zip"
+                              placeholder="ZIP"
+                              value={billingZip}
+                              onChange={(e) => setBillingZip(e.target.value)}
+                            />
+                          </div>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 ) : null}
                 </div>

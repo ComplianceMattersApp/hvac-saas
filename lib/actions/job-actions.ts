@@ -6896,6 +6896,17 @@ const billing_city = String(formData.get("billing_city") || "").trim() || null;
 const billing_state = String(formData.get("billing_state") || "").trim() || null;
 const billing_zip = String(formData.get("billing_zip") || "").trim() || null;
 
+const site_access_contact_different =
+  String(formData.get("site_access_contact_different") || "").trim() === "1";
+const site_access_contact_name =
+  String(formData.get("site_access_contact_name") || "").trim() || null;
+const site_access_contact_phone =
+  String(formData.get("site_access_contact_phone") || "").trim() || null;
+const site_access_contact_email =
+  String(formData.get("site_access_contact_email") || "").trim().toLowerCase() || null;
+const site_access_contact_notes =
+  String(formData.get("site_access_contact_notes") || "").trim() || null;
+
 const { scheduled_date: derived_scheduled_date, window_start: derived_window_start, window_end: derived_window_end, ops_status: derived_ops_status } =
   deriveScheduleAndOps(formData);
 
@@ -7186,6 +7197,103 @@ if (!canonicalOwnerUserId) {
     jobAddress?: string | null;
   }) {
     return findRecentDuplicateJob(params);
+  }
+
+  function normalizeSiteAccessPhoneE164(value: string | null) {
+    const raw = String(value ?? "").trim();
+    if (!raw) return null;
+
+    const compact = raw.replace(/[\s().-]/g, "");
+    const digits = compact.replace(/\D/g, "");
+
+    if (compact.startsWith("+")) {
+      if (digits.length >= 8 && digits.length <= 15) return `+${digits}`;
+      return null;
+    }
+
+    if (digits.length === 10) return `+1${digits}`;
+    if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+    if (digits.length >= 8 && digits.length <= 15) return `+${digits}`;
+
+    return null;
+  }
+
+  function normalizeSiteAccessEmail(value: string | null) {
+    const normalized = String(value ?? "").trim().toLowerCase();
+    if (!normalized) return null;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalized)) return null;
+    return normalized;
+  }
+
+  function phoneLast10FromE164(value: string | null) {
+    if (!value) return null;
+    const digits = String(value).replace(/\D/g, "");
+    return digits.length >= 10 ? digits.slice(-10) : null;
+  }
+
+  async function maybeCreateLocationSiteAccessContact(locationId: string) {
+    if (isContractorUser) return;
+    if (!site_access_contact_different) return;
+
+    const linkedLocationId = String(locationId ?? "").trim();
+    if (!linkedLocationId) return;
+
+    const displayName = String(site_access_contact_name ?? "").trim().slice(0, 120);
+    const phoneE164 = normalizeSiteAccessPhoneE164(site_access_contact_phone);
+    const phoneLast10 = phoneLast10FromE164(phoneE164);
+    const email = normalizeSiteAccessEmail(site_access_contact_email);
+    const notes = String(site_access_contact_notes ?? "").trim().slice(0, 500) || null;
+
+    if (!displayName) return;
+    if (!phoneE164 && !email) return;
+
+    const { data: existingContactRows, error: existingContactErr } = await canonicalWriteClient
+      .from("contact_recipients")
+      .select("id, display_name, phone_e164, email")
+      .eq("account_owner_user_id", canonicalOwnerUserId)
+      .eq("linked_entity_type", "location")
+      .eq("linked_entity_id", linkedLocationId)
+      .eq("recipient_role", "site_access_contact")
+      .eq("status", "active")
+      .limit(25);
+
+    if (existingContactErr) throw existingContactErr;
+
+    const alreadyExists = (existingContactRows ?? []).some((row: any) => {
+      const existingName = String(row?.display_name ?? "").trim().toLowerCase();
+      const existingPhone = String(row?.phone_e164 ?? "").trim();
+      const existingEmail = String(row?.email ?? "").trim().toLowerCase();
+      return (
+        existingName === displayName.toLowerCase() &&
+        existingPhone === String(phoneE164 ?? "") &&
+        existingEmail === String(email ?? "")
+      );
+    });
+
+    if (alreadyExists) return;
+
+    const preferredContactMethod = phoneE164 ? "phone" : email ? "email" : "none";
+
+    const { error: insertSiteAccessErr } = await canonicalWriteClient
+      .from("contact_recipients")
+      .insert({
+        account_owner_user_id: canonicalOwnerUserId,
+        linked_entity_type: "location",
+        linked_entity_id: linkedLocationId,
+        recipient_role: "site_access_contact",
+        display_name: displayName,
+        phone_e164: phoneE164,
+        phone_last10: phoneLast10,
+        email,
+        preferred_contact_method: preferredContactMethod,
+        notes,
+        source_type: "manual",
+        status: "active",
+        created_by_user_id: userId,
+        updated_by_user_id: userId,
+      });
+
+    if (insertSiteAccessErr) throw insertSiteAccessErr;
   }
 
 
@@ -8200,6 +8308,16 @@ if (existingCustomerId && !existingLocationId) {
     serviceCaseWriteClient: canonicalWriteClient,
   });
 
+  try {
+    await maybeCreateLocationSiteAccessContact(existingLocationId);
+  } catch (error) {
+    console.error("site_access_contact_create_failed", {
+      createdJobId: created.id,
+      linkedLocationId: existingLocationId,
+      error: error instanceof Error ? error.message : "Unknown site/access contact create error",
+    });
+  }
+
   // Attempt to create maintenance agreement visit link if this job came from service plan prefill
   if (maintenanceAgreementIdRaw && userId) {
     await createMaintenanceAgreementVisitLinkFromJobCreation({
@@ -8322,6 +8440,26 @@ const created = await createJob({
 }, {
   serviceCaseWriteClient: canonicalWriteClient,
 });
+
+  try {
+    await maybeCreateLocationSiteAccessContact(locationIdToUse);
+  } catch (error) {
+    console.error("site_access_contact_create_failed", {
+      createdJobId: created.id,
+      linkedLocationId: locationIdToUse,
+      error: error instanceof Error ? error.message : "Unknown site/access contact create error",
+    });
+  }
+
+try {
+  await maybeCreateLocationSiteAccessContact(locationIdToUse);
+} catch (error) {
+  console.error("site_access_contact_create_failed", {
+    createdJobId: created.id,
+    linkedLocationId: locationIdToUse,
+    error: error instanceof Error ? error.message : "Unknown site/access contact create error",
+  });
+}
 
 // Attempt to create maintenance agreement visit link if this job came from service plan prefill
 if (maintenanceAgreementIdRaw && userId) {

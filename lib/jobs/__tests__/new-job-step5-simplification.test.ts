@@ -25,7 +25,7 @@ describe("New job Step 5 simplification wiring", () => {
 
   it("uses compact top progress text", () => {
     expect(formSource).not.toContain("Step 1 of 5");
-    expect(formSource).toContain("Select a customer, choose the work, then create the job.");
+    expect(formSource).toContain("Select the responsible account, choose the work, then create the job.");
   });
 
   it("prioritizes current job scope above add controls", () => {

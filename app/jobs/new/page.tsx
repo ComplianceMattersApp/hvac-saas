@@ -48,6 +48,15 @@ type LocationLookupRow = {
   nickname: string | null;
 };
 
+type LocationSiteAccessHintRow = {
+  linked_entity_id: string | null;
+  display_name: string | null;
+  phone_e164: string | null;
+  email: string | null;
+  notes: string | null;
+  updated_at: string | null;
+};
+
 type ContractorMembershipRow = {
   contractor_id: string | null;
   contractors:
@@ -200,6 +209,13 @@ export default async function NewJobPage(props: {
   // Internal guided mode lookup data
   let customerLookupRows: CustomerLookupRow[] = [];
   let locationLookupRows: LocationLookupRow[] = [];
+  let locationSiteAccessHints: Array<{
+    location_id: string;
+    display_name: string;
+    phone_e164: string | null;
+    email: string | null;
+    notes: string | null;
+  }> = [];
   let maintenanceAgreementPrefill = null as Awaited<
     ReturnType<typeof resolveScopedMaintenanceAgreementJobPrefill>
   >;
@@ -282,6 +298,50 @@ export default async function NewJobPage(props: {
     }
   }
 
+  if (!myContractor?.id && accountOwnerUserId) {
+    const scopedLocationIds = customerContextMode
+      ? customerLocations.map((row) => String(row.id ?? "").trim()).filter(Boolean)
+      : locationLookupRows.map((row) => String(row.id ?? "").trim()).filter(Boolean);
+
+    if (scopedLocationIds.length > 0) {
+      const { data: siteAccessRows, error: siteAccessErr } = await supabase
+        .from("contact_recipients")
+        .select("linked_entity_id, display_name, phone_e164, email, notes, updated_at")
+        .eq("account_owner_user_id", accountOwnerUserId)
+        .eq("linked_entity_type", "location")
+        .eq("recipient_role", "site_access_contact")
+        .eq("status", "active")
+        .in("linked_entity_id", scopedLocationIds)
+        .order("updated_at", { ascending: false })
+        .limit(1500);
+
+      if (siteAccessErr) throw siteAccessErr;
+
+      const dedupedByLocation = new Map<string, {
+        location_id: string;
+        display_name: string;
+        phone_e164: string | null;
+        email: string | null;
+        notes: string | null;
+      }>();
+
+      (siteAccessRows as LocationSiteAccessHintRow[] | null ?? []).forEach((row) => {
+        const locationId = String(row.linked_entity_id ?? "").trim();
+        const displayName = String(row.display_name ?? "").trim();
+        if (!locationId || !displayName || dedupedByLocation.has(locationId)) return;
+        dedupedByLocation.set(locationId, {
+          location_id: locationId,
+          display_name: displayName,
+          phone_e164: row.phone_e164 ?? null,
+          email: row.email ?? null,
+          notes: row.notes ?? null,
+        });
+      });
+
+      locationSiteAccessHints = Array.from(dedupedByLocation.values());
+    }
+  }
+
   return (
     <NewJobForm
       contractors={contractors}
@@ -297,6 +357,7 @@ export default async function NewJobPage(props: {
       initialJobType={initialJobType}
       productMode={productMode}
       pricebookTemplateItems={pricebookTemplateItems}
+      locationSiteAccessHints={locationSiteAccessHints}
       maintenanceAgreementPrefill={maintenanceAgreementPrefill}
       maintenanceAgreementPrefillStatus={maintenanceAgreementPrefillStatus}
     />

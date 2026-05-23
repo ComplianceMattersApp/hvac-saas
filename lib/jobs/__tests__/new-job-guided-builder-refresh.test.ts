@@ -11,15 +11,15 @@ describe("/jobs/new guided builder refresh", () => {
   it("uses a shared guided-section shell for the main internal intake sections", () => {
     expect(formSource).toContain("guidedSectionShellClass");
     expect(formSource).toContain("renderGuidedSectionIntro({");
-    expect(formSource).toContain('title: "Customer & Location"');
+    expect(formSource).toContain('title: "Responsible Account & Service Location"');
     expect(formSource).toContain('title: "Schedule"');
     expect(formSource).toContain('title: "Additional Details"');
     expect(formSource).toContain('title: createSectionTitle');
   });
 
   it("shows summary-first guided copy instead of final confidence copy", () => {
-    expect(formSource).toContain("Find the customer and confirm where the work order should happen.");
-    expect(formSource).toContain("Find the customer and confirm where the compliance job should happen.");
+    expect(formSource).toContain("Select the customer / responsible account and confirm where the work order should happen.");
+    expect(formSource).toContain("Select the customer / responsible account and confirm where the compliance job should happen.");
     expect(formSource).toContain("Choose visit details and add the work scope.");
     expect(formSource).toContain("Leave unscheduled if timing is not set yet.");
     expect(formSource).toContain("Permit, equipment, photos, and comments stay secondary.");
@@ -41,7 +41,15 @@ describe("/jobs/new guided builder refresh", () => {
   it("folds internal billing controls into the guided Schedule section", () => {
     expect(formSource).toContain('title: "Schedule"');
     expect(formSource).toContain("Schedule the visit if needed, then confirm who gets billed later.");
-    expect(formSource).toContain("Billing Recipient");
+    expect(formSource).toContain("Billing / Paperwork Recipient");
+    expect(formSource).toContain("Different billing/paperwork recipient?");
+    expect(formSource).toContain("Billing and paperwork default to the responsible account.");
+  });
+
+  it("keeps site/access contact toggle collapsed by default", () => {
+    expect(formSource).toContain("Different site/access contact?");
+    expect(formSource).toContain('name="site_access_contact_different"');
+    expect(formSource).toContain("Defaults to responsible account contact details.");
   });
 
   it("collapses customer and existing-location selectors after they are chosen", () => {

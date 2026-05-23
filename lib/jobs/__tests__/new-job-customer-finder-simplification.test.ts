@@ -14,14 +14,14 @@ describe("New job customer finder simplification", () => {
   });
 
   it("uses field-first customer finder copy", () => {
-    expect(formSource).toContain("Search customer name, phone, or address.");
-    expect(formSource).toContain("Search customer name, phone, or address");
+    expect(formSource).toContain("Who is responsible for this work?");
+    expect(formSource).toContain("Search responsible account name, phone, or address");
     expect(formSource).toContain("No matching customers found.");
     expect(formSource).not.toContain("Type customer name to find the best match.");
   });
 
   it("keeps create-new customer path available", () => {
     expect(formSource).toContain("create-new-customer-shortcut");
-    expect(formSource).toContain("+ New Customer");
+    expect(formSource).toContain("+ New Responsible Account");
   });
 });

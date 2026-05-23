@@ -12,8 +12,8 @@ describe("NewJobForm — Create New Customer shortcut", () => {
     expect(formSource).toContain('id="create-new-customer-shortcut"');
   });
 
-  it("shortcut button label is '+ New Customer'", () => {
-    expect(formSource).toContain("+ New Customer");
+  it("shortcut button label is '+ New Responsible Account'", () => {
+    expect(formSource).toContain("+ New Responsible Account");
   });
 
   it("shortcut button calls setCreateNewCustomer(true)", () => {
