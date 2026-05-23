@@ -75,7 +75,7 @@ function createProposalLinkToken() {
   return randomBytes(32).toString("base64url");
 }
 
-function hashProposalLinkToken(rawToken: string) {
+export function hashEstimateProposalLinkToken(rawToken: string) {
   return createHash("sha256").update(rawToken).digest("hex");
 }
 
@@ -298,7 +298,7 @@ export async function issueEstimateProposalLink(params: {
   }
 
   const rawToken = createProposalLinkToken();
-  const tokenHash = hashProposalLinkToken(rawToken);
+  const tokenHash = hashEstimateProposalLinkToken(rawToken);
   const recipientEmailSnapshot = normalizeRecipientEmail(params.recipientEmailSnapshot);
   const expiresAt = buildDefaultExpiryIso();
 
@@ -392,7 +392,7 @@ export async function regenerateEstimateProposalLink(params: {
   }
 
   const rawToken = createProposalLinkToken();
-  const tokenHash = hashProposalLinkToken(rawToken);
+  const tokenHash = hashEstimateProposalLinkToken(rawToken);
   const recipientEmailSnapshot = normalizeRecipientEmail(
     params.recipientEmailSnapshot ?? activeLink?.recipient_email_snapshot ?? null
   );
@@ -527,6 +527,6 @@ export const __private__ = {
   ESTIMATE_PROPOSAL_LINK_TTL_DAYS,
   buildDefaultExpiryIso,
   createProposalLinkToken,
-  hashProposalLinkToken,
+  hashEstimateProposalLinkToken,
   normalizeRecipientEmail,
 };

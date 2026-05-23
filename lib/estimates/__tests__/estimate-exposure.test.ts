@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest";
-import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  isEstimatesEnabled,
+  isEstimateProposalLinksEnabled,
+} from "@/lib/estimates/estimate-exposure";
 
 describe("isEstimatesEnabled", () => {
   it("fails closed when unset or empty", () => {
@@ -25,5 +28,38 @@ describe("isEstimatesEnabled", () => {
     expect(isEstimatesEnabled("off")).toBe(false);
     expect(isEstimatesEnabled("no")).toBe(false);
     expect(isEstimatesEnabled("enabled")).toBe(false);
+  });
+});
+
+describe("isEstimateProposalLinksEnabled", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.ENABLE_ESTIMATE_PROPOSAL_LINKS;
+  });
+
+  it.each([undefined, null, "", " "])("fails closed for empty input %s", (value) => {
+    expect(isEstimateProposalLinksEnabled(value as string | null | undefined)).toBe(false);
+  });
+
+  it.each(["1", "true", "yes", "on", "  TRUE  "])(
+    "returns true for enabled token %s",
+    (value) => {
+      expect(isEstimateProposalLinksEnabled(value)).toBe(true);
+    }
+  );
+
+  it.each(["0", "false", "no", "off", "garbage"])(
+    "returns false for disabled token %s",
+    (value) => {
+      expect(isEstimateProposalLinksEnabled(value)).toBe(false);
+    }
+  );
+
+  it("uses process env when arg is omitted", () => {
+    process.env.ENABLE_ESTIMATE_PROPOSAL_LINKS = "true";
+    expect(isEstimateProposalLinksEnabled()).toBe(true);
+
+    process.env.ENABLE_ESTIMATE_PROPOSAL_LINKS = "0";
+    expect(isEstimateProposalLinksEnabled()).toBe(false);
   });
 });

@@ -21,3 +21,15 @@ export function isEstimateEmailSendEnabled(rawValue?: string | null): boolean {
   if (!normalized) return false;
   return ENABLED_VALUES.has(normalized);
 }
+
+/**
+ * Fail-closed guard for the public estimate proposal link resolver.
+ * When disabled, public proposal routes render a generic unavailable shell
+ * without revealing whether a link or estimate exists.
+ */
+export function isEstimateProposalLinksEnabled(rawValue?: string | null): boolean {
+  const source = rawValue ?? process.env.ENABLE_ESTIMATE_PROPOSAL_LINKS;
+  const normalized = String(source ?? "").trim().toLowerCase();
+  if (!normalized) return false;
+  return ENABLED_VALUES.has(normalized);
+}

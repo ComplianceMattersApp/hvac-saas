@@ -52,7 +52,8 @@ export function isUnauthedPublicRoute(pathname: string) {
     pathname.startsWith("/login") ||
     pathname.startsWith("/signup") ||
     pathname.startsWith("/auth") ||
-    pathname.startsWith("/set-password")
+    pathname.startsWith("/set-password") ||
+    pathname.startsWith("/proposals")
   );
 }
 
