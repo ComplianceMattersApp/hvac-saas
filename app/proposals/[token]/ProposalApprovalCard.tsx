@@ -4,9 +4,11 @@ import { useActionState, useState } from "react";
 
 import {
   approveEstimateFromProposalLinkForm,
+} from "./actions";
+import {
   initialProposalApprovalActionState,
   type ProposalApprovalActionState,
-} from "./actions";
+} from "./proposal-approval-action-state";
 
 type PublicProposalOption = {
   slotIndex: number;

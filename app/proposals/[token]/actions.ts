@@ -1,16 +1,7 @@
 "use server";
 
 import { approveEstimateFromProposalLink } from "@/lib/estimates/estimate-proposal-public-approval";
-
-export type ProposalApprovalActionState = {
-  status: "idle" | "error" | "success";
-  message: string | null;
-};
-
-export const initialProposalApprovalActionState: ProposalApprovalActionState = {
-  status: "idle",
-  message: null,
-};
+import { type ProposalApprovalActionState } from "./proposal-approval-action-state";
 
 export async function approveEstimateFromProposalLinkForm(
   _previousState: ProposalApprovalActionState,
