@@ -95,7 +95,6 @@ function buildProposalEmailHtml(params: {
   estimateTitle: string;
   proposalUrl: string;
 }) {
-  const supportDetails = [params.supportEmail, params.supportPhone].filter(Boolean).join(" | ");
   const logoBlock = params.companyLogoUrl
     ? `<p style="margin:0 0 14px 0;"><img src="${escapeHtml(params.companyLogoUrl)}" alt="${escapeHtml(params.companyDisplayName)} logo" width="132" height="52" style="display:inline-block;width:132px;max-width:100%;max-height:52px;height:auto;object-fit:contain;" /></p>`
     : "";
@@ -120,17 +119,12 @@ function buildProposalEmailHtml(params: {
     <p style="margin:0 0 4px 0;font-size:11px;line-height:1.5;color:#6b7280;">
       If the button does not open, use this secure link:
     </p>
-    <p style="margin:0;font-size:11px;line-height:1.5;color:#6b7280;word-break:break-all;">
+    <p style="margin:0 0 10px 0;font-size:10px;line-height:1.5;color:#94a3b8;word-break:break-all;">
       <a href="${escapeHtml(params.proposalUrl)}" style="color:#1f2937;text-decoration:underline;">${escapeHtml(params.proposalUrl)}</a>
     </p>
-    <p style="margin:18px 0 0 0;color:#111827;font-size:13px;">
-      ${escapeHtml(params.companyDisplayName)}
+    <p style="margin:0;color:#6b7280;font-size:11px;line-height:1.5;">
+      This secure link is unique to this proposal.
     </p>
-    ${
-      supportDetails
-        ? `<p style="margin:4px 0 0 0;color:#4b5563;font-size:12px;">Contact: ${escapeHtml(supportDetails)}</p>`
-        : ""
-    }
   `;
 
   return renderOperationalEmailLayout({
@@ -154,14 +148,15 @@ function buildProposalEmailText(params: {
   const support = [params.supportEmail, params.supportPhone].filter(Boolean).join(" | ");
 
   return [
-    `Your proposal from ${params.companyDisplayName} is ready`,
+    "Your proposal is ready",
     "",
     `Proposal: ${params.estimateNumber}${params.estimateTitle ? ` - ${params.estimateTitle}` : ""}`,
     "",
     "Please review the proposal details and approve online when ready:",
     params.proposalUrl,
     "",
-    support ? `Questions: ${support}` : "",
+    support ? `${params.companyDisplayName} | ${support}` : params.companyDisplayName,
+    "This is an automated message containing a secure proposal link.",
   ]
     .filter(Boolean)
     .join("\n");

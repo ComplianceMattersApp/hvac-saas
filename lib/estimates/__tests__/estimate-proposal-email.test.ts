@@ -299,20 +299,34 @@ describe("sendEstimateProposalEmail", () => {
     expect(sendArgs.html).toContain("Your proposal is ready");
     expect(sendArgs.html).toContain("Please review the proposal details and approve online when ready.");
     expect(sendArgs.html).toContain("Review Proposal");
+    expect(sendArgs.html).toContain("This secure link is unique to this proposal.");
+    expect(sendArgs.html).toContain("If the button does not open, use this secure link:");
     expect(sendArgs.html).toContain("Acme Heating");
     expect(sendArgs.html).toContain("support@acme.test");
     expect(sendArgs.html).toContain("555-0000");
     expect(sendArgs.html).toContain("http://localhost:3000/proposals/raw-token-new");
+    expect(sendArgs.text).toContain("Your proposal is ready");
     expect(sendArgs.text).toContain("Please review the proposal details and approve online when ready:");
+    expect(sendArgs.text).toContain(
+      "This is an automated message containing a secure proposal link."
+    );
     expect(sendArgs.text).toContain("http://localhost:3000/proposals/raw-token-new");
+
+    const supportEmailOccurrences = sendArgs.html.match(/support@acme\.test/g)?.length ?? 0;
+    const supportPhoneOccurrences = sendArgs.html.match(/555-0000/g)?.length ?? 0;
+    expect(supportEmailOccurrences).toBe(1);
+    expect(supportPhoneOccurrences).toBe(1);
+
     expect(sendArgs.html.toLowerCase()).not.toContain("invoice");
     expect(sendArgs.html.toLowerCase()).not.toContain("payment");
     expect(sendArgs.html.toLowerCase()).not.toContain("sms");
     expect(sendArgs.html.toLowerCase()).not.toContain("provider");
+    expect(sendArgs.html.toLowerCase()).not.toContain("token_hash");
     expect(sendArgs.text.toLowerCase()).not.toContain("invoice");
     expect(sendArgs.text.toLowerCase()).not.toContain("payment");
     expect(sendArgs.text.toLowerCase()).not.toContain("sms");
     expect(sendArgs.text.toLowerCase()).not.toContain("provider");
+    expect(sendArgs.text.toLowerCase()).not.toContain("token_hash");
 
     expect(regenerateEstimateProposalLinkMock).not.toHaveBeenCalled();
     expect(supabase._communicationInserts[0].attempt_status).toBe("accepted");
