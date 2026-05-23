@@ -12,6 +12,7 @@ const updateEstimateOptionMetadataMock = vi.fn();
 const convertApprovedEstimateToJobMock = vi.fn();
 const saveManualEstimateLineToPricebookMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const redirectMock = vi.fn();
 
 vi.mock("@/lib/estimates/estimate-actions", () => ({
   addEstimateLineItem: (...args: unknown[]) => addEstimateLineItemMock(...args),
@@ -33,6 +34,10 @@ vi.mock("@/lib/estimates/estimate-actions", () => ({
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+}));
+
+vi.mock("next/navigation", () => ({
+  redirect: (...args: unknown[]) => redirectMock(...args),
 }));
 
 describe("estimate route action guards", () => {
@@ -557,7 +562,7 @@ describe("estimate route action guards", () => {
     expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 
-  it("convertEstimateToJobFromForm delegates and revalidates when enabled", async () => {
+  it("convertEstimateToJobFromForm delegates, revalidates, and redirects to job when enabled", async () => {
     process.env.ENABLE_ESTIMATES = "true";
     convertApprovedEstimateToJobMock.mockResolvedValue({
       success: true,
@@ -579,5 +584,29 @@ describe("estimate route action guards", () => {
     expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
     expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1");
     expect(revalidatePathMock).toHaveBeenCalledWith("/jobs");
+    expect(redirectMock).toHaveBeenCalledWith("/jobs/job-1");
+  });
+
+  it("convertEstimateToJobFromForm preserves failure result without redirect", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    convertApprovedEstimateToJobMock.mockResolvedValue({
+      success: false,
+      error: "Estimate already converted.",
+      existingJobId: "job-existing",
+    });
+
+    const { convertEstimateToJobFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+
+    const result = await convertEstimateToJobFromForm(fd);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Estimate already converted.",
+      existingJobId: "job-existing",
+    });
+    expect(redirectMock).not.toHaveBeenCalled();
   });
 });

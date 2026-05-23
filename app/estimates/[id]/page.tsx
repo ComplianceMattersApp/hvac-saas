@@ -207,12 +207,8 @@ export default async function EstimateDetailPage({
     if (!estimateId) return;
 
     const result = await convertEstimateToJobFromForm(formData);
-    if (!result?.success) {
-      const encoded = encodeURIComponent(String(result?.error ?? "estimate_conversion_failed"));
-      redirect(`/estimates/${estimateId}?notice=${encoded}`);
-    }
-
-    redirect(`/estimates/${estimateId}?notice=estimate_converted_to_job`);
+    const encoded = encodeURIComponent(String(result?.error ?? "estimate_conversion_failed"));
+    redirect(`/estimates/${estimateId}?notice=${encoded}`);
   }
 
   async function submitConvertEstimateToInvoiceDraft(formData: FormData) {

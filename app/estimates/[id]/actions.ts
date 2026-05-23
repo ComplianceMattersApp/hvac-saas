@@ -5,6 +5,7 @@
 // Delegates to V1B domain actions and revalidates the estimate detail route.
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import {
   addEstimateLineItem,
   addEstimateOptionLineItem,
@@ -392,6 +393,7 @@ export async function convertEstimateToJobFromForm(formData: FormData) {
     revalidatePath(`/estimates/${estimateId}`);
     revalidatePath(`/jobs/${result.jobId}`);
     revalidatePath("/jobs");
+    redirect(`/jobs/${result.jobId}`);
   }
 
   return result;
