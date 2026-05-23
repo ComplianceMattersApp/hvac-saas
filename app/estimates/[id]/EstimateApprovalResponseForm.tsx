@@ -7,7 +7,6 @@
 // Does NOT send email, create a job, invoice, payment, or conversion record.
 
 import { useState } from "react";
-import { CheckCircle2 } from "lucide-react";
 
 type OptionChoice = {
   id: string;
@@ -60,19 +59,9 @@ export default function EstimateApprovalResponseForm({
           event.preventDefault();
         }
       }}
-      className="space-y-3 rounded-xl border border-emerald-200/70 bg-emerald-50/60 p-3"
+      className="space-y-4"
     >
       <input type="hidden" name="estimate_id" value={estimateId} />
-
-      <div className="flex items-start gap-2.5">
-        <span className="inline-flex h-7 w-7 items-center justify-center rounded-xl border border-emerald-200 bg-white text-emerald-700">
-          <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-        </span>
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-emerald-700">Approval</p>
-          <p className="mt-0.5 text-xs text-slate-600">Record approval for this estimate.</p>
-        </div>
-      </div>
 
       {isMultiOption && (
         <div className="space-y-1.5">
@@ -130,13 +119,8 @@ export default function EstimateApprovalResponseForm({
           disabled={!isReadyToSubmit}
           className="inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-[background-color,border-color,transform] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
         >
-          {isMultiOption ? "Select Option" : "Record Approval"}
+          Record Approval
         </button>
-        <p className="max-w-64 text-[11px] leading-4 text-slate-500">
-          {isMultiOption
-            ? "Records selected option and approval only. No job or draft invoice is created."
-            : "Records approval only. No job or draft invoice is created."}
-        </p>
       </div>
     </form>
   );
