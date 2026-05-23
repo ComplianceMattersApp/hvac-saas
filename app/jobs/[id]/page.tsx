@@ -1637,6 +1637,7 @@ export default async function JobDetailPage({
 
   const customerName =
   (customerBilling?.full_name ||
+    customerBilling?.billing_name ||
     [customerBilling?.first_name, customerBilling?.last_name].filter(Boolean).join(" ").trim() ||
     [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ").trim() ||
     "—");
@@ -2279,12 +2280,30 @@ const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chai
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
 const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
 const isHvacServiceMode = productMode === "hvac_service";
+const jobTitleText = normalizeRetestLinkedJobTitle(job.title);
+const serviceVisitReasonText = String(job.service_visit_reason ?? "").trim();
+const jobNotesText = String(job.job_notes ?? "").trim();
+const fieldHeaderTitle =
+  firstNonEmpty(
+    customerDisplayName !== "—" ? customerDisplayName : "",
+    primarySiteAccessName,
+    jobTitleText,
+  ) ?? "Job Detail";
+const visitReasonText =
+  firstNonEmpty(serviceVisitReasonText, jobTitleText, visitScopeLeadText) ??
+  "No visit reason saved yet.";
+const shouldShowCustomerConcern =
+  Boolean(jobTitleText) && normalizeCompareText(jobTitleText) !== normalizeCompareText(visitReasonText);
+const shouldShowWorkSummary =
+  Boolean(visitScopeSummary) &&
+  normalizeCompareText(visitScopeSummary) !== normalizeCompareText(visitReasonText) &&
+  normalizeCompareText(visitScopeSummary) !== normalizeCompareText(jobNotesText);
 const headerJobTypeLabel = String(job.job_type ?? "service")
   .split("_")
   .filter(Boolean)
   .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
   .join(" ");
-const headerMetaLine = [headerJobTypeLabel, serviceCity]
+const headerMetaLine = [headerJobTypeLabel, serviceCity || serviceLocationLabel]
   .filter((part) => String(part ?? "").trim().length > 0)
   .join(" • ");
 const showSharedNotesCard = !isHvacServiceMode;
@@ -3088,9 +3107,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           Job Command Center
         </div>
         <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
-          {normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}
+          {fieldHeaderTitle}
         </h1>
         <div className="mt-1.5 text-sm font-medium text-slate-600">{headerMetaLine}</div>
+        {serviceAddressDisplay !== "No address set" ? (
+          <div className="mt-1 max-w-2xl break-words text-sm leading-5 text-slate-500">
+            {serviceAddressDisplay}
+          </div>
+        ) : null}
         <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
           <span className="text-slate-400">Job ID</span>
           <span className="font-mono normal-case tracking-normal text-slate-600">{job.id}</span>
@@ -3245,7 +3269,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           {customerDisplayName}
         </Link>
       ) : (
-        <h1 className="mt-1.5 text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950">{customerDisplayName}</h1>
+        <div className="mt-1.5 text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950">{customerDisplayName}</div>
       )}
 
       <div className="mt-3 space-y-2.5 border-t border-slate-200/70 pt-3 text-sm">
@@ -3445,6 +3469,71 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               onPhaseTiming={recordBlockingPhase}
             />
           </Suspense>
+        </div>
+      </div>
+
+      <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/94 p-4`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              Visit Reason / Intake Notes
+            </div>
+            <div className="mt-1 text-sm text-slate-600">
+              Why this visit exists and what the field team should know first.
+            </div>
+          </div>
+          {job.job_type === "service" ? (
+            <a
+              href="#visit-scope-section"
+              className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white"
+            >
+              Work Items
+            </a>
+          ) : null}
+        </div>
+
+        <div className="mt-3 space-y-3">
+          <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              Visit Reason
+            </div>
+            <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900">
+              {visitReasonText}
+            </div>
+          </div>
+
+          {shouldShowCustomerConcern ? (
+            <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Customer Concern
+              </div>
+              <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
+                {jobTitleText}
+              </div>
+            </div>
+          ) : null}
+
+          {jobNotesText ? (
+            <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Intake Notes
+              </div>
+              <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
+                {jobNotesText}
+              </div>
+            </div>
+          ) : null}
+
+          {shouldShowWorkSummary ? (
+            <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                Work Summary
+              </div>
+              <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
+                {visitScopeSummary}
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -5249,14 +5338,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         onPhaseTiming={recordBlockingPhase}
       />
 
-      {job.job_notes ? (
-        <div className={`${workspacePanelClass} p-4 text-gray-900`}>
-          <div className="mb-2 text-sm font-semibold text-slate-950">Job Notes</div>
-          <div className="whitespace-pre-wrap rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-800">
-            {job.job_notes}
-          </div>
-        </div>
-      ) : null}
 </details>
 
 

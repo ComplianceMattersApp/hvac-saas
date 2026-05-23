@@ -60,6 +60,23 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("Text access phone");
   });
 
+  it("uses a field-first job command header instead of the job title as the main heading", () => {
+    expect(jobPageSource).toContain("const fieldHeaderTitle =");
+    expect(jobPageSource).toContain("{fieldHeaderTitle}");
+    expect(jobPageSource).toContain("primarySiteAccessName");
+    expect(jobPageSource).toContain("?? \"Job Detail\"");
+    expect(jobPageSource).not.toContain('{normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}');
+  });
+
+  it("keeps visit reason and intake notes below the location preview", () => {
+    expect(jobPageSource).toContain("Visit Reason / Intake Notes");
+    expect(jobPageSource).toContain("const visitReasonText =");
+    expect(jobPageSource).toContain("{visitReasonText}");
+    expect(jobPageSource).toContain("Customer Concern");
+    expect(jobPageSource).toContain("Intake Notes");
+    expect(jobPageSource).toContain("whitespace-pre-wrap break-words");
+  });
+
   it("includes location-linked contacts in site/access resolution priority", () => {
     expect(jobPageSource).toContain('linkedEntityType: "location"');
     expect(jobPageSource).toContain('["job", 0]');
