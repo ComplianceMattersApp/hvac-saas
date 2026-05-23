@@ -4,6 +4,10 @@ import {
   isEstimateProposalLinksEnabled,
 } from "@/lib/estimates/estimate-exposure";
 
+beforeEach(() => {
+  delete process.env.ENABLE_ESTIMATES;
+});
+
 describe("isEstimatesEnabled", () => {
   it("fails closed when unset or empty", () => {
     expect(isEstimatesEnabled(undefined)).toBe(false);
