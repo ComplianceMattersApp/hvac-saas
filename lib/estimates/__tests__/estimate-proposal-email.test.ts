@@ -7,6 +7,7 @@ const isEstimateProposalLinksEnabledMock = vi.fn();
 const isEstimateProposalEmailSendEnabledMock = vi.fn();
 const readActiveEstimateProposalLinkForInternalMock = vi.fn();
 const issueEstimateProposalLinkMock = vi.fn();
+const regenerateEstimateProposalLinkMock = vi.fn();
 const readCachedEstimateProposalLinkRawTokenMock = vi.fn();
 const resolveOperationalTenantIdentityMock = vi.fn();
 const sendEmailMock = vi.fn();
@@ -30,6 +31,8 @@ vi.mock("@/lib/estimates/estimate-proposal-links", () => ({
   readActiveEstimateProposalLinkForInternal: (...args: unknown[]) =>
     readActiveEstimateProposalLinkForInternalMock(...args),
   issueEstimateProposalLink: (...args: unknown[]) => issueEstimateProposalLinkMock(...args),
+  regenerateEstimateProposalLink: (...args: unknown[]) =>
+    regenerateEstimateProposalLinkMock(...args),
   readCachedEstimateProposalLinkRawToken: (...args: unknown[]) =>
     readCachedEstimateProposalLinkRawTokenMock(...args),
 }));
@@ -184,6 +187,15 @@ describe("sendEstimateProposalEmail", () => {
       recipientEmailSnapshot: "owner@client.com",
     });
 
+    regenerateEstimateProposalLinkMock.mockResolvedValue({
+      success: true,
+      proposalLinkId: "plink-regenerated",
+      rawToken: "raw-token-regenerated",
+      expiresAt: "2026-06-02T00:00:00.000Z",
+      recipientEmailSnapshot: "owner@client.com",
+      status: "active",
+    });
+
     readCachedEstimateProposalLinkRawTokenMock.mockReturnValue("raw-token-cached");
 
     resolveOperationalTenantIdentityMock.mockResolvedValue({
@@ -276,6 +288,7 @@ describe("sendEstimateProposalEmail", () => {
     expect(result.success).toBe(true);
     expect(issueEstimateProposalLinkMock).toHaveBeenCalledTimes(1);
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(regenerateEstimateProposalLinkMock).not.toHaveBeenCalled();
     expect(supabase._communicationInserts[0].attempt_status).toBe("accepted");
     expect(supabase._proposalLinkUpdates).toHaveLength(1);
     expect(Object.prototype.hasOwnProperty.call(supabase._proposalLinkUpdates[0], "sent_at")).toBe(true);
@@ -285,6 +298,10 @@ describe("sendEstimateProposalEmail", () => {
     const allMeta = supabase._eventInserts.map((event) => JSON.stringify(event.meta ?? {})).join("\n");
     expect(allMeta).not.toContain("raw-token");
     expect(allMeta).not.toContain("token_hash");
+
+    const allCommunicationPayloads = JSON.stringify(supabase._communicationInserts);
+    expect(allCommunicationPayloads).not.toContain("raw-token");
+    expect(allCommunicationPayloads).not.toContain("token_hash");
   });
 
   it("reuses active link with cached raw token without issuing a new link", async () => {
@@ -309,13 +326,14 @@ describe("sendEstimateProposalEmail", () => {
 
     expect(result.success).toBe(true);
     expect(issueEstimateProposalLinkMock).not.toHaveBeenCalled();
+    expect(regenerateEstimateProposalLinkMock).not.toHaveBeenCalled();
     expect(readCachedEstimateProposalLinkRawTokenMock).toHaveBeenCalledWith({
       proposalLinkId: "plink-active",
     });
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
   });
 
-  it("fails when active link exists but cached raw token is unavailable", async () => {
+  it("regenerates and sends when active link exists but cached raw token is unavailable", async () => {
     readActiveEstimateProposalLinkForInternalMock.mockResolvedValue({
       schemaAvailable: true,
       activeLink: {
@@ -336,8 +354,43 @@ describe("sendEstimateProposalEmail", () => {
       recipientEmail: "owner@client.com",
     });
 
+    expect(result.success).toBe(true);
+    expect(issueEstimateProposalLinkMock).not.toHaveBeenCalled();
+    expect(regenerateEstimateProposalLinkMock).toHaveBeenCalledWith({
+      estimateId: ESTIMATE_ID,
+      recipientEmailSnapshot: "owner@client.com",
+    });
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(supabase._communicationInserts).toHaveLength(1);
+  });
+
+  it("returns proposal_link_unavailable when regeneration fails", async () => {
+    readActiveEstimateProposalLinkForInternalMock.mockResolvedValue({
+      schemaAvailable: true,
+      activeLink: {
+        proposalLinkId: "plink-active",
+        expiresAt: "2026-06-10T00:00:00.000Z",
+        recipientEmailSnapshot: "owner@client.com",
+        sentAt: null,
+      },
+    });
+    readCachedEstimateProposalLinkRawTokenMock.mockReturnValue(null);
+    regenerateEstimateProposalLinkMock.mockResolvedValue({
+      success: false,
+      error: "Proposal link setup is unavailable in this environment.",
+    });
+
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { sendEstimateProposalEmail } = await import("@/lib/estimates/estimate-proposal-email");
+    const result = await sendEstimateProposalEmail({
+      estimateId: ESTIMATE_ID,
+      recipientEmail: "owner@client.com",
+    });
+
     expect(result.success).toBe(false);
-    expect((result as { code?: string }).code).toBe("proposal_link_token_unavailable");
+    expect((result as { code?: string }).code).toBe("proposal_link_unavailable");
     expect(sendEmailMock).not.toHaveBeenCalled();
     expect(supabase._communicationInserts).toHaveLength(0);
   });

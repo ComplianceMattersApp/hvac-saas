@@ -7,6 +7,7 @@ import {
 } from "@/lib/estimates/estimate-exposure";
 import {
   issueEstimateProposalLink,
+  regenerateEstimateProposalLink,
   readActiveEstimateProposalLinkForInternal,
   readCachedEstimateProposalLinkRawToken,
 } from "@/lib/estimates/estimate-proposal-links";
@@ -218,20 +219,33 @@ async function resolveProposalLinkForEmail(params: {
       proposalLinkId: activeRead.activeLink.proposalLinkId,
     });
 
-    if (!cachedRawToken) {
+    if (cachedRawToken) {
+      return {
+        success: true as const,
+        proposalLinkId: activeRead.activeLink.proposalLinkId,
+        rawToken: cachedRawToken,
+        hadPriorSentAt: Boolean(activeRead.activeLink.sentAt),
+      };
+    }
+
+    const regenerateResult = await regenerateEstimateProposalLink({
+      estimateId: params.estimateId,
+      recipientEmailSnapshot: params.recipientEmail,
+    });
+
+    if (!regenerateResult.success) {
       return {
         success: false as const,
-        error:
-          "An active proposal link exists, but its reusable token is unavailable in this runtime. Regenerate the proposal link before sending email.",
-        code: "proposal_link_token_unavailable" as const,
+        error: regenerateResult.error,
+        code: "proposal_link_unavailable" as const,
       };
     }
 
     return {
       success: true as const,
-      proposalLinkId: activeRead.activeLink.proposalLinkId,
-      rawToken: cachedRawToken,
-      hadPriorSentAt: Boolean(activeRead.activeLink.sentAt),
+      proposalLinkId: regenerateResult.proposalLinkId,
+      rawToken: regenerateResult.rawToken,
+      hadPriorSentAt: false,
     };
   }
 
