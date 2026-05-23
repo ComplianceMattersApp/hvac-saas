@@ -1,0 +1,73 @@
+import type { ProposalEmailActionState } from "./proposal-email-action-state";
+
+export function canRenderProposalEmailControls(estimateStatus: string) {
+  return String(estimateStatus ?? "").trim().toLowerCase() === "sent";
+}
+
+export function resolveProposalEmailNotice(
+  state: ProposalEmailActionState | null | undefined
+): { tone: "success" | "warning" | "error"; message: string } | null {
+  if (!state) return null;
+
+  if (state.success) {
+    if (state.attemptStatus === "accepted") {
+      return {
+        tone: "success",
+        message: "Proposal email sent. The customer can review and approve using the secure link.",
+      };
+    }
+
+    if (state.attemptStatus === "blocked" || state.emailDisabled) {
+      return {
+        tone: "warning",
+        message:
+          "Email delivery must be enabled before messages are sent. You can still copy the proposal link and share it manually.",
+      };
+    }
+
+    if (state.attemptStatus === "failed") {
+      return {
+        tone: "error",
+        message:
+          "Unable to send proposal email right now. You can retry, or copy the proposal link and share it manually.",
+      };
+    }
+  }
+
+  if (!state.success) {
+    if (state.code === "recipient_required") {
+      return { tone: "error", message: "Recipient email is required." };
+    }
+
+    if (state.code === "recipient_invalid") {
+      return { tone: "error", message: "Enter a valid recipient email address." };
+    }
+
+    if (
+      state.code === "proposal_links_unavailable" ||
+      state.code === "proposal_link_unavailable" ||
+      state.code === "proposal_link_token_unavailable"
+    ) {
+      return {
+        tone: "warning",
+        message:
+          "Proposal link setup is unavailable in this environment. You can still copy the proposal link and share it manually.",
+      };
+    }
+
+    if (state.code === "estimates_unavailable") {
+      return {
+        tone: "warning",
+        message: "Estimates are currently unavailable in this environment.",
+      };
+    }
+
+    return {
+      tone: "error",
+      message:
+        "Unable to send proposal email right now. You can retry, or copy the proposal link and share it manually.",
+    };
+  }
+
+  return null;
+}

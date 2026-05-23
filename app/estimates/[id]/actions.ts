@@ -260,6 +260,16 @@ export async function sendEstimateProposalEmailFromForm(
 }
 
 /**
+ * Unified form action for internal proposal-email controls.
+ */
+export async function submitEstimateProposalEmailActionFromForm(
+  _previousState: ProposalEmailActionState,
+  formData: FormData
+): Promise<ProposalEmailActionState> {
+  return sendEstimateProposalEmailFromForm(formData);
+}
+
+/**
  * Create default estimate option packages (Good, Better, Best).
  * Route-level wrapper that revalidates the estimate detail page.
  */

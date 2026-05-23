@@ -33,6 +33,8 @@ import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
 import EditEstimateOptionForm from "./EditEstimateOptionForm";
 import AddEstimateOptionLineForm from "./AddEstimateOptionLineForm";
 import ProposalLinkControls from "./ProposalLinkControls";
+import ProposalEmailControls from "./ProposalEmailControls";
+import { canRenderProposalEmailControls } from "./proposal-email-ui";
 import { removeEstimateOptionLineItemFromForm } from "./actions";
 
 export const metadata = { title: "Estimate" };
@@ -182,6 +184,7 @@ export default async function EstimateDetailPage({
 
   const isDraft = estimate.status === "draft";
   const isSent = estimate.status === "sent";
+  const canShowProposalEmailControls = canRenderProposalEmailControls(estimate.status);
   const isApproved = estimate.status === "approved";
   const isConverted = estimate.status === "converted";
   const canConvertToJob =
@@ -641,7 +644,7 @@ export default async function EstimateDetailPage({
 
       {/* Estimate proposal rendering */}
       {isSent && (
-        <div className="print:hidden">
+        <div className="grid gap-4 print:hidden xl:grid-cols-2">
           <ProposalLinkControls
             estimateId={estimate.id}
             activeLink={
@@ -655,6 +658,12 @@ export default async function EstimateDetailPage({
             }
             schemaUnavailable={!proposalLinkRead.schemaAvailable}
           />
+          {canShowProposalEmailControls ? (
+            <ProposalEmailControls
+              estimateId={estimate.id}
+              defaultRecipientEmail={customerEmail}
+            />
+          ) : null}
         </div>
       )}
 
