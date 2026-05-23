@@ -5,6 +5,7 @@ export type ProposalEmailActionState = {
   attemptStatus?: "blocked" | "accepted" | "failed";
   communicationId?: string;
   proposalLinkId?: string;
+  proposalUrl?: string | null;
   providerMessageId?: string | null;
   emailDisabled?: boolean;
 };

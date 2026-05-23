@@ -2,10 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   canRenderProposalEmailControls,
+  resolveCopyableProposalUrl,
   resolveProposalEmailNotice,
 } from "@/app/estimates/[id]/proposal-email-ui";
 
 describe("proposal email UI helpers", () => {
+  it("returns null for initial idle action state", () => {
+    const notice = resolveProposalEmailNotice({
+      success: false,
+      error: null,
+    });
+
+    expect(notice).toBeNull();
+  });
+
   it("renders controls only for sent status", () => {
     expect(canRenderProposalEmailControls("sent")).toBe(true);
     expect(canRenderProposalEmailControls("draft")).toBe(false);
@@ -77,6 +87,20 @@ describe("proposal email UI helpers", () => {
     expect(notice?.message).toContain("Unable to send proposal email right now");
   });
 
+  it("hides stale notice while a new submit is pending", () => {
+    const notice = resolveProposalEmailNotice(
+      {
+        success: true,
+        error: null,
+        attemptStatus: "failed",
+        emailDisabled: false,
+      },
+      { isPending: true }
+    );
+
+    expect(notice).toBeNull();
+  });
+
   it("never surfaces raw token or token hash from error payload", () => {
     const notice = resolveProposalEmailNotice({
       success: false,
@@ -88,5 +112,17 @@ describe("proposal email UI helpers", () => {
     expect(notice?.message).not.toContain("raw_token");
     expect(notice?.message).not.toContain("token_hash");
     expect(notice?.message).toContain("Unable to send proposal email right now");
+  });
+
+  it("allows copy link only for safe proposal URLs", () => {
+    expect(resolveCopyableProposalUrl("https://hvac-saas-xi.vercel.app/proposals/abc123")).toBe(
+      "https://hvac-saas-xi.vercel.app/proposals/abc123"
+    );
+    expect(resolveCopyableProposalUrl("http://localhost:3000/proposals/abc123")).toBe(
+      "http://localhost:3000/proposals/abc123"
+    );
+    expect(resolveCopyableProposalUrl("/proposals/abc123")).toBeNull();
+    expect(resolveCopyableProposalUrl("javascript:alert(1)")).toBeNull();
+    expect(resolveCopyableProposalUrl("https://x.test/proposals/abc?token_hash=leak")).toBeNull();
   });
 });

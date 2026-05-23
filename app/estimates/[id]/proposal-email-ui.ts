@@ -4,10 +4,31 @@ export function canRenderProposalEmailControls(estimateStatus: string) {
   return String(estimateStatus ?? "").trim().toLowerCase() === "sent";
 }
 
+export function resolveCopyableProposalUrl(
+  proposalUrl: string | null | undefined
+): string | null {
+  const normalized = String(proposalUrl ?? "").trim();
+  if (!normalized) return null;
+  if (!/^https?:\/\//i.test(normalized)) return null;
+  if (normalized.toLowerCase().includes("token_hash")) return null;
+  return normalized;
+}
+
 export function resolveProposalEmailNotice(
-  state: ProposalEmailActionState | null | undefined
+  state: ProposalEmailActionState | null | undefined,
+  options?: { isPending?: boolean }
 ): { tone: "success" | "warning" | "error"; message: string } | null {
   if (!state) return null;
+  if (options?.isPending) return null;
+
+  const isIdleState =
+    !state.error &&
+    !state.code &&
+    !state.attemptStatus &&
+    !state.communicationId &&
+    !state.proposalLinkId &&
+    !state.providerMessageId;
+  if (isIdleState) return null;
 
   if (state.success) {
     if (state.attemptStatus === "accepted") {
