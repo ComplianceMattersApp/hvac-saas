@@ -96,19 +96,19 @@ function statusLabel(status: string) {
 function statusGuidanceMessage(status: string) {
   switch (status) {
     case "draft":
-      return "Draft is the editable internal proposal state. Adjust line items here before marking it sent.";
+      return "Draft is editable. Add or adjust items before marking this estimate as sent.";
     case "sent":
-      return "Sent means the proposal is locked from further editing. No customer email, PDF, approval record, invoice, payment, or conversion was created by this status change.";
+      return "Sent estimates are locked for editing until the status changes.";
     case "approved":
-      return "Approved is terminal for V1. It records internal outcome only and does not create a job, invoice, payment, customer approval record, or conversion.";
+      return "Approved estimates are ready for conversion to a job when available.";
     case "declined":
-      return "Declined is terminal for V1. It records internal outcome only and does not create follow-on commercial or customer-facing records.";
+      return "This estimate has been marked declined.";
     case "expired":
-      return "Expired is terminal for V1. It records internal outcome only and does not create follow-on commercial or customer-facing records.";
+      return "This estimate has expired.";
     case "cancelled":
-      return "Cancelled is terminal for V1. It records internal outcome only and does not create follow-on commercial or customer-facing records.";
+      return "This estimate has been cancelled.";
     case "converted":
-      return "This estimate is converted. Conversion controls are reserved for a later phase.";
+      return "This estimate has already been converted to a job.";
     default:
       return null;
   }
@@ -215,7 +215,7 @@ export default async function EstimateDetailPage({
     ? "Editable proposal"
     : isSent
       ? "Sent and locked"
-      : "Terminal for V1";
+      : "Completed state";
   let pricebookItems: PricebookPickerRow[] = [];
 
   if (isDraft) {
@@ -350,7 +350,7 @@ export default async function EstimateDetailPage({
           {notice === "estimate_converted_to_job"
             ? "Estimate converted to job successfully."
             : notice === "estimate_converted_to_invoice_draft"
-              ? "Estimate converted to invoice draft successfully."
+              ? "Draft invoice created from this estimate successfully."
             : notice === "estimate_conversion_schema_unavailable"
               ? "Estimate conversion is unavailable until the conversion schema migration is applied."
               : notice === "invoice_conversion_schema_unavailable"
@@ -377,7 +377,7 @@ export default async function EstimateDetailPage({
             rel="noreferrer"
             className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
           >
-            Print / Save PDF
+            Preview Proposal
           </Link>
           {estimate.customer_id && (
             <Link
@@ -400,10 +400,10 @@ export default async function EstimateDetailPage({
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)] print:rounded-none print:border-slate-300 print:shadow-none">
         <div className="mb-3 hidden border-b border-slate-200 pb-3 print:block">
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Internal Estimate Proposal
+            Estimate Builder
           </div>
           <div className="mt-1 text-sm text-slate-700">
-            Estimate remains proposed commercial scope for internal review.
+            Proposed commercial scope prepared for customer presentation.
           </div>
         </div>
 
@@ -432,13 +432,13 @@ export default async function EstimateDetailPage({
             {isMultiOptionProposal ? (
               <>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Proposal mode
+                  Estimate type
                 </div>
                 <div className="mt-0.5 text-2xl font-bold tracking-[-0.02em] text-slate-950">
-                  Multi-option
+                  Options
                 </div>
                 <div className="mt-1 text-xs text-slate-500">
-                  Totals are shown inside each option package.
+                  Totals are shown inside each option.
                 </div>
               </>
             ) : (
@@ -462,8 +462,8 @@ export default async function EstimateDetailPage({
         {/* Context */}
         <div className="mt-4 grid gap-2 border-t border-slate-100 pt-4 text-sm text-slate-600 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6">
           <div>
-            <span className="font-medium text-slate-700">Proposal Mode:</span>{" "}
-            {isMultiOptionProposal ? "Multi-option packages" : "Single-option flat"}
+            <span className="font-medium text-slate-700">Estimate Type:</span>{" "}
+            {isMultiOptionProposal ? "Options" : "Single Estimate"}
           </div>
           {documentView.context.customerName && (
             <div>
@@ -490,94 +490,6 @@ export default async function EstimateDetailPage({
         </div>
       </div>
 
-      <details className="rounded-2xl border border-slate-200/80 bg-slate-50/70 text-sm text-slate-700 print:hidden">
-        <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-slate-900 marker:content-none">
-          <span className="flex items-center justify-between gap-3">
-            <span>Internal Readiness Notes</span>
-            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
-              Expand
-            </span>
-          </span>
-        </summary>
-        <div className="border-t border-slate-200/80 px-4 pb-4 pt-3">
-          <h2 className="text-sm font-semibold text-slate-900">Document Readiness</h2>
-          <ul className="mt-2 list-disc space-y-1 pl-5">
-            {ESTIMATE_DOCUMENT_READINESS_GUIDANCE.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-            <li>
-              {emailSendEnabled
-                ? "Send/email is explicitly enabled for this environment."
-                : "Send/email is currently disabled by feature flag in this environment."}
-            </li>
-          </ul>
-          <h3 className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Boundary Disclaimers
-          </h3>
-          <ul className="mt-1 list-disc space-y-1 pl-5 text-xs sm:text-sm">
-            {ESTIMATE_DOCUMENT_DISCLAIMERS.map((line) => (
-              <li key={line}>{line}</li>
-            ))}
-          </ul>
-          <p className="mt-2 text-xs text-slate-500">
-            Revision planning defaults: freeze trigger {ESTIMATE_REVISION_PLANNING_DEFAULTS.freezeTrigger}, history {ESTIMATE_REVISION_PLANNING_DEFAULTS.historyPolicy}, post-freeze edits {ESTIMATE_REVISION_PLANNING_DEFAULTS.postFreezeEditPolicy}.
-          </p>
-        </div>
-      </details>
-
-      <section className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
-        {isMultiOptionProposal ? (
-          <>
-            <h2 className="text-base font-semibold text-slate-950">Quote Readiness Checklist</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Multi-option readiness scoring is not defined in this slice. Flat checklist scoring remains unchanged for single-option estimates.
-            </p>
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
-              This estimate is in multi-option package mode. Review option package cards below as proposed commercial alternatives.
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="text-base font-semibold text-slate-950">Quote Readiness Checklist</h2>
-                <p className="mt-1 text-sm text-slate-600">
-                  Internal-only readiness for manual presentation/sharing. This is advisory and does not change lifecycle behavior.
-                </p>
-              </div>
-              <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-right text-xs text-slate-600">
-                <div>
-                  Ready: <span className="font-semibold text-slate-900">{readinessChecklist.readyCount}</span>
-                </div>
-                <div>
-                  Needs attention: <span className="font-semibold text-slate-900">{readinessChecklist.attentionCount}</span>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 divide-y divide-slate-200/70 overflow-hidden rounded-xl border border-slate-200/80">
-              {readinessChecklist.items.map((item) => (
-                <div key={item.key} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-900">{item.label}</div>
-                    <div className="mt-0.5 text-xs leading-5 text-slate-600">{item.detail}</div>
-                  </div>
-                  <span
-                    className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${
-                      item.status === "ready"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-amber-100 text-amber-700"
-                    }`}
-                  >
-                    {item.status === "ready" ? "Ready" : "Attention"}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
-
       {/* Create default option packages (if eligible for multi-option upgrade) */}
       <CreateDefaultOptionsForm
         estimateId={estimate.id}
@@ -587,11 +499,11 @@ export default async function EstimateDetailPage({
         optionsUnavailable={false}
       />
 
-      {/* Status actions (internal + scoped + feature-gated by route access) */}
+      {/* Status actions */}
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Status Actions</h2>
+            <h2 className="text-base font-semibold text-slate-950">Builder Actions</h2>
             <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
               {statusPanelTitle}
             </p>
@@ -599,7 +511,7 @@ export default async function EstimateDetailPage({
               <p className="mt-1 text-sm text-slate-600">{statusMessage}</p>
             ) : (
               <p className="mt-1 text-sm text-slate-600">
-                Transition this estimate within the internal V1E lifecycle.
+                Use these actions to move this estimate through the builder workflow.
               </p>
             )}
           </div>
@@ -614,8 +526,8 @@ export default async function EstimateDetailPage({
                   label="Mark Sent Manually"
                   helperText={
                     isMultiOptionProposal
-                      ? "Updates the estimate status only. This does not send an email or PDF, capture approval, or select an option."
-                      : "Updates the estimate status only. This does not send an email or PDF."
+                      ? "Marks this estimate as sent and locks edits."
+                      : "Marks this estimate as sent and locks edits."
                   }
                   confirmMessage={
                     isMultiOptionProposal
@@ -629,7 +541,7 @@ export default async function EstimateDetailPage({
                   estimateId={estimate.id}
                   nextStatus="cancelled"
                   label="Cancel Estimate"
-                  helperText="Terminal for V1. No conversion or follow-on record is created."
+                  helperText="Closes this estimate without approval."
                   confirmMessage="Cancel this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
                   className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
                 />
@@ -653,7 +565,7 @@ export default async function EstimateDetailPage({
                   estimateId={estimate.id}
                   nextStatus="declined"
                   label="Mark Declined"
-                  helperText="Terminal for V1. Stronger confirm because this closes the estimate path."
+                  helperText="Closes this estimate as declined."
                   confirmMessage="Decline this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
                   className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
                 />
@@ -662,7 +574,7 @@ export default async function EstimateDetailPage({
                   estimateId={estimate.id}
                   nextStatus="expired"
                   label="Mark Expired"
-                  helperText="Terminal for V1. Use when the proposal should no longer remain active."
+                  helperText="Marks this estimate as no longer active."
                   confirmMessage="Expire this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
                   className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-[background-color,border-color,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
                 />
@@ -671,7 +583,7 @@ export default async function EstimateDetailPage({
                   estimateId={estimate.id}
                   nextStatus="cancelled"
                   label="Cancel Estimate"
-                  helperText="Terminal for V1. Use when this proposal should be closed without approval."
+                  helperText="Closes this estimate without approval."
                   confirmMessage="Cancel this estimate? This is a terminal V1 action and no job, invoice, payment, or conversion record will be created."
                   className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
                 />
@@ -685,9 +597,9 @@ export default async function EstimateDetailPage({
       {/* Approval response panel — visible on approved terminal state */}
       {isApproved && (
         <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
-          <h2 className="text-base font-semibold text-emerald-900">Approval Response</h2>
+          <h2 className="text-base font-semibold text-emerald-900">Approval</h2>
           <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-600">
-            Internally approved
+            Approved
           </p>
           {estimate.approved_at && (
             <p className="mt-1 text-sm text-slate-600">
@@ -714,13 +626,10 @@ export default async function EstimateDetailPage({
           ) : null}
           {estimate.response_note && (
             <div className="mt-3">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Internal note</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Note</p>
               <p className="mt-1 text-sm text-slate-700">{estimate.response_note}</p>
             </div>
           )}
-          <p className="mt-3 text-[11px] text-slate-400">
-            Internal V1 record only. No job, invoice, payment, customer approval record, or conversion was created.
-          </p>
 
           {canConvertToJob && (
             <form action={submitConvertEstimateToJob} className="mt-4">
@@ -731,23 +640,14 @@ export default async function EstimateDetailPage({
               >
                 Convert to Job
               </button>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Internal-only Action A: approved estimate to job. No invoice/payment/QBO/SMS/email/portal behavior.
-              </p>
             </form>
-          )}
-
-          {isApproved && !estimate.conversionSchemaReady && (
-            <p className="mt-3 text-[11px] text-amber-700">
-              Conversion action is hidden until conversion schema migration is available in this environment.
-            </p>
           )}
         </div>
       )}
 
       {isConverted && estimate.converted_job_id && (
         <div className="rounded-2xl border border-violet-200 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
-          <h2 className="text-base font-semibold text-violet-900">Converted Job Linkage</h2>
+          <h2 className="text-base font-semibold text-violet-900">Linked Job</h2>
           <p className="mt-1 text-sm text-slate-700">
             This estimate is linked to job{" "}
             <Link href={`/jobs/${estimate.converted_job_id}`} className="font-semibold text-violet-700 hover:underline">
@@ -763,18 +663,9 @@ export default async function EstimateDetailPage({
                 type="submit"
                 className="inline-flex items-center justify-center rounded-lg border border-violet-200 bg-white px-3 py-1.5 text-xs font-semibold text-violet-700 transition-[background-color,border-color,transform] hover:bg-violet-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-200 active:translate-y-[0.5px]"
               >
-                Convert to Invoice Draft
+                Create Draft Invoice
               </button>
-              <p className="mt-1 text-[11px] text-slate-500">
-                Internal-only Action B: converted estimate/job to draft internal invoice. No issue/send/payment/QBO/SMS/email/portal behavior.
-              </p>
             </form>
-          )}
-
-          {!estimate.invoiceConversionSchemaReady && (
-            <p className="mt-3 text-[11px] text-amber-700">
-              Invoice conversion action is hidden until invoice conversion schema migration is available in this environment.
-            </p>
           )}
 
           {convertedInvoiceId && invoiceWorkspaceHref && (
@@ -790,7 +681,7 @@ export default async function EstimateDetailPage({
         {isMultiOptionProposal ? (
           <>
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700 print:border-slate-300 print:bg-white">
-              Proposed commercial alternatives are grouped into option packages. Totals below are per option package; no single selected option is implied in this view.
+              Proposed commercial alternatives are grouped into options. Totals below are shown per option.
             </div>
 
             <div className="space-y-4">
@@ -831,7 +722,7 @@ export default async function EstimateDetailPage({
 
                   {option.line_items.length === 0 ? (
                     <div className="px-5 py-4 text-sm text-slate-500 print:px-4 print:py-3">
-                      No line items in this option package.
+                      No line items in this option.
                     </div>
                   ) : (
                     <div className="divide-y divide-slate-200/60">
@@ -1025,113 +916,216 @@ export default async function EstimateDetailPage({
         )}
       </div>
 
-      {/* Send estimate panel — draft and sent estimates only */}
-      {(isDraft || isSent) && (
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
-          <h2 className="text-base font-semibold text-slate-950">Record Send Attempt</h2>
-          <p className="mt-1 text-sm text-slate-600">
-            {isDraft
-              ? "This estimate is still in draft. You can record a send attempt before or after marking it sent."
-              : "This estimate is marked sent. Record a send attempt to log that you shared this estimate."}
-          </p>
-          <p className="mt-1 text-xs text-slate-500">
-            Records an estimate communication attempt. This does not change the estimate lifecycle status.
-          </p>
-          <div className="mt-3">
-            <SendEstimateForm
-              estimateId={estimate.id}
-              action={sendEstimateFromForm}
-              isEmailSendEnabled={emailSendEnabled}
-              isMultiOptionProposal={isMultiOptionProposal}
-              defaultRecipientEmail={customerEmail}
-            />
-          </div>
-        </div>
-      )}
+      <details className="rounded-2xl border border-slate-200/80 bg-slate-50/70 text-sm text-slate-700 print:hidden">
+        <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-slate-900 marker:content-none">
+          <span className="flex items-center justify-between gap-3">
+            <span>Advanced / Internal</span>
+            <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
+              Expand
+            </span>
+          </span>
+        </summary>
+        <div className="space-y-5 border-t border-slate-200/80 px-4 pb-4 pt-3">
+          <section className="rounded-xl border border-slate-200/80 bg-white p-4">
+            <h2 className="text-sm font-semibold text-slate-900">Internal Readiness Notes</h2>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {ESTIMATE_DOCUMENT_READINESS_GUIDANCE.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+              <li>
+                {emailSendEnabled
+                  ? "Send/email is explicitly enabled for this environment."
+                  : "Send/email is currently disabled by feature flag in this environment."}
+              </li>
+            </ul>
+            <h3 className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Boundary Disclaimers
+            </h3>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-xs sm:text-sm">
+              {ESTIMATE_DOCUMENT_DISCLAIMERS.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
+            <p className="mt-2 text-xs text-slate-500">
+              Revision planning defaults: freeze trigger {ESTIMATE_REVISION_PLANNING_DEFAULTS.freezeTrigger}, history {ESTIMATE_REVISION_PLANNING_DEFAULTS.historyPolicy}, post-freeze edits {ESTIMATE_REVISION_PLANNING_DEFAULTS.postFreezeEditPolicy}.
+            </p>
+          </section>
 
-      {/* Communication history */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
-        <h2 className="text-base font-semibold text-slate-950">Communication History</h2>
-        {communications.length === 0 ? (
-          <p className="mt-2 text-sm text-slate-500">No send attempts recorded for this estimate.</p>
-        ) : (
-          <div className="mt-3 divide-y divide-slate-200/60 overflow-hidden rounded-xl border border-slate-200/80">
-            {communications.map((comm) => (
-              <div key={comm.id} className="px-4 py-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
+          <section className="rounded-xl border border-slate-200/80 bg-white p-4">
+            {isMultiOptionProposal ? (
+              <>
+                <h2 className="text-base font-semibold text-slate-950">Quote Readiness Checklist</h2>
+                <p className="mt-1 text-sm text-slate-600">
+                  Multi-option readiness scoring is not defined in this slice. Flat checklist scoring remains unchanged for single-option estimates.
+                </p>
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                  This estimate is in options mode. Review option cards as proposed commercial alternatives.
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h2 className="text-base font-semibold text-slate-950">Quote Readiness Checklist</h2>
+                    <p className="mt-1 text-sm text-slate-600">
+                      Advisory checklist for internal review.
+                    </p>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-right text-xs text-slate-600">
+                    <div>
+                      Ready: <span className="font-semibold text-slate-900">{readinessChecklist.readyCount}</span>
+                    </div>
+                    <div>
+                      Needs attention: <span className="font-semibold text-slate-900">{readinessChecklist.attentionCount}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 divide-y divide-slate-200/70 overflow-hidden rounded-xl border border-slate-200/80">
+                  {readinessChecklist.items.map((item) => (
+                    <div key={item.key} className="flex flex-col gap-1 px-4 py-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-slate-900">{item.label}</div>
+                        <div className="mt-0.5 text-xs leading-5 text-slate-600">{item.detail}</div>
+                      </div>
                       <span
-                        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
-                          comm.attempt_status === "accepted"
+                        className={`inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${
+                          item.status === "ready"
                             ? "bg-emerald-100 text-emerald-700"
-                            : comm.attempt_status === "blocked"
-                              ? "bg-slate-100 text-slate-600"
-                              : comm.attempt_status === "failed"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-amber-100 text-amber-700"
+                            : "bg-amber-100 text-amber-700"
                         }`}
                       >
-                        {comm.attempt_status}
+                        {item.status === "ready" ? "Ready" : "Attention"}
                       </span>
-                      {comm.provider_name && (
-                        <span className="text-xs text-slate-500">via {comm.provider_name}</span>
-                      )}
                     </div>
-                    <div className="mt-1 text-sm text-slate-800">
-                      {comm.recipient_email_snapshot}
-                    </div>
-                    {comm.attempt_error && (
-                      <div className="mt-0.5 text-xs text-red-600">{comm.attempt_error}</div>
-                    )}
-                    {comm.attempt_status === "accepted" && (
-                      <div className="mt-0.5 text-[11px] text-slate-400">
-                        Accepted by provider — not the same as delivered or read
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+
+          {(isDraft || isSent) && (
+            <section className="rounded-xl border border-slate-200/80 bg-white p-4">
+              <h2 className="text-base font-semibold text-slate-950">Record Send Attempt</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                {isDraft
+                  ? "This estimate is still in draft. You can record a send attempt before or after marking it sent."
+                  : "This estimate is marked sent. Record a send attempt to log that you shared this estimate."}
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                Records an estimate communication attempt. This does not change the estimate lifecycle status.
+              </p>
+              <div className="mt-3">
+                <SendEstimateForm
+                  estimateId={estimate.id}
+                  action={sendEstimateFromForm}
+                  isEmailSendEnabled={emailSendEnabled}
+                  isMultiOptionProposal={isMultiOptionProposal}
+                  defaultRecipientEmail={customerEmail}
+                />
+              </div>
+            </section>
+          )}
+
+          <section className="rounded-xl border border-slate-200/80 bg-white p-4">
+            <h2 className="text-base font-semibold text-slate-950">Communication History</h2>
+            {communications.length === 0 ? (
+              <p className="mt-2 text-sm text-slate-500">No send attempts recorded for this estimate.</p>
+            ) : (
+              <div className="mt-3 divide-y divide-slate-200/60 overflow-hidden rounded-xl border border-slate-200/80">
+                {communications.map((comm) => (
+                  <div key={comm.id} className="px-4 py-3">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span
+                            className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold capitalize ${
+                              comm.attempt_status === "accepted"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : comm.attempt_status === "blocked"
+                                  ? "bg-slate-100 text-slate-600"
+                                  : comm.attempt_status === "failed"
+                                    ? "bg-red-100 text-red-700"
+                                    : "bg-amber-100 text-amber-700"
+                            }`}
+                          >
+                            {comm.attempt_status}
+                          </span>
+                          {comm.provider_name && (
+                            <span className="text-xs text-slate-500">via {comm.provider_name}</span>
+                          )}
+                        </div>
+                        <div className="mt-1 text-sm text-slate-800">
+                          {comm.recipient_email_snapshot}
+                        </div>
+                        {comm.attempt_error && (
+                          <div className="mt-0.5 text-xs text-red-600">{comm.attempt_error}</div>
+                        )}
+                        {comm.attempt_status === "accepted" && (
+                          <div className="mt-0.5 text-[11px] text-slate-400">
+                            Accepted by provider - not the same as delivered or read
+                          </div>
+                        )}
                       </div>
-                    )}
+                      <div className="shrink-0 text-xs text-slate-400">
+                        {formatDateTime(comm.attempted_at)}
+                      </div>
+                    </div>
                   </div>
-                  <div className="shrink-0 text-xs text-slate-400">
-                    {formatDateTime(comm.attempted_at)}
-                  </div>
+                ))}
+              </div>
+            )}
+            <p className="mt-2 text-[11px] text-slate-400">
+              Delivery tracking is not available in V1H. Accepted by provider does not mean delivered or read.
+            </p>
+          </section>
+
+          {events.length > 0 && (
+            <section className="rounded-xl border border-slate-200/80 bg-white p-4">
+              <h2 className="text-base font-semibold text-slate-950">Activity</h2>
+              <div className="mt-3 overflow-hidden rounded-xl border border-slate-200/80 bg-white">
+                <div className="divide-y divide-slate-200/60">
+                  {events.map((event) => (
+                    <div key={event.id} className="px-5 py-3.5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-sm font-medium text-slate-800">
+                            {formatEstimateEventLabel(event.event_type)}
+                          </div>
+                          {formatEstimateEventSummary(event.event_type, event.meta) ? (
+                            <div className="mt-1 text-xs leading-5 text-slate-500">
+                              {formatEstimateEventSummary(event.event_type, event.meta)}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="shrink-0 text-xs text-slate-400">
+                          {formatDateTime(event.created_at)}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
-        )}
-        <p className="mt-2 text-[11px] text-slate-400">
-          Delivery tracking is not available in V1H. Accepted by provider does not mean delivered or read.
-        </p>
-      </div>
+            </section>
+          )}
 
-      {/* Estimate Events */}
-      {events.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-base font-semibold text-slate-950">Activity</h2>
-          <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)]">
-            <div className="divide-y divide-slate-200/60">
-              {events.map((event) => (
-                <div key={event.id} className="px-5 py-3.5">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-medium text-slate-800">
-                        {formatEstimateEventLabel(event.event_type)}
-                      </div>
-                      {formatEstimateEventSummary(event.event_type, event.meta) ? (
-                        <div className="mt-1 text-xs leading-5 text-slate-500">
-                          {formatEstimateEventSummary(event.event_type, event.meta)}
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="shrink-0 text-xs text-slate-400">
-                      {formatDateTime(event.created_at)}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
+          {(!estimate.conversionSchemaReady || !estimate.invoiceConversionSchemaReady) && (
+            <section className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800">
+              <p className="font-semibold uppercase tracking-[0.12em] text-amber-900">Schema readiness</p>
+              {!estimate.conversionSchemaReady && (
+                <p className="mt-1">
+                  Job conversion action is hidden until the conversion schema migration is available in this environment.
+                </p>
+              )}
+              {!estimate.invoiceConversionSchemaReady && (
+                <p className="mt-1">
+                  Draft invoice conversion action is hidden until the invoice conversion schema migration is available in this environment.
+                </p>
+              )}
+            </section>
+          )}
         </div>
-      )}
+      </details>
 
       {/* Non-goal confirmation: no approval/conversion/payment/email/PDF UI */}
     </div>

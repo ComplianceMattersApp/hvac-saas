@@ -38,9 +38,9 @@ export default function CreateDefaultOptionsForm({
       {isEligible ? (
         <>
           <div className="mb-3">
-            <h2 className="text-base font-semibold text-slate-950">Option Packages</h2>
+            <h2 className="text-base font-semibold text-slate-950">Options</h2>
             <p className="mt-1 text-sm text-slate-600">
-              Convert this flat estimate to a multi-option proposal with three default packages: Good, Better, and Best.
+              Convert this single estimate into three options: Good, Better, and Best.
             </p>
           </div>
 
@@ -66,10 +66,10 @@ export default function CreateDefaultOptionsForm({
       ) : (
         <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-blue-900">
-            Option Packages Blocked
+            Options Blocked
           </div>
           <p className="mt-1 text-sm text-blue-800">
-            This estimate has flat line items. Option packages cannot be created for estimates with existing lines. To use option packages, create a new estimate.
+            This estimate already has single-estimate line items. Options cannot be created when those lines already exist. To use options, start a new estimate.
           </p>
         </div>
       )}

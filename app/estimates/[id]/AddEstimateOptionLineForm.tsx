@@ -147,7 +147,7 @@ export default function AddEstimateOptionLineForm({
       className="mt-3 space-y-3 rounded-xl border border-blue-200 bg-blue-50/40 p-3 print:hidden"
     >
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
-        Add Option Line
+        Add Item
       </div>
 
       {error && (
@@ -305,7 +305,7 @@ export default function AddEstimateOptionLineForm({
           disabled={isPending}
           className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {isPending ? "Adding..." : "Add Option Line"}
+          {isPending ? "Adding..." : "Add Item"}
         </button>
       </div>
     </form>

@@ -69,7 +69,7 @@ export default function EstimateApprovalResponseForm({
             htmlFor={`approval-option-${estimateId}`}
             className="block text-xs font-semibold text-slate-700"
           >
-            Select approved option <span className="text-rose-500">*</span>
+            Select option <span className="text-rose-500">*</span>
           </label>
           <select
             id={`approval-option-${estimateId}`}
@@ -119,7 +119,7 @@ export default function EstimateApprovalResponseForm({
           disabled={!isReadyToSubmit}
           className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-[background-color,border-color,transform] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-400"
         >
-          {isMultiOption ? "Record Option Approval" : "Mark Approved"}
+          {isMultiOption ? "Select Option" : "Record Approval"}
         </button>
         <p className="max-w-64 text-[11px] leading-4 text-slate-500">
           {isMultiOption
