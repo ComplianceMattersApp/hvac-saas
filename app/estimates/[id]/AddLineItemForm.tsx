@@ -6,12 +6,13 @@
 
 import { useEffect, useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Search, Sparkles } from "lucide-react";
+import { Plus, Sparkles } from "lucide-react";
 import { addLineItemAction } from "./actions";
 import type { PricebookEntryItem } from "@/components/pricebook/PricebookLineEntryFields";
 
 const ITEM_TYPES = [
   { value: "service", label: "Service" },
+  { value: "install", label: "Install" },
   { value: "material", label: "Material" },
   { value: "diagnostic", label: "Diagnostic" },
   { value: "adjustment", label: "Adjustment" },
@@ -183,16 +184,11 @@ export default function AddLineItemForm({
     <div className="rounded-[28px] border border-slate-200/85 bg-white shadow-[0_22px_60px_-42px_rgba(15,23,42,0.42)]">
       <div className="border-b border-blue-200 bg-blue-50/80 px-4 py-4 sm:px-5">
         <div className="flex items-center justify-between gap-3">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-blue-200 bg-white text-blue-700">
-              <Search className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
-                Add Line Item
-              </div>
-              <p className="mt-0.5 text-xs text-slate-600">Search Pricebook or enter a manual item.</p>
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+              Add Line Item
             </div>
+            <p className="mt-0.5 text-xs text-slate-600">Search Pricebook or enter a manual item.</p>
           </div>
           <button
             type="button"
@@ -218,7 +214,7 @@ export default function AddLineItemForm({
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200/85 bg-white p-3.5 sm:p-4">
           <div>
             <label htmlFor="estimate_line_search" className={labelClass}>
-              Search or type line item
+              Search Pricebook or type item
             </label>
             <input
               ref={searchInputRef}
@@ -243,31 +239,38 @@ export default function AddLineItemForm({
               }}
               className={inputClass}
             />
-          </div>
 
-          {pricebookItems.length > 0 && (
-            <div>
-              <label htmlFor="estimate_source_pricebook" className={labelClass}>
-                Matching Pricebook item (optional)
-              </label>
-              <select
-                id="estimate_source_pricebook"
-                value={selectedPricebookId}
-                onChange={(event) => {
-                  setSelectedPricebookId(event.target.value);
-                  setError(null);
-                }}
-                className={inputClass}
-              >
-                <option value="">Manual line (no Pricebook source)</option>
-                {filteredPricebookItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.item_name} {item.category ? `- ${item.category}` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+            {pricebookItems.length > 0 && normalizedSearch.length > 0 && !selectedPricebookId && (
+              <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-slate-200 bg-white p-1.5">
+                {filteredPricebookItems.length > 0 ? (
+                  filteredPricebookItems.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedPricebookId(item.id);
+                        setError(null);
+                      }}
+                      className="flex w-full items-start justify-between gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-slate-50"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-slate-900">{item.item_name}</span>
+                        <span className="block truncate text-xs text-slate-500">
+                          {item.category || "Uncategorized"}
+                          {item.item_type ? ` - ${item.item_type}` : ""}
+                        </span>
+                      </span>
+                      <span className="shrink-0 text-xs font-semibold text-slate-600">
+                        ${(Number(item.default_unit_price ?? 0)).toFixed(2)}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p className="px-2.5 py-2 text-xs text-slate-500">No Pricebook matches. This line will be treated as manual.</p>
+                )}
+              </div>
+            )}
+          </div>
 
           {selectedPricebookItem && (
             <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">

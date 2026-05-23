@@ -4,7 +4,7 @@
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { ArrowLeft, ClipboardList, Eye, Layers3, Link2, ListChecks, Workflow } from "lucide-react";
+import { ArrowLeft, Eye, Link2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireInternalUser,
@@ -378,8 +378,7 @@ export default async function EstimateDetailPage({
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
-            <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              <ClipboardList className="h-3.5 w-3.5" aria-hidden="true" />
+            <p className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Estimate Builder
             </p>
             <div className="flex flex-wrap items-center gap-2">
@@ -474,18 +473,8 @@ export default async function EstimateDetailPage({
 
       {/* Status actions */}
       <div className="rounded-[28px] border border-slate-200/85 bg-white shadow-[0_22px_60px_-42px_rgba(15,23,42,0.42)] print:hidden">
-        <div className="border-b border-slate-200/85 bg-slate-50/80 px-5 py-4 sm:px-6">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200/85 bg-white text-slate-600">
-              <Workflow className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <div>
-              <h2 className="text-base font-semibold text-slate-950">Builder Workflow</h2>
-              <p className="mt-1 text-sm text-slate-600">Keep the core path simple: build, preview, send, approve, and convert.</p>
-            </div>
-          </div>
-        </div>
         <div className="px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
+        <p className="mb-3 text-xs text-slate-500">Builder path: build, preview, send, approve, convert.</p>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h3 className="text-base font-semibold text-slate-950">Builder Actions</h3>
@@ -667,7 +656,7 @@ export default async function EstimateDetailPage({
         {isMultiOptionProposal ? (
           <>
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700 print:border-slate-300 print:bg-white">
-              <span className="inline-flex items-center gap-2 font-medium text-slate-800"><Layers3 className="h-4 w-4" aria-hidden="true" />Proposed commercial alternatives are grouped into options.</span>
+              <span className="inline-flex items-center font-medium text-slate-800">Proposed commercial alternatives are grouped into options.</span>
               <span className="mt-1 block text-sm text-slate-700">Totals are shown per option below.</span>
             </div>
 
@@ -822,7 +811,7 @@ export default async function EstimateDetailPage({
         ) : (
           <>
         <div className="flex items-center justify-between">
-          <h2 className="inline-flex items-center gap-2 text-base font-semibold text-slate-950"><ListChecks className="h-4 w-4" aria-hidden="true" />Line Items</h2>
+          <h2 className="text-base font-semibold text-slate-950">Line Items</h2>
           <div className="text-sm text-slate-500 print:text-slate-700">
             {estimate.line_items.length}{" "}
             {estimate.line_items.length === 1 ? "item" : "items"}
