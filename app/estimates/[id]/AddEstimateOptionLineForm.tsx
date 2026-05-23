@@ -5,7 +5,6 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Sparkles } from "lucide-react";
 import { addEstimateOptionLineItemFromForm } from "./actions";
 
 const labelClass =
@@ -177,7 +176,7 @@ export default function AddEstimateOptionLineForm({
     >
       <div>
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">Add Item</div>
-        <p className="mt-0.5 text-xs text-slate-600">Search Pricebook or enter a manual item.</p>
+        <p className="mt-0.5 text-xs text-slate-600">Search to use Pricebook defaults, or keep typing to enter a manual item.</p>
       </div>
 
       {error && (
@@ -240,7 +239,7 @@ export default function AddEstimateOptionLineForm({
                 </button>
               ))
             ) : (
-              <p className="px-2.5 py-2 text-xs text-slate-500">No Pricebook matches. This line will be treated as manual.</p>
+              <p className="px-2.5 py-2 text-xs text-slate-500">No Pricebook matches. Keep typing to add this as a manual line.</p>
             )}
           </div>
         )}
@@ -249,7 +248,7 @@ export default function AddEstimateOptionLineForm({
       {selectedPricebookItem && (
         <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
           <span>
-            Using Pricebook defaults from <strong>{selectedPricebookItem.item_name}</strong>
+            Pricebook defaults applied from <strong>{selectedPricebookItem.item_name}</strong>
           </span>
           <button
             type="button"
@@ -363,7 +362,6 @@ export default function AddEstimateOptionLineForm({
           disabled={isPending}
           className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
           {isPending ? "Adding..." : "Add Item"}
         </button>
       </div>

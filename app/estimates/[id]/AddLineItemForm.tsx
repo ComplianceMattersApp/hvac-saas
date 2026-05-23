@@ -6,7 +6,7 @@
 
 import { useEffect, useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Sparkles } from "lucide-react";
+import { Plus } from "lucide-react";
 import { addLineItemAction } from "./actions";
 import type { PricebookEntryItem } from "@/components/pricebook/PricebookLineEntryFields";
 
@@ -188,7 +188,7 @@ export default function AddLineItemForm({
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
               Add Line Item
             </div>
-            <p className="mt-0.5 text-xs text-slate-600">Search Pricebook or enter a manual item.</p>
+            <p className="mt-0.5 text-xs text-slate-600">Search to use Pricebook defaults, or keep typing to enter a manual item.</p>
           </div>
           <button
             type="button"
@@ -266,7 +266,7 @@ export default function AddLineItemForm({
                     </button>
                   ))
                 ) : (
-                  <p className="px-2.5 py-2 text-xs text-slate-500">No Pricebook matches. This line will be treated as manual.</p>
+                  <p className="px-2.5 py-2 text-xs text-slate-500">No Pricebook matches. Keep typing to add this as a manual line.</p>
                 )}
               </div>
             )}
@@ -275,7 +275,7 @@ export default function AddLineItemForm({
           {selectedPricebookItem && (
             <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
               <span>
-                Using Pricebook defaults from <strong>{selectedPricebookItem.item_name}</strong>
+                Pricebook defaults applied from <strong>{selectedPricebookItem.item_name}</strong>
               </span>
               <button
                 type="button"
@@ -395,7 +395,6 @@ export default function AddLineItemForm({
               disabled={isPending}
               className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(15,23,42,0.56)] transition-all hover:-translate-y-px hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Sparkles className="h-4 w-4" aria-hidden="true" />
               {isPending ? "Adding…" : "Add Line"}
             </button>
           </div>
