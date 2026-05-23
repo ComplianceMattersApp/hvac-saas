@@ -4,11 +4,16 @@
 // Compliance Matters: Client component for adding a manual line item to a draft estimate.
 // Calls addLineItemAction server action; refreshes RSC on success via router.refresh().
 
-import { useEffect, useState, useTransition, useRef } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { addLineItemAction } from "./actions";
-import type { PricebookEntryItem } from "@/components/pricebook/PricebookLineEntryFields";
+import EstimatePricebookSearchPicker from "./EstimatePricebookSearchPicker";
+import {
+  applySearchValueToDraft,
+  formatPricebookDollars,
+  type EstimatePricebookPickerItem,
+} from "@/lib/estimates/estimate-pricebook-picker-model";
 
 const ITEM_TYPES = [
   { value: "service", label: "Service" },
@@ -24,20 +29,17 @@ const labelClass =
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200";
 
-type PricebookPickerItem = PricebookEntryItem;
-
 export default function AddLineItemForm({
   estimateId,
   pricebookItems,
 }: {
   estimateId: string;
-  pricebookItems: PricebookPickerItem[];
+  pricebookItems: EstimatePricebookPickerItem[];
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [open, setOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const formRef = useRef<HTMLFormElement | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [selectedPricebookId, setSelectedPricebookId] = useState("");
@@ -51,49 +53,6 @@ export default function AddLineItemForm({
     unitPriceDollars: "0.00",
   });
 
-  useEffect(() => {
-    if (!selectedPricebookId) {
-      return;
-    }
-
-    const selected = pricebookItems.find((item) => item.id === selectedPricebookId);
-    if (!selected) return;
-
-    setPricebookDraft({
-      itemName: selected.item_name,
-      description: selected.default_description ?? "",
-      itemType: selected.item_type || "service",
-      category: selected.category ?? "",
-      unitLabel: selected.unit_label ?? "",
-      quantity: "1.00",
-      unitPriceDollars: Number(selected.default_unit_price ?? 0).toFixed(2),
-    });
-    setSearchValue(selected.item_name);
-  }, [selectedPricebookId, pricebookItems]);
-
-  const normalizedSearch = searchValue.trim().toLowerCase();
-  const filteredPricebookItems =
-    normalizedSearch.length === 0
-      ? pricebookItems.slice(0, 6)
-      : pricebookItems
-          .filter((item) => {
-            const haystack = [
-              item.item_name,
-              item.default_description ?? "",
-              item.item_type,
-              item.category ?? "",
-              item.unit_label ?? "",
-            ]
-              .join(" ")
-              .toLowerCase();
-            return haystack.includes(normalizedSearch);
-          })
-          .slice(0, 6);
-
-  const selectedPricebookItem = selectedPricebookId
-    ? pricebookItems.find((item) => item.id === selectedPricebookId) ?? null
-    : null;
-
   function resetDraftState() {
     setSearchValue("");
     setSelectedPricebookId("");
@@ -105,6 +64,21 @@ export default function AddLineItemForm({
       unitLabel: "",
       quantity: "1.00",
       unitPriceDollars: "0.00",
+    });
+  }
+
+  function applySelectedPricebookItem(item: EstimatePricebookPickerItem) {
+    setSelectedPricebookId(item.id);
+    setSearchValue(item.item_name);
+    setError(null);
+    setPricebookDraft({
+      itemName: item.item_name,
+      description: item.default_description ?? "",
+      itemType: item.item_type || "service",
+      category: item.category ?? "",
+      unitLabel: item.unit_label ?? "",
+      quantity: "1.00",
+      unitPriceDollars: formatPricebookDollars(item.default_unit_price),
     });
   }
 
@@ -212,84 +186,33 @@ export default function AddLineItemForm({
         )}
 
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200/85 bg-white p-3.5 sm:p-4">
-          <div>
-            <label htmlFor="estimate_line_search" className={labelClass}>
-              Search Pricebook or type item
-            </label>
-            <input
-              ref={searchInputRef}
-              id="estimate_line_search"
-              type="text"
-              value={searchValue}
-              placeholder={
-                pricebookItems.length > 0
-                  ? "Search Pricebook or type a manual estimate line"
-                  : "Type a manual estimate line"
+          <EstimatePricebookSearchPicker
+            items={pricebookItems}
+            searchValue={searchValue}
+            selectedItemId={selectedPricebookId}
+            inputId="estimate_line_search"
+            labelClassName={labelClass}
+            inputClassName={inputClass}
+            onSearchValueChange={(nextValue) => {
+              setSearchValue(nextValue);
+              setPricebookDraft((prev) =>
+                applySearchValueToDraft(prev, nextValue, Boolean(selectedPricebookId))
+              );
+              if (selectedPricebookId) {
+                setSelectedPricebookId("");
               }
-              onChange={(event) => {
-                const nextValue = event.target.value;
-                setSearchValue(nextValue);
-                if (selectedPricebookId) {
-                  setSelectedPricebookId("");
-                }
-                setPricebookDraft((prev) => ({
-                  ...prev,
-                  itemName: nextValue,
-                }));
-              }}
-              className={inputClass}
-            />
-
-            {pricebookItems.length > 0 && normalizedSearch.length > 0 && !selectedPricebookId && (
-              <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-slate-200 bg-white p-1.5">
-                {filteredPricebookItems.length > 0 ? (
-                  filteredPricebookItems.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedPricebookId(item.id);
-                        setError(null);
-                      }}
-                      className="flex w-full items-start justify-between gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-slate-50"
-                    >
-                      <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold text-slate-900">{item.item_name}</span>
-                        <span className="block truncate text-xs text-slate-500">
-                          {item.category || "Uncategorized"}
-                          {item.item_type ? ` - ${item.item_type}` : ""}
-                        </span>
-                      </span>
-                      <span className="shrink-0 text-xs font-semibold text-slate-600">
-                        ${(Number(item.default_unit_price ?? 0)).toFixed(2)}
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <p className="px-2.5 py-2 text-xs text-slate-500">No Pricebook matches. Keep typing to add this as a manual line.</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {selectedPricebookItem && (
-            <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-              <span>
-                Pricebook defaults applied from <strong>{selectedPricebookItem.item_name}</strong>
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedPricebookId("");
-                  setError(null);
-                  searchInputRef.current?.focus();
-                }}
-                className="rounded-md border border-emerald-200 bg-white px-2 py-1 font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
-              >
-                Clear
-              </button>
-            </div>
-          )}
+            }}
+            onSelectItem={applySelectedPricebookItem}
+            onClearSelection={() => {
+              setSelectedPricebookId("");
+              setError(null);
+              setPricebookDraft((prev) => ({
+                ...prev,
+                category: "",
+                unitLabel: "",
+              }));
+            }}
+          />
 
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">

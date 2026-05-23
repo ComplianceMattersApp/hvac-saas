@@ -6,21 +6,17 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { addEstimateOptionLineItemFromForm } from "./actions";
+import EstimatePricebookSearchPicker from "./EstimatePricebookSearchPicker";
+import {
+  applySearchValueToDraft,
+  formatPricebookDollars,
+  type EstimatePricebookPickerItem,
+} from "@/lib/estimates/estimate-pricebook-picker-model";
 
 const labelClass =
   "mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200";
-
-type PricebookPickerItem = {
-  id: string;
-  item_name: string;
-  item_type: string;
-  category: string | null;
-  default_description: string | null;
-  default_unit_price: number;
-  unit_label: string | null;
-};
 
 const ITEM_TYPES = [
   { value: "service", label: "Service" },
@@ -38,13 +34,12 @@ export default function AddEstimateOptionLineForm({
 }: {
   estimateId: string;
   estimateOptionId: string;
-  pricebookItems: PricebookPickerItem[];
+  pricebookItems: EstimatePricebookPickerItem[];
 }) {
   const router = useRouter();
   const formRef = useRef<HTMLFormElement | null>(null);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [searchValue, setSearchValue] = useState("");
   const [selectedPricebookId, setSelectedPricebookId] = useState("");
   const [draft, setDraft] = useState({
@@ -69,36 +64,13 @@ export default function AddEstimateOptionLineForm({
       ...prev,
       itemName: selected.item_name,
       itemType: selected.item_type || "service",
-      unitPriceDollars: Number(selected.default_unit_price ?? 0).toFixed(2),
+      unitPriceDollars: formatPricebookDollars(selected.default_unit_price),
       description: selected.default_description ?? "",
       category: selected.category ?? "",
       unitLabel: selected.unit_label ?? "",
     }));
     setSearchValue(selected.item_name);
   }, [selectedPricebookId, pricebookItems]);
-
-  const normalizedSearch = searchValue.trim().toLowerCase();
-  const filteredPricebookItems =
-    normalizedSearch.length === 0
-      ? pricebookItems.slice(0, 6)
-      : pricebookItems
-          .filter((item) => {
-            const haystack = [
-              item.item_name,
-              item.default_description ?? "",
-              item.item_type,
-              item.category ?? "",
-              item.unit_label ?? "",
-            ]
-              .join(" ")
-              .toLowerCase();
-            return haystack.includes(normalizedSearch);
-          })
-          .slice(0, 6);
-
-  const selectedPricebookItem = selectedPricebookId
-    ? pricebookItems.find((item) => item.id === selectedPricebookId) ?? null
-    : null;
 
   function resetDraftState() {
     setSearchValue("");
@@ -112,6 +84,21 @@ export default function AddEstimateOptionLineForm({
       category: "",
       unitLabel: "",
     });
+  }
+
+  function applySelectedPricebookItem(item: EstimatePricebookPickerItem) {
+    setSelectedPricebookId(item.id);
+    setSearchValue(item.item_name);
+    setError(null);
+    setDraft((prev) => ({
+      ...prev,
+      itemName: item.item_name,
+      itemType: item.item_type || "service",
+      unitPriceDollars: formatPricebookDollars(item.default_unit_price),
+      description: item.default_description ?? "",
+      category: item.category ?? "",
+      unitLabel: item.unit_label ?? "",
+    }));
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -185,84 +172,33 @@ export default function AddEstimateOptionLineForm({
         </div>
       )}
 
-      <div>
-        <label className={labelClass} htmlFor={`option_search_pricebook_${estimateOptionId}`}>
-          Search Pricebook or type item
-        </label>
-        <input
-          ref={searchInputRef}
-          id={`option_search_pricebook_${estimateOptionId}`}
-          type="text"
-          value={searchValue}
-          placeholder={
-            pricebookItems.length > 0
-              ? "Search Pricebook or type a manual estimate line"
-              : "Type a manual estimate line"
+      <EstimatePricebookSearchPicker
+        items={pricebookItems}
+        searchValue={searchValue}
+        selectedItemId={selectedPricebookId}
+        inputId={`option_search_pricebook_${estimateOptionId}`}
+        labelClassName={labelClass}
+        inputClassName={inputClass}
+        onSearchValueChange={(nextValue) => {
+          setSearchValue(nextValue);
+          setDraft((prev) =>
+            applySearchValueToDraft(prev, nextValue, Boolean(selectedPricebookId))
+          );
+          if (selectedPricebookId) {
+            setSelectedPricebookId("");
           }
-          onChange={(event) => {
-            const nextValue = event.target.value;
-            setSearchValue(nextValue);
-            if (selectedPricebookId) {
-              setSelectedPricebookId("");
-            }
-            setDraft((prev) => ({
-              ...prev,
-              itemName: nextValue,
-            }));
-          }}
-          className={inputClass}
-        />
-
-        {pricebookItems.length > 0 && normalizedSearch.length > 0 && !selectedPricebookId && (
-          <div className="mt-2 max-h-48 overflow-auto rounded-lg border border-slate-200 bg-white p-1.5">
-            {filteredPricebookItems.length > 0 ? (
-              filteredPricebookItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedPricebookId(item.id);
-                    setError(null);
-                  }}
-                  className="flex w-full items-start justify-between gap-3 rounded-md px-2.5 py-2 text-left transition-colors hover:bg-slate-50"
-                >
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-slate-900">{item.item_name}</span>
-                    <span className="block truncate text-xs text-slate-500">
-                      {item.category || "Uncategorized"}
-                      {item.item_type ? ` - ${item.item_type}` : ""}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-xs font-semibold text-slate-600">
-                    ${(Number(item.default_unit_price ?? 0)).toFixed(2)}
-                  </span>
-                </button>
-              ))
-            ) : (
-              <p className="px-2.5 py-2 text-xs text-slate-500">No Pricebook matches. Keep typing to add this as a manual line.</p>
-            )}
-          </div>
-        )}
-      </div>
-
-      {selectedPricebookItem && (
-        <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-          <span>
-            Pricebook defaults applied from <strong>{selectedPricebookItem.item_name}</strong>
-          </span>
-          <button
-            type="button"
-            onClick={() => {
-              setSelectedPricebookId("");
-              setError(null);
-              searchInputRef.current?.focus();
-            }}
-            className="rounded-md border border-emerald-200 bg-white px-2 py-1 font-semibold text-emerald-700 transition-colors hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200"
-          >
-            Clear
-          </button>
-        </div>
-      )}
+        }}
+        onSelectItem={applySelectedPricebookItem}
+        onClearSelection={() => {
+          setSelectedPricebookId("");
+          setError(null);
+          setDraft((prev) => ({
+            ...prev,
+            category: "",
+            unitLabel: "",
+          }));
+        }}
+      />
 
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="sm:col-span-2">
