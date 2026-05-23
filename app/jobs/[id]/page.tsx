@@ -1709,15 +1709,22 @@ export default async function JobDetailPage({
   const hasSeparateSiteAccessContact = Boolean(
     primarySiteAccessName || primarySiteAccessPhone || primarySiteAccessEmail,
   );
-  const siteAccessFallbackText =
-    customerPhone !== "—" || customerEmail !== "—"
-      ? "Same as responsible account"
-      : "No separate site/access contact saved";
+  const normalizeCompareText = (value?: string | null) => String(value ?? "").trim().toLowerCase();
+  const normalizeComparePhone = (value?: string | null) => String(value ?? "").replace(/\D/g, "");
+  const accountNameForCompare = normalizeCompareText(customerDisplayName);
+  const accountPhoneForCompare = customerPhone === "—" ? "" : customerPhone;
+  const accountEmailForCompare = customerEmail === "—" ? "" : customerEmail;
+  const siteAccessMatchesAccount =
+    hasSeparateSiteAccessContact &&
+    (!primarySiteAccessName || normalizeCompareText(primarySiteAccessName) === accountNameForCompare) &&
+    (!primarySiteAccessPhone ||
+      normalizeComparePhone(primarySiteAccessPhone) === normalizeComparePhone(accountPhoneForCompare)) &&
+    (!primarySiteAccessEmail || normalizeCompareText(primarySiteAccessEmail) === normalizeCompareText(accountEmailForCompare));
+  const showSiteAccessCard = hasSeparateSiteAccessContact && !siteAccessMatchesAccount;
 
-  const billingRecipientName = firstNonEmpty(
-    (job as any).billing_name,
-    (job as any).billing_recipient,
-  );
+  const billingRecipientType = String((job as any).billing_recipient ?? "").trim().toLowerCase();
+  const isContractorBillingRecipient = billingRecipientType === "contractor";
+  const billingRecipientName = String((job as any).billing_name ?? "").trim();
   const billingRecipientEmail = String((job as any).billing_email ?? "").trim();
   const billingRecipientPhone = String((job as any).billing_phone ?? "").trim();
   const billingRecipientAddressParts = formatBillingAddress({
@@ -1728,11 +1735,19 @@ export default async function JobDetailPage({
     billing_zip: (job as any).billing_zip,
   });
   const billingRecipientAddress = billingRecipientAddressParts.join(", ");
-  const hasJobBillingRecipient = Boolean(
-    billingRecipientName ||
-      billingRecipientEmail ||
-      billingRecipientPhone ||
+  const hasBillingSnapshotFields = Boolean(
+    billingRecipientName || billingRecipientEmail || billingRecipientPhone || billingRecipientAddress,
+  );
+  const billingSnapshotDiffersFromAccount = Boolean(
+    (billingRecipientName && normalizeCompareText(billingRecipientName) !== accountNameForCompare) ||
+      (billingRecipientEmail &&
+        normalizeCompareText(billingRecipientEmail) !== normalizeCompareText(accountEmailForCompare)) ||
+      (billingRecipientPhone &&
+        normalizeComparePhone(billingRecipientPhone) !== normalizeComparePhone(accountPhoneForCompare)) ||
       billingRecipientAddress,
+  );
+  const hasJobBillingRecipient = Boolean(
+    isContractorBillingRecipient || hasBillingSnapshotFields || billingSnapshotDiffersFromAccount,
   );
   const accountBillingContact = customerRoleContacts.find((contact) => {
     const role = String(contact.recipient_role ?? "").trim().toLowerCase();
@@ -1755,6 +1770,10 @@ export default async function JobDetailPage({
   const contractorName = contractorId
     ? (resolvedContractorName || "Assigned contractor")
     : null;
+  const billingRecipientDisplayName = isContractorBillingRecipient
+    ? (contractorName || "Contractor")
+    : billingRecipientName;
+  const showBillingRecipientCard = hasJobBillingRecipient || hasAccountBillingContact;
 
   const serviceLocation = Array.isArray((job as any).locations)
     ? (job as any).locations.find((location: any) => location) ?? null
@@ -3231,8 +3250,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
       <div className="mt-3 space-y-2.5 border-t border-slate-200/70 pt-3 text-sm">
         <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Responsible Account</div>
-          <div className="mt-1 font-semibold text-slate-900">{customerDisplayName}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Account Contact</div>
           <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
             {customerPhone !== "—" ? (
               <div>
@@ -3253,73 +3271,69 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="mt-1 text-xs text-slate-600">{serviceAddressDisplay}</div>
         </div>
 
-        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Site / Access Contact</div>
-          {hasSeparateSiteAccessContact ? (
-            <>
-              {primarySiteAccessName ? (
-                <div className="mt-1 font-semibold text-slate-900">{primarySiteAccessName}</div>
-              ) : null}
-              <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
-                {primarySiteAccessPhone ? (
-                  <div>
-                    <span className="font-semibold text-slate-500">Access phone:</span> {primarySiteAccessPhone}
-                  </div>
-                ) : null}
-                {primarySiteAccessEmail ? (
-                  <div className="break-all">
-                    <span className="font-semibold text-slate-500">Access email:</span> {primarySiteAccessEmail}
-                  </div>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <div className="mt-1 text-xs text-slate-600">{siteAccessFallbackText}</div>
-          )}
-        </div>
-
-        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing / Paperwork Recipient</div>
-          {hasJobBillingRecipient ? (
-            <>
-              {billingRecipientName ? (
-                <div className="mt-1 font-semibold text-slate-900">{billingRecipientName}</div>
-              ) : null}
-              <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
-                {billingRecipientPhone ? (
-                  <div>
-                    <span className="font-semibold text-slate-500">Billing phone:</span> {billingRecipientPhone}
-                  </div>
-                ) : null}
-                {billingRecipientEmail ? (
-                  <div className="break-all">
-                    <span className="font-semibold text-slate-500">Billing email:</span> {billingRecipientEmail}
-                  </div>
-                ) : null}
-              </div>
-              {billingRecipientAddress ? (
-                <div className="mt-1 text-xs text-slate-600">
-                  <span className="font-semibold text-slate-500">Billing address:</span> {billingRecipientAddress}
+        {showSiteAccessCard ? (
+          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Site / Access Contact</div>
+            {primarySiteAccessName ? (
+              <div className="mt-1 font-semibold text-slate-900">{primarySiteAccessName}</div>
+            ) : null}
+            <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
+              {primarySiteAccessPhone ? (
+                <div>
+                  <span className="font-semibold text-slate-500">Access phone:</span> {primarySiteAccessPhone}
                 </div>
               ) : null}
-            </>
-          ) : (
-            <div className="mt-1 space-y-1.5 text-xs text-slate-600">
-              <div>Defaults to responsible account</div>
-              {hasAccountBillingContact ? (
+              {primarySiteAccessEmail ? (
+                <div className="break-all">
+                  <span className="font-semibold text-slate-500">Access email:</span> {primarySiteAccessEmail}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {showBillingRecipientCard ? (
+          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing / Paperwork Recipient</div>
+            {hasJobBillingRecipient ? (
+              <>
+                {isContractorBillingRecipient ? (
+                  <div className="mt-1 font-semibold text-slate-900">Billing / Paperwork Recipient: Contractor</div>
+                ) : null}
+                {billingRecipientDisplayName ? (
+                  <div className="mt-1 font-semibold text-slate-900">{billingRecipientDisplayName}</div>
+                ) : null}
+                <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
+                  {billingRecipientPhone ? (
+                    <div>
+                      <span className="font-semibold text-slate-500">Billing phone:</span> {billingRecipientPhone}
+                    </div>
+                  ) : null}
+                  {billingRecipientEmail ? (
+                    <div className="break-all">
+                      <span className="font-semibold text-slate-500">Billing email:</span> {billingRecipientEmail}
+                    </div>
+                  ) : null}
+                </div>
+                {billingRecipientAddress ? (
+                  <div className="mt-1 text-xs text-slate-600">
+                    <span className="font-semibold text-slate-500">Billing address:</span> {billingRecipientAddress}
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="mt-1 space-y-1.5 text-xs text-slate-600">
                 <div>
                   <span className="font-semibold text-slate-500">Billing contact on account:</span>{" "}
                   {accountBillingContactName || "Saved billing contact"}
                   {accountBillingContactEmail ? ` - ${accountBillingContactEmail}` : ""}
                   {accountBillingContactPhone ? ` - ${accountBillingContactPhone}` : ""}
                 </div>
-              ) : null}
-              {hasAccountBillingContact ? (
                 <div>Invoice routing still follows the job/invoice billing recipient fields.</div>
-              ) : null}
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
+        ) : null}
 
         {contractorId ? (
           <div>

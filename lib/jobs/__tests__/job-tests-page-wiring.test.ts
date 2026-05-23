@@ -37,12 +37,27 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("Billing email");
   });
 
-  it("includes explicit fallback copy for access and billing defaults", () => {
-    expect(jobPageSource).toContain("Same as responsible account");
-    expect(jobPageSource).toContain("No separate site/access contact saved");
-    expect(jobPageSource).toContain("Defaults to responsible account");
+  it("suppresses duplicate default cards and keeps billing-context hint copy", () => {
+    expect(jobPageSource).toContain("const showSiteAccessCard = hasSeparateSiteAccessContact && !siteAccessMatchesAccount;");
+    expect(jobPageSource).not.toContain("Same as responsible account");
+    expect(jobPageSource).not.toContain("No separate site/access contact saved");
+    expect(jobPageSource).not.toContain("Defaults to responsible account");
     expect(jobPageSource).toContain("Billing contact on account");
     expect(jobPageSource).toContain("Invoice routing still follows the job/invoice billing recipient fields.");
+  });
+
+  it("keeps custom and contractor billing recipient display branches", () => {
+    expect(jobPageSource).toContain("const hasBillingSnapshotFields = Boolean(");
+    expect(jobPageSource).toContain("const isContractorBillingRecipient = billingRecipientType === \"contractor\";");
+    expect(jobPageSource).toContain("Billing / Paperwork Recipient: Contractor");
+    expect(jobPageSource).toContain("Billing address:");
+  });
+
+  it("keeps account and distinct access action buttons available", () => {
+    expect(jobPageSource).toContain("Call account phone");
+    expect(jobPageSource).toContain("Text account phone");
+    expect(jobPageSource).toContain("Call access phone");
+    expect(jobPageSource).toContain("Text access phone");
   });
 
   it("includes location-linked contacts in site/access resolution priority", () => {
