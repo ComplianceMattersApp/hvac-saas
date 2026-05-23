@@ -152,12 +152,6 @@ export default async function EstimatePrintPage({
           </h1>
           <p className="mt-1 text-sm font-mono text-slate-600">{documentView.identity.estimateNumber}</p>
 
-          {estimate.notes ? (
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 print:border-slate-300 print:bg-white">
-              {estimate.notes}
-            </div>
-          ) : null}
-
           <div className="mt-5 grid gap-4 md:grid-cols-2 print:grid-cols-2 print:gap-x-6">
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 print:border-slate-300 print:bg-white">
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Quote Summary</div>
@@ -213,7 +207,7 @@ export default async function EstimatePrintPage({
               <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-900 print:border-amber-300 print:bg-white">
                 <p className="font-semibold">Multiple Options Included</p>
                 <p className="mt-1">This proposal includes multiple options. Totals are shown per option; no option has been selected in this document.</p>
-                <p className="mt-1 text-xs text-amber-800">Option packages are proposed commercial alternatives. Choosing, approving, paying, converting, or invoicing an option is not captured by this print view.</p>
+                <p className="mt-1 text-xs text-amber-800">Compare each option and select the one that best fits your needs.</p>
               </div>
 
               {documentView.options.length === 0 ? (
@@ -307,12 +301,12 @@ export default async function EstimatePrintPage({
             </div>
           )}
 
-          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 print:border-slate-300 print:bg-white">
-            <p className="font-semibold text-slate-900">Proposal Boundaries</p>
-            <p className="mt-1">Estimate Lines are proposed commercial scope only.</p>
-            <p className="mt-1">Work Items and Visit Scope remain operational work scope; Invoice Charges remain billed scope; payment entries remain collected/tracking truth where implemented.</p>
-            <p className="mt-1">No approval signature, payment collection, outbound email automation, customer portal publication, conversion, or accounting sync occurs from this print view.</p>
-          </div>
+          {estimate.notes ? (
+            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 print:border-slate-300 print:bg-white">
+              <p className="font-semibold text-slate-900">Proposal Notes</p>
+              <p className="mt-1 whitespace-pre-wrap">{estimate.notes}</p>
+            </div>
+          ) : null}
 
           <div className="mt-4 border-t border-slate-200 pt-3 text-xs text-slate-500 print:border-slate-300">
             <p>

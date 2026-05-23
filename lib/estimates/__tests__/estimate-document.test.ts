@@ -273,14 +273,16 @@ describe("buildEstimateDocumentViewModel", () => {
 });
 
 describe("ESTIMATE_DOCUMENT_DISCLAIMERS", () => {
-  it("includes required truth-boundary language", () => {
+  it("uses customer-friendly footer wording", () => {
     const joined = ESTIMATE_DOCUMENT_DISCLAIMERS.join(" ").toLowerCase();
-    expect(joined).toContain("proposed commercial scope");
-    expect(joined).toContain("not customer approval");
-    expect(joined).toContain("not invoice issuance");
-    expect(joined).toContain("not payment collection");
-    expect(joined).toContain("not delivery/read confirmation");
-    expect(joined).toContain("invoice/payment remain separate downstream truths");
+    expect(joined).toContain("valid until the date shown");
+    expect(joined).toContain("final work and billing are confirmed by the company");
+    expect(joined).not.toContain("provider");
+    expect(joined).not.toContain("portal publication");
+    expect(joined).not.toContain("accounting sync");
+    expect(joined).not.toContain("operational truth");
+    expect(joined).not.toContain("billed scope");
+    expect(joined).not.toContain("collected truth");
   });
 });
 

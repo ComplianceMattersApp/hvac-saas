@@ -5,12 +5,8 @@
 import type { EstimateReadResult } from "@/lib/estimates/estimate-read";
 
 export const ESTIMATE_DOCUMENT_DISCLAIMERS = [
-  "Estimate is proposed commercial scope.",
-  "Estimate is not customer approval.",
-  "Estimate is not invoice issuance.",
-  "Estimate is not payment collection.",
-  "Provider acceptance is not delivery/read confirmation.",
-  "Invoice/payment remain separate downstream truths.",
+  "This proposal is valid until the date shown, unless updated by the company.",
+  "Final work and billing are confirmed by the company.",
 ] as const;
 
 export const ESTIMATE_DOCUMENT_READINESS_GUIDANCE = [
