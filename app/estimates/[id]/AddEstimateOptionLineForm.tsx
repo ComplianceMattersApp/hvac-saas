@@ -246,32 +246,6 @@ export default function AddEstimateOptionLineForm({
           />
         </div>
 
-        <div>
-          <label className={labelClass} htmlFor={`option_category_${estimateOptionId}`}>
-            Category
-          </label>
-          <input
-            id={`option_category_${estimateOptionId}`}
-            type="text"
-            value={draft.category}
-            onChange={(event) => setDraft((prev) => ({ ...prev, category: event.target.value }))}
-            className={inputClass}
-          />
-        </div>
-
-        <div>
-          <label className={labelClass} htmlFor={`option_unit_label_${estimateOptionId}`}>
-            Unit Label
-          </label>
-          <input
-            id={`option_unit_label_${estimateOptionId}`}
-            type="text"
-            value={draft.unitLabel}
-            onChange={(event) => setDraft((prev) => ({ ...prev, unitLabel: event.target.value }))}
-            className={inputClass}
-          />
-        </div>
-
         <div className="sm:col-span-2">
           <label className={labelClass} htmlFor={`option_description_${estimateOptionId}`}>
             Description

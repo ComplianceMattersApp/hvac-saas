@@ -24,10 +24,6 @@ const inputClass =
 
 type PricebookPickerItem = PricebookEntryItem;
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(value);
-}
-
 export default function AddLineItemForm({
   estimateId,
   pricebookItems,
@@ -237,42 +233,27 @@ export default function AddLineItemForm({
             />
           </div>
 
-          {pricebookItems.length > 0 && filteredPricebookItems.length > 0 && (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {filteredPricebookItems.map((item) => {
-                const isSelected = item.id === selectedPricebookId;
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedPricebookId(item.id);
-                      setError(null);
-                    }}
-                    className={`rounded-xl border px-3 py-2 text-left transition-[border-color,background-color,transform] hover:-translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 ${
-                      isSelected
-                        ? "border-blue-300 bg-blue-50"
-                        : "border-slate-200 bg-slate-50 hover:border-blue-200 hover:bg-blue-50/50"
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="text-sm font-semibold text-slate-900">{item.item_name}</div>
-                      <div className="text-xs font-semibold text-slate-700">
-                        {formatCurrency(Number(item.default_unit_price ?? 0))}
-                      </div>
-                    </div>
-                    <div className="mt-1 text-xs text-slate-600">
-                      {[item.item_type, item.category, item.unit_label].filter(Boolean).join(" · ") ||
-                        "Pricebook item"}
-                    </div>
-                    {item.default_description && (
-                      <p className="mt-1.5 line-clamp-2 text-xs leading-5 text-slate-600">
-                        {item.default_description}
-                      </p>
-                    )}
-                  </button>
-                );
-              })}
+          {pricebookItems.length > 0 && (
+            <div>
+              <label htmlFor="estimate_source_pricebook" className={labelClass}>
+                Matching Pricebook item (optional)
+              </label>
+              <select
+                id="estimate_source_pricebook"
+                value={selectedPricebookId}
+                onChange={(event) => {
+                  setSelectedPricebookId(event.target.value);
+                  setError(null);
+                }}
+                className={inputClass}
+              >
+                <option value="">Manual line (no Pricebook source)</option>
+                {filteredPricebookItems.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.item_name} {item.category ? `- ${item.category}` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
@@ -371,38 +352,6 @@ export default function AddLineItemForm({
                   setPricebookDraft((prev) => ({ ...prev, unitPriceDollars: event.target.value }))
                 }
                 required
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="add_category" className={labelClass}>
-                Category
-              </label>
-              <input
-                id="add_category"
-                name="category"
-                type="text"
-                value={pricebookDraft.category}
-                onChange={(event) =>
-                  setPricebookDraft((prev) => ({ ...prev, category: event.target.value }))
-                }
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label htmlFor="add_unit_label" className={labelClass}>
-                Unit Label
-              </label>
-              <input
-                id="add_unit_label"
-                name="unit_label"
-                type="text"
-                value={pricebookDraft.unitLabel}
-                onChange={(event) =>
-                  setPricebookDraft((prev) => ({ ...prev, unitLabel: event.target.value }))
-                }
                 className={inputClass}
               />
             </div>
