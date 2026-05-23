@@ -14,9 +14,14 @@ describe("isUnauthedPublicRoute", () => {
     expect(isUnauthedPublicRoute("/set-password")).toBe(true);
   });
 
+  it("allows public proposal token routes without auth", () => {
+    expect(isUnauthedPublicRoute("/proposals/some-token")).toBe(true);
+  });
+
   it("does not allow protected ops routes", () => {
     expect(isUnauthedPublicRoute("/ops")).toBe(false);
     expect(isUnauthedPublicRoute("/ops/admin")).toBe(false);
+    expect(isUnauthedPublicRoute("/estimates")).toBe(false);
   });
 
   it("allows the push service worker through as a public asset", () => {
