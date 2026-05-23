@@ -28,6 +28,7 @@ export type SendEstimateProposalEmailResult =
       attemptStatus: ProposalEmailAttemptStatus;
       communicationId: string;
       proposalLinkId: string;
+      proposalUrl: string | null;
       providerMessageId: string | null;
       emailDisabled: boolean;
     }
@@ -591,6 +592,7 @@ export async function sendEstimateProposalEmail(
     attemptStatus,
     communicationId: communicationResult.communicationId,
     proposalLinkId: linkResult.proposalLinkId,
+    proposalUrl,
     providerMessageId,
     emailDisabled: !emailEnabled,
   };
