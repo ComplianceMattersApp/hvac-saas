@@ -11,6 +11,7 @@ import {
 } from "@/lib/auth/internal-user";
 import { listEstimatesByAccount } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { ClipboardList, Filter, Layers3, ListChecks, PackageOpen, Plus, Sparkles } from "lucide-react";
 
 export const metadata = { title: "Estimates" };
 
@@ -139,34 +140,47 @@ export default async function EstimatesPage({
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 text-slate-950 sm:p-6">
-      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-[0_14px_34px_-28px_rgba(15,23,42,0.28)] sm:p-6">
+      <div className="rounded-2xl border border-slate-200/85 bg-white p-5 shadow-[0_22px_60px_-42px_rgba(15,23,42,0.42)] sm:p-6">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="text-xs font-semibold text-slate-500">Estimate workspace</div>
-            <h1 className="mt-1 text-2xl font-semibold text-slate-950 sm:text-3xl">Estimates</h1>
+            <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <ClipboardList className="h-3.5 w-3.5" aria-hidden="true" />
+              Estimate workspace
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950 sm:text-3xl">Estimates</h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
               Draft, review, and print customer proposals without mixing quote totals into job, invoice, or payment truth.
             </p>
           </div>
           <Link
             href="/estimates/new"
-            className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-18px_rgba(37,99,235,0.48)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_14px_26px_-18px_rgba(37,99,235,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
+            className="inline-flex min-h-10 shrink-0 items-center justify-center gap-2 rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(15,23,42,0.56)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_16px_28px_-18px_rgba(15,23,42,0.58)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px]"
           >
-            + New Estimate
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            New Estimate
           </Link>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-            <div className="text-2xl font-semibold text-slate-950">{estimates.length}</div>
+          <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3">
+            <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600">
+              <ListChecks className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <div className="mt-2 text-2xl font-semibold text-slate-950">{estimates.length}</div>
             <div className="mt-0.5 text-xs font-semibold text-slate-500">Showing now</div>
           </div>
-          <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-blue-900">
-            <div className="text-2xl font-semibold">{draftCount + sentCount}</div>
+          <div className="rounded-xl border border-blue-200 bg-blue-50/90 px-4 py-3 text-blue-900">
+            <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-blue-200 bg-white text-blue-700">
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <div className="mt-2 text-2xl font-semibold">{draftCount + sentCount}</div>
             <div className="mt-0.5 text-xs font-semibold">Draft or sent</div>
           </div>
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-emerald-900">
-            <div className="text-2xl font-semibold">{multiOptionCount}</div>
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-3 text-emerald-900">
+            <div className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-emerald-200 bg-white text-emerald-700">
+              <Layers3 className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <div className="mt-2 text-2xl font-semibold">{multiOptionCount}</div>
             <div className="mt-0.5 text-xs font-semibold">Multi-option</div>
           </div>
         </div>
@@ -175,7 +189,10 @@ export default async function EstimatesPage({
       <section className="space-y-3">
         <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <div className="text-xs font-semibold text-slate-500">Status filter</div>
+            <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+              Status filter
+            </div>
             <h2 className="mt-0.5 text-lg font-semibold text-slate-950">
               {statusFilter ? statusLabel(statusFilter) : "All estimates"}
             </h2>
@@ -185,7 +202,7 @@ export default async function EstimatesPage({
           </div>
         </div>
 
-        <div className="flex flex-wrap gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-[0_10px_28px_-28px_rgba(15,23,42,0.2)]">
+        <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200/85 bg-white p-2 shadow-[0_10px_28px_-28px_rgba(15,23,42,0.2)]">
           <Link
             href={filterLinkBase}
             className={`rounded-lg px-3 py-2 text-xs font-semibold transition-colors ${
@@ -213,7 +230,10 @@ export default async function EstimatesPage({
       </section>
 
       {estimates.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center">
+        <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-12 text-center">
+          <div className="mx-auto mb-3 inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600">
+            <PackageOpen className="h-5 w-5" aria-hidden="true" />
+          </div>
           <div className="text-base font-semibold text-slate-800">
             {statusFilter ? "No estimates match this status" : "No estimates yet"}
           </div>
@@ -226,15 +246,16 @@ export default async function EstimatesPage({
             <div className="mt-5">
               <Link
                 href="/estimates/new"
-                className="inline-flex min-h-10 items-center justify-center rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_12px_24px_-18px_rgba(37,99,235,0.48)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
+                className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(15,23,42,0.56)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px]"
               >
-                + New Estimate
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                New Estimate
               </Link>
             </div>
           )}
         </div>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_14px_34px_-30px_rgba(15,23,42,0.24)]">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_34px_-30px_rgba(15,23,42,0.24)]">
           <div className="divide-y divide-slate-200">
             {estimates.map((est) => {
               const customerName = est.customer_id ? customerMap[est.customer_id] ?? "Unknown Customer" : null;

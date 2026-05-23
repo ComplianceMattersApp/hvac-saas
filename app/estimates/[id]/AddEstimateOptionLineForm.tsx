@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ClipboardPlus, Sparkles } from "lucide-react";
 import { addEstimateOptionLineItemFromForm } from "./actions";
 
 const labelClass =
@@ -144,10 +145,16 @@ export default function AddEstimateOptionLineForm({
     <form
       ref={formRef}
       onSubmit={handleSubmit}
-      className="mt-3 space-y-3 rounded-xl border border-blue-200 bg-blue-50/40 p-3 print:hidden"
+      className="mt-3 space-y-3 rounded-2xl border border-slate-200/85 bg-white p-3 shadow-[0_14px_28px_-30px_rgba(15,23,42,0.28)] print:hidden sm:p-4"
     >
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
-        Add Item
+      <div className="flex items-start gap-2.5">
+        <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-blue-200 bg-blue-50 text-blue-700">
+          <ClipboardPlus className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">Add Item</div>
+          <p className="mt-0.5 text-xs text-slate-600">Add a line to this option package.</p>
+        </div>
       </div>
 
       {error && (
@@ -277,8 +284,9 @@ export default function AddEstimateOptionLineForm({
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-50"
         >
+          <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
           {isPending ? "Adding..." : "Add Item"}
         </button>
       </div>

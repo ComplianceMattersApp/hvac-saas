@@ -4,6 +4,7 @@
 
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ArrowLeft, ClipboardList, Eye, Layers3, Link2, ListChecks, Shield, Sparkles, Workflow } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import {
   requireInternalUser,
@@ -344,7 +345,7 @@ export default async function EstimateDetailPage({
     : null;
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
+    <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
       {notice && (
         <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 print:hidden">
           {notice === "estimate_converted_to_job"
@@ -375,29 +376,32 @@ export default async function EstimateDetailPage({
             href={`/estimates/${estimate.id}/print`}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
           >
+            <Eye className="h-3.5 w-3.5" aria-hidden="true" />
             Preview Proposal
           </Link>
           {estimate.customer_id && (
             <Link
               href={`/customers/${estimate.customer_id}`}
-              className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
             >
-              ← Back to Customer
+              <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              Back to Customer
             </Link>
           )}
           <Link
             href="/estimates"
-            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
           >
+            <ArrowLeft className="h-3.5 w-3.5" aria-hidden="true" />
             Back to Estimates
           </Link>
         </div>
       </nav>
 
       {/* Header card */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)] print:rounded-none print:border-slate-300 print:shadow-none">
+      <div className="rounded-[28px] border border-slate-200/85 bg-white p-5 shadow-[0_22px_60px_-42px_rgba(15,23,42,0.42)] print:rounded-none print:border-slate-300 print:shadow-none">
         <div className="mb-3 hidden border-b border-slate-200 pb-3 print:block">
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             Estimate Builder
@@ -409,6 +413,10 @@ export default async function EstimateDetailPage({
 
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0">
+            <p className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <ClipboardList className="h-3.5 w-3.5" aria-hidden="true" />
+              Estimate Builder
+            </p>
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-500">
                 {documentView.identity.estimateNumber}
@@ -419,7 +427,7 @@ export default async function EstimateDetailPage({
                 {documentView.identity.statusLabel}
               </span>
             </div>
-            <h1 className="mt-1 text-xl font-semibold tracking-[-0.02em] text-slate-950">
+            <h1 className="mt-2 text-xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-2xl">
               {documentView.identity.title}
             </h1>
             {estimate.notes && (
@@ -500,10 +508,22 @@ export default async function EstimateDetailPage({
       />
 
       {/* Status actions */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
+      <div className="rounded-[28px] border border-slate-200/85 bg-white shadow-[0_22px_60px_-42px_rgba(15,23,42,0.42)] print:hidden">
+        <div className="border-b border-slate-200/85 bg-slate-50/80 px-5 py-4 sm:px-6">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl border border-slate-200/85 bg-white text-slate-600">
+              <Workflow className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div>
+              <h2 className="text-base font-semibold text-slate-950">Builder Workflow</h2>
+              <p className="mt-1 text-sm text-slate-600">Keep the core path simple: build, preview, send, approve, and convert.</p>
+            </div>
+          </div>
+        </div>
+        <div className="px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-slate-950">Builder Actions</h2>
+            <h3 className="text-base font-semibold text-slate-950">Builder Actions</h3>
             <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
               {statusPanelTitle}
             </p>
@@ -591,6 +611,7 @@ export default async function EstimateDetailPage({
             )}
           </div>
         </div>
+        </div>
       </div>
 
       {/* Estimate proposal rendering */}
@@ -647,7 +668,7 @@ export default async function EstimateDetailPage({
 
       {isConverted && estimate.converted_job_id && (
         <div className="rounded-2xl border border-violet-200 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
-          <h2 className="text-base font-semibold text-violet-900">Linked Job</h2>
+          <h2 className="inline-flex items-center gap-2 text-base font-semibold text-violet-900"><Link2 className="h-4 w-4" aria-hidden="true" />Linked Job</h2>
           <p className="mt-1 text-sm text-slate-700">
             This estimate is linked to job{" "}
             <Link href={`/jobs/${estimate.converted_job_id}`} className="font-semibold text-violet-700 hover:underline">
@@ -681,7 +702,8 @@ export default async function EstimateDetailPage({
         {isMultiOptionProposal ? (
           <>
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700 print:border-slate-300 print:bg-white">
-              Proposed commercial alternatives are grouped into options. Totals below are shown per option.
+              <span className="inline-flex items-center gap-2 font-medium text-slate-800"><Layers3 className="h-4 w-4" aria-hidden="true" />Proposed commercial alternatives are grouped into options.</span>
+              <span className="mt-1 block text-sm text-slate-700">Totals are shown per option below.</span>
             </div>
 
             <div className="space-y-4">
@@ -789,7 +811,7 @@ export default async function EstimateDetailPage({
         ) : (
           <>
         <div className="flex items-center justify-between">
-          <h2 className="text-base font-semibold text-slate-950">Line Items</h2>
+          <h2 className="inline-flex items-center gap-2 text-base font-semibold text-slate-950"><ListChecks className="h-4 w-4" aria-hidden="true" />Line Items</h2>
           <div className="text-sm text-slate-500 print:text-slate-700">
             {estimate.line_items.length}{" "}
             {estimate.line_items.length === 1 ? "item" : "items"}
@@ -919,7 +941,7 @@ export default async function EstimateDetailPage({
       <details className="rounded-2xl border border-slate-200/80 bg-slate-50/70 text-sm text-slate-700 print:hidden">
         <summary className="cursor-pointer list-none px-4 py-3 font-semibold text-slate-900 marker:content-none">
           <span className="flex items-center justify-between gap-3">
-            <span>Advanced / Internal</span>
+            <span className="inline-flex items-center gap-2"><Shield className="h-4 w-4 text-slate-500" aria-hidden="true" />Advanced / Internal</span>
             <span className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-400">
               Expand
             </span>
@@ -927,7 +949,7 @@ export default async function EstimateDetailPage({
         </summary>
         <div className="space-y-5 border-t border-slate-200/80 px-4 pb-4 pt-3">
           <section className="rounded-xl border border-slate-200/80 bg-white p-4">
-            <h2 className="text-sm font-semibold text-slate-900">Internal Readiness Notes</h2>
+            <h2 className="inline-flex items-center gap-2 text-sm font-semibold text-slate-900"><Sparkles className="h-4 w-4 text-slate-500" aria-hidden="true" />Internal Readiness Notes</h2>
             <ul className="mt-2 list-disc space-y-1 pl-5">
               {ESTIMATE_DOCUMENT_READINESS_GUIDANCE.map((line) => (
                 <li key={line}>{line}</li>
@@ -954,7 +976,7 @@ export default async function EstimateDetailPage({
           <section className="rounded-xl border border-slate-200/80 bg-white p-4">
             {isMultiOptionProposal ? (
               <>
-                <h2 className="text-base font-semibold text-slate-950">Quote Readiness Checklist</h2>
+                <h2 className="inline-flex items-center gap-2 text-base font-semibold text-slate-950"><ListChecks className="h-4 w-4 text-slate-500" aria-hidden="true" />Quote Readiness Checklist</h2>
                 <p className="mt-1 text-sm text-slate-600">
                   Multi-option readiness scoring is not defined in this slice. Flat checklist scoring remains unchanged for single-option estimates.
                 </p>
@@ -966,7 +988,7 @@ export default async function EstimateDetailPage({
               <>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h2 className="text-base font-semibold text-slate-950">Quote Readiness Checklist</h2>
+                    <h2 className="inline-flex items-center gap-2 text-base font-semibold text-slate-950"><ListChecks className="h-4 w-4 text-slate-500" aria-hidden="true" />Quote Readiness Checklist</h2>
                     <p className="mt-1 text-sm text-slate-600">
                       Advisory checklist for internal review.
                     </p>

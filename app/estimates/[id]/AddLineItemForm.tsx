@@ -6,6 +6,7 @@
 
 import { useEffect, useState, useTransition, useRef } from "react";
 import { useRouter } from "next/navigation";
+import { Plus, Search, Sparkles } from "lucide-react";
 import { addLineItemAction } from "./actions";
 import type { PricebookEntryItem } from "@/components/pricebook/PricebookLineEntryFields";
 
@@ -170,40 +171,51 @@ export default function AddLineItemForm({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center justify-center rounded-xl border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 transition-[background-color,border-color,transform] hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
+        className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
       >
-        + Add Line Item
+        <Plus className="h-4 w-4" aria-hidden="true" />
+        Add Line Item
       </button>
     );
   }
 
   return (
-    <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
-          Add Line Item
+    <div className="rounded-[28px] border border-slate-200/85 bg-white shadow-[0_22px_60px_-42px_rgba(15,23,42,0.42)]">
+      <div className="border-b border-blue-200 bg-blue-50/80 px-4 py-4 sm:px-5">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl border border-blue-200 bg-white text-blue-700">
+              <Search className="h-4 w-4" aria-hidden="true" />
+            </span>
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
+                Add Line Item
+              </div>
+              <p className="mt-0.5 text-xs text-slate-600">Search Pricebook or enter a manual item.</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setOpen(false);
+              setError(null);
+              resetDraftState();
+            }}
+            className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+          >
+            Cancel
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            setOpen(false);
-            setError(null);
-            resetDraftState();
-          }}
-          className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
-        >
-          Cancel
-        </button>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 px-4 pb-4 pt-4 sm:px-5 sm:pb-5">
         {error && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">
             {error}
           </div>
         )}
 
-        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 rounded-xl border border-blue-200 bg-white p-3.5">
+        <form ref={formRef} onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200/85 bg-white p-3.5 sm:p-4">
           <div>
             <label htmlFor="estimate_line_search" className={labelClass}>
               Search or type line item
@@ -378,8 +390,9 @@ export default function AddLineItemForm({
             <button
               type="submit"
               disabled={isPending}
-              className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-[0_14px_22px_-18px_rgba(37,99,235,0.55)] transition-all hover:-translate-y-px hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(15,23,42,0.56)] transition-all hover:-translate-y-px hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
             >
+              <Sparkles className="h-4 w-4" aria-hidden="true" />
               {isPending ? "Adding…" : "Add Line"}
             </button>
           </div>

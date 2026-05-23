@@ -6,6 +6,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
+import { ClipboardList, MapPinned, Plus, UserRound } from "lucide-react";
 import {
   createEstimateDraft,
   resolveEstimateCustomerLocationAssist,
@@ -58,6 +59,10 @@ const labelClass =
   "mb-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500";
 const inputClass =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 placeholder-slate-400 shadow-[inset_0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200";
+const sectionCardClass =
+  "space-y-3 rounded-2xl border border-slate-200/85 bg-white p-4 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.32)] sm:p-5";
+const sectionBadgeClass =
+  "inline-flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200/85 bg-white text-slate-600";
 
 export default function NewEstimateForm({
   customers,
@@ -288,7 +293,18 @@ export default function NewEstimateForm({
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {/* Customer */}
-      <div>
+      <div className={sectionCardClass}>
+        <div className="flex items-start gap-3">
+          <span className={sectionBadgeClass}>
+            <UserRound className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Step 1</p>
+            <h2 className="mt-0.5 text-base font-semibold text-slate-950">Customer</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-600">Select or create the customer this proposal belongs to.</p>
+          </div>
+        </div>
+
         <label htmlFor="customer_search" className={labelClass}>
           Customer <span className="text-red-500">*</span>
         </label>
@@ -318,9 +334,10 @@ export default function NewEstimateForm({
                 setAssistError(null);
                 setAssistMessage(null);
               }}
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
             >
-              + Add Customer
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add Customer
             </button>
           </div>
         ) : (
@@ -388,9 +405,10 @@ export default function NewEstimateForm({
                 setAssistError(null);
                 setAssistMessage(null);
               }}
-              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+              className="inline-flex min-h-10 items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
             >
-              + Add Customer
+              <Plus className="h-4 w-4" aria-hidden="true" />
+              Add Customer
             </button>
           </div>
         )}
@@ -502,7 +520,17 @@ export default function NewEstimateForm({
       </div>
 
       {/* Location */}
-      <div>
+      <div className={sectionCardClass}>
+        <div className="flex items-start gap-3">
+          <span className={sectionBadgeClass}>
+            <MapPinned className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Step 2</p>
+            <h2 className="mt-0.5 text-base font-semibold text-slate-950">Service Location</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-600">Choose where this estimate applies.</p>
+          </div>
+        </div>
         <label htmlFor="location_id" className={labelClass}>
           Location <span className="text-red-500">*</span>
         </label>
@@ -532,7 +560,17 @@ export default function NewEstimateForm({
       </div>
 
       {/* Title */}
-      <div>
+      <div className={sectionCardClass}>
+        <div className="flex items-start gap-3">
+          <span className={sectionBadgeClass}>
+            <ClipboardList className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Step 3</p>
+            <h2 className="mt-0.5 text-base font-semibold text-slate-950">Proposal Details</h2>
+            <p className="mt-1 text-xs leading-5 text-slate-600">Use clear wording so the draft is easy to review later.</p>
+          </div>
+        </div>
         <label htmlFor="title" className={labelClass}>
           Estimate Title <span className="text-red-500">*</span>
         </label>
@@ -568,17 +606,17 @@ export default function NewEstimateForm({
       )}
 
       {/* Actions */}
-      <div className="flex items-center justify-between gap-3 border-t border-slate-100 pt-4">
+      <div className="flex flex-col-reverse items-stretch justify-between gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
         <a
           href="/estimates"
-          className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
         >
           Cancel
         </a>
         <button
           type="submit"
           disabled={isPending}
-          className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-[0_14px_22px_-18px_rgba(37,99,235,0.55)] transition-all hover:-translate-y-px hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-10 items-center justify-center rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(15,23,42,0.56)] transition-all hover:-translate-y-px hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending ? "Creating…" : "Create Draft Estimate"}
         </button>
