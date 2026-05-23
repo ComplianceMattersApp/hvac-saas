@@ -203,11 +203,6 @@ export default async function EstimateDetailPage({
   }
 
   const statusMessage = statusGuidanceMessage(estimate.status);
-  const statusPanelTitle = isDraft
-    ? "Editable proposal"
-    : isSent
-      ? "Sent and locked"
-      : "Completed state";
   let pricebookItems: PricebookPickerRow[] = [];
 
   if (isDraft) {
@@ -472,22 +467,13 @@ export default async function EstimateDetailPage({
       />
 
       {/* Status actions */}
-      <div className="rounded-[28px] border border-slate-200/85 bg-white shadow-[0_22px_60px_-42px_rgba(15,23,42,0.42)] print:hidden">
-        <div className="px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
-        <p className="mb-3 text-xs text-slate-500">Builder path: build, preview, send, approve, convert.</p>
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-base font-semibold text-slate-950">Builder Actions</h3>
-            <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-              {statusPanelTitle}
-            </p>
+      <div className="print:hidden">
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/85 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0">
+            <h2 className="text-sm font-semibold text-slate-900">Actions</h2>
             {statusMessage ? (
               <p className="mt-1 text-sm text-slate-600">{statusMessage}</p>
-            ) : (
-              <p className="mt-1 text-sm text-slate-600">
-                Use these actions to move this estimate through the builder workflow.
-              </p>
-            )}
+            ) : null}
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -564,7 +550,6 @@ export default async function EstimateDetailPage({
               </>
             )}
           </div>
-        </div>
         </div>
       </div>
 

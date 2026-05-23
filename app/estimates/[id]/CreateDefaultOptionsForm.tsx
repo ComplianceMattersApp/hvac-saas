@@ -34,34 +34,34 @@ export default function CreateDefaultOptionsForm({
   const isEligible = !hasFlatLines && !optionsUnavailable;
 
   return (
-    <div className="rounded-[28px] border border-slate-200/85 bg-white shadow-[0_22px_60px_-42px_rgba(15,23,42,0.42)] print:hidden">
+    <div className="print:hidden">
       {isEligible ? (
-        <>
-          <div className="border-b border-slate-200/85 bg-slate-50/80 px-5 py-3 sm:px-6">
-            <div>
-              <h2 className="text-sm font-semibold text-slate-900">Build Three Options</h2>
-              <p className="mt-1 text-xs text-slate-600">
-                Convert this draft into Good, Better, and Best options.
-              </p>
+        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/85 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Proposal Style
+            </p>
+            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 font-medium text-slate-700">
+                Single Estimate
+              </span>
+              <span aria-hidden="true" className="text-slate-300">→</span>
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 font-medium text-blue-700">
+                Good / Better / Best
+              </span>
             </div>
           </div>
 
-          <div className="space-y-3 px-5 pb-5 pt-4 sm:px-6 sm:pb-6">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-              Draft only action
-            </p>
-
-            <form action={createDefaultEstimateOptionsFromForm} className="flex gap-2">
+          <form action={createDefaultEstimateOptionsFromForm} className="flex gap-2">
               <input type="hidden" name="estimate_id" value={estimateId} />
               <button
                 type="submit"
                 className="inline-flex min-h-10 items-center justify-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,transform] hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px]"
               >
-                Create Good / Better / Best Options
+                Create Good / Better / Best
               </button>
             </form>
-          </div>
-        </>
+        </div>
       ) : optionsUnavailable ? (
         <div className="rounded-[28px] border border-amber-200 bg-amber-50 px-5 py-4 sm:px-6">
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-900">
