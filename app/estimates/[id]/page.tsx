@@ -88,19 +88,19 @@ function statusLabel(status: string) {
 function statusGuidanceMessage(status: string) {
   switch (status) {
     case "draft":
-      return "Draft is editable. Add or adjust items before marking this estimate as sent.";
+      return "Editable Proposal";
     case "sent":
-      return "Sent estimates are locked for editing until the status changes.";
+      return "Awaiting Decision";
     case "approved":
-      return "Approved estimates are ready for conversion to a job when available.";
+      return "Approved";
     case "declined":
-      return "This estimate has been marked declined.";
+      return "Declined";
     case "expired":
-      return "This estimate has expired.";
+      return "Expired";
     case "cancelled":
-      return "This estimate has been cancelled.";
+      return "Cancelled";
     case "converted":
-      return "This estimate has already been converted to a job.";
+      return "Converted";
     default:
       return null;
   }
@@ -468,87 +468,85 @@ export default async function EstimateDetailPage({
 
       {/* Status actions */}
       <div className="print:hidden">
-        <div className="flex flex-col gap-3 rounded-2xl border border-slate-200/85 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <h2 className="text-sm font-semibold text-slate-900">Actions</h2>
-            {statusMessage ? (
-              <p className="mt-1 text-sm text-slate-600">{statusMessage}</p>
-            ) : null}
-          </div>
+        <div className="border-y border-slate-200/80 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Status</p>
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                {statusMessage ? (
+                  <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusBadgeClass(documentView.identity.status)}`}>
+                    {statusMessage}
+                  </span>
+                ) : null}
+                <span className="text-sm text-slate-500">Actions</span>
+              </div>
+            </div>
 
-          <div className="flex flex-wrap gap-2">
-            {isDraft && (
-              <>
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="sent"
-                  label="Mark Sent Manually"
-                  helperText={
-                    isMultiOptionProposal
-                      ? "Marks this estimate as sent and locks edits."
-                      : "Marks this estimate as sent and locks edits."
-                  }
-                  confirmMessage={
-                    isMultiOptionProposal
-                      ? "Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent, and no option will be selected or approved."
-                      : "Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent."
-                  }
-                  className="inline-flex items-center justify-center rounded-lg border border-blue-200 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 transition-[background-color,border-color,transform] hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
-                />
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="cancelled"
-                  label="Cancel Estimate"
-                  helperText="Closes this estimate without approval."
-                  confirmMessage="Cancel this estimate? No job or draft invoice will be created from this estimate."
-                  className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
-                />
-              </>
-            )}
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              {isDraft && (
+                <>
+                  <EstimateStatusActionForm
+                    action={transitionEstimateStatusFromForm}
+                    estimateId={estimate.id}
+                    nextStatus="sent"
+                    label="Mark Sent Manually"
+                    confirmMessage={
+                      isMultiOptionProposal
+                        ? "Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent, and no option will be selected or approved."
+                        : "Mark this estimate as Sent? This locks line editing. No customer email or PDF will be sent."
+                    }
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                  />
+                  <EstimateStatusActionForm
+                    action={transitionEstimateStatusFromForm}
+                    estimateId={estimate.id}
+                    nextStatus="cancelled"
+                    label="Cancel Estimate"
+                    confirmMessage="Cancel this estimate? No job or draft invoice will be created from this estimate."
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition-[background-color,border-color,transform] hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                  />
+                </>
+              )}
 
-            {isSent && (
-              <>
-                <EstimateApprovalResponseForm
-                  action={recordEstimateApprovalResponseFromForm}
-                  estimateId={estimate.id}
-                  proposalMode={estimate.proposalMode}
-                  options={(estimate.options ?? []).map((o) => ({
-                    id: o.id,
-                    label: o.label,
-                    total_cents: o.total_cents,
-                  }))}
-                />
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="declined"
-                  label="Mark Declined"
-                  helperText="Closes this estimate as declined."
-                  confirmMessage="Mark this estimate declined? No job or draft invoice will be created from this estimate."
-                  className="inline-flex items-center justify-center rounded-lg border border-rose-200 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-[background-color,border-color,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
-                />
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="expired"
-                  label="Mark Expired"
-                  helperText="Marks this estimate as no longer active."
-                  confirmMessage="Mark this estimate expired? No job or draft invoice will be created from this estimate."
-                  className="inline-flex items-center justify-center rounded-lg border border-amber-200 bg-white px-3 py-1.5 text-xs font-semibold text-amber-700 transition-[background-color,border-color,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px]"
-                />
-                <EstimateStatusActionForm
-                  action={transitionEstimateStatusFromForm}
-                  estimateId={estimate.id}
-                  nextStatus="cancelled"
-                  label="Cancel Estimate"
-                  helperText="Closes this estimate without approval."
-                  confirmMessage="Cancel this estimate? No job or draft invoice will be created from this estimate."
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
-                />
-              </>
-            )}
+              {isSent && (
+                <>
+                  <EstimateApprovalResponseForm
+                    action={recordEstimateApprovalResponseFromForm}
+                    estimateId={estimate.id}
+                    proposalMode={estimate.proposalMode}
+                    options={(estimate.options ?? []).map((o) => ({
+                      id: o.id,
+                      label: o.label,
+                      total_cents: o.total_cents,
+                    }))}
+                  />
+                  <EstimateStatusActionForm
+                    action={transitionEstimateStatusFromForm}
+                    estimateId={estimate.id}
+                    nextStatus="declined"
+                    label="Mark Declined"
+                    confirmMessage="Mark this estimate declined? No job or draft invoice will be created from this estimate."
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                  />
+                  <EstimateStatusActionForm
+                    action={transitionEstimateStatusFromForm}
+                    estimateId={estimate.id}
+                    nextStatus="expired"
+                    label="Mark Expired"
+                    confirmMessage="Mark this estimate expired? No job or draft invoice will be created from this estimate."
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                  />
+                  <EstimateStatusActionForm
+                    action={transitionEstimateStatusFromForm}
+                    estimateId={estimate.id}
+                    nextStatus="cancelled"
+                    label="Cancel Estimate"
+                    confirmMessage="Cancel this estimate? No job or draft invoice will be created from this estimate."
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-500 transition-[background-color,border-color,transform] hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                  />
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
