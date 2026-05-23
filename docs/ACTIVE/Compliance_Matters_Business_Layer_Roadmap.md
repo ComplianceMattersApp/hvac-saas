@@ -44,6 +44,29 @@ It extends it.
 - **Invoice** = billed commercial scope
 - **Payment** = money collected against an internal invoice, when payment capability exists
 
+Relationship intake and display lane closeout (May 2026):
+- This lane is complete for V1 and should be treated as closed unless real usage evidence reopens it.
+- Completed scope:
+  - `/jobs/new` lightweight relationship intake now centers on customer/service location first, with optional `Different site/access contact?` and optional `Different billing/paperwork recipient?`.
+  - job detail smart display now avoids duplicate/default relationship cards and shows only meaningful relationship context.
+  - Billing Contact display is billing/paperwork context only and is not used as site/access fallback.
+  - external closeout wording uses `External Billing Complete` and shares hardened helper contract where applicable.
+- Source-of-truth boundaries remain unchanged:
+  - responsible account, service location, site/access contact, and billing/paperwork recipient remain relationship context
+  - invoice truth remains invoice snapshot once invoice exists
+  - payment truth remains payment records
+  - closeout external-billing completion remains projection truth, not delivery-proof metadata
+
+Parked future relationship/commercial extensions (not V1):
+- Relationship Exceptions Report / Billing and Access Exceptions Report
+- contact edit/deactivate lifecycle tooling
+- account type labels (Homeowner, Property Management, Landlord, Home Warranty, Commercial)
+- default closeout method model (Internal Invoice, External Billing Complete, Portal/Claim Submission, No Charge, Track Only)
+- Billing Contact automation into job/invoice defaults
+- invoice delivery-proof metadata (`sent_to`, `sent_at`, `channel`, external invoice id)
+- home-warranty claim/authorization model
+- standalone customer-only create-flow polish if later needed
+
 Maintenance agreements closeout note (May 2026):
 - Group 9A-10B Service Plan Count Eligibility projection is now documented as read-only visibility on `/service-plans`.
 - Visit Count Review labels (`No linked visits`, `Linked`, `Eligible for count review`, `Counted`, `Excluded`, `Reversed`, `Not eligible`) are display-only in this slice.

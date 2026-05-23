@@ -36,6 +36,36 @@ Recent closeout snapshot (May 2026):
 - Source-of-truth boundaries remain unchanged: Invoice Charges remain billed truth, Work Items/Visit Scope remain operational work scope, external billing remains lightweight invoice-sent tracking, internal invoicing remains internal/admin only, payment entries remain tracking-only, Closeout Queue V1 uses existing closeout projection truth, and Calendar Work Context uses a derived compact label rather than a new truth model.
 - Parked follow-up remains parked: Closeout Queue V2 waits for owner feedback after V1 use, contact recipient write/edit workflow stays deferred unless field use proves need, SMS/provider-powered messaging stays behind existing gates, and live tenant customer payment execution remains deferred.
 
+Customer/location/contact/billing relationship intake closeout (May 2026):
+- Completed model lock for V1 relationship intake and display:
+  - Customer (responsible account) first
+  - Service location second
+  - optional site/access contact only when different
+  - optional billing/paperwork recipient only when different
+- Completed customer-facing intake wording on `/jobs/new`:
+  - `Customer & Service Location`
+  - `New Customer`
+  - `Different site/access contact?`
+  - `Different billing/paperwork recipient?`
+- Completed smart display cleanup on job detail so relationship cards render only when meaningful and distinct.
+- Completed Billing Contact display refinement: Billing Contact is billing/paperwork context only and is not a site/access fallback.
+- Completed external billing wording hardening: closeout wording now uses `External Billing Complete` while keeping existing closeout projection truth.
+- Completed commit trail for this lane:
+  - `12bacd2` clarify job detail account contact summary
+  - `545a2c2` clarify customer relationship overview
+  - `5b22bb9` add lightweight relationship contacts
+  - `38e4dde` clarify external billing closeout action
+  - `85265a3` harden external billing completion contract
+  - `1960c45` clarify billing contact display context
+  - `382ad94` simplify job detail relationship display
+  - `58bbefc` streamline new job relationship intake
+- Boundary confirmation:
+  - no invoice routing automation was added
+  - invoice truth remains invoice snapshot once invoice exists
+  - payment truth remains payment records
+  - external billing completion remains closeout projection and not delivery-proof metadata
+  - `Request came from` is not part of supported intake model
+
 Current Program Status Note (May 2026)
 
 - Manual Text Logging Wording Clarification is complete and pushed in commit `36460b8`:

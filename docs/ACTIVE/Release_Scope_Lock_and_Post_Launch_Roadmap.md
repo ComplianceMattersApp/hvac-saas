@@ -33,6 +33,24 @@ Recent closeout status snapshot (May 2026):
 - Confirmed boundaries remain intact: Invoice Charges remain billed truth, Work Items/Visit Scope remain operational work scope, external billing remains lightweight invoice-sent tracking, internal invoicing remains internal/admin only, payment entries remain tracking-only, and Closeout Queue V1 continues to use existing closeout projection truth.
 - Parked follow-up remains parked: Closeout Queue V2 waits until the owner uses V1 and gives feedback, contact recipient write/edit workflow remains deferred unless field use proves need, SMS/provider-powered messaging remains behind the existing gates, and live tenant customer payment execution remains deferred.
 
+Customer/location relationship handling polish closeout (May 2026):
+- Completed for current release scope as a polish/hardening lane, not a new CRM module.
+- Completed behavior/copy alignment:
+   - `/jobs/new` lightweight relationship intake using customer/service location first
+   - optional `Different site/access contact?`
+   - optional `Different billing/paperwork recipient?`
+   - no `Request came from` intake model
+   - customer-facing labels include `Customer & Service Location` and `New Customer`
+- Completed display alignment:
+   - job detail relationship cards now avoid duplicate/default cards and render only meaningful relationship context
+   - Billing Contact is billing/paperwork context only
+- Completed closeout wording alignment:
+   - `External Billing Complete` wording is active where invoice-sent projection completion is represented
+- Confirmed non-goals remained unchanged in this lane:
+   - no invoice automation or invoice-routing automation
+   - no payment execution behavior change
+   - no schema/model expansion for account-type/default-closeout metadata
+
 Field bus closeout documentation note (May 2026):
 - Active documentation now records completed passes for:
    - New Job Alert lifecycle cleanup
@@ -257,6 +275,11 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 15. Notification test expansion / badge optimization hardening.
 16. Broad performance campaign unless daily use surfaces specific real issues.
 17. Calendar-filtering TypeScript watch item only, until the unrelated `work_context_label` fixture gap is resolved in the test suite.
+18. Relationship Exceptions Report / Billing and Access Exceptions Report (future reporting lane).
+19. Relationship/account-type taxonomy model (Homeowner, Property Management, Landlord, Home Warranty, Commercial).
+20. Default closeout-method model and related invoice delivery-proof metadata (`sent_to`, `sent_at`, `channel`, external invoice id).
+21. Billing Contact automation into job defaults or invoice defaults.
+22. Claim/authorization model for home-warranty style workflows.
 
 Deferred means intentionally sequenced later, not ignored.
 

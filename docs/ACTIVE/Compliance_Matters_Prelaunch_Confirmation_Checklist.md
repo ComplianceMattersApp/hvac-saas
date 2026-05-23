@@ -117,6 +117,29 @@ If any item here conflicts with the active spine, the spine wins.
   - Payment Count replaces Payments
   - CSV header wording aligned where applicable
 
+### 2.3.1A Customer/location relationship-intake and display verification (completed)
+- Completed closeout scope references:
+  - `58bbefc` streamline new job relationship intake
+  - `382ad94` simplify job detail relationship display
+  - `1960c45` clarify billing contact display context
+  - `38e4dde` clarify external billing closeout action
+  - `85265a3` harden external billing completion contract
+- Completed model verification baseline:
+  - homeowner-style job intake remains fast with customer and service location first
+  - property-management-style intake supports customer/responsible account + service location + optional site/access contact + optional different billing/paperwork recipient
+  - `/jobs/new` keeps customer-friendly wording (`Customer & Service Location`, `New Customer`, `Different site/access contact?`, `Different billing/paperwork recipient?`)
+  - `Request came from` is not part of supported intake behavior
+- Completed display verification baseline:
+  - job detail relationship cards show only meaningful and distinct relationship context
+  - Billing Contact appears as billing/paperwork context only and is not an access-contact fallback
+- Completed closeout wording verification baseline:
+  - external billing completion wording is `External Billing Complete`
+- Boundary verification baseline:
+  - no invoice/payment routing automation was added
+  - no invoice truth change (internal invoice snapshot remains invoice truth once invoice exists)
+  - no payment truth change (payment records remain payment truth)
+  - no schema/model/runtime behavior changes beyond wording/display/intake UX hardening
+
 ### 2.3.2 Stripe platform onboarding status and live rollout confirmation
 - Stripe Platform Subscription V1 is implemented and has now passed live production smoke for platform account onboarding.
 - Live Stripe Product/Price is configured for the flat platform account subscription.
