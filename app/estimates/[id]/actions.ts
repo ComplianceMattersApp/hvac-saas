@@ -18,8 +18,10 @@ import {
   recordEstimateApprovalResponse,
   convertApprovedEstimateToJob,
   recordEstimateToInvoiceDraftConversion,
+  saveManualEstimateLineToPricebook,
   type AddEstimateLineItemParams,
   type AddEstimateOptionLineItemParams,
+  type SaveManualEstimateLineToPricebookParams,
   type UpdateEstimateLineItemParams,
   type UpdateEstimateOptionLineItemParams,
   type UpdateEstimateOptionMetadataParams,
@@ -307,6 +309,40 @@ export async function updateEstimateOptionLineItemFromForm(formData: FormData) {
     quantity,
     unitPriceCents,
   } satisfies UpdateEstimateOptionLineItemParams);
+
+  if (result.success) {
+    revalidatePath(`/estimates/${estimateId}`);
+  }
+
+  return result;
+}
+
+/**
+ * Save an existing draft manual estimate line to Pricebook for future reuse.
+ * Does not mutate the line item's source_pricebook_item_id provenance.
+ */
+export async function saveManualEstimateLineToPricebookFromForm(formData: FormData) {
+  if (!isEstimatesEnabled()) {
+    return {
+      success: false as const,
+      error: "Estimates are currently unavailable.",
+    };
+  }
+
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  const lineScopeRaw = String(formData.get("line_scope") ?? "").trim().toLowerCase();
+  const lineItemId = String(formData.get("line_item_id") ?? "").trim();
+  const estimateOptionId = String(formData.get("estimate_option_id") ?? "").trim() || null;
+
+  const lineScope: SaveManualEstimateLineToPricebookParams["lineScope"] =
+    lineScopeRaw === "option" ? "option" : "flat";
+
+  const result = await saveManualEstimateLineToPricebook({
+    lineScope,
+    estimateId,
+    lineItemId,
+    estimateOptionId,
+  });
 
   if (result.success) {
     revalidatePath(`/estimates/${estimateId}`);

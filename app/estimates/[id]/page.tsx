@@ -23,6 +23,7 @@ import {
   recordEstimateApprovalResponseFromForm,
   convertEstimateToJobFromForm,
   convertEstimateToInvoiceDraftFromForm,
+  saveManualEstimateLineToPricebookFromForm,
 } from "./actions";
 import AddLineItemForm from "./AddLineItemForm";
 import EstimateStatusActionForm from "./EstimateStatusActionForm";
@@ -104,6 +105,32 @@ function statusGuidanceMessage(status: string) {
     default:
       return null;
   }
+}
+
+const SAVE_TO_PRICEBOOK_SUPPORTED_TYPES = new Set(["service", "material", "diagnostic"]);
+
+function canShowSaveToPricebook(params: {
+  isDraft: boolean;
+  line: {
+    source_pricebook_item_id: string | null;
+    item_name_snapshot: string;
+    item_type_snapshot: string;
+    unit_price_cents: number;
+  };
+}) {
+  if (!params.isDraft) return false;
+  if (params.line.source_pricebook_item_id) return false;
+
+  const itemName = String(params.line.item_name_snapshot ?? "").trim();
+  if (!itemName) return false;
+
+  const itemType = String(params.line.item_type_snapshot ?? "").trim().toLowerCase();
+  if (!SAVE_TO_PRICEBOOK_SUPPORTED_TYPES.has(itemType)) return false;
+
+  const unitPriceCents = Number(params.line.unit_price_cents);
+  if (!Number.isFinite(unitPriceCents) || unitPriceCents < 0) return false;
+
+  return true;
 }
 
 type CustomerRow = { id: string; full_name: string | null; first_name: string | null; last_name: string | null; email: string | null };
@@ -200,6 +227,24 @@ export default async function EstimateDetailPage({
     }
 
     redirect(`/estimates/${estimateId}?notice=estimate_converted_to_invoice_draft`);
+  }
+
+  async function submitSaveManualLineToPricebook(formData: FormData) {
+    "use server";
+    const estimateId = String(formData.get("estimate_id") ?? "").trim();
+    if (!estimateId) return;
+
+    const result = await saveManualEstimateLineToPricebookFromForm(formData);
+    if (!result?.success) {
+      const encoded = encodeURIComponent(String(result?.error ?? "manual_line_save_to_pricebook_failed"));
+      redirect(`/estimates/${estimateId}?notice=${encoded}`);
+    }
+
+    if (result.duplicate) {
+      redirect(`/estimates/${estimateId}?notice=estimate_manual_line_save_to_pricebook_duplicate`);
+    }
+
+    redirect(`/estimates/${estimateId}?notice=estimate_manual_line_saved_to_pricebook`);
   }
 
   const statusMessage = statusGuidanceMessage(estimate.status);
@@ -312,13 +357,17 @@ export default async function EstimateDetailPage({
             ? "Estimate converted to job successfully."
             : notice === "estimate_converted_to_invoice_draft"
               ? "Draft invoice created from this estimate successfully."
+              : notice === "estimate_manual_line_saved_to_pricebook"
+                ? "Saved to Pricebook for future reuse. This estimate line remains manual."
+                : notice === "estimate_manual_line_save_to_pricebook_duplicate"
+                  ? "Matching Pricebook item already exists. This estimate line remains manual."
             : notice === "estimate_conversion_schema_unavailable"
               ? "Estimate conversion is currently unavailable in this environment."
               : notice === "invoice_conversion_schema_unavailable"
                 ? "Draft invoice conversion is currently unavailable in this environment."
               : notice === "selected_option_id is required before converting multi-option estimates."
                 ? "Select an approved option before converting this multi-option estimate."
-                : `Estimate conversion notice: ${notice}`}
+              : `Estimate notice: ${notice}`}
         </div>
       )}
 
@@ -750,6 +799,20 @@ export default async function EstimateDetailPage({
 
                             {isDraft && (
                               <div className="flex flex-wrap justify-start gap-2 lg:justify-end print:hidden">
+                                {canShowSaveToPricebook({ isDraft, line }) && (
+                                  <form action={submitSaveManualLineToPricebook}>
+                                    <input type="hidden" name="estimate_id" value={estimate.id} />
+                                    <input type="hidden" name="line_scope" value="option" />
+                                    <input type="hidden" name="line_item_id" value={line.id} />
+                                    <input type="hidden" name="estimate_option_id" value={option.id} />
+                                    <button
+                                      type="submit"
+                                      className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-[background-color,border-color,transform] hover:bg-slate-50 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                                    >
+                                      Save to Pricebook
+                                    </button>
+                                  </form>
+                                )}
                                 <div className="hidden lg:block" />
                                 <form action={submitRemoveOptionLine}>
                                   <input type="hidden" name="estimate_id" value={estimate.id} />
@@ -925,6 +988,19 @@ export default async function EstimateDetailPage({
 
                     {isDraft && (
                       <div className="flex flex-wrap justify-start gap-2 lg:justify-end print:hidden">
+                        {canShowSaveToPricebook({ isDraft, line }) && (
+                          <form action={submitSaveManualLineToPricebook}>
+                            <input type="hidden" name="estimate_id" value={estimate.id} />
+                            <input type="hidden" name="line_scope" value="flat" />
+                            <input type="hidden" name="line_item_id" value={line.id} />
+                            <button
+                              type="submit"
+                              className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-[background-color,border-color,transform] hover:bg-slate-50 hover:text-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+                            >
+                              Save to Pricebook
+                            </button>
+                          </form>
+                        )}
                         <form action={removeLineItemFromForm}>
                           <input type="hidden" name="estimate_id" value={estimate.id} />
                           <input type="hidden" name="line_item_id" value={line.id} />

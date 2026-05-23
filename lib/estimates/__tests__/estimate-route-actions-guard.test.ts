@@ -10,6 +10,7 @@ const transitionEstimateStatusMock = vi.fn();
 const createDefaultEstimateOptionsMock = vi.fn();
 const updateEstimateOptionMetadataMock = vi.fn();
 const convertApprovedEstimateToJobMock = vi.fn();
+const saveManualEstimateLineToPricebookMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock("@/lib/estimates/estimate-actions", () => ({
@@ -26,6 +27,8 @@ vi.mock("@/lib/estimates/estimate-actions", () => ({
   updateEstimateOptionMetadata: (...args: unknown[]) => updateEstimateOptionMetadataMock(...args),
   convertApprovedEstimateToJob: (...args: unknown[]) =>
     convertApprovedEstimateToJobMock(...args),
+  saveManualEstimateLineToPricebook: (...args: unknown[]) =>
+    saveManualEstimateLineToPricebookMock(...args),
 }));
 
 vi.mock("next/cache", () => ({
@@ -378,6 +381,59 @@ describe("estimate route action guards", () => {
       error: "Option package not found on this estimate.",
     });
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("saveManualEstimateLineToPricebookFromForm short-circuits when feature flag disabled", async () => {
+    process.env.ENABLE_ESTIMATES = "false";
+    const { saveManualEstimateLineToPricebookFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("line_scope", "flat");
+    fd.set("line_item_id", "line-1");
+
+    const result = await saveManualEstimateLineToPricebookFromForm(fd);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Estimates are currently unavailable.",
+    });
+    expect(saveManualEstimateLineToPricebookMock).not.toHaveBeenCalled();
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it("saveManualEstimateLineToPricebookFromForm delegates and revalidates on success", async () => {
+    process.env.ENABLE_ESTIMATES = "true";
+    saveManualEstimateLineToPricebookMock.mockResolvedValue({
+      success: true,
+      created: true,
+      duplicate: false,
+      pricebookItemId: "pb-1",
+    });
+
+    const { saveManualEstimateLineToPricebookFromForm } = await import("@/app/estimates/[id]/actions");
+
+    const fd = new FormData();
+    fd.set("estimate_id", "est-1");
+    fd.set("line_scope", "option");
+    fd.set("line_item_id", "line-1");
+    fd.set("estimate_option_id", "opt-1");
+
+    const result = await saveManualEstimateLineToPricebookFromForm(fd);
+
+    expect(result).toEqual({
+      success: true,
+      created: true,
+      duplicate: false,
+      pricebookItemId: "pb-1",
+    });
+    expect(saveManualEstimateLineToPricebookMock).toHaveBeenCalledWith({
+      lineScope: "option",
+      estimateId: "est-1",
+      lineItemId: "line-1",
+      estimateOptionId: "opt-1",
+    });
+    expect(revalidatePathMock).toHaveBeenCalledWith("/estimates/est-1");
   });
 
   it("removeEstimateOptionLineItemFromForm short-circuits when feature flag disabled", async () => {

@@ -7,6 +7,11 @@
 
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requireInternalUser } from "@/lib/auth/internal-user";
+import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
+import {
+  parsePricebookCategory,
+  parsePricebookUnitLabel,
+} from "@/lib/business/pricebook-options";
 import { findOrCreateCustomer } from "@/lib/customers/findOrCreateCustomer";
 import {
   buildEstimateNumber,
@@ -880,6 +885,273 @@ export type AddEstimateOptionLineItemResult =
       total_cents: number;
     }
   | { success: false; error: string };
+
+export type SaveManualEstimateLineToPricebookParams = {
+  lineScope: "flat" | "option";
+  estimateId: string;
+  lineItemId: string;
+  estimateOptionId?: string | null;
+};
+
+export type SaveManualEstimateLineToPricebookResult =
+  | {
+      success: true;
+      created: true;
+      duplicate: false;
+      pricebookItemId: string;
+    }
+  | {
+      success: true;
+      created: false;
+      duplicate: true;
+      pricebookItemId: string;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+const MANUAL_LINE_SAVE_SUPPORTED_PRICEBOOK_TYPES = new Set(["service", "material", "diagnostic"]);
+
+function normalizeDuplicateText(value: string | null | undefined) {
+  return String(value ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase();
+}
+
+function buildManualLineDuplicateKey(params: {
+  itemName: string;
+  itemType: string;
+  category: string | null;
+}) {
+  const categoryPart = params.category ? normalizeDuplicateText(params.category) : "";
+  return [normalizeDuplicateText(params.itemName), params.itemType, categoryPart].join("|");
+}
+
+export async function saveManualEstimateLineToPricebook(
+  params: SaveManualEstimateLineToPricebookParams
+): Promise<SaveManualEstimateLineToPricebookResult> {
+  if (!isEstimatesEnabled()) {
+    return { success: false, error: "Estimates are currently unavailable." };
+  }
+
+  const lineScope = params.lineScope;
+  if (lineScope !== "flat" && lineScope !== "option") {
+    return { success: false, error: "line_scope must be flat or option." };
+  }
+
+  const estimateId = String(params.estimateId ?? "").trim();
+  const lineItemId = String(params.lineItemId ?? "").trim();
+  const estimateOptionId = String(params.estimateOptionId ?? "").trim() || null;
+
+  if (!estimateId || !lineItemId) {
+    return { success: false, error: "estimate_id and line_item_id are required." };
+  }
+
+  if (lineScope === "option" && !estimateOptionId) {
+    return { success: false, error: "estimate_option_id is required for option line scope." };
+  }
+
+  const supabase = await createClient();
+  const { internalUser } = await requireInternalUser({ supabase });
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  const userId = String(internalUser.user_id ?? "").trim();
+
+  if (!accountOwnerUserId || !userId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  const { data: estimate, error: estimateErr } = await supabase
+    .from("estimates")
+    .select("id, status, account_owner_user_id")
+    .eq("id", estimateId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (estimateErr) throw estimateErr;
+  if (!estimate?.id) {
+    return { success: false, error: "Estimate not found in this account." };
+  }
+  if (estimate.status !== "draft") {
+    return { success: false, error: "Save to Pricebook is available only on draft estimates." };
+  }
+
+  let line:
+    | {
+        id: string;
+        estimate_id: string;
+        estimate_option_id?: string;
+        source_pricebook_item_id: string | null;
+        item_name_snapshot: string;
+        description_snapshot: string | null;
+        item_type_snapshot: string;
+        category_snapshot: string | null;
+        unit_label_snapshot: string | null;
+        unit_price_cents: number;
+      }
+    | null = null;
+
+  if (lineScope === "flat") {
+    const { data: flatLine, error: flatLineErr } = await supabase
+      .from("estimate_line_items")
+      .select(
+        "id, estimate_id, source_pricebook_item_id, item_name_snapshot, description_snapshot, item_type_snapshot, category_snapshot, unit_label_snapshot, unit_price_cents"
+      )
+      .eq("id", lineItemId)
+      .eq("estimate_id", estimateId)
+      .maybeSingle();
+    if (flatLineErr) throw flatLineErr;
+    line = flatLine;
+  } else {
+    const { data: optionLine, error: optionLineErr } = await supabase
+      .from("estimate_option_line_items")
+      .select(
+        "id, estimate_id, estimate_option_id, source_pricebook_item_id, item_name_snapshot, description_snapshot, item_type_snapshot, category_snapshot, unit_label_snapshot, unit_price_cents"
+      )
+      .eq("id", lineItemId)
+      .eq("estimate_id", estimateId)
+      .eq("estimate_option_id", estimateOptionId)
+      .maybeSingle();
+    if (optionLineErr) throw optionLineErr;
+    line = optionLine;
+  }
+
+  if (!line?.id) {
+    return { success: false, error: "Line item not found on this estimate." };
+  }
+
+  if (line.source_pricebook_item_id) {
+    return { success: false, error: "Only manual line items can be saved to Pricebook." };
+  }
+
+  const itemName = String(line.item_name_snapshot ?? "").trim();
+  if (!itemName) {
+    return { success: false, error: "item_name is required to save a manual line to Pricebook." };
+  }
+
+  const itemType = String(line.item_type_snapshot ?? "").trim().toLowerCase();
+  if (!MANUAL_LINE_SAVE_SUPPORTED_PRICEBOOK_TYPES.has(itemType)) {
+    return {
+      success: false,
+      error: "Only service, material, and diagnostic manual lines can be saved to Pricebook.",
+    };
+  }
+
+  const unitPriceCents = Math.round(Number(line.unit_price_cents));
+  if (!Number.isFinite(unitPriceCents) || unitPriceCents < 0) {
+    return { success: false, error: "unit_price is required to save a manual line to Pricebook." };
+  }
+
+  const entitlementDecision = await resolveOperationalMutationEntitlementAccess({
+    accountOwnerUserId,
+    supabase,
+  });
+  if (!entitlementDecision.authorized) {
+    return {
+      success: false,
+      error: `Pricebook mutation blocked: ${entitlementDecision.reason}`,
+    };
+  }
+
+  const defaultDescription = String(line.description_snapshot ?? "").trim() || null;
+  const category = parsePricebookCategory(line.category_snapshot) ?? null;
+  const unitLabel = parsePricebookUnitLabel(line.unit_label_snapshot) ?? null;
+  const duplicateKey = buildManualLineDuplicateKey({
+    itemName,
+    itemType,
+    category,
+  });
+
+  const { data: duplicateCandidates, error: duplicateQueryErr } = await supabase
+    .from("pricebook_items")
+    .select("id, item_name, category")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("item_type", itemType);
+  if (duplicateQueryErr) throw duplicateQueryErr;
+
+  const normalizedName = normalizeDuplicateText(itemName);
+  const normalizedCategory = category ? normalizeDuplicateText(category) : "";
+  const duplicate = (duplicateCandidates ?? []).find((candidate: any) => {
+    const candidateName = normalizeDuplicateText(candidate.item_name);
+    if (candidateName !== normalizedName) return false;
+    const candidateCategory = candidate.category
+      ? normalizeDuplicateText(candidate.category)
+      : "";
+    return candidateCategory === normalizedCategory;
+  });
+
+  if (duplicate?.id) {
+    const existingPricebookItemId = String(duplicate.id ?? "").trim();
+
+    await supabase.from("estimate_events").insert({
+      estimate_id: estimateId,
+      event_type: "estimate_manual_line_save_to_pricebook_duplicate",
+      meta: {
+        line_scope: lineScope,
+        line_item_id: lineItemId,
+        estimate_option_id: lineScope === "option" ? estimateOptionId : null,
+        item_name_snapshot: itemName,
+        item_type_snapshot: itemType,
+        existing_pricebook_item_id: existingPricebookItemId,
+        duplicate_key: duplicateKey,
+      },
+      user_id: userId,
+    });
+
+    return {
+      success: true,
+      created: false,
+      duplicate: true,
+      pricebookItemId: existingPricebookItemId,
+    };
+  }
+
+  const defaultUnitPrice = Math.round(unitPriceCents) / 100;
+  const { data: insertedPricebookItem, error: insertPricebookErr } = await supabase
+    .from("pricebook_items")
+    .insert({
+      account_owner_user_id: accountOwnerUserId,
+      item_name: itemName,
+      item_type: itemType,
+      category,
+      default_description: defaultDescription,
+      default_unit_price: defaultUnitPrice,
+      unit_label: unitLabel,
+      is_active: true,
+    })
+    .select("id")
+    .single();
+  if (insertPricebookErr || !insertedPricebookItem?.id) {
+    return {
+      success: false,
+      error: insertPricebookErr?.message ?? "Failed to create Pricebook item from manual line.",
+    };
+  }
+
+  const createdPricebookItemId = String(insertedPricebookItem.id).trim();
+  await supabase.from("estimate_events").insert({
+    estimate_id: estimateId,
+    event_type: "estimate_manual_line_saved_to_pricebook",
+    meta: {
+      line_scope: lineScope,
+      line_item_id: lineItemId,
+      estimate_option_id: lineScope === "option" ? estimateOptionId : null,
+      item_name_snapshot: itemName,
+      item_type_snapshot: itemType,
+      created_pricebook_item_id: createdPricebookItemId,
+      duplicate_key: duplicateKey,
+    },
+    user_id: userId,
+  });
+
+  return {
+    success: true,
+    created: true,
+    duplicate: false,
+    pricebookItemId: createdPricebookItemId,
+  };
+}
 
 export async function addEstimateOptionLineItem(
   params: AddEstimateOptionLineItemParams
