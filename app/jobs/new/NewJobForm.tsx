@@ -1898,9 +1898,13 @@ const [billingRecipient, setBillingRecipient] = useState<
         <section className={guidedSectionShellClass}>
           {renderGuidedSectionIntro({
             icon: <MapPinned className="h-4 w-4" aria-hidden="true" />,
-            title: "Responsible Account & Service Location",
+            title: "Customer & Service Location",
             description: customerSectionDescription,
-            summary: internalResolutionReady ? `${selectedCustomerSummary} — ${selectedLocationSummary}` : "Select or create the responsible account, then confirm the service location.",
+            summary: internalResolutionReady
+              ? (!selectedCustomer && (createNewCustomer || locationMode === "new")
+                ? "New customer and service address"
+                : `${selectedCustomerSummary} — ${selectedLocationSummary}`)
+              : "Select or create the responsible account, then confirm the service location.",
             tone: customerSectionTone,
             action:
               selectedCustomerId && !createNewCustomer && !isCustomerContextInternalMode ? (
@@ -1953,7 +1957,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                         }}
                         className="rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-all duration-150 hover:border-slate-400 hover:bg-slate-50 active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                       >
-                        + New Responsible Account
+                        + New Customer
                       </button>
                     </div>
                   </div>
@@ -2271,8 +2275,8 @@ const [billingRecipient, setBillingRecipient] = useState<
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-slate-900">Create new responsible account and location</p>
-                      <p className="mt-0.5 text-xs text-slate-500">Use this only when a reliable existing match is not available.</p>
+                      <p className="text-sm font-semibold text-slate-900">New Customer Entry</p>
+                      <p className="mt-0.5 text-xs text-slate-500">Add a new customer and service address when they are not already saved.</p>
                     </div>
                     <button
                       type="button"

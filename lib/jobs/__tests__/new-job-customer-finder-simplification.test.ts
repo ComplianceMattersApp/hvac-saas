@@ -22,6 +22,6 @@ describe("New job customer finder simplification", () => {
 
   it("keeps create-new customer path available", () => {
     expect(formSource).toContain("create-new-customer-shortcut");
-    expect(formSource).toContain("+ New Responsible Account");
+    expect(formSource).toContain("+ New Customer");
   });
 });

@@ -11,7 +11,7 @@ describe("/jobs/new guided builder refresh", () => {
   it("uses a shared guided-section shell for the main internal intake sections", () => {
     expect(formSource).toContain("guidedSectionShellClass");
     expect(formSource).toContain("renderGuidedSectionIntro({");
-    expect(formSource).toContain('title: "Responsible Account & Service Location"');
+    expect(formSource).toContain('title: "Customer & Service Location"');
     expect(formSource).toContain('title: "Schedule"');
     expect(formSource).toContain('title: "Additional Details"');
     expect(formSource).toContain('title: createSectionTitle');
