@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { readPublicEstimateProposalByToken } from "@/lib/estimates/estimate-proposal-public-read";
+import ProposalApprovalCard from "./ProposalApprovalCard";
 
 export const metadata = {
   title: "Proposal",
@@ -106,7 +107,7 @@ export default async function PublicProposalPage({
               {proposal.identity.title}
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600 sm:text-base">
-              Review the proposed scope and pricing below. Approval and selection actions are not enabled in this view yet.
+              Review the proposed scope and pricing below, then submit your approval.
             </p>
 
             <div className="mt-5 grid gap-4 md:grid-cols-[minmax(0,1.5fr)_minmax(17rem,0.9fr)]">
@@ -133,12 +134,18 @@ export default async function PublicProposalPage({
           </div>
         </section>
 
+        <ProposalApprovalCard
+          token={token}
+          proposalMode={proposal.proposalMode}
+          options={proposal.options}
+        />
+
         {proposal.proposalMode === "multi_option_packages" ? (
           <section className="space-y-4">
             <div className="rounded-2xl border border-amber-200/80 bg-amber-50/90 px-5 py-4 text-sm text-amber-950 shadow-[0_18px_40px_-34px_rgba(120,53,15,0.26)]">
               <div className="font-semibold">Multiple options are included in this proposal.</div>
               <div className="mt-1 text-amber-900/90">
-                Compare each option below. Online selection and approval are not enabled in this version.
+                Compare each option below before selecting one in the approval section.
               </div>
             </div>
 

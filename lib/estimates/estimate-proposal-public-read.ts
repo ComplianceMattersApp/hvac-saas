@@ -2,17 +2,10 @@ import { createAdminClient } from "@/lib/supabase/server";
 import { buildEstimateDocumentViewModel } from "@/lib/estimates/estimate-document";
 import { isEstimateProposalLinksEnabled } from "@/lib/estimates/estimate-exposure";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
-import { hashEstimateProposalLinkToken } from "@/lib/estimates/estimate-proposal-links";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
-
-type ProposalLinkRow = {
-  id: string;
-  estimate_id: string;
-  account_owner_user_id: string;
-  status: string;
-  expires_at: string;
-  revoked_at: string | null;
-};
+import {
+  findActiveProposalLinkByRawToken,
+} from "@/lib/estimates/estimate-proposal-public-shared";
 
 export type PublicProposalShellResult =
   | { available: false }
@@ -67,31 +60,6 @@ export type PublicProposalShellResult =
       };
     };
 
-function normalizeToken(rawToken: string) {
-  return String(rawToken ?? "").trim();
-}
-
-function isLikelyProposalToken(rawToken: string) {
-  return /^[A-Za-z0-9_-]{32,}$/.test(rawToken);
-}
-
-function isMissingProposalLinkSchemaError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-
-  const maybeError = error as { code?: string | null; message?: string | null };
-  const code = String(maybeError.code ?? "").trim();
-  const message = String(maybeError.message ?? "").toLowerCase();
-
-  if (code === "42P01" || code === "PGRST205") {
-    return true;
-  }
-
-  return (
-    message.includes("estimate_proposal_links") ||
-    message.includes("schema cache") ||
-    (message.includes("relation") && message.includes("does not exist"))
-  );
-}
 
 async function loadSafeLocationDisplay(params: {
   admin: any;
@@ -128,37 +96,6 @@ async function loadSafeLocationDisplay(params: {
       .join(", ") ||
     null
   );
-}
-
-async function findActiveProposalLinkByTokenHash(params: {
-  admin: any;
-  tokenHash: string;
-  nowIso: string;
-}) {
-  try {
-    const { data, error } = await params.admin
-      .from("estimate_proposal_links")
-      .select("id, estimate_id, account_owner_user_id, status, expires_at, revoked_at")
-      .eq("token_hash", params.tokenHash)
-      .maybeSingle();
-
-    if (error) {
-      if (isMissingProposalLinkSchemaError(error)) return null;
-      throw error;
-    }
-
-    const proposalLink = (data ?? null) as ProposalLinkRow | null;
-    if (!proposalLink?.id) return null;
-
-    if (String(proposalLink.status ?? "").trim().toLowerCase() !== "active") return null;
-    if (proposalLink.revoked_at) return null;
-    if (String(proposalLink.expires_at ?? "").trim() <= params.nowIso) return null;
-
-    return proposalLink;
-  } catch (error) {
-    if (isMissingProposalLinkSchemaError(error)) return null;
-    throw error;
-  }
 }
 
 function toPublicProposalShell(input: {
@@ -222,18 +159,12 @@ export async function readPublicEstimateProposalByToken(rawToken: string): Promi
     return { available: false };
   }
 
-  const token = normalizeToken(rawToken);
-  if (!token || !isLikelyProposalToken(token)) {
-    return { available: false };
-  }
-
   const admin = createAdminClient();
   const nowIso = new Date().toISOString();
-  const tokenHash = hashEstimateProposalLinkToken(token);
 
-  const proposalLink = await findActiveProposalLinkByTokenHash({
+  const proposalLink = await findActiveProposalLinkByRawToken({
     admin,
-    tokenHash,
+    rawToken,
     nowIso,
   });
   if (!proposalLink?.id) {
