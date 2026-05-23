@@ -1667,8 +1667,6 @@ export default async function JobDetailPage({
     ["tenant_or_occupant", 1],
     ["responsible_party", 2],
     ["homeowner", 3],
-    ["third_party_oversight", 4],
-    ["billing_contact", 5],
   ]);
   const siteAccessEntityPriority = new Map<string, number>([
     ["job", 0],
@@ -1735,6 +1733,19 @@ export default async function JobDetailPage({
       billingRecipientEmail ||
       billingRecipientPhone ||
       billingRecipientAddress,
+  );
+  const accountBillingContact = customerRoleContacts.find((contact) => {
+    const role = String(contact.recipient_role ?? "").trim().toLowerCase();
+    const status = String(contact.status ?? "").trim().toLowerCase();
+    if (role !== "billing_contact") return false;
+    if (status === "inactive") return false;
+    return true;
+  }) ?? null;
+  const accountBillingContactName = String(accountBillingContact?.display_name ?? "").trim();
+  const accountBillingContactEmail = String(accountBillingContact?.email ?? "").trim();
+  const accountBillingContactPhone = String(accountBillingContact?.phone_e164 ?? "").trim();
+  const hasAccountBillingContact = Boolean(
+    accountBillingContactName || accountBillingContactEmail || accountBillingContactPhone,
   );
 
   const resolvedContractorName =
@@ -3293,7 +3304,20 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               ) : null}
             </>
           ) : (
-            <div className="mt-1 text-xs text-slate-600">Defaults to responsible account</div>
+            <div className="mt-1 space-y-1.5 text-xs text-slate-600">
+              <div>Defaults to responsible account</div>
+              {hasAccountBillingContact ? (
+                <div>
+                  <span className="font-semibold text-slate-500">Billing contact on account:</span>{" "}
+                  {accountBillingContactName || "Saved billing contact"}
+                  {accountBillingContactEmail ? ` - ${accountBillingContactEmail}` : ""}
+                  {accountBillingContactPhone ? ` - ${accountBillingContactPhone}` : ""}
+                </div>
+              ) : null}
+              {hasAccountBillingContact ? (
+                <div>Invoice routing still follows the job/invoice billing recipient fields.</div>
+              ) : null}
+            </div>
           )}
         </div>
 

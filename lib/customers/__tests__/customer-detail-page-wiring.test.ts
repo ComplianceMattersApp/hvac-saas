@@ -32,6 +32,8 @@ describe("customer detail relationship hub wiring", () => {
 
   it("shows billing and paperwork defaults copy", () => {
     expect(customerPageSource).toContain("Billing / Paperwork Defaults");
+    expect(customerPageSource).toContain("Billing / Paperwork Contact:");
+    expect(customerPageSource).toContain("Saved billing contact");
     expect(customerPageSource).toContain(
       "Invoices and paperwork default to the responsible account unless a job or invoice has its own billing recipient.",
     );

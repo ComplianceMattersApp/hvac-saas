@@ -41,6 +41,8 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("Same as responsible account");
     expect(jobPageSource).toContain("No separate site/access contact saved");
     expect(jobPageSource).toContain("Defaults to responsible account");
+    expect(jobPageSource).toContain("Billing contact on account");
+    expect(jobPageSource).toContain("Invoice routing still follows the job/invoice billing recipient fields.");
   });
 
   it("includes location-linked contacts in site/access resolution priority", () => {
@@ -48,5 +50,6 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain('["job", 0]');
     expect(jobPageSource).toContain('["location", 1]');
     expect(jobPageSource).toContain('["customer", 2]');
+    expect(jobPageSource).not.toContain('["billing_contact", 5]');
   });
 });

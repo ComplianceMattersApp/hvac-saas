@@ -594,6 +594,17 @@ export default async function CustomerDetailPage(props: {
   const hasDisplayableRoleContacts = customerRoleContacts.some((recipient) =>
     isDisplayableRole(recipient.recipient_role),
   );
+  const savedBillingContact = customerRoleContacts.find((recipient) => {
+    const role = String(recipient.recipient_role ?? "").trim().toLowerCase();
+    const status = String(recipient.status ?? "").trim().toLowerCase();
+    return role === "billing_contact" && status !== "inactive";
+  }) ?? null;
+  const savedBillingContactName = String(savedBillingContact?.display_name ?? "").trim();
+  const savedBillingContactPhone = String(savedBillingContact?.phone_e164 ?? "").trim();
+  const savedBillingContactEmail = String(savedBillingContact?.email ?? "").trim();
+  const hasSavedBillingContact = Boolean(
+    savedBillingContactName || savedBillingContactPhone || savedBillingContactEmail,
+  );
 
   // Maintenance Agreements: load only for internal viewers when the flag is on
   // The maintenance_agreements table does not exist in production yet. The flag
@@ -869,6 +880,19 @@ export default async function CustomerDetailPage(props: {
             <div className="mt-4 space-y-2 text-sm text-slate-700">
               <div>
                 <span className="font-semibold text-slate-900">Responsible Account:</span> {customerDisplayName(customer)}
+              </div>
+              <div>
+                <span className="font-semibold text-slate-900">Billing / Paperwork Contact:</span>{" "}
+                {hasSavedBillingContact ? (
+                  <>
+                    <span>Saved billing contact</span>
+                    {savedBillingContactName ? <span> - {savedBillingContactName}</span> : null}
+                    {savedBillingContactEmail ? <span> - {savedBillingContactEmail}</span> : null}
+                    {savedBillingContactPhone ? <span> - {savedBillingContactPhone}</span> : null}
+                  </>
+                ) : (
+                  <span>Defaults to responsible account contact details</span>
+                )}
               </div>
               <div>
                 <span className="font-semibold text-slate-900">Billing Address:</span> {customerBillingAddress || "Defaults to responsible account service address context"}
