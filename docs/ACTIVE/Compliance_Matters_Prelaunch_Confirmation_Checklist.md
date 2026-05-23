@@ -227,18 +227,11 @@ If any item here conflicts with the active spine, the spine wins.
   - targeted Vitest passed: contractor intake hotfix + attachment resilience tests, 2 files / 10 tests
 
 ### 2.3.6 Recent closeout polish pass (completed)
-- Dedicated Closeout Queue V1 is closed and complete for the current pass.
-- Calendar Work Context/Includes display is closed and complete for the current pass.
-- Internal Invoice Workspace V1 is closed and complete for the current pass, including send workflow clarity and Print / Save PDF view.
-- Premium internal invoice email template, premium appointment scheduled email template, appointment email company header polish, and Ops tenant logo polish are closed and complete for the current pass.
-- ECC subcool tolerance is now +/-3F.
-- Pricebook runtime seed display name is now `Diagnostic` instead of `Diagnostic Fee`.
-- Confirmed boundaries for this closeout:
-  - Invoice Charges remain billed truth.
-  - Work Items / Visit Scope remain operational work scope.
-  - External billing remains lightweight invoice-sent tracking.
-  - Internal invoicing remains internal/admin only.
-  - Payment entries remain tracking-only and do not execute live customer payment rails.
+ Section 2I closeout recorded: visual builder cleanup, editable estimate line items, builder workflow polish, pricebook search model, save-manual-line-to-pricebook, redirect-to-new-job-after-convert-to-job, proposal print/customer presentation polish, Internal Proposal Boundaries box removal, Proposal Notes section using the existing estimate notes field, and no schema changes for print/proposal polish.
+ Section 2J closeout recorded: 2J-A proposal-link foundation complete and pushed; controlled target-only migration window verified for `20260523130000_estimate_proposal_links_foundation.sql`; `estimate_proposal_links` table, expected columns, expected indexes/constraints, RLS, internal select/insert/update policies, and no delete/public-select policy verified; 2J-B public proposal read shell complete and pushed; 2J-C customer proposal approval complete and pushed; 2J-D internal proposal link copy/regenerate/revoke controls complete and pushed; live proposal-link smoke passed with valid render, successful customer approval, `approved_at` set, `estimate_approved` event created, `response_source = customer_proposal_link`, `proposal_link_id` present, raw token absent from event metadata, stale/reopen behavior safe, and invalid token rendering the generic unavailable page without estimate/customer/company leakage.
+ Explicit non-actions recorded for Section 2J: no proposal email send yet, no SMS/text proposal delivery yet, no payment/QBO behavior, no invoice issue/send behavior, no e-signature artifact/legal signature model, no customer portal account/login dependency, and no real customer smoke was used.
+ Next recommended section recorded: Section 2K — Estimate Proposal Email Delivery; it should reuse branded tenant email infrastructure and the existing proposal-link model, while SMS remains deferred until provider gates are ready and e-signature remains a separate legal/artifact model.
+ Ops note: if there is any chance a live Supabase service-role key was exposed in terminal logs or transcripts during diagnostics, rotate the key after the smoke/diagnostic window and update deployed env afterward; do not record actual secret values in docs.
   - Closeout Queue V1 continues to use existing closeout projection truth.
   - Calendar Work Context uses a derived compact label, not a new truth model.
 - Parked follow-up remains parked:

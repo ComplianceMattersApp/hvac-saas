@@ -2051,6 +2051,7 @@ Estimates/quoting V1A-V1J is now implemented to the current guarded internal bas
 Estimates is internal-only production-live: V1A and V1H migrations are applied in production, `ENABLE_ESTIMATES=true` is enabled in Vercel Production only, and `ENABLE_ESTIMATE_EMAIL_SEND` remains unset/false.
 The earlier enabled-mode render error is now a watch item only for planning purposes: clean captured smoke did not reproduce the `TypeError: Cannot read properties of undefined (reading 'call')`, and `/estimates` plus multiple `/estimates/[id]` routes returned `200` without a real stack trace.
 Estimates internal-only production enablement execution is complete and documented in the runbook closeout.
+Section 2I / 2J docs closeout is complete: estimate UX cleanup, proposal-link/customer approval delivery, live customer smoke, and exposure-flag test isolation are recorded; the next recommended section is Section 2K — Estimate Proposal Email Delivery.
 V1E internal-only status transitions are complete (`draft -> sent`, `sent -> approved|declined|expired|cancelled`, and `draft -> cancelled`).
 V1E transition events write `previous_status` and `next_status`; status timestamps are set on transition.
 V1E keeps line editing draft-only and hides line-edit controls after `sent`.
