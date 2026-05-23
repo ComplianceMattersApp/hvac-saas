@@ -78,6 +78,8 @@ function makeSupabaseClient(options?: {
   proposalLinkRows?: Array<Record<string, unknown>>;
   insertProposalLinkError?: string | null;
   estimateError?: string | null;
+  proposalLinkSelectError?: { message: string; code?: string } | null;
+  proposalLinkUpdateError?: { message: string; code?: string } | null;
 }) {
   const estimateRow =
     options && Object.prototype.hasOwnProperty.call(options, "estimateRow")
@@ -128,6 +130,9 @@ function makeSupabaseClient(options?: {
         }
 
         if (table === "estimate_proposal_links") {
+          if (options?.proposalLinkSelectError) {
+            return { data: null, error: options.proposalLinkSelectError };
+          }
           const matched = proposalLinkRows.filter((row) => matchesWhere(row, where));
           return { data: matched[0] ?? null, error: null };
         }
@@ -152,8 +157,12 @@ function makeSupabaseClient(options?: {
         where.push({ type: "lte", column, value });
         return chain;
       }),
-      then: (resolve: (value: { data: null; error: null }) => unknown) => {
+      then: (resolve: (value: { data: null; error: unknown }) => unknown) => {
         if (table === "estimate_proposal_links") {
+          if (options?.proposalLinkUpdateError) {
+            return Promise.resolve({ data: null, error: options.proposalLinkUpdateError }).then(resolve);
+          }
+
           for (const row of proposalLinkRows) {
             if (matchesWhere(row, where)) {
               Object.assign(row, patch);
@@ -463,5 +472,92 @@ describe("estimate proposal link foundation", () => {
     expect(JSON.stringify(event.meta)).not.toContain(result.rawToken);
     expect(JSON.stringify(event.meta)).not.toContain("last_user_agent");
     expect(JSON.stringify(event.meta)).not.toContain("last_viewed_ip");
+  });
+
+  it("returns a safe failure when proposal-link schema is unavailable", async () => {
+    const supabase = makeSupabaseClient({
+      proposalLinkUpdateError: {
+        code: "42P01",
+        message: 'relation "estimate_proposal_links" does not exist',
+      },
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const {
+      issueEstimateProposalLink,
+      regenerateEstimateProposalLink,
+      revokeEstimateProposalLink,
+    } = await import("@/lib/estimates/estimate-proposal-links");
+
+    const issueResult = await issueEstimateProposalLink({ estimateId: ESTIMATE_ID });
+    const regenerateResult = await regenerateEstimateProposalLink({ estimateId: ESTIMATE_ID });
+    const revokeResult = await revokeEstimateProposalLink({ estimateId: ESTIMATE_ID });
+
+    expect(issueResult).toEqual({
+      success: false,
+      error: "Proposal link setup is unavailable in this environment.",
+    });
+    expect(regenerateResult).toEqual({
+      success: false,
+      error: "Proposal link setup is unavailable in this environment.",
+    });
+    expect(revokeResult).toEqual({
+      success: false,
+      error: "Proposal link setup is unavailable in this environment.",
+    });
+  });
+
+  it("reads internal active-link view without exposing token hash", async () => {
+    const supabase = makeSupabaseClient({
+      proposalLinkRows: [
+        makeProposalLinkRow({
+          token_hash: "secret-hash",
+          expires_at: "2099-01-01T00:00:00.000Z",
+        }),
+      ],
+    });
+
+    const { readActiveEstimateProposalLinkForInternal } = await import(
+      "@/lib/estimates/estimate-proposal-links"
+    );
+
+    const result = await readActiveEstimateProposalLinkForInternal({
+      estimateId: ESTIMATE_ID,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      supabase,
+    });
+
+    expect(result.schemaAvailable).toBe(true);
+    expect(result.activeLink).toMatchObject({
+      proposalLinkId: "plink-001",
+      expiresAt: "2099-01-01T00:00:00.000Z",
+      status: "active",
+    });
+    expect(JSON.stringify(result.activeLink ?? {})).not.toContain("token_hash");
+    expect(JSON.stringify(result)).not.toContain("secret-hash");
+  });
+
+  it("returns schema unavailable for internal read when proposal-link schema is missing", async () => {
+    const supabase = makeSupabaseClient({
+      proposalLinkUpdateError: {
+        code: "42P01",
+        message: 'relation "estimate_proposal_links" does not exist',
+      },
+    });
+
+    const { readActiveEstimateProposalLinkForInternal } = await import(
+      "@/lib/estimates/estimate-proposal-links"
+    );
+
+    const result = await readActiveEstimateProposalLinkForInternal({
+      estimateId: ESTIMATE_ID,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      supabase,
+    });
+
+    expect(result).toEqual({
+      schemaAvailable: false,
+      activeLink: null,
+    });
   });
 });

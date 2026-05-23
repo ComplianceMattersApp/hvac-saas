@@ -27,10 +27,41 @@ import {
   type UpdateEstimateOptionLineItemParams,
   type UpdateEstimateOptionMetadataParams,
 } from "@/lib/estimates/estimate-actions";
+import {
+  issueEstimateProposalLink,
+  regenerateEstimateProposalLink,
+  revokeEstimateProposalLink,
+} from "@/lib/estimates/estimate-proposal-links";
+import {
+  initialEstimateProposalLinkActionState,
+  type EstimateProposalLinkActionState,
+} from "./proposal-link-action-state";
 import { sendEstimateCommunication } from "@/lib/estimates/estimate-communication";
-import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import {
+  isEstimateProposalLinksEnabled,
+  isEstimatesEnabled,
+} from "@/lib/estimates/estimate-exposure";
 
 type TransitionTargetStatus = "sent" | "approved" | "declined" | "expired" | "cancelled";
+
+type ProposalLinkActionIntent = "issue" | "regenerate" | "revoke";
+
+function toSafeProposalLinkErrorState(message?: string | null): EstimateProposalLinkActionState {
+  const normalized = String(message ?? "").toLowerCase();
+  const schemaUnavailable =
+    normalized.includes("setup is unavailable") || normalized.includes("schema");
+
+  return {
+    status: "error",
+    message: schemaUnavailable
+      ? "Proposal link setup is unavailable in this environment."
+      : "Unable to update proposal link right now.",
+    hasActiveLink: false,
+    copyToken: null,
+    expiresAt: null,
+    schemaUnavailable,
+  };
+}
 
 /**
  * Add a line item to a draft estimate and revalidate the detail route.
@@ -417,4 +448,161 @@ export async function convertEstimateToInvoiceDraftFromForm(formData: FormData) 
   }
 
   return result;
+}
+
+/**
+ * Create an active customer proposal link for a sent estimate.
+ * Returns a short-lived raw token only in this action response for immediate copy UX.
+ */
+export async function issueEstimateProposalLinkFromForm(
+  formData: FormData
+): Promise<EstimateProposalLinkActionState> {
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  if (!estimateId) {
+    return {
+      ...initialEstimateProposalLinkActionState,
+      status: "error",
+      message: "Estimate not found.",
+    };
+  }
+
+  if (!isEstimatesEnabled() || !isEstimateProposalLinksEnabled()) {
+    return {
+      ...initialEstimateProposalLinkActionState,
+      status: "error",
+      message: "Proposal link setup is unavailable in this environment.",
+      schemaUnavailable: true,
+    };
+  }
+
+  const result = await issueEstimateProposalLink({ estimateId });
+  if (!result.success) {
+    if (result.code === "already_exists") {
+      return {
+        status: "error",
+        message: "An active link already exists. Regenerate to copy a fresh link.",
+        hasActiveLink: true,
+        copyToken: null,
+        expiresAt: result.expiresAt ?? null,
+        schemaUnavailable: false,
+      };
+    }
+    return toSafeProposalLinkErrorState(result.error);
+  }
+
+  revalidatePath(`/estimates/${estimateId}`);
+  return {
+    status: "success",
+    message: "Proposal link created.",
+    hasActiveLink: true,
+    copyToken: result.rawToken,
+    expiresAt: result.expiresAt,
+    schemaUnavailable: false,
+  };
+}
+
+/**
+ * Revoke the current active proposal link and issue a fresh one for copy.
+ */
+export async function regenerateEstimateProposalLinkFromForm(
+  formData: FormData
+): Promise<EstimateProposalLinkActionState> {
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  if (!estimateId) {
+    return {
+      ...initialEstimateProposalLinkActionState,
+      status: "error",
+      message: "Estimate not found.",
+    };
+  }
+
+  if (!isEstimatesEnabled() || !isEstimateProposalLinksEnabled()) {
+    return {
+      ...initialEstimateProposalLinkActionState,
+      status: "error",
+      message: "Proposal link setup is unavailable in this environment.",
+      schemaUnavailable: true,
+    };
+  }
+
+  const result = await regenerateEstimateProposalLink({ estimateId });
+  if (!result.success) {
+    return toSafeProposalLinkErrorState(result.error);
+  }
+
+  revalidatePath(`/estimates/${estimateId}`);
+  return {
+    status: "success",
+    message: "Proposal link regenerated.",
+    hasActiveLink: true,
+    copyToken: result.rawToken,
+    expiresAt: result.expiresAt,
+    schemaUnavailable: false,
+  };
+}
+
+/**
+ * Revoke the current active proposal link for this estimate.
+ */
+export async function revokeEstimateProposalLinkFromForm(
+  formData: FormData
+): Promise<EstimateProposalLinkActionState> {
+  const estimateId = String(formData.get("estimate_id") ?? "").trim();
+  if (!estimateId) {
+    return {
+      ...initialEstimateProposalLinkActionState,
+      status: "error",
+      message: "Estimate not found.",
+    };
+  }
+
+  if (!isEstimatesEnabled() || !isEstimateProposalLinksEnabled()) {
+    return {
+      ...initialEstimateProposalLinkActionState,
+      status: "error",
+      message: "Proposal link setup is unavailable in this environment.",
+      schemaUnavailable: true,
+    };
+  }
+
+  const result = await revokeEstimateProposalLink({ estimateId });
+  if (!result.success) {
+    return toSafeProposalLinkErrorState(result.error);
+  }
+
+  revalidatePath(`/estimates/${estimateId}`);
+  return {
+    status: "success",
+    message: result.revoked ? "Proposal link revoked." : "No active proposal link to revoke.",
+    hasActiveLink: false,
+    copyToken: null,
+    expiresAt: null,
+    schemaUnavailable: false,
+  };
+}
+
+/**
+ * Unified form action for internal proposal-link controls.
+ */
+export async function submitEstimateProposalLinkActionFromForm(
+  _previousState: EstimateProposalLinkActionState,
+  formData: FormData
+): Promise<EstimateProposalLinkActionState> {
+  const intent = String(formData.get("intent") ?? "").trim().toLowerCase() as ProposalLinkActionIntent;
+
+  if (intent === "issue") {
+    return issueEstimateProposalLinkFromForm(formData);
+  }
+  if (intent === "regenerate") {
+    return regenerateEstimateProposalLinkFromForm(formData);
+  }
+  if (intent === "revoke") {
+    return revokeEstimateProposalLinkFromForm(formData);
+  }
+
+  return {
+    ...initialEstimateProposalLinkActionState,
+    status: "error",
+    message: "Unsupported proposal link action.",
+  };
 }

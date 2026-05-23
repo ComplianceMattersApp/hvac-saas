@@ -15,6 +15,7 @@ import {
 } from "@/lib/estimates/estimate-document";
 import { getEstimateById } from "@/lib/estimates/estimate-read";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { readActiveEstimateProposalLinkForInternal } from "@/lib/estimates/estimate-proposal-links";
 import {
   removeLineItemFromForm,
   updateLineItemFromForm,
@@ -31,6 +32,7 @@ import EstimateApprovalResponseForm from "./EstimateApprovalResponseForm";
 import CreateDefaultOptionsForm from "./CreateDefaultOptionsForm";
 import EditEstimateOptionForm from "./EditEstimateOptionForm";
 import AddEstimateOptionLineForm from "./AddEstimateOptionLineForm";
+import ProposalLinkControls from "./ProposalLinkControls";
 import { removeEstimateOptionLineItemFromForm } from "./actions";
 
 export const metadata = { title: "Estimate" };
@@ -345,6 +347,14 @@ export default async function EstimateDetailPage({
     ? `/jobs/${estimate.converted_job_id}/invoice`
     : null;
 
+  const proposalLinkRead = isSent
+    ? await readActiveEstimateProposalLinkForInternal({
+        estimateId: estimate.id,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        supabase,
+      })
+    : { schemaAvailable: true, activeLink: null };
+
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6 print:mx-0 print:max-w-none print:space-y-3 print:bg-white print:p-0 print:text-black">
       {notice && (
@@ -630,6 +640,24 @@ export default async function EstimateDetailPage({
       </div>
 
       {/* Estimate proposal rendering */}
+      {isSent && (
+        <div className="print:hidden">
+          <ProposalLinkControls
+            estimateId={estimate.id}
+            activeLink={
+              proposalLinkRead.activeLink
+                ? {
+                    proposalLinkId: proposalLinkRead.activeLink.proposalLinkId,
+                    recipientEmailSnapshot: proposalLinkRead.activeLink.recipientEmailSnapshot,
+                    expiresAt: proposalLinkRead.activeLink.expiresAt,
+                  }
+                : null
+            }
+            schemaUnavailable={!proposalLinkRead.schemaAvailable}
+          />
+        </div>
+      )}
+
       {/* Approval response panel visible on approved terminal state */}
       {isApproved && (
         <div className="rounded-2xl border border-emerald-200 bg-white p-5 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.14)] print:hidden">
