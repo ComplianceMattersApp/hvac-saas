@@ -628,7 +628,6 @@ export default async function EstimateDetailPage({
                       estimateId={estimate.id}
                       nextStatus="sent"
                       label={finalizeProposalCopy.label}
-                      confirmMessage={finalizeProposalCopy.confirmMessage}
                       className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
                     />
                     <EstimateStatusActionForm

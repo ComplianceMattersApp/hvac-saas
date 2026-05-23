@@ -3,19 +3,10 @@ type FinalizeProposalCopyParams = {
 };
 
 export function getFinalizeProposalActionCopy(params: FinalizeProposalCopyParams) {
-  const base =
-    "Finalize this proposal? This locks line editing and enables customer delivery tools. This action does not send an email.";
-
-  if (params.isMultiOptionProposal) {
-    return {
-      label: "Finalize Proposal",
-      confirmMessage: `${base} No option will be selected or approved.`,
-    };
-  }
+  void params;
 
   return {
     label: "Finalize Proposal",
-    confirmMessage: base,
   };
 }
 

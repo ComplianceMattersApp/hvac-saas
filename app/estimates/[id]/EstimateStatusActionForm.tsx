@@ -6,7 +6,7 @@ type EstimateStatusActionFormProps = {
   nextStatus: "sent" | "approved" | "declined" | "expired" | "cancelled";
   label: string;
   className: string;
-  confirmMessage: string;
+  confirmMessage?: string;
   helperText?: string;
 };
 
@@ -19,11 +19,17 @@ export default function EstimateStatusActionForm({
   confirmMessage,
   helperText,
 }: EstimateStatusActionFormProps) {
+  const normalizedConfirmMessage = String(confirmMessage ?? "").trim();
+
   return (
     <form
       action={action}
       onSubmit={(event) => {
-        if (typeof window !== "undefined" && !window.confirm(confirmMessage)) {
+        if (
+          normalizedConfirmMessage &&
+          typeof window !== "undefined" &&
+          !window.confirm(normalizedConfirmMessage)
+        ) {
           event.preventDefault();
         }
       }}
