@@ -94,8 +94,8 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
   return (
     <div ref={sectionRef} id="contact-logging" className="mt-4 border-t border-slate-200/80 pt-4 scroll-mt-24">
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Contact Logging</div>
-      <div className="flex flex-wrap gap-2">
-        <form action={action}>
+      <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
+        <form action={action} className="w-full">
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="method" value="call" />
           <input type="hidden" name="result" value="no_answer" />
@@ -108,7 +108,7 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
           />
         </form>
 
-        <form action={action}>
+        <form action={action} className="w-full">
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="method" value="text" />
           <input type="hidden" name="result" value="sent" />
@@ -124,7 +124,10 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
       <div className="mt-2 text-[11px] text-slate-500">
         {resolvedSummaryText}
       </div>
-      <div className="mt-1 text-[11px] text-slate-500">
+      <div className="mt-1 text-[11px] text-slate-500 sm:hidden">
+        Attempt log only - not delivery confirmation.
+      </div>
+      <div className="mt-1 hidden text-[11px] text-slate-500 sm:block">
         Logs communication attempts only; does not confirm carrier delivery.
       </div>
     </div>
