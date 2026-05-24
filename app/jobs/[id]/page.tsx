@@ -2300,7 +2300,7 @@ const followUpSummaryText = hasFollowUpReminder
       .filter(Boolean)
       .join(" • ")
   : "No follow-up reminder set yet.";
-const followUpHistorySummaryText = "Follow-up history loads below";
+const followUpHistorySummaryText = undefined;
 const serviceChainSummaryText = serviceCaseId
   ? "Visit history across the linked service case."
   : "No linked service case yet.";
@@ -2351,9 +2351,9 @@ const internalNotesMeta = noteCountSummary.internalCount
 const timelineNotesMeta = noteCountSummary.timelineNoteEventCount
   ? `${noteCountSummary.timelineNoteEventCount} note${noteCountSummary.timelineNoteEventCount === 1 ? "" : "s"}`
   : undefined;
-const sharedNotesSummaryText = "Notes stream below.";
-const internalNotesSummaryText = "Notes stream below.";
-const timelineSummaryText = "History loads below.";
+const sharedNotesSummaryText = undefined;
+const internalNotesSummaryText = undefined;
+const timelineSummaryText = undefined;
 
 const showRetestSection =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
@@ -3361,7 +3361,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
     <div>
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Operations Board</div>
-      <div className="mt-1 text-sm text-slate-600">Who to contact, where to go, who owns it, and what equipment matters.</div>
     </div>
     <div className="inline-flex rounded-full border border-slate-200 bg-white/86 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
       {equipmentCount} equipment / {assignedTeam.length} assigned
@@ -3613,9 +3612,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               Visit Reason / Intake Notes
-            </div>
-            <div className="mt-1 text-sm text-slate-600">
-              Why this visit exists and what the field team should know first.
             </div>
           </div>
           {job.job_type === "service" ? (
@@ -5598,7 +5594,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title="Attachments"
-              subtitle="Uploaded files and shareable job records."
               compactOnMobile
             />
           </summary>
