@@ -46,7 +46,7 @@ export default async function PaymentsReadinessSnapshot({
   const readiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, admin);
 
   return (
-    <div className="mx-auto max-w-[1100px] space-y-5 px-4 pb-6 text-slate-900 sm:px-6">
+    <div id="customer-payments" className="mx-auto max-w-[1100px] scroll-mt-24 space-y-5 px-4 pb-6 text-slate-900 sm:px-6">
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
