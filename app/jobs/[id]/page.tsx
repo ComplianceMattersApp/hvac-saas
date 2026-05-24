@@ -3103,7 +3103,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   <div className="mb-4 border-b border-slate-200/80 pb-4">
     <div className="mt-1 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
       <div className="min-w-0 max-w-3xl">
-        <div className="mb-2 inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-800">
+        <div className="mb-2 hidden sm:inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-800">
           Job Command Center
         </div>
         <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
@@ -3111,11 +3111,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </h1>
         <div className="mt-1.5 text-sm font-medium text-slate-600">{headerMetaLine}</div>
         {serviceAddressDisplay !== "No address set" ? (
-          <div className="mt-1 max-w-2xl break-words text-sm leading-5 text-slate-500">
+          <div className="mt-1 hidden max-w-2xl break-words text-sm leading-5 text-slate-500 sm:block">
             {serviceAddressDisplay}
           </div>
         ) : null}
-        <div className="mt-2 inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+        <div className="mt-2 hidden items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:inline-flex">
           <span className="text-slate-400">Job ID</span>
           <span className="font-mono normal-case tracking-normal text-slate-600">{job.id}</span>
         </div>
@@ -3200,6 +3200,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
   <div className="mb-4 rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9),rgba(255,255,255,0.99))] px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),0_18px_36px_-34px_rgba(15,23,42,0.32)] sm:px-4">
     <div className="grid gap-2 lg:grid-cols-3">
+      {/* Appointment — full card on all breakpoints */}
       <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
         <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Appointment</div>
         <div className="mt-0.5 min-w-0 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950">
@@ -3211,13 +3212,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       </div>
 
-      <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
+      {/* Workflow — full card on lg+; compressed chip on mobile */}
+      <div className="hidden rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5 lg:block">
         <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Workflow</div>
         <div className="mt-0.5 text-sm font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</div>
         <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{currentStateDetailText}</div>
       </div>
 
-      <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
+      {/* Field — full card on lg+; compressed chip on mobile */}
+      <div className="hidden rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5 lg:block">
         <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Field</div>
         <div className={`mt-0.5 text-sm font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>
           {formatStatus(job.status)}
@@ -3225,6 +3228,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <div className="mt-0.5 text-xs leading-5 text-slate-600">
           {isFieldComplete ? "Field work complete" : "Field work open"}
         </div>
+      </div>
+    </div>
+
+    {/* Mobile-only: Workflow + Field chip summary row (hidden on lg+) */}
+    <div className="mt-2 flex flex-wrap gap-2 lg:hidden">
+      <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/86 px-2.5 py-1 text-xs">
+        <span className="font-semibold uppercase tracking-[0.08em] text-slate-400">Workflow</span>
+        <span className="font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</span>
+      </div>
+      <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/86 px-2.5 py-1 text-xs">
+        <span className="font-semibold uppercase tracking-[0.08em] text-slate-400">Field</span>
+        <span className={`font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>{formatStatus(job.status)}</span>
       </div>
     </div>
 
@@ -3255,21 +3270,21 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   <div className="mb-4 grid items-start gap-4 xl:grid-cols-[minmax(300px,0.92fr)_minmax(420px,1.25fr)_minmax(260px,0.83fr)]">
     {/* Left: customer / contact info */}
     <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+      <div className="hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:block">
         {(job.job_type ? String(job.job_type).toUpperCase() : "SERVICE")}
         {serviceCity ? ` • ${serviceCity}` : ""}
       </div>
-      <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Responsible Account</div>
+      <div className="mt-2 hidden text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:block">Responsible Account</div>
 
       {job.customer_id ? (
         <Link
           href={`/customers/${job.customer_id}`}
-          className="mt-1.5 block text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950 hover:underline"
+          className="mt-1.5 hidden text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950 hover:underline sm:block"
         >
           {customerDisplayName}
         </Link>
       ) : (
-        <div className="mt-1.5 text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950">{customerDisplayName}</div>
+        <div className="mt-1.5 hidden text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950 sm:block">{customerDisplayName}</div>
       )}
 
       <div className="mt-3 space-y-2.5 border-t border-slate-200/70 pt-3 text-sm">
