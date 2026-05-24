@@ -1,8 +1,15 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 
-export default function SupportCallSummaryActions({ summaryText }: { summaryText: string }) {
+export default function SupportCallSummaryActions({
+  accountOwnerUserId,
+  summaryText,
+}: {
+  accountOwnerUserId: string;
+  summaryText: string;
+}) {
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
@@ -24,6 +31,12 @@ export default function SupportCallSummaryActions({ summaryText }: { summaryText
       >
         {copied ? "Copied" : "Copy Summary"}
       </button>
+      <Link
+        href={`/ops/owner-console/${encodeURIComponent(accountOwnerUserId)}/customers`}
+        className="inline-flex items-center rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+      >
+        Customers
+      </Link>
       <a
         href="#support-next-checks"
         className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
