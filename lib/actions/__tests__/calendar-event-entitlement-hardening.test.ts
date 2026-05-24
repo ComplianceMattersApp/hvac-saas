@@ -37,6 +37,23 @@ vi.mock('@/lib/utils/schedule-la', () => ({
 function makeCalendarEventFixture() {
   const writes: Array<{ table: string; op: string }> = [];
 
+  function buildScopedMutationResult() {
+    return {
+      eq: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            select: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { id: 'event-1' },
+                error: null,
+              })),
+            })),
+          })),
+        })),
+      })),
+    };
+  }
+
   const supabase = {
     from: vi.fn((table: string) => {
       if (table === 'calendar_events') {
@@ -47,23 +64,11 @@ function makeCalendarEventFixture() {
           }),
           update: vi.fn(() => {
             writes.push({ table, op: 'update' });
-            return {
-              eq: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                  eq: vi.fn(async () => ({ error: null })),
-                })),
-              })),
-            };
+            return buildScopedMutationResult();
           }),
           delete: vi.fn(() => {
             writes.push({ table, op: 'delete' });
-            return {
-              eq: vi.fn(() => ({
-                eq: vi.fn(() => ({
-                  eq: vi.fn(async () => ({ error: null })),
-                })),
-              })),
-            };
+            return buildScopedMutationResult();
           }),
           select: vi.fn(() => ({
             eq: vi.fn(() => ({

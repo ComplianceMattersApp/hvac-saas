@@ -92,6 +92,17 @@ function makeSessionClientFixture() {
   const updateCalls: Array<{ table: string; values: Record<string, unknown>; eq: Array<[string, unknown]> }> = [];
   const insertCalls: Array<{ table: string; values: Record<string, unknown> }> = [];
 
+  function buildInsertedEventResult() {
+    return {
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: { id: "job-event-1" },
+          error: null,
+        })),
+      })),
+    };
+  }
+
   const supabase = {
     from(table: string) {
       if (table === "jobs" || table === "service_cases") {
@@ -119,7 +130,7 @@ function makeSessionClientFixture() {
         return {
           insert(values: Record<string, unknown>) {
             insertCalls.push({ table, values });
-            return Promise.resolve({ error: null });
+            return buildInsertedEventResult();
           },
         };
       }

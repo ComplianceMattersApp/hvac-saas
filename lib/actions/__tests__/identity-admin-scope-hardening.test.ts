@@ -46,6 +46,14 @@ vi.mock("@/lib/auth/internal-user", () => ({
   requireInternalRole: (...args: unknown[]) => requireInternalRoleMock(...args),
 }));
 
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveAccountEntitlement: vi.fn(async () => ({
+    isInternalComped: false,
+    seatLimit: null,
+    activeSeatCount: 0,
+  })),
+}));
+
 vi.mock("@supabase/supabase-js", () => ({
   createClient: vi.fn(() => ({
     auth: {

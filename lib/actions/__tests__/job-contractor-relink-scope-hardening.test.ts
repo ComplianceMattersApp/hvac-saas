@@ -87,6 +87,17 @@ function makeWriteTrackingSupabaseFixture() {
   const jobsWrites: Array<Record<string, unknown>> = [];
   const jobEventWrites: Array<Record<string, unknown>> = [];
 
+  function buildInsertedEventResult() {
+    return {
+      select: vi.fn(() => ({
+        single: vi.fn(async () => ({
+          data: { id: "job-event-1" },
+          error: null,
+        })),
+      })),
+    };
+  }
+
   const supabase = {
     from(table: string) {
       if (table === "jobs") {
@@ -112,7 +123,7 @@ function makeWriteTrackingSupabaseFixture() {
         return {
           insert: vi.fn((payload: Record<string, unknown>) => {
             jobEventWrites.push(payload);
-            return Promise.resolve({ error: null });
+            return buildInsertedEventResult();
           }),
         };
       }
