@@ -119,7 +119,7 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
             href={mapsDirectionsUrl}
             target="_blank"
             rel="noreferrer"
-            className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+            className="hidden min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 sm:inline-flex"
           >
             Navigate
           </a>

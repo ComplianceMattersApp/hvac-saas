@@ -1823,6 +1823,15 @@ export default async function JobDetailPage({
   const serviceLocationLabel =
     firstNonEmpty(serviceLocation?.nickname, serviceLocation?.label) ?? "Service address";
 
+  const mobilePrimaryPhone = customerPhone !== "—" ? customerPhone : primarySiteAccessPhone || "";
+  const mobilePrimaryPhoneDigits = mobilePrimaryPhone.replace(/\D/g, "");
+  const mobileCallHref = mobilePrimaryPhoneDigits ? `tel:${mobilePrimaryPhoneDigits}` : null;
+  const mobileTextHref = mobilePrimaryPhoneDigits ? `sms:${mobilePrimaryPhoneDigits}` : null;
+  const mobileNavigateHref =
+    serviceAddressDisplay !== "No address set"
+      ? `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(serviceAddressDisplay)}`
+      : null;
+
     const hasFullSchedule =
     !!job.scheduled_date &&
     !!job.window_start &&
@@ -3159,7 +3168,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </div>
         )}
 
-        <div className="flex w-full flex-wrap gap-2 xl:justify-end">
+        <div className="hidden w-full flex-wrap gap-2 sm:flex xl:justify-end">
           <Link
             href="/ops"
             className={compactUtilityButtonClass}
@@ -3194,6 +3203,35 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </Link>
           ) : null}
         </div>
+
+        <details className="sm:hidden">
+          <summary className="mt-2 inline-flex cursor-pointer list-none items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
+            More job actions
+          </summary>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Link href="/ops" className={compactUtilityButtonClass}>
+              Back to Ops
+            </Link>
+
+            {job.customer_id ? (
+              <Link href={`/customers/${job.customer_id}`} className={compactUtilityButtonClass}>
+                Open Customer
+              </Link>
+            ) : null}
+
+            {createEstimateFromJobHref ? (
+              <Link href={createEstimateFromJobHref} className={compactUtilityButtonClass}>
+                Create Estimate
+              </Link>
+            ) : null}
+
+            {job.job_type === "ecc" ? (
+              <Link href={`/jobs/${job.id}/tests`} className={compactWorkspaceActionButtonClass}>
+                Open Tests Workspace
+              </Link>
+            ) : null}
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -3255,6 +3293,49 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </a>
       </div>
     ) : null}
+  </div>
+
+  <div className="mb-4 grid gap-2 sm:hidden">
+    {mobileCallHref ? (
+      <a
+        href={mobileCallHref}
+        className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200/80 bg-white px-3 py-3 text-sm font-semibold text-slate-900 shadow-[0_10px_24px_-22px_rgba(15,23,42,0.25)] transition-[border-color,box-shadow,transform,background-color] hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
+      >
+        Call
+      </a>
+    ) : (
+      <span className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-400">
+        Call
+      </span>
+    )}
+
+    {mobileTextHref ? (
+      <a
+        href={mobileTextHref}
+        className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200/80 bg-white px-3 py-3 text-sm font-semibold text-slate-900 shadow-[0_10px_24px_-22px_rgba(15,23,42,0.25)] transition-[border-color,box-shadow,transform,background-color] hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
+      >
+        Text
+      </a>
+    ) : (
+      <span className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-400">
+        Text
+      </span>
+    )}
+
+    {mobileNavigateHref ? (
+      <a
+        href={mobileNavigateHref}
+        target="_blank"
+        rel="noreferrer"
+        className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200/80 bg-white px-3 py-3 text-sm font-semibold text-slate-900 shadow-[0_10px_24px_-22px_rgba(15,23,42,0.25)] transition-[border-color,box-shadow,transform,background-color] hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]"
+      >
+        Navigate
+      </a>
+    ) : (
+      <span className="inline-flex min-h-12 items-center justify-center rounded-xl border border-slate-200/70 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-400">
+        Navigate
+      </span>
+    )}
   </div>
 
   <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
@@ -3382,7 +3463,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
       </div>
 
-      <div className="mt-3 flex flex-wrap gap-2 sm:gap-1.5 lg:gap-2">
+      <div className="mt-3 hidden flex-wrap gap-2 sm:flex sm:gap-1.5 lg:gap-2">
         {telLink ? (
           <a
             href={telLink}
