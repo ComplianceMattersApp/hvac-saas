@@ -197,6 +197,9 @@ describe("tenant Stripe Connect onboarding helper", () => {
       accounts: {
         retrieve: vi.fn(async () => ({
           id: "acct_existing_1",
+          capabilities: {
+            card_payments: "active",
+          },
           charges_enabled: true,
           payouts_enabled: true,
           details_submitted: true,
@@ -238,6 +241,9 @@ describe("tenant Stripe Connect onboarding helper", () => {
       accounts: {
         retrieve: vi.fn(async () => ({
           id: "acct_existing_1",
+          capabilities: {
+            card_payments: "inactive",
+          },
           charges_enabled: false,
           payouts_enabled: true,
           details_submitted: true,
@@ -256,6 +262,46 @@ describe("tenant Stripe Connect onboarding helper", () => {
 
     expect(readiness.chargesEnabled).toBe(false);
     expect(readiness.disabledReason).toBe("requirements.past_due");
+    expect(readiness.isReady).toBe(false);
+  });
+
+  it("readiness sync does not treat unrequested card_payments capability as ready for invoice payments", async () => {
+    const fixture = buildAdmin({
+      account_owner_user_id: "owner-1",
+      display_name: "Company",
+      stripe_connected_account_id: "acct_existing_1",
+      stripe_connect_onboarding_status: "pending",
+      stripe_charges_enabled: false,
+      stripe_payouts_enabled: false,
+      stripe_details_submitted: false,
+      stripe_connect_disabled_reason: null,
+      stripe_connect_last_synced_at: null,
+    });
+
+    const stripe = {
+      accounts: {
+        retrieve: vi.fn(async () => ({
+          id: "acct_existing_1",
+          capabilities: {
+            card_payments: "unrequested",
+          },
+          charges_enabled: true,
+          payouts_enabled: true,
+          details_submitted: true,
+          requirements: {
+            disabled_reason: null,
+          },
+        })),
+      },
+    } as any;
+
+    const readiness = await syncTenantStripeConnectReadinessForAccountOwner({
+      accountOwnerUserId: "owner-1",
+      admin: fixture.admin,
+      stripe,
+    });
+
+    expect(readiness.chargesEnabled).toBe(false);
     expect(readiness.isReady).toBe(false);
   });
 });

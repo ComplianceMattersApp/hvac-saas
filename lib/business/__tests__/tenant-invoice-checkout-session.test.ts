@@ -276,6 +276,14 @@ describe("createTenantInvoiceCheckoutSession", () => {
         invoice_number: "INV-1001",
       }),
     );
+    expect(payload.payment_intent_data?.metadata).toEqual(
+      expect.objectContaining({
+        account_owner_user_id: "owner-1",
+        invoice_id: "inv-1",
+        job_id: "job-1",
+        invoice_number: "INV-1001",
+      }),
+    );
   });
 
   it("does not insert local payment rows during checkout session creation", async () => {

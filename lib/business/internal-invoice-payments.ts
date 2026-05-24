@@ -258,6 +258,47 @@ export async function isStripeEventAlreadyRecorded(
   return Boolean(data?.id);
 }
 
+export async function isStripePaymentAlreadyRecorded(params: {
+  accountOwnerUserId: string;
+  invoiceId: string;
+  stripeCheckoutSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
+  processorChargeId?: string | null;
+  supabase: any;
+}): Promise<boolean> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  const invoiceId = String(params.invoiceId ?? "").trim();
+  const stripeCheckoutSessionId = String(params.stripeCheckoutSessionId ?? "").trim();
+  const stripePaymentIntentId = String(params.stripePaymentIntentId ?? "").trim();
+  const processorChargeId = String(params.processorChargeId ?? "").trim();
+
+  if (!accountOwnerUserId || !invoiceId) return false;
+
+  const identityClauses = [
+    stripeCheckoutSessionId && `stripe_checkout_session_id.eq.${stripeCheckoutSessionId}`,
+    stripePaymentIntentId && `stripe_payment_intent_id.eq.${stripePaymentIntentId}`,
+    processorChargeId && `processor_charge_id.eq.${processorChargeId}`,
+  ].filter(Boolean);
+
+  if (!identityClauses.length) return false;
+
+  const { data, error } = await params.supabase
+    .from("internal_invoice_payments")
+    .select("id")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("invoice_id", invoiceId)
+    .or(identityClauses.join(","))
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(
+      `Failed to check Stripe payment identity idempotency: ${error.message ?? "unknown error"}`,
+    );
+  }
+
+  return Boolean(data?.id);
+}
+
 /**
  * Validates that an invoice is eligible for online payment.
  * Requirements: issued status, positive balance, active account
@@ -367,6 +408,12 @@ export async function createTenantInvoiceCheckoutSession(params: {
   }
 
   const balanceDueCents = paymentSummary.balanceDueCents;
+  const checkoutMetadata = {
+    account_owner_user_id: accountOwnerUserId,
+    invoice_id: invoiceId,
+    job_id: jobId,
+    invoice_number: String(invoice.invoice_number ?? "").trim() || invoiceId,
+  };
 
   const session = await stripe.checkout.sessions.create(
     {
@@ -385,11 +432,9 @@ export async function createTenantInvoiceCheckoutSession(params: {
       ],
       success_url: `${appUrl}/jobs/${jobId}/invoice?banner=internal_invoice_payment_checkout_success#invoice-workspace`,
       cancel_url: `${appUrl}/jobs/${jobId}/invoice?banner=internal_invoice_payment_checkout_cancelled#invoice-workspace`,
-      metadata: {
-        account_owner_user_id: accountOwnerUserId,
-        invoice_id: invoiceId,
-        job_id: jobId,
-        invoice_number: String(invoice.invoice_number ?? "").trim() || invoiceId,
+      metadata: checkoutMetadata,
+      payment_intent_data: {
+        metadata: checkoutMetadata,
       },
       ...(String(invoice.billing_email ?? "").trim()
         ? { customer_email: String(invoice.billing_email).trim() }

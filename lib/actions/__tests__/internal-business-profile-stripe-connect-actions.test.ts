@@ -5,6 +5,7 @@ const createAdminClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const createTenantStripeConnectOnboardingLinkMock = vi.fn();
 const syncTenantStripeConnectReadinessForAccountOwnerMock = vi.fn();
+const resolveTenantStripeConnectReadinessMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
@@ -35,6 +36,11 @@ vi.mock("@/lib/business/tenant-stripe-connect-onboarding", () => ({
     stage,
     message: error instanceof Error ? error.message : "unknown_error",
   }),
+}));
+
+vi.mock("@/lib/business/tenant-stripe-connect-readiness", () => ({
+  resolveTenantStripeConnectReadiness: (...args: unknown[]) =>
+    resolveTenantStripeConnectReadinessMock(...args),
 }));
 
 function buildAdmin(preflightAllowed = true) {
@@ -84,6 +90,7 @@ describe("internal business profile Stripe Connect actions", () => {
         account_owner_user_id: "owner-1",
       },
     });
+    resolveTenantStripeConnectReadinessMock.mockResolvedValue({ isReady: false });
   });
 
   it("starts onboarding for same-account admin and redirects to onboarding URL", async () => {
@@ -176,5 +183,41 @@ describe("internal business profile Stripe Connect actions", () => {
 
     expect(createTenantStripeConnectOnboardingLinkMock).not.toHaveBeenCalled();
     expect(syncTenantStripeConnectReadinessForAccountOwnerMock).not.toHaveBeenCalled();
+  });
+
+  it("uses a softer refresh notice when stored readiness is already ready", async () => {
+    createAdminClientMock.mockReturnValue(buildAdmin(true));
+    syncTenantStripeConnectReadinessForAccountOwnerMock.mockRejectedValue(new Error("stripe down"));
+    resolveTenantStripeConnectReadinessMock.mockResolvedValueOnce({ isReady: true });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { refreshTenantStripeConnectReadinessFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    await expect(refreshTenantStripeConnectReadinessFromForm()).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=stripe_connect_status_refresh_failed_ready",
+    );
+
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it("keeps setup-focused refresh notice when stored readiness is not ready", async () => {
+    createAdminClientMock.mockReturnValue(buildAdmin(true));
+    syncTenantStripeConnectReadinessForAccountOwnerMock.mockRejectedValue(new Error("stripe down"));
+    resolveTenantStripeConnectReadinessMock.mockResolvedValueOnce({ isReady: false });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+
+    const { refreshTenantStripeConnectReadinessFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    await expect(refreshTenantStripeConnectReadinessFromForm()).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=stripe_connect_status_refresh_failed_unready",
+    );
+
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

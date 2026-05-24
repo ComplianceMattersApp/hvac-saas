@@ -9,7 +9,11 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["lib/**/*.test.ts", "scripts/**/*.test.ts"],
+    include: [
+      "lib/**/*.test.ts",
+      "scripts/**/*.test.ts",
+      "app/api/stripe/webhook/__tests__/route.test.ts",
+    ],
     clearMocks: true,
   },
 });

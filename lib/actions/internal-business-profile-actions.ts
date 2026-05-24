@@ -14,6 +14,7 @@ import {
   normalizeStripeConnectError,
   syncTenantStripeConnectReadinessForAccountOwner,
 } from "@/lib/business/tenant-stripe-connect-onboarding";
+import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 
 const MAX_LOGO_FILE_SIZE = 5 * 1024 * 1024;
 
@@ -303,10 +304,23 @@ export async function refreshTenantStripeConnectReadinessFromForm(): Promise<voi
       throw error;
     }
 
+    let notice = "stripe_connect_status_refresh_failed_unready";
+    try {
+      const storedReadiness = await resolveTenantStripeConnectReadiness(
+        internalUser.account_owner_user_id,
+        admin,
+      );
+      if (storedReadiness.isReady) {
+        notice = "stripe_connect_status_refresh_failed_ready";
+      }
+    } catch {
+      notice = "stripe_connect_status_refresh_failed";
+    }
+
     console.warn("Stripe Connect readiness refresh failed", {
       accountOwnerUserId: internalUser.account_owner_user_id,
       message: error instanceof Error ? error.message : "unknown_error",
     });
-    redirect(withNotice("stripe_connect_status_refresh_failed"));
+    redirect(withNotice(notice));
   }
 }

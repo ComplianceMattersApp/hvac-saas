@@ -332,12 +332,15 @@ export async function syncTenantStripeConnectReadinessForAccountOwner(params: {
     throw error;
   }
   const disabledReason = toCleanString(account.requirements?.disabled_reason) || null;
+  const cardPaymentsCapability = toCleanString(account.capabilities?.card_payments).toLowerCase();
+  const chargesEnabledForInvoicePayments =
+    Boolean(account.charges_enabled) && cardPaymentsCapability === "active";
 
   await updateInternalBusinessProfileConnectFields({
     admin,
     accountOwnerUserId: ownerId,
     patch: {
-      stripe_charges_enabled: Boolean(account.charges_enabled),
+      stripe_charges_enabled: chargesEnabledForInvoicePayments,
       stripe_payouts_enabled: Boolean(account.payouts_enabled),
       stripe_details_submitted: Boolean(account.details_submitted),
       stripe_connect_onboarding_status: deriveOnboardingStatusFromStripeAccount(account),

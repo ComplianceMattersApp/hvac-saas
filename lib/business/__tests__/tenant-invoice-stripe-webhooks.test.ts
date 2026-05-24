@@ -3,11 +3,13 @@ import Stripe from 'stripe';
 
 const mockResolveInternalInvoiceByJobId = vi.fn();
 const mockIsStripeEventAlreadyRecorded = vi.fn();
+const mockIsStripePaymentAlreadyRecorded = vi.fn();
 const mockResolveInvoiceCollectedPaymentSummary = vi.fn();
 const mockValidateInvoiceEligibleForOnlinePayment = vi.fn();
 const mockBuildStripePaymentReference = vi.fn();
 const mockResolveTenantStripeConnectReadiness = vi.fn();
 const mockInsertJobEvent = vi.fn(async () => null);
+const mockGetStripeServerClient = vi.fn();
 
 vi.mock('@/lib/business/internal-invoice', () => ({
   resolveInternalInvoiceByJobId: (...args: unknown[]) => mockResolveInternalInvoiceByJobId(...args),
@@ -15,6 +17,8 @@ vi.mock('@/lib/business/internal-invoice', () => ({
 
 vi.mock('@/lib/business/internal-invoice-payments', () => ({
   isStripeEventAlreadyRecorded: (...args: unknown[]) => mockIsStripeEventAlreadyRecorded(...args),
+  isStripePaymentAlreadyRecorded: (...args: unknown[]) =>
+    mockIsStripePaymentAlreadyRecorded(...args),
   resolveInvoiceCollectedPaymentSummary: (...args: unknown[]) =>
     mockResolveInvoiceCollectedPaymentSummary(...args),
   validateInvoiceEligibleForOnlinePayment: (...args: unknown[]) =>
@@ -31,11 +35,36 @@ vi.mock('@/lib/actions/job-actions', () => ({
   insertJobEvent: mockInsertJobEvent,
 }));
 
+vi.mock('@/lib/business/platform-billing-stripe', () => ({
+  getStripeServerClient: (...args: unknown[]) => mockGetStripeServerClient(...args),
+}));
+
 function makeAdminInsertSuccess() {
   const single = vi.fn(async () => ({ data: { id: 'payment-1' }, error: null }));
   const select = vi.fn(() => ({ single }));
   const insert = vi.fn(() => ({ select }));
-  const from = vi.fn(() => ({ insert }));
+  const from = vi.fn((table: string) => {
+    if (table === 'internal_invoices') {
+      const query: any = {
+        select: vi.fn(() => query),
+        eq: vi.fn(() => query),
+        maybeSingle: vi.fn(async () => ({
+          data: {
+            id: 'inv-1',
+            account_owner_user_id: 'owner-1',
+            job_id: 'job-1',
+            invoice_number: 'INV-001',
+            status: 'issued',
+            total_cents: 5000,
+          },
+          error: null,
+        })),
+      };
+      return query;
+    }
+
+    return { insert };
+  });
 
   return {
     admin: { from },
@@ -59,11 +88,30 @@ function baseCharge(overrides?: Partial<Stripe.Charge>): Stripe.Charge {
   } as Stripe.Charge;
 }
 
+function baseCheckoutSession(
+  overrides?: Partial<Stripe.Checkout.Session>,
+): Stripe.Checkout.Session {
+  return {
+    id: 'cs_test_1',
+    mode: 'payment',
+    payment_status: 'paid',
+    amount_total: 5000,
+    payment_intent: 'pi_test_1',
+    metadata: {
+      account_owner_user_id: 'owner-1',
+      invoice_id: 'inv-1',
+      job_id: 'job-1',
+    },
+    ...overrides,
+  } as Stripe.Checkout.Session;
+}
+
 describe('tenant invoice Stripe webhook handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
     mockIsStripeEventAlreadyRecorded.mockResolvedValue(false);
+    mockIsStripePaymentAlreadyRecorded.mockResolvedValue(false);
     mockResolveInternalInvoiceByJobId.mockResolvedValue({
       id: 'inv-1',
       invoice_number: 'INV-001',
@@ -94,6 +142,16 @@ describe('tenant invoice Stripe webhook handlers', () => {
       disabledReason: null,
       lastSyncedAt: '2026-05-19T00:00:00.000Z',
       isReady: true,
+    });
+
+    mockGetStripeServerClient.mockReturnValue({
+      paymentIntents: {
+        retrieve: vi.fn(async () => ({
+          id: 'pi_test_1',
+          created: 1747756800,
+          latest_charge: 'ch_test_1',
+        })),
+      },
     });
   });
 
@@ -201,6 +259,138 @@ describe('tenant invoice Stripe webhook handlers', () => {
 
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('idempotency');
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('charge.succeeded with existing Stripe payment identity does not double record', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+
+      mockIsStripePaymentAlreadyRecorded.mockResolvedValueOnce(true);
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_duplicate_payment_identity',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.reason).toContain('Payment already recorded');
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('checkout.session.completed (payment mode) with matching connected account records payment', async () => {
+      const { recordTenantInvoicePaymentFromCheckoutSession } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+
+      const stripe = {
+        paymentIntents: {
+          retrieve: vi.fn(async () => ({
+            id: 'pi_test_1',
+            created: 1747756800,
+            latest_charge: 'ch_test_1',
+          })),
+        },
+      } as any;
+
+      const result = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession(),
+        eventId: 'evt_checkout_match_1',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+        stripe,
+      });
+
+      expect(result.recorded).toBe(true);
+      expect(insert).toHaveBeenCalledTimes(1);
+      expect(insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stripe_checkout_session_id: 'cs_test_1',
+          stripe_payment_intent_id: 'pi_test_1',
+          processor_charge_id: 'ch_test_1',
+          stripe_event_id: 'evt_checkout_match_1',
+        }),
+      );
+    });
+
+    it('checkout.session.completed duplicate event id is idempotent', async () => {
+      const { recordTenantInvoicePaymentFromCheckoutSession } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+
+      mockIsStripeEventAlreadyRecorded.mockResolvedValueOnce(true);
+
+      const result = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession(),
+        eventId: 'evt_checkout_duplicate',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.reason).toContain('idempotency');
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('checkout.session.completed with existing Stripe payment identity does not double record', async () => {
+      const { recordTenantInvoicePaymentFromCheckoutSession } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+
+      mockIsStripePaymentAlreadyRecorded.mockResolvedValueOnce(true);
+
+      const result = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession(),
+        eventId: 'evt_checkout_duplicate_payment_identity',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.reason).toContain('Payment already recorded');
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('checkout.session.completed missing invoice metadata is ignored without throw', async () => {
+      const { recordTenantInvoicePaymentFromCheckoutSession } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+
+      const result = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession({ metadata: {} }),
+        eventId: 'evt_checkout_missing_meta',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.reason).toContain('Missing metadata');
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('checkout.session.completed with connected account mismatch is ignored', async () => {
+      const { recordTenantInvoicePaymentFromCheckoutSession } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+
+      const result = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession(),
+        eventId: 'evt_checkout_mismatch',
+        connectedAccountId: 'acct_connected_2',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.reason).toContain('mismatch');
       expect(insert).not.toHaveBeenCalled();
     });
   });

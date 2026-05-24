@@ -8,6 +8,7 @@ import {
   syncPlatformEntitlementFromStripeSubscriptionEvent,
 } from "@/lib/business/platform-billing-stripe";
 import {
+  recordTenantInvoicePaymentFromCheckoutSession,
   recordTenantInvoicePaymentFromStripeCharge,
   recordTenantInvoicePaymentFailureFromStripeCharge,
 } from "@/lib/business/tenant-invoice-stripe-webhooks";
@@ -64,6 +65,21 @@ export async function POST(request: Request) {
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
+
+      if (session.mode === "payment") {
+        const connectedAccountId = typeof event.account === "string"
+          ? event.account.trim()
+          : "";
+
+        await recordTenantInvoicePaymentFromCheckoutSession({
+          session,
+          eventId: event.id,
+          connectedAccountId,
+          stripe,
+        });
+
+        return NextResponse.json({ received: true });
+      }
 
       // Only process subscription-mode sessions that our platform created.
       // Unmanaged or fixture sessions (no metadata owner, wrong mode, missing

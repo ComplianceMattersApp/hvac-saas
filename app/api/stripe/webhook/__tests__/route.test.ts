@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mockRecordTenantInvoicePaymentFromStripeCharge = vi.fn();
 const mockRecordTenantInvoicePaymentFailureFromStripeCharge = vi.fn();
+const mockRecordTenantInvoicePaymentFromCheckoutSession = vi.fn();
 
 vi.mock('@/lib/business/tenant-invoice-stripe-webhooks', () => ({
+  recordTenantInvoicePaymentFromCheckoutSession: mockRecordTenantInvoicePaymentFromCheckoutSession,
   recordTenantInvoicePaymentFromStripeCharge: mockRecordTenantInvoicePaymentFromStripeCharge,
   recordTenantInvoicePaymentFailureFromStripeCharge:
     mockRecordTenantInvoicePaymentFailureFromStripeCharge,
@@ -43,6 +45,66 @@ async function postWebhook(event: Record<string, unknown>) {
 describe('Stripe webhook route — charge events', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('routes payment-mode checkout.session.completed to tenant invoice persistence', async () => {
+    mockRecordTenantInvoicePaymentFromCheckoutSession.mockResolvedValue({
+      recorded: true,
+      paymentId: 'payment-checkout-1',
+    });
+
+    const response = await postWebhook({
+      id: 'evt_checkout_payment_1',
+      account: 'acct_connected_9',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_1',
+          mode: 'payment',
+          payment_status: 'paid',
+          payment_intent: 'pi_test_1',
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            job_id: 'job-1',
+          },
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordTenantInvoicePaymentFromCheckoutSession).toHaveBeenCalledTimes(1);
+    expect(mockRecordTenantInvoicePaymentFromCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'evt_checkout_payment_1',
+        connectedAccountId: 'acct_connected_9',
+      }),
+    );
+  });
+
+  it('acknowledges payment-mode checkout.session.completed with missing metadata without throwing', async () => {
+    mockRecordTenantInvoicePaymentFromCheckoutSession.mockResolvedValue({
+      recorded: false,
+      reason: 'Missing metadata: account_owner_user_id or invoice_id',
+    });
+
+    const response = await postWebhook({
+      id: 'evt_checkout_payment_missing_meta',
+      account: 'acct_connected_9',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_test_missing_meta',
+          mode: 'payment',
+          payment_status: 'paid',
+          payment_intent: 'pi_test_missing_meta',
+          metadata: {},
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordTenantInvoicePaymentFromCheckoutSession).toHaveBeenCalledTimes(1);
   });
 
   it('routes charge.succeeded with invoice_id and forwards connected account context', async () => {

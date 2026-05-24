@@ -51,8 +51,16 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
     message: "We couldn't start Stripe setup. Please try again.",
   },
   stripe_connect_status_refresh_failed: {
-    tone: "error",
-    message: "We couldn't refresh Stripe status right now. Please try again.",
+    tone: "warn",
+    message: "We couldn't refresh the latest Stripe status just now. The last saved setup state is shown below.",
+  },
+  stripe_connect_status_refresh_failed_ready: {
+    tone: "warn",
+    message: "Stripe is connected. We couldn't refresh the latest status just now.",
+  },
+  stripe_connect_status_refresh_failed_unready: {
+    tone: "warn",
+    message: "We couldn't refresh the latest Stripe status just now. The last saved setup state is shown below.",
   },
 };
 
