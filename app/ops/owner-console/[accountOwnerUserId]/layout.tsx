@@ -173,7 +173,7 @@ async function TeamAndSeatsSection({ accountOwnerUserId }: { accountOwnerUserId:
   const topUsers = teamUsers.slice(0, 12);
 
   return (
-    <div className="mx-auto max-w-[1100px] space-y-5 px-4 pb-6 text-slate-900 sm:px-6">
+    <div id="team-seats" className="mx-auto max-w-[1100px] scroll-mt-24 space-y-5 px-4 pb-6 text-slate-900 sm:px-6">
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
