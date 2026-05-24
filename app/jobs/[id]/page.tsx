@@ -588,22 +588,22 @@ function CollapsibleHeader(props: {
   const { title, subtitle, meta, metaTone = "default", compactOnMobile = false } = props;
   const metaClassName = compactOnMobile
     ? metaTone === "note-highlight"
-      ? "mt-0.5 shrink-0 rounded-md border border-amber-200/80 bg-amber-50/85 px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-amber-800 shadow-[0_10px_24px_-24px_rgba(217,119,6,0.35)] sm:rounded-lg sm:px-2.5 sm:py-[0.3125rem] sm:text-[10px] sm:tracking-[0.12em]"
-      : "mt-0.5 shrink-0 rounded-md border border-slate-200/70 bg-slate-50/72 px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-slate-500 sm:rounded-lg sm:px-2.5 sm:py-[0.3125rem] sm:text-[10px] sm:tracking-[0.12em]"
+      ? "mt-0.5 shrink-0 rounded-md border border-amber-200/80 bg-amber-50/85 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-800 shadow-[0_10px_24px_-24px_rgba(217,119,6,0.35)] sm:rounded-lg sm:px-2.5 sm:py-[0.3125rem] sm:text-[10px] sm:tracking-[0.12em]"
+      : "mt-0.5 shrink-0 rounded-md border border-slate-200/70 bg-slate-50/72 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-slate-500 sm:rounded-lg sm:px-2.5 sm:py-[0.3125rem] sm:text-[10px] sm:tracking-[0.12em]"
     : metaTone === "note-highlight"
       ? "mt-0.5 shrink-0 rounded-lg border border-amber-200/80 bg-amber-50/85 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-800 shadow-[0_10px_24px_-24px_rgba(217,119,6,0.35)]"
       : "mt-0.5 shrink-0 rounded-lg border border-slate-200/70 bg-slate-50/72 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
   return (
-    <div className={compactOnMobile ? "flex min-h-9 min-w-0 items-start justify-between gap-3 py-0 sm:gap-4 sm:py-0.5" : "flex min-w-0 items-start justify-between gap-4 py-0.5"}>
-      <div className={compactOnMobile ? "flex min-w-0 items-start gap-2" : "flex min-w-0 items-start gap-2.5"}>
+    <div className={compactOnMobile ? "flex min-h-8 min-w-0 items-start justify-between gap-2 py-0 sm:min-h-9 sm:gap-4 sm:py-0.5" : "flex min-w-0 items-start justify-between gap-4 py-0.5"}>
+      <div className={compactOnMobile ? "flex min-w-0 items-start gap-1.5" : "flex min-w-0 items-start gap-2.5"}>
         <span
           aria-hidden
-          className={compactOnMobile ? "disclosure-icon mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[8px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90 sm:h-4.5 sm:w-4.5 sm:text-[9px]" : "disclosure-icon mt-0.5 inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[9px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90"}
+          className={compactOnMobile ? "disclosure-icon mt-0.5 inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[7px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90 sm:h-4.5 sm:w-4.5 sm:text-[9px]" : "disclosure-icon mt-0.5 inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[9px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90"}
         >
           ▶
         </span>
-        <div className="min-w-0 pt-0.5">
-          <div className={compactOnMobile ? "text-[13.5px] font-semibold tracking-[-0.02em] text-slate-950 sm:text-[14.5px]" : "text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950"}>{title}</div>
+        <div className={compactOnMobile ? "min-w-0 pt-0" : "min-w-0 pt-0.5"}>
+          <div className={compactOnMobile ? "text-[13px] font-semibold tracking-[-0.015em] text-slate-950 sm:text-[14.5px]" : "text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950"}>{title}</div>
           {subtitle ? <div className={compactOnMobile ? "mt-0.5 hidden max-w-[42rem] text-[11px] leading-[1.4] text-slate-500 sm:mt-1 sm:block sm:text-[11.5px] sm:leading-[1.45]" : "mt-1 max-w-[42rem] text-[11.5px] leading-[1.45] text-slate-500"}>{subtitle}</div> : null}
         </div>
       </div>
@@ -805,7 +805,7 @@ const compactSecondaryButtonClass =
 const darkButtonClass =
   "inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_28px_-22px_rgba(15,23,42,0.55)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_16px_30px_-22px_rgba(15,23,42,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:translate-y-[0.5px]";
 const infoChipClass =
-  "inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700";
+  "inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-700 sm:px-2.5 sm:py-1 sm:text-xs";
 const compactUtilityButtonClass =
   "inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200/90 bg-white/78 px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.02)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-300 hover:bg-white hover:shadow-[0_8px_18px_-18px_rgba(15,23,42,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]";
 const compactWorkspaceActionButtonClass =
@@ -814,8 +814,8 @@ const workspaceDetailsClass =
   `${workspaceSectionClass} group text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] [&[open]_.disclosure-icon]:rotate-90`;
 const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
 const jobRecordsDetailsClass =
-  `${workspacePanelClass} group rounded-2xl p-3 text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] sm:rounded-3xl sm:p-5 [&[open]_.disclosure-icon]:rotate-90`;
-const jobRecordsDetailsDividerClass = "mt-2.5 border-t border-slate-200/90 pt-3 sm:mt-3 sm:pt-4";
+  `${workspacePanelClass} group rounded-2xl p-2.5 text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] sm:rounded-3xl sm:p-5 [&[open]_.disclosure-icon]:rotate-90`;
+const jobRecordsDetailsDividerClass = "mt-2 border-t border-slate-200/90 pt-2.5 sm:mt-3 sm:pt-4";
 const workspaceSoftCardClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
 const workspaceEmptyStateClass =
@@ -3362,7 +3362,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     <div>
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Operations Board</div>
     </div>
-    <div className="inline-flex rounded-full border border-slate-200 bg-white/86 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">
+    <div className="inline-flex rounded-full border border-slate-200 bg-white/86 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-slate-500 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.1em]">
       {equipmentCount} equipment / {assignedTeam.length} assigned
     </div>
   </div>
@@ -3767,7 +3767,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
         <div className="mt-1 text-sm text-slate-600">Field ownership for this visit.</div>
       </div>
-      <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
+      <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
     </div>
     {assignedTeam.length > 0 ? (
       <div className="mt-3 flex min-w-0 flex-wrap gap-2">
@@ -3845,10 +3845,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Next Service Action</div>
-          <div className="mt-1 text-sm font-semibold text-slate-900">Continue this service chain when another visit is required.</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">Create a linked follow-up visit.</div>
         </div>
         {serviceCaseVisitCount > 1 ? (
-          <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+          <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-600 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">
             {serviceCaseVisitCount} visits linked
           </span>
         ) : null}
@@ -3885,10 +3885,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             className={workspaceInputClass}
           />
           <p className="text-xs leading-5 text-slate-600">
-            Next visit continues the same service chain. Work Items remain per-visit and should be reviewed for the new visit.
-          </p>
-          <p className="text-xs leading-5 text-slate-500">
-            No automatic Work Item copy-forward is applied in this action.
+            Creates a linked visit only. Review Work Items on the new visit.
           </p>
         </div>
 
@@ -5179,13 +5176,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="flex flex-wrap items-center gap-2">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">Work Package</div>
             {job.job_type === "service" ? (
-              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-600 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">
                 {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
               </span>
             ) : null}
           </div>
           <div className="text-lg font-semibold tracking-tight text-slate-950">Visit Scope</div>
-          <div className="text-xs leading-5 text-slate-500">Reason, work items, and companion follow-up for this visit.</div>
         </div>
 
         <details className="group">
@@ -5547,7 +5543,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           {showEccSummaryCard ? <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{eccRunCount} ECC runs</span> : null}
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-2.5 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3">
         {/* Internal Notes */}
         <details id="internal-notes" className={jobRecordsDetailsClass} open={Boolean(internalNoteBannerMessage)}>
           <summary className="cursor-pointer list-none">
