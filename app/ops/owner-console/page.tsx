@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import {
@@ -209,7 +210,7 @@ export default async function PlatformOwnerConsolePage(props: {
         </p>
         <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
           <div className="overflow-x-auto">
-            <table className="min-w-[780px] divide-y divide-slate-200 text-left text-sm">
+            <table className="min-w-[860px] divide-y divide-slate-200 text-left text-sm">
               <thead className="bg-slate-50 text-xs uppercase tracking-[0.1em] text-slate-500">
                 <tr>
                   <th className="w-[24%] px-4 py-3 font-semibold">Company</th>
@@ -219,6 +220,7 @@ export default async function PlatformOwnerConsolePage(props: {
                   <th className="w-[8%] px-4 py-3 font-semibold">Users</th>
                   <th className="w-[9%] px-4 py-3 font-semibold">Created</th>
                   <th className="w-[8%] px-4 py-3 font-semibold text-slate-400">Billing</th>
+                  <th className="px-4 py-3 font-semibold text-slate-400">Support</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
@@ -268,12 +270,20 @@ export default async function PlatformOwnerConsolePage(props: {
                       <td className="px-4 py-3 text-xs text-slate-400">
                         {formatBillingModeLabel(row.billingMode)}
                       </td>
+                      <td className="px-4 py-3">
+                        <Link
+                          href={`/ops/owner-console/${encodeURIComponent(row.accountOwnerUserId)}`}
+                          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          View Snapshot
+                        </Link>
+                      </td>
                     </tr>
                   );
                 })}
                 {filteredRows.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">
+                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-500">
                       No accounts in this view.
                     </td>
                   </tr>
