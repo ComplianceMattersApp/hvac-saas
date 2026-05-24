@@ -92,7 +92,7 @@ function resolveProposalBaseUrl() {
     return "http://localhost:3000";
   }
 
-  return "https://hvac-saas-xi.vercel.app";
+  return "https://app.compliancemattersca.com";
 }
 
 function isEnabledFlag(value: string | undefined) {

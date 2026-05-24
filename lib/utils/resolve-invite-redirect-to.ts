@@ -28,6 +28,6 @@ export function resolveInviteRedirectTo(): string {
 
   // Production: use hardcoded known URL if env vars not set.
   // If you're in production and need a different URL, set NEXT_PUBLIC_APP_URL in environment.
-  const productionFallback = "https://hvac-saas-xi.vercel.app";
+  const productionFallback = "https://app.compliancemattersca.com";
   return `${productionFallback}/auth/callback`;
 }
