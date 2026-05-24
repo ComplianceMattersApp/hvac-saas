@@ -1782,6 +1782,19 @@ export default async function JobDetailPage({
     ? (contractorName || "Contractor")
     : billingRecipientName;
   const showBillingRecipientCard = hasJobBillingRecipient || hasAccountBillingContact;
+  const contractorNameForCompare = normalizeCompareText(contractorName);
+  const billingRecipientNameForCompare = normalizeCompareText(billingRecipientDisplayName);
+  const contractorBillingSameEntity = Boolean(
+    contractorNameForCompare &&
+    billingRecipientNameForCompare &&
+    contractorNameForCompare === billingRecipientNameForCompare,
+  );
+  const showCombinedContractorBillingCard = Boolean(
+    contractorId &&
+    showBillingRecipientCard &&
+    hasJobBillingRecipient &&
+    contractorBillingSameEntity,
+  );
 
   const serviceLocation = Array.isArray((job as any).locations)
     ? (job as any).locations.find((location: any) => location) ?? null
@@ -3357,7 +3370,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
   <div className="mb-4 grid items-start gap-4 xl:grid-cols-[minmax(300px,0.92fr)_minmax(420px,1.25fr)_minmax(260px,0.83fr)]">
     {/* Left: customer / contact info */}
-    <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
+    <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-3 sm:p-4`}>
       <div className="hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:block">
         {(job.job_type ? String(job.job_type).toUpperCase() : "SERVICE")}
         {serviceCity ? ` • ${serviceCity}` : ""}
@@ -3375,10 +3388,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <div className="mt-1.5 hidden text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950 sm:block">{customerDisplayName}</div>
       )}
 
-      <div className="mt-3 space-y-2.5 border-t border-slate-200/70 pt-3 text-sm">
-        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
+      <div className="mt-2.5 space-y-2 border-t border-slate-200/70 pt-2.5 text-sm sm:mt-3 sm:space-y-2.5 sm:pt-3">
+        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Account Contact</div>
-          <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
+          <div className="mt-1 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:mt-1.5 sm:grid-cols-2">
             {customerPhone !== "—" ? (
               <div>
                 <span className="font-semibold text-slate-500">Account phone:</span> {customerPhone}
@@ -3392,19 +3405,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </div>
         </div>
 
-        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Service Location</div>
-          <div className="mt-1 font-semibold text-slate-900">{serviceLocationLabel}</div>
-          <div className="mt-1 text-xs text-slate-600">{serviceAddressDisplay}</div>
+        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Service Address</div>
+          <div className="mt-1 text-xs text-slate-700">{serviceAddressDisplay}</div>
         </div>
 
         {showSiteAccessCard ? (
-          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
+          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Site / Access Contact</div>
             {primarySiteAccessName ? (
               <div className="mt-1 font-semibold text-slate-900">{primarySiteAccessName}</div>
             ) : null}
-            <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
+            <div className="mt-1 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:mt-1.5 sm:grid-cols-2">
               {primarySiteAccessPhone ? (
                 <div>
                   <span className="font-semibold text-slate-500">Access phone:</span> {primarySiteAccessPhone}
@@ -3419,37 +3431,58 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </div>
         ) : null}
 
-        {showBillingRecipientCard ? (
-          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-3 py-2.5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing / Paperwork Recipient</div>
+        {showCombinedContractorBillingCard ? (
+          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contractor / Billing</div>
+            <div className="mt-1 font-semibold text-slate-900">{billingRecipientDisplayName || contractorName}</div>
+            <div className="mt-1 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:mt-1.5 sm:grid-cols-2">
+              {billingRecipientPhone ? (
+                <div>
+                  <span className="font-semibold text-slate-500">Phone:</span> {billingRecipientPhone}
+                </div>
+              ) : null}
+              {billingRecipientEmail ? (
+                <div className="break-all">
+                  <span className="font-semibold text-slate-500">Email:</span> {billingRecipientEmail}
+                </div>
+              ) : null}
+            </div>
+            {billingRecipientAddress ? (
+              <div className="mt-1 text-xs text-slate-600">
+                <span className="font-semibold text-slate-500">Address:</span> {billingRecipientAddress}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+
+        {showBillingRecipientCard && !showCombinedContractorBillingCard ? (
+          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing</div>
             {hasJobBillingRecipient ? (
               <>
-                {isContractorBillingRecipient ? (
-                  <div className="mt-1 font-semibold text-slate-900">Billing / Paperwork Recipient: Contractor</div>
-                ) : null}
                 {billingRecipientDisplayName ? (
                   <div className="mt-1 font-semibold text-slate-900">{billingRecipientDisplayName}</div>
                 ) : null}
-                <div className="mt-1.5 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:grid-cols-2">
+                <div className="mt-1 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:mt-1.5 sm:grid-cols-2">
                   {billingRecipientPhone ? (
                     <div>
-                      <span className="font-semibold text-slate-500">Billing phone:</span> {billingRecipientPhone}
+                      <span className="font-semibold text-slate-500">Phone:</span> {billingRecipientPhone}
                     </div>
                   ) : null}
                   {billingRecipientEmail ? (
                     <div className="break-all">
-                      <span className="font-semibold text-slate-500">Billing email:</span> {billingRecipientEmail}
+                      <span className="font-semibold text-slate-500">Email:</span> {billingRecipientEmail}
                     </div>
                   ) : null}
                 </div>
                 {billingRecipientAddress ? (
                   <div className="mt-1 text-xs text-slate-600">
-                    <span className="font-semibold text-slate-500">Billing address:</span> {billingRecipientAddress}
+                    <span className="font-semibold text-slate-500">Address:</span> {billingRecipientAddress}
                   </div>
                 ) : null}
               </>
             ) : (
-              <div className="mt-1 space-y-1.5 text-xs text-slate-600">
+              <div className="mt-1 space-y-1 text-xs text-slate-600">
                 <div>
                   <span className="font-semibold text-slate-500">Billing contact on account:</span>{" "}
                   {accountBillingContactName || "Saved billing contact"}
@@ -3462,8 +3495,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </div>
         ) : null}
 
-        {contractorId ? (
-          <div>
+        {contractorId && !showCombinedContractorBillingCard ? (
+          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contractor</div>
             <div className="mt-1 font-semibold text-slate-800">{contractorName}</div>
           </div>
