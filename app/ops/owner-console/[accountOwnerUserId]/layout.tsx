@@ -5,6 +5,7 @@ import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import CompanyProfileSnapshot from "./CompanyProfileSnapshot";
 import PaymentsReadinessSnapshot from "./PaymentsReadinessSnapshot";
+import SupportCallSummarySnapshot from "./SupportCallSummarySnapshot";
 import UsageRecencySnapshot from "./UsageRecencySnapshot";
 
 type LayoutParams = Promise<{
@@ -259,6 +260,7 @@ export default async function AccountSnapshotLayout({
 
   return (
     <>
+      <SupportCallSummarySnapshot accountOwnerUserId={accountOwnerUserId} />
       {children}
       <UsageRecencySnapshot accountOwnerUserId={accountOwnerUserId} />
       <PaymentsReadinessSnapshot accountOwnerUserId={accountOwnerUserId} />
