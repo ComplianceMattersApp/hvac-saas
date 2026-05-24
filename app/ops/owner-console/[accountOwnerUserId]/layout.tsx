@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import CompanyProfileSnapshot from "./CompanyProfileSnapshot";
 
 type LayoutParams = Promise<{
   accountOwnerUserId?: string;
@@ -258,6 +259,7 @@ export default async function AccountSnapshotLayout({
     <>
       {children}
       <TeamAndSeatsSection accountOwnerUserId={accountOwnerUserId} />
+      <CompanyProfileSnapshot accountOwnerUserId={accountOwnerUserId} />
     </>
   );
 }
