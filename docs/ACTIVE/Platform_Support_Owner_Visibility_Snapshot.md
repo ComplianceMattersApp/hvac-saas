@@ -31,20 +31,38 @@ Completed:
 
 ### Account Support Snapshot
 
-Completed read-only snapshot sections:
+Completed read-only snapshot sections and actions:
 
+- Support Call Summary.
+- Copy Summary client-side action.
+- Quick jump buttons for Next Checks, Payments, Team, and Profile.
 - Account identity header.
 - Support Health.
 - Support Next Checks.
-- Operational Activity aggregate counts.
-- Usage Recency aggregate counts for the last 30 days.
 - Account State.
-- Readiness Checklist.
-- Entitlement & Billing Snapshot.
 - Customer Payments / Stripe Connect readiness snapshot.
+- Usage Recency aggregate counts for the last 30 days.
+- Operational Activity aggregate counts.
 - Team & Seats snapshot, including last sign-in signal.
 - Company Profile / Contact snapshot, including logo display.
+- Readiness Checklist.
+- Entitlement & Billing Snapshot.
 - Explicit support boundary notice.
+
+Current intended page order:
+
+1. Support Call Summary.
+2. Account Support Snapshot header / identity.
+3. Support Health.
+4. Support Next Checks.
+5. Account State.
+6. Customer Payments.
+7. Usage Recency.
+8. Operational Activity.
+9. Team & Seats.
+10. Company Profile.
+11. Readiness Checklist / Entitlement details.
+12. Support Boundary.
 
 ## Current visibility provided
 
@@ -65,6 +83,19 @@ The owner can now see these read-only signals for a selected account:
 - Last-30-day aggregate usage counts.
 - Internal team members, roles, status, created date, and last sign-in signal.
 - Company profile display name, support email, support phone, invoice mode, logo, created date, and updated date.
+- Copy-friendly support-call summary text.
+
+## Current convenience actions
+
+These actions are intentionally client-side/read-only:
+
+- Copy Summary: copies support-call context to the clipboard for owner notes.
+- Next Checks: jumps to the read-only Support Next Checks section.
+- Payments: jumps to the read-only Customer Payments section.
+- Team: jumps to the read-only Team & Seats section.
+- Profile: jumps to the read-only Company Profile section.
+
+These actions do not mutate tenant data, start a support session, impersonate a user, refresh Stripe, create a payment link, or write support notes.
 
 ## Explicit boundaries preserved
 
@@ -86,6 +117,7 @@ This lane does not add:
 - Production Supabase commands.
 - Schema changes.
 - Env changes.
+- Persisted support notes or issue tracker rows.
 
 ## Source-of-truth boundaries
 
@@ -119,10 +151,20 @@ Owner Console / Support Snapshot commits:
 - `7238686` — `feat(owner): render usage recency snapshot`
 - `123716e` — `feat(owner): add payments readiness snapshot`
 - `cf74323` — `feat(owner): render payments readiness snapshot`
+- `92bf593` — `docs(owner): record support visibility snapshot scope`
+- `f73695e` — `feat(owner): add support call summary snapshot`
+- `9acd4eb` — `feat(owner): render support call summary snapshot`
+- `6382b9c` — `feat(owner): add support summary actions`
+- `c765dd3` — `feat(owner): make support summary actionable`
+- `eb4bbcc` — `fix(owner): wire support snapshot anchor targets`
+- `4f5c069` — `fix(owner): add company profile anchor target`
+- `1959bd4` — `fix(owner): add support next checks anchor target`
+- `63d9e4b` — `fix(owner): add team seats anchor target`
+- `b1d9cc6` — `polish(owner): reorder support snapshot sections`
 
 Docs checkpoint:
 
-- `docs(owner): record support visibility snapshot scope`
+- `docs(owner): update support visibility closeout notes`
 
 ## Recommended next slices
 
@@ -130,12 +172,12 @@ Recommended next work should stay read-only unless explicitly approved otherwise
 
 Potential next slices:
 
-1. Owner Console snapshot layout polish after live use.
-2. Small account-support print/copy summary for owner notes, without persistence.
+1. Browser polish after real support use.
+2. Read-only account drilldown audit for customer/job/invoice detail-lite visibility.
 3. Error/log visibility audit before any implementation.
 4. Support issue tracker planning, but not schema/UI until explicitly approved.
 5. Support Console V1 re-evaluation only after owner-console visibility proves insufficient.
 
 ## Explicit non-actions still in force
 
-No code should add support-side tenant mutation, impersonation, production repair tools, raw provider identifiers, customer portal access, QBO actions, SMS sends, payment execution, Stripe refresh actions, or broad tenant record browsing unless separately designed, reviewed, approved, and documented.
+No code should add support-side tenant mutation, impersonation, production repair tools, raw provider identifiers, customer portal access, QBO actions, SMS sends, payment execution, Stripe refresh actions, persisted support notes, or broad tenant record browsing unless separately designed, reviewed, approved, and documented.
