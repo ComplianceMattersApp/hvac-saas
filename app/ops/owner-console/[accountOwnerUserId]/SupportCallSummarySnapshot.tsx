@@ -95,7 +95,7 @@ export default async function SupportCallSummarySnapshot({
             }`}>
               {readiness.isOperationallyReady ? "Ready" : "Needs setup"}
             </span>
-            <SupportCallSummaryActions summaryText={summaryText} />
+            <SupportCallSummaryActions accountOwnerUserId={accountOwnerUserId} summaryText={summaryText} />
           </div>
         </div>
 
