@@ -36,7 +36,7 @@ Recent closeout snapshot (May 2026):
 - ECC subcool tolerance is now +/-3F.
 - Pricebook runtime seed display name is now Diagnostic instead of Diagnostic Fee.
 - Source-of-truth boundaries remain unchanged: Invoice Charges remain billed truth, Work Items/Visit Scope remain operational work scope, external billing remains lightweight invoice-sent tracking, internal invoicing remains internal/admin only, payment truth is owned by `internal_invoice_payments` (manual plus Stripe webhook-confirmed rows), Closeout Queue V1 uses existing closeout projection truth, and Calendar Work Context uses a derived compact label rather than a new truth model.
-- Parked follow-up remains parked: Closeout Queue V2 waits for owner feedback after V1 use, contact recipient write/edit workflow stays deferred unless field use proves need, SMS/provider-powered messaging stays behind existing gates, and payment add-ons (refunds, disputes, saved cards, partial payments, receipt messaging, public payment portal, platform application fees, QBO sync) remain deferred.
+- Parked follow-up remains parked: Closeout Queue V2 waits for owner feedback after V1 use, contact recipient write/edit workflow stays deferred unless field use proves need, SMS/provider-powered messaging stays behind existing gates, and the Payments V2 deferred register covers refunds, disputes, saved cards, partial payments, receipt messaging, public payment portal, platform application fees, ACH, and QBO sync.
 
 Customer/location/contact/billing relationship intake closeout (May 2026):
 - Completed model lock for V1 relationship intake and display:

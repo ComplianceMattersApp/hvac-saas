@@ -32,7 +32,7 @@ Recent closeout status snapshot (May 2026):
 - Closed and treated as complete for this pass: Dedicated Closeout Queue V1, Calendar Work Context/Includes display, Job Detail Command Center polish, External Billing one-click closeout UX, Internal Invoice Workspace V1, internal invoice send workflow clarity, premium internal invoice email template, internal invoice Print / Save PDF view, premium appointment scheduled email template, appointment email company header polish, Ops tenant logo polish, ECC subcool tolerance change to +/-3F, and Pricebook naming cleanup (`Diagnostic Fee` -> `Diagnostic`).
 - Estimates Section 2K closeout is complete for this pass: proposal email delivery/customer approval lane is closed (provider-backed proposal email send smoke passed, public proposal-link approval smoke passed, internal approval-notification smoke passed, active-link regeneration fallback smoke passed, Customer Delivery deployed UI smoke passed, and local preview-mode smoke passed with `.tmp/email-outbox` output and no real email send). Token safety is verified (raw token/token_hash not persisted in events, communications, or notification payloads). Explicit non-actions remain: no SMS/text proposal delivery, no payment collection from proposal, no QBO behavior, no invoice issue/send behavior from proposal approval, no automatic job conversion, no automatic invoice conversion, no customer portal login dependency, no e-signature/legal artifact model, and no live SMS behavior.
 - Confirmed boundaries remain intact: Invoice Charges remain billed truth, Work Items/Visit Scope remain operational work scope, external billing remains lightweight invoice-sent tracking, internal invoicing remains internal/admin only, payment truth is owned by `internal_invoice_payments` (manual plus Stripe webhook-confirmed rows), and Closeout Queue V1 continues to use existing closeout projection truth.
-- Parked follow-up remains parked: Closeout Queue V2 waits until the owner uses V1 and gives feedback, contact recipient write/edit workflow remains deferred unless field use proves need, SMS/provider-powered messaging remains behind the existing gates, and payment add-ons (refunds/disputes/saved cards/partial payments/receipt messaging/public portal/platform application fees/QBO sync) remain deferred.
+- Parked follow-up remains parked: Closeout Queue V2 waits until the owner uses V1 and gives feedback, contact recipient write/edit workflow remains deferred unless field use proves need, SMS/provider-powered messaging remains behind the existing gates, and the Payments V2 deferred register covers refunds, disputes, saved cards, partial payments, receipt messaging, public payment portal, platform application fees, ACH, and QBO sync.
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
@@ -217,7 +217,7 @@ Execution companion note: for practical first-customer support posture and expan
 | Notifications | Complete (PASS) | Final sanity pass: pass, no must-fix issues; optional hardening remains future/non-blocking. |
 | Reports / decision surfaces | Complete for owner-release | Report center and invoice/payment tracking honesty alignment documented and stabilized. |
 | Admin/setup | Complete for owner-release | Admin and setup polish complete; owner/operator readiness runbook path exists. |
-| Invoice/payment truth and honesty | Complete for current scope | Tenant customer payments V1 current scope is implemented: connected-account direct-charge checkout path, webhook-only payment truth persistence, invoice paid projection, duplicate protection, and honest deferred-feature boundaries. |
+| Invoice/payment truth and honesty | Complete for current scope | Tenant customer payments V1 current scope is implemented: connected-account direct-charge checkout path, webhook-only payment truth persistence, invoice paid projection, duplicate protection, and honest Payments V2 deferred-feature boundaries. |
 | Product-mode matrix documentation | Complete | Matrix documented as shared-engine, presentation/configuration direction without pre-release switching requirement. |
 | Mobile/PWA baseline | Complete baseline | Installability baseline and route/access smoke documented; offline/native packaging remains deferred. |
 | First-owner/operator readiness runbook | Complete as controlled runbook | First-owner provisioning runbook is active with strict guardrails, dry-run/apply gates, and verification checklist. |
@@ -651,7 +651,7 @@ Ordering rationale:
 
 4. Deferred payment expectations
    - Risk: users infer unsupported payment add-ons from invoice/payment surfaces.
-   - Mitigation: preserve strict wording honesty for current V1 behavior and explicit deferred-feature boundaries (refunds, disputes, saved cards, partial payments, public portal, platform fees, QBO sync).
+   - Mitigation: preserve strict wording honesty for current V1 behavior and point deferred add-ons to the Payments V2 register (refunds, disputes, saved cards, partial payments, receipt messaging, public portal, platform fees, ACH, QBO sync).
 
 5. First-owner provisioning gates
    - Risk: uncontrolled apply/invite use outside runbook.
@@ -822,7 +822,7 @@ Active planned groups in priority sequence:
 | 8 | Support / Owner Operations | Planned |
 | 9A | Recurring Services / Maintenance Agreements | Group 9A-2/3/4/5B/6/7B/8B/9A/9B/9C/9E/10B/10C closeout is documented, including manual `Mark Visit Counted` implementation (`1b69336`) and always-visible placement fix (`2ae1a4b`); boundaries remain no automatic counting/no due-date advancement/no invoice-payment behavior; production remains gated by intentional migration/flag enablement - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
 | 9B | SMS / On-My-Way Messaging | Planned |
-| 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Current V1 intended scope complete; add-ons deferred |
+| 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Current V1 intended scope complete; Payments V2 deferred register parked |
 | 9D | Customer Portal | Planned |
 | 9E | QBO / Accounting Sync | Last-last; optional downstream only |
 

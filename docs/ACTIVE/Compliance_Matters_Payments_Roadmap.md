@@ -91,14 +91,28 @@ Collected-payment truth is now materially implemented in repo for issued interna
 - collected-payment rows are owned by `internal_invoice_payments`
 - collected-payment visibility is implemented in the internal invoice ledger and CSV export
 
-Still not implemented/live in current scope:
-- refunds/disputes
-- saved payment methods
+### Payments V2 / Deferred Invoice Payment Features
+
+These are intentionally parked as future work and are not active Payments V1 blockers.
+
+Deferred Payments V2 register:
+- refunds
+- disputes / chargebacks
 - partial payments
-- customer payment portal/public payment portal
-- receipt email/SMS automation
+- saved cards
+- ACH
+- receipt email automation
+- receipt SMS automation
+- public customer payment portal
 - platform application fees
-- QBO payment sync
+- QBO sync
+
+Current support posture:
+- refunds, disputes, and related exceptions are handled directly in Stripe or via manual support for now
+- Compliance Matters remains invoice/payment truth for recorded payments
+- QBO remains downstream/last-last and must not override Compliance Matters truth
+- no customer portal or public payment self-service exists in V1
+- no saved cards, partial payments, ACH, or refund tooling exists in V1
 
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
@@ -113,7 +127,7 @@ Platform subscription onboarding status (separate from tenant payment execution)
 - V1D-B reconciliation uses `proration_behavior: "none"` and does not roll back local internal-user mutations on Stripe failure.
 - Billing portal quantity editing remains deferred.
 - Internal/comped owner protection is complete through `internal_comped_v1` detection and comped-safe entitlement rows with no Stripe linkage.
-	- This does not alter tenant customer payment boundaries: no refunds/disputes/saved cards/partial payments/public portal/platform fees/QBO sync.
+	- This does not alter tenant customer payment boundaries: the Payments V2 register below remains deferred.
 
 ---
 

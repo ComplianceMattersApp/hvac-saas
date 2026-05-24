@@ -75,6 +75,7 @@ If any item here conflicts with the active spine, the spine wins.
   - duplicate protection is active across charge/session/payment-intent identity checks and Stripe event idempotency
   - failed attempts are captured as non-balance-changing failed rows; invoice remains unpaid unless recorded payment truth exists
   - partial/full payment outcomes in current scope remain limited to existing invoice eligibility and full-balance checkout posture
+  - deferred invoice/payment add-ons are parked in the Payments V2 register
   - refunds/disputes remain later
   - optional small platform fee remains future capability
   - QBO remains optional/downstream only
@@ -243,7 +244,7 @@ If any item here conflicts with the active spine, the spine wins.
   - Contact recipient write/edit workflow stays deferred unless field use proves need.
   - Closeout Queue V2 waits until the owner uses V1 and provides feedback.
   - SMS/provider-powered messaging stays behind the existing gates.
-  - Payment add-ons remain deferred (refunds, disputes, saved cards, partial payments, receipt messaging, customer portal, platform application fees, QBO sync).
+  - Payments V2 deferred register remains parked (refunds, disputes, saved cards, partial payments, receipt messaging, customer portal/public portal, platform application fees, ACH, QBO sync).
 - Resolved watch item:
   - `calendar-filtering.test.ts` is green again and no longer represents an active TypeScript fixture gap.
 
@@ -474,7 +475,7 @@ If any item here conflicts with the active spine, the spine wins.
   6. First-owner/operator handoff dry-run (owner setup, operator checklist, account readiness, support readiness, launch operations)
   7. Controlled tester onboarding only after the above are acceptably complete
 - Tester remains in the wings intentionally and is not to be treated as a public launch trigger.
-- Support Console and Estimates production enablement remain parked behind their runbooks; tenant customer payments V1 is complete for current intended scope; QBO remains optional downstream/last-last.
+- Support Console and Estimates production enablement remain parked behind their runbooks; tenant customer payments V1 is complete for current intended scope; the Payments V2 deferred register is parked; QBO remains optional downstream/last-last.
 - Resume broader launch-readiness sequencing after this docs closeout without treating tester pressure as a launch trigger.
 
 ### 2.3.7 Field-ready installable/PWA access readiness V1 (Slice 1 baseline hardening)

@@ -1398,7 +1398,7 @@ P1 closeout note:
   - issue/send/payment/void section wording is clarified
   - external-billing lightweight path wording now emphasizes Invoice Sent tracking
   - line-item editor microcopy polish is complete
-  - unsupported payment add-ons remain deferred (refunds/disputes/saved cards/partial payments/public portal/platform fees/QBO sync)
+  - unsupported payment add-ons are parked in the Payments V2 deferred register (refunds/disputes/saved cards/partial payments/public portal/platform fees/ACH/QBO sync)
 - Internal invoice draft prefill fallback hardening is complete where source fields exist:
   - available job/customer/contractor/location fields are now used for fallback prefill
   - existing drafts are not overwritten
@@ -1469,7 +1469,7 @@ Field-note launch-hardening closeout alignment note (current baseline):
 - Launch gating remains unchanged:
   - controlled tester onboarding remains parked pending explicit owner approval
   - Estimates and Support Console production enablement remain parked behind runbooks
-  - tenant customer payments V1 is complete for current intended scope; further add-ons remain deferred
+  - tenant customer payments V1 is complete for current intended scope; the Payments V2 deferred register is parked
   - QBO remains optional/downstream only
 
 Contractor report current-scope closeout note (completed):
@@ -1585,7 +1585,7 @@ Ops First Impression (`/ops`) closeout alignment note (current pass complete):
 - Live confirmation includes deployed env, live webhook handling, successful non-owner checkout completion, entitlement sync, and Manage billing availability.
 - This onboarding priority remains separate from tenant customer invoice payment execution.
 - Tenant customer invoice payments V1 current scope is now complete (connected-account direct-charge model, webhook-only payment truth, duplicate protection, paid projection).
-- Deferred in this lane: refunds/disputes/saved cards/partial payments/receipt messaging/public portal/platform application fees/QBO sync.
+- Deferred in this lane: the Payments V2 register covers refunds/disputes/saved cards/partial payments/receipt messaging/public portal/platform application fees/ACH/QBO sync.
 - Invoice/payment language should reflect current V1 behavior and must not promise deferred add-ons.
 
 ### Service workflow refinement V1 baseline (completed)
@@ -1594,7 +1594,7 @@ Ops First Impression (`/ops`) closeout alignment note (current pass complete):
 - Create Next Service Visit is complete: foundation-only; internal users can create a next visit under the same service case; no auto-release, no parts inventory, no estimate automation, no Visit Scope copy-forward.
 - Reporting cleanup is complete: dashboard/report drilldown alignment done; Jobs Report assignment filter (All/Unassigned/specific user) is complete; Jobs Report now includes `contractor_id = null` same-account customer-owned jobs while cross-account null-contractor jobs remain excluded; contractor filter remains contractor-only for safety; Service Cases Report Latest Visit display is clarity-only polish; remaining work is visual/card polish, not data alignment.
 - Next planned product track after this baseline: estimates/quoting.
-- Stripe tenant customer payments V1 is complete for current intended scope.
+- Stripe tenant customer payments V1 is complete for current intended scope; Payments V2 remains parked.
 - Confirmed: no schema changes, no migrations, no Supabase commands, no production data actions, no payment/Stripe/QBO/ECC/retest/Visit Scope/contractor/assignment/scheduling behavior changes were part of this baseline.
 
 ### Locked rule
@@ -1817,7 +1817,7 @@ Boundaries remain unchanged:
 - internal/comped owner protection is complete; comped owner/internal accounts remain outside Stripe checkout and surface as Internal / Comped with no billing-customer or subscription requirement
 - `/ops/admin/internal-users` normal launch UI no longer exposes the Link existing auth user panel; invite teammate, team setup confirmation, and team member management remain intact
 - tenant customer invoice payments V1 current scope is complete
-- deferred payment add-ons remain deferred (refunds/disputes/saved cards/partial payments/public portal/platform application fees/QBO sync)
+- the Payments V2 deferred register remains parked (refunds/disputes/saved cards/partial payments/public portal/platform application fees/ACH/QBO sync)
 
 ---
 
