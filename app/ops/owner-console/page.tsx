@@ -128,6 +128,12 @@ function rowMatchesQuery(params: {
   return haystack.includes(query);
 }
 
+function rowMatchesSelectedAccount(row: PlatformOwnerDashboardRow, selectedAccountOwnerId: string) {
+  const selected = String(selectedAccountOwnerId ?? "").trim();
+  if (!selected) return true;
+  return row.accountOwnerUserId === selected;
+}
+
 function rowMatchesProduct(row: PlatformOwnerDashboardRow, product: OwnerConsoleProductFilter) {
   if (product === "all") return true;
   if (product === "not_set") return !row.productMode;
@@ -143,11 +149,13 @@ function rowMatchesStatus(row: PlatformOwnerDashboardRow, status: OwnerConsoleSt
 function filterRowsForOwnerSearch(params: {
   rows: PlatformOwnerDashboardRow[];
   query: string;
+  selectedAccountOwnerId: string;
   product: OwnerConsoleProductFilter;
   status: OwnerConsoleStatusFilter;
   internalEmails: Set<string>;
 }) {
   return params.rows.filter((row) =>
+    rowMatchesSelectedAccount(row, params.selectedAccountOwnerId) &&
     rowMatchesQuery({ row, query: params.query, internalEmails: params.internalEmails }) &&
     rowMatchesProduct(row, params.product) &&
     rowMatchesStatus(row, params.status),
@@ -157,6 +165,12 @@ function filterRowsForOwnerSearch(params: {
 function clearFiltersHref(view: PlatformOwnerConsoleView) {
   if (view === "current") return "/ops/owner-console";
   return `/ops/owner-console?view=${encodeURIComponent(view)}`;
+}
+
+function formatAccountDropdownLabel(row: PlatformOwnerDashboardRow) {
+  const ownerEmail = String(row.ownerEmail ?? "").trim();
+  if (ownerEmail) return `${row.company} — ${ownerEmail}`;
+  return row.company;
 }
 
 const VIEW_META: Record<
@@ -197,6 +211,7 @@ export default async function PlatformOwnerConsolePage(props: {
   const searchParams = (props.searchParams ? await props.searchParams : {}) ?? {};
   const view = resolveView(firstSearchParamValue(searchParams, "view"));
   const accountQuery = firstSearchParamValue(searchParams, "q");
+  const selectedAccountOwnerId = firstSearchParamValue(searchParams, "account");
   const productFilter = resolveProductFilter(firstSearchParamValue(searchParams, "product"));
   const statusFilter = resolveStatusFilter(firstSearchParamValue(searchParams, "status"));
   const viewRows = filterPlatformOwnerDashboardRows({
@@ -208,6 +223,7 @@ export default async function PlatformOwnerConsolePage(props: {
   const filteredRows = filterRowsForOwnerSearch({
     rows: viewRows,
     query: accountQuery,
+    selectedAccountOwnerId,
     product: productFilter,
     status: statusFilter,
     internalEmails,
@@ -218,7 +234,9 @@ export default async function PlatformOwnerConsolePage(props: {
     hiddenEmails,
     internalEmails,
   });
-  const hasActiveFilters = Boolean(accountQuery || productFilter !== "all" || statusFilter !== "all");
+  const hasActiveFilters = Boolean(
+    accountQuery || selectedAccountOwnerId || productFilter !== "all" || statusFilter !== "all",
+  );
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-5 p-4 text-slate-900 sm:p-6">
@@ -264,7 +282,7 @@ export default async function PlatformOwnerConsolePage(props: {
 
       {/* Search and filters */}
       <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
-        <form action="/ops/owner-console" method="get" className="grid gap-3 lg:grid-cols-[1fr_180px_180px_auto] lg:items-end">
+        <form action="/ops/owner-console" method="get" className="grid gap-3 xl:grid-cols-[1fr_1fr_170px_170px_auto] xl:items-end">
           <input type="hidden" name="view" value={view} />
           <label className="block">
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Find account</span>
@@ -274,6 +292,21 @@ export default async function PlatformOwnerConsolePage(props: {
               placeholder="Company, owner email, domain, account id..."
               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-500"
             />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Account dropdown</span>
+            <select
+              name="account"
+              defaultValue={selectedAccountOwnerId}
+              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-500"
+            >
+              <option value="">All accounts in this view</option>
+              {viewRows.map((row) => (
+                <option key={row.accountOwnerUserId} value={row.accountOwnerUserId}>
+                  {formatAccountDropdownLabel(row)}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="block">
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Product</span>
