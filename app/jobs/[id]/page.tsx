@@ -3361,7 +3361,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     )}
   </div>
 
-  <div className="mb-3 flex flex-wrap items-end justify-between gap-2">
+  <div className="mb-3 mt-5 flex flex-wrap items-end justify-between gap-2 border-t border-slate-200/70 pt-5 sm:mt-0 sm:border-t-0 sm:pt-0">
     <div>
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Operations Board</div>
     </div>
@@ -3574,7 +3574,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
 
     {/* Center: destination panel */}
-    <div className="space-y-3">
+    <div className="space-y-4 sm:space-y-3">
       <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.28)]">
         <div className="absolute left-3 top-3 z-10">
           <div className="rounded-full border border-white/70 bg-white/76 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.3)] backdrop-blur-sm">
@@ -3882,7 +3882,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
   </div>
 
-  <div id="assigned-team" className={`${workspaceSubtleCardClass} scroll-mt-24 border-slate-200/70 bg-white/92 p-4`}>
+  <div id="assigned-team" className={`${workspaceSubtleCardClass} mt-5 scroll-mt-24 border-slate-200/70 bg-white/92 p-4 sm:mt-0`}>
     {assignmentBannerMessage ? (
       <FlashBanner
         type={assignmentBannerType as "success" | "warning"}
@@ -3969,7 +3969,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   </div>
 
   {isInternalUser && job.job_type === "service" ? (
-    <div className="mt-3.5 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)]">
+    <div className="mt-4 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)] sm:mt-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Next Service Action</div>
