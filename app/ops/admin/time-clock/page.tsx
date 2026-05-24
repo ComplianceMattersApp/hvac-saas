@@ -6,8 +6,8 @@ import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-
 import { createClient } from "@/lib/supabase/server";
 import {
   listNeedsReviewTimeEntriesForAccount,
+  listRecentTimeEntriesForAccount,
   listTeamClockStatusPreview,
-  listTodayTimeEntriesForAccount,
   type AdminTimeEntryReviewRow,
 } from "@/lib/time-clock/read-model";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
@@ -74,6 +74,45 @@ function formatDurationFromClockIn(clockInAt: string, clockOutAt?: string | null
 
   if (hours <= 0) return `${minutes}m`;
   return `${hours}h ${minutes}m`;
+}
+
+function toDateGroupKey(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "";
+
+  return toDateGroupKeyFromDate(date);
+}
+
+function toDateGroupKeyFromDate(date: Date) {
+  if (!Number.isFinite(date.getTime())) return "";
+
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+function formatDateGroupLabel(value: string, now = new Date()) {
+  const key = toDateGroupKey(value);
+  if (!key) return "Unknown date";
+
+  const todayKey = toDateGroupKeyFromDate(now);
+  const yesterdayAnchor = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const yesterdayKey = toDateGroupKeyFromDate(yesterdayAnchor);
+
+  if (key === todayKey) return "Today";
+  if (key === yesterdayKey) return "Yesterday";
+
+  const [year, month, day] = key.split("-").map(Number);
+  const middayUtc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  return new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(middayUtc);
 }
 
 function toStatusLabel(value: string) {
@@ -256,16 +295,17 @@ export default async function AdminTimeClockPage({ searchParams }: { searchParam
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
 
-  const [activeNowRows, todayRows, needsReviewRows] = await Promise.all([
+  const [activeNowRows, recentRows, needsReviewRows] = await Promise.all([
     listTeamClockStatusPreview({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
       limit: 100,
     }),
-    listTodayTimeEntriesForAccount({
+    listRecentTimeEntriesForAccount({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
-      limit: 200,
+      days: 7,
+      limit: 500,
     }),
     listNeedsReviewTimeEntriesForAccount({
       supabase,
@@ -277,7 +317,7 @@ export default async function AdminTimeClockPage({ searchParams }: { searchParam
   const allUserIds = Array.from(
     new Set([
       ...activeNowRows.map((row) => row.internalUserId),
-      ...todayRows.map((row) => row.internalUserId),
+      ...recentRows.map((row) => row.internalUserId),
       ...needsReviewRows.map((row) => row.internalUserId),
     ]),
   );
@@ -286,6 +326,16 @@ export default async function AdminTimeClockPage({ searchParams }: { searchParam
     supabase,
     userIds: allUserIds,
   });
+
+  const recentGroups = Array.from(
+    recentRows.reduce((map, row) => {
+      const key = toDateGroupKey(row.clockInAt) || "unknown";
+      const existing = map.get(key) ?? [];
+      existing.push(row);
+      map.set(key, existing);
+      return map;
+    }, new Map<string, AdminTimeEntryReviewRow[]>()),
+  );
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 text-slate-900 sm:space-y-8 sm:p-6">
@@ -349,22 +399,33 @@ export default async function AdminTimeClockPage({ searchParams }: { searchParam
       </section>
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
-        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Today's Entries</h2>
-        <p className="mt-1 text-sm leading-6 text-slate-600">Time entries that started today.</p>
+        <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">7-Day Time Review</h2>
+        <p className="mt-1 text-sm leading-6 text-slate-600">
+          Review recent time entries. Older entries remain available for future reports.
+        </p>
 
-        <div className="mt-4 grid gap-3">
-          {todayRows.length === 0 ? (
+        <div className="mt-4 space-y-5">
+          {recentGroups.length === 0 ? (
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
-              No entries started today.
+              No entries found in the last 7 days.
             </div>
           ) : (
-            todayRows.map((row) =>
-              renderEntryRow({
-                row,
-                displayName: String(displayMap[row.internalUserId] ?? "").trim() || "Unknown User",
-                showCorrection: true,
-              }),
-            )
+            recentGroups.map(([groupKey, rows]) => (
+              <div key={groupKey} className="space-y-3">
+                <div className="border-b border-slate-200 pb-2 text-sm font-semibold text-slate-900">
+                  {groupKey === "unknown" ? "Unknown date" : formatDateGroupLabel(rows[0]?.clockInAt ?? "")}
+                </div>
+                <div className="grid gap-3">
+                  {rows.map((row) =>
+                    renderEntryRow({
+                      row,
+                      displayName: String(displayMap[row.internalUserId] ?? "").trim() || "Unknown User",
+                      showCorrection: true,
+                    }),
+                  )}
+                </div>
+              </div>
+            ))
           )}
         </div>
       </section>

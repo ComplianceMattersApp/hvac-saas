@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   getCurrentInternalUserClockState,
+  listRecentTimeEntriesForAccount,
   listTeamClockStatusPreview,
   listTodayTimeEntriesForAccount,
   listNeedsReviewTimeEntriesForAccount,
@@ -282,6 +283,78 @@ describe("time clock read helpers", () => {
     });
 
     expect(result.map((row) => row.entryId)).toEqual(["today-1"]);
+  });
+
+  it("returns recent entries inside the rolling 7-day window newest first", async () => {
+    const now = new Date("2026-05-24T20:00:00Z");
+    const { supabase } = makeSupabase({
+      timeEntries: [
+        makeTimeEntry({ id: "today-1", clock_in_at: "2026-05-24T16:00:00Z", status: "closed" }),
+        makeTimeEntry({ id: "day-2", clock_in_at: "2026-05-23T16:00:00Z", status: "open" }),
+        makeTimeEntry({ id: "day-7", clock_in_at: "2026-05-18T16:00:00Z", status: "voided" }),
+      ],
+    });
+
+    const result = await listRecentTimeEntriesForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+      now,
+      days: 7,
+    });
+
+    expect(result.map((row) => row.entryId)).toEqual(["today-1", "day-2", "day-7"]);
+  });
+
+  it("excludes entries older than the rolling 7-day window", async () => {
+    const now = new Date("2026-05-24T20:00:00Z");
+    const { supabase } = makeSupabase({
+      timeEntries: [
+        makeTimeEntry({ id: "inside-window", clock_in_at: "2026-05-18T16:00:00Z", status: "closed" }),
+        makeTimeEntry({ id: "older-than-7", clock_in_at: "2026-05-17T06:59:00Z", status: "closed" }),
+      ],
+    });
+
+    const result = await listRecentTimeEntriesForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+      now,
+      days: 7,
+    });
+
+    expect(result.map((row) => row.entryId)).toEqual(["inside-window"]);
+  });
+
+  it("returns safe empty recent review when account scope is missing", async () => {
+    const { supabase, calls } = makeSupabase();
+
+    const result = await listRecentTimeEntriesForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "",
+      now: new Date("2026-05-24T20:00:00Z"),
+    });
+
+    expect(result).toEqual([]);
+    expect(calls.some((call) => call.op === "from")).toBe(false);
+  });
+
+  it("keeps recent review account scoped", async () => {
+    const now = new Date("2026-05-24T20:00:00Z");
+    const { supabase } = makeSupabase({
+      timeEntries: [
+        makeTimeEntry({ id: "owned-1", account_owner_user_id: "owner-1", clock_in_at: "2026-05-24T16:00:00Z" }),
+        makeTimeEntry({ id: "foreign-1", account_owner_user_id: "owner-2", clock_in_at: "2026-05-24T17:00:00Z" }),
+      ],
+    });
+
+    const result = await listRecentTimeEntriesForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+      now,
+      days: 7,
+    });
+
+    expect(result.map((row) => row.entryId)).toEqual(["owned-1"]);
+    expect(result.every((row) => row.accountOwnerUserId === "owner-1")).toBe(true);
   });
 
   it("returns needs-review rows for prior-day active and incomplete entries", async () => {

@@ -254,6 +254,18 @@ V1F closeout status:
 - Server action is admin-gated and account-scoped; target entry must belong to current account owner scope.
 - No payroll approvals, exports/reporting, wage/overtime calculations, GPS/geofencing, job-costing, or contractor/customer-portal behavior added in this phase.
 
+### V1G - 7-day admin time review
+- Expand admin review center from a today-only list to a rolling 7-day review surface.
+- Keep `Active Now`, `Needs Review`, and existing correction controls with required reason.
+- Preserve durable time-entry history while keeping older lookup/export parked for V1.5.
+
+V1G closeout status:
+- Complete in repository: `/ops/admin/time-clock` now includes `7-Day Time Review` grouped by readable LA date labels.
+- Recent review remains account-scoped and uses a rolling 7-calendar-day window based on `clock_in_at`.
+- Existing correction controls remain available on each recent entry; entries are durable and no delete/reset behavior was added.
+- Older time entries remain durable for future reporting/export surfaces; this page is only a recent review surface.
+- No reporting/export, payroll, GPS/geofencing, job-costing, or contractor/customer-portal behavior added in this phase.
+
 ### V1.5 - weekly summary/export
 - Add report-center ledger style weekly summary/export.
 - Reuse existing CSV/export conventions and limits.

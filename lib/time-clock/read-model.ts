@@ -1,4 +1,4 @@
-import { startOfTodayUtcIsoLA, startOfTomorrowUtcIsoLA } from "@/lib/utils/schedule-la";
+import { laDateToUtcMidnightIso, startOfTodayUtcIsoLA, startOfTomorrowUtcIsoLA } from "@/lib/utils/schedule-la";
 
 type SupabaseLike = {
   from(table: string): any;
@@ -164,6 +164,23 @@ function toMillis(value: string | null | undefined) {
   return Number.isFinite(millis) ? millis : NaN;
 }
 
+function formatLaDateKey(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+function startOfRecentWindowUtcIsoLA(days: number, now = new Date()) {
+  const base = formatLaDateKey(now);
+  const [year, month, day] = base.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day - (days - 1), 12, 0, 0));
+  const shiftedYmd = formatLaDateKey(shifted);
+  return laDateToUtcMidnightIso(shiftedYmd);
+}
+
 export async function getCurrentInternalUserClockState(params: {
   supabase: SupabaseLike;
   accountOwnerUserId: string | null | undefined;
@@ -260,6 +277,44 @@ export async function listTodayTimeEntriesForAccount(params: {
     : 200;
 
   const startIso = startOfTodayUtcIsoLA(params.now);
+  const endIso = startOfTomorrowUtcIsoLA(params.now);
+
+  const { data, error } = await params.supabase
+    .from("internal_user_time_entries")
+    .select(INTERNAL_USER_TIME_ENTRY_SELECT)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .gte("clock_in_at", startIso)
+    .lt("clock_in_at", endIso)
+    .order("clock_in_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map(normalizeRow).filter(Boolean).map((row) => toAdminReviewRow(row as InternalUserTimeEntryRow));
+}
+
+export async function listRecentTimeEntriesForAccount(params: {
+  supabase: SupabaseLike;
+  accountOwnerUserId: string | null | undefined;
+  now?: Date;
+  days?: number | null;
+  limit?: number | null;
+}): Promise<AdminTimeEntryReviewRow[]> {
+  const accountOwnerUserId = asTrimmed(params.accountOwnerUserId);
+  if (!accountOwnerUserId) return [];
+
+  const normalizedDays = Number(params.days ?? 7);
+  const days = Number.isFinite(normalizedDays)
+    ? Math.min(Math.max(Math.trunc(normalizedDays), 1), 31)
+    : 7;
+
+  const normalizedLimit = Number(params.limit ?? 500);
+  const limit = Number.isFinite(normalizedLimit)
+    ? Math.min(Math.max(Math.trunc(normalizedLimit), 1), 2000)
+    : 500;
+
+  const startIso = startOfRecentWindowUtcIsoLA(days, params.now);
   const endIso = startOfTomorrowUtcIsoLA(params.now);
 
   const { data, error } = await params.supabase
