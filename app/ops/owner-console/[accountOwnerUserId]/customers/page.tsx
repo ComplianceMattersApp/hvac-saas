@@ -123,7 +123,7 @@ export default async function OwnerSupportCustomerLitePage({
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Platform Owner</p>
             <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-950">Customer Lookup Lite</h1>
             <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              Search-first customer lookup for owner-led support calls. This is not a full customer database view and does not open tenant edit pages.
+              Search-first customer lookup for owner-led support calls. This is not a full customer database view and does not open account-side edit pages.
             </p>
           </div>
           <Link
@@ -191,19 +191,20 @@ export default async function OwnerSupportCustomerLitePage({
         <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Customers</p>
           <p className="mt-1 text-sm text-slate-500">
-            {listHelper} This page intentionally does not link to tenant customer edit pages.
+            {listHelper} Use Open Snapshot for read-only customer context.
           </p>
         </div>
         <div className="overflow-x-auto">
-          <table className="min-w-[900px] divide-y divide-slate-200 text-left text-sm">
+          <table className="min-w-[980px] divide-y divide-slate-200 text-left text-sm">
             <thead className="bg-white text-xs uppercase tracking-[0.1em] text-slate-500">
               <tr>
-                <th className="w-[24%] px-4 py-3 font-semibold">Customer</th>
-                <th className="w-[18%] px-4 py-3 font-semibold">Contact</th>
-                <th className="w-[28%] px-4 py-3 font-semibold">Billing Address</th>
-                <th className="w-[10%] px-4 py-3 font-semibold">Locations</th>
-                <th className="w-[10%] px-4 py-3 font-semibold">Jobs</th>
+                <th className="w-[22%] px-4 py-3 font-semibold">Customer</th>
+                <th className="w-[16%] px-4 py-3 font-semibold">Contact</th>
+                <th className="w-[26%] px-4 py-3 font-semibold">Billing Address</th>
+                <th className="w-[8%] px-4 py-3 font-semibold">Locations</th>
+                <th className="w-[8%] px-4 py-3 font-semibold">Jobs</th>
                 <th className="w-[10%] px-4 py-3 font-semibold">Latest Job</th>
+                <th className="w-[10%] px-4 py-3 font-semibold">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-white">
@@ -221,11 +222,19 @@ export default async function OwnerSupportCustomerLitePage({
                   <td className="px-4 py-3 font-medium text-slate-900">{customer.locationCount}</td>
                   <td className="px-4 py-3 font-medium text-slate-900">{customer.jobCount}</td>
                   <td className="px-4 py-3 text-slate-700">{formatDate(customer.latestJobAt)}</td>
+                  <td className="px-4 py-3">
+                    <Link
+                      href={`/ops/owner-console/${encodeURIComponent(accountOwnerUserId)}/customers/${encodeURIComponent(customer.id)}`}
+                      className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                    >
+                      Open Snapshot
+                    </Link>
+                  </td>
                 </tr>
               ))}
               {customers.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">
                     {query ? "No customers match this search." : "No customers are visible for this account."}
                   </td>
                 </tr>
