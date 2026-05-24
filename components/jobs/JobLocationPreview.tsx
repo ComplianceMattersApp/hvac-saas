@@ -62,7 +62,7 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
   if (!addressDisplay) {
     return (
       <div className={props.className}>
-        <div className="flex aspect-[16/9] w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-4 text-center text-sm font-medium text-slate-600">
+        <div className="flex h-40 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-4 text-center text-sm font-medium text-slate-600 sm:h-52 lg:h-56 xl:h-60">
           Location preview unavailable
         </div>
         <p className="mt-2 text-sm text-gray-500">
@@ -104,16 +104,16 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
           <img
             src={imageUrl}
             alt={imageAlt}
-            className="aspect-[16/9] w-full object-cover transition duration-200 group-hover:scale-[1.01]"
+            className="h-40 w-full object-cover transition duration-200 group-hover:scale-[1.01] sm:h-52 lg:h-56 xl:h-60"
           />
         ) : (
-          <div className="flex aspect-[16/9] w-full items-center justify-center px-4 text-center text-sm font-medium text-slate-600">
+          <div className="flex h-40 w-full items-center justify-center px-4 text-center text-sm font-medium text-slate-600 sm:h-52 lg:h-56 xl:h-60">
             Location preview unavailable
           </div>
         )}
       </a>
 
-      <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between">
+      <div className="mt-3 hidden flex-col gap-2 sm:flex sm:flex-row sm:items-stretch sm:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <a
             href={mapsDirectionsUrl}

@@ -12,6 +12,11 @@ const jobPageSource = readFileSync(
   "utf8",
 );
 
+const jobLocationPreviewSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/JobLocationPreview.tsx"),
+  "utf8",
+);
+
 describe("job tests page wiring", () => {
   it("exposes Asbestos as a manual override option and keeps override reason free-form", () => {
     expect(jobTestsPageSource).toContain('<option value="pass">Smoke Test</option>');
@@ -75,6 +80,14 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("Customer Concern");
     expect(jobPageSource).toContain("Intake Notes");
     expect(jobPageSource).toContain("whitespace-pre-wrap break-words");
+  });
+
+  it("keeps the location preview compact on mobile and hides lower map actions there", () => {
+    expect(jobLocationPreviewSource).toContain("h-40 w-full object-cover");
+    expect(jobLocationPreviewSource).toContain("sm:h-52 lg:h-56 xl:h-60");
+    expect(jobLocationPreviewSource).toContain("mt-3 hidden flex-col gap-2 sm:flex");
+    expect(jobPageSource).toContain("h-40 w-full animate-pulse");
+    expect(jobPageSource).toContain("mt-3 hidden flex-col gap-2 sm:flex");
   });
 
   it("includes location-linked contacts in site/access resolution priority", () => {

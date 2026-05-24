@@ -682,21 +682,21 @@ function JobLocationPreviewFallback({
   return (
     <div className={className}>
       {addressDisplay ? (
-        <div className="aspect-[16/9] w-full animate-pulse rounded-lg border border-slate-200 bg-slate-200/60" />
+        <div className="h-40 w-full animate-pulse rounded-lg border border-slate-200 bg-slate-200/60 sm:h-52 lg:h-56 xl:h-60" />
       ) : (
-        <div className="flex aspect-[16/9] w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-4 text-center text-sm font-medium text-slate-600">
+        <div className="flex h-40 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-4 text-center text-sm font-medium text-slate-600 sm:h-52 lg:h-56 xl:h-60">
           Location preview unavailable
         </div>
       )}
       {addressDisplay ? (
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between">
+        <div className="mt-3 hidden flex-col gap-2 sm:flex sm:flex-row sm:items-stretch sm:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {mapsDirectionsUrl ? (
               <a
                 href={mapsDirectionsUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800"
+                className="hidden min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 sm:inline-flex"
               >
                 Navigate
               </a>
