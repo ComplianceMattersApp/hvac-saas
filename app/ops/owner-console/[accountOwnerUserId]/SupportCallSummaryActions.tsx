@@ -33,9 +33,9 @@ export default function SupportCallSummaryActions({
       </button>
       <Link
         href={`/ops/owner-console/${encodeURIComponent(accountOwnerUserId)}/customers`}
-        className="inline-flex items-center rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white hover:bg-blue-700"
+        className="inline-flex items-center rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700"
       >
-        Customers
+        View Customers
       </Link>
       <a
         href="#support-next-checks"
