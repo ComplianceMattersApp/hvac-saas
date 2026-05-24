@@ -16,6 +16,7 @@ type TeamUserSnapshot = {
   isActive: boolean;
   emailConfirmed: boolean | null;
   createdAt: string | null;
+  lastSignInAt: string | null;
 };
 
 async function requirePlatformOwnerOrFailClosed() {
@@ -58,6 +59,11 @@ function formatDate(value: string | null | undefined) {
     day: "2-digit",
     year: "numeric",
   }).format(date);
+}
+
+function formatLastSignIn(value: string | null | undefined) {
+  const formatted = formatDate(value);
+  return formatted === "-" ? "Never" : formatted;
 }
 
 function resolveDisplayName(user: any, fallback: string) {
@@ -132,6 +138,7 @@ async function loadTeamSnapshot(params: {
         isActive: Boolean(row?.is_active),
         emailConfirmed: authUser ? Boolean((authUser as any).email_confirmed_at) : null,
         createdAt: String(row?.created_at ?? "").trim() || null,
+        lastSignInAt: String((authUser as any)?.last_sign_in_at ?? "").trim() || null,
       };
     }),
   );
@@ -157,6 +164,7 @@ async function TeamAndSeatsSection({ accountOwnerUserId }: { accountOwnerUserId:
   const activeCount = teamUsers.filter((user) => user.isActive).length;
   const invitedCount = teamUsers.filter((user) => user.isActive && user.emailConfirmed === false).length;
   const inactiveCount = teamUsers.filter((user) => !user.isActive).length;
+  const signedInCount = teamUsers.filter((user) => Boolean(user.lastSignInAt)).length;
   const seatLimitLabel = entitlement.seatLimit == null ? "Unlimited / not set" : String(entitlement.seatLimit);
   const topUsers = teamUsers.slice(0, 12);
 
@@ -173,23 +181,25 @@ async function TeamAndSeatsSection({ accountOwnerUserId }: { accountOwnerUserId:
           </div>
         </div>
 
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
           <TeamSeatCard label="Active Users" value={String(activeCount)} helper={`${teamUsers.length} total internal user${teamUsers.length === 1 ? "" : "s"}.`} />
           <TeamSeatCard label="Seat Limit" value={seatLimitLabel} helper="Platform entitlement seat limit signal." />
           <TeamSeatCard label="Pending Invites" value={String(invitedCount)} helper="Active users without confirmed email." />
+          <TeamSeatCard label="Signed In" value={String(signedInCount)} helper="Users with a recorded sign-in." />
           <TeamSeatCard label="Inactive Users" value={String(inactiveCount)} helper="Paused or inactive internal users." />
         </div>
 
         <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-          <div className="grid grid-cols-[1.4fr_0.8fr_0.8fr_0.7fr] gap-3 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+          <div className="grid grid-cols-[1.3fr_0.7fr_0.8fr_0.7fr_0.7fr] gap-3 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
             <span>User</span>
             <span>Role</span>
             <span>Status</span>
+            <span>Last Sign-in</span>
             <span>Added</span>
           </div>
           <div className="divide-y divide-slate-100 bg-white">
             {topUsers.map((user) => (
-              <div key={user.userId} className="grid grid-cols-[1.4fr_0.8fr_0.8fr_0.7fr] gap-3 px-4 py-3 text-sm">
+              <div key={user.userId} className="grid grid-cols-[1.3fr_0.7fr_0.8fr_0.7fr_0.7fr] gap-3 px-4 py-3 text-sm">
                 <div className="min-w-0">
                   <p className="truncate font-medium text-slate-950" title={user.displayName}>{user.displayName}</p>
                   <p className="truncate text-xs text-slate-500" title={user.email ?? user.userId}>{user.email ?? user.userId}</p>
@@ -204,6 +214,7 @@ async function TeamAndSeatsSection({ accountOwnerUserId }: { accountOwnerUserId:
                     {resolveLifecycle(user)}
                   </span>
                 </div>
+                <div className="text-xs text-slate-500">{formatLastSignIn(user.lastSignInAt)}</div>
                 <div className="text-xs text-slate-500">{formatDate(user.createdAt)}</div>
               </div>
             ))}
