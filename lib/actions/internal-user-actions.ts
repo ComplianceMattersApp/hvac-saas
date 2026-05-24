@@ -778,3 +778,40 @@ export async function updateInternalUserTimeTrackingFromForm(formData: FormData)
   revalidatePath(`/ops/admin/internal-users/${encodeURIComponent(targetUserId)}`);
   redirect(buildInternalUserTimeTrackingNoticeHref(targetUserId, "saved"));
 }
+
+export async function updateInternalUserTimeTrackingFromListForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser: actorInternalUser } = await requireInternalRole(
+    "admin",
+    { supabase },
+  );
+
+  const admin = createAdminClient();
+  const targetUserId = String(formData.get("user_id") ?? "").trim();
+  if (!targetUserId) {
+    throw new Error("MISSING_TARGET_USER_ID");
+  }
+
+  const timeTrackingEnabled = parseBooleanToggleEntries(
+    formData.getAll("time_tracking_enabled"),
+  );
+
+  await requireScopedTarget(
+    admin,
+    actorInternalUser.account_owner_user_id,
+    targetUserId,
+  );
+
+  const { error } = await admin
+    .from("internal_users")
+    .update({ time_tracking_enabled: timeTrackingEnabled })
+    .eq("user_id", targetUserId)
+    .eq("account_owner_user_id", actorInternalUser.account_owner_user_id)
+    .select("user_id")
+    .single();
+
+  if (error) throw error;
+
+  revalidateInternalUserViews();
+  redirect(`/ops/admin/internal-users?time_tracking_saved=${encodeURIComponent(targetUserId)}`);
+}

@@ -211,6 +211,18 @@ V1C closeout status (settings controls only):
 - Contractor/customer portal users remain blocked through existing internal-role/admin route gates.
 - No `/time-clock` employee runtime actions, Ops team status card, or admin correction/timesheet runtime behavior added in this pass.
 
+### V1C-2 - consolidated team tracking controls
+- Add consolidated Time Tracking status + toggle column to `/ops/admin/internal-users` list page.
+- Allow admin/owner to manage time tracking for all team members from one surface.
+- Keep existing detail-page toggle as backup control.
+
+V1C-2 closeout status (consolidated team management):
+- Complete in repository: Time Tracking status + inline toggle on `/ops/admin/internal-users` list page.
+- Consolidated team controls now preferred admin workflow; individual user detail page toggle remains available as backup.
+- Action `updateInternalUserTimeTrackingFromListForm` handles list-level updates with account scoping and admin-role gating.
+- Inactive users show current time tracking state but toggle is disabled in UI.
+- No clock-in/out behavior, Ops card changes, reporting, payroll, GPS, job-costing, or contractor/portal behavior added in this phase.
+
 ### V1D - employee clock page
 - Add `/time-clock` page and server actions.
 - Enforce account/user toggles and internal-user gating.

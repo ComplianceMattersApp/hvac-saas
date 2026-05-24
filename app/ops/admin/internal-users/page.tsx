@@ -15,6 +15,7 @@ import {
   deleteInternalUserFromForm,
   inviteInternalUserFromForm,
   updateInternalUserRoleFromForm,
+  updateInternalUserTimeTrackingFromListForm,
 } from "@/lib/actions/internal-user-actions";
 
 async function requireAdminOrRedirect() {
@@ -81,7 +82,7 @@ function toRoleLabel(role: string): string {
   return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
 }
 
-type SearchParams = Promise<{ invite_status?: string; team_confirm?: string }>;
+type SearchParams = Promise<{ invite_status?: string; team_confirm?: string; time_tracking_saved?: string }>;
 
 const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   invited: {
@@ -139,6 +140,7 @@ export default async function AdminInternalUsersPage({
   const inviteStatus = String(sp.invite_status ?? "").trim().toLowerCase();
   const inviteNotice = INVITE_STATUS_TEXT[inviteStatus];
   const teamConfirmStatus = String(sp.team_confirm ?? "").trim().toLowerCase();
+  const timeTrackingSavedUserId = String(sp.time_tracking_saved ?? "").trim();
 
   const { supabase, userId, internalUser } = await requireAdminOrRedirect();
 
@@ -152,7 +154,7 @@ export default async function AdminInternalUsersPage({
 
   const { data: internalUsers, error } = await supabase
     .from("internal_users")
-    .select("user_id, role, is_active, created_at")
+    .select("user_id, role, is_active, time_tracking_enabled, created_at")
     .eq("account_owner_user_id", internalUser.account_owner_user_id)
     .order("created_at", { ascending: true });
 
@@ -253,6 +255,12 @@ export default async function AdminInternalUsersPage({
         </div>
       ) : null}
 
+      {timeTrackingSavedUserId ? (
+        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-sm">
+          Time tracking setting updated.
+        </div>
+      ) : null}
+
       <div>
       <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invite team member</h2>
@@ -341,6 +349,29 @@ export default async function AdminInternalUsersPage({
                     >
                       Edit Team Member
                     </Link>
+
+                    <form action={updateInternalUserTimeTrackingFromListForm} className="flex items-center gap-2">
+                      <input type="hidden" name="user_id" value={row.user_id} />
+                      <input type="hidden" name="time_tracking_enabled" value="0" />
+                      <label className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-50 has-[input:disabled]:opacity-60 has-[input:disabled]:cursor-not-allowed">
+                        <input
+                          type="checkbox"
+                          name="time_tracking_enabled"
+                          value="1"
+                          defaultChecked={Boolean((row as any).time_tracking_enabled)}
+                          disabled={!row.is_active}
+                          className="h-4 w-4 rounded border-slate-300 text-slate-900 cursor-pointer disabled:cursor-not-allowed"
+                        />
+                        <span className="whitespace-nowrap">Track time</span>
+                      </label>
+                      <button
+                        type="submit"
+                        disabled={!row.is_active}
+                        className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Update
+                      </button>
+                    </form>
 
                     <form action={updateInternalUserRoleFromForm} className="flex items-center gap-2">
                       <input type="hidden" name="user_id" value={row.user_id} />
