@@ -11,6 +11,30 @@ export type PlatformOwnerCustomerLiteRow = {
   updatedAt: string | null;
 };
 
+export type PlatformOwnerCustomerLiteLocation = {
+  id: string;
+  label: string;
+  address: string;
+  createdAt: string | null;
+};
+
+export type PlatformOwnerCustomerLiteJob = {
+  id: string;
+  title: string;
+  status: string | null;
+  opsStatus: string | null;
+  jobType: string | null;
+  scheduledDate: string | null;
+  address: string;
+  createdAt: string | null;
+};
+
+export type PlatformOwnerCustomerLiteSnapshot = {
+  customer: PlatformOwnerCustomerLiteRow;
+  locations: PlatformOwnerCustomerLiteLocation[];
+  recentJobs: PlatformOwnerCustomerLiteJob[];
+};
+
 function normalizeText(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -48,6 +72,24 @@ function buildBillingAddress(row: any) {
   const cityStateZip = [city, state, zip].filter(Boolean).join(" ").trim();
   const parts = [line1, line2, cityStateZip].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : "No billing address visible";
+}
+
+function buildLocationAddress(row: any) {
+  const line1 = normalizeText(row?.address_line1);
+  const line2 = normalizeText(row?.address_line2);
+  const city = normalizeText(row?.city);
+  const state = normalizeText(row?.state);
+  const zip = normalizeText(row?.zip || row?.postal_code);
+  const cityStateZip = [city, state, zip].filter(Boolean).join(" ").trim();
+  const parts = [line1, line2, cityStateZip].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "No service address visible";
+}
+
+function buildJobAddress(row: any) {
+  const address = normalizeText(row?.job_address);
+  if (address) return address;
+  const city = normalizeText(row?.city);
+  return city || "No job address visible";
 }
 
 function rowMatchesQuery(row: PlatformOwnerCustomerLiteRow, query: string) {
@@ -133,6 +175,72 @@ async function projectCustomerRow(params: {
   };
 }
 
+async function loadCustomerById(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  customerId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from("customers")
+    .select(
+      "id, first_name, last_name, full_name, email, phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip, created_at, updated_at",
+    )
+    .eq("id", params.customerId)
+    .eq("owner_user_id", params.accountOwnerUserId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
+}
+
+async function loadCustomerLocations(params: {
+  supabase: any;
+  customerId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from("locations")
+    .select("id, label, nickname, address_line1, address_line2, city, state, zip, postal_code, created_at")
+    .eq("customer_id", params.customerId)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) throw error;
+
+  return (data ?? []).map((row: any): PlatformOwnerCustomerLiteLocation => ({
+    id: normalizeText(row?.id),
+    label: normalizeText(row?.nickname) || normalizeText(row?.label) || "Service Location",
+    address: buildLocationAddress(row),
+    createdAt: normalizeText(row?.created_at) || null,
+  }));
+}
+
+async function loadCustomerRecentJobs(params: {
+  supabase: any;
+  customerId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from("jobs")
+    .select("id, title, status, ops_status, job_type, scheduled_date, job_address, city, created_at")
+    .eq("customer_id", params.customerId)
+    .is("deleted_at", null)
+    .order("created_at", { ascending: false })
+    .limit(10);
+
+  if (error) throw error;
+
+  return (data ?? []).map((row: any): PlatformOwnerCustomerLiteJob => ({
+    id: normalizeText(row?.id),
+    title: normalizeText(row?.title) || "Untitled job",
+    status: normalizeText(row?.status) || null,
+    opsStatus: normalizeText(row?.ops_status) || null,
+    jobType: normalizeText(row?.job_type) || null,
+    scheduledDate: normalizeText(row?.scheduled_date) || null,
+    address: buildJobAddress(row),
+    createdAt: normalizeText(row?.created_at) || null,
+  }));
+}
+
 export async function loadPlatformOwnerCustomerLiteRows(params: {
   supabase: any;
   accountOwnerUserId: string;
@@ -161,4 +269,34 @@ export async function loadPlatformOwnerCustomerLiteRows(params: {
   );
 
   return rows.filter((row) => rowMatchesQuery(row, params.query ?? ""));
+}
+
+export async function loadPlatformOwnerCustomerLiteSnapshot(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  customerId: string;
+}): Promise<PlatformOwnerCustomerLiteSnapshot | null> {
+  const accountOwnerUserId = normalizeText(params.accountOwnerUserId);
+  const customerId = normalizeText(params.customerId);
+  if (!accountOwnerUserId || !customerId) return null;
+
+  const customerRow = await loadCustomerById({
+    supabase: params.supabase,
+    accountOwnerUserId,
+    customerId,
+  });
+
+  if (!customerRow) return null;
+
+  const [customer, locations, recentJobs] = await Promise.all([
+    projectCustomerRow({ supabase: params.supabase, row: customerRow }),
+    loadCustomerLocations({ supabase: params.supabase, customerId }),
+    loadCustomerRecentJobs({ supabase: params.supabase, customerId }),
+  ]);
+
+  return {
+    customer,
+    locations,
+    recentJobs,
+  };
 }
