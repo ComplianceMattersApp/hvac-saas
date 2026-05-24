@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
@@ -69,7 +70,7 @@ function DetailCard(props: { label: string; value: string; helper?: string }) {
   );
 }
 
-function Badge(props: { children: React.ReactNode; tone: "slate" | "emerald" | "blue" | "amber" }) {
+function Badge(props: { children: ReactNode; tone: "slate" | "emerald" | "blue" | "amber" }) {
   const classes = {
     slate: "bg-slate-100 text-slate-700",
     emerald: "bg-emerald-100 text-emerald-800",
