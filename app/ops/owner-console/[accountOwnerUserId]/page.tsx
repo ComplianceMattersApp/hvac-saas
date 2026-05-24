@@ -31,6 +31,12 @@ type AccountHealthSignal = {
   tone: HealthTone;
 };
 
+type AccountTriageItem = {
+  title: string;
+  detail: string;
+  tone: HealthTone;
+};
+
 async function requirePlatformOwnerOrFailClosed() {
   const supabase = await createClient();
   const {
@@ -246,6 +252,76 @@ function resolveAccountHealthSignals(params: {
   ];
 }
 
+function resolveSupportNextChecks(params: {
+  row: PlatformOwnerDashboardRow;
+  readiness: AccountReadinessSummary;
+  entitlement: AccountEntitlementContext;
+}) {
+  const checks: AccountTriageItem[] = [];
+  const status = String(params.row.entitlementStatus ?? params.entitlement.entitlementStatus ?? "").trim().toLowerCase();
+  const trialEnd = toValidDate(params.row.trialEnd);
+  const trialDaysRemaining = trialEnd ? daysUntil(trialEnd) : null;
+
+  for (const item of params.readiness.items) {
+    if (item.status === "optional" || item.status === "complete") continue;
+    checks.push({
+      title: `Finish ${item.label}`,
+      detail: item.description,
+      tone: "amber",
+    });
+  }
+
+  if (!params.row.productMode) {
+    checks.push({
+      title: "Confirm product mode",
+      detail: "Product mode is not set, which can make support triage harder.",
+      tone: "amber",
+    });
+  }
+
+  if (status && !["active", "trial", "grace"].includes(status)) {
+    checks.push({
+      title: "Review account status",
+      detail: `Account status is ${formatStatusLabel(status)}. Confirm this is expected before troubleshooting workflow behavior.`,
+      tone: "amber",
+    });
+  }
+
+  if (status === "trial" && trialDaysRemaining != null && trialDaysRemaining <= 7) {
+    checks.push({
+      title: "Trial follow-up",
+      detail: `Trial ends ${formatOwnerConsoleDate(params.row.trialEnd)}. Consider a friendly check-in if this is a real customer account.`,
+      tone: "amber",
+    });
+  }
+
+  if (!params.entitlement.billingSubscriptionLinked && status !== "trial" && !params.entitlement.isInternalComped) {
+    checks.push({
+      title: "Check platform billing linkage",
+      detail: "No subscription linkage is visible for a non-trial, non-comped account.",
+      tone: "amber",
+    });
+  }
+
+  if (params.row.activeUsers <= 0) {
+    checks.push({
+      title: "Confirm active users",
+      detail: "No active internal users are visible for this account.",
+      tone: "amber",
+    });
+  }
+
+  if (checks.length === 0) {
+    checks.push({
+      title: "No immediate setup checks",
+      detail: "Core account health signals look ready. Continue with the customer-reported issue context.",
+      tone: "emerald",
+    });
+  }
+
+  return checks.slice(0, 6);
+}
+
 function DetailCard(props: { label: string; value: string; helper?: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -287,6 +363,25 @@ function HealthSignalCard(props: { signal: AccountHealthSignal }) {
       </div>
       <p className="mt-2 text-base font-semibold text-slate-950">{props.signal.value}</p>
       <p className="mt-1 text-xs text-slate-600">{props.signal.helper}</p>
+    </div>
+  );
+}
+
+function SupportNextCheckCard(props: { item: AccountTriageItem }) {
+  const borderClass = {
+    slate: "border-slate-200 bg-white",
+    emerald: "border-emerald-200 bg-emerald-50",
+    blue: "border-blue-200 bg-blue-50",
+    amber: "border-amber-200 bg-amber-50",
+  }[props.item.tone];
+
+  return (
+    <div className={`rounded-2xl border p-4 ${borderClass}`}>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="font-medium text-slate-950">{props.item.title}</p>
+        <Badge tone={props.item.tone}>{props.item.tone === "emerald" ? "Clear" : props.item.tone === "amber" ? "Check" : "Info"}</Badge>
+      </div>
+      <p className="mt-1 text-sm text-slate-600">{props.item.detail}</p>
     </div>
   );
 }
@@ -345,6 +440,7 @@ export default async function PlatformOwnerAccountSnapshotPage({ params }: { par
   ]);
   const badges = resolveAccountBadges({ row, hiddenEmails, internalEmails });
   const healthSignals = resolveAccountHealthSignals({ row, readiness, entitlement });
+  const supportNextChecks = resolveSupportNextChecks({ row, readiness, entitlement });
   const requiredReadinessItems = readiness.items.filter((item) => item.status !== "optional");
   const optionalReadinessItems = readiness.items.filter((item) => item.status === "optional");
 
@@ -391,6 +487,22 @@ export default async function PlatformOwnerAccountSnapshotPage({ params }: { par
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {healthSignals.map((signal) => (
             <HealthSignalCard key={signal.label} signal={signal} />
+          ))}
+        </div>
+      </section>
+
+      <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Support Next Checks</h2>
+            <p className="mt-1 text-sm text-slate-500">
+              Read-only prompts from account setup, trial, billing, and user signals. These do not perform tenant actions.
+            </p>
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3 md:grid-cols-2">
+          {supportNextChecks.map((item) => (
+            <SupportNextCheckCard key={`${item.title}-${item.detail}`} item={item} />
           ))}
         </div>
       </section>
