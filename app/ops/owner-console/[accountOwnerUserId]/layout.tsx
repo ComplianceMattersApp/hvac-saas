@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import AccountSnapshotIdentityHeader from "./AccountSnapshotIdentityHeader";
 import CompanyProfileSnapshot from "./CompanyProfileSnapshot";
 import PaymentsReadinessSnapshot from "./PaymentsReadinessSnapshot";
 import SupportCallSummarySnapshot from "./SupportCallSummarySnapshot";
@@ -260,8 +261,11 @@ export default async function AccountSnapshotLayout({
 
   return (
     <>
+      <AccountSnapshotIdentityHeader accountOwnerUserId={accountOwnerUserId} />
       <SupportCallSummarySnapshot accountOwnerUserId={accountOwnerUserId} />
-      {children}
+      <div className="[&>div>section:nth-child(-n+2)]:hidden">
+        {children}
+      </div>
       <PaymentsReadinessSnapshot accountOwnerUserId={accountOwnerUserId} />
       <UsageRecencySnapshot accountOwnerUserId={accountOwnerUserId} />
       <TeamAndSeatsSection accountOwnerUserId={accountOwnerUserId} />
