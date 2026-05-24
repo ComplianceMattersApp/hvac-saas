@@ -11,6 +11,8 @@ const regenerateEstimateProposalLinkMock = vi.fn();
 const readCachedEstimateProposalLinkRawTokenMock = vi.fn();
 const resolveOperationalTenantIdentityMock = vi.fn();
 const sendEmailMock = vi.fn();
+const mkdirMock = vi.fn();
+const writeFileMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -46,9 +48,16 @@ vi.mock("@/lib/email/sendEmail", () => ({
   sendEmail: (...args: unknown[]) => sendEmailMock(...args),
 }));
 
+vi.mock("node:fs/promises", () => ({
+  mkdir: (...args: unknown[]) => mkdirMock(...args),
+  writeFile: (...args: unknown[]) => writeFileMock(...args),
+}));
+
 const ACCOUNT_OWNER = "owner-1";
 const USER_ID = "user-1";
 const ESTIMATE_ID = "est-1";
+const ORIGINAL_NODE_ENV = process.env.NODE_ENV;
+const ORIGINAL_VERCEL_ENV = process.env.VERCEL_ENV;
 
 type CommunicationInsert = {
   attempt_status: string;
@@ -206,6 +215,15 @@ describe("sendEstimateProposalEmail", () => {
     });
 
     sendEmailMock.mockResolvedValue({ data: { id: "resend-1" }, error: null });
+    mkdirMock.mockResolvedValue(undefined);
+    writeFileMock.mockResolvedValue(undefined);
+
+    delete process.env.EMAIL_DELIVERY_MODE;
+    delete process.env.ENABLE_EMAIL_PREVIEW_OUTBOX;
+    delete process.env.ALLOWED_TEST_EMAIL_RECIPIENTS;
+    vi.unstubAllEnvs();
+    vi.stubEnv("NODE_ENV", ORIGINAL_NODE_ENV ?? "test");
+    vi.stubEnv("VERCEL_ENV", ORIGINAL_VERCEL_ENV ?? "");
   });
 
   it("fails closed when estimates are disabled", async () => {
@@ -520,5 +538,102 @@ describe("sendEstimateProposalEmail", () => {
     expect(supabase._proposalLinkUpdates).toHaveLength(1);
     expect(Object.prototype.hasOwnProperty.call(supabase._proposalLinkUpdates[0], "sent_at")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(supabase._proposalLinkUpdates[0], "last_sent_at")).toBe(true);
+  });
+
+  it("generates local preview outbox without calling provider", async () => {
+    process.env.EMAIL_DELIVERY_MODE = "preview";
+    isEstimateProposalLinksEnabledMock.mockReturnValue(false);
+
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { sendEstimateProposalEmail } = await import("@/lib/estimates/estimate-proposal-email");
+    const result = await sendEstimateProposalEmail({
+      estimateId: ESTIMATE_ID,
+      recipientEmail: "owner@client.com",
+    });
+
+    expect(result.success).toBe(true);
+    expect((result as { deliveryMode?: string }).deliveryMode).toBe("preview");
+    expect((result as { proposalUrl?: string }).proposalUrl).toContain("/proposals/preview-est-1");
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(mkdirMock).toHaveBeenCalled();
+    expect(writeFileMock).toHaveBeenCalledTimes(3);
+
+    const htmlWrite = writeFileMock.mock.calls.find((call) =>
+      String(call[0]).includes("latest-proposal-email.html")
+    );
+    const textWrite = writeFileMock.mock.calls.find((call) =>
+      String(call[0]).includes("latest-proposal-email.txt")
+    );
+    const jsonWrite = writeFileMock.mock.calls.find((call) =>
+      String(call[0]).includes("latest-proposal-email.json")
+    );
+
+    expect(htmlWrite?.[1]).toContain("/proposals/preview-est-1");
+    expect(textWrite?.[1]).toContain("/proposals/preview-est-1");
+    expect(String(jsonWrite?.[1])).not.toContain("token_hash");
+    expect(String(jsonWrite?.[1])).not.toContain("raw_token");
+
+    expect(supabase._communicationInserts).toHaveLength(0);
+    expect(supabase._eventInserts).toHaveLength(0);
+    expect(supabase._proposalLinkUpdates).toHaveLength(0);
+  });
+
+  it("fails closed when preview mode is set in production runtime", async () => {
+    process.env.EMAIL_DELIVERY_MODE = "preview";
+    vi.stubEnv("NODE_ENV", "production");
+
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { sendEstimateProposalEmail } = await import("@/lib/estimates/estimate-proposal-email");
+    const result = await sendEstimateProposalEmail({
+      estimateId: ESTIMATE_ID,
+      recipientEmail: "owner@client.com",
+    });
+
+    expect(result.success).toBe(false);
+    expect((result as { code?: string }).code).toBe("preview_mode_unavailable");
+    expect(sendEmailMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks non-allowlisted recipients in explicit non-production provider mode", async () => {
+    process.env.EMAIL_DELIVERY_MODE = "provider";
+    process.env.ALLOWED_TEST_EMAIL_RECIPIENTS = "sandbox-only@client.com";
+
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { sendEstimateProposalEmail } = await import("@/lib/estimates/estimate-proposal-email");
+    const result = await sendEstimateProposalEmail({
+      estimateId: ESTIMATE_ID,
+      recipientEmail: "owner@client.com",
+    });
+
+    expect(result.success).toBe(false);
+    expect((result as { code?: string }).code).toBe("recipient_not_allowlisted");
+    expect(sendEmailMock).not.toHaveBeenCalled();
+    expect(supabase._communicationInserts).toHaveLength(0);
+  });
+
+  it("allows explicit non-production provider mode for allowlisted recipients", async () => {
+    process.env.EMAIL_DELIVERY_MODE = "provider";
+    process.env.ALLOWED_TEST_EMAIL_RECIPIENTS = "owner@client.com";
+
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { sendEstimateProposalEmail } = await import("@/lib/estimates/estimate-proposal-email");
+    const result = await sendEstimateProposalEmail({
+      estimateId: ESTIMATE_ID,
+      recipientEmail: "owner@client.com",
+    });
+
+    expect(result.success).toBe(true);
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    const sendArgs = sendEmailMock.mock.calls[0][0] as { subject: string };
+    expect(sendArgs.subject).toContain("[LOCAL TEST]");
+    expect(sendArgs.subject).toContain("Proposal Ready:");
   });
 });

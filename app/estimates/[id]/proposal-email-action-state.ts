@@ -3,6 +3,7 @@ export type ProposalEmailActionState = {
   error: string | null;
   code?: string;
   attemptStatus?: "blocked" | "accepted" | "failed";
+  deliveryMode?: "provider" | "preview";
   communicationId?: string;
   proposalLinkId?: string;
   proposalUrl?: string | null;

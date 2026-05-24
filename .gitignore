@@ -54,3 +54,6 @@ supabase/.temp/
 # OS / editor
 .DS_Store
 node_modules/
+
+# local preview outbox
+.tmp/

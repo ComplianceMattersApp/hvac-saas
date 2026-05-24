@@ -1,3 +1,6 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+
 import { createClient } from "@/lib/supabase/server";
 import { requireInternalUser } from "@/lib/auth/internal-user";
 import {
@@ -16,6 +19,7 @@ import { renderOperationalEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 
 type ProposalEmailAttemptStatus = "blocked" | "accepted" | "failed";
+type EmailDeliveryMode = "provider" | "preview";
 
 type SendEstimateProposalEmailParams = {
   estimateId: string;
@@ -26,8 +30,9 @@ export type SendEstimateProposalEmailResult =
   | {
       success: true;
       attemptStatus: ProposalEmailAttemptStatus;
-      communicationId: string;
-      proposalLinkId: string;
+  deliveryMode: EmailDeliveryMode;
+  communicationId?: string;
+  proposalLinkId?: string;
       proposalUrl: string | null;
       providerMessageId: string | null;
       emailDisabled: boolean;
@@ -45,6 +50,8 @@ export type SendEstimateProposalEmailResult =
         | "proposal_link_unavailable"
         | "proposal_link_token_unavailable"
         | "proposal_email_base_url_unavailable"
+        | "preview_mode_unavailable"
+        | "recipient_not_allowlisted"
         | "communication_insert_failed";
     };
 
@@ -84,6 +91,76 @@ function resolveProposalBaseUrl() {
   }
 
   return "https://hvac-saas-xi.vercel.app";
+}
+
+function isEnabledFlag(value: string | undefined) {
+  return ["1", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
+}
+
+function isProductionRuntime() {
+  const vercelEnv = String(process.env.VERCEL_ENV ?? "").trim().toLowerCase();
+  if (vercelEnv === "production") return true;
+  return String(process.env.NODE_ENV ?? "").trim().toLowerCase() === "production";
+}
+
+function resolveEmailDeliveryMode(): { mode: EmailDeliveryMode; explicitProvider: boolean } {
+  const rawMode = String(process.env.EMAIL_DELIVERY_MODE ?? "").trim().toLowerCase();
+  if (rawMode === "preview" || isEnabledFlag(process.env.ENABLE_EMAIL_PREVIEW_OUTBOX)) {
+    return { mode: "preview", explicitProvider: false };
+  }
+
+  if (rawMode === "provider") {
+    return { mode: "provider", explicitProvider: true };
+  }
+
+  return { mode: "provider", explicitProvider: false };
+}
+
+function resolveNonProdSubjectPrefix() {
+  const vercelEnv = String(process.env.VERCEL_ENV ?? "").trim().toLowerCase();
+  if (vercelEnv === "preview") return "[SANDBOX TEST]";
+  return "[LOCAL TEST]";
+}
+
+function parseAllowedTestRecipients() {
+  const raw = String(process.env.ALLOWED_TEST_EMAIL_RECIPIENTS ?? "");
+  return new Set(
+    raw
+      .split(/[\s,;]+/)
+      .map((entry) => String(entry ?? "").trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
+
+async function writeProposalEmailPreviewOutbox(params: {
+  estimateId: string;
+  recipientEmail: string;
+  subject: string;
+  html: string;
+  text: string;
+  proposalUrl: string;
+}) {
+  const outboxDir = path.join(process.cwd(), ".tmp", "email-outbox");
+  await mkdir(outboxDir, { recursive: true });
+
+  const jsonPayload = {
+    generated_at: new Date().toISOString(),
+    mode: "preview",
+    estimate_id: params.estimateId,
+    recipient_email: params.recipientEmail,
+    subject: params.subject,
+    proposal_url: params.proposalUrl,
+  };
+
+  await Promise.all([
+    writeFile(path.join(outboxDir, "latest-proposal-email.html"), params.html, "utf8"),
+    writeFile(path.join(outboxDir, "latest-proposal-email.txt"), params.text, "utf8"),
+    writeFile(
+      path.join(outboxDir, "latest-proposal-email.json"),
+      JSON.stringify(jsonPayload, null, 2),
+      "utf8"
+    ),
+  ]);
 }
 
 function buildProposalEmailHtml(params: {
@@ -396,7 +473,19 @@ export async function sendEstimateProposalEmail(
     };
   }
 
-  if (!isEstimateProposalLinksEnabled()) {
+  const deliveryModeResult = resolveEmailDeliveryMode();
+  const deliveryMode = deliveryModeResult.mode;
+  const explicitProviderMode = deliveryModeResult.explicitProvider;
+
+  if (deliveryMode === "preview" && isProductionRuntime()) {
+    return {
+      success: false,
+      code: "preview_mode_unavailable",
+      error: "Email preview mode is unavailable in production.",
+    };
+  }
+
+  if (deliveryMode === "provider" && !isEstimateProposalLinksEnabled()) {
     return {
       success: false,
       code: "proposal_links_unavailable",
@@ -442,16 +531,6 @@ export async function sendEstimateProposalEmail(
     return estimateResult;
   }
 
-  const linkResult = await resolveProposalLinkForEmail({
-    supabase,
-    estimateId,
-    accountOwnerUserId,
-    recipientEmail,
-  });
-  if (!linkResult.success) {
-    return linkResult;
-  }
-
   const baseUrl = resolveProposalBaseUrl();
   if (!baseUrl) {
     return {
@@ -461,7 +540,26 @@ export async function sendEstimateProposalEmail(
     };
   }
 
-  const proposalUrl = `${baseUrl}/proposals/${linkResult.rawToken}`;
+  let proposalLinkId: string | undefined;
+  let hadPriorSentAt = false;
+  let proposalUrl = `${baseUrl}/proposals/preview-${estimateId}`;
+
+  if (deliveryMode === "provider") {
+    const linkResult = await resolveProposalLinkForEmail({
+      supabase,
+      estimateId,
+      accountOwnerUserId,
+      recipientEmail,
+    });
+    if (!linkResult.success) {
+      return linkResult;
+    }
+
+    proposalLinkId = linkResult.proposalLinkId;
+    hadPriorSentAt = linkResult.hadPriorSentAt;
+    proposalUrl = `${baseUrl}/proposals/${linkResult.rawToken}`;
+  }
+
   const tenantIdentity = await resolveOperationalTenantIdentity({
     accountOwnerUserId,
     supabase,
@@ -472,6 +570,10 @@ export async function sendEstimateProposalEmail(
     estimateTitle: estimateResult.estimate.title,
     companyDisplayName: tenantIdentity.displayName,
   });
+  const providerSubject =
+    explicitProviderMode && !isProductionRuntime()
+      ? `${resolveNonProdSubjectPrefix()} ${subject}`
+      : subject;
   const html = buildProposalEmailHtml({
     companyDisplayName: tenantIdentity.displayName,
     companyLogoUrl: tenantIdentity.logoUrl,
@@ -490,6 +592,37 @@ export async function sendEstimateProposalEmail(
     proposalUrl,
   });
 
+  if (deliveryMode === "preview") {
+    await writeProposalEmailPreviewOutbox({
+      estimateId,
+      recipientEmail,
+      subject,
+      html,
+      text,
+      proposalUrl,
+    });
+
+    return {
+      success: true,
+      attemptStatus: "accepted",
+      deliveryMode: "preview",
+      proposalUrl,
+      providerMessageId: null,
+      emailDisabled: false,
+    };
+  }
+
+  if (explicitProviderMode && !isProductionRuntime()) {
+    const allowedRecipients = parseAllowedTestRecipients();
+    if (!allowedRecipients.has(recipientEmail)) {
+      return {
+        success: false,
+        code: "recipient_not_allowlisted",
+        error: "Recipient is not allowlisted for non-production provider mode.",
+      };
+    }
+  }
+
   const emailEnabled = isEstimateProposalEmailSendEnabled();
 
   let attemptStatus: ProposalEmailAttemptStatus = "blocked";
@@ -502,7 +635,7 @@ export async function sendEstimateProposalEmail(
     try {
       const providerResult = await sendEmail({
         to: recipientEmail,
-        subject,
+        subject: providerSubject,
         html,
         text,
       });
@@ -521,7 +654,7 @@ export async function sendEstimateProposalEmail(
     accountOwnerUserId,
     userId,
     recipientEmail,
-    subject,
+    subject: providerSubject,
     attemptStatus,
     providerName,
     providerMessageId,
@@ -532,14 +665,14 @@ export async function sendEstimateProposalEmail(
   }
 
   const commonMeta = {
-    proposal_link_id: linkResult.proposalLinkId,
+    proposal_link_id: proposalLinkId,
     communication_id: communicationResult.communicationId,
     recipient_email_snapshot: recipientEmail,
     send_outcome: attemptStatus,
     provider_message_id: providerMessageId,
     sanitized_error: sanitizedError,
     source: "internal",
-    delivery_mode: "email",
+    delivery_mode: "email_provider",
   } satisfies Record<string, unknown>;
 
   await insertEstimateEvent({
@@ -550,14 +683,14 @@ export async function sendEstimateProposalEmail(
     meta: commonMeta,
   });
 
-  if (attemptStatus === "accepted") {
+  if (attemptStatus === "accepted" && proposalLinkId) {
     const sentAtIso = new Date().toISOString();
     await touchProposalLinkSendTimestamps({
       supabase,
-      proposalLinkId: linkResult.proposalLinkId,
+      proposalLinkId,
       accountOwnerUserId,
       sentAtIso,
-      shouldSetInitialSentAt: !linkResult.hadPriorSentAt,
+      shouldSetInitialSentAt: !hadPriorSentAt,
     });
 
     await insertEstimateEvent({
@@ -585,8 +718,9 @@ export async function sendEstimateProposalEmail(
   return {
     success: true,
     attemptStatus,
+    deliveryMode: "provider",
     communicationId: communicationResult.communicationId,
-    proposalLinkId: linkResult.proposalLinkId,
+    proposalLinkId,
     proposalUrl,
     providerMessageId,
     emailDisabled: !emailEnabled,

@@ -31,6 +31,13 @@ export function resolveProposalEmailNotice(
   if (isIdleState) return null;
 
   if (state.success) {
+    if (state.attemptStatus === "accepted" && state.deliveryMode === "preview") {
+      return {
+        tone: "success",
+        message: "Proposal email preview generated.",
+      };
+    }
+
     if (state.attemptStatus === "accepted") {
       return {
         tone: "success",
@@ -62,6 +69,21 @@ export function resolveProposalEmailNotice(
 
     if (state.code === "recipient_invalid") {
       return { tone: "error", message: "Enter a valid recipient email address." };
+    }
+
+    if (state.code === "recipient_not_allowlisted") {
+      return {
+        tone: "warning",
+        message:
+          "Recipient is not allowlisted for non-production provider mode.",
+      };
+    }
+
+    if (state.code === "preview_mode_unavailable") {
+      return {
+        tone: "warning",
+        message: "Email preview mode is unavailable in production.",
+      };
     }
 
     if (

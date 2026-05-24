@@ -245,6 +245,7 @@ export async function sendEstimateProposalEmailFromForm(
       success: true,
       error: null,
       attemptStatus: result.attemptStatus,
+      deliveryMode: result.deliveryMode,
       communicationId: result.communicationId,
       proposalLinkId: result.proposalLinkId,
       proposalUrl: result.proposalUrl,
