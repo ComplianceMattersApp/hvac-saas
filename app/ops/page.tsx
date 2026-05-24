@@ -1,6 +1,7 @@
 // app/ops/page
 import Link from "next/link";
 import Image from "next/image";
+import { Clock3 } from "lucide-react";
 import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
@@ -15,7 +16,7 @@ import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
-import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
+import { getActiveJobAssignmentDisplayMap, resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
@@ -43,6 +44,7 @@ import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { summarizeMaintenanceAgreementsForAccount } from "@/lib/maintenance-agreements/read-model";
+import { listTeamClockStatusPreview } from "@/lib/time-clock/read-model";
 import {
   buildLatestCustomerAttemptByJob,
   resolveRecentAttemptDisplay,
@@ -150,6 +152,36 @@ function startOfTodayLocalISO() {
   d.setHours(0, 0, 0, 0);
   return d.toISOString();
 }
+
+function formatTeamClockSince(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "-";
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return "-";
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
+function formatTeamClockElapsedFromClockIn(clockInAt: string | null | undefined) {
+  const normalized = String(clockInAt ?? "").trim();
+  if (!normalized) return "0m";
+
+  const startedAt = new Date(normalized).getTime();
+  if (!Number.isFinite(startedAt)) return "0m";
+
+  const totalMinutes = Math.max(0, Math.floor((Date.now() - startedAt) / 60000));
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  if (hours <= 0) return `${minutes}m`;
+  return `${hours}h ${minutes}m`;
+}
 function startOfTomorrowLocalISO() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -210,6 +242,60 @@ export default async function OpsPage({
 
   const internalUser = actorContext.internalUser;
   if (opsTimingEnabled) console.log(`[ops:requestActorContext] ${Date.now() - _t_requestActorContext}ms`);
+
+  const showTeamClockStatusCardForRole =
+    internalUser.role === "admin" || internalUser.role === "office";
+
+  let showTeamClockStatusCard = false;
+  let teamClockStatusRows: Array<{
+    internalUserId: string;
+    displayName: string;
+    statusLabel: "Clocked In" | "On Lunch";
+    sinceAt: string;
+    elapsed: string;
+  }> = [];
+
+  if (showTeamClockStatusCardForRole) {
+    const { data: accountSettings, error: accountSettingsErr } = await supabase
+      .from("account_settings")
+      .select("time_clock_enabled")
+      .eq("account_owner_user_id", internalUser.account_owner_user_id)
+      .maybeSingle();
+
+    if (accountSettingsErr) throw accountSettingsErr;
+
+    const isTimeClockEnabled = Boolean((accountSettings as any)?.time_clock_enabled);
+    if (isTimeClockEnabled) {
+      const previewRows = await listTeamClockStatusPreview({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+      });
+
+      const displayMap = await resolveUserDisplayMap({
+        supabase,
+        userIds: previewRows
+          .map((row) => String(row.internalUserId ?? "").trim())
+          .filter(Boolean),
+      });
+
+      showTeamClockStatusCard = true;
+      teamClockStatusRows = previewRows.map((row) => {
+        const internalUserId = String(row.internalUserId ?? "").trim();
+        const displayName =
+          formatPersonNamePart(displayMap[internalUserId] ?? "") || "Unknown User";
+        const statusLabel = row.status === "on_lunch" ? "On Lunch" : "Clocked In";
+        const sinceSource = row.status === "on_lunch" ? row.lunchStartAt ?? row.clockInAt : row.clockInAt;
+
+        return {
+          internalUserId,
+          displayName,
+          statusLabel,
+          sinceAt: formatTeamClockSince(sinceSource),
+          elapsed: formatTeamClockElapsedFromClockIn(row.clockInAt),
+        };
+      });
+    }
+  }
 
   const resolvedProductModePromise = resolveProductModeForAccountOwnerId({
     supabase,
@@ -2581,7 +2667,9 @@ return (
           </div>
         </div>
 
-        {isHvacServiceMode ? (
+        {isHvacServiceMode || showTeamClockStatusCard ? (
+          <div className="space-y-3">
+          {isHvacServiceMode ? (
           <div className="rounded-2xl border border-slate-200/90 bg-white/92 p-3.5 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.35)]">
             <div className="flex flex-wrap items-start justify-between gap-2">
               <div>
@@ -2644,6 +2732,60 @@ return (
                 </Link>
               </div>
             ) : null}
+          </div>
+          ) : null}
+
+          {showTeamClockStatusCard ? (
+            <div className="rounded-2xl border border-slate-200/90 bg-white/92 p-3.5 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.35)]">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className={`${opsUtilityLabelClass} text-slate-500`}>Operations</div>
+                  <div className="mt-0.5 flex items-center gap-1.5 text-base font-semibold tracking-tight text-slate-950">
+                    <Clock3 className="h-4 w-4 text-slate-500" aria-hidden="true" />
+                    <span>Team Clock Status</span>
+                  </div>
+                </div>
+                <Link
+                  href="/time-clock"
+                  className="inline-flex items-center rounded-lg border border-slate-300/90 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_20px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
+                >
+                  Open Time Clock
+                </Link>
+              </div>
+
+              {teamClockStatusRows.length === 0 ? (
+                <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                  No team members are clocked in right now.
+                </div>
+              ) : (
+                <div className="mt-3 space-y-2">
+                  {teamClockStatusRows.map((row) => (
+                    <div
+                      key={row.internalUserId}
+                      className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="truncate text-sm font-semibold text-slate-900">{row.displayName}</div>
+                          <div className="mt-0.5 text-xs text-slate-600">Since {row.sinceAt}</div>
+                        </div>
+                        <span
+                          className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                            row.statusLabel === "On Lunch"
+                              ? "border-amber-200 bg-amber-50 text-amber-800"
+                              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          }`}
+                        >
+                          {row.statusLabel}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs text-slate-600">Session {row.elapsed}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
           </div>
         ) : null}
       </div>

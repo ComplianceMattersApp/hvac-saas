@@ -225,6 +225,11 @@ V1D closeout status:
 - Add admin/office Team Clock Status card on `/ops`.
 - Keep card read-first and lightweight.
 
+V1E closeout status:
+- Complete in repository: admin/office-only Team Clock Status card on `/ops` with active entries (`Clocked In` and `On Lunch`) and `Open Time Clock` link.
+- Card stays account-scoped and read-only, and remains hidden when account time clock is disabled to avoid dashboard clutter.
+- No correction controls, reporting/export, payroll, overtime, GPS, or job-costing behavior added in this phase.
+
 ### V1F - admin review/correction page
 - Add admin/owner review center.
 - Add correction workflow with required reason.
