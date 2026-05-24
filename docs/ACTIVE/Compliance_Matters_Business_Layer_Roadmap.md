@@ -1394,11 +1394,11 @@ P1 closeout note:
   - no model, validation, billing, ECC, or RLS behavior changes were introduced in that pass
 - Invoice job-detail TLC pass is complete:
   - internal invoice panel scanability is improved
-  - invoice truth anchor is explicit: invoices are billed truth, payment entries are tracking-only and do not execute card charges
+  - invoice truth anchor is explicit: invoices are billed truth, and payment truth is manual plus Stripe webhook-confirmed rows in `internal_invoice_payments`
   - issue/send/payment/void section wording is clarified
   - external-billing lightweight path wording now emphasizes Invoice Sent tracking
   - line-item editor microcopy polish is complete
-  - no live payment execution was introduced
+  - unsupported payment add-ons remain deferred (refunds/disputes/saved cards/partial payments/public portal/platform fees/QBO sync)
 - Internal invoice draft prefill fallback hardening is complete where source fields exist:
   - available job/customer/contractor/location fields are now used for fallback prefill
   - existing drafts are not overwritten
@@ -1469,7 +1469,7 @@ Field-note launch-hardening closeout alignment note (current baseline):
 - Launch gating remains unchanged:
   - controlled tester onboarding remains parked pending explicit owner approval
   - Estimates and Support Console production enablement remain parked behind runbooks
-  - tenant customer payment execution remains deferred
+  - tenant customer payments V1 is complete for current intended scope; further add-ons remain deferred
   - QBO remains optional/downstream only
 
 Contractor report current-scope closeout note (completed):
@@ -1584,9 +1584,9 @@ Ops First Impression (`/ops`) closeout alignment note (current pass complete):
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production for the platform account subscription slice.
 - Live confirmation includes deployed env, live webhook handling, successful non-owner checkout completion, entitlement sync, and Manage billing availability.
 - This onboarding priority remains separate from tenant customer invoice payment execution.
-- Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
-- Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
-- Invoice/payment language remains tracking-only until processor-backed execution exists.
+- Tenant customer invoice payments V1 current scope is now complete (connected-account direct-charge model, webhook-only payment truth, duplicate protection, paid projection).
+- Deferred in this lane: refunds/disputes/saved cards/partial payments/receipt messaging/public portal/platform application fees/QBO sync.
+- Invoice/payment language should reflect current V1 behavior and must not promise deferred add-ons.
 
 ### Service workflow refinement V1 baseline (completed)
 - Service Case Reconciliation V1 is complete: centralized `reconcileServiceCaseStatusAfterJobChange` helper is wired into closeout and next-visit write paths; active linked visit keeps/reopens case open; all-terminal linked visits resolve case; `job_events` write intentionally deferred.
@@ -1594,7 +1594,7 @@ Ops First Impression (`/ops`) closeout alignment note (current pass complete):
 - Create Next Service Visit is complete: foundation-only; internal users can create a next visit under the same service case; no auto-release, no parts inventory, no estimate automation, no Visit Scope copy-forward.
 - Reporting cleanup is complete: dashboard/report drilldown alignment done; Jobs Report assignment filter (All/Unassigned/specific user) is complete; Jobs Report now includes `contractor_id = null` same-account customer-owned jobs while cross-account null-contractor jobs remain excluded; contractor filter remains contractor-only for safety; Service Cases Report Latest Visit display is clarity-only polish; remaining work is visual/card polish, not data alignment.
 - Next planned product track after this baseline: estimates/quoting.
-- Stripe tenant customer payment execution remains deferred.
+- Stripe tenant customer payments V1 is complete for current intended scope.
 - Confirmed: no schema changes, no migrations, no Supabase commands, no production data actions, no payment/Stripe/QBO/ECC/retest/Visit Scope/contractor/assignment/scheduling behavior changes were part of this baseline.
 
 ### Locked rule
@@ -1816,8 +1816,8 @@ Boundaries remain unchanged:
 - platform subscription billing for onboarding is live-smoke confirmed for the platform account subscription slice
 - internal/comped owner protection is complete; comped owner/internal accounts remain outside Stripe checkout and surface as Internal / Comped with no billing-customer or subscription requirement
 - `/ops/admin/internal-users` normal launch UI no longer exposes the Link existing auth user panel; invite teammate, team setup confirmation, and team member management remain intact
-- tenant customer invoice payment execution remains deferred
-- live Stripe/customer checkout remains deferred
+- tenant customer invoice payments V1 current scope is complete
+- deferred payment add-ons remain deferred (refunds/disputes/saved cards/partial payments/public portal/platform application fees/QBO sync)
 
 ---
 
@@ -3257,7 +3257,7 @@ The following implementation groups have been closed as of May 2026.
 | 8 | Support / Owner Operations | Planned |
 | 9A | Recurring Services / Maintenance Agreements | Group 9A-2/3/4/5B/6/7B/8B/9A/9B/9C/9E/10B/10C closeout is documented, including read-only count eligibility (`0588a26`) plus manual `Mark Visit Counted` (`1b69336`) with always-visible placement fix (`2ae1a4b`); boundaries remain no automatic counting/no due-date advancement/no invoice-payment behavior; production remains inactive until migration apply and flag enablement are intentionally approved - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
 | 9B | SMS / On-My-Way Messaging | Planned (staged) — Slice A (`afddb9c`, `02aee5a`), Slice B1 (`39a2963`), Slice B2 (`c0247af`), Slice C (docs/model), Slice D (docs/model), Slice E1 (docs/model), and Slice E2 migration foundation (`b90c9ea`) are complete. Slice E2 migration `supabase/migrations/20260515130000_sms_message_intent_provider_delivery_foundation.sql` created `sms_message_intents` and `sms_provider_deliveries` with locked semantics: intents are send-request/decision audit context, deliveries are provider submission/callback truth, one current delivery row per intent, and account-scoped idempotency foundation on intents. Quiet-hours/timezone scope is locked as future conservative fail-closed SMS pre-send gate only; Mark On The Way and lifecycle/status transitions remain direct workflow and are not blocked; no quiet-hours settings UI is approved for V1 direct workflows. E2 validation passed (`npx.cmd tsc --noEmit`, helper tests `16/16` and `4/4`, `git diff --check`, `supabase db reset --local --no-seed --yes` with full local chain including E2). Scope remains no provider delivery write path, no send endpoint/webhook/provider integration, no live SMS, no backfill, no production migration apply, and no production writes. Marketplace guardrail remains neutral tenant/account-scoped audit infrastructure only. Live SMS remains deferred pending activation gates in `docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md`, recipient-role boundaries in `docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md`, and future gate slices documented in `docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md`, `docs/ACTIVE/SMS_Background_On_The_Way_Workflow_Spec.md`, `docs/ACTIVE/SMS_Settings_Communications_IA_Spec.md`, and `docs/ACTIVE/SMS_Message_Intent_and_Provider_Delivery_Model_Spec.md`. |
-| 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Planned |
+| 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Current V1 intended scope complete; add-ons deferred |
 | 9D | Customer Portal | Planned |
 | 9E | QBO / Accounting Sync | Last-last; optional downstream only |
 

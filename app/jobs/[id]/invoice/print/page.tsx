@@ -240,7 +240,7 @@ export default async function InternalInvoicePrintPage({
 
           <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 print:border-slate-300 print:bg-white">
             <p className="font-semibold text-slate-900">Payment + Billing Notice</p>
-            <p className="mt-1">Payment entries are tracking-only and do not charge a card, run checkout, or execute online payment.</p>
+            <p className="mt-1">Payment entries include manual records and Stripe-confirmed online payments captured via webhook.</p>
             <p className="mt-1">Please contact {tenantIdentity.displayName} for billing questions or payment instructions.</p>
           </div>
 

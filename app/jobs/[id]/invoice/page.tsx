@@ -529,9 +529,9 @@ export default async function InternalInvoiceWorkspacePage({
             {invoice.status === "issued" ? (
               <section className={`${panelClass} p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Tracking</div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Tracking-only payment record</h2>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Manual and webhook payment records</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Payment entries are tracking-only and do not charge a card, run ACH, or open customer checkout.
+                  Manual entries can be recorded here. Online card payments are recorded after Stripe webhook confirmation.
                 </p>
 
                 {paymentSummary ? (

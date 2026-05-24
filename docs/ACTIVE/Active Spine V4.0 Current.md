@@ -35,8 +35,8 @@ Recent closeout snapshot (May 2026):
 - Remaining estimate polish is parked and non-blocking: public proposal Service Location wording/presentation audit (must never show business address in service-location slot), optional proposal email visual polish via local preview mode only, visual-only Customer Delivery UI tweaks unless field workflow evidence reopens behavior, optional notification routing enhancements (assignment/admin/internal-email), optional multi-option customer card presentation polish, and future public-proposal Service Location/card wording polish.
 - ECC subcool tolerance is now +/-3F.
 - Pricebook runtime seed display name is now Diagnostic instead of Diagnostic Fee.
-- Source-of-truth boundaries remain unchanged: Invoice Charges remain billed truth, Work Items/Visit Scope remain operational work scope, external billing remains lightweight invoice-sent tracking, internal invoicing remains internal/admin only, payment entries remain tracking-only, Closeout Queue V1 uses existing closeout projection truth, and Calendar Work Context uses a derived compact label rather than a new truth model.
-- Parked follow-up remains parked: Closeout Queue V2 waits for owner feedback after V1 use, contact recipient write/edit workflow stays deferred unless field use proves need, SMS/provider-powered messaging stays behind existing gates, and live tenant customer payment execution remains deferred.
+- Source-of-truth boundaries remain unchanged: Invoice Charges remain billed truth, Work Items/Visit Scope remain operational work scope, external billing remains lightweight invoice-sent tracking, internal invoicing remains internal/admin only, payment truth is owned by `internal_invoice_payments` (manual plus Stripe webhook-confirmed rows), Closeout Queue V1 uses existing closeout projection truth, and Calendar Work Context uses a derived compact label rather than a new truth model.
+- Parked follow-up remains parked: Closeout Queue V2 waits for owner feedback after V1 use, contact recipient write/edit workflow stays deferred unless field use proves need, SMS/provider-powered messaging stays behind existing gates, and payment add-ons (refunds, disputes, saved cards, partial payments, receipt messaging, public payment portal, platform application fees, QBO sync) remain deferred.
 
 Customer/location/contact/billing relationship intake closeout (May 2026):
 - Completed model lock for V1 relationship intake and display:
@@ -1029,7 +1029,7 @@ Current Program Status Note (May 2026)
   - no source-of-truth redesign
   - no queue rewrite
   - no payment/Stripe tenant execution/QBO/Estimates/Support/onboarding behavior changes
-- Planned pre-launch spine order is now resumed after this docs closeout; Support Console and Estimates production enablement remain parked behind their runbooks, tenant customer payment execution remains deferred, QBO remains optional downstream/last-last, and controlled tester onboarding remains intentionally held until readiness work is acceptably complete and supportable.
+- Planned pre-launch spine order is now resumed after this docs closeout; Support Console and Estimates production enablement remain parked behind their runbooks, tenant customer payments V1 is complete for current intended scope, deferred payment add-ons remain parked, QBO remains optional downstream/last-last, and controlled tester onboarding remains intentionally held until readiness work is acceptably complete and supportable.
 - Contractor Report current-scope delivery is complete and accepted for current launch scope quality:
   - failed ECC contractor reports aggregate all failed completed ECC runs for the job
   - enriched contractor-actionable failure details are included (baseline, measured value, variance), including corrected duct-leakage percentage logic

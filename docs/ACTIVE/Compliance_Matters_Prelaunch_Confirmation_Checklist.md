@@ -62,26 +62,28 @@ If any item here conflicts with the active spine, the spine wins.
 - Marketplace-readiness framing: this wording hardening is actor-neutral and preserves clean communication boundaries across customers, responsible parties, contractors, internal users, account owners, and future marketplace participants.
 
 ### 2.3 Payment/live enablement readiness
-- Confirm launch posture remains `payment-ready by design, payment-active later` unless explicitly changed.
-- Confirm Phase P1 payment-ready foundation is complete, while live processor-backed payment execution remains later/pre-launch enablement work.
+- Confirm launch posture now includes tenant customer invoice payments V1 in current scope (connected-account direct-charge model; webhook-only payment truth).
+- Confirm Phase P1 payment-ready foundation and tenant customer invoice payments V1 closeout are complete for current intended scope.
 - Confirm Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Confirm this Stripe work is separate from tenant customer/work invoice payment execution.
-- Confirm the tenant customer/work payment execution track remains future/deferred:
+- Confirm tenant customer/work payment execution V1 current-scope behavior:
   - tenant customer payment execution V1 means processor-backed customer payment acceptance for issued tenant internal invoices
   - it is separate from platform subscription billing, which charges the tenant account for Compliance Matters access and syncs entitlement truth
   - customer pays invoice online
   - payment outcome writes back to Compliance Matters
   - invoice payment status/balance updates
-  - partial/full payment outcomes anticipated
-  - refunds/disputes/payment-failure handling remains later
+  - duplicate protection is active across charge/session/payment-intent identity checks and Stripe event idempotency
+  - failed attempts are captured as non-balance-changing failed rows; invoice remains unpaid unless recorded payment truth exists
+  - partial/full payment outcomes in current scope remain limited to existing invoice eligibility and full-balance checkout posture
+  - refunds/disputes remain later
   - optional small platform fee remains future capability
   - QBO remains optional/downstream only
 - Confirm QBO remains last-last and never overrides Compliance Matters invoice or payment truth.
-- Verify no UI implies live processor-backed payment collection before it truly exists.
+- Verify UI copy matches current behavior without promising unsupported payment features.
 - Confirm Stripe-first future direction and QBO-optional boundary remain intact.
 - Confirm recent invoice/payment wording polish remains honest:
-  - payment entries are tracking-only and do not execute card charges
-  - no live Pay Now/Charge Card/checkout/refund/dispute/payout language appears as active behavior
+  - manual entries and Stripe webhook-confirmed rows coexist in `internal_invoice_payments`
+  - no refund/dispute/saved-card/partial-payment/customer-portal/platform-fee/QBO promise appears as active behavior
   - manual/off-platform payment recording continues to coexist with Stripe-sourced payment rows
 
 ### 2.3.1 Launch-readiness catch-up confirmations (completed)
@@ -241,7 +243,7 @@ If any item here conflicts with the active spine, the spine wins.
   - Contact recipient write/edit workflow stays deferred unless field use proves need.
   - Closeout Queue V2 waits until the owner uses V1 and provides feedback.
   - SMS/provider-powered messaging stays behind the existing gates.
-  - Live tenant customer payment execution remains deferred.
+  - Payment add-ons remain deferred (refunds, disputes, saved cards, partial payments, receipt messaging, customer portal, platform application fees, QBO sync).
 - Resolved watch item:
   - `calendar-filtering.test.ts` is green again and no longer represents an active TypeScript fixture gap.
 
@@ -472,7 +474,7 @@ If any item here conflicts with the active spine, the spine wins.
   6. First-owner/operator handoff dry-run (owner setup, operator checklist, account readiness, support readiness, launch operations)
   7. Controlled tester onboarding only after the above are acceptably complete
 - Tester remains in the wings intentionally and is not to be treated as a public launch trigger.
-- Support Console and Estimates production enablement remain parked behind their runbooks; tenant customer payment execution remains deferred; QBO remains optional downstream/last-last.
+- Support Console and Estimates production enablement remain parked behind their runbooks; tenant customer payments V1 is complete for current intended scope; QBO remains optional downstream/last-last.
 - Resume broader launch-readiness sequencing after this docs closeout without treating tester pressure as a launch trigger.
 
 ### 2.3.7 Field-ready installable/PWA access readiness V1 (Slice 1 baseline hardening)
@@ -717,7 +719,7 @@ Verification notes (2026-05-07, local dev session):
 - Launch gating posture remains unchanged:
   - controlled tester onboarding remains parked until explicit owner approval after remaining spine review
   - Estimates and Support Console production enablement remain parked behind runbooks
-  - tenant customer payment execution remains deferred
+  - tenant customer payments V1 is closed for current intended scope; further payment expansions remain deferred
   - QBO remains optional/downstream only
 
 ### 2.3.10 Release scope lock confirmation (May 2026)
@@ -1080,7 +1082,7 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
   - manual draft invoice line add still works
   - Pricebook draft invoice line add still works
   - issued/void invoice states keep builder/edit controls hidden
-  - invoice/payment wording remains tracking-only and does not imply live charging
+  - invoice/payment wording reflects manual + webhook-confirmed payment truth and does not imply unsupported payment features
 - Before launch (post-deploy), operators should verify this path in production UI:
 
 ### ECC verification expansion + closeout queue correction closeout (completed)

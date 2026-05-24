@@ -1,18 +1,18 @@
 # Compliance Matters Software — Payments Roadmap
 
-**Status:** ACTIVE IMPLEMENTATION DIRECTION (platform-subscription V1 live platform smoke complete)  
-**Purpose:** Define the correct payment architecture now, while building only the payment-ready foundation and avoiding rework later.
+**Status:** ACTIVE IMPLEMENTATION DIRECTION (platform-subscription V1 live platform smoke complete; tenant customer payments V1 current scope implemented and locally/sandbox validated)
+**Purpose:** Define the locked payment architecture and current-shipped V1 scope, while keeping deferred add-ons explicitly parked.
 
 ---
 
 ## 1. Core decision
 
-Compliance Matters will **build payment architecture now**, but will **not yet enable live payment processing**.
+Compliance Matters has **built payment architecture and shipped tenant customer invoice payments V1 for the current intended scope**.
 
 ### Locked rule
 - the platform is **payment-ready by design**
-- the platform is **not yet payment-active**
-- payment execution comes later
+- tenant customer invoice payments V1 current scope is **payment-active**
+- payment add-ons beyond V1 current scope come later
 - architecture must support future payment acceptance without requiring backwards redesign
 
 ---
@@ -63,8 +63,8 @@ When real payment acceptance is introduced later:
 
 ### Current implementation rule
 Platform subscription billing for account onboarding is implemented as Stripe Platform Subscription V1 and has passed live production smoke for platform account subscriptions.  
-Tenant customer invoice payment execution remains deferred.  
-Build tenant payment architecture so later Stripe execution can be introduced without structural rework.
+Tenant customer invoice payments V1 current scope is implemented in connected-account direct-charge model and validated in local/sandbox closeout.
+Future payment add-ons remain deferred to avoid scope expansion.
 
 Alignment note:
 - operational entitlement mutation guard rollout for active internal operational mutation paths is production-promoted on `main` at commit `bf38eca` (89 test files, 1057 tests, TSC_OK, production smoke confirmed)
@@ -77,7 +77,7 @@ Alignment note:
 ## 5. Current product truth
 
 ### Live behavior right now
-Payments are **tracking-only**.
+Tenant customer invoice payments V1 current scope is **implemented**.
 
 Current implemented repo truth now includes:
 - a real internal invoice domain for internal-invoicing mode
@@ -91,9 +91,14 @@ Collected-payment truth is now materially implemented in repo for issued interna
 - collected-payment rows are owned by `internal_invoice_payments`
 - collected-payment visibility is implemented in the internal invoice ledger and CSV export
 
-Still not implemented/live:
-- live processor-backed payment execution
-- customer checkout / saved payment methods / refunds / disputes / payout workflows
+Still not implemented/live in current scope:
+- refunds/disputes
+- saved payment methods
+- partial payments
+- customer payment portal/public payment portal
+- receipt email/SMS automation
+- platform application fees
+- QBO payment sync
 
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
@@ -108,7 +113,7 @@ Platform subscription onboarding status (separate from tenant payment execution)
 - V1D-B reconciliation uses `proration_behavior: "none"` and does not roll back local internal-user mutations on Stripe failure.
 - Billing portal quantity editing remains deferred.
 - Internal/comped owner protection is complete through `internal_comped_v1` detection and comped-safe entitlement rows with no Stripe linkage.
-- This does not introduce tenant invoice checkout, tenant customer payment links, Pay Now/Charge Card, refunds/disputes/payout execution, Connect, or QBO sync.
+	- This does not alter tenant customer payment boundaries: no refunds/disputes/saved cards/partial payments/public portal/platform fees/QBO sync.
 
 ---
 
@@ -599,7 +604,7 @@ Completed P1 foundation work (V1):
 - Invoice job-detail TLC pass is complete:
 	- panel scanability and section wording improved
 	- invoice truth anchor clarified
-	- payment entries remain tracking-only, no card charge execution
+	- payment truth remains `internal_invoice_payments` with manual and Stripe webhook-confirmed rows
 - Internal invoice draft prefill fallback hardening is complete where source fields exist, without overwriting existing drafts.
 - Internal invoice void recovery/replacement behavior is complete:
 	- voided invoices remain historical
@@ -623,12 +628,12 @@ Does **not** include:
 - saved cards
 - refunds through processor
 
-### Phase P2 — Stripe customer/work payment execution (tenant invoice acceptance, later)
-First live tenant payment-acceptance phase, currently a planning target rather than immediate implementation.
+### Phase P2 — Stripe customer/work payment execution (tenant invoice acceptance, current scope closed)
+Current intended Payments V1 scope is implemented and validated.
 
 Locked carry-forward clarification:
 - Dashboard payment/cash-performance analytics expansion remains deferred.
-- Tenant customer/work payment execution remains a later P2 Stripe-first implementation.
+- Tenant customer/work payment execution V1 current scope is implemented.
 - Platform subscription billing for account onboarding is implemented in V1 and live-smoke confirmed in production.
 - This platform-billing slice remains separate from tenant internal invoice/customer-work payment execution.
 
@@ -666,9 +671,8 @@ Locked carry-forward clarification:
 Launch-status update:
 - Stripe Platform Subscription V1 for new account users/platform onboarding is implemented and live-smoke confirmed in production.
 - This work no longer sits in pending live-environment readiness; live keys, live webhook, and final smoke are complete for the platform-account subscription slice.
-- This does not move tenant customer invoice/work-payment execution into current scope.
-- Tenant customer invoice/work-payment execution remains deferred unless explicitly pulled forward.
-- Live Pay Now/Charge Card/checkout/refunds/disputes/payout execution remains deferred.
+- Tenant customer invoice/work-payment execution V1 current scope is now in scope and closed for this phase.
+- Deferred in this lane: refunds/disputes/saved cards/partial payments/receipt messaging/public portal/platform application fees/QBO sync.
 
 Recommended first scope for tenant customer/work payments:
 - customer pays invoice online
@@ -760,6 +764,6 @@ Not as:
 
 ---
 
-## 12. One-line definition
+### 12. One-line definition
 
-Compliance Matters is **payment-ready by design now, payment-active later for tenant invoice execution**: operational payment truth lives in the platform, Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding, Stripe remains the future tenant payment rail, QBO remains optional accounting sync only, and a small configurable platform fee is supported for later rollout.
+Compliance Matters is **payment-ready by design with tenant customer payments V1 current scope active**: operational payment truth lives in the platform, Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding, tenant customer invoice checkout uses connected-account direct-charge with webhook-only payment truth writeback, and refunds/disputes/saved cards/partial payments/public portal/platform application fees/QBO sync remain deferred.
