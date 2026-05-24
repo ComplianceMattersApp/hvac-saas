@@ -3,6 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import {
   getCurrentInternalUserClockState,
   listTeamClockStatusPreview,
+  listTodayTimeEntriesForAccount,
+  listNeedsReviewTimeEntriesForAccount,
   INTERNAL_USER_TIME_ENTRY_ACTIVE_STATUSES,
 } from "@/lib/time-clock/read-model";
 
@@ -53,6 +55,8 @@ function makeSupabase(fixtures?: { timeEntries?: TimeEntryFixture[] }) {
 
       const eqFilters: Array<[string, unknown]> = [];
       const inFilters: Array<[string, unknown[]]> = [];
+      const gteFilters: Array<[string, unknown]> = [];
+      const ltFilters: Array<[string, unknown]> = [];
       const orderFilters: Array<[string, boolean]> = [];
       let cappedLimit: number | null = null;
 
@@ -65,6 +69,14 @@ function makeSupabase(fixtures?: { timeEntries?: TimeEntryFixture[] }) {
 
         for (const [column, values] of inFilters) {
           data = data.filter((row) => values.includes(row?.[column]));
+        }
+
+        for (const [column, value] of gteFilters) {
+          data = data.filter((row) => String(row?.[column] ?? "") >= String(value ?? ""));
+        }
+
+        for (const [column, value] of ltFilters) {
+          data = data.filter((row) => String(row?.[column] ?? "") < String(value ?? ""));
         }
 
         for (const [column, ascending] of orderFilters) {
@@ -94,6 +106,16 @@ function makeSupabase(fixtures?: { timeEntries?: TimeEntryFixture[] }) {
         in: vi.fn((column: string, values: unknown[]) => {
           calls.push({ table, op: "in", column, value: values });
           inFilters.push([column, values]);
+          return query;
+        }),
+        gte: vi.fn((column: string, value: unknown) => {
+          calls.push({ table, op: "gte", column, value });
+          gteFilters.push([column, value]);
+          return query;
+        }),
+        lt: vi.fn((column: string, value: unknown) => {
+          calls.push({ table, op: "lt", column, value });
+          ltFilters.push([column, value]);
           return query;
         }),
         order: vi.fn((column: string, options?: { ascending?: boolean }) => {
@@ -241,5 +263,44 @@ describe("time clock read helpers", () => {
 
     expect(result).toEqual([]);
     expect(calls.some((call) => call.op === "from")).toBe(false);
+  });
+
+  it("returns today entries only for LA day boundaries", async () => {
+    const now = new Date("2026-05-24T20:00:00Z");
+    const { supabase } = makeSupabase({
+      timeEntries: [
+        makeTimeEntry({ id: "today-1", clock_in_at: "2026-05-24T16:00:00Z", status: "closed", clock_out_at: "2026-05-24T18:00:00Z" }),
+        makeTimeEntry({ id: "prior-1", clock_in_at: "2026-05-23T23:59:00Z", status: "open" }),
+        makeTimeEntry({ id: "next-1", clock_in_at: "2026-05-25T08:00:00Z", status: "open" }),
+      ],
+    });
+
+    const result = await listTodayTimeEntriesForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+      now,
+    });
+
+    expect(result.map((row) => row.entryId)).toEqual(["today-1"]);
+  });
+
+  it("returns needs-review rows for prior-day active and incomplete entries", async () => {
+    const now = new Date("2026-05-24T20:00:00Z");
+    const { supabase } = makeSupabase({
+      timeEntries: [
+        makeTimeEntry({ id: "prior-open", status: "open", clock_in_at: "2026-05-23T18:00:00Z" }),
+        makeTimeEntry({ id: "marked-review", status: "needs_review", clock_in_at: "2026-05-24T14:00:00Z" }),
+        makeTimeEntry({ id: "missing-out", status: "closed", clock_in_at: "2026-05-24T10:00:00Z", clock_out_at: null }),
+        makeTimeEntry({ id: "clean-closed", status: "closed", clock_in_at: "2026-05-24T10:00:00Z", clock_out_at: "2026-05-24T14:00:00Z" }),
+      ],
+    });
+
+    const result = await listNeedsReviewTimeEntriesForAccount({
+      supabase: supabase as any,
+      accountOwnerUserId: "owner-1",
+      now,
+    });
+
+    expect(result.map((row) => row.entryId)).toEqual(["marked-review", "missing-out", "prior-open"]);
   });
 });

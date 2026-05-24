@@ -1,3 +1,5 @@
+import { startOfTodayUtcIsoLA, startOfTomorrowUtcIsoLA } from "@/lib/utils/schedule-la";
+
 type SupabaseLike = {
   from(table: string): any;
 };
@@ -62,6 +64,22 @@ export type TeamClockStatusRow = {
   entryId: string;
 };
 
+export type AdminTimeEntryReviewRow = {
+  entryId: string;
+  accountOwnerUserId: string;
+  internalUserId: string;
+  status: InternalUserTimeEntryStatus;
+  clockInAt: string;
+  lunchStartAt: string | null;
+  lunchEndAt: string | null;
+  clockOutAt: string | null;
+  adjustedByUserId: string | null;
+  adjustedAt: string | null;
+  adjustmentReason: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 function asTrimmed(value: unknown) {
   const text = String(value ?? "").trim();
   return text.length > 0 ? text : "";
@@ -120,6 +138,30 @@ function isActiveEntry(
 
 function activeDisplayStateFromStatus(status: "open" | "on_lunch"): TimeClockDerivedDisplayState {
   return status === "on_lunch" ? "on_lunch" : "clocked_in";
+}
+
+function toAdminReviewRow(row: InternalUserTimeEntryRow): AdminTimeEntryReviewRow {
+  return {
+    entryId: row.id,
+    accountOwnerUserId: row.account_owner_user_id,
+    internalUserId: row.internal_user_id,
+    status: row.status,
+    clockInAt: row.clock_in_at,
+    lunchStartAt: row.lunch_start_at,
+    lunchEndAt: row.lunch_end_at,
+    clockOutAt: row.clock_out_at,
+    adjustedByUserId: row.adjusted_by_user_id,
+    adjustedAt: row.adjusted_at,
+    adjustmentReason: row.adjustment_reason,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+function toMillis(value: string | null | undefined) {
+  if (!value) return NaN;
+  const millis = new Date(value).getTime();
+  return Number.isFinite(millis) ? millis : NaN;
 }
 
 export async function getCurrentInternalUserClockState(params: {
@@ -201,4 +243,82 @@ export async function listTeamClockStatusPreview(params: {
       clockOutAt: row.clock_out_at,
       entryId: row.id,
     }));
+}
+
+export async function listTodayTimeEntriesForAccount(params: {
+  supabase: SupabaseLike;
+  accountOwnerUserId: string | null | undefined;
+  now?: Date;
+  limit?: number | null;
+}): Promise<AdminTimeEntryReviewRow[]> {
+  const accountOwnerUserId = asTrimmed(params.accountOwnerUserId);
+  if (!accountOwnerUserId) return [];
+
+  const normalizedLimit = Number(params.limit ?? 200);
+  const limit = Number.isFinite(normalizedLimit)
+    ? Math.min(Math.max(Math.trunc(normalizedLimit), 1), 1000)
+    : 200;
+
+  const startIso = startOfTodayUtcIsoLA(params.now);
+  const endIso = startOfTomorrowUtcIsoLA(params.now);
+
+  const { data, error } = await params.supabase
+    .from("internal_user_time_entries")
+    .select(INTERNAL_USER_TIME_ENTRY_SELECT)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .gte("clock_in_at", startIso)
+    .lt("clock_in_at", endIso)
+    .order("clock_in_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  const rows = Array.isArray(data) ? data : [];
+  return rows.map(normalizeRow).filter(Boolean).map((row) => toAdminReviewRow(row as InternalUserTimeEntryRow));
+}
+
+export async function listNeedsReviewTimeEntriesForAccount(params: {
+  supabase: SupabaseLike;
+  accountOwnerUserId: string | null | undefined;
+  now?: Date;
+  limit?: number | null;
+}): Promise<AdminTimeEntryReviewRow[]> {
+  const accountOwnerUserId = asTrimmed(params.accountOwnerUserId);
+  if (!accountOwnerUserId) return [];
+
+  const normalizedLimit = Number(params.limit ?? 400);
+  const limit = Number.isFinite(normalizedLimit)
+    ? Math.min(Math.max(Math.trunc(normalizedLimit), 1), 1500)
+    : 400;
+
+  const startOfTodayMs = toMillis(startOfTodayUtcIsoLA(params.now));
+
+  const { data, error } = await params.supabase
+    .from("internal_user_time_entries")
+    .select(INTERNAL_USER_TIME_ENTRY_SELECT)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .order("clock_in_at", { ascending: false })
+    .limit(limit);
+
+  if (error) throw error;
+
+  const rows = Array.isArray(data) ? data : [];
+
+  return rows
+    .map(normalizeRow)
+    .filter(Boolean)
+    .filter((row) => {
+      const normalized = row as InternalUserTimeEntryRow;
+      const clockInMs = toMillis(normalized.clock_in_at);
+      const priorDayActive =
+        (normalized.status === "open" || normalized.status === "on_lunch") &&
+        Number.isFinite(clockInMs) &&
+        clockInMs < startOfTodayMs;
+      const explicitNeedsReview = normalized.status === "needs_review";
+      const closedMissingClockOut = normalized.status === "closed" && !normalized.clock_out_at;
+      const incompleteLunchWindow = Boolean(normalized.lunch_start_at) && !normalized.lunch_end_at && normalized.status !== "on_lunch";
+
+      return priorDayActive || explicitNeedsReview || closedMissingClockOut || incompleteLunchWindow;
+    })
+    .map((row) => toAdminReviewRow(row as InternalUserTimeEntryRow));
 }

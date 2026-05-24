@@ -145,6 +145,15 @@ export default async function OpsAdminPage() {
     },
     {
       section: "people",
+      eyebrow: "People",
+      title: "Time Clock",
+      description: "Review team time entries and missed clock-outs.",
+      href: "/ops/admin/time-clock",
+      ctaLabel: "Open workspace",
+      enabled: true,
+    },
+    {
+      section: "people",
       eyebrow: productMode === "hvac_service" ? "Optional Contractor Tools" : "Contractors",
       title: productMode === "hvac_service" ? "Contractors (Optional)" : "Contractors",
       description:

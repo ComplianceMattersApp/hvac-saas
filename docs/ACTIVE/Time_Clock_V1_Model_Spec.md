@@ -247,6 +247,13 @@ V1E closeout status:
 - Add correction workflow with required reason.
 - Add `needs_review` and `voided` review handling UX.
 
+V1F closeout status:
+- Complete in repository: admin-only `/ops/admin/time-clock` review center with Today-first operational view.
+- Includes `Active Now`, `Today's Entries`, and `Needs Review` sections with account-scoped read helpers.
+- Admin correction action supports required adjustment reason and minimal updates (`clock_out_at`, optional `lunch_end_at`, status `closed|needs_review`, `adjusted_by_user_id`, `adjusted_at`, `adjustment_reason`).
+- Server action is admin-gated and account-scoped; target entry must belong to current account owner scope.
+- No payroll approvals, exports/reporting, wage/overtime calculations, GPS/geofencing, job-costing, or contractor/customer-portal behavior added in this phase.
+
 ### V1.5 - weekly summary/export
 - Add report-center ledger style weekly summary/export.
 - Reuse existing CSV/export conventions and limits.
