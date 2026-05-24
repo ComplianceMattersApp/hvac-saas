@@ -95,8 +95,8 @@ Required core fields:
 - `id uuid primary key default gen_random_uuid()`
 - `account_owner_user_id uuid not null`
 - `internal_user_id uuid not null`
-- `entry_status text not null`
-- `clock_in_at timestamptz null`
+- `status text not null`
+- `clock_in_at timestamptz not null`
 - `lunch_start_at timestamptz null`
 - `lunch_end_at timestamptz null`
 - `clock_out_at timestamptz null`
@@ -114,8 +114,7 @@ Future-ready optional fields (parked V1.5+):
 - `approved_at timestamptz null`
 
 ### 3.3 Status lifecycle lock
-Allowed persisted values for `entry_status`:
-- `clocked_out`
+Allowed persisted values for `status`:
 - `open`
 - `on_lunch`
 - `closed`
@@ -128,14 +127,15 @@ V1 behavioral intent:
 - `closed`: normal ended entry.
 - `needs_review`: flagged for manual correction.
 - `voided`: invalidated entry with audit trail.
-- `clocked_out`: explicit no-active-shift state marker for simple status reads.
+- `clocked_out`: derived read-state only when no active entry exists for a user.
 
 ### 3.4 Minimal validity guardrails
 Model-level guardrails (no implementation in V1A):
-- `clock_in_at` required for persisted entries that are not `clocked_out` only status markers.
+- `clock_in_at` required for all persisted entries.
 - `lunch_end_at` cannot exist without `lunch_start_at`.
-- `clock_out_at` should be on or after `clock_in_at`.
-- correction fields must be set together when adjustment occurs.
+- `closed` status requires `clock_out_at`.
+- `on_lunch` requires `lunch_start_at` and no `lunch_end_at`.
+- adjustment metadata requires `adjustment_reason`.
 - `adjustment_reason` required for admin/owner correction writes.
 
 ### 3.5 Account and user settings lock
@@ -195,6 +195,11 @@ Scope:
 - Add `account_settings.time_clock_enabled`.
 - Add `internal_users.time_tracking_enabled`.
 - Add RLS policies and baseline helper tests.
+
+V1B closeout status:
+- Complete in repository: migration + account-scoped read helpers + focused tests.
+- Unique active-entry protection is schema-enforced (partial unique index for `open|on_lunch`).
+- No employee clock page, Ops card, or admin correction UI behavior added in this phase.
 
 ### V1C - employee clock page
 - Add `/time-clock` page and server actions.
