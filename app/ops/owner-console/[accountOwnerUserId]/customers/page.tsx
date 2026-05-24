@@ -11,6 +11,9 @@ type PageParams = Promise<{
 
 type PageSearchParams = Promise<Record<string, string | string[] | undefined>>;
 
+const DEFAULT_CUSTOMER_LIMIT = 50;
+const SEARCH_CUSTOMER_LIMIT = 250;
+
 async function requirePlatformOwnerOrFailClosed() {
   const supabase = await createClient();
   const {
@@ -85,6 +88,8 @@ export default async function OwnerSupportCustomerLitePage({
 
   const resolvedSearchParams = (searchParams ? await searchParams : {}) ?? {};
   const query = firstSearchParamValue(resolvedSearchParams, "q");
+  const hasSearch = Boolean(query);
+  const resultLimit = hasSearch ? SEARCH_CUSTOMER_LIMIT : DEFAULT_CUSTOMER_LIMIT;
   const admin = createAdminClient();
   const [dashboardModel, customers] = await Promise.all([
     loadPlatformOwnerDashboardModel({ admin }),
@@ -92,7 +97,7 @@ export default async function OwnerSupportCustomerLitePage({
       supabase: admin,
       accountOwnerUserId,
       query,
-      limit: 250,
+      limit: resultLimit,
     }),
   ]);
   const accountRow = dashboardModel.rows.find(
@@ -106,6 +111,9 @@ export default async function OwnerSupportCustomerLitePage({
   const customersWithJobs = customers.filter((customer) => customer.jobCount > 0).length;
   const totalJobs = customers.reduce((sum, customer) => sum + customer.jobCount, 0);
   const totalLocations = customers.reduce((sum, customer) => sum + customer.locationCount, 0);
+  const listHelper = hasSearch
+    ? `Showing matching customers from the most recent ${SEARCH_CUSTOMER_LIMIT} customer records. Refine the search if needed.`
+    : `Showing the ${DEFAULT_CUSTOMER_LIMIT} most recent customers. Use search to find older records.`;
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-5 p-4 text-slate-900 sm:p-6">
@@ -113,9 +121,9 @@ export default async function OwnerSupportCustomerLitePage({
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Platform Owner</p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-950">Customer List Lite</h1>
+            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-950">Customer Lookup Lite</h1>
             <p className="mt-1 max-w-2xl text-sm text-slate-500">
-              Read-only customer lookup for owner-led support calls. No customer edits, notes, attachments, portal access, or tenant actions are available here.
+              Search-first customer lookup for owner-led support calls. This is not a full customer database view and does not open tenant edit pages.
             </p>
           </div>
           <Link
@@ -142,10 +150,10 @@ export default async function OwnerSupportCustomerLitePage({
       </section>
 
       <section className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <SummaryCard label="Customers Shown" value={String(customers.length)} helper={query ? "Filtered result count." : "Read-only customer records shown."} />
-        <SummaryCard label="With Jobs" value={String(customersWithJobs)} helper="Customers with at least one visible job." />
-        <SummaryCard label="Total Jobs" value={String(totalJobs)} helper="Aggregate visible job count." />
-        <SummaryCard label="Locations" value={String(totalLocations)} helper="Aggregate visible location count." />
+        <SummaryCard label="Customers Shown" value={String(customers.length)} helper={hasSearch ? "Search result count." : `Most recent ${DEFAULT_CUSTOMER_LIMIT} records max.`} />
+        <SummaryCard label="With Jobs" value={String(customersWithJobs)} helper="Customers shown with at least one visible job." />
+        <SummaryCard label="Shown Jobs" value={String(totalJobs)} helper="Aggregate jobs for currently shown customers." />
+        <SummaryCard label="Shown Locations" value={String(totalLocations)} helper="Aggregate locations for currently shown customers." />
       </section>
 
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -155,7 +163,7 @@ export default async function OwnerSupportCustomerLitePage({
             <input
               name="q"
               defaultValue={query}
-              placeholder="Name, email, phone, billing address, customer id..."
+              placeholder="Search by name, email, phone, billing address, or customer id..."
               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-500"
             />
           </label>
@@ -176,13 +184,14 @@ export default async function OwnerSupportCustomerLitePage({
             ) : null}
           </div>
         </form>
+        <p className="mt-3 text-xs text-slate-500">{listHelper}</p>
       </section>
 
       <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
         <div className="border-b border-slate-200 bg-slate-50 px-5 py-4">
           <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Customers</p>
           <p className="mt-1 text-sm text-slate-500">
-            Read-only list. This page intentionally does not link to tenant customer edit pages.
+            {listHelper} This page intentionally does not link to tenant customer edit pages.
           </p>
         </div>
         <div className="overflow-x-auto">
