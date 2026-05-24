@@ -11,6 +11,7 @@ import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 import { getInternalBusinessProfileByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import { createAdminClient } from "@/lib/supabase/server";
+import SupportCallSummaryActions from "./SupportCallSummaryActions";
 
 function firstCheckLabel(params: {
   readinessReady: boolean;
@@ -61,6 +62,21 @@ export default async function SupportCallSummarySnapshot({
     entitlementStatus: row.entitlementStatus ?? entitlement.entitlementStatus,
     paymentsReady: payments.isReady,
   });
+  const productLabel = formatProductModeLabel({ row, internalEmails });
+  const statusLabel = formatStatusLabel(row.entitlementStatus);
+  const paymentsLabel = payments.isReady ? "ready" : "not ready";
+  const summaryText = [
+    `${row.company} support summary`,
+    `Owner: ${row.ownerEmail ?? "No owner email visible"}`,
+    `Product/status: ${productLabel} / ${statusLabel}`,
+    `Users: ${row.activeUsers}/${row.totalUsers}`,
+    `Setup: ${readiness.completedRequiredCount}/${readiness.totalRequiredCount}`,
+    `First check: ${firstCheck}`,
+    `Trial end: ${formatOwnerConsoleDate(row.trialEnd)}`,
+    `Billing mode: ${formatBillingModeLabel(row.billingMode)}`,
+    `Customer payments: ${paymentsLabel}`,
+    `Tenant support: ${profile?.support_email ?? "Email not set"} / ${profile?.support_phone ?? "Phone not set"}`,
+  ].join("\n");
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-5 px-4 pb-6 text-slate-900 sm:px-6">
@@ -70,19 +86,22 @@ export default async function SupportCallSummarySnapshot({
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Support Call Summary</p>
             <h2 className="mt-1 text-base font-semibold text-slate-900">Quick account facts</h2>
             <p className="mt-1 text-sm text-slate-500">
-              Copy-friendly read-only summary for owner-led support calls. No actions are performed from this section.
+              Copy-friendly read-only summary for owner-led support calls. Buttons only copy text or jump to read-only sections.
             </p>
           </div>
-          <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
-            readiness.isOperationallyReady ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"
-          }`}>
-            {readiness.isOperationallyReady ? "Ready" : "Needs setup"}
-          </span>
+          <div className="flex flex-col items-end gap-3">
+            <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${
+              readiness.isOperationallyReady ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-900"
+            }`}>
+              {readiness.isOperationallyReady ? "Ready" : "Needs setup"}
+            </span>
+            <SupportCallSummaryActions summaryText={summaryText} />
+          </div>
         </div>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryFact label="Account" value={row.company} helper={row.ownerEmail ?? "No owner email visible"} />
-          <SummaryFact label="Product / Status" value={formatProductModeLabel({ row, internalEmails })} helper={formatStatusLabel(row.entitlementStatus)} />
+          <SummaryFact label="Product / Status" value={productLabel} helper={statusLabel} />
           <SummaryFact label="First Check" value={firstCheck} helper={`${readiness.completedRequiredCount}/${readiness.totalRequiredCount} required setup items complete`} />
           <SummaryFact label="Users" value={`${row.activeUsers}/${row.totalUsers} active`} helper="Active / total internal users" />
           <SummaryFact label="Trial End" value={formatOwnerConsoleDate(row.trialEnd)} helper="Current stored trial end date" />
@@ -94,7 +113,7 @@ export default async function SupportCallSummarySnapshot({
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
           <p className="font-semibold text-slate-900">Copy-friendly note</p>
           <p className="mt-1">
-            {row.company} · {formatProductModeLabel({ row, internalEmails })} · {formatStatusLabel(row.entitlementStatus)} · Users {row.activeUsers}/{row.totalUsers} · Setup {readiness.completedRequiredCount}/{readiness.totalRequiredCount} · Payments {payments.isReady ? "ready" : "not ready"}.
+            {row.company} · {productLabel} · {statusLabel} · Users {row.activeUsers}/{row.totalUsers} · Setup {readiness.completedRequiredCount}/{readiness.totalRequiredCount} · Payments {paymentsLabel}.
           </p>
         </div>
       </section>
