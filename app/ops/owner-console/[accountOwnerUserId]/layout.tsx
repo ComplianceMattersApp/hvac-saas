@@ -262,8 +262,8 @@ export default async function AccountSnapshotLayout({
     <>
       <SupportCallSummarySnapshot accountOwnerUserId={accountOwnerUserId} />
       {children}
-      <UsageRecencySnapshot accountOwnerUserId={accountOwnerUserId} />
       <PaymentsReadinessSnapshot accountOwnerUserId={accountOwnerUserId} />
+      <UsageRecencySnapshot accountOwnerUserId={accountOwnerUserId} />
       <TeamAndSeatsSection accountOwnerUserId={accountOwnerUserId} />
       <CompanyProfileSnapshot accountOwnerUserId={accountOwnerUserId} />
     </>
