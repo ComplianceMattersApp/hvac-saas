@@ -27,6 +27,14 @@ Support V0 clarification:
    - `docs/ACTIVE/Support_V0_Issue_Log_Template.md`
 - Group 8 status: Closed / Monitoring — owner-led Support V0 active with a single-owner slim spreadsheet workflow.
 
+Support Case / Call Log V1 status (May 2026):
+- Support Case / Call Log V1 is now implemented and production-smoke-passed.
+- Provides durable owner/support-internal issue and call log layer alongside Support V0 manual SOP.
+- Mutates only `support_cases` and `support_case_notes`; does not mutate tenant operational records.
+- No impersonation. No customer-facing exposure.
+- Access is owner/support-internal only (platform-owner allowlist from Owner Console).
+- Full spec and production closeout: `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`.
+
 This addendum does **not** activate or change any deferred/gated implementation area, including:
 - Support Console production enablement
 - onboarding automation/provisioning execution

@@ -3265,3 +3265,13 @@ The following implementation groups have been closed as of May 2026.
 
 - Choose one lane. Audit/plan first. Implement surgically. Validate. Commit/push. Update docs at closeout.
 - Do not jump lanes unless there is a real blocker, dependency, risk, or owner decision to park.
+
+### Support Case / Call Log V1 production closeout (May 2026)
+
+- **Status: IMPLEMENTED / PRODUCTION-SMOKE-PASSED**
+- Support Case / Call Log V1 is implemented and owner production-smoke-passed. This is distinct from the full Support Console.
+- Access: owner/support-internal only. Mutation boundary: `support_cases` and `support_case_notes` only. No impersonation. No tenant mutation. No customer-facing exposure.
+- Migration `202605241700_support_cases_v1.sql` applied to true production (`ornrnvxtwwtulohqwxop`); root cause of prior PGRST205 was that earlier migrations targeted CMTest (`kvpesjdukqwwlgpkzfjm`) instead.
+- Owner smoke passed: Support Cases panel, case creation, case detail, internal notes, status update, account snapshot counts.
+- Group 8 (Support / Owner Operations) next planned work is the full Support Console production enablement (runbook-gated, deferred) and any further Support Case V1 improvements.
+- Full spec and closeout record: `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`.

@@ -1,6 +1,6 @@
 # Owner Support Read-Only Drilldown Audit
 
-Status: AUDIT / PLANNING ONLY
+Status: AUDIT / PLANNING — Support Case V1 IMPLEMENTED / PRODUCTION-SMOKE-PASSED
 
 Purpose: Define the safe path from the current Owner Console support snapshot toward practical phone-support visibility without impersonation or tenant mutation.
 
@@ -187,3 +187,25 @@ This gives the owner a practical phone-support tool: “I can find the customer 
 Do not implement any drilldown until this audit is accepted and a focused slice is chosen.
 
 Do not add schema, env, production Supabase commands, impersonation, tenant mutation, provider actions, or broad data browsing as part of the first drilldown slice.
+
+---
+
+## Support Case / Call Log V1 production closeout (May 2026)
+
+- **Status: IMPLEMENTED / PRODUCTION-SMOKE-PASSED**
+- Support Case / Call Log V1 is now implemented and owner production-smoke-passed.
+- This is separate from the broader owner drilldown candidates described above (Customer Detail Lite, Job Detail Lite, Invoice Detail Lite), which remain parked as future work.
+- Access: owner/support-internal only via existing platform-owner allowlist gate. No tenant users, no customer-facing portal.
+- Mutation boundary: mutates only `support_cases` and `support_case_notes`. Does not mutate tenant operational records. No impersonation boundary crossed.
+- Migration `202605241700_support_cases_v1.sql` applied to true production (`ornrnvxtwwtulohqwxop`).
+- Owner smoke passed: Support Cases panel loaded, case creation, case detail, internal notes, status update, account snapshot counts updated.
+- Parked next improvements from this V1 baseline:
+  - Support cases index/list surface.
+  - Related customer/job/invoice selectors on case detail.
+  - Search and filter on support cases.
+  - Explicit access/view reason logging.
+  - Read-only job/invoice snapshots from case detail.
+  - Account support workspace polish.
+- Impersonation boundary preserved: V1 does not add login-as-customer, tenant-side mutation, or customer-facing portal exposure.
+- Full spec and closeout record: `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`.
+- Candidate drilldowns from this audit (Customer Detail Lite, Job Detail Lite, Invoice Detail Lite) remain parked as separate future planning work, unchanged from the original audit scope above.

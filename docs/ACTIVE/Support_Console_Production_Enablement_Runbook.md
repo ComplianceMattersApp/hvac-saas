@@ -6,6 +6,53 @@ Scope: Production enablement procedure for Support Console V1, intentionally not
 
 ---
 
+## Support Case / Call Log V1 Production Enablement Closeout (May 2026)
+
+> **Note on scope distinction:** This runbook governs the full Support Console (impersonation-lite, `support_users`, `support_account_grants`, `support_access_sessions`, `ENABLE_SUPPORT_CONSOLE` flag). Support Case / Call Log V1 is a separate, lighter owner/support-internal record layer. Support Case V1 is now implemented and production-smoke-passed. That closeout is recorded here for traceability.
+
+### Support Case / Call Log V1 — implementation and production closeout
+
+**Status: IMPLEMENTED / PRODUCTION-SMOKE-PASSED**
+
+**What Support Case V1 is:**
+- Owner/support-internal issue and call log layer.
+- Mutates only `support_cases` and `support_case_notes`.
+- Does not mutate tenant operational records.
+- Does not enable impersonation.
+- Access gated by existing platform-owner allowlist from Owner Console.
+- Not exposed to tenant users or their customers.
+
+**Migration applied:**
+- `202605241700_support_cases_v1.sql` applied to true production (`ornrnvxtwwtulohqwxop`).
+
+**Migration history correction:**
+- Earlier run had targeted CMTest (`kvpesjdukqwwlgpkzfjm`) rather than true production.
+- PGRST205 root cause: `support_cases`/`support_case_notes` absent from true production.
+- CLI relinked to `ornrnvxtwwtulohqwxop`.
+- Stage A: drift repair for `20260519140000` and `20260519183000`.
+- Stage B: 9 pending migrations applied via `db push --linked --include-all`.
+- PostgREST schema cache reloaded via `notify pgrst, 'reload schema'`.
+
+**Post-apply verification summary:**
+- All expected tables, RLS, indexes, constraints, and triggers confirmed present.
+- `tsc --noEmit` passed. `git diff --check` passed. Branch clean.
+
+**Owner production smoke passed:**
+- Support Cases panel loaded on account snapshot (no PGRST205).
+- Case creation, detail page, internal note creation, status update, and count update all confirmed.
+
+**Parked next improvements (Support Case V1):**
+- Support cases index/list
+- Related customer/job/invoice selectors
+- Support case search/filter
+- Explicit support access/view reason logging
+- Read-only job/invoice snapshots from case detail
+- Account support workspace polish
+
+---
+
+---
+
 ## 1. Executive summary
 
 This runbook defines how production Support Console enablement must be executed later through strict, auditable gates.

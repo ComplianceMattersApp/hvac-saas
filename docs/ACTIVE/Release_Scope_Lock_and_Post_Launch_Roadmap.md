@@ -218,6 +218,7 @@ Execution companion note: for practical first-customer support posture and expan
 | Reports / decision surfaces | Complete for owner-release | Report center and invoice/payment tracking honesty alignment documented and stabilized. |
 | Admin/setup | Complete for owner-release | Admin and setup polish complete; owner/operator readiness runbook path exists. |
 | Invoice/payment truth and honesty | Complete for current scope | Tenant customer payments V1 current scope is implemented: connected-account direct-charge checkout path, webhook-only payment truth persistence, invoice paid projection, duplicate protection, and honest Payments V2 deferred-feature boundaries. |
+| Support Case / Call Log V1 | Complete / production-smoke-passed | Support Case V1 implemented and production-smoke-passed (May 2026). Owner/support-internal only. Mutates only `support_cases` and `support_case_notes`. No impersonation. No tenant mutation. See `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`. |
 | Product-mode matrix documentation | Complete | Matrix documented as shared-engine, presentation/configuration direction without pre-release switching requirement. |
 | Mobile/PWA baseline | Complete baseline | Installability baseline and route/access smoke documented; offline/native packaging remains deferred. |
 | First-owner/operator readiness runbook | Complete as controlled runbook | First-owner provisioning runbook is active with strict guardrails, dry-run/apply gates, and verification checklist. |
@@ -260,7 +261,7 @@ Release scope lock statements:
 The following remain intentionally deferred/parked (not blockers for owner-release):
 
 1. Estimates production enablement expansion beyond internal-only baseline (runbook-gated; internal-only production enablement is now completed).
-2. Support Console production enablement (runbook-gated; currently disabled).
+2. Support Console production enablement (runbook-gated; full `ENABLE_SUPPORT_CONSOLE` console with impersonation-lite, support grants, and support access sessions is still disabled and runbook-gated). Note: Support Case / Call Log V1 owner/support-internal record layer is now implemented and production-smoke-passed separately — see completion matrix above.
 3. First-owner provisioning apply/invites outside controlled runbook operation.
 4. Tenant customer payment execution (online checkout/payment rail at tenant invoice layer; later Stripe-first invoice acceptance, separate from platform subscription billing).
 5. QBO integration (last-last, optional downstream accounting sync/export only).

@@ -1,6 +1,6 @@
 # Support Case / Call Log V1 Model Spec
 
-Status: PROPOSED / SOURCE-OF-TRUTH SPEC
+Status: IMPLEMENTED / PRODUCTION-SMOKE-PASSED
 
 Purpose: Pivot owner support from accumulating read-only data cards toward a practical support workspace: account visibility plus issue/call logging, without impersonation or tenant mutation.
 
@@ -270,3 +270,63 @@ Before building, approve:
 3. V1 is owner/support internal only.
 4. V1 support notes are not visible to tenant users or their customers.
 5. V1 can mutate support-case tables only, not tenant operational tables.
+
+---
+
+## Production closeout (May 2026)
+
+**Status: IMPLEMENTED / PRODUCTION-SMOKE-PASSED**
+
+### Implementation summary
+
+- `support_cases` and `support_case_notes` tables created via migration `202605241700_support_cases_v1.sql`.
+- Owner/support-internal access only (platform-owner allowlist gate from Owner Console).
+- Mutation boundary confirmed: mutates only `support_cases` and `support_case_notes`; does not mutate any tenant operational record.
+- No impersonation. No customer-facing portal exposure. No tenant-visible notes.
+
+### Migration history correction
+
+- Earlier migration run targeted CMTest (`kvpesjdukqwwlgpkzfjm`) rather than true production.
+- Root cause of PGRST205 error: `support_cases` and `support_case_notes` were absent from true production (`ornrnvxtwwtulohqwxop`).
+- Vercel production was correctly pointed at `ornrnvxtwwtulohqwxop` throughout.
+- CLI was relinked to `ornrnvxtwwtulohqwxop`.
+- Stage A repair applied to two drift candidates (`20260519140000`, `20260519183000`).
+- Stage B applied 9 pending migrations via `db push --linked --include-all`.
+- PostgREST schema cache reloaded via `notify pgrst, 'reload schema'`.
+
+### Post-apply verification
+
+- `support_cases` exists: ✅
+- `support_case_notes` exists: ✅
+- RLS enabled on both tables: ✅
+- `status`, `priority`, `source` check constraints present: ✅
+- `note_type` check constraint present: ✅
+- All 3 expected indexes present: ✅
+- `support_cases_set_updated_at` trigger present: ✅
+- `support_case_notes_touch_case` trigger present: ✅
+- `tsc --noEmit`: passed ✅
+- `git diff --check`: passed ✅
+- Branch: `main...origin/main` clean/synced ✅
+
+### Owner production smoke passed (May 2026)
+
+- Owner Console opened.
+- Account snapshot opened.
+- Support Cases panel loaded (no PGRST205).
+- Support case creation worked.
+- Support case detail page worked.
+- Internal note creation worked.
+- Status update worked.
+- Account snapshot counts updated.
+
+### Parked next improvements
+
+The following are parked for a future pass and do not block V1 operation:
+
+- Support cases index/list (`/ops/owner-console/support-cases`)
+- Related customer selector in create/edit case form
+- Related job/invoice selector in create/edit case form
+- Support case search/filter across accounts
+- Explicit support access/view reason logging per case
+- Read-only job/invoice snapshots linked from case detail
+- Account support workspace polish

@@ -68,6 +68,18 @@ Customer/location/contact/billing relationship intake closeout (May 2026):
   - external billing completion remains closeout projection and not delivery-proof metadata
   - `Request came from` is not part of supported intake model
 
+Support Case / Call Log V1 production closeout (May 2026):
+- Support Case / Call Log V1 is implemented and production-smoke-passed.
+- Migration `202605241700_support_cases_v1.sql` applied to true production (`ornrnvxtwwtulohqwxop`).
+- Migration correction: earlier run had targeted CMTest (`kvpesjdukqwwlgpkzfjm`); root cause of PGRST205 was missing tables in true production, not code.
+- Repair steps: Stage A drift repair (`20260519140000`, `20260519183000`), Stage B 9-migration apply via `db push --linked --include-all`, PostgREST schema cache reloaded.
+- All post-apply objects confirmed: tables, RLS, constraints, indexes, triggers.
+- Access: owner/support-internal only via existing platform-owner allowlist gate. No tenant mutation. No impersonation. No customer-facing exposure.
+- Mutation boundary: mutates only `support_cases` and `support_case_notes`.
+- Owner production smoke passed: Support Cases panel, case creation, case detail, internal notes, status update, account snapshot count update.
+- Parked next improvements: support cases index/list, related customer/job/invoice selectors, search/filter, explicit access/view reason logging, read-only job/invoice snapshots, account support workspace polish.
+- Full spec: `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`.
+
 Current Program Status Note (May 2026)
 
 - Manual Text Logging Wording Clarification is complete and pushed in commit `36460b8`:

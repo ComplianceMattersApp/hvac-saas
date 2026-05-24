@@ -1649,6 +1649,19 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Production support-console enablement later requires both decisions together: production support migration apply decision and explicit `ENABLE_SUPPORT_CONSOLE` enablement decision.
 - Keep-ready rollout checklist (later, explicit approval only):
   - production migration approval
+
+### 3.4 Support Case / Call Log V1 production closeout (completed — May 2026)
+
+- **Status: IMPLEMENTED / PRODUCTION-SMOKE-PASSED**
+- Support Case / Call Log V1 is now implemented and owner production-smoke-passed. This is distinct from the full Support Console (§ 3.1–3.3 above).
+- Access: owner/support-internal only via existing platform-owner allowlist gate. No tenant users, no customer-facing portal.
+- Mutation boundary: mutates only `support_cases` and `support_case_notes`. Does not mutate tenant operational records. No impersonation.
+- Migration: `202605241700_support_cases_v1.sql` applied to true production (`ornrnvxtwwtulohqwxop`).
+- Migration correction: earlier run targeted CMTest (`kvpesjdukqwwlgpkzfjm`) — root cause of PGRST205. CLI relinked to true production; Stage A drift repair + Stage B 9-migration apply + PostgREST cache reload performed.
+- Post-apply verification confirmed: tables, RLS, constraints, indexes, triggers — all present.
+- Owner smoke passed: Support Cases panel, case creation, case detail, internal notes, status update, account snapshot count update.
+- Parked next improvements: support cases index/list, related customer/job/invoice selectors, search/filter, explicit access/view reason logging, read-only snapshots from case detail, account support workspace polish.
+- Full spec and closeout record: `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`.
   - production `support_user` seed
   - one read_only grant
   - explicit `ENABLE_SUPPORT_CONSOLE` enablement

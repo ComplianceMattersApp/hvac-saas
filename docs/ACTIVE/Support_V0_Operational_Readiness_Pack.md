@@ -27,6 +27,8 @@ Support V0 documentation/readiness is complete, but practical first-customer set
 
 Support V0 closes operationally only when a formal ticketing/support system is in place and Support Console or an equivalent support process is enabled later.
 
+**Support Case / Call Log V1 status (May 2026):** Support Case / Call Log V1 is now implemented and production-smoke-passed. It provides owner-led issue and call logging via `support_cases` and `support_case_notes`. Access is owner/support-internal only. It does not mutate tenant operational records and does not enable impersonation. Support V0 manual SOP remains the primary intake model; Support Case V1 is the durable internal case record that accompanies it. See `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md` for full spec and closeout record.
+
 ---
 
 ## 2. Support Contact SOP
