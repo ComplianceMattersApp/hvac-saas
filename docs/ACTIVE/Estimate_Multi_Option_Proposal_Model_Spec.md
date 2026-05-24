@@ -74,6 +74,14 @@ Original model-lock boundary:
 - no QBO behavior
 - no SMS/Twilio behavior
 
+Section 2K closeout alignment note (2026-05-23):
+
+- Customer proposal delivery lane is now complete: Finalize Proposal -> Customer Delivery -> Send Proposal Email / Copy Link -> Customer Approves -> Internal Notification -> Review/Convert when ready.
+- Provider-backed proposal email send, public proposal-link approval, internal approval notification, active-link regeneration fallback, Customer Delivery deployed UI, and local preview mode (`EMAIL_DELIVERY_MODE=preview`) smoke are all recorded as passed.
+- Token safety is verified for proposal-link handling: raw token and token_hash are not persisted in events, communications, or notification payloads.
+- Non-actions remain locked for this closeout: no SMS/text proposal delivery, no payment collection from proposal, no QBO behavior, no invoice issue/send from proposal approval, no automatic job conversion, no automatic invoice conversion, no customer portal login dependency, and no e-signature/legal artifact model.
+- Multi-option customer-facing visual treatment remains optional polish only and is parked unless future field evidence reopens it.
+
 ---
 
 ## 2) Current Model Limitation
