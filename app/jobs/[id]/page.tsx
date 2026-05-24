@@ -2327,6 +2327,9 @@ const shouldShowWorkSummary =
   Boolean(visitScopeSummary) &&
   normalizeCompareText(visitScopeSummary) !== normalizeCompareText(visitReasonText) &&
   normalizeCompareText(visitScopeSummary) !== normalizeCompareText(jobNotesText);
+const shouldShowIntakeNotes =
+  Boolean(jobNotesText) &&
+  normalizeCompareText(jobNotesText) !== normalizeCompareText(visitReasonText);
 const headerJobTypeLabel = String(job.job_type ?? "service")
   .split("_")
   .filter(Boolean)
@@ -3611,7 +3614,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Visit Reason / Intake Notes
+              Visit Reason
             </div>
           </div>
           {job.job_type === "service" ? (
@@ -3625,13 +3628,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
 
         <div className="mt-3 space-y-3">
-          <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
-              Visit Reason
-            </div>
-            <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900">
-              {visitReasonText}
-            </div>
+          <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900">
+            {visitReasonText}
           </div>
 
           {shouldShowCustomerConcern ? (
@@ -3645,7 +3643,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
           ) : null}
 
-          {jobNotesText ? (
+          {shouldShowIntakeNotes ? (
             <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                 Intake Notes
@@ -3682,14 +3680,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">Work Package</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">Work Needed</div>
                   {job.job_type === "service" ? (
-                    <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-600 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">
+                    <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:inline-flex">
                       {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
                     </span>
                   ) : null}
                 </div>
-                <div className="text-lg font-semibold tracking-tight text-slate-950">Visit Scope</div>
               </div>
 
               <details className="group w-full sm:w-auto">
@@ -3714,13 +3711,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
             <div className="rounded-2xl border border-slate-200/80 bg-white/94 px-4 py-3.5 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)]">
               <div className="space-y-3.5">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Reason for Visit</div>
-                  <div className="mt-1 text-sm leading-6 text-slate-900">
-                    {visitScopeLeadText || "No visit brief saved yet."}
-                  </div>
-                </div>
-
                 {primaryVisitScopeItems.length > 0 ? (
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items</div>
