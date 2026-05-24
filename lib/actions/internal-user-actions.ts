@@ -6,6 +6,7 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to";
 import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 import { reconcilePlatformSubscriptionSeatQuantity } from "@/lib/business/platform-billing-stripe";
+import { parseBooleanToggleEntries } from "@/lib/time-clock/settings-controls";
 import {
   requireInternalRole,
   type InternalRole,
@@ -56,6 +57,10 @@ function normalizePhone(raw: FormDataEntryValue | null) {
 
 function buildInternalUserProfileNoticeHref(userId: string, notice: string) {
   return `/ops/admin/internal-users/${encodeURIComponent(userId)}?profile_status=${encodeURIComponent(notice)}`;
+}
+
+function buildInternalUserTimeTrackingNoticeHref(userId: string, notice: string) {
+  return `/ops/admin/internal-users/${encodeURIComponent(userId)}?time_tracking_status=${encodeURIComponent(notice)}`;
 }
 
 const INTERNAL_USERS_SEAT_LIMIT_REACHED = "INTERNAL_USERS_SEAT_LIMIT_REACHED";
@@ -734,4 +739,42 @@ export async function updateInternalUserProfileFromForm(formData: FormData): Pro
 
   revalidateInternalUserViews();
   redirect(buildInternalUserProfileNoticeHref(targetUserId, "saved"));
+}
+
+export async function updateInternalUserTimeTrackingFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { internalUser: actorInternalUser } = await requireInternalRole(
+    "admin",
+    { supabase },
+  );
+
+  const admin = createAdminClient();
+  const targetUserId = String(formData.get("user_id") ?? "").trim();
+  if (!targetUserId) {
+    throw new Error("MISSING_TARGET_USER_ID");
+  }
+
+  const timeTrackingEnabled = parseBooleanToggleEntries(
+    formData.getAll("time_tracking_enabled"),
+  );
+
+  await requireScopedTarget(
+    admin,
+    actorInternalUser.account_owner_user_id,
+    targetUserId,
+  );
+
+  const { error } = await admin
+    .from("internal_users")
+    .update({ time_tracking_enabled: timeTrackingEnabled })
+    .eq("user_id", targetUserId)
+    .eq("account_owner_user_id", actorInternalUser.account_owner_user_id)
+    .select("user_id")
+    .single();
+
+  if (error) throw error;
+
+  revalidateInternalUserViews();
+  revalidatePath(`/ops/admin/internal-users/${encodeURIComponent(targetUserId)}`);
+  redirect(buildInternalUserTimeTrackingNoticeHref(targetUserId, "saved"));
 }

@@ -206,6 +206,11 @@ V1B closeout status:
 - Enforce account/user toggles and internal-user gating.
 - Implement Clock In, Start Lunch, End Lunch, Clock Out only.
 
+V1C closeout status (settings controls only):
+- Complete in repository: admin account-level toggle for `account_settings.time_clock_enabled` and admin per-user toggle for `internal_users.time_tracking_enabled`.
+- Contractor/customer portal users remain blocked through existing internal-role/admin route gates.
+- No `/time-clock` employee runtime actions, Ops team status card, or admin correction/timesheet runtime behavior added in this pass.
+
 ### V1D - Ops dashboard card
 - Add admin/office Team Clock Status card on `/ops`.
 - Keep card read-first and lightweight.

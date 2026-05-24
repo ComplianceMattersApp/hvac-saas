@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { updateInternalUserProfileFromForm } from "@/lib/actions/internal-user-actions";
+import {
+  updateInternalUserProfileFromForm,
+  updateInternalUserTimeTrackingFromForm,
+} from "@/lib/actions/internal-user-actions";
 import {
   isInternalAccessError,
   requireInternalRole,
@@ -24,6 +27,7 @@ export const metadata: Metadata = {
 const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   saved: { tone: "success", message: "Internal user profile updated." },
   missing_name: { tone: "error", message: "Enter a display name before saving." },
+  time_tracking_saved: { tone: "success", message: "Time tracking setting updated." },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {
@@ -113,13 +117,15 @@ async function requireAdminOrRedirect() {
 export default async function AdminInternalUserProfilePage({ params, searchParams }: PageProps) {
   const { userId: targetUserId } = await params;
   const sp = (searchParams ? await searchParams : {}) ?? {};
-  const notice = NOTICE_TEXT[readSearchParam(sp, "profile_status")];
+  const profileNotice = NOTICE_TEXT[readSearchParam(sp, "profile_status")];
+  const timeTrackingNotice = NOTICE_TEXT[readSearchParam(sp, "time_tracking_status")];
+  const notice = profileNotice ?? timeTrackingNotice;
 
   const { supabase, userId: actorUserId, internalUser } = await requireAdminOrRedirect();
 
   const { data: targetMembership, error: targetMembershipError } = await supabase
     .from("internal_users")
-    .select("user_id, role, is_active, account_owner_user_id, created_at")
+    .select("user_id, role, is_active, time_tracking_enabled, account_owner_user_id, created_at")
     .eq("user_id", targetUserId)
     .eq("account_owner_user_id", internalUser.account_owner_user_id)
     .maybeSingle();
@@ -305,6 +311,41 @@ export default async function AdminInternalUserProfilePage({ params, searchParam
                 <dd className="mt-1 break-all font-mono text-[12px] text-slate-600">{targetUserId}</dd>
               </div>
             </dl>
+          </section>
+
+          <section className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+            <h2 className="text-sm font-semibold text-slate-900">Time tracking</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Control whether this internal user is eligible for Time Clock tracking.
+            </p>
+
+            <form action={updateInternalUserTimeTrackingFromForm} className="mt-4 space-y-4">
+              <input type="hidden" name="user_id" value={targetUserId} />
+              <input type="hidden" name="time_tracking_enabled" value="0" />
+
+              <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-800">
+                <input
+                  type="checkbox"
+                  name="time_tracking_enabled"
+                  value="1"
+                  defaultChecked={Boolean((targetMembership as any).time_tracking_enabled)}
+                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900"
+                />
+                <span>
+                  <span className="block font-semibold text-slate-900">Track time for this user</span>
+                  <span className="mt-0.5 block text-xs text-slate-600">
+                    Current status: {Boolean((targetMembership as any).time_tracking_enabled) ? "Enabled" : "Disabled"}
+                  </span>
+                </span>
+              </label>
+
+              <button
+                type="submit"
+                className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
+              >
+                Save time tracking setting
+              </button>
+            </form>
           </section>
 
           <section className="rounded-[24px] border border-slate-200 bg-slate-50/80 p-5 shadow-[0_18px_32px_-30px_rgba(15,23,42,0.18)] sm:p-6">

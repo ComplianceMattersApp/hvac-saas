@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireInternalRole } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { parseBooleanToggleEntries } from "@/lib/time-clock/settings-controls";
 import {
   buildInternalBusinessProfileLogoStorageRef,
   DEFAULT_BILLING_MODE,
@@ -273,6 +274,48 @@ export async function saveInvoiceModeFromForm(formData: FormData): Promise<void>
   revalidatePath("/ops/admin/company-profile");
   revalidatePath("/jobs");
   redirect(withNotice("invoice_settings_saved"));
+}
+
+export async function saveTimeClockAccountSettingFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalRole("admin", { supabase });
+
+  const admin = createAdminClient();
+  try {
+    await requireScopedInternalBusinessProfileMutationContext({
+      admin,
+      actorUserId: userId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect("/forbidden");
+  }
+
+  const timeClockEnabled = parseBooleanToggleEntries(
+    formData.getAll("time_clock_enabled"),
+  );
+
+  const { error } = await admin
+    .from("account_settings")
+    .upsert(
+      {
+        account_owner_user_id: internalUser.account_owner_user_id,
+        time_clock_enabled: timeClockEnabled,
+      },
+      {
+        onConflict: "account_owner_user_id",
+      },
+    );
+
+  if (error) {
+    redirect(withNotice("time_clock_settings_save_failed"));
+  }
+
+  revalidatePath("/ops");
+  revalidatePath("/ops/admin");
+  revalidatePath("/ops/admin/company-profile");
+  revalidatePath("/ops/admin/internal-users");
+  redirect(withNotice("time_clock_settings_saved"));
 }
 
 export async function confirmTeamSetupFromForm(): Promise<void> {
