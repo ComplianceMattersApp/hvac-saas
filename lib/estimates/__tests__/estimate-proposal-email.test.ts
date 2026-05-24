@@ -320,9 +320,15 @@ describe("sendEstimateProposalEmail", () => {
       "We have prepared the details for the recommended work and included the full proposal for your review."
     );
     expect(sendArgs.html).toContain("When you are ready, you can approve it securely online.");
+    expect(sendArgs.html).toContain("Prepared for you by Acme Heating");
+    expect(sendArgs.html).toContain("Sent on ");
     expect(sendArgs.html).toContain("Review Proposal");
+    expect(sendArgs.html).toContain("Secure online review and approval.");
     expect(sendArgs.html).toContain("If the button does not open, use this secure link:");
     expect(sendArgs.html).toContain("Questions before approving? Contact Acme Heating at support@acme.test or 555-0000.");
+    expect(sendArgs.html).toContain(
+      "What happens next: after approval, our team will follow up to confirm scheduling details."
+    );
     expect(sendArgs.html).toContain("This secure proposal was sent by Acme Heating.");
     expect(sendArgs.html).toContain("If the button does not open, use this secure link:");
     expect(sendArgs.html).toContain("Acme Heating");
@@ -334,7 +340,13 @@ describe("sendEstimateProposalEmail", () => {
       "We've prepared the details for the recommended work and included the full proposal for your review."
     );
     expect(sendArgs.text).toContain("When you're ready, you can approve it securely online.");
+    expect(sendArgs.text).toContain("Prepared for you by Acme Heating");
+    expect(sendArgs.text).toContain("Sent on ");
+    expect(sendArgs.text).toContain("Secure online review and approval.");
     expect(sendArgs.text).toContain("Questions before approving? Contact Acme Heating at support@acme.test or 555-0000.");
+    expect(sendArgs.text).toContain(
+      "What happens next: after approval, our team will follow up to confirm scheduling details."
+    );
     expect(sendArgs.text).toContain("This secure proposal was sent by Acme Heating.");
     expect(sendArgs.text).toContain("http://localhost:3000/proposals/raw-token-new");
 

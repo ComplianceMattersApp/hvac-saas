@@ -187,6 +187,8 @@ function buildProposalEmailHtml(params: {
   const logoBlock = params.companyLogoUrl
     ? `<p style="margin:0 0 12px 0;"><img src="${escapeHtml(params.companyLogoUrl)}" alt="${escapeHtml(params.companyDisplayName)} logo" width="156" height="56" style="display:inline-block;width:156px;max-width:100%;max-height:56px;height:auto;object-fit:contain;" /></p>`
     : `<p style="margin:0 0 12px 0;font-size:22px;line-height:1.25;font-weight:700;color:#111827;">${escapeHtml(params.companyDisplayName)}</p>`;
+  const now = new Date();
+  const sentOn = `${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}-${String(now.getUTCFullYear())}`;
 
   return `
     <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:640px;">
@@ -199,26 +201,36 @@ function buildProposalEmailHtml(params: {
       <p style="margin:0 0 16px 0;font-size:15px;color:#111827;">
         When you are ready, you can approve it securely online.
       </p>
-      <p style="margin:0 0 18px 0;font-size:14px;color:#374151;">
-        Proposal <strong>${escapeHtml(params.estimateNumber)}</strong>${
-          params.estimateTitle
-            ? `: ${escapeHtml(params.estimateTitle)}`
-            : ""
-        }
-      </p>
-      <p style="margin:0 0 16px 0;">
-        <a href="${escapeHtml(params.proposalUrl)}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;">
+      <div style="margin:0 0 18px 0;padding:12px 14px;border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc;">
+        <p style="margin:0 0 2px 0;font-size:11px;line-height:1.4;letter-spacing:0.04em;text-transform:uppercase;color:#64748b;">Prepared for you by ${escapeHtml(params.companyDisplayName)}</p>
+        <p style="margin:0 0 4px 0;font-size:11px;line-height:1.45;color:#64748b;">Sent on ${escapeHtml(sentOn)}</p>
+        <p style="margin:0;font-size:14px;line-height:1.5;color:#374151;">
+          Proposal <strong>${escapeHtml(params.estimateNumber)}</strong>${
+            params.estimateTitle
+              ? `: ${escapeHtml(params.estimateTitle)}`
+              : ""
+          }
+        </p>
+      </div>
+      <p style="margin:0 0 22px 0;">
+        <a href="${escapeHtml(params.proposalUrl)}" style="display:inline-block;padding:12px 18px;border-radius:9px;background:#0b1630;color:#ffffff;text-decoration:none;font-weight:700;font-size:14px;box-shadow:0 6px 14px -8px rgba(15,23,42,0.65);">
           Review Proposal
         </a>
+        <span style="display:block;margin-top:8px;font-size:11px;line-height:1.45;color:#64748b;">
+          Secure online review and approval.
+        </span>
       </p>
-      <p style="margin:0 0 4px 0;font-size:11px;line-height:1.45;color:#6b7280;">
+      <p style="margin:0 0 8px 0;font-size:11px;line-height:1.45;color:#6b7280;">
         If the button does not open, use this secure link:
       </p>
-      <p style="margin:0 0 14px 0;font-size:11px;line-height:1.45;color:#64748b;word-break:break-all;">
+      <p style="margin:0 0 18px 0;font-size:11px;line-height:1.45;color:#64748b;word-break:break-all;">
         <a href="${escapeHtml(params.proposalUrl)}" style="color:#1f2937;text-decoration:underline;">${escapeHtml(params.proposalUrl)}</a>
       </p>
-      <p style="margin:0 0 8px 0;font-size:13px;line-height:1.45;color:#374151;">
+      <p style="margin:0 0 12px 0;font-size:13px;line-height:1.45;color:#374151;">
         ${contactLine}
+      </p>
+      <p style="margin:0 0 10px 0;font-size:12px;line-height:1.45;color:#475569;">
+        What happens next: after approval, our team will follow up to confirm scheduling details.
       </p>
       <p style="margin:0;font-size:11px;line-height:1.45;color:#6b7280;">
         This secure proposal was sent by ${escapeHtml(params.companyDisplayName)}.
@@ -237,6 +249,8 @@ function buildProposalEmailText(params: {
 }) {
   const supportEmail = String(params.supportEmail ?? "").trim();
   const supportPhone = String(params.supportPhone ?? "").trim();
+  const now = new Date();
+  const sentOn = `${String(now.getUTCMonth() + 1).padStart(2, "0")}-${String(now.getUTCDate()).padStart(2, "0")}-${String(now.getUTCFullYear())}`;
   const contactLine = supportEmail && supportPhone
     ? `Questions before approving? Contact ${params.companyDisplayName} at ${supportEmail} or ${supportPhone}.`
     : supportEmail
@@ -254,14 +268,20 @@ function buildProposalEmailText(params: {
     "",
     "When you're ready, you can approve it securely online.",
     "",
+    `Prepared for you by ${params.companyDisplayName}`,
+    `Sent on ${sentOn}`,
+    "",
     `Proposal: ${params.estimateNumber}${params.estimateTitle ? ` - ${params.estimateTitle}` : ""}`,
     "",
     "Review Proposal:",
     params.proposalUrl,
+    "Secure online review and approval.",
     "",
     "If the button does not open, use the secure link above.",
     "",
     contactLine,
+    "",
+    "What happens next: after approval, our team will follow up to confirm scheduling details.",
     "",
     `This secure proposal was sent by ${params.companyDisplayName}.`,
   ]
