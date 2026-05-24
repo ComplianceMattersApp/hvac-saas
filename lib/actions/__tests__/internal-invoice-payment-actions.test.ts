@@ -485,6 +485,22 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     );
   });
 
+  it('redirects directly to Stripe checkout when redirect_to_checkout is requested', async () => {
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData({ redirect_to_checkout: '1' })),
+    ).rejects.toThrow('REDIRECT:https://checkout.stripe.com/c/pay/cs_123');
+
+    expect(createTenantInvoiceCheckoutSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: 'owner-1',
+        jobId: 'job-1',
+        invoiceId: 'inv-1',
+      }),
+    );
+  });
+
   it('not-ready connect maps to safe notice', async () => {
     createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
       new Error('Tenant Stripe Connect account is not ready for checkout session creation.'),
@@ -529,6 +545,20 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     expect(insertJobEventMock).not.toHaveBeenCalled();
   });
 
+  it('does not insert payment rows or mark paid for direct checkout redirect action', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData({ redirect_to_checkout: '1' })),
+    ).rejects.toThrow('REDIRECT:https://checkout.stripe.com/c/pay/cs_123');
+
+    expect(fixture.writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(false);
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+  });
+
   it('action-state wrapper forces no-redirect and returns checkout URL state', async () => {
     const { createTenantInvoiceCheckoutSessionFromFormState } = await import('@/lib/actions/internal-invoice-payment-actions');
 
@@ -547,6 +577,22 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
         status: 'success',
         checkoutSessionId: 'cs_123',
         checkoutSessionUrl: 'https://checkout.stripe.com/c/pay/cs_123',
+      }),
+    );
+  });
+
+  it('collectTenantInvoicePaymentNowFromForm redirects directly to Stripe checkout', async () => {
+    const { collectTenantInvoicePaymentNowFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      collectTenantInvoicePaymentNowFromForm(buildCheckoutFormData()),
+    ).rejects.toThrow('REDIRECT:https://checkout.stripe.com/c/pay/cs_123');
+
+    expect(createTenantInvoiceCheckoutSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: 'owner-1',
+        jobId: 'job-1',
+        invoiceId: 'inv-1',
       }),
     );
   });

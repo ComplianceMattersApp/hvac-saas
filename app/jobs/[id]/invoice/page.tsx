@@ -36,7 +36,10 @@ import {
   updateInternalInvoiceLineItemFromForm,
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
-import { recordInternalInvoicePaymentFromForm } from "@/lib/actions/internal-invoice-payment-actions";
+import {
+  collectTenantInvoicePaymentNowFromForm,
+  recordInternalInvoicePaymentFromForm,
+} from "@/lib/actions/internal-invoice-payment-actions";
 import TenantInvoicePaymentLinkPanel from "./_components/TenantInvoicePaymentLinkPanel";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
@@ -533,6 +536,21 @@ export default async function InternalInvoiceWorkspacePage({
                 <p className="mt-1 text-sm leading-6 text-slate-600">
                   Manual entries can be recorded here. Online card payments are recorded after Stripe webhook confirmation.
                 </p>
+
+                {invoicePaymentLinkUiState.showCreateButton ? (
+                  <form action={collectTenantInvoicePaymentNowFromForm} className="mt-4 space-y-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
+                    <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <div className="text-sm leading-6 text-slate-700">
+                      Opens secure Stripe Checkout so the customer can pay this invoice now.
+                    </div>
+                    <SubmitButton loadingText="Opening checkout..." className={darkButtonClass}>
+                      Collect payment now
+                    </SubmitButton>
+                  </form>
+                ) : null}
 
                 {paymentSummary ? (
                   <div className="mt-4 grid gap-2 sm:grid-cols-3">

@@ -277,6 +277,7 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
   const tab = getTrimmedString(formData.get('tab')) || 'info';
   const returnTo = getTrimmedString(formData.get('return_to'));
   const noRedirect = getTrimmedString(formData.get('no_redirect')) === '1';
+  const redirectToCheckout = getTrimmedString(formData.get('redirect_to_checkout')) === '1';
 
   if (!jobId) {
     throw new Error('Job ID is required.');
@@ -348,6 +349,10 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
       } as const;
     }
 
+    if (redirectToCheckout) {
+      redirect(checkoutSession.checkoutSessionUrl);
+    }
+
     redirect(
       buildInternalInvoiceCheckoutReturnHref({
         jobId,
@@ -370,6 +375,19 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
 
     throw error;
   }
+}
+
+export async function collectTenantInvoicePaymentNowFromForm(formData: FormData): Promise<void> {
+  const forwardedFormData = new FormData();
+
+  for (const [key, value] of formData.entries()) {
+    forwardedFormData.set(key, value);
+  }
+
+  forwardedFormData.delete('no_redirect');
+  forwardedFormData.set('redirect_to_checkout', '1');
+
+  await createTenantInvoiceCheckoutSessionFromForm(forwardedFormData);
 }
 
 export type { TenantInvoiceCheckoutSessionActionState } from '@/lib/actions/internal-invoice-payment-actions-state';
