@@ -16,6 +16,7 @@ import {
   type PlatformOwnerDashboardRow,
 } from "@/lib/business/platform-owner-dashboard";
 import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib/business/platform-entitlement";
+import { accountScopeInList, resolveReportAccountContractorIds } from "@/lib/reports/report-account-scope";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 type PageParams = Promise<{
@@ -35,6 +36,16 @@ type AccountTriageItem = {
   title: string;
   detail: string;
   tone: HealthTone;
+};
+
+type OperationalActivitySnapshot = {
+  customerCount: number;
+  latestCustomerAt: string | null;
+  jobCount: number;
+  latestJobAt: string | null;
+  invoiceCount: number;
+  issuedInvoiceCount: number;
+  latestInvoiceAt: string | null;
 };
 
 async function requirePlatformOwnerOrFailClosed() {
@@ -85,6 +96,107 @@ function toValidDate(value: string | null | undefined) {
 function daysUntil(date: Date, now = new Date()) {
   const msPerDay = 24 * 60 * 60 * 1000;
   return Math.ceil((date.getTime() - now.getTime()) / msPerDay);
+}
+
+function normalizeCount(value: unknown) {
+  const count = Number(value ?? 0);
+  if (!Number.isFinite(count)) return 0;
+  return Math.max(0, Math.trunc(count));
+}
+
+function latestTimestampFromRow(row: any, preferredKey: string, fallbackKey?: string) {
+  const preferred = String(row?.[preferredKey] ?? "").trim();
+  if (preferred) return preferred;
+  const fallback = String(row?.[fallbackKey ?? ""] ?? "").trim();
+  return fallback || null;
+}
+
+function formatLatestActivity(value: string | null) {
+  const formatted = formatOwnerConsoleDate(value);
+  return formatted === "-" ? "No activity yet" : `Latest: ${formatted}`;
+}
+
+async function resolveOperationalActivitySnapshot(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<OperationalActivitySnapshot> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  const contractorIds = await resolveReportAccountContractorIds({
+    supabase: params.supabase,
+    accountOwnerUserId,
+  });
+  const scopedContractorIds = accountScopeInList(contractorIds);
+
+  const [
+    customerCountResult,
+    latestCustomerResult,
+    jobCountResult,
+    latestJobResult,
+    invoiceCountResult,
+    issuedInvoiceCountResult,
+    latestInvoiceResult,
+  ] = await Promise.all([
+    params.supabase
+      .from("customers")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_user_id", accountOwnerUserId)
+      .is("deleted_at", null),
+    params.supabase
+      .from("customers")
+      .select("created_at")
+      .eq("owner_user_id", accountOwnerUserId)
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    params.supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .in("contractor_id", scopedContractorIds),
+    params.supabase
+      .from("jobs")
+      .select("created_at")
+      .is("deleted_at", null)
+      .in("contractor_id", scopedContractorIds)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    params.supabase
+      .from("internal_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("account_owner_user_id", accountOwnerUserId),
+    params.supabase
+      .from("internal_invoices")
+      .select("id", { count: "exact", head: true })
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("status", "issued"),
+    params.supabase
+      .from("internal_invoices")
+      .select("created_at, issued_at")
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+
+  if (customerCountResult.error) throw customerCountResult.error;
+  if (latestCustomerResult.error) throw latestCustomerResult.error;
+  if (jobCountResult.error) throw jobCountResult.error;
+  if (latestJobResult.error) throw latestJobResult.error;
+  if (invoiceCountResult.error) throw invoiceCountResult.error;
+  if (issuedInvoiceCountResult.error) throw issuedInvoiceCountResult.error;
+  if (latestInvoiceResult.error) throw latestInvoiceResult.error;
+
+  return {
+    customerCount: normalizeCount(customerCountResult.count),
+    latestCustomerAt: latestTimestampFromRow(latestCustomerResult.data, "created_at"),
+    jobCount: normalizeCount(jobCountResult.count),
+    latestJobAt: latestTimestampFromRow(latestJobResult.data, "created_at"),
+    invoiceCount: normalizeCount(invoiceCountResult.count),
+    issuedInvoiceCount: normalizeCount(issuedInvoiceCountResult.count),
+    latestInvoiceAt: latestTimestampFromRow(latestInvoiceResult.data, "issued_at", "created_at"),
+  };
 }
 
 function resolveOverallHealth(params: {
@@ -256,11 +368,13 @@ function resolveSupportNextChecks(params: {
   row: PlatformOwnerDashboardRow;
   readiness: AccountReadinessSummary;
   entitlement: AccountEntitlementContext;
+  activitySnapshot: OperationalActivitySnapshot;
 }) {
   const checks: AccountTriageItem[] = [];
   const status = String(params.row.entitlementStatus ?? params.entitlement.entitlementStatus ?? "").trim().toLowerCase();
   const trialEnd = toValidDate(params.row.trialEnd);
   const trialDaysRemaining = trialEnd ? daysUntil(trialEnd) : null;
+  const billingMode = String(params.row.billingMode ?? "").trim().toLowerCase();
 
   for (const item of params.readiness.items) {
     if (item.status === "optional" || item.status === "complete") continue;
@@ -275,6 +389,30 @@ function resolveSupportNextChecks(params: {
     checks.push({
       title: "Confirm product mode",
       detail: "Product mode is not set, which can make support triage harder.",
+      tone: "amber",
+    });
+  }
+
+  if (params.activitySnapshot.customerCount === 0) {
+    checks.push({
+      title: "No customers yet",
+      detail: "No customer records are visible for this account yet.",
+      tone: "amber",
+    });
+  }
+
+  if (params.activitySnapshot.jobCount === 0) {
+    checks.push({
+      title: "No jobs yet",
+      detail: "No job records are visible for this account yet.",
+      tone: "amber",
+    });
+  }
+
+  if (billingMode === "internal_invoicing" && params.activitySnapshot.jobCount > 0 && params.activitySnapshot.invoiceCount === 0) {
+    checks.push({
+      title: "No internal invoices yet",
+      detail: "This account uses internal invoicing, but no invoice records are visible yet.",
       tone: "amber",
     });
   }
@@ -434,13 +572,14 @@ export default async function PlatformOwnerAccountSnapshotPage({ params }: { par
 
   const hiddenEmails = parseHiddenAccountEmails(process.env);
   const internalEmails = parseInternalAccountEmails(process.env);
-  const [readiness, entitlement] = await Promise.all([
+  const [readiness, entitlement, activitySnapshot] = await Promise.all([
     resolveAccountReadiness(accountOwnerUserId, admin),
     resolveAccountEntitlement(accountOwnerUserId, admin),
+    resolveOperationalActivitySnapshot({ supabase: admin, accountOwnerUserId }),
   ]);
   const badges = resolveAccountBadges({ row, hiddenEmails, internalEmails });
   const healthSignals = resolveAccountHealthSignals({ row, readiness, entitlement });
-  const supportNextChecks = resolveSupportNextChecks({ row, readiness, entitlement });
+  const supportNextChecks = resolveSupportNextChecks({ row, readiness, entitlement, activitySnapshot });
   const requiredReadinessItems = readiness.items.filter((item) => item.status !== "optional");
   const optionalReadinessItems = readiness.items.filter((item) => item.status === "optional");
 
@@ -505,6 +644,19 @@ export default async function PlatformOwnerAccountSnapshotPage({ params }: { par
             <SupportNextCheckCard key={`${item.title}-${item.detail}`} item={item} />
           ))}
         </div>
+      </section>
+
+      <section>
+        <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Operational Activity</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <DetailCard label="Customers" value={String(activitySnapshot.customerCount)} helper={formatLatestActivity(activitySnapshot.latestCustomerAt)} />
+          <DetailCard label="Jobs" value={String(activitySnapshot.jobCount)} helper={formatLatestActivity(activitySnapshot.latestJobAt)} />
+          <DetailCard label="Invoices" value={String(activitySnapshot.invoiceCount)} helper={formatLatestActivity(activitySnapshot.latestInvoiceAt)} />
+          <DetailCard label="Issued Invoices" value={String(activitySnapshot.issuedInvoiceCount)} helper="Issued invoice count only." />
+        </div>
+        <p className="mt-2 text-xs text-slate-500">
+          Aggregate counts only. No customer, job, or invoice records are listed or opened from this support snapshot.
+        </p>
       </section>
 
       <section>
