@@ -316,25 +316,34 @@ describe("sendEstimateProposalEmail", () => {
     expect(sendArgs.to).toBe("owner@client.com");
     expect(sendArgs.subject).toBe("Proposal Ready: Spring Tune-up");
     expect(sendArgs.html).toContain("Your proposal is ready");
-    expect(sendArgs.html).toContain("Please review the proposal details and approve online when ready.");
+    expect(sendArgs.html).toContain(
+      "We have prepared the details for the recommended work and included the full proposal for your review."
+    );
+    expect(sendArgs.html).toContain("When you are ready, you can approve it securely online.");
     expect(sendArgs.html).toContain("Review Proposal");
-    expect(sendArgs.html).toContain("This secure link is unique to this proposal.");
+    expect(sendArgs.html).toContain("If the button does not open, use this secure link:");
+    expect(sendArgs.html).toContain("Questions before approving? Contact Acme Heating at support@acme.test or 555-0000.");
+    expect(sendArgs.html).toContain("This secure proposal was sent by Acme Heating.");
     expect(sendArgs.html).toContain("If the button does not open, use this secure link:");
     expect(sendArgs.html).toContain("Acme Heating");
     expect(sendArgs.html).toContain("support@acme.test");
     expect(sendArgs.html).toContain("555-0000");
     expect(sendArgs.html).toContain("http://localhost:3000/proposals/raw-token-new");
     expect(sendArgs.text).toContain("Your proposal is ready");
-    expect(sendArgs.text).toContain("Please review the proposal details and approve online when ready:");
     expect(sendArgs.text).toContain(
-      "This is an automated message containing a secure proposal link."
+      "We've prepared the details for the recommended work and included the full proposal for your review."
     );
+    expect(sendArgs.text).toContain("When you're ready, you can approve it securely online.");
+    expect(sendArgs.text).toContain("Questions before approving? Contact Acme Heating at support@acme.test or 555-0000.");
+    expect(sendArgs.text).toContain("This secure proposal was sent by Acme Heating.");
     expect(sendArgs.text).toContain("http://localhost:3000/proposals/raw-token-new");
 
     const supportEmailOccurrences = sendArgs.html.match(/support@acme\.test/g)?.length ?? 0;
     const supportPhoneOccurrences = sendArgs.html.match(/555-0000/g)?.length ?? 0;
     expect(supportEmailOccurrences).toBe(1);
     expect(supportPhoneOccurrences).toBe(1);
+    expect(sendArgs.html.toLowerCase()).not.toContain("automated message");
+    expect(sendArgs.text.toLowerCase()).not.toContain("automated message");
 
     expect(sendArgs.html.toLowerCase()).not.toContain("invoice");
     expect(sendArgs.html.toLowerCase()).not.toContain("payment");

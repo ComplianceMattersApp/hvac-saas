@@ -15,7 +15,7 @@ import {
   readCachedEstimateProposalLinkRawToken,
 } from "@/lib/estimates/estimate-proposal-links";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
-import { renderOperationalEmailLayout, escapeHtml } from "@/lib/email/layout";
+import { escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { resolveProposalEmailPreviewUrl } from "@/lib/estimates/estimate-proposal-email-preview";
 
@@ -174,46 +174,57 @@ function buildProposalEmailHtml(params: {
   estimateTitle: string;
   proposalUrl: string;
 }) {
+  const supportEmail = String(params.supportEmail ?? "").trim();
+  const supportPhone = String(params.supportPhone ?? "").trim();
+  const contactLine = supportEmail && supportPhone
+    ? `Questions before approving? Contact ${escapeHtml(params.companyDisplayName)} at ${escapeHtml(supportEmail)} or ${escapeHtml(supportPhone)}.`
+    : supportEmail
+      ? `Questions before approving? Contact ${escapeHtml(params.companyDisplayName)} at ${escapeHtml(supportEmail)}.`
+      : supportPhone
+        ? `Questions before approving? Contact ${escapeHtml(params.companyDisplayName)} at ${escapeHtml(supportPhone)}.`
+        : `Questions before approving? Contact ${escapeHtml(params.companyDisplayName)} directly.`;
+
   const logoBlock = params.companyLogoUrl
-    ? `<p style="margin:0 0 14px 0;"><img src="${escapeHtml(params.companyLogoUrl)}" alt="${escapeHtml(params.companyDisplayName)} logo" width="132" height="52" style="display:inline-block;width:132px;max-width:100%;max-height:52px;height:auto;object-fit:contain;" /></p>`
-    : "";
+    ? `<p style="margin:0 0 12px 0;"><img src="${escapeHtml(params.companyLogoUrl)}" alt="${escapeHtml(params.companyDisplayName)} logo" width="156" height="56" style="display:inline-block;width:156px;max-width:100%;max-height:56px;height:auto;object-fit:contain;" /></p>`
+    : `<p style="margin:0 0 12px 0;font-size:22px;line-height:1.25;font-weight:700;color:#111827;">${escapeHtml(params.companyDisplayName)}</p>`;
 
-  const bodyHtml = `
-    ${logoBlock}
-    <p style="margin:0 0 12px 0;font-size:15px;color:#111827;">
-      Please review the proposal details and approve online when ready.
-    </p>
-    <p style="margin:0 0 18px 0;font-size:14px;color:#374151;">
-      Proposal <strong>${escapeHtml(params.estimateNumber)}</strong>${
-        params.estimateTitle
-          ? `: ${escapeHtml(params.estimateTitle)}`
-          : ""
-      }
-    </p>
-    <p style="margin:0 0 18px 0;">
-      <a href="${escapeHtml(params.proposalUrl)}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;">
-        Review Proposal
-      </a>
-    </p>
-    <p style="margin:0 0 4px 0;font-size:11px;line-height:1.5;color:#6b7280;">
-      If the button does not open, use this secure link:
-    </p>
-    <p style="margin:0 0 10px 0;font-size:10px;line-height:1.5;color:#94a3b8;word-break:break-all;">
-      <a href="${escapeHtml(params.proposalUrl)}" style="color:#1f2937;text-decoration:underline;">${escapeHtml(params.proposalUrl)}</a>
-    </p>
-    <p style="margin:0;color:#6b7280;font-size:11px;line-height:1.5;">
-      This secure link is unique to this proposal.
-    </p>
+  return `
+    <div style="font-family:Arial,sans-serif;line-height:1.5;color:#111827;max-width:640px;">
+      ${logoBlock}
+      <h2 style="margin:0 0 12px 0;font-size:24px;line-height:1.3;color:#111827;">Your proposal is ready</h2>
+      <p style="margin:0 0 10px 0;font-size:15px;color:#111827;">Hello,</p>
+      <p style="margin:0 0 10px 0;font-size:15px;color:#111827;">
+        We have prepared the details for the recommended work and included the full proposal for your review.
+      </p>
+      <p style="margin:0 0 16px 0;font-size:15px;color:#111827;">
+        When you are ready, you can approve it securely online.
+      </p>
+      <p style="margin:0 0 18px 0;font-size:14px;color:#374151;">
+        Proposal <strong>${escapeHtml(params.estimateNumber)}</strong>${
+          params.estimateTitle
+            ? `: ${escapeHtml(params.estimateTitle)}`
+            : ""
+        }
+      </p>
+      <p style="margin:0 0 16px 0;">
+        <a href="${escapeHtml(params.proposalUrl)}" style="display:inline-block;padding:11px 16px;border-radius:8px;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600;font-size:14px;">
+          Review Proposal
+        </a>
+      </p>
+      <p style="margin:0 0 4px 0;font-size:11px;line-height:1.45;color:#6b7280;">
+        If the button does not open, use this secure link:
+      </p>
+      <p style="margin:0 0 14px 0;font-size:11px;line-height:1.45;color:#64748b;word-break:break-all;">
+        <a href="${escapeHtml(params.proposalUrl)}" style="color:#1f2937;text-decoration:underline;">${escapeHtml(params.proposalUrl)}</a>
+      </p>
+      <p style="margin:0 0 8px 0;font-size:13px;line-height:1.45;color:#374151;">
+        ${contactLine}
+      </p>
+      <p style="margin:0;font-size:11px;line-height:1.45;color:#6b7280;">
+        This secure proposal was sent by ${escapeHtml(params.companyDisplayName)}.
+      </p>
+    </div>
   `;
-
-  return renderOperationalEmailLayout({
-    title: "Your proposal is ready",
-    bodyHtml,
-    companyDisplayName: params.companyDisplayName,
-    companyLogoUrl: null,
-    supportEmail: params.supportEmail,
-    supportPhone: params.supportPhone,
-  });
 }
 
 function buildProposalEmailText(params: {
@@ -224,18 +235,35 @@ function buildProposalEmailText(params: {
   estimateTitle: string;
   proposalUrl: string;
 }) {
-  const support = [params.supportEmail, params.supportPhone].filter(Boolean).join(" | ");
+  const supportEmail = String(params.supportEmail ?? "").trim();
+  const supportPhone = String(params.supportPhone ?? "").trim();
+  const contactLine = supportEmail && supportPhone
+    ? `Questions before approving? Contact ${params.companyDisplayName} at ${supportEmail} or ${supportPhone}.`
+    : supportEmail
+      ? `Questions before approving? Contact ${params.companyDisplayName} at ${supportEmail}.`
+      : supportPhone
+        ? `Questions before approving? Contact ${params.companyDisplayName} at ${supportPhone}.`
+        : `Questions before approving? Contact ${params.companyDisplayName} directly.`;
 
   return [
     "Your proposal is ready",
     "",
+    "Hello,",
+    "",
+    "We've prepared the details for the recommended work and included the full proposal for your review.",
+    "",
+    "When you're ready, you can approve it securely online.",
+    "",
     `Proposal: ${params.estimateNumber}${params.estimateTitle ? ` - ${params.estimateTitle}` : ""}`,
     "",
-    "Please review the proposal details and approve online when ready:",
+    "Review Proposal:",
     params.proposalUrl,
     "",
-    support ? `${params.companyDisplayName} | ${support}` : params.companyDisplayName,
-    "This is an automated message containing a secure proposal link.",
+    "If the button does not open, use the secure link above.",
+    "",
+    contactLine,
+    "",
+    `This secure proposal was sent by ${params.companyDisplayName}.`,
   ]
     .filter(Boolean)
     .join("\n");
