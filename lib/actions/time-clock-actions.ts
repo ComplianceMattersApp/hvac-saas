@@ -182,12 +182,19 @@ export async function correctTimeEntryFromForm(formData: FormData): Promise<void
   }
 
   const nextStatusRaw = String(formData.get("status") ?? "").trim().toLowerCase();
-  const nextStatus = nextStatusRaw === "needs_review" ? "needs_review" : "closed";
+  const nextStatus =
+    nextStatusRaw === "needs_review" || nextStatusRaw === "voided"
+      ? nextStatusRaw
+      : "closed";
 
+  let clockInAt: string | null = null;
+  let lunchStartAt: string | null = null;
   let clockOutAt: string | null = null;
   let lunchEndAt: string | null = null;
 
   try {
+    clockInAt = parseOptionalLaDateTimeToUtcIso(formData.get("clock_in_at_local"));
+    lunchStartAt = parseOptionalLaDateTimeToUtcIso(formData.get("lunch_start_at_local"));
     clockOutAt = parseOptionalLaDateTimeToUtcIso(formData.get("clock_out_at_local"));
     lunchEndAt = parseOptionalLaDateTimeToUtcIso(formData.get("lunch_end_at_local"));
   } catch {
@@ -212,6 +219,14 @@ export async function correctTimeEntryFromForm(formData: FormData): Promise<void
     adjusted_at: new Date().toISOString(),
     adjustment_reason: adjustmentReason.slice(0, 500),
   };
+
+  if (clockInAt) {
+    nextPayload.clock_in_at = clockInAt;
+  }
+
+  if (lunchStartAt) {
+    nextPayload.lunch_start_at = lunchStartAt;
+  }
 
   if (clockOutAt) {
     nextPayload.clock_out_at = clockOutAt;

@@ -159,63 +159,92 @@ function renderEntryRow(params: {
       </div>
 
       {showCorrection ? (
-        <form action={correctTimeEntryFromForm} className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
-          <input type="hidden" name="entry_id" value={row.entryId} />
+        <details className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <summary className="inline-flex cursor-pointer items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-[background-color,transform] hover:bg-slate-50 active:translate-y-[0.5px]">
+            Edit Entry
+          </summary>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <label className="space-y-1 text-xs text-slate-600">
-              <span className="font-medium text-slate-700">Set status</span>
-              <select
-                name="status"
-                defaultValue={row.status === "needs_review" ? "needs_review" : "closed"}
-                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900"
-              >
-                <option value="closed">Closed</option>
-                <option value="needs_review">Needs review</option>
-              </select>
-            </label>
+          <form action={correctTimeEntryFromForm} className="mt-3 space-y-3">
+            <input type="hidden" name="entry_id" value={row.entryId} />
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-xs text-slate-600">
+                <span className="font-medium text-slate-700">Clock in (LA)</span>
+                <input
+                  type="datetime-local"
+                  name="clock_in_at_local"
+                  defaultValue={toLocalDateTimeInputValue(row.clockInAt)}
+                  className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900"
+                />
+              </label>
+
+              <label className="space-y-1 text-xs text-slate-600">
+                <span className="font-medium text-slate-700">Lunch start (LA)</span>
+                <input
+                  type="datetime-local"
+                  name="lunch_start_at_local"
+                  defaultValue={toLocalDateTimeInputValue(row.lunchStartAt)}
+                  className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900"
+                />
+              </label>
+
+              <label className="space-y-1 text-xs text-slate-600">
+                <span className="font-medium text-slate-700">Lunch end (LA)</span>
+                <input
+                  type="datetime-local"
+                  name="lunch_end_at_local"
+                  defaultValue={toLocalDateTimeInputValue(row.lunchEndAt)}
+                  className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900"
+                />
+              </label>
+
+              <label className="space-y-1 text-xs text-slate-600">
+                <span className="font-medium text-slate-700">Clock out (LA)</span>
+                <input
+                  type="datetime-local"
+                  name="clock_out_at_local"
+                  defaultValue={toLocalDateTimeInputValue(row.clockOutAt)}
+                  className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900"
+                />
+              </label>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <label className="space-y-1 text-xs text-slate-600">
+                <span className="font-medium text-slate-700">Status</span>
+                <select
+                  name="status"
+                  defaultValue={row.status === "needs_review" || row.status === "voided" ? row.status : "closed"}
+                  className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900"
+                >
+                  <option value="closed">Closed</option>
+                  <option value="needs_review">Needs review</option>
+                  <option value="voided">Voided</option>
+                </select>
+              </label>
+            </div>
 
             <label className="space-y-1 text-xs text-slate-600">
-              <span className="font-medium text-slate-700">Clock out (LA)</span>
-              <input
-                type="datetime-local"
-                name="clock_out_at_local"
-                defaultValue={toLocalDateTimeInputValue(row.clockOutAt)}
+              <span className="font-medium text-slate-700">Reason for correction</span>
+              <textarea
+                name="adjustment_reason"
+                required
+                minLength={3}
+                maxLength={500}
+                rows={2}
+                placeholder="Correct time entry with a clear reason."
                 className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900"
               />
             </label>
 
-            <label className="space-y-1 text-xs text-slate-600">
-              <span className="font-medium text-slate-700">Lunch end (LA)</span>
-              <input
-                type="datetime-local"
-                name="lunch_end_at_local"
-                defaultValue={toLocalDateTimeInputValue(row.lunchEndAt)}
-                className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900"
-              />
-            </label>
-          </div>
-
-          <label className="space-y-1 text-xs text-slate-600">
-            <span className="font-medium text-slate-700">Adjustment reason</span>
-            <textarea
-              name="adjustment_reason"
-              required
-              minLength={3}
-              maxLength={500}
-              rows={2}
-              placeholder="Explain the correction for this time entry."
-              className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900"
-            />
-          </label>
-
-          <button
-            type="submit"
-            className="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white shadow-[0_12px_22px_-14px_rgba(15,23,42,0.45)] transition-[background-color,transform] hover:bg-slate-800 active:translate-y-[0.5px]"
-          >
-            Save correction
-          </button>
-        </form>
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-lg bg-slate-900 px-3.5 py-2 text-sm font-semibold text-white shadow-[0_12px_22px_-14px_rgba(15,23,42,0.45)] transition-[background-color,transform] hover:bg-slate-800 active:translate-y-[0.5px]"
+            >
+              Correct time entry
+            </button>
+          </form>
+        </details>
       ) : null}
     </div>
   );
@@ -333,7 +362,7 @@ export default async function AdminTimeClockPage({ searchParams }: { searchParam
               renderEntryRow({
                 row,
                 displayName: String(displayMap[row.internalUserId] ?? "").trim() || "Unknown User",
-                showCorrection: false,
+                showCorrection: true,
               }),
             )
           )}

@@ -111,7 +111,9 @@ describe("time clock admin correction action", () => {
     const { correctTimeEntryFromForm } = await import("@/lib/actions/time-clock-actions");
     const formData = new FormData();
     formData.set("entry_id", "entry-1");
-    formData.set("status", "closed");
+    formData.set("status", "voided");
+    formData.set("clock_in_at_local", "2026-05-24T08:00");
+    formData.set("lunch_start_at_local", "2026-05-24T12:00");
     formData.set("clock_out_at_local", "2026-05-24T15:30");
     formData.set("lunch_end_at_local", "2026-05-24T12:45");
     formData.set("adjustment_reason", "Dispatcher confirmed missed clock-out.");
@@ -121,9 +123,13 @@ describe("time clock admin correction action", () => {
     );
 
     expect(fixture.updates).toHaveLength(1);
-    expect(fixture.updates[0]?.status).toBe("closed");
+    expect(fixture.updates[0]?.status).toBe("voided");
     expect(fixture.updates[0]?.adjusted_by_user_id).toBe("admin-1");
     expect(fixture.updates[0]?.adjustment_reason).toBe("Dispatcher confirmed missed clock-out.");
+    expect(typeof fixture.updates[0]?.clock_in_at).toBe("string");
+    expect(typeof fixture.updates[0]?.lunch_start_at).toBe("string");
+    expect(typeof fixture.updates[0]?.lunch_end_at).toBe("string");
+    expect(typeof fixture.updates[0]?.clock_out_at).toBe("string");
     expect(revalidatePathMock).toHaveBeenCalledWith("/ops/admin/time-clock");
     expect(revalidatePathMock).toHaveBeenCalledWith("/ops");
     expect(revalidatePathMock).toHaveBeenCalledWith("/time-clock");
