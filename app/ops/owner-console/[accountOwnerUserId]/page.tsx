@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { resolveAccountReadiness } from "@/lib/business/account-readiness";
+import { resolveAccountReadiness, type AccountReadinessSummary } from "@/lib/business/account-readiness";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import {
   formatBillingModeLabel,
@@ -15,12 +15,21 @@ import {
   parseInternalAccountEmails,
   type PlatformOwnerDashboardRow,
 } from "@/lib/business/platform-owner-dashboard";
-import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
+import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib/business/platform-entitlement";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 type PageParams = Promise<{
   accountOwnerUserId?: string;
 }>;
+
+type HealthTone = "slate" | "emerald" | "blue" | "amber";
+
+type AccountHealthSignal = {
+  label: string;
+  value: string;
+  helper: string;
+  tone: HealthTone;
+};
 
 async function requirePlatformOwnerOrFailClosed() {
   const supabase = await createClient();
@@ -60,6 +69,183 @@ function yesNo(value: boolean) {
   return value ? "Yes" : "No";
 }
 
+function toValidDate(value: string | null | undefined) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  const date = new Date(raw);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function daysUntil(date: Date, now = new Date()) {
+  const msPerDay = 24 * 60 * 60 * 1000;
+  return Math.ceil((date.getTime() - now.getTime()) / msPerDay);
+}
+
+function resolveOverallHealth(params: {
+  row: PlatformOwnerDashboardRow;
+  readiness: AccountReadinessSummary;
+  entitlement: AccountEntitlementContext;
+}) : AccountHealthSignal {
+  const status = String(params.row.entitlementStatus ?? params.entitlement.entitlementStatus ?? "").trim().toLowerCase();
+  const trialEnd = toValidDate(params.row.trialEnd);
+  const trialDaysRemaining = trialEnd ? daysUntil(trialEnd) : null;
+
+  if (!params.readiness.isOperationallyReady) {
+    return {
+      label: "Overall Health",
+      value: "Needs setup",
+      helper: `${params.readiness.completedRequiredCount}/${params.readiness.totalRequiredCount} required setup items complete.`,
+      tone: "amber",
+    };
+  }
+
+  if (status && !["active", "trial", "grace"].includes(status)) {
+    return {
+      label: "Overall Health",
+      value: "Inactive status",
+      helper: `Current account status is ${formatStatusLabel(status)}.`,
+      tone: "amber",
+    };
+  }
+
+  if (params.row.activeUsers <= 0) {
+    return {
+      label: "Overall Health",
+      value: "No active users",
+      helper: "The account has no active internal users.",
+      tone: "amber",
+    };
+  }
+
+  if (status === "trial" && trialDaysRemaining != null && trialDaysRemaining <= 7) {
+    return {
+      label: "Overall Health",
+      value: "Trial ending soon",
+      helper: `Trial ends ${formatOwnerConsoleDate(params.row.trialEnd)}.`,
+      tone: "amber",
+    };
+  }
+
+  return {
+    label: "Overall Health",
+    value: "Looks ready",
+    helper: "Core setup, status, and user signals look healthy.",
+    tone: "emerald",
+  };
+}
+
+function resolveBillingHealth(params: {
+  row: PlatformOwnerDashboardRow;
+  entitlement: AccountEntitlementContext;
+}) : AccountHealthSignal {
+  const status = String(params.row.entitlementStatus ?? params.entitlement.entitlementStatus ?? "").trim().toLowerCase();
+
+  if (params.entitlement.isInternalComped) {
+    return {
+      label: "Billing Health",
+      value: "Internal comped",
+      helper: "Comped account signal is active; no tenant billing action shown here.",
+      tone: "blue",
+    };
+  }
+
+  if (params.entitlement.billingSubscriptionLinked) {
+    return {
+      label: "Billing Health",
+      value: params.entitlement.billingSubscriptionStatus ?? "Linked",
+      helper: `Subscription period ends ${formatOwnerConsoleDate(params.entitlement.billingCurrentPeriodEnd?.toISOString() ?? null)}.`,
+      tone: "emerald",
+    };
+  }
+
+  if (status === "trial") {
+    return {
+      label: "Billing Health",
+      value: "Trial account",
+      helper: "No subscription linkage is required while trial is active.",
+      tone: "slate",
+    };
+  }
+
+  return {
+    label: "Billing Health",
+    value: "Not linked",
+    helper: "No platform subscription linkage is visible in this read-only snapshot.",
+    tone: "amber",
+  };
+}
+
+function resolveTrialHealth(row: PlatformOwnerDashboardRow): AccountHealthSignal {
+  const trialEnd = toValidDate(row.trialEnd);
+  const status = String(row.entitlementStatus ?? "").trim().toLowerCase();
+
+  if (!trialEnd) {
+    return {
+      label: "Trial Signal",
+      value: "No trial date",
+      helper: "No trial end date is visible for this account.",
+      tone: status === "trial" ? "amber" : "slate",
+    };
+  }
+
+  const remainingDays = daysUntil(trialEnd);
+  if (remainingDays < 0) {
+    return {
+      label: "Trial Signal",
+      value: "Trial date passed",
+      helper: `Trial ended ${formatOwnerConsoleDate(row.trialEnd)}.`,
+      tone: "amber",
+    };
+  }
+
+  if (remainingDays <= 7) {
+    return {
+      label: "Trial Signal",
+      value: `${remainingDays} day${remainingDays === 1 ? "" : "s"} left`,
+      helper: `Trial ends ${formatOwnerConsoleDate(row.trialEnd)}.`,
+      tone: "amber",
+    };
+  }
+
+  return {
+    label: "Trial Signal",
+    value: `${remainingDays} days left`,
+    helper: `Trial ends ${formatOwnerConsoleDate(row.trialEnd)}.`,
+    tone: status === "trial" ? "emerald" : "slate",
+  };
+}
+
+function resolveUserHealth(row: PlatformOwnerDashboardRow): AccountHealthSignal {
+  if (row.activeUsers <= 0) {
+    return {
+      label: "User Health",
+      value: "No active users",
+      helper: `${row.totalUsers} total internal user${row.totalUsers === 1 ? "" : "s"} found.`,
+      tone: "amber",
+    };
+  }
+
+  return {
+    label: "User Health",
+    value: `${row.activeUsers}/${row.totalUsers} active`,
+    helper: "Active internal user count is available for support triage.",
+    tone: "emerald",
+  };
+}
+
+function resolveAccountHealthSignals(params: {
+  row: PlatformOwnerDashboardRow;
+  readiness: AccountReadinessSummary;
+  entitlement: AccountEntitlementContext;
+}) {
+  return [
+    resolveOverallHealth(params),
+    resolveBillingHealth(params),
+    resolveTrialHealth(params.row),
+    resolveUserHealth(params.row),
+  ];
+}
+
 function DetailCard(props: { label: string; value: string; helper?: string }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -70,7 +256,7 @@ function DetailCard(props: { label: string; value: string; helper?: string }) {
   );
 }
 
-function Badge(props: { children: ReactNode; tone: "slate" | "emerald" | "blue" | "amber" }) {
+function Badge(props: { children: ReactNode; tone: HealthTone }) {
   const classes = {
     slate: "bg-slate-100 text-slate-700",
     emerald: "bg-emerald-100 text-emerald-800",
@@ -85,12 +271,32 @@ function Badge(props: { children: ReactNode; tone: "slate" | "emerald" | "blue" 
   );
 }
 
+function HealthSignalCard(props: { signal: AccountHealthSignal }) {
+  const borderClass = {
+    slate: "border-slate-200 bg-white",
+    emerald: "border-emerald-200 bg-emerald-50",
+    blue: "border-blue-200 bg-blue-50",
+    amber: "border-amber-200 bg-amber-50",
+  }[props.signal.tone];
+
+  return (
+    <div className={`rounded-2xl border p-4 shadow-sm ${borderClass}`}>
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{props.signal.label}</p>
+        <Badge tone={props.signal.tone}>{props.signal.tone === "emerald" ? "OK" : props.signal.tone === "amber" ? "Watch" : "Info"}</Badge>
+      </div>
+      <p className="mt-2 text-base font-semibold text-slate-950">{props.signal.value}</p>
+      <p className="mt-1 text-xs text-slate-600">{props.signal.helper}</p>
+    </div>
+  );
+}
+
 function resolveAccountBadges(params: {
   row: PlatformOwnerDashboardRow;
   hiddenEmails: Set<string>;
   internalEmails: Set<string>;
 }) {
-  const badges: { label: string; tone: "slate" | "emerald" | "blue" | "amber" }[] = [];
+  const badges: { label: string; tone: HealthTone }[] = [];
 
   if (isPlatformInternalAccountRow(params.row, params.internalEmails)) {
     badges.push({ label: "Platform / Internal", tone: "emerald" });
@@ -138,6 +344,7 @@ export default async function PlatformOwnerAccountSnapshotPage({ params }: { par
     resolveAccountEntitlement(accountOwnerUserId, admin),
   ]);
   const badges = resolveAccountBadges({ row, hiddenEmails, internalEmails });
+  const healthSignals = resolveAccountHealthSignals({ row, readiness, entitlement });
   const requiredReadinessItems = readiness.items.filter((item) => item.status !== "optional");
   const optionalReadinessItems = readiness.items.filter((item) => item.status === "optional");
 
@@ -176,6 +383,15 @@ export default async function PlatformOwnerAccountSnapshotPage({ params }: { par
             <p className="font-semibold text-slate-700">Account owner user id</p>
             <p className="mt-1 break-all font-mono text-slate-800">{row.accountOwnerUserId}</p>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <p className="mb-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Support Health</p>
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {healthSignals.map((signal) => (
+            <HealthSignalCard key={signal.label} signal={signal} />
+          ))}
         </div>
       </section>
 
