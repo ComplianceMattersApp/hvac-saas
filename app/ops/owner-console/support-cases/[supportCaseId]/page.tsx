@@ -11,6 +11,7 @@ import {
   formatSupportCaseStatus,
   loadSupportCaseById,
   loadSupportCaseNotes,
+  type SupportCaseNote,
 } from "@/lib/business/support-cases";
 import { loadPlatformOwnerDashboardModel } from "@/lib/business/platform-owner-dashboard";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
@@ -79,7 +80,7 @@ export default async function SupportCaseDetailPage({ params }: { params: PagePa
   const supportCase = await loadSupportCaseById({ supabase: admin, supportCaseId });
   if (!supportCase) notFound();
 
-  const [notes, dashboardModel] = await Promise.all([
+  const [notes, dashboardModel]: [SupportCaseNote[], Awaited<ReturnType<typeof loadPlatformOwnerDashboardModel>>] = await Promise.all([
     loadSupportCaseNotes({ supabase: admin, supportCaseId }),
     loadPlatformOwnerDashboardModel({ admin }),
   ]);

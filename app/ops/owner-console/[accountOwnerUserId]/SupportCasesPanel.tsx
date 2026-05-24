@@ -6,6 +6,7 @@ import {
   formatSupportCaseStatus,
   loadSupportCaseCountsForAccount,
   loadSupportCasesForAccount,
+  type SupportCaseSummary,
 } from "@/lib/business/support-cases";
 import { createAdminClient } from "@/lib/supabase/server";
 
@@ -37,7 +38,7 @@ export default async function SupportCasesPanel({
   accountOwnerUserId: string;
 }) {
   const admin = createAdminClient();
-  const [cases, counts] = await Promise.all([
+  const [cases, counts]: [SupportCaseSummary[], Awaited<ReturnType<typeof loadSupportCaseCountsForAccount>>] = await Promise.all([
     loadSupportCasesForAccount({ supabase: admin, accountOwnerUserId, limit: 6 }),
     loadSupportCaseCountsForAccount({ supabase: admin, accountOwnerUserId }),
   ]);
