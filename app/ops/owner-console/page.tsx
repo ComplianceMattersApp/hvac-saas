@@ -14,8 +14,12 @@ import {
   parseInternalAccountEmails,
   summarizePlatformOwnerDashboardRows,
   type PlatformOwnerConsoleView,
+  type PlatformOwnerDashboardRow,
 } from "@/lib/business/platform-owner-dashboard";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+
+type OwnerConsoleProductFilter = "all" | "hvac_service" | "ecc_hers" | "hybrid" | "not_set";
+type OwnerConsoleStatusFilter = "all" | "active" | "trial" | "grace" | "expired" | "suspended" | "cancelled" | "not_set";
 
 async function requirePlatformOwnerOrFailClosed() {
   const supabase = await createClient();
@@ -47,6 +51,19 @@ function SummaryCard(props: { label: string; value: number }) {
   );
 }
 
+function firstSearchParamValue(
+  searchParams: Record<string, string | string[] | undefined>,
+  key: string,
+) {
+  const value = searchParams[key];
+  if (Array.isArray(value)) return String(value[0] ?? "").trim();
+  return String(value ?? "").trim();
+}
+
+function normalizeForSearch(value: unknown) {
+  return String(value ?? "").trim().toLowerCase();
+}
+
 function resolveView(value: string | undefined): PlatformOwnerConsoleView {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "inactive") return "inactive";
@@ -54,6 +71,92 @@ function resolveView(value: string | undefined): PlatformOwnerConsoleView {
   if (normalized === "all") return "all";
   if (normalized === "hidden") return "hidden";
   return "current";
+}
+
+function resolveProductFilter(value: string | undefined): OwnerConsoleProductFilter {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "hvac_service") return "hvac_service";
+  if (normalized === "ecc_hers") return "ecc_hers";
+  if (normalized === "hybrid") return "hybrid";
+  if (normalized === "not_set") return "not_set";
+  return "all";
+}
+
+function resolveStatusFilter(value: string | undefined): OwnerConsoleStatusFilter {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "active") return "active";
+  if (normalized === "trial") return "trial";
+  if (normalized === "grace") return "grace";
+  if (normalized === "expired") return "expired";
+  if (normalized === "suspended") return "suspended";
+  if (normalized === "cancelled") return "cancelled";
+  if (normalized === "not_set") return "not_set";
+  return "all";
+}
+
+function ownerEmailDomain(row: PlatformOwnerDashboardRow) {
+  const email = String(row.ownerEmail ?? "").trim().toLowerCase();
+  const atIndex = email.indexOf("@");
+  if (atIndex < 0 || atIndex === email.length - 1) return "";
+  return email.slice(atIndex + 1);
+}
+
+function rowMatchesQuery(params: {
+  row: PlatformOwnerDashboardRow;
+  query: string;
+  internalEmails: Set<string>;
+}) {
+  const query = normalizeForSearch(params.query);
+  if (!query) return true;
+
+  const row = params.row;
+  const haystack = [
+    row.company,
+    row.ownerName,
+    row.ownerEmail,
+    ownerEmailDomain(row),
+    row.accountOwnerUserId,
+    formatProductModeLabel({ row, internalEmails: params.internalEmails }),
+    formatStatusLabel(row.entitlementStatus),
+    formatBillingModeLabel(row.billingMode),
+    row.setupInviteState,
+  ]
+    .map(normalizeForSearch)
+    .filter(Boolean)
+    .join(" ");
+
+  return haystack.includes(query);
+}
+
+function rowMatchesProduct(row: PlatformOwnerDashboardRow, product: OwnerConsoleProductFilter) {
+  if (product === "all") return true;
+  if (product === "not_set") return !row.productMode;
+  return row.productMode === product;
+}
+
+function rowMatchesStatus(row: PlatformOwnerDashboardRow, status: OwnerConsoleStatusFilter) {
+  if (status === "all") return true;
+  const normalizedStatus = normalizeForSearch(row.entitlementStatus) || "not_set";
+  return normalizedStatus === status;
+}
+
+function filterRowsForOwnerSearch(params: {
+  rows: PlatformOwnerDashboardRow[];
+  query: string;
+  product: OwnerConsoleProductFilter;
+  status: OwnerConsoleStatusFilter;
+  internalEmails: Set<string>;
+}) {
+  return params.rows.filter((row) =>
+    rowMatchesQuery({ row, query: params.query, internalEmails: params.internalEmails }) &&
+    rowMatchesProduct(row, params.product) &&
+    rowMatchesStatus(row, params.status),
+  );
+}
+
+function clearFiltersHref(view: PlatformOwnerConsoleView) {
+  if (view === "current") return "/ops/owner-console";
+  return `/ops/owner-console?view=${encodeURIComponent(view)}`;
 }
 
 const VIEW_META: Record<
@@ -92,21 +195,30 @@ export default async function PlatformOwnerConsolePage(props: {
   const hiddenEmails = parseHiddenAccountEmails(process.env);
   const internalEmails = parseInternalAccountEmails(process.env);
   const searchParams = (props.searchParams ? await props.searchParams : {}) ?? {};
-  const view = resolveView(
-    typeof searchParams.view === "string" ? searchParams.view : undefined,
-  );
-  const filteredRows = filterPlatformOwnerDashboardRows({
+  const view = resolveView(firstSearchParamValue(searchParams, "view"));
+  const accountQuery = firstSearchParamValue(searchParams, "q");
+  const productFilter = resolveProductFilter(firstSearchParamValue(searchParams, "product"));
+  const statusFilter = resolveStatusFilter(firstSearchParamValue(searchParams, "status"));
+  const viewRows = filterPlatformOwnerDashboardRows({
     rows: model.rows,
     view,
     hiddenEmails,
     internalEmails,
   });
+  const filteredRows = filterRowsForOwnerSearch({
+    rows: viewRows,
+    query: accountQuery,
+    product: productFilter,
+    status: statusFilter,
+    internalEmails,
+  });
   const viewSummary = summarizePlatformOwnerDashboardRows({
-    rows: filteredRows,
+    rows: viewRows,
     allRows: model.rows,
     hiddenEmails,
     internalEmails,
   });
+  const hasActiveFilters = Boolean(accountQuery || productFilter !== "all" || statusFilter !== "all");
 
   return (
     <div className="mx-auto max-w-[1200px] space-y-5 p-4 text-slate-900 sm:p-6">
@@ -148,6 +260,72 @@ export default async function PlatformOwnerConsolePage(props: {
           </div>
           <p className="text-xs text-slate-500">{VIEW_META[view].description}</p>
         </div>
+      </section>
+
+      {/* Search and filters */}
+      <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+        <form action="/ops/owner-console" method="get" className="grid gap-3 lg:grid-cols-[1fr_180px_180px_auto] lg:items-end">
+          <input type="hidden" name="view" value={view} />
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Find account</span>
+            <input
+              name="q"
+              defaultValue={accountQuery}
+              placeholder="Company, owner email, domain, account id..."
+              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-500"
+            />
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Product</span>
+            <select
+              name="product"
+              defaultValue={productFilter}
+              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-500"
+            >
+              <option value="all">All products</option>
+              <option value="hvac_service">HVAC Service</option>
+              <option value="ecc_hers">ECC</option>
+              <option value="hybrid">Hybrid</option>
+              <option value="not_set">Not Set</option>
+            </select>
+          </label>
+          <label className="block">
+            <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Status</span>
+            <select
+              name="status"
+              defaultValue={statusFilter}
+              className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-500"
+            >
+              <option value="all">All statuses</option>
+              <option value="active">Active</option>
+              <option value="trial">Trial</option>
+              <option value="grace">Grace</option>
+              <option value="expired">Expired</option>
+              <option value="suspended">Suspended</option>
+              <option value="cancelled">Cancelled</option>
+              <option value="not_set">Not Set</option>
+            </select>
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-800"
+            >
+              Search
+            </button>
+            {hasActiveFilters ? (
+              <Link
+                href={clearFiltersHref(view)}
+                className="inline-flex items-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                Clear
+              </Link>
+            ) : null}
+          </div>
+        </form>
+        <p className="mt-3 text-xs text-slate-500">
+          Showing {filteredRows.length} of {viewRows.length} account{viewRows.length === 1 ? "" : "s"} in this view.
+        </p>
       </section>
 
       {/* Compact helper notes */}
@@ -284,7 +462,7 @@ export default async function PlatformOwnerConsolePage(props: {
                 {filteredRows.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-4 py-10 text-center text-sm text-slate-500">
-                      No accounts in this view.
+                      {hasActiveFilters ? "No accounts match these filters." : "No accounts in this view."}
                     </td>
                   </tr>
                 ) : null}
