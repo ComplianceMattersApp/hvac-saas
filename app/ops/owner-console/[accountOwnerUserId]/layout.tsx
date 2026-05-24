@@ -7,6 +7,7 @@ import AccountSnapshotIdentityHeader from "./AccountSnapshotIdentityHeader";
 import CompanyProfileSnapshot from "./CompanyProfileSnapshot";
 import PaymentsReadinessSnapshot from "./PaymentsReadinessSnapshot";
 import SupportCallSummarySnapshot from "./SupportCallSummarySnapshot";
+import SupportCasesPanel from "./SupportCasesPanel";
 import UsageRecencySnapshot from "./UsageRecencySnapshot";
 
 type LayoutParams = Promise<{
@@ -263,6 +264,7 @@ export default async function AccountSnapshotLayout({
     <>
       <AccountSnapshotIdentityHeader accountOwnerUserId={accountOwnerUserId} />
       <SupportCallSummarySnapshot accountOwnerUserId={accountOwnerUserId} />
+      <SupportCasesPanel accountOwnerUserId={accountOwnerUserId} />
       <div className="[&>div>section:nth-child(-n+2)]:hidden">
         {children}
       </div>
