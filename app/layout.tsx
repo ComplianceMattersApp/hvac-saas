@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { Clock3 } from "lucide-react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileShellMenu from "@/components/layout/MobileShellMenu";
@@ -197,6 +198,15 @@ export default async function RootLayout({
                         className={shellUtilityLinkClass}
                       >
                         Estimates
+                      </Link>
+                    )}
+                    {isInternalUser && (
+                      <Link
+                        href="/time-clock"
+                        className={shellUtilityLinkClass}
+                      >
+                        <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span>Time Clock</span>
                       </Link>
                     )}
                     {isInternalUser && (

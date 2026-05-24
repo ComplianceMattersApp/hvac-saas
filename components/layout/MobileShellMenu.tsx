@@ -124,6 +124,15 @@ export default function MobileShellMenu({
               My Work
             </Link>
           ) : null}
+          {isInternalUser ? (
+            <Link
+              href="/time-clock"
+              onClick={() => setOpen(false)}
+              className={mobileMenuItemClass}
+            >
+              Time Clock
+            </Link>
+          ) : null}
           {isInternalUser && isEstimatesEnabled ? (
             <Link
               href="/estimates"

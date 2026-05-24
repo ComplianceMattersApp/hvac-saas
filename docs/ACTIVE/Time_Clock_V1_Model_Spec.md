@@ -201,21 +201,31 @@ V1B closeout status:
 - Unique active-entry protection is schema-enforced (partial unique index for `open|on_lunch`).
 - No employee clock page, Ops card, or admin correction UI behavior added in this phase.
 
-### V1C - employee clock page
-- Add `/time-clock` page and server actions.
-- Enforce account/user toggles and internal-user gating.
-- Implement Clock In, Start Lunch, End Lunch, Clock Out only.
+### V1C - settings controls
+- Add admin account-level toggle for `account_settings.time_clock_enabled`.
+- Add admin per-user toggle for `internal_users.time_tracking_enabled`.
+- Keep controls account-scoped and admin-only.
 
 V1C closeout status (settings controls only):
 - Complete in repository: admin account-level toggle for `account_settings.time_clock_enabled` and admin per-user toggle for `internal_users.time_tracking_enabled`.
 - Contractor/customer portal users remain blocked through existing internal-role/admin route gates.
 - No `/time-clock` employee runtime actions, Ops team status card, or admin correction/timesheet runtime behavior added in this pass.
 
-### V1D - Ops dashboard card
+### V1D - employee clock page
+- Add `/time-clock` page and server actions.
+- Enforce account/user toggles and internal-user gating.
+- Implement Clock In, Start Lunch, End Lunch, Clock Out only.
+
+V1D closeout status:
+- Complete in repository: mobile-first internal-user `/time-clock` route with guarded Clock In, Start Lunch, End Lunch, and Clock Out actions.
+- Writes remain account-scoped and action-checked, with duplicate-active protection backed by schema constraints.
+- No Ops Team Clock Status card, admin correction center, reporting exports, payroll behavior, or contractor/portal time tracking added in this phase.
+
+### V1E - Ops dashboard card
 - Add admin/office Team Clock Status card on `/ops`.
 - Keep card read-first and lightweight.
 
-### V1E - admin review/correction page
+### V1F - admin review/correction page
 - Add admin/owner review center.
 - Add correction workflow with required reason.
 - Add `needs_review` and `voided` review handling UX.
