@@ -36,10 +36,10 @@ describe("job detail field operations board layout", () => {
   it("labels account, access, and billing context clearly", () => {
     expect(jobPageSource).toContain("Responsible Account");
     expect(jobPageSource).toContain("Site / Access Contact");
-    expect(jobPageSource).toContain("Billing / Paperwork Recipient");
+    expect(jobPageSource).toContain("Billing");
     expect(jobPageSource).toContain("Account phone");
     expect(jobPageSource).toContain("Access phone");
-    expect(jobPageSource).toContain("Billing email");
+    expect(jobPageSource).toContain("billingRecipientEmail");
   });
 
   it("suppresses duplicate default cards and keeps billing-context hint copy", () => {
@@ -54,8 +54,8 @@ describe("job detail field operations board layout", () => {
   it("keeps custom and contractor billing recipient display branches", () => {
     expect(jobPageSource).toContain("const hasBillingSnapshotFields = Boolean(");
     expect(jobPageSource).toContain("const isContractorBillingRecipient = billingRecipientType === \"contractor\";");
-    expect(jobPageSource).toContain("Billing / Paperwork Recipient: Contractor");
-    expect(jobPageSource).toContain("Billing address:");
+    expect(jobPageSource).toContain("Contractor / Billing");
+    expect(jobPageSource).toContain("billingRecipientAddressParts");
   });
 
   it("keeps account and distinct access action buttons available", () => {
@@ -74,12 +74,26 @@ describe("job detail field operations board layout", () => {
   });
 
   it("keeps visit reason and intake notes below the location preview", () => {
-    expect(jobPageSource).toContain("Visit Reason / Intake Notes");
+    expect(jobPageSource).toContain("Visit Reason");
     expect(jobPageSource).toContain("const visitReasonText =");
     expect(jobPageSource).toContain("{visitReasonText}");
     expect(jobPageSource).toContain("Customer Concern");
     expect(jobPageSource).toContain("Intake Notes");
     expect(jobPageSource).toContain("whitespace-pre-wrap break-words");
+  });
+
+  it("keeps work needed after visit reason on mobile while spanning the desktop grid", () => {
+    const visitReasonIndex = jobPageSource.indexOf("Visit Reason");
+    const visitScopeIndex = jobPageSource.indexOf('id="visit-scope-section"');
+    const rightRailIndex = jobPageSource.indexOf("Right: permit and equipment reference rail");
+    const assignedTeamIndex = jobPageSource.indexOf('id="assigned-team"');
+
+    expect(visitReasonIndex).toBeGreaterThan(-1);
+    expect(visitScopeIndex).toBeGreaterThan(visitReasonIndex);
+    expect(rightRailIndex).toBeGreaterThan(visitScopeIndex);
+    expect(assignedTeamIndex).toBeGreaterThan(rightRailIndex);
+    expect(jobPageSource).toContain("xl:order-4 xl:col-span-3");
+    expect(jobPageSource).toContain("space-y-3 xl:order-3");
   });
 
   it("keeps the location preview compact on mobile and hides lower map actions there", () => {

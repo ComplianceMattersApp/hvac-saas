@@ -3667,140 +3667,140 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       </div>
 
-      {/* Visit scope workspace */}
-      {isInternalUser ? (
-        <div id="visit-scope-section" className="scroll-mt-24 rounded-2xl border border-slate-200/80 bg-white/94 p-4 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)]">
-          <div className="space-y-3">
-            {job.job_type === "service" && visitScopeCount === 0 ? (
-              <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-                Add Work Items before closeout or billing.
+    </div>
+
+    {/* Visit scope workspace */}
+    {isInternalUser ? (
+      <div id="visit-scope-section" className="scroll-mt-24 rounded-2xl border border-slate-200/80 bg-white/94 p-4 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)] xl:order-4 xl:col-span-3">
+        <div className="space-y-3">
+          {job.job_type === "service" && visitScopeCount === 0 ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+              Add Work Items before closeout or billing.
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">Work Needed</div>
+                {job.job_type === "service" ? (
+                  <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:inline-flex">
+                    {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
+                  </span>
+                ) : null}
               </div>
-            ) : null}
-
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">Work Needed</div>
-                  {job.job_type === "service" ? (
-                    <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:inline-flex">
-                      {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
-                    </span>
-                  ) : null}
-                </div>
-              </div>
-
-              <details className="group w-full sm:w-auto">
-                <summary className="inline-flex min-h-11 w-full cursor-pointer list-none items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:min-h-9 sm:w-auto sm:py-1.5 sm:text-xs">
-                  {hasVisitScopeDefined ? "Edit Work Items" : "Add Work Items"}
-                </summary>
-
-                <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
-                  <VisitScopeJobDetailForm
-                    jobId={job.id}
-                    jobType={job.job_type === "service" ? "service" : "ecc"}
-                    tab={tab}
-                    initialSummary={visitScopeSummary}
-                    initialItems={visitScopeItems}
-                    pricebookTemplateItems={visitScopePricebookTemplates}
-                    primaryButtonClass={primaryButtonClass}
-                  />
-                </div>
-              </details>
-
             </div>
 
-            <div className="rounded-2xl border border-slate-200/80 bg-white/94 px-4 py-3.5 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)]">
-              <div className="space-y-3.5">
-                {primaryVisitScopeItems.length > 0 ? (
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items</div>
-                    <div className="mt-2 space-y-2.5">
-                      {primaryVisitScopeItems.map((item, index) => (
-                        <div key={`primary-${index}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
-                          <div className="text-sm font-semibold leading-5 text-slate-900">
-                            {item.title}
-                            {item.expected_unit_price !== null && item.expected_unit_price !== undefined
-                              ? ` - $${Number(item.expected_unit_price).toFixed(2)}`
-                              : ""}
+            <details className="group w-full sm:w-auto">
+              <summary className="inline-flex min-h-11 w-full cursor-pointer list-none items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:min-h-9 sm:w-auto sm:py-1.5 sm:text-xs">
+                {hasVisitScopeDefined ? "Edit Work Items" : "Add Work Items"}
+              </summary>
+
+              <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
+                <VisitScopeJobDetailForm
+                  jobId={job.id}
+                  jobType={job.job_type === "service" ? "service" : "ecc"}
+                  tab={tab}
+                  initialSummary={visitScopeSummary}
+                  initialItems={visitScopeItems}
+                  pricebookTemplateItems={visitScopePricebookTemplates}
+                  primaryButtonClass={primaryButtonClass}
+                />
+              </div>
+            </details>
+
+          </div>
+
+          <div className="rounded-2xl border border-slate-200/80 bg-white/94 px-4 py-3.5 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)]">
+            <div className="space-y-3.5">
+              {primaryVisitScopeItems.length > 0 ? (
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items</div>
+                  <div className="mt-2 space-y-2.5">
+                    {primaryVisitScopeItems.map((item, index) => (
+                      <div key={`primary-${index}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
+                        <div className="text-sm font-semibold leading-5 text-slate-900">
+                          {item.title}
+                          {item.expected_unit_price !== null && item.expected_unit_price !== undefined
+                            ? ` - $${Number(item.expected_unit_price).toFixed(2)}`
+                            : ""}
+                        </div>
+                        {item.details ? (
+                          <div className="text-sm leading-6 text-slate-600">{item.details}</div>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : hasVisitScopeDefined ? (
+                <div className="text-sm text-slate-600">No primary trip items are listed yet.</div>
+              ) : null}
+
+              {companionVisitScopeItems.length > 0 ? (
+                <div className="border-t border-slate-200 pt-3.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Companion follow-up</div>
+                  <div className="mt-2 space-y-2.5">
+                    {companionVisitScopeItems.map((item, companionIndex) => {
+                      const itemIndex = visitScopeItems.findIndex((candidate) => candidate === item);
+
+                      return (
+                        <div key={`companion-${companionIndex}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className="text-sm font-semibold leading-5 text-slate-900">{item.title}</div>
+                            <div className="text-xs text-slate-500">{formatVisitScopeItemKindLabel(item.kind)}</div>
+                            {isVisitScopeItemPromoted(item) ? (
+                              <div className="text-xs font-medium text-emerald-700">Promoted</div>
+                            ) : null}
                           </div>
                           {item.details ? (
                             <div className="text-sm leading-6 text-slate-600">{item.details}</div>
                           ) : null}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : hasVisitScopeDefined ? (
-                  <div className="text-sm text-slate-600">No primary trip items are listed yet.</div>
-                ) : null}
-
-                {companionVisitScopeItems.length > 0 ? (
-                  <div className="border-t border-slate-200 pt-3.5">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Companion follow-up</div>
-                    <div className="mt-2 space-y-2.5">
-                      {companionVisitScopeItems.map((item, companionIndex) => {
-                        const itemIndex = visitScopeItems.findIndex((candidate) => candidate === item);
-
-                        return (
-                          <div key={`companion-${companionIndex}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <div className="text-sm font-semibold leading-5 text-slate-900">{item.title}</div>
-                              <div className="text-xs text-slate-500">{formatVisitScopeItemKindLabel(item.kind)}</div>
-                              {isVisitScopeItemPromoted(item) ? (
-                                <div className="text-xs font-medium text-emerald-700">Promoted</div>
-                              ) : null}
-                            </div>
-                            {item.details ? (
-                              <div className="text-sm leading-6 text-slate-600">{item.details}</div>
-                            ) : null}
-                            {job.job_type === "ecc" ? (
-                              <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
-                                {isVisitScopeItemPromoted(item) && item.promoted_service_job_id ? (
-                                  <>
-                                    <span>This companion scope now runs as its own Service job.</span>
-                                    <Link
-                                      href={`/jobs/${String(item.promoted_service_job_id)}?tab=info`}
+                          {job.job_type === "ecc" ? (
+                            <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
+                              {isVisitScopeItemPromoted(item) && item.promoted_service_job_id ? (
+                                <>
+                                  <span>This companion scope now runs as its own Service job.</span>
+                                  <Link
+                                    href={`/jobs/${String(item.promoted_service_job_id)}?tab=info`}
+                                    className={secondaryButtonClass}
+                                  >
+                                    Open Service Job
+                                  </Link>
+                                </>
+                              ) : (
+                                <>
+                                  <span>Promote when this companion work needs its own Service lifecycle.</span>
+                                  <form action={promoteCompanionScopeToServiceJobFromForm}>
+                                    <input type="hidden" name="job_id" value={job.id} />
+                                    <input type="hidden" name="item_index" value={String(itemIndex)} />
+                                    <input type="hidden" name="tab" value={tab} />
+                                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}`} />
+                                    <SubmitButton
+                                      loadingText="Creating..."
                                       className={secondaryButtonClass}
                                     >
-                                      Open Service Job
-                                    </Link>
-                                  </>
-                                ) : (
-                                  <>
-                                    <span>Promote when this companion work needs its own Service lifecycle.</span>
-                                    <form action={promoteCompanionScopeToServiceJobFromForm}>
-                                      <input type="hidden" name="job_id" value={job.id} />
-                                      <input type="hidden" name="item_index" value={String(itemIndex)} />
-                                      <input type="hidden" name="tab" value={tab} />
-                                      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}`} />
-                                      <SubmitButton
-                                        loadingText="Creating..."
-                                        className={secondaryButtonClass}
-                                      >
-                                        Create Service Follow-Up
-                                      </SubmitButton>
-                                    </form>
-                                  </>
-                                )}
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-                    </div>
+                                      Create Service Follow-Up
+                                    </SubmitButton>
+                                  </form>
+                                </>
+                              )}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
-                ) : null}
-              </div>
+                </div>
+              ) : null}
             </div>
-
           </div>
-        </div>
-      ) : null}
 
-    </div>
+        </div>
+      </div>
+    ) : null}
 
     {/* Right: permit and equipment reference rail */}
-    <div className="space-y-3">
+    <div className="space-y-3 xl:order-3">
       {job.job_type === "ecc" ? (
         <div className={`${workspaceSubtleCardClass} border-slate-200/70 p-4 ${hasPermitDetails ? "bg-white/92" : "bg-slate-50/88"}`}>
           <div className="mb-3 flex items-start justify-between gap-3">
