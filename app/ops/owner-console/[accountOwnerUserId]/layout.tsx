@@ -4,6 +4,7 @@ import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import CompanyProfileSnapshot from "./CompanyProfileSnapshot";
+import UsageRecencySnapshot from "./UsageRecencySnapshot";
 
 type LayoutParams = Promise<{
   accountOwnerUserId?: string;
@@ -258,6 +259,7 @@ export default async function AccountSnapshotLayout({
   return (
     <>
       {children}
+      <UsageRecencySnapshot accountOwnerUserId={accountOwnerUserId} />
       <TeamAndSeatsSection accountOwnerUserId={accountOwnerUserId} />
       <CompanyProfileSnapshot accountOwnerUserId={accountOwnerUserId} />
     </>
