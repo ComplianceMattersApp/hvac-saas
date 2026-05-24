@@ -583,24 +583,28 @@ function CollapsibleHeader(props: {
   subtitle?: string;
   meta?: string;
   metaTone?: "default" | "note-highlight";
+  compactOnMobile?: boolean;
 }) {
-  const { title, subtitle, meta, metaTone = "default" } = props;
-  const metaClassName =
-    metaTone === "note-highlight"
+  const { title, subtitle, meta, metaTone = "default", compactOnMobile = false } = props;
+  const metaClassName = compactOnMobile
+    ? metaTone === "note-highlight"
+      ? "mt-0.5 shrink-0 rounded-md border border-amber-200/80 bg-amber-50/85 px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-amber-800 shadow-[0_10px_24px_-24px_rgba(217,119,6,0.35)] sm:rounded-lg sm:px-2.5 sm:py-[0.3125rem] sm:text-[10px] sm:tracking-[0.12em]"
+      : "mt-0.5 shrink-0 rounded-md border border-slate-200/70 bg-slate-50/72 px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-slate-500 sm:rounded-lg sm:px-2.5 sm:py-[0.3125rem] sm:text-[10px] sm:tracking-[0.12em]"
+    : metaTone === "note-highlight"
       ? "mt-0.5 shrink-0 rounded-lg border border-amber-200/80 bg-amber-50/85 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-amber-800 shadow-[0_10px_24px_-24px_rgba(217,119,6,0.35)]"
       : "mt-0.5 shrink-0 rounded-lg border border-slate-200/70 bg-slate-50/72 px-2.5 py-[0.3125rem] text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500";
   return (
-    <div className="flex min-w-0 items-start justify-between gap-4 py-0.5">
-      <div className="flex min-w-0 items-start gap-2.5">
+    <div className={compactOnMobile ? "flex min-h-9 min-w-0 items-start justify-between gap-3 py-0 sm:gap-4 sm:py-0.5" : "flex min-w-0 items-start justify-between gap-4 py-0.5"}>
+      <div className={compactOnMobile ? "flex min-w-0 items-start gap-2" : "flex min-w-0 items-start gap-2.5"}>
         <span
           aria-hidden
-          className="disclosure-icon mt-0.5 inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[9px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90"
+          className={compactOnMobile ? "disclosure-icon mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[8px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90 sm:h-4.5 sm:w-4.5 sm:text-[9px]" : "disclosure-icon mt-0.5 inline-flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded-md border border-slate-200/70 bg-white/80 text-[9px] text-slate-400 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-transform duration-150 group-open:rotate-90"}
         >
           ▶
         </span>
         <div className="min-w-0 pt-0.5">
-          <div className="text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950">{title}</div>
-          {subtitle ? <div className="mt-1 max-w-[42rem] text-[11.5px] leading-[1.45] text-slate-500">{subtitle}</div> : null}
+          <div className={compactOnMobile ? "text-[13.5px] font-semibold tracking-[-0.02em] text-slate-950 sm:text-[14.5px]" : "text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950"}>{title}</div>
+          {subtitle ? <div className={compactOnMobile ? "mt-0.5 hidden max-w-[42rem] text-[11px] leading-[1.4] text-slate-500 sm:mt-1 sm:block sm:text-[11.5px] sm:leading-[1.45]" : "mt-1 max-w-[42rem] text-[11.5px] leading-[1.45] text-slate-500"}>{subtitle}</div> : null}
         </div>
       </div>
       {meta ? <div className={metaClassName}>{meta}</div> : null}
@@ -809,6 +813,9 @@ const compactWorkspaceActionButtonClass =
 const workspaceDetailsClass =
   `${workspaceSectionClass} group text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] [&[open]_.disclosure-icon]:rotate-90`;
 const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
+const jobRecordsDetailsClass =
+  `${workspacePanelClass} group rounded-2xl p-3 text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] sm:rounded-3xl sm:p-5 [&[open]_.disclosure-icon]:rotate-90`;
+const jobRecordsDetailsDividerClass = "mt-2.5 border-t border-slate-200/90 pt-3 sm:mt-3 sm:pt-4";
 const workspaceSoftCardClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
 const workspaceEmptyStateClass =
@@ -2319,9 +2326,9 @@ const showSharedNotesCard = !isHvacServiceMode;
 const showEccSummaryCard = job.job_type === "ecc";
 const lowerGridCardCount = 6 + (showSharedNotesCard ? 1 : 0) + (showEccSummaryCard ? 1 : 0);
 const lowerGridHasOrphan = lowerGridCardCount % 2 === 1;
-const sharedNotesCardClass = `${workspaceDetailsClass}${lowerGridHasOrphan && showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
-const serviceChainCardClass = `${workspaceDetailsClass}${lowerGridHasOrphan && !showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
-const eccSummaryCardClass = `${workspaceDetailsClass}${lowerGridHasOrphan && showEccSummaryCard ? " xl:col-span-2" : ""}`;
+const sharedNotesCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
+const serviceChainCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && !showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
+const eccSummaryCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && showEccSummaryCard ? " xl:col-span-2" : ""}`;
 const sharedNotesMeta = noteCountSummary.sharedCount
   ? `${noteCountSummary.sharedCount} note${noteCountSummary.sharedCount === 1 ? "" : "s"}`
   : undefined;
@@ -5498,31 +5505,32 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       ) : null}
 
-    <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.99))] p-4 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/70 sm:p-5">
-      <div className="mb-4 flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-end sm:justify-between">
+    <section className="rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.99))] p-3.5 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-5">
+      <div className="mb-3 flex flex-col gap-1.5 border-b border-slate-200/80 pb-2.5 sm:mb-4 sm:gap-2 sm:pb-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Job Records</div>
-          <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950">Activity, Evidence, and History</div>
-          <div className="mt-1 text-sm text-slate-600">Notes, attachments, follow-up, timeline, service chain, and compliance context.</div>
+          <div className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:mt-1 sm:text-lg">Activity, Evidence, and History</div>
+          <div className="mt-1 hidden text-sm text-slate-600 sm:block">Notes, attachments, follow-up, timeline, service chain, and compliance context.</div>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          <span className={infoChipClass}>{noteCountSummary.timelineNoteEventCount} notes</span>
-          <span className={infoChipClass}>{serviceCaseVisitCount} visits</span>
-          {showEccSummaryCard ? <span className={infoChipClass}>{eccRunCount} ECC runs</span> : null}
+        <div className="flex flex-wrap gap-1">
+          <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{noteCountSummary.timelineNoteEventCount} notes</span>
+          <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{serviceCaseVisitCount} visits</span>
+          {showEccSummaryCard ? <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{eccRunCount} ECC runs</span> : null}
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-2.5 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3">
         {/* Internal Notes */}
-        <details id="internal-notes" className={workspaceDetailsClass} open={Boolean(internalNoteBannerMessage)}>
+        <details id="internal-notes" className={jobRecordsDetailsClass} open={Boolean(internalNoteBannerMessage)}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title={internalNotesTitle}
               subtitle={internalNotesSummaryText}
               meta={internalNotesMeta}
+              compactOnMobile
             />
           </summary>
 
-          <div className={`${workspaceDetailsDividerClass} space-y-2`}>
+          <div className={`${jobRecordsDetailsDividerClass} space-y-2`}>
             {internalNoteBannerMessage ? (
               <FlashBanner
                 type={internalNoteBannerType as "success" | "warning" | "error"}
@@ -5553,14 +5561,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </details>
 
         {/* Attachments */}
-        <details className={workspaceDetailsClass}>
+        <details className={jobRecordsDetailsClass}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title="Attachments"
               subtitle="Uploaded files and shareable job records."
+              compactOnMobile
             />
           </summary>
-          <div className={`${workspaceDetailsDividerClass} px-0 pb-0`}>
+          <div className={`${jobRecordsDetailsDividerClass} px-0 pb-0`}>
             <div className="mb-3 flex items-center justify-end">
               <Link
                 href={`/jobs/${job.id}/attachments`}
@@ -5579,15 +5588,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </details>
 
         {/* Section A: Follow Up (Active Edit Area) */}
-        <details id="follow-up" className={workspaceDetailsClass}>
+        <details id="follow-up" className={jobRecordsDetailsClass}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title="Follow Up"
               subtitle={followUpSummaryText}
+              compactOnMobile
             />
           </summary>
 
-          <div className={workspaceDetailsDividerClass}>
+          <div className={jobRecordsDetailsDividerClass}>
             <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4">
 
             {hasFollowUpReminder ? (
@@ -5644,15 +5654,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
         </details>
 
-        <details className={workspaceDetailsClass}>
+        <details className={jobRecordsDetailsClass}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title="Follow-Up History"
               subtitle={followUpHistorySummaryText}
+              compactOnMobile
             />
           </summary>
 
-          <div className={`${workspaceDetailsDividerClass} rounded-xl border border-slate-200/80 bg-white/96 p-4`}>
+          <div className={`${jobRecordsDetailsDividerClass} rounded-xl border border-slate-200/80 bg-white/96 p-4`}>
             <Suspense fallback={<FollowUpHistorySectionFallback />}>
               <DeferredCustomerAttemptsHistory
                 jobId={String(job.id)}
@@ -5664,16 +5675,17 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </details>
 
         {/* Timeline - Activity/History */}
-        <details className={workspaceDetailsClass}>
+        <details className={jobRecordsDetailsClass}>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title={timelineTitle}
               subtitle={timelineSummaryText}
               meta={timelineNotesMeta}
+              compactOnMobile
             />
           </summary>
 
-          <div className={`${workspaceDetailsDividerClass} space-y-2`}>
+          <div className={`${jobRecordsDetailsDividerClass} space-y-2`}>
     <Suspense fallback={<NarrativeTimelineBodyFallback />}>
       <DeferredTimelineBody
         jobId={String(job.id)}
@@ -5691,10 +5703,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               title="Service Chain"
               subtitle={serviceChainSummaryText}
               meta={`${serviceCaseVisitCount} visit${serviceCaseVisitCount === 1 ? "" : "s"}`}
+              compactOnMobile
             />
           </summary>
 
-          <div className={workspaceDetailsDividerClass}>
+          <div className={jobRecordsDetailsDividerClass}>
             {serviceCaseId ? (
               <div className="mb-3 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                 Case: {serviceCaseId.slice(0, 8)}…
@@ -5725,10 +5738,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 title={sharedNotesTitle}
                 subtitle={sharedNotesSummaryText}
                 meta={sharedNotesMeta}
+                compactOnMobile
               />
             </summary>
 
-            <div className={`${workspaceDetailsDividerClass} space-y-2`}>
+            <div className={`${jobRecordsDetailsDividerClass} space-y-2`}>
               {sharedNoteBannerMessage ? (
                 <FlashBanner
                   type={sharedNoteBannerType as "success" | "warning" | "error"}
@@ -5778,10 +5792,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 title="ECC Summary"
                 subtitle="Test history, runs, and compliance workspace context."
                 meta={`${eccRunCount} run${eccRunCount === 1 ? "" : "s"}`}
+                compactOnMobile
               />
             </summary>
 
-            <div className={workspaceDetailsDividerClass}>
+            <div className={jobRecordsDetailsDividerClass}>
               <div className="rounded-xl border border-slate-200/80 bg-white/96 px-4 py-4 text-sm text-slate-700">
                 <p className="text-sm leading-6 text-slate-700">
                   Test history, runs, and compliance workspace context.
