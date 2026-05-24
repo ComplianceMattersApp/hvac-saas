@@ -6,6 +6,7 @@ import { requireInternalRole } from "@/lib/auth/internal-user";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   buildInternalBusinessProfileLogoStorageRef,
+  DEFAULT_BILLING_MODE,
   normalizeBillingMode,
   parseInternalBusinessProfileLogoStorageRef,
 } from "@/lib/business/internal-business-profile";
@@ -100,7 +101,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   const displayName = normalizeText(formData.get("display_name"));
   const supportEmail = normalizeNullableText(formData.get("support_email"));
   const supportPhone = normalizeNullableText(formData.get("support_phone"));
-  const billingMode = normalizeBillingMode(String(formData.get("billing_mode") ?? ""));
+  const hasBillingModeInput = formData.has("billing_mode");
   const logoFileEntry = formData.get("logo_file");
   const removeLogo = String(formData.get("remove_logo") ?? "").trim() === "1";
 
@@ -135,7 +136,7 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
 
   const { data: existingProfile, error: existingProfileError } = await admin
     .from("internal_business_profiles")
-    .select("logo_url")
+    .select("logo_url, billing_mode")
     .eq("account_owner_user_id", internalUser.account_owner_user_id)
     .maybeSingle();
 
@@ -144,6 +145,9 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   }
 
   const existingLogoRef = parseInternalBusinessProfileLogoStorageRef(existingProfile?.logo_url ?? null);
+  const billingMode = hasBillingModeInput
+    ? normalizeBillingMode(String(formData.get("billing_mode") ?? ""))
+    : normalizeBillingMode(String(existingProfile?.billing_mode ?? DEFAULT_BILLING_MODE));
   let nextLogoUrl = String(existingProfile?.logo_url ?? "").trim() || null;
 
   if (removeLogo) {
@@ -214,6 +218,61 @@ export async function saveInternalBusinessProfileFromForm(formData: FormData): P
   revalidatePath("/ops/admin/company-profile");
   revalidatePath("/jobs");
   redirect(withNotice("saved"));
+}
+
+export async function saveInvoiceModeFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalRole("admin", { supabase });
+  const billingMode = normalizeBillingMode(String(formData.get("billing_mode") ?? ""));
+
+  const admin = createAdminClient();
+  try {
+    await requireScopedInternalBusinessProfileMutationContext({
+      admin,
+      actorUserId: userId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch {
+    redirect("/forbidden");
+  }
+
+  const { data: existingProfile, error: existingProfileError } = await admin
+    .from("internal_business_profiles")
+    .select("display_name, support_email, support_phone, logo_url")
+    .eq("account_owner_user_id", internalUser.account_owner_user_id)
+    .maybeSingle();
+
+  if (existingProfileError) {
+    redirect(withNotice("save_failed"));
+  }
+
+  const displayName = String(existingProfile?.display_name ?? "").trim() || "Your Company";
+
+  const { error } = await admin
+    .from("internal_business_profiles")
+    .upsert(
+      {
+        account_owner_user_id: internalUser.account_owner_user_id,
+        display_name: displayName,
+        support_email: normalizeNullableText(existingProfile?.support_email ?? null),
+        support_phone: normalizeNullableText(existingProfile?.support_phone ?? null),
+        logo_url: normalizeNullableText(existingProfile?.logo_url ?? null),
+        billing_mode: billingMode,
+      },
+      {
+        onConflict: "account_owner_user_id",
+      },
+    );
+
+  if (error) {
+    redirect(withNotice("save_failed"));
+  }
+
+  revalidatePath("/ops");
+  revalidatePath("/ops/admin");
+  revalidatePath("/ops/admin/company-profile");
+  revalidatePath("/jobs");
+  redirect(withNotice("invoice_settings_saved"));
 }
 
 export async function confirmTeamSetupFromForm(): Promise<void> {

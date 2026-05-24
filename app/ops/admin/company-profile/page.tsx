@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   refreshTenantStripeConnectReadinessFromForm,
+  saveInvoiceModeFromForm,
   saveInternalBusinessProfileFromForm,
   startTenantStripeConnectOnboardingFromForm,
 } from "@/lib/actions/internal-business-profile-actions";
@@ -13,10 +14,6 @@ import {
 } from "@/lib/business/internal-business-profile";
 import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib/business/platform-entitlement";
 import {
-  formatSeatAuditBillingExplanation,
-  formatSeatAuditBillingModeLabel,
-  formatSeatAuditKnownGapNote,
-  formatSeatAuditPendingInviteLabel,
   formatSeatAuditSeatLimitLabel,
   resolvePlatformSeatAuditPreviewCounts,
 } from "@/lib/business/platform-seat-audit-preview";
@@ -37,6 +34,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   invalid_logo_file: { tone: "error", message: "Upload an image file for your logo." },
   logo_too_large: { tone: "error", message: "Logo files must be 5 MB or smaller." },
   save_failed: { tone: "error", message: "We couldn't save your company details. Please try again." },
+  invoice_settings_saved: { tone: "success", message: "Invoice settings were saved." },
   stripe_connect_status_refreshed: { tone: "success", message: "Stripe payment readiness was refreshed." },
   stripe_connect_onboarding_returned: {
     tone: "warn",
@@ -322,54 +320,6 @@ export default async function AdminCompanyProfilePage({
               </div>
             </div>
 
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-600">
-              {profile
-                ? "These details help your company look polished and familiar throughout the app."
-                : "Add your company details once, and we’ll use them anywhere your team expects to see them."}
-            </div>
-
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
-              <div className="space-y-1.5">
-                <label htmlFor="billing_mode" className="text-sm font-medium text-slate-700">
-                  Invoice mode
-                </label>
-                <select
-                  id="billing_mode"
-                  name="billing_mode"
-                  defaultValue={billingMode}
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-slate-200"
-                >
-                  <option value="external_billing">External billing — lightweight tracking only</option>
-                  <option value="internal_invoicing">Internal invoicing — create, issue &amp; send invoices</option>
-                </select>
-              </div>
-
-              <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-                <p>
-                  <span className="font-medium text-slate-800">External billing</span> — use one-click
-                  &ldquo;Mark invoice sent&rdquo; and &ldquo;Mark complete&rdquo; actions on each job.
-                  No invoice document is created; this is lightweight close-out tracking only.
-                </p>
-                <p>
-                  <span className="font-medium text-slate-800">Internal invoicing</span> — create a full invoice
-                  directly from the job, add line items from your pricebook, issue it, send it to the customer,
-                  and optionally record payment received. Use this mode if your company handles billing directly.
-                </p>
-              </div>
-
-              {billingMode === "external_billing" ? (
-                <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-sm leading-6 text-blue-900">
-                  <span className="font-semibold">HVAC Service company invoicing your own customers?</span>{" "}
-                  Switch to <span className="font-semibold">Internal invoicing</span> to access the full invoice
-                  creation and send workflow on each job.
-                </div>
-              ) : (
-                <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm leading-6 text-emerald-900">
-                  Internal invoicing is active. Your team can create, issue, and send invoices from each job.
-                </div>
-              )}
-            </div>
-
             <div className="flex items-center justify-end">
               <button
                 type="submit"
@@ -387,6 +337,68 @@ export default async function AdminCompanyProfilePage({
         availability={platformBillingAvailability}
         seatAuditPreview={seatAuditPreview}
       />
+
+      <div className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invoice Settings</h2>
+          <p className="text-sm leading-6 text-slate-600">
+            Choose how your company handles invoices inside Compliance Matters.
+          </p>
+        </div>
+
+        <form action={saveInvoiceModeFromForm} className="mt-6 space-y-4">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
+            <div className="space-y-1.5">
+              <label htmlFor="billing_mode" className="text-sm font-medium text-slate-700">
+                Invoice mode
+              </label>
+              <select
+                id="billing_mode"
+                name="billing_mode"
+                defaultValue={billingMode}
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-slate-200"
+              >
+                <option value="external_billing">External billing — lightweight tracking only</option>
+                <option value="internal_invoicing">Internal invoicing — create, issue &amp; send invoices</option>
+              </select>
+            </div>
+
+            <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+              <p>
+                <span className="font-medium text-slate-800">External billing</span> — use one-click
+                &ldquo;Mark invoice sent&rdquo; and &ldquo;Mark complete&rdquo; actions on each job.
+                No invoice document is created; this is lightweight close-out tracking only.
+              </p>
+              <p>
+                <span className="font-medium text-slate-800">Internal invoicing</span> — create a full invoice
+                directly from the job, add line items from your pricebook, issue it, send it to the customer,
+                and optionally record payment received. Use this mode if your company handles billing directly.
+              </p>
+            </div>
+
+            {billingMode === "external_billing" ? (
+              <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-sm leading-6 text-blue-900">
+                <span className="font-semibold">HVAC Service company invoicing your own customers?</span>{" "}
+                Switch to <span className="font-semibold">Internal invoicing</span> to access the full invoice
+                creation and send workflow on each job.
+              </div>
+            ) : (
+              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm leading-6 text-emerald-900">
+                Internal invoicing is active. Your team can create, issue, and send invoices from each job.
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end">
+            <button
+              type="submit"
+              className="inline-flex min-h-11 items-center rounded-xl bg-slate-900 px-4.5 py-2.5 text-sm font-semibold text-white shadow-[0_18px_30px_-22px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_22px_34px_-22px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
+            >
+              Save invoice settings
+            </button>
+          </div>
+        </form>
+      </div>
 
       <TenantStripePaymentsSection readiness={tenantStripeReadiness} />
     </div>
@@ -428,15 +440,11 @@ function PlatformAccountSection({
     ? "Active"
     : STATUS_LABELS[entitlement.entitlementStatus] ?? entitlement.entitlementStatus;
   const seatLimitLabel = formatSeatAuditSeatLimitLabel(entitlement);
-  const billingModeLabel = formatSeatAuditBillingModeLabel(entitlement);
-  const billingExplanation = formatSeatAuditBillingExplanation();
-  const pendingInviteLabel = formatSeatAuditPendingInviteLabel();
-  const knownGapNote = formatSeatAuditKnownGapNote();
-  const inactiveInternalUserCountLabel =
+  const inactiveUserCountLabel =
     seatAuditPreview.inactiveInternalUserCount == null
       ? "Unavailable"
       : String(seatAuditPreview.inactiveInternalUserCount);
-  const contractorDirectoryCountLabel =
+  const externalRecordCountLabel =
     seatAuditPreview.contractorDirectoryCount == null
       ? "Unavailable"
       : String(seatAuditPreview.contractorDirectoryCount);
@@ -481,87 +489,37 @@ function PlatformAccountSection({
   return (
     <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
-        <div className="text-sm font-semibold text-slate-950">Platform account</div>
+        <div className="text-sm font-semibold text-slate-950">Account &amp; Billing</div>
         <div className="mt-1 text-sm text-slate-600">
-          Current access level and read-only seat audit preview for this account.
+          Manage your Compliance Matters subscription and account access.
         </div>
-        <div className="mt-1 text-sm text-slate-600">
-          This is platform account subscription billing, not customer invoice payment collection.
+        <div className="mt-2 text-xs leading-5 text-slate-500">
+          This subscription is for Compliance Matters access. Customer invoice payments are managed
+          separately through invoice payment settings.
         </div>
       </div>
-      <dl className="grid grid-cols-2 gap-px bg-slate-100/70 sm:grid-cols-4">
+      <dl className="grid grid-cols-2 gap-px bg-slate-100/70 sm:grid-cols-3">
         <PlatformAccountField label="Plan" value={planLabel} />
         <PlatformAccountField label="Account status" value={statusLabel} />
-        <PlatformAccountField label="Active internal seats" value={String(entitlement.activeSeatCount)} />
-        <PlatformAccountField label="Seat limit / comped" value={seatLimitLabel} />
+        <PlatformAccountField label="Active users" value={String(entitlement.activeSeatCount)} />
+        <PlatformAccountField label="Seat limit" value={seatLimitLabel} />
+        <PlatformAccountField label="Billing profile" value={billingCustomerLabel} />
+        <PlatformAccountField label="Subscription status" value={subscriptionLabel} />
       </dl>
-      <div className="border-t border-slate-100 bg-slate-50/70 px-5 py-4">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="text-sm font-semibold text-slate-950">Seat audit preview</div>
-            <div className="mt-1 text-sm leading-6 text-slate-600">
-              Read-only seat usage preview for platform subscription billing. It does not update Stripe quantity,
-              enforce seat limits, or touch customer invoice payment collection.
+      {billingPeriodEndLabel || trialEndsLabel ? (
+        <div className="border-t border-slate-100 bg-white px-5 py-3 text-sm leading-6 text-slate-700">
+          {trialEndsLabel ? (
+            <div>
+              Trial ends:{" "}
+              <span className="font-medium text-slate-900">{trialEndsLabel}</span>
             </div>
-          </div>
-          <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Preview only
-          </div>
-        </div>
-
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <SeatAuditStat
-            label="Active internal seats"
-            value={String(entitlement.activeSeatCount)}
-            note="Counted live from internal_users."
-          />
-          <SeatAuditStat
-            label="Inactive internal users excluded"
-            value={inactiveInternalUserCountLabel}
-            note="Inactive internal_users rows are excluded."
-          />
-          <SeatAuditStat
-            label="Contractor/external accounts excluded"
-            value={contractorDirectoryCountLabel}
-            note="Contractor directory records are excluded from platform seat usage."
-          />
-          <SeatAuditStat
-            label="Pending invites / not-yet-active users"
-            value={pendingInviteLabel}
-            note="Not separately modeled in the current read-only data."
-          />
-        </div>
-
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-700">
-            <div className="font-semibold text-slate-950">Billing mode / status</div>
-            <div className="mt-1">{billingModeLabel}</div>
-            <div className="mt-2 text-slate-600">{billingExplanation}</div>
-          </div>
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-900">
-            <div className="font-semibold">Known modeling gap</div>
-            <div className="mt-1">{knownGapNote}</div>
-          </div>
-        </div>
-      </div>
-      <dl className="grid grid-cols-1 gap-px border-t border-slate-100 bg-slate-100/70 sm:grid-cols-3">
-        <PlatformAccountField
-          label="Billing customer"
-          value={billingCustomerLabel}
-        />
-        <PlatformAccountField
-          label="Subscription"
-          value={subscriptionLabel}
-        />
-        <PlatformAccountField
-          label="Period end"
-          value={billingPeriodEndLabel ?? "-"}
-        />
-      </dl>
-      {trialEndsLabel ? (
-        <div className="border-t border-slate-100 px-5 py-3 text-sm leading-6 text-slate-600">
-          Trial ends:{" "}
-          <span className="font-medium text-slate-900">{trialEndsLabel}</span>
+          ) : null}
+          {billingPeriodEndLabel ? (
+            <div>
+              Current period ends:{" "}
+              <span className="font-medium text-slate-900">{billingPeriodEndLabel}</span>
+            </div>
+          ) : null}
         </div>
       ) : null}
       {entitlement.billingCancelAtPeriodEnd && !isInternalComped ? (
@@ -599,6 +557,37 @@ function PlatformAccountSection({
           </div>
         )}
       </div>
+      <details className="group border-t border-slate-100 bg-white px-5 py-3">
+        <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
+          <span className="inline-flex items-center gap-2">
+            <span aria-hidden="true" className="transition-transform group-open:rotate-90">›</span>
+            Advanced billing details
+          </span>
+        </summary>
+        <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+          <div className="text-xs text-slate-500">
+            These details are for support review only and do not change billing automatically.
+          </div>
+          <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-100/70 sm:grid-cols-2">
+            <PlatformAccountField
+              label="Active users counted"
+              value={String(entitlement.activeSeatCount)}
+            />
+            <PlatformAccountField
+              label="Inactive users excluded"
+              value={inactiveUserCountLabel}
+            />
+            <PlatformAccountField
+              label="External/contractor records excluded"
+              value={externalRecordCountLabel}
+            />
+            <PlatformAccountField
+              label="Pending invites"
+              value="Not counted yet"
+            />
+          </dl>
+        </div>
+      </details>
     </div>
   );
 }
@@ -676,24 +665,6 @@ function TenantStripePaymentsSection({
           Customer payment links are available from issued invoice workspaces when Stripe setup is ready.
         </div>
       </div>
-    </div>
-  );
-}
-
-function SeatAuditStat({
-  label,
-  value,
-  note,
-}: {
-  label: string;
-  value: string;
-  note: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-[0_10px_24px_-20px_rgba(15,23,42,0.16)]">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
-      <div className="mt-2 text-lg font-semibold tracking-[-0.02em] text-slate-950">{value}</div>
-      <div className="mt-1 text-sm leading-6 text-slate-600">{note}</div>
     </div>
   );
 }

@@ -114,6 +114,12 @@ function buildFormData(includeLogo = false) {
   return formData;
 }
 
+function buildInvoiceModeFormData() {
+  const formData = new FormData();
+  formData.set("billing_mode", "internal_invoicing");
+  return formData;
+}
+
 describe("internal business profile scope hardening", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -176,6 +182,41 @@ describe("internal business profile scope hardening", () => {
 
     await expect(saveInternalBusinessProfileFromForm(buildFormData(true))).rejects.toThrow(
       "Active internal user required.",
+    );
+
+    expect(fixture.profileWrites).toHaveLength(0);
+    expect(fixture.storageUploads).toHaveLength(0);
+    expect(fixture.storageRemoves).toHaveLength(0);
+  });
+
+  it("allows same-account admin saveInvoiceModeFromForm without requiring company profile fields", async () => {
+    const fixture = buildFixture({ preflightAllowed: true });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { saveInvoiceModeFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    await expect(saveInvoiceModeFromForm(buildInvoiceModeFormData())).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=invoice_settings_saved",
+    );
+
+    expect(fixture.profileWrites).toHaveLength(1);
+    expect(fixture.storageUploads).toHaveLength(0);
+    expect(fixture.storageRemoves).toHaveLength(0);
+    expect(fixture.profileWrites[0]?.billing_mode).toBe("internal_invoicing");
+  });
+
+  it("denies cross-account saveInvoiceModeFromForm before profile mutation", async () => {
+    const fixture = buildFixture({ preflightAllowed: false });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { saveInvoiceModeFromForm } = await import(
+      "@/lib/actions/internal-business-profile-actions"
+    );
+
+    await expect(saveInvoiceModeFromForm(buildInvoiceModeFormData())).rejects.toThrow(
+      "REDIRECT:/forbidden",
     );
 
     expect(fixture.profileWrites).toHaveLength(0);
