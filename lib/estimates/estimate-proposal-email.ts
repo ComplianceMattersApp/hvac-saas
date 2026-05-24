@@ -17,6 +17,7 @@ import {
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { renderOperationalEmailLayout, escapeHtml } from "@/lib/email/layout";
 import { sendEmail } from "@/lib/email/sendEmail";
+import { resolveProposalEmailPreviewUrl } from "@/lib/estimates/estimate-proposal-email-preview";
 
 type ProposalEmailAttemptStatus = "blocked" | "accepted" | "failed";
 type EmailDeliveryMode = "provider" | "preview";
@@ -34,6 +35,7 @@ export type SendEstimateProposalEmailResult =
   communicationId?: string;
   proposalLinkId?: string;
       proposalUrl: string | null;
+      emailPreviewUrl?: string | null;
       providerMessageId: string | null;
       emailDisabled: boolean;
     }
@@ -593,6 +595,8 @@ export async function sendEstimateProposalEmail(
   });
 
   if (deliveryMode === "preview") {
+    const emailPreviewUrl = resolveProposalEmailPreviewUrl();
+
     await writeProposalEmailPreviewOutbox({
       estimateId,
       recipientEmail,
@@ -607,6 +611,7 @@ export async function sendEstimateProposalEmail(
       attemptStatus: "accepted",
       deliveryMode: "preview",
       proposalUrl,
+      emailPreviewUrl,
       providerMessageId: null,
       emailDisabled: false,
     };
@@ -722,6 +727,7 @@ export async function sendEstimateProposalEmail(
     communicationId: communicationResult.communicationId,
     proposalLinkId,
     proposalUrl,
+    emailPreviewUrl: null,
     providerMessageId,
     emailDisabled: !emailEnabled,
   };

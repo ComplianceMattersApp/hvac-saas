@@ -304,6 +304,7 @@ describe("sendEstimateProposalEmail", () => {
     });
 
     expect(result.success).toBe(true);
+    expect((result as { emailPreviewUrl?: string | null }).emailPreviewUrl).toBeNull();
     expect(issueEstimateProposalLinkMock).toHaveBeenCalledTimes(1);
     expect(sendEmailMock).toHaveBeenCalledTimes(1);
     const sendArgs = sendEmailMock.mock.calls[0][0] as {
@@ -556,6 +557,9 @@ describe("sendEstimateProposalEmail", () => {
     expect(result.success).toBe(true);
     expect((result as { deliveryMode?: string }).deliveryMode).toBe("preview");
     expect((result as { proposalUrl?: string }).proposalUrl).toContain("/proposals/preview-est-1");
+    expect((result as { emailPreviewUrl?: string | null }).emailPreviewUrl).toBe(
+      "/dev/email-preview/proposal"
+    );
     expect(sendEmailMock).not.toHaveBeenCalled();
     expect(mkdirMock).toHaveBeenCalled();
     expect(writeFileMock).toHaveBeenCalledTimes(3);

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   canRenderProposalEmailControls,
+  resolveDevEmailPreviewUrl,
   resolveCopyableProposalUrl,
   resolveProposalEmailNotice,
 } from "@/app/estimates/[id]/proposal-email-ui";
@@ -124,5 +125,14 @@ describe("proposal email UI helpers", () => {
     expect(resolveCopyableProposalUrl("/proposals/abc123")).toBeNull();
     expect(resolveCopyableProposalUrl("javascript:alert(1)")).toBeNull();
     expect(resolveCopyableProposalUrl("https://x.test/proposals/abc?token_hash=leak")).toBeNull();
+  });
+
+  it("allows local dev preview link only for safe dev route", () => {
+    expect(resolveDevEmailPreviewUrl("/dev/email-preview/proposal")).toBe(
+      "/dev/email-preview/proposal"
+    );
+    expect(resolveDevEmailPreviewUrl("https://example.com/dev/email-preview/proposal")).toBeNull();
+    expect(resolveDevEmailPreviewUrl("/dev/email-preview/proposal?x=1")).toBeNull();
+    expect(resolveDevEmailPreviewUrl("/proposals/token")).toBeNull();
   });
 });

@@ -15,6 +15,7 @@ import {
 } from "./proposal-link-action-state";
 import {
   canRenderProposalEmailControls,
+  resolveDevEmailPreviewUrl,
   resolveCopyableProposalUrl,
   resolveProposalEmailNotice,
 } from "./proposal-email-ui";
@@ -79,6 +80,7 @@ export default function ProposalEmailControls(props: ProposalEmailControlsProps)
 
   const proposalUrl = resolveCopyableProposalUrl(state.proposalUrl) ??
     resolveCopyableProposalUrl(linkUrlFromToken);
+  const emailPreviewUrl = resolveDevEmailPreviewUrl(state.emailPreviewUrl);
 
   const notice = useMemo(
     () => resolveProposalEmailNotice(state, { isPending }),
@@ -223,6 +225,19 @@ export default function ProposalEmailControls(props: ProposalEmailControlsProps)
         >
           {notice.message}
         </p>
+      ) : null}
+
+      {state.success && state.attemptStatus === "accepted" && state.deliveryMode === "preview" && emailPreviewUrl ? (
+        <div className="mt-2">
+          <a
+            href={emailPreviewUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-[background-color,border-color,transform] hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-[0.5px]"
+          >
+            Open Email Preview
+          </a>
+        </div>
       ) : null}
 
       {secondaryStatus ? (

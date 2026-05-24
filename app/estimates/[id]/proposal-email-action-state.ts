@@ -7,6 +7,7 @@ export type ProposalEmailActionState = {
   communicationId?: string;
   proposalLinkId?: string;
   proposalUrl?: string | null;
+  emailPreviewUrl?: string | null;
   providerMessageId?: string | null;
   emailDisabled?: boolean;
 };

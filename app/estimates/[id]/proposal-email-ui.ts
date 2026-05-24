@@ -14,6 +14,16 @@ export function resolveCopyableProposalUrl(
   return normalized;
 }
 
+export function resolveDevEmailPreviewUrl(
+  previewUrl: string | null | undefined
+): string | null {
+  const normalized = String(previewUrl ?? "").trim();
+  if (!normalized) return null;
+  if (!normalized.startsWith("/dev/email-preview/")) return null;
+  if (normalized.includes("?")) return null;
+  return normalized;
+}
+
 export function resolveProposalEmailNotice(
   state: ProposalEmailActionState | null | undefined,
   options?: { isPending?: boolean }
