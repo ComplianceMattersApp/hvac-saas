@@ -2601,18 +2601,6 @@ return (
               <Image src="/icon.png" alt={`${internalBusinessDisplayName} logo`} width={36} height={36} className="h-9 w-9 rounded-lg shadow-[0_12px_24px_-18px_rgba(15,23,42,0.45)]" />
             )}
           </div>
-          <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className={`rounded-xl border px-3 py-2 ${exceptionCount > 0 ? "border-rose-200 bg-rose-50/70" : "border-slate-200 bg-slate-50/85"}`}>
-              <div className={`${opsUtilityLabelClass} ${exceptionCount > 0 ? "text-rose-700" : "text-slate-500"}`}>Needs Attention</div>
-              <div className={`mt-1 text-lg font-semibold tabular-nums ${exceptionCount > 0 ? "text-rose-700" : "text-slate-900"}`}>
-                {exceptionCount}
-              </div>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2">
-              <div className={`${opsUtilityLabelClass} text-slate-500`}>Ready for Closeout</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{prioritizedCloseoutJobs.length}</div>
-            </div>
-          </div>
         </div>
       </div>
     </section>
@@ -2622,7 +2610,7 @@ return (
         <div className="min-w-0">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <div className={`${opsUtilityLabelClass} text-slate-500`}>Operational Snapshot</div>
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Priority Queues</div>
               <div className="text-lg font-semibold tracking-tight text-slate-950">Work Flow</div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
