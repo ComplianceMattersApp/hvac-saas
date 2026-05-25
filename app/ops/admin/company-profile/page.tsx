@@ -2,7 +2,6 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   refreshTenantStripeConnectReadinessFromForm,
-  saveTimeClockAccountSettingFromForm,
   saveInvoiceModeFromForm,
   saveInternalBusinessProfileFromForm,
   startTenantStripeConnectOnboardingFromForm,
@@ -61,14 +60,6 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
     tone: "warn",
     message: "We couldn't refresh the latest Stripe status just now. The last saved setup state is shown below.",
   },
-  time_clock_settings_saved: {
-    tone: "success",
-    message: "Time Clock account setting was saved.",
-  },
-  time_clock_settings_save_failed: {
-    tone: "error",
-    message: "We couldn't save the Time Clock account setting. Please try again.",
-  },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {
@@ -125,12 +116,6 @@ export default async function AdminCompanyProfilePage({
       supabase,
     }),
   ]);
-  const { data: accountSettings, error: accountSettingsError } = await supabase
-    .from("account_settings")
-    .select("time_clock_enabled")
-    .eq("account_owner_user_id", internalUser.account_owner_user_id)
-    .maybeSingle();
-  if (accountSettingsError) throw accountSettingsError;
 
   const tenantStripeReadiness = await resolveTenantStripeConnectReadiness(
     internalUser.account_owner_user_id,
@@ -144,7 +129,6 @@ export default async function AdminCompanyProfilePage({
   const companyName = String(profile?.display_name ?? "").trim() || "Your Company";
   const supportEmail = String(profile?.support_email ?? "").trim();
   const supportPhone = String(profile?.support_phone ?? "").trim();
-  const timeClockEnabled = Boolean((accountSettings as any)?.time_clock_enabled);
   const billingMode = profile?.billing_mode ?? DEFAULT_BILLING_MODE;
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
   const platformBillingAvailability = getPlatformBillingAvailability();
@@ -180,43 +164,6 @@ export default async function AdminCompanyProfilePage({
           {notice.message}
         </div>
       ) : null}
-
-      <div className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
-        <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Time Clock settings</h2>
-          <p className="text-sm leading-6 text-slate-600">
-            Enable or disable Time Clock access for this account. Existing time entries are preserved if disabled.
-          </p>
-        </div>
-
-        <form action={saveTimeClockAccountSettingFromForm} className="mt-4 space-y-4">
-          <input type="hidden" name="time_clock_enabled" value="0" />
-          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-800">
-            <input
-              type="checkbox"
-              name="time_clock_enabled"
-              value="1"
-              defaultChecked={timeClockEnabled}
-              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900"
-            />
-            <span>
-              <span className="block font-semibold text-slate-900">Enable Time Clock for this account</span>
-              <span className="mt-0.5 block text-xs text-slate-600">
-                Current status: {timeClockEnabled ? "Enabled" : "Disabled"}
-              </span>
-            </span>
-          </label>
-
-          <div className="flex justify-end">
-            <button
-              type="submit"
-              className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
-            >
-              Save Time Clock setting
-            </button>
-          </div>
-        </form>
-      </div>
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
         <div className="flex flex-wrap items-center justify-between gap-2">

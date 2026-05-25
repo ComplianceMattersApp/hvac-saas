@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Clock3 } from "lucide-react";
 import { redirect } from "next/navigation";
+import { saveTimeClockAccountSettingFromForm } from "@/lib/actions/internal-business-profile-actions";
 import { correctTimeEntryFromForm } from "@/lib/actions/time-clock-actions";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
@@ -16,6 +17,11 @@ type SearchParams = Promise<{ notice?: string }>;
 
 const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   entry_corrected: { tone: "success", message: "Time entry updated." },
+  time_clock_settings_saved: { tone: "success", message: "Time Clock account setting was saved." },
+  time_clock_settings_save_failed: {
+    tone: "error",
+    message: "We couldn't save the Time Clock account setting. Please try again.",
+  },
   reason_required: { tone: "warn", message: "Adjustment reason is required." },
   invalid_datetime: { tone: "warn", message: "Enter a valid date and time." },
   entry_not_found: { tone: "warn", message: "That time entry was not found in your account." },
@@ -295,7 +301,12 @@ export default async function AdminTimeClockPage({ searchParams }: { searchParam
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
 
-  const [activeNowRows, recentRows, needsReviewRows] = await Promise.all([
+  const [accountSettingsResult, activeNowRows, recentRows, needsReviewRows] = await Promise.all([
+    supabase
+      .from("account_settings")
+      .select("time_clock_enabled")
+      .eq("account_owner_user_id", internalUser.account_owner_user_id)
+      .maybeSingle(),
     listTeamClockStatusPreview({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
@@ -313,6 +324,9 @@ export default async function AdminTimeClockPage({ searchParams }: { searchParam
       limit: 400,
     }),
   ]);
+
+  if (accountSettingsResult.error) throw accountSettingsResult.error;
+  const timeClockEnabled = Boolean((accountSettingsResult.data as any)?.time_clock_enabled);
 
   const allUserIds = Array.from(
     new Set([
@@ -365,6 +379,44 @@ export default async function AdminTimeClockPage({ searchParams }: { searchParam
           {notice.message}
         </div>
       ) : null}
+
+      <section className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Account Time Clock Access</h2>
+          <p className="text-sm leading-6 text-slate-600">
+            Enable or disable Time Clock for this account. Existing time entries remain preserved if disabled.
+          </p>
+        </div>
+
+        <form action={saveTimeClockAccountSettingFromForm} className="mt-4 space-y-4">
+          <input type="hidden" name="time_clock_enabled" value="0" />
+          <input type="hidden" name="redirect_to" value="/ops/admin/time-clock" />
+          <label className="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-800">
+            <input
+              type="checkbox"
+              name="time_clock_enabled"
+              value="1"
+              defaultChecked={timeClockEnabled}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900"
+            />
+            <span>
+              <span className="block font-semibold text-slate-900">Enable Time Clock for this account</span>
+              <span className="mt-0.5 block text-xs text-slate-600">
+                Current status: {timeClockEnabled ? "Enabled" : "Disabled"}
+              </span>
+            </span>
+          </label>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
+            >
+              Save Time Clock setting
+            </button>
+          </div>
+        </form>
+      </section>
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Active Now</h2>

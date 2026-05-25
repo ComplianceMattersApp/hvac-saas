@@ -2536,6 +2536,8 @@ const operationalFlowCards = [
 const operationalFlowTotal = operationalFlowCards.reduce((sum, card) => sum + card.count, 0);
 const activeOpsWorkCount = uniqueAllOpenOpsJobs.length;
 const exceptionCount = sortedExceptionJobs.length;
+const clockedInNowCount = teamClockStatusRows.filter((row) => row.statusLabel === "Clocked In").length;
+const onLunchCount = teamClockStatusRows.length - clockedInNowCount;
 
 if (opsTimingEnabled) console.log(`[ops:totalBeforeRender] ${Date.now() - _t_total}ms`);
 return (
@@ -2559,17 +2561,26 @@ return (
           <div className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             Dispatch, field progress, exceptions, and closeout work in one daily operating surface.
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Link href="/calendar" className={sectionActionLinkClass}>
-              Calendar
-            </Link>
-            <Link href="/ops/call-list" className={sectionActionLinkClass}>
-              Call List
-            </Link>
-            <Link href="/reports/dashboard" className={sectionActionLinkClass}>
-              Reports
-            </Link>
-          </div>
+          {showTeamClockStatusCard ? (
+            <div className="mt-4 flex flex-wrap items-center gap-2.5">
+              <div className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50/85 px-3 py-1.5 text-xs font-semibold text-emerald-800">
+                <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Clocked In Now</span>
+                <span className="rounded-md bg-white/90 px-1.5 py-0.5 tabular-nums text-emerald-900">{clockedInNowCount}</span>
+              </div>
+              {onLunchCount > 0 ? (
+                <div className="inline-flex items-center rounded-xl border border-amber-200 bg-amber-50/85 px-2.5 py-1.5 text-xs font-semibold text-amber-800">
+                  On Lunch {onLunchCount}
+                </div>
+              ) : null}
+              <Link
+                href="/time-clock"
+                className="inline-flex items-center rounded-xl border border-slate-300/90 bg-white px-3 py-1.5 text-xs font-semibold text-slate-900 shadow-sm transition-[background-color,box-shadow,transform] hover:bg-slate-50 hover:shadow-[0_10px_20px_-18px_rgba(15,23,42,0.4)] active:translate-y-[0.5px]"
+              >
+                Open Time Clock
+              </Link>
+            </div>
+          ) : null}
         </div>
         <div className="rounded-2xl border border-white/80 bg-white/78 p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)]">
           <div className="flex items-start justify-between gap-3">

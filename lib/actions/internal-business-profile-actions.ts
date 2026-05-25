@@ -48,6 +48,17 @@ function withNotice(notice: string) {
   return `/ops/admin/company-profile?notice=${encodeURIComponent(notice)}`;
 }
 
+function normalizeTimeClockSettingsRedirectTarget(raw: FormDataEntryValue | null) {
+  const target = String(raw ?? "").trim();
+  if (target === "/ops/admin/company-profile") return target;
+  if (target === "/ops/admin/time-clock") return target;
+  return "/ops/admin/time-clock";
+}
+
+function withNoticeAtPath(path: string, notice: string) {
+  return `${path}?notice=${encodeURIComponent(notice)}`;
+}
+
 function isRedirectControlFlowError(error: unknown) {
   if (!error) return false;
 
@@ -279,6 +290,7 @@ export async function saveInvoiceModeFromForm(formData: FormData): Promise<void>
 export async function saveTimeClockAccountSettingFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
   const { userId, internalUser } = await requireInternalRole("admin", { supabase });
+  const redirectPath = normalizeTimeClockSettingsRedirectTarget(formData.get("redirect_to"));
 
   const admin = createAdminClient();
   try {
@@ -308,14 +320,15 @@ export async function saveTimeClockAccountSettingFromForm(formData: FormData): P
     );
 
   if (error) {
-    redirect(withNotice("time_clock_settings_save_failed"));
+    redirect(withNoticeAtPath(redirectPath, "time_clock_settings_save_failed"));
   }
 
   revalidatePath("/ops");
   revalidatePath("/ops/admin");
   revalidatePath("/ops/admin/company-profile");
+  revalidatePath("/ops/admin/time-clock");
   revalidatePath("/ops/admin/internal-users");
-  redirect(withNotice("time_clock_settings_saved"));
+  redirect(withNoticeAtPath(redirectPath, "time_clock_settings_saved"));
 }
 
 export async function confirmTeamSetupFromForm(): Promise<void> {
