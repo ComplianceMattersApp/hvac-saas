@@ -78,7 +78,7 @@ function toRoleLabel(role: string): string {
   if (normalized === "admin") return "Admin";
   if (normalized === "office") return "Dispatcher";
   if (normalized === "tech" || normalized === "technician") return "Technician";
-  if (normalized === "billing") return "Billing";
+  if (normalized === "billing") return "Billing / AR";
   return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
 }
 
@@ -280,6 +280,7 @@ export default async function AdminInternalUsersPage({
           >
             <option value="admin">Admin</option>
             <option value="office">Dispatcher</option>
+            <option value="billing">Billing / AR</option>
             <option value="technician">Technician</option>
           </select>
           <button
@@ -382,6 +383,7 @@ export default async function AdminInternalUsersPage({
                       >
                         <option value="admin">Admin</option>
                         <option value="office">Dispatcher</option>
+                        <option value="billing">Billing / AR</option>
                         <option value="tech">Technician</option>
                       </select>
                       <button

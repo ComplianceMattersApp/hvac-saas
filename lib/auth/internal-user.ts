@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 
-export type InternalRole = "admin" | "office" | "tech";
+export type InternalRole = "admin" | "office" | "tech" | "billing";
 
 export type InternalUserRow = {
   user_id: string;
@@ -53,7 +53,7 @@ async function timeInternalUserPhase<T>(
 }
 
 function parseInternalRole(value: unknown): InternalRole | null {
-  if (value === "admin" || value === "office" || value === "tech") {
+  if (value === "admin" || value === "office" || value === "tech" || value === "billing") {
     return value;
   }
 

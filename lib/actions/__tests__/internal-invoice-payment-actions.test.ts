@@ -298,6 +298,28 @@ describe('recordInternalInvoicePaymentFromForm', () => {
     expect(writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(true);
   });
 
+  it('allows billing role to record payments', async () => {
+    const { supabase, writes } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'billing-1',
+      internalUser: {
+        user_id: 'billing-1',
+        role: 'billing',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_recorded',
+    );
+
+    expect(writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(true);
+  });
+
   it('denies office/dispatcher from recording payments when not structural owner', async () => {
     const { supabase, writes } = makeSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
@@ -528,6 +550,29 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
       internalUser: {
         user_id: 'owner-1',
         role: 'office',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData({ no_redirect: '1' })),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        checkoutSessionId: 'cs_123',
+      }),
+    );
+  });
+
+  it('allows billing role to create checkout session', async () => {
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'billing-1',
+      internalUser: {
+        user_id: 'billing-1',
+        role: 'billing',
         is_active: true,
         account_owner_user_id: 'owner-1',
       },

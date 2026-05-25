@@ -23,7 +23,7 @@ type InternalUserRecord = {
 function parseInternalRole(raw: FormDataEntryValue | null): InternalRole {
   const role = String(raw ?? "").trim().toLowerCase();
 
-  if (role === "admin" || role === "office" || role === "tech") {
+  if (role === "admin" || role === "office" || role === "tech" || role === "billing") {
     return role;
   }
 
@@ -99,7 +99,12 @@ function isInviteRateLimitError(error: any) {
 
 function normalizeInternalUserRecord(data: any): InternalUserRecord | null {
   if (!data?.user_id || !data?.account_owner_user_id) return null;
-  if (data.role !== "admin" && data.role !== "office" && data.role !== "tech") {
+  if (
+    data.role !== "admin"
+    && data.role !== "office"
+    && data.role !== "tech"
+    && data.role !== "billing"
+  ) {
     return null;
   }
 

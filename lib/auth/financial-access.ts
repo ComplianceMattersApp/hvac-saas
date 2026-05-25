@@ -52,7 +52,8 @@ export function isStructuralAccountOwner(params: FinancialAccessParams) {
 function hasAdminFinancialRole(params: FinancialAccessParams) {
   if (!hasActiveInternalUser(params)) return false;
   if (!hasAccountScopeAccess(params)) return false;
-  return normalize(params.internalUser?.role).toLowerCase() === 'admin';
+  const role = normalize(params.internalUser?.role).toLowerCase();
+  return role === 'admin' || role === 'billing';
 }
 
 function hasFinancialAuthority(params: FinancialAccessParams) {

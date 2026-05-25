@@ -61,7 +61,7 @@ function toRoleLabel(role: string): string {
   if (normalized === "admin") return "Admin";
   if (normalized === "office") return "Dispatcher";
   if (normalized === "tech" || normalized === "technician") return "Technician";
-  if (normalized === "billing") return "Billing";
+  if (normalized === "billing") return "Billing / AR";
   return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
 }
 

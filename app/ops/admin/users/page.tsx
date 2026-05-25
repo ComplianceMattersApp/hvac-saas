@@ -77,7 +77,7 @@ function toRoleLabel(role: string): string {
   const normalized = String(role || "").trim().toLowerCase();
   if (normalized === "tech" || normalized === "technician") return "Technician";
   if (normalized === "office") return "Dispatcher";
-  if (normalized === "billing") return "Billing";
+  if (normalized === "billing") return "Billing / AR";
   if (normalized === "member") return "Member";
   if (normalized === "owner") return "Owner";
   if (normalized === "admin") return "Admin";
@@ -472,6 +472,7 @@ export default async function AdminUsersCommandCenterPage({
             >
               <option value="admin">Admin</option>
               <option value="office">Dispatcher</option>
+              <option value="billing">Billing / AR</option>
               <option value="technician">Technician</option>
             </select>
             <button
@@ -551,6 +552,7 @@ export default async function AdminUsersCommandCenterPage({
                           >
                             <option value="admin">Admin</option>
                             <option value="office">Dispatcher</option>
+                            <option value="billing">Billing / AR</option>
                             <option value="tech">Technician</option>
                           </select>
                           <button

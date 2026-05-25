@@ -112,6 +112,25 @@ describe('invoice export route financial access', () => {
     expect(listInvoiceLedgerRowsMock).toHaveBeenCalledTimes(1);
   });
 
+  it('allows billing role to export invoice ledger CSV', async () => {
+    createClientMock.mockResolvedValue(makeSupabaseFixture('billing-1'));
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: {
+        user_id: 'billing-1',
+        role: 'billing',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { GET } = await import('@/app/reports/invoices/export/route');
+    const response = await GET(buildRequest());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/csv');
+    expect(listInvoiceLedgerRowsMock).toHaveBeenCalledTimes(1);
+  });
+
   it('denies office/dispatcher from exporting financial CSV', async () => {
     createClientMock.mockResolvedValue(makeSupabaseFixture('office-1'));
     requireInternalUserMock.mockResolvedValue({

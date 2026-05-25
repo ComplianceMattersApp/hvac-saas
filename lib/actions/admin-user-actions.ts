@@ -25,9 +25,9 @@ function normalizeEmail(raw: FormDataEntryValue | null): string {
   return String(raw ?? "").trim().toLowerCase();
 }
 
-function parseInternalRoleForInvite(raw: FormDataEntryValue | null): "admin" | "office" | "tech" {
+function parseInternalRoleForInvite(raw: FormDataEntryValue | null): "admin" | "office" | "tech" | "billing" {
   const role = String(raw ?? "").trim().toLowerCase();
-  if (role === "admin" || role === "office" || role === "tech") return role;
+  if (role === "admin" || role === "office" || role === "tech" || role === "billing") return role;
   if (role === "technician") return "tech";
   return "office";
 }

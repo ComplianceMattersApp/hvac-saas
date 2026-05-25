@@ -68,6 +68,32 @@ describe('financial access helper', () => {
     ).toBe(true);
   });
 
+  it('billing passes', () => {
+    expect(
+      canViewFinancialRegister({
+        actorUserId: 'billing-1',
+        internalUser: {
+          user_id: 'billing-1',
+          role: 'billing',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      canExportFinancialData({
+        actorUserId: 'billing-1',
+        internalUser: {
+          user_id: 'billing-1',
+          role: 'billing',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(true);
+  });
+
   it('office/dispatcher and tech fail when not structural owner', () => {
     expect(
       canRecordInvoicePayment({
