@@ -7,12 +7,14 @@ vi.mock('next/navigation', () => ({
 }));
 
 import {
+  canManageInvoiceLifecycle,
   canCreateTenantInvoicePaymentLink,
   canExportFinancialData,
   canRecordInvoicePayment,
   canViewFinancialRegister,
   isStructuralAccountOwner,
   requireFinancialExportAccessOrResponse,
+  requireInvoiceLifecycleAccessOrRedirect,
 } from '@/lib/auth/financial-access';
 
 describe('financial access helper', () => {
@@ -92,6 +94,18 @@ describe('financial access helper', () => {
         },
       }),
     ).toBe(true);
+
+    expect(
+      canManageInvoiceLifecycle({
+        actorUserId: 'billing-1',
+        internalUser: {
+          user_id: 'billing-1',
+          role: 'billing',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(true);
   });
 
   it('office/dispatcher and tech fail when not structural owner', () => {
@@ -132,6 +146,21 @@ describe('financial access helper', () => {
         },
       }),
     ).toBe(false);
+  });
+
+  it('invoice lifecycle redirect helper denies office when not structural owner', () => {
+    expect(() =>
+      requireInvoiceLifecycleAccessOrRedirect({
+        actorUserId: 'office-1',
+        internalUser: {
+          user_id: 'office-1',
+          role: 'office',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+        redirectTo: '/jobs/job-1?tab=info&banner=not_authorized#internal-invoice-panel',
+      }),
+    ).toThrow('REDIRECT:/jobs/job-1?tab=info&banner=not_authorized#internal-invoice-panel');
   });
 
   it('contractor/non-internal fails route-friendly response check', () => {

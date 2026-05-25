@@ -149,6 +149,13 @@ type InvoiceMutationEntrypoint =
   | 'removeInternalInvoiceLineItemFromForm'
   | 'sendInternalInvoiceEmailFromForm';
 
+type InvoiceLifecycleEntrypoint =
+  | 'createInternalInvoiceDraftFromForm'
+  | 'saveInternalInvoiceDraftFromForm'
+  | 'issueInternalInvoiceFromForm'
+  | 'voidInternalInvoiceFromForm'
+  | 'sendInternalInvoiceEmailFromForm';
+
 const targetedEntrypoints: InvoiceMutationEntrypoint[] = [
   'createInternalInvoiceDraftFromForm',
   'saveInternalInvoiceDraftFromForm',
@@ -159,6 +166,14 @@ const targetedEntrypoints: InvoiceMutationEntrypoint[] = [
   'addInternalInvoiceLineItemsFromVisitScopeForm',
   'updateInternalInvoiceLineItemFromForm',
   'removeInternalInvoiceLineItemFromForm',
+  'sendInternalInvoiceEmailFromForm',
+];
+
+const lifecycleEntrypoints: InvoiceLifecycleEntrypoint[] = [
+  'createInternalInvoiceDraftFromForm',
+  'saveInternalInvoiceDraftFromForm',
+  'issueInternalInvoiceFromForm',
+  'voidInternalInvoiceFromForm',
   'sendInternalInvoiceEmailFromForm',
 ];
 
@@ -194,7 +209,7 @@ describe('internal invoice mutation same-account hardening', () => {
       userId: 'internal-user-1',
       internalUser: {
         user_id: 'internal-user-1',
-        role: 'office',
+        role: 'admin',
         is_active: true,
         account_owner_user_id: 'owner-1',
       },
@@ -358,4 +373,90 @@ describe('internal invoice mutation same-account hardening', () => {
     expect(insertJobEventMock).not.toHaveBeenCalled();
     expect(sendEmailMock).not.toHaveBeenCalled();
   });
+
+  for (const entrypointName of lifecycleEntrypoints) {
+    it(`allows structural owner internal ${entrypointName} past financial lifecycle authority preflight`, async () => {
+      const { supabase } = makeAllowSupabaseFixture();
+      createClientMock.mockResolvedValue(supabase);
+      loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+      requireInternalUserMock.mockResolvedValueOnce({
+        userId: 'owner-1',
+        internalUser: {
+          user_id: 'owner-1',
+          role: 'office',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      });
+
+      await expect(invokeEntrypoint(entrypointName, buildInvoiceFormData())).rejects.toThrow(
+        'ALLOW_PATH_REACHED',
+      );
+    });
+
+    it(`allows billing internal ${entrypointName} past financial lifecycle authority preflight`, async () => {
+      const { supabase } = makeAllowSupabaseFixture();
+      createClientMock.mockResolvedValue(supabase);
+      loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+      requireInternalUserMock.mockResolvedValueOnce({
+        userId: 'billing-1',
+        internalUser: {
+          user_id: 'billing-1',
+          role: 'billing',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      });
+
+      await expect(invokeEntrypoint(entrypointName, buildInvoiceFormData())).rejects.toThrow(
+        'ALLOW_PATH_REACHED',
+      );
+    });
+
+    it(`denies office internal ${entrypointName} before invoice/jobs/events/notification writes and email side effects`, async () => {
+      const { supabase, writeCalls } = makeDenySupabaseFixture();
+      createClientMock.mockResolvedValue(supabase);
+      loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+      requireInternalUserMock.mockResolvedValueOnce({
+        userId: 'office-1',
+        internalUser: {
+          user_id: 'office-1',
+          role: 'office',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      });
+
+      await expect(invokeEntrypoint(entrypointName, buildInvoiceFormData())).rejects.toThrow(
+        'banner=not_authorized',
+      );
+
+      assertNoDeniedWrites(writeCalls);
+      expect(insertJobEventMock).not.toHaveBeenCalled();
+      expect(sendEmailMock).not.toHaveBeenCalled();
+    });
+
+    it(`denies tech internal ${entrypointName} before invoice/jobs/events/notification writes and email side effects`, async () => {
+      const { supabase, writeCalls } = makeDenySupabaseFixture();
+      createClientMock.mockResolvedValue(supabase);
+      loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+      requireInternalUserMock.mockResolvedValueOnce({
+        userId: 'tech-1',
+        internalUser: {
+          user_id: 'tech-1',
+          role: 'tech',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      });
+
+      await expect(invokeEntrypoint(entrypointName, buildInvoiceFormData())).rejects.toThrow(
+        'banner=not_authorized',
+      );
+
+      assertNoDeniedWrites(writeCalls);
+      expect(insertJobEventMock).not.toHaveBeenCalled();
+      expect(sendEmailMock).not.toHaveBeenCalled();
+    });
+  }
 });

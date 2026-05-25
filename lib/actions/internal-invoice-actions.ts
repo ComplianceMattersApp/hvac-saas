@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
+import { requireInvoiceLifecycleAccessOrRedirect } from '@/lib/auth/financial-access';
 import {
   resolveBillingModeByAccountOwnerId,
 } from '@/lib/business/internal-business-profile';
@@ -983,6 +984,13 @@ async function logInvoiceEvent(params: {
 export async function createInternalInvoiceDraftFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
+  requireInvoiceLifecycleAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
+
   if (context.invoice) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_draft_exists', context.returnTo));
   }
@@ -1120,6 +1128,13 @@ export async function saveInternalInvoiceDraftFromForm(formData: FormData): Prom
   const context = await loadInternalInvoiceContext(formData);
   const noRedirect = isNoRedirectRequested(formData);
 
+  requireInvoiceLifecycleAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
+
   if (!context.invoice) {
     return resolveSmallMutationResult({
       jobId: context.jobId,
@@ -1217,6 +1232,13 @@ export async function saveInternalInvoiceDraftFromForm(formData: FormData): Prom
 export async function issueInternalInvoiceFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
+  requireInvoiceLifecycleAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
+
   if (!context.invoice) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));
   }
@@ -1296,6 +1318,13 @@ export async function issueInternalInvoiceFromForm(formData: FormData) {
 
 export async function voidInternalInvoiceFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
+
+  requireInvoiceLifecycleAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
 
   if (!context.invoice) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));
@@ -1882,6 +1911,13 @@ export async function removeInternalInvoiceLineItemFromForm(formData: FormData):
 
 export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
+
+  requireInvoiceLifecycleAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
 
   if (!context.invoice) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_missing', context.returnTo));

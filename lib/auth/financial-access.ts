@@ -64,6 +64,10 @@ export function canViewFinancialRegister(params: FinancialAccessParams) {
   return hasFinancialAuthority(params);
 }
 
+export function canManageInvoiceLifecycle(params: FinancialAccessParams) {
+  return hasFinancialAuthority(params);
+}
+
 export function canRecordInvoicePayment(params: FinancialAccessParams) {
   return hasFinancialAuthority(params);
 }
@@ -80,6 +84,16 @@ export function requireInvoicePaymentRecordAccessOrRedirect(params: FinancialAcc
   redirectTo: string;
 }) {
   if (canRecordInvoicePayment(params)) {
+    return;
+  }
+
+  redirect(params.redirectTo);
+}
+
+export function requireInvoiceLifecycleAccessOrRedirect(params: FinancialAccessParams & {
+  redirectTo: string;
+}) {
+  if (canManageInvoiceLifecycle(params)) {
     return;
   }
 
