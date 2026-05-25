@@ -1,8 +1,8 @@
 # Service Role Controls / Financial Access Controls V1A Model Spec
 
-Status: ACTIVE MODEL LOCK + IMPLEMENTATION VERIFIED (V1A-2 / V1A-3)
+Status: ACTIVE MODEL LOCK + IMPLEMENTATION VERIFIED (V1A-2 / V1A-3 / V1A-4)
 Owner lane: Service Role Controls / Financial Access Controls V1A
-Scope: role/access authority model and implemented-access closeout for sensitive invoice/payment financial actions. Billing Register / Payments Register implementation remains separately gated.
+Scope: role/access authority model and implemented-access closeout for sensitive invoice/payment financial actions. Access-control prerequisite is satisfied; Billing Register / Payments Register may resume in the next implementation lane under existing helper/server-side gates.
 
 ## Purpose
 
@@ -10,19 +10,21 @@ Service Role Controls / Financial Access Controls V1A locks the authority model 
 
 The Financial Ledger / Payments Register V1 model established that Compliance Matters is tenant financial operating truth for all money received, while Stripe remains processor truth for Stripe transactions. That model creates new sensitive surfaces: payment register views, manual payment recording, payment correction, failed payment signals, exports, and financial dashboards. Those surfaces need source-of-truth authorization rules before implementation resumes.
 
-This lane began as audit/model-first and now has implementation closeout for V1A-2 and V1A-3 financial access controls.
+This lane began as audit/model-first and now has implementation closeout for V1A-2, V1A-3, and V1A-4 financial access controls.
 
 Implemented closeout summary:
 
 - V1A-2 implemented centralized financial access helper and server-side gates for sensitive financial actions.
 - V1A-3 implemented `billing` (Billing / AR) as a real internal role in app role model/parsers/UI.
+- V1A-4 implemented server-side financial gates for invoice lifecycle actions: create draft, save/update draft, issue, void, and send/resend invoice email.
 - Financial authority is now Owner/Admin/Billing for sensitive financial actions listed below.
 - Admin-only authority remains separate from Billing / AR authority.
 
-Locked dependency rule:
+Locked dependency rule (satisfied):
 
-- Financial Ledger / Payments Register implementation remains paused until existing financial access controls are accepted and no additional invoice-lifecycle gating is required for V1.
-- Billing Register V1 UI, payment register mutations, payment correction tools, and broad financial dashboards remain blocked until that resume gate is explicitly accepted.
+- Financial access-control prerequisite for Billing Register resume is satisfied.
+- Billing Register V1 may resume in the next implementation lane under Owner/Admin/Billing authority using the existing financial-access helper and server-side gates.
+- This document still does not authorize Billing Register UI/mutation buildout in this docs pass.
 
 ## Current Role Baseline
 
@@ -212,6 +214,11 @@ Currently protected server-side financial actions (implemented):
 - manual internal invoice payment recording
 - tenant customer payment-link / checkout-session creation
 - invoice ledger CSV export
+- invoice draft create
+- invoice draft update
+- invoice issue
+- invoice void
+- invoice email send/resend
 
 Each sensitive check should verify:
 
@@ -237,29 +244,26 @@ Rules:
 - Every sensitive action/export/read model must enforce the financial capability server-side.
 - Product mode may hide irrelevant workflows but must not grant or deny financial authority.
 
-## Billing Register Dependency Rule
+## Billing Register Resume Gate
 
-Billing Register / Payments Register work remains paused pending explicit resume gate acceptance.
+Billing Register / Payments Register access-control prerequisite is satisfied.
 
-Resume gate requirement:
+Resume posture:
 
-- Existing financial access controls (Owner/Admin/Billing authority and default blocks) are accepted.
-- No additional invoice-lifecycle gating is required for V1 resume.
+- Service Role Controls / Financial Access Controls V1A is complete for the current Billing Register prerequisite.
+- Billing Register V1 may now resume in the next implementation lane.
+- Billing Register implementation must use the existing financial-access helper and server-side gates.
 
-Blocked until resume gate acceptance:
+Still deferred outside this pass:
 
-- Billing Register V1 UI
+- Billing Register V1 UI buildout
 - payment register mutations
 - payment allocation implementation
-- financial exports
-- payment correction tools
 - broad financial dashboard cards
 - Stripe fee work
 - ACH
 - QBO
 - recurring billing
-
-V1A-2 and V1A-3 implementation slices are complete for existing sensitive invoice/payment actions; Billing Register / Payments Register remains a separate resumed lane after the gate above is satisfied.
 
 ## Contractor / Portal Separation
 
@@ -335,17 +339,14 @@ Completed:
 
 - V1A-2 centralized helper and server-side gates for sensitive existing financial actions.
 - V1A-3 Billing / AR role enablement in app role model/parsers/UI and authority grant in financial helper.
+- V1A-4 invoice lifecycle financial gates for draft create/update, issue, void, and email send/resend.
 
-Next-slice decision gate (before Billing Register resume):
+Next lane:
 
-- confirm whether additional invoice lifecycle actions need Owner/Admin/Billing gating for V1:
-	- create draft invoice
-	- update invoice
-	- issue invoice
-	- void/cancel invoice
-	- send/resend invoice email
-
-After that decision, resume Billing Register / Payments Register V1 only through explicit gated implementation slices.
+- Billing Register / Payments Register V1 may resume under the implemented Owner/Admin/Billing financial authority model.
+- Dispatcher/office and technician remain blocked by default from sensitive financial actions unless structural owner authority applies.
+- Billing / AR has financial authority but does not receive Admin/team-management authority by default.
+- Contractor/portal users retain no internal financial authority.
 
 ## Documentation Cross-References
 
@@ -360,6 +361,6 @@ Related active docs:
 
 ## Non-Implementation Boundary
 
-This model spec is now both authority model lock and implementation-closeout reference for V1A-2/V1A-3.
+This model spec is now both authority model lock and implementation-closeout reference for V1A-2/V1A-3/V1A-4.
 
 No schema changes, migrations, Supabase commands, RLS changes, Stripe API calls, env/secret changes, production changes, QBO work, recurring billing implementation, platform fee implementation, ACH UI, Billing Register UI, payment register mutation, or allocation implementation are authorized by this spec unless explicitly opened in a separate approved implementation slice.

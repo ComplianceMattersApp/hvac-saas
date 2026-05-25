@@ -4,17 +4,24 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Ledger / Payments Register V1
 Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, production, recurring billing, platform fee, or ACH UI work is authorized by this spec.
 
-Implementation pause:
+Implementation gate status:
 
-- Service Role Controls / Financial Access Controls V1A-2 and V1A-3 are implemented and documented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md).
-- Financial Ledger / Payments Register implementation remains paused until existing financial access controls are accepted and no further invoice-lifecycle gating is required for V1.
-- Billing Register UI, payment register mutations, payment correction tools, broad financial dashboards, and recurring billing remain blocked until that resume gate is accepted.
+- Service Role Controls / Financial Access Controls V1A-2, V1A-3, and V1A-4 are implemented and documented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md).
+- Financial access-control prerequisite for Billing Register resume is satisfied.
+- Billing Register V1 may resume in the next implementation lane under Owner/Admin/Billing authority using existing financial-access helper/server-side gates.
+- Billing Register UI/actions remain deferred in this pass and are not implemented by this docs closeout.
 
 Current financial access model for sensitive financial actions:
 
 - authorized: structural owner, admin, billing
 - blocked by default: dispatcher/office, technician, contractor/portal users, inactive users, unauthenticated users
-- currently gated server-side actions: manual internal invoice payment recording, tenant customer payment-link/checkout-session creation, and invoice ledger CSV export
+- currently gated server-side actions: manual internal invoice payment recording, tenant customer payment-link/checkout-session creation, invoice ledger CSV export, invoice draft create/update, invoice issue, invoice void, and invoice email send/resend
+
+Role authority posture (implemented):
+
+- allowed: structural owner, admin, billing
+- blocked by default: dispatcher/office, technician, contractor/portal users, inactive users, unauthenticated users
+- Billing / AR has financial authority but is not Admin and does not inherit team/admin settings authority
 - admin-only authority remains separate; Billing / AR is not Admin and does not manage admin settings/team access by default
 
 ## Purpose

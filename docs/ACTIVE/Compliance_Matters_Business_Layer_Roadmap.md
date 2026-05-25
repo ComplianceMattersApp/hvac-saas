@@ -2989,9 +2989,9 @@ For business-layer planning purposes:
 - manual/off-platform payment recording must continue to coexist with Stripe-sourced payment rows
 - Stripe is the payment rail, not the operational source of truth
 - Financial Ledger / Payments Register V1 locks the future model as Payment Register Entry plus Payment Allocation, with invoice paid/balance as a derived projection and failed attempts separated from collected money
-- Service Role Controls / Financial Access Controls V1A-2 and V1A-3 are implemented: Billing / AR is now a valid internal role and sensitive financial authority is structural owner/admin/billing with default blocks for dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users
-- Existing sensitive financial server-side gates are active for manual invoice payment recording, tenant payment-link/checkout-session creation, and invoice ledger CSV export
-- Financial Ledger / Payments Register implementation remains paused until existing controls are accepted and no additional invoice-lifecycle gate is required for V1
+- Service Role Controls / Financial Access Controls V1A-2, V1A-3, and V1A-4 are implemented: Billing / AR is now a valid internal role and sensitive financial authority is structural owner/admin/billing with default blocks for dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users
+- Existing sensitive financial server-side gates are active for manual invoice payment recording, tenant payment-link/checkout-session creation, invoice ledger CSV export, invoice draft create/update, invoice issue, invoice void, and invoice email send/resend
+- Access-control prerequisite for Financial Ledger / Payments Register V1 is satisfied; Billing Register V1 may resume in the next implementation lane under existing helper/server-side gates
 
 ### Locked rule
 Do not use this document to override:
@@ -3006,7 +3006,7 @@ Those belong to the payments roadmap.
 
 ## 15. Billing permissions (planned)
 
-This section is now subordinate to `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`. V1A-2 and V1A-3 are implemented and Billing / AR is now a real internal role with financial authority (not Admin authority). Financial Ledger / Payments Register implementation remains paused until existing controls are accepted and no additional invoice-lifecycle gate is required for V1. Billing Register UI, payment register mutations, payment correction tools, and broad financial dashboards must not proceed from this older planning section alone.
+This section is now subordinate to `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`. V1A-2, V1A-3, and V1A-4 are implemented and Billing / AR is now a real internal role with financial authority (not Admin authority). Access-control prerequisite for Billing Register resume is satisfied; Billing Register V1 may resume in the next implementation lane only through existing financial-access helper/server-side gates. Billing Register UI, payment register mutations, payment correction tools, and broad financial dashboards still require explicit next-lane implementation and must not proceed from this older planning section alone.
 
 ### Office/Admin
 - full invoice management

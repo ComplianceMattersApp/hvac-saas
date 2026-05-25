@@ -31,12 +31,14 @@ Financial Ledger / Payments Register V1 model lock:
 - Stripe is processor truth for Stripe transactions; Compliance Matters is tenant financial operating truth for all money received
 
 Service Role Controls / Financial Access Controls V1A dependency:
-- V1A-2 and V1A-3 are implemented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md)
+- V1A-2, V1A-3, and V1A-4 are implemented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md)
 - Billing / AR is now a valid internal role in app role model/parsers/UI
 - sensitive financial authority now allows structural owner, admin, and billing
 - sensitive financial authority blocks by default: dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users
-- currently protected server-side actions include manual internal invoice payment recording, tenant payment-link/checkout-session creation, and invoice ledger CSV export
-- Billing Register implementation remains paused until these controls are accepted and no additional invoice lifecycle gate is required for V1
+- currently protected server-side actions include manual internal invoice payment recording, tenant payment-link/checkout-session creation, invoice ledger CSV export, invoice draft create/update, invoice issue, invoice void, and invoice email send/resend
+- Billing / AR is not Admin and does not inherit team/admin settings authority
+- access-control prerequisite for Billing Register resume is satisfied; Billing Register V1 may resume in the next implementation lane and must use the existing financial-access helper/server-side gates
+- Billing Register UI/actions are still deferred in this pass and remain next-lane implementation work
 
 ### Meaning
 The app must be built now so that:

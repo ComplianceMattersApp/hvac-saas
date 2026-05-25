@@ -90,15 +90,16 @@ If any item here conflicts with the active spine, the spine wins.
   - source spec: `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
   - future model separates Payment Register Entry, Payment Allocation, Invoice Payment Projection, and Failed Payment Attempt
   - ACH remains hidden/deferred until supported
-- Confirm Service Role Controls / Financial Access Controls V1A-2 and V1A-3 are implemented and accepted:
+- Confirm Service Role Controls / Financial Access Controls V1A-2, V1A-3, and V1A-4 are implemented and accepted:
   - Billing / AR is now a valid internal role in app role model/parsers/UI
   - sensitive financial authority allows structural owner, admin, and billing
   - sensitive financial authority blocks by default dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users
-  - currently protected server-side financial actions include manual internal invoice payment recording, tenant payment-link/checkout-session creation, and invoice ledger CSV export
+  - currently protected server-side financial actions include manual internal invoice payment recording, tenant payment-link/checkout-session creation, invoice ledger CSV export, invoice draft create/update, invoice issue, invoice void, and invoice email send/resend
   - Billing / AR is not Admin and does not manage team access/admin settings unless separately assigned Admin
-- Confirm Financial Ledger / Payments Register implementation remains paused until resume gate acceptance:
+- Confirm Financial Ledger / Payments Register access-control prerequisite is satisfied:
   - source spec: `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`
-  - Billing Register UI, payment register mutations, payment correction tools, broad financial dashboards, and recurring billing remain blocked until existing financial controls are accepted and no further invoice lifecycle gate is required for V1
+  - Billing Register V1 may resume in the next implementation lane under Owner/Admin/Billing and existing helper/server-side gates
+  - Billing Register UI/actions remain deferred in this pass and require a separate implementation lane
 
 ### 2.4 Time Clock lane closeout confirmation (completed)
 - Time Clock V1 through V1.5A is complete for current intended scope.
