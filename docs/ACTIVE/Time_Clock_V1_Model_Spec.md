@@ -270,6 +270,16 @@ V1G closeout status:
 - Add report-center ledger style weekly summary/export.
 - Reuse existing CSV/export conventions and limits.
 
+### V1.5A - reporting/history foundation
+- Add admin-only Time Clock report/history surface with date range, employee, and status filters.
+- Keep this surface historical visibility/export only, not payroll or approval workflow.
+
+V1.5A closeout status:
+- Complete in repository: admin-only `/reports/time-clock` with date range, employee, and status filtering.
+- Includes newest-first historical visibility and simple CSV export using existing Report Center patterns.
+- Report fields include employee, status, clock in/out windows, duration, adjusted indicator, adjustment reason, adjusted by, and adjusted at.
+- Time entry history remains account-scoped and durable; no payroll, overtime, wages, GPS/geofencing, job-costing, contractor, portal, or approval behavior was added.
+
 ---
 
 ## 6) Explicit Non-Goals
