@@ -519,9 +519,6 @@ export default async function ReportCenterDashboardPage({
               </p>
             </div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-600 lg:max-w-[30rem]">
-            Operations, service cases, invoices, and payments stay separate. This page points to the source reports instead of blending those truths together.
-          </div>
         </div>
       </header>
 
