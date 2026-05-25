@@ -109,7 +109,7 @@ describe("resolveSetPasswordDestinationWithFirstOwnerGate", () => {
     expect(decision.target).toBe("/ops/admin");
   });
 
-  it("marker missing + valid internal user routes to /ops", async () => {
+  it("marker missing + valid internal user routes to /today", async () => {
     const supabase = makeSupabase({
       internalUser: {
         user_id: ownerId,
@@ -126,7 +126,7 @@ describe("resolveSetPasswordDestinationWithFirstOwnerGate", () => {
       userMetadata: {},
     });
 
-    expect(decision.target).toBe("/ops");
+    expect(decision.target).toBe("/today");
   });
 
   it("contractor member path remains /portal", async () => {

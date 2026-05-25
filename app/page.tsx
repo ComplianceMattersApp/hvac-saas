@@ -15,5 +15,5 @@ export default async function HomePage() {
 
   if (cu?.contractor_id) redirect("/portal");
 
-  redirect("/ops");
+  redirect("/today");
 }

@@ -2,7 +2,7 @@ import { type BillingMode } from "@/lib/business/internal-business-profile";
 
 const FIRST_OWNER_MARKER_KEY = "first_owner_provisioning_v1";
 
-type RouteTarget = "/portal" | "/ops" | "/ops/admin";
+type RouteTarget = "/portal" | "/today" | "/ops/admin";
 
 type InternalUserRow = {
   user_id: string | null;
@@ -79,7 +79,7 @@ export async function resolveSetPasswordDestinationWithFirstOwnerGate(params: {
 
   if (!hasFirstOwnerMarker(params.userMetadata)) {
     return {
-      target: "/ops",
+      target: "/today",
       reason: "INTERNAL_STANDARD",
     };
   }
