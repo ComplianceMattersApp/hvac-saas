@@ -183,10 +183,9 @@ export default async function PaymentsRegisterPage({
               helperText={`Recorded totals in current view by taxonomy: ${methodMixSummary}`}
               tone="slate"
             />
-            <ReportStatCard label="Visible rows" value={register.rows.length} helperText="Rows rendered with the active filters." />
-            <ReportStatCard label="Recorded" value={recordedRows.length} helperText="Collected payment rows in current view." tone="emerald" />
-            <ReportStatCard label="Failed" value={failedRows.length} helperText="Failed attempt rows separated from collected money." tone="rose" />
+            <ReportStatCard label="Payments shown" value={register.rows.length} helperText="Payments matching the current filters." />
             <ReportStatCard label="Recorded total" value={totalRecordedDisplay} helperText="Sum of visible recorded rows only." tone="blue" />
+            <ReportStatCard label="Recorded" value={recordedRows.length} helperText="Collected payment rows in current view." tone="emerald" />
           </ReportStatGrid>
 
           <ReportFilterPanel
