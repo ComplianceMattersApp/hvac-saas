@@ -2989,7 +2989,9 @@ For business-layer planning purposes:
 - manual/off-platform payment recording must continue to coexist with Stripe-sourced payment rows
 - Stripe is the payment rail, not the operational source of truth
 - Financial Ledger / Payments Register V1 locks the future model as Payment Register Entry plus Payment Allocation, with invoice paid/balance as a derived projection and failed attempts separated from collected money
-- Financial Ledger / Payments Register implementation is paused until Service Role Controls / Financial Access Controls V1A is locked
+- Service Role Controls / Financial Access Controls V1A-2 and V1A-3 are implemented: Billing / AR is now a valid internal role and sensitive financial authority is structural owner/admin/billing with default blocks for dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users
+- Existing sensitive financial server-side gates are active for manual invoice payment recording, tenant payment-link/checkout-session creation, and invoice ledger CSV export
+- Financial Ledger / Payments Register implementation remains paused until existing controls are accepted and no additional invoice-lifecycle gate is required for V1
 
 ### Locked rule
 Do not use this document to override:
@@ -3004,7 +3006,7 @@ Those belong to the payments roadmap.
 
 ## 15. Billing permissions (planned)
 
-This section is now subordinate to `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`. Financial Ledger / Payments Register implementation is paused until that V1A role/access model is locked. Billing Register UI, payment register mutations, financial exports, payment correction tools, and broad financial dashboards must not proceed from this older planning section alone.
+This section is now subordinate to `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`. V1A-2 and V1A-3 are implemented and Billing / AR is now a real internal role with financial authority (not Admin authority). Financial Ledger / Payments Register implementation remains paused until existing controls are accepted and no additional invoice-lifecycle gate is required for V1. Billing Register UI, payment register mutations, payment correction tools, and broad financial dashboards must not proceed from this older planning section alone.
 
 ### Office/Admin
 - full invoice management

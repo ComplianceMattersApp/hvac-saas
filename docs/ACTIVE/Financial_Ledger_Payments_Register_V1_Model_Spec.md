@@ -6,8 +6,16 @@ Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, produc
 
 Implementation pause:
 
-- Financial Ledger / Payments Register implementation is paused until [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md) is locked.
-- Billing Register UI, payment register mutations, financial exports, payment correction tools, broad financial dashboards, and recurring billing remain blocked until that role/access model is accepted.
+- Service Role Controls / Financial Access Controls V1A-2 and V1A-3 are implemented and documented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md).
+- Financial Ledger / Payments Register implementation remains paused until existing financial access controls are accepted and no further invoice-lifecycle gating is required for V1.
+- Billing Register UI, payment register mutations, payment correction tools, broad financial dashboards, and recurring billing remain blocked until that resume gate is accepted.
+
+Current financial access model for sensitive financial actions:
+
+- authorized: structural owner, admin, billing
+- blocked by default: dispatcher/office, technician, contractor/portal users, inactive users, unauthenticated users
+- currently gated server-side actions: manual internal invoice payment recording, tenant customer payment-link/checkout-session creation, and invoice ledger CSV export
+- admin-only authority remains separate; Billing / AR is not Admin and does not manage admin settings/team access by default
 
 ## Purpose
 
