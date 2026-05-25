@@ -174,7 +174,7 @@ export default async function PaymentsRegisterPage({
             <ReportStatCard
               label="Recent payments"
               value={`${viewSnapshot.recentRecordedCount} rows`}
-              helperText={`Latest recorded rows in current view (up to 10): ${viewSnapshot.recentRecordedAmountDisplay}`}
+              helperText={`Latest collected payments in the current view, up to 10 (${viewSnapshot.recentRecordedAmountDisplay}).`}
               tone="slate"
             />
             <ReportStatCard
@@ -185,7 +185,6 @@ export default async function PaymentsRegisterPage({
             />
             <ReportStatCard label="Payments shown" value={register.rows.length} helperText="Payments matching the current filters." />
             <ReportStatCard label="Recorded total" value={totalRecordedDisplay} helperText="Sum of visible recorded rows only." tone="blue" />
-            <ReportStatCard label="Recorded" value={recordedRows.length} helperText="Collected payment rows in current view." tone="emerald" />
           </ReportStatGrid>
 
           <ReportFilterPanel
