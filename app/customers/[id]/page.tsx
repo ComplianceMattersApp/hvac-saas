@@ -45,6 +45,9 @@ import {
   isDisplayableRole,
 } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
+import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/lib/reports/payments-register";
+import { canViewFinancialRegister } from "@/lib/auth/financial-access";
+import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 
 
 type CustomerRow = {
@@ -666,6 +669,33 @@ export default async function CustomerDetailPage(props: {
     }
   }
 
+  // Payment History: load only for authorized financial viewers
+  let customerPaymentHistory: CustomerPaymentHistoryRow[] = [];
+  let canViewPaymentHistory = false;
+
+  if (isInternalViewer) {
+    try {
+      const { internalUser: iu } = await requireInternalUser({ supabase, userId: userData.user.id });
+      canViewPaymentHistory = canViewFinancialRegister({
+        internalUser: iu,
+        resourceAccountOwnerUserId: visibilityScope.accountOwnerUserId,
+      });
+
+      if (canViewPaymentHistory) {
+        customerPaymentHistory = await listCustomerPaymentHistory({
+          supabase,
+          accountOwnerUserId: visibilityScope.accountOwnerUserId,
+          customerId,
+          limit: 50,
+        });
+      }
+    } catch {
+      // Fail safely if read fails
+      customerPaymentHistory = [];
+      canViewPaymentHistory = false;
+    }
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl space-y-7 p-4 md:space-y-8 md:p-6">
@@ -802,6 +832,15 @@ export default async function CustomerDetailPage(props: {
             ))}
           </div>
         </section>
+
+        {/* Payment History (if authorized) */}
+        {canViewPaymentHistory && (
+          <PaymentHistoryCard
+            payments={customerPaymentHistory}
+            customerId={customerId}
+            customerName={customerDisplayName(customer)}
+          />
+        )}
 
         {/* Overview */}
         <section className="grid gap-6 xl:grid-cols-[1.25fr_.9fr]">

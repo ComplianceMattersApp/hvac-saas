@@ -88,6 +88,24 @@ export type PaymentsRegisterResult = {
   truncated: boolean;
 };
 
+export type CustomerPaymentHistoryRow = {
+  paymentId: string;
+  paidAtDisplay: string;
+  status: PaymentsRegisterStatus;
+  statusLabel: string;
+  method: PaymentsRegisterMethod;
+  methodLabel: string;
+  amountCents: number;
+  amountDisplay: string;
+  invoiceNumber: string;
+  invoiceHref: string | null;
+  jobReference: string;
+  jobTitle: string;
+  jobHref: string | null;
+  reference: string;
+  notes: string;
+};
+
 function readParam(source: FilterSource, key: string) {
   if (source instanceof URLSearchParams) {
     return source.get(key) ?? undefined;
@@ -334,6 +352,108 @@ export async function listPaymentsRegisterRows(params: {
     totalCount: rows.length,
     truncated,
   };
+}
+
+export async function listCustomerPaymentHistory(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  customerId: string;
+  limit?: number;
+}): Promise<CustomerPaymentHistoryRow[]> {
+  const limit = params.limit ?? 50;
+
+  // First, find all invoices for this customer
+  const { data: customerInvoices, error: invoiceError } = await params.supabase
+    .from("internal_invoices")
+    .select("id, invoice_number, customer_id")
+    .eq("customer_id", params.customerId);
+
+  if (invoiceError) throw invoiceError;
+
+  const invoiceIds = (customerInvoices ?? [])
+    .map((row: InternalInvoiceRow) => String(row.id ?? "").trim())
+    .filter(Boolean);
+
+  if (!invoiceIds.length) {
+    return [];
+  }
+
+  // Query payments for these invoices, scoped to account
+  const { data: paymentRows, error: paymentError } = await params.supabase
+    .from("internal_invoice_payments")
+    .select("id, invoice_id, job_id, payment_status, payment_method, amount_cents, paid_at, received_reference, notes, created_at")
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .in("invoice_id", invoiceIds)
+    .order("paid_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (paymentError) throw paymentError;
+
+  const payments = (paymentRows ?? []) as InternalInvoicePaymentRow[];
+  if (!payments.length) return [];
+
+  // Fetch related invoices and jobs
+  const jobIds = Array.from(new Set(payments.map((row) => String(row.job_id ?? "").trim()).filter(Boolean)));
+  const invoicesToFetch = Array.from(new Set(payments.map((row) => String(row.invoice_id ?? "").trim()).filter(Boolean)));
+
+  const [jobsResult, invoicesResult] = await Promise.all([
+    params.supabase
+      .from("jobs")
+      .select("id, title")
+      .in("id", jobIds.length ? jobIds : ["00000000-0000-0000-0000-000000000000"]),
+    params.supabase
+      .from("internal_invoices")
+      .select("id, invoice_number")
+      .in("id", invoicesToFetch.length ? invoicesToFetch : ["00000000-0000-0000-0000-000000000000"]),
+  ]);
+
+  if (jobsResult.error) throw jobsResult.error;
+  if (invoicesResult.error) throw invoicesResult.error;
+
+  const jobById = new Map<string, JobRow>();
+  for (const row of (jobsResult.data ?? []) as JobRow[]) {
+    const id = String(row.id ?? "").trim();
+    if (id) jobById.set(id, row);
+  }
+
+  const invoiceById = new Map<string, InternalInvoiceRow>();
+  for (const row of (invoicesResult.data ?? []) as InternalInvoiceRow[]) {
+    const id = String(row.id ?? "").trim();
+    if (id) invoiceById.set(id, row);
+  }
+
+  // Build history rows
+  const rows = payments.map((payment) => {
+    const paymentId = String(payment.id ?? "").trim();
+    const invoiceId = String(payment.invoice_id ?? "").trim();
+    const jobId = String(payment.job_id ?? "").trim();
+    const method = normalizeMethodForRegister(payment.payment_method);
+    const status = normalizeStatus(payment.payment_status);
+    const invoice = invoiceById.get(invoiceId);
+
+    const row: CustomerPaymentHistoryRow = {
+      paymentId,
+      paidAtDisplay: formatTimestampDisplay(payment.paid_at),
+      status,
+      statusLabel: formatStatusLabel(status),
+      method,
+      methodLabel: formatMethodLabel(method),
+      amountCents: Number(payment.amount_cents ?? 0) || 0,
+      amountDisplay: formatCurrencyCents(payment.amount_cents),
+      invoiceNumber: String(invoice?.invoice_number ?? "").trim() || shortReference(invoiceId),
+      invoiceHref: jobId ? `/jobs/${jobId}/invoice` : null,
+      jobReference: shortReference(jobId),
+      jobTitle: String(jobById.get(jobId)?.title ?? "").trim() || "-",
+      jobHref: jobId ? `/jobs/${jobId}` : null,
+      reference: String(payment.received_reference ?? "").trim() || "-",
+      notes: String(payment.notes ?? "").trim() || "-",
+    };
+
+    return row;
+  });
+
+  return rows;
 }
 
 function csvEscape(value: string) {

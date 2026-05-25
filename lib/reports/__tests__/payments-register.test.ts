@@ -6,6 +6,7 @@ import {
   normalizeMethodForRegister,
   parsePaymentsRegisterFilters,
   type PaymentsRegisterRow,
+  type CustomerPaymentHistoryRow,
 } from "@/lib/reports/payments-register";
 
 describe("payments register helper", () => {
@@ -184,5 +185,88 @@ describe("payments register helper", () => {
     expect(csv).toContain('"Smith, ""The Owner"""');
     // Notes field with newline and quote should be escaped
     expect(csv).toContain('"Quote:\n""Payment received in full"""');
+  });
+});
+
+describe("customer payment history", () => {
+  it("customer payment history row includes all required fields", () => {
+    const row: CustomerPaymentHistoryRow = {
+      paymentId: "pay-cust-1",
+      paidAtDisplay: "May 24, 2026",
+      status: "recorded",
+      statusLabel: "Recorded",
+      method: "online_stripe",
+      methodLabel: "Online / Stripe",
+      amountCents: 50000,
+      amountDisplay: "$500.00",
+      invoiceNumber: "INV-001",
+      invoiceHref: "/jobs/job-1/invoice",
+      jobReference: "job-abc",
+      jobTitle: "AC Repair",
+      jobHref: "/jobs/job-1",
+      reference: "ref-123",
+      notes: "Payment noted",
+    };
+
+    expect(row.paymentId).toBe("pay-cust-1");
+    expect(row.status).toBe("recorded");
+    expect(row.method).toBe("online_stripe");
+    expect(row.amountCents).toBe(50000);
+  });
+
+  it("customer payment history correctly normalizes payment methods", () => {
+    // Verify ACH is never exposed in customer history
+    const achedNormalized = normalizeMethodForRegister("ach_off_platform");
+    expect(achedNormalized).toBe("other");
+
+    // Verify standard methods map correctly
+    expect(normalizeMethodForRegister("card_stripe_online")).toBe("online_stripe");
+    expect(normalizeMethodForRegister("card_off_platform")).toBe("card");
+    expect(normalizeMethodForRegister("check")).toBe("check");
+    expect(normalizeMethodForRegister("cash")).toBe("cash");
+    expect(normalizeMethodForRegister("bank_transfer")).toBe("digital");
+  });
+
+  it("customer payment history row type can include both recorded and failed payments", () => {
+    const recorded: CustomerPaymentHistoryRow = {
+      paymentId: "rec-1",
+      paidAtDisplay: "May 20, 2026",
+      status: "recorded",
+      statusLabel: "Recorded",
+      method: "check",
+      methodLabel: "Check",
+      amountCents: 100000,
+      amountDisplay: "$1,000.00",
+      invoiceNumber: "INV-100",
+      invoiceHref: "/jobs/job-100/invoice",
+      jobReference: "job-100",
+      jobTitle: "Service",
+      jobHref: "/jobs/job-100",
+      reference: "Check #1",
+      notes: "Check received",
+    };
+
+    const failed: CustomerPaymentHistoryRow = {
+      paymentId: "fail-1",
+      paidAtDisplay: "May 19, 2026",
+      status: "failed",
+      statusLabel: "Failed",
+      method: "online_stripe",
+      methodLabel: "Online / Stripe",
+      amountCents: 75000,
+      amountDisplay: "$750.00",
+      invoiceNumber: "INV-101",
+      invoiceHref: "/jobs/job-101/invoice",
+      jobReference: "job-101",
+      jobTitle: "Emergency",
+      jobHref: "/jobs/job-101",
+      reference: "stripe_fail_456",
+      notes: "Card declined",
+    };
+
+    expect(recorded.status).toBe("recorded");
+    expect(failed.status).toBe("failed");
+    expect(recorded.statusLabel).toBe("Recorded");
+    expect(failed.statusLabel).toBe("Failed");
   });
 });
