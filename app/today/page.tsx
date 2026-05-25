@@ -440,7 +440,7 @@ function chipToneClass(chip: PriorityChip): string {
 }
 
 // -----------------------------------------------------------------------------
-// Follow-Up Center
+// Action Center
 // -----------------------------------------------------------------------------
 
 function FollowUpSection({
@@ -455,10 +455,10 @@ function FollowUpSection({
       <div className="flex items-end justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Follow-Up Center
+            Action Center
           </div>
           <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-            Stuck work
+            Work that needs a next step
           </h2>
         </div>
         {desktop ? (
@@ -469,7 +469,7 @@ function FollowUpSection({
       </div>
 
       {groups.length === 0 ? (
-        <EmptyState message="No follow-ups waiting right now." />
+        <EmptyState message="No next-step work waiting right now." />
       ) : (
         <ul className="mt-3 space-y-2">
           {groups.map((group) => (

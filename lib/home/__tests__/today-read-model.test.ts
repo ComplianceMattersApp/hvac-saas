@@ -380,8 +380,24 @@ describe("buildFollowUpGroups", () => {
     });
 
     expect(groups.find((g) => g.key === "scheduling")?.count).toBe(12);
+    expect(groups.find((g) => g.key === "scheduling")?.label).toBe("Needs Scheduling");
     expect(groups.find((g) => g.key === "closeout")?.count).toBe(4);
+    expect(groups.find((g) => g.key === "closeout")?.label).toBe("Closeout & Review");
     expect(groups.find((g) => g.key === "payments")?.count).toBe(1);
+    expect(groups.find((g) => g.key === "payments")?.label).toBe("Payment Follow-Up");
+  });
+
+  it("labels service plan group as follow-up", () => {
+    const groups = buildFollowUpGroups({
+      role: "admin",
+      followUps: [],
+      priorityCounts: baseCounts,
+      servicePlansOverdue: 2,
+      openInvoiceCount: 0,
+      canViewBusinessPulse: true,
+    });
+
+    expect(groups.find((g) => g.key === "service_plans")?.label).toBe("Service Plan Follow-Up");
   });
 });
 

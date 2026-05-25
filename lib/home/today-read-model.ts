@@ -1163,7 +1163,7 @@ export function buildFollowUpGroups(params: {
   if (schedulingCount > 0 || schedulingItems.length > 0) {
     groups.push({
       key: "scheduling",
-      label: "Scheduling",
+      label: "Needs Scheduling",
       count: schedulingCount > 0 ? schedulingCount : schedulingItems.length,
       href: "/ops/call-list",
       preview: schedulingItems.slice(0, 3),
@@ -1175,7 +1175,7 @@ export function buildFollowUpGroups(params: {
   if (closeoutCount > 0 || closeoutItems.length > 0) {
     groups.push({
       key: "closeout",
-      label: "Closeout",
+      label: "Closeout & Review",
       count: closeoutCount > 0 ? closeoutCount : closeoutItems.length,
       href: "/ops/closeout-queue",
       preview: closeoutItems.slice(0, 3),
@@ -1210,7 +1210,7 @@ export function buildFollowUpGroups(params: {
   if ((params.servicePlansOverdue ?? 0) > 0 && params.role !== "tech") {
     groups.push({
       key: "service_plans",
-      label: "Service Plans",
+      label: "Service Plan Follow-Up",
       count: params.servicePlansOverdue ?? 0,
       href: "/service-plans",
       preview: [],
@@ -1221,7 +1221,7 @@ export function buildFollowUpGroups(params: {
   if (params.canViewBusinessPulse && (params.openInvoiceCount ?? 0) > 0) {
     groups.push({
       key: "payments",
-      label: "Payments",
+      label: "Payment Follow-Up",
       count: params.openInvoiceCount ?? 0,
       href: "/reports/payments",
       preview: [],
