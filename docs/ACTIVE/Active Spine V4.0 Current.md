@@ -29,6 +29,9 @@ Group 9A-9E closeout is now recorded there: agreement default Work Items persist
 **Financial Ledger / Payments Register V1 Model Lock:**
 The bookkeeping-ready payment register and allocation model is locked in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md). Current `internal_invoice_payments` remains today's invoice-bound collected-payment truth, while future register work must separate Payment Register Entry, Payment Allocation, Invoice Payment Projection, and Failed Payment Attempt. Stripe remains processor truth for Stripe transactions; Compliance Matters remains tenant financial operating truth for all money received. ACH, QBO sync, refunds/disputes, platform fees, saved cards, full accounting ledger, customer portal self-service, and recurring billing execution remain deferred.
 
+**Service Role Controls / Financial Access Controls V1A Model Lock:**
+Financial Ledger / Payments Register implementation is paused until [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md) is locked. Billing Register UI, payment register mutations, financial exports, payment correction tools, broad financial dashboards, and recurring billing remain blocked until the role/access model is accepted as implementation authority.
+
 **Owner-Completion Cycle Closeout (May 2026):** All areas in the owner-release completion matrix are confirmed closed at current quality bar. Next work is treated as post-launch/future-roadmap work unless the owner explicitly reopens a release-scope item. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical decision surface.
 
 Recent closeout snapshot (May 2026):

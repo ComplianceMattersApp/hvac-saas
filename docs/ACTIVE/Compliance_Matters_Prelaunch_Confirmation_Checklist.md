@@ -90,6 +90,9 @@ If any item here conflicts with the active spine, the spine wins.
   - source spec: `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
   - future model separates Payment Register Entry, Payment Allocation, Invoice Payment Projection, and Failed Payment Attempt
   - ACH remains hidden/deferred until supported
+- Confirm Financial Ledger / Payments Register implementation remains paused until Service Role Controls / Financial Access Controls V1A is locked:
+  - source spec: `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`
+  - Billing Register UI, payment register mutations, financial exports, payment correction tools, broad financial dashboards, and recurring billing remain blocked until the role/access model is accepted
 
 ### 2.4 Time Clock lane closeout confirmation (completed)
 - Time Clock V1 through V1.5A is complete for current intended scope.

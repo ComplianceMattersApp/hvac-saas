@@ -2975,6 +2975,7 @@ This roadmap does not define payment processor architecture.
 That direction is owned by:
 - `docs/ACTIVE/Compliance_Matters_Payments_Roadmap.md`
 - `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
+- `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`
 
 ### Business-layer meaning of payments
 For business-layer planning purposes:
@@ -2988,6 +2989,7 @@ For business-layer planning purposes:
 - manual/off-platform payment recording must continue to coexist with Stripe-sourced payment rows
 - Stripe is the payment rail, not the operational source of truth
 - Financial Ledger / Payments Register V1 locks the future model as Payment Register Entry plus Payment Allocation, with invoice paid/balance as a derived projection and failed attempts separated from collected money
+- Financial Ledger / Payments Register implementation is paused until Service Role Controls / Financial Access Controls V1A is locked
 
 ### Locked rule
 Do not use this document to override:
@@ -3001,6 +3003,8 @@ Those belong to the payments roadmap.
 ---
 
 ## 15. Billing permissions (planned)
+
+This section is now subordinate to `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`. Financial Ledger / Payments Register implementation is paused until that V1A role/access model is locked. Billing Register UI, payment register mutations, financial exports, payment correction tools, and broad financial dashboards must not proceed from this older planning section alone.
 
 ### Office/Admin
 - full invoice management

@@ -4,6 +4,11 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Ledger / Payments Register V1
 Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, production, recurring billing, platform fee, or ACH UI work is authorized by this spec.
 
+Implementation pause:
+
+- Financial Ledger / Payments Register implementation is paused until [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md) is locked.
+- Billing Register UI, payment register mutations, financial exports, payment correction tools, broad financial dashboards, and recurring billing remain blocked until that role/access model is accepted.
+
 ## Purpose
 
 Financial Ledger / Payments Register V1 defines the bookkeeping-ready payment tracking model for Compliance Matters Software before recurring maintenance billing, deeper financial dashboards, QBO sync, or advanced payment workflows are built.

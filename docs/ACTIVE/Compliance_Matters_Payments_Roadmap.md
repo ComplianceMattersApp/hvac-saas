@@ -30,6 +30,10 @@ Financial Ledger / Payments Register V1 model lock:
 - future financial reporting must distinguish Payment Register Entry, Payment Allocation, Invoice Payment Projection, and Failed Payment Attempt
 - Stripe is processor truth for Stripe transactions; Compliance Matters is tenant financial operating truth for all money received
 
+Service Role Controls / Financial Access Controls V1A dependency:
+- Financial Ledger / Payments Register implementation is paused until [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md) is locked
+- Billing Register UI, payment register mutations, financial exports, payment correction tools, broad financial dashboards, and recurring billing remain blocked until financial access controls are accepted as implementation authority
+
 ### Meaning
 The app must be built now so that:
 - payment tracking works without processor dependency
