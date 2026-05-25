@@ -106,6 +106,29 @@ export type CustomerPaymentHistoryRow = {
   notes: string;
 };
 
+export type PaymentsRegisterMethodMixRow = {
+  method: PaymentsRegisterMethod;
+  methodLabel: string;
+  count: number;
+  amountCents: number;
+  amountDisplay: string;
+};
+
+export type PaymentsRegisterViewSnapshot = {
+  failedAttemptsCount: number;
+  recentRecordedCount: number;
+  recentRecordedAmountCents: number;
+  recentRecordedAmountDisplay: string;
+  methodMix: PaymentsRegisterMethodMixRow[];
+};
+
+export type PaymentsRegisterHeadlineSnapshot = {
+  receivedThisMonthCents: number;
+  receivedThisMonthDisplay: string;
+  receivedLast30DaysCents: number;
+  receivedLast30DaysDisplay: string;
+};
+
 function readParam(source: FilterSource, key: string) {
   if (source instanceof URLSearchParams) {
     return source.get(key) ?? undefined;
@@ -124,6 +147,31 @@ function addOneDay(dateYmd: string) {
   const [year, month, day] = dateYmd.split("-").map(Number);
   const next = new Date(Date.UTC(year, month - 1, day + 1, 12, 0, 0));
   return next.toISOString().slice(0, 10);
+}
+
+function shiftYmdByDays(dateYmd: string, days: number) {
+  const [year, month, day] = dateYmd.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days, 12, 0, 0));
+  return shifted.toISOString().slice(0, 10);
+}
+
+function monthStartYmd(dateYmd: string) {
+  return `${dateYmd.slice(0, 7)}-01`;
+}
+
+function nextMonthStartYmd(dateYmd: string) {
+  const [year, month] = dateYmd.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month, 1, 12, 0, 0));
+  return shifted.toISOString().slice(0, 10);
+}
+
+function dateYmdInLa(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
 }
 
 function normalizeStatus(value: unknown): PaymentsRegisterStatus {
@@ -215,6 +263,85 @@ export function buildPaymentsRegisterSearchParams(filters: PaymentsRegisterFilte
   if (filters.toDate) params.set("to", filters.toDate);
   if (filters.query) params.set("q", filters.query);
   return params;
+}
+
+function sumAmountCents(rows: Array<{ amount_cents: number | null | undefined }>) {
+  return rows.reduce((sum, row) => sum + (Number(row.amount_cents ?? 0) || 0), 0);
+}
+
+export function buildPaymentsRegisterViewSnapshot(params: {
+  rows: PaymentsRegisterRow[];
+  recentLimit?: number;
+}): PaymentsRegisterViewSnapshot {
+  const recentLimit = params.recentLimit ?? 10;
+
+  const recordedRows = params.rows.filter((row) => row.status === "recorded");
+  const failedRows = params.rows.filter((row) => row.status === "failed");
+  const recentRecordedRows = recordedRows.slice(0, Math.max(0, recentLimit));
+
+  const methodMix = PAYMENTS_REGISTER_METHOD_OPTIONS.map((option) => {
+    const methodRows = recordedRows.filter((row) => row.method === option.value);
+    const amountCents = methodRows.reduce((sum, row) => sum + row.amountCents, 0);
+    return {
+      method: option.value,
+      methodLabel: option.label,
+      count: methodRows.length,
+      amountCents,
+      amountDisplay: formatCurrencyCents(amountCents),
+    };
+  });
+
+  const recentRecordedAmountCents = recentRecordedRows.reduce((sum, row) => sum + row.amountCents, 0);
+
+  return {
+    failedAttemptsCount: failedRows.length,
+    recentRecordedCount: recentRecordedRows.length,
+    recentRecordedAmountCents,
+    recentRecordedAmountDisplay: formatCurrencyCents(recentRecordedAmountCents),
+    methodMix,
+  };
+}
+
+export async function readPaymentsRegisterHeadlineSnapshot(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  now?: Date;
+}): Promise<PaymentsRegisterHeadlineSnapshot> {
+  const nowYmd = dateYmdInLa(params.now);
+  const monthStart = monthStartYmd(nowYmd);
+  const nextMonthStart = nextMonthStartYmd(nowYmd);
+  const last30DaysStart = shiftYmdByDays(nowYmd, -29);
+  const tomorrow = addOneDay(nowYmd);
+
+  const [monthResult, last30Result] = await Promise.all([
+    params.supabase
+      .from("internal_invoice_payments")
+      .select("amount_cents")
+      .eq("account_owner_user_id", params.accountOwnerUserId)
+      .eq("payment_status", "recorded")
+      .gte("paid_at", laDateToUtcMidnightIso(monthStart))
+      .lt("paid_at", laDateToUtcMidnightIso(nextMonthStart)),
+    params.supabase
+      .from("internal_invoice_payments")
+      .select("amount_cents")
+      .eq("account_owner_user_id", params.accountOwnerUserId)
+      .eq("payment_status", "recorded")
+      .gte("paid_at", laDateToUtcMidnightIso(last30DaysStart))
+      .lt("paid_at", laDateToUtcMidnightIso(tomorrow)),
+  ]);
+
+  if (monthResult.error) throw monthResult.error;
+  if (last30Result.error) throw last30Result.error;
+
+  const receivedThisMonthCents = sumAmountCents((monthResult.data ?? []) as Array<{ amount_cents: number | null }>);
+  const receivedLast30DaysCents = sumAmountCents((last30Result.data ?? []) as Array<{ amount_cents: number | null }>);
+
+  return {
+    receivedThisMonthCents,
+    receivedThisMonthDisplay: formatCurrencyCents(receivedThisMonthCents),
+    receivedLast30DaysCents,
+    receivedLast30DaysDisplay: formatCurrencyCents(receivedLast30DaysCents),
+  };
 }
 
 function matchesQuery(row: PaymentsRegisterRow, query: string) {

@@ -25,9 +25,11 @@ import {
   PAYMENTS_REGISTER_METHOD_OPTIONS,
   PAYMENTS_REGISTER_PAGE_LIMIT,
   PAYMENTS_REGISTER_STATUS_OPTIONS,
+  buildPaymentsRegisterViewSnapshot,
   buildPaymentsRegisterSearchParams,
   listPaymentsRegisterRows,
   parsePaymentsRegisterFilters,
+  readPaymentsRegisterHeadlineSnapshot,
 } from "@/lib/reports/payments-register";
 
 export const metadata = {
@@ -87,14 +89,28 @@ export default async function PaymentsRegisterPage({
 
   const usesInternalInvoicing = billingMode === "internal_invoicing";
 
-  const register = usesInternalInvoicing
-    ? await listPaymentsRegisterRows({
-        supabase,
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        filters,
-        limit: PAYMENTS_REGISTER_PAGE_LIMIT,
-      })
-    : { rows: [], totalCount: 0, truncated: false };
+  const [register, headlineSnapshot] = usesInternalInvoicing
+    ? await Promise.all([
+        listPaymentsRegisterRows({
+          supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          filters,
+          limit: PAYMENTS_REGISTER_PAGE_LIMIT,
+        }),
+        readPaymentsRegisterHeadlineSnapshot({
+          supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+        }),
+      ])
+    : [
+        { rows: [], totalCount: 0, truncated: false },
+        {
+          receivedThisMonthCents: 0,
+          receivedThisMonthDisplay: "$0.00",
+          receivedLast30DaysCents: 0,
+          receivedLast30DaysDisplay: "$0.00",
+        },
+      ];
 
   const recordedRows = register.rows.filter((row) => row.status === "recorded");
   const failedRows = register.rows.filter((row) => row.status === "failed");
@@ -106,6 +122,11 @@ export default async function PaymentsRegisterPage({
     style: "currency",
     currency: "USD",
   }).format(totalRecordedCents / 100);
+
+  const viewSnapshot = buildPaymentsRegisterViewSnapshot({ rows: register.rows, recentLimit: 10 });
+  const methodMixSummary = viewSnapshot.methodMix
+    .map((row) => `${row.methodLabel}: ${row.amountDisplay}`)
+    .join(" | ");
 
   return (
     <div className={reportPageClass}>
@@ -132,6 +153,36 @@ export default async function PaymentsRegisterPage({
       ) : (
         <>
           <ReportStatGrid>
+            <ReportStatCard
+              label="Received this month"
+              value={headlineSnapshot.receivedThisMonthDisplay}
+              helperText="Recorded payments only. Current calendar month; not filter-dependent."
+              tone="emerald"
+            />
+            <ReportStatCard
+              label="Received last 30 days"
+              value={headlineSnapshot.receivedLast30DaysDisplay}
+              helperText="Recorded payments only. Rolling 30-day snapshot; not filter-dependent."
+              tone="blue"
+            />
+            <ReportStatCard
+              label="Failed attempts"
+              value={viewSnapshot.failedAttemptsCount}
+              helperText="Failed rows in current view/filter window; never counted as collected money."
+              tone="rose"
+            />
+            <ReportStatCard
+              label="Recent payments"
+              value={`${viewSnapshot.recentRecordedCount} rows`}
+              helperText={`Latest recorded rows in current view (up to 10): ${viewSnapshot.recentRecordedAmountDisplay}`}
+              tone="slate"
+            />
+            <ReportStatCard
+              label="Method mix"
+              value={recordedRows.length}
+              helperText={`Recorded totals in current view by taxonomy: ${methodMixSummary}`}
+              tone="slate"
+            />
             <ReportStatCard label="Visible rows" value={register.rows.length} helperText="Rows rendered with the active filters." />
             <ReportStatCard label="Recorded" value={recordedRows.length} helperText="Collected payment rows in current view." tone="emerald" />
             <ReportStatCard label="Failed" value={failedRows.length} helperText="Failed attempt rows separated from collected money." tone="rose" />

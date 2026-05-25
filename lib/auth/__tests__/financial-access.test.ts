@@ -204,6 +204,75 @@ describe('financial access helper', () => {
     ).toThrow('REDIRECT:/reports/payments?banner=not_authorized');
   });
 
+  it('register view remains Owner/Admin/Billing only', () => {
+    expect(
+      canViewFinancialRegister({
+        actorUserId: 'owner-1',
+        internalUser: {
+          user_id: 'owner-1',
+          role: 'office',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      canViewFinancialRegister({
+        actorUserId: 'admin-1',
+        internalUser: {
+          user_id: 'admin-1',
+          role: 'admin',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      canViewFinancialRegister({
+        actorUserId: 'billing-1',
+        internalUser: {
+          user_id: 'billing-1',
+          role: 'billing',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(true);
+
+    expect(
+      canViewFinancialRegister({
+        actorUserId: 'dispatcher-1',
+        internalUser: {
+          user_id: 'dispatcher-1',
+          role: 'dispatcher',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      canViewFinancialRegister({
+        actorUserId: 'tech-1',
+        internalUser: {
+          user_id: 'tech-1',
+          role: 'tech',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      canViewFinancialRegister({
+        actorUserId: 'contractor-1',
+        internalUser: null,
+      }),
+    ).toBe(false);
+  });
+
   it('contractor/non-internal fails route-friendly response check', () => {
     const contractorResponse = requireFinancialExportAccessOrResponse({
       actorUserId: 'contractor-user-1',

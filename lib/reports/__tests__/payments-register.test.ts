@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   PAYMENTS_REGISTER_METHOD_OPTIONS,
+  buildPaymentsRegisterViewSnapshot,
   buildPaymentsRegisterCsv,
   buildPaymentsRegisterSearchParams,
   normalizeMethodForRegister,
@@ -185,6 +186,113 @@ describe("payments register helper", () => {
     expect(csv).toContain('"Smith, ""The Owner"""');
     // Notes field with newline and quote should be escaped
     expect(csv).toContain('"Quote:\n""Payment received in full"""');
+  });
+
+  it("builds view snapshot with recorded-only totals and failed-attempt separation", () => {
+    const rows: PaymentsRegisterRow[] = [
+      {
+        paymentId: "r1",
+        paidAtDisplay: "May 24, 2026",
+        status: "recorded",
+        statusLabel: "Recorded",
+        method: "online_stripe",
+        methodLabel: "Online / Stripe",
+        amountCents: 10000,
+        amountDisplay: "$100.00",
+        customerName: "Customer A",
+        customerHref: null,
+        invoiceNumber: "INV-1",
+        invoiceHref: null,
+        jobReference: "job-1",
+        jobTitle: "Job 1",
+        jobHref: null,
+        reference: "ref-1",
+        notes: "-",
+      },
+      {
+        paymentId: "f1",
+        paidAtDisplay: "May 24, 2026",
+        status: "failed",
+        statusLabel: "Failed",
+        method: "online_stripe",
+        methodLabel: "Online / Stripe",
+        amountCents: 20000,
+        amountDisplay: "$200.00",
+        customerName: "Customer B",
+        customerHref: null,
+        invoiceNumber: "INV-2",
+        invoiceHref: null,
+        jobReference: "job-2",
+        jobTitle: "Job 2",
+        jobHref: null,
+        reference: "ref-2",
+        notes: "-",
+      },
+      {
+        paymentId: "r2",
+        paidAtDisplay: "May 23, 2026",
+        status: "recorded",
+        statusLabel: "Recorded",
+        method: "other",
+        methodLabel: "Other",
+        amountCents: 30000,
+        amountDisplay: "$300.00",
+        customerName: "Customer C",
+        customerHref: null,
+        invoiceNumber: "INV-3",
+        invoiceHref: null,
+        jobReference: "job-3",
+        jobTitle: "Job 3",
+        jobHref: null,
+        reference: "ref-3",
+        notes: "-",
+      },
+    ];
+
+    const snapshot = buildPaymentsRegisterViewSnapshot({ rows, recentLimit: 10 });
+
+    expect(snapshot.failedAttemptsCount).toBe(1);
+    expect(snapshot.recentRecordedCount).toBe(2);
+    expect(snapshot.recentRecordedAmountCents).toBe(40000);
+    expect(snapshot.recentRecordedAmountDisplay).toBe("$400.00");
+
+    const onlineStripe = snapshot.methodMix.find((row) => row.method === "online_stripe");
+    const other = snapshot.methodMix.find((row) => row.method === "other");
+    expect(onlineStripe?.amountCents).toBe(10000);
+    expect(onlineStripe?.count).toBe(1);
+    expect(other?.amountCents).toBe(30000);
+    expect(other?.count).toBe(1);
+  });
+
+  it("method mix totals stay in V1 taxonomy and keep ACH hidden as other", () => {
+    const rows: PaymentsRegisterRow[] = [
+      {
+        paymentId: "r-ach",
+        paidAtDisplay: "May 22, 2026",
+        status: "recorded",
+        statusLabel: "Recorded",
+        method: normalizeMethodForRegister("ach_off_platform"),
+        methodLabel: "Other",
+        amountCents: 12500,
+        amountDisplay: "$125.00",
+        customerName: "Customer D",
+        customerHref: null,
+        invoiceNumber: "INV-4",
+        invoiceHref: null,
+        jobReference: "job-4",
+        jobTitle: "Job 4",
+        jobHref: null,
+        reference: "ref-4",
+        notes: "-",
+      },
+    ];
+
+    const snapshot = buildPaymentsRegisterViewSnapshot({ rows, recentLimit: 10 });
+    const other = snapshot.methodMix.find((row) => row.method === "other");
+
+    expect(rows[0].method).toBe("other");
+    expect(other?.amountCents).toBe(12500);
+    expect(snapshot.methodMix.some((row) => row.method === ("ach_off_platform" as any))).toBe(false);
   });
 });
 
