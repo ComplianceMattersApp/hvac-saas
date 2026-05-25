@@ -62,7 +62,7 @@ export default async function OpsWithoutTechQueuePage() {
   const { data: assignmentRows, error: assignmentError } = jobIds.length
     ? await supabase
         .from("job_assignments")
-        .select("job_id, user_id, is_primary, is_active, deleted_at, removed_at")
+        .select("job_id, user_id, is_primary, is_active")
         .eq("is_active", true)
         .in("job_id", jobIds)
     : { data: [], error: null };
