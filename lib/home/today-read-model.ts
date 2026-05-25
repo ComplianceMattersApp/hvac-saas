@@ -117,7 +117,14 @@ export type FollowUpItem = {
 };
 
 export type FollowUpGroup = {
-  key: "scheduling" | "closeout" | "waiting" | "exceptions" | "service_plans" | "payments";
+  key:
+    | "scheduling"
+    | "without_tech"
+    | "closeout"
+    | "waiting"
+    | "exceptions"
+    | "service_plans"
+    | "payments";
   label: string;
   count: number;
   href: string;
@@ -958,7 +965,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
         productMode === "ecc_hers"
           ? "Compliance exceptions are blocking clean throughput."
           : "Failed or escalated jobs are blocking throughput.",
-      primaryHref: "/ops?bucket=failed",
+      primaryHref: "/ops/queues/exceptions",
       primaryLabel: "Review Exceptions",
       focusKey: "exceptions",
     };
@@ -969,7 +976,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       kind: "dispatcher_schedule",
       headline: `${priorityCounts.scheduledTodayWithoutTech} scheduled ${priorityCounts.scheduledTodayWithoutTech === 1 ? "visit is" : "visits are"} unassigned`,
       detail: "Dispatch coverage is missing for work already on today’s board.",
-      primaryHref: "/ops/field",
+      primaryHref: "/ops/queues/without-tech",
       primaryLabel: "Assign Technicians",
       focusKey: "without_tech",
     };
@@ -1002,7 +1009,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       kind: "follow_up",
       headline: `${waitingCount} waiting item${waitingCount === 1 ? "" : "s"} need follow-up`,
       detail: "Pending info and on-hold work need office attention.",
-      primaryHref: "/ops?bucket=pending_info",
+      primaryHref: "/ops/queues/waiting",
       primaryLabel: "Review Waiting Work",
       focusKey: "waiting",
     };
@@ -1159,7 +1166,20 @@ export function buildFollowUpGroups(params: {
 
   const groups: FollowUpGroup[] = [];
 
-  const schedulingCount = (params.priorityCounts.needScheduling ?? 0) + (params.priorityCounts.scheduledTodayWithoutTech ?? 0);
+  const schedulingCount = params.priorityCounts.needScheduling ?? 0;
+  const withoutTechCount = params.priorityCounts.scheduledTodayWithoutTech ?? 0;
+
+  if (withoutTechCount > 0) {
+    groups.push({
+      key: "without_tech",
+      label: "Without Tech",
+      count: withoutTechCount,
+      href: "/ops/queues/without-tech",
+      preview: [],
+      summary: `${withoutTechCount} scheduled ${withoutTechCount === 1 ? "job is" : "jobs are"} missing assignment.`,
+    });
+  }
+
   if (schedulingCount > 0 || schedulingItems.length > 0) {
     groups.push({
       key: "scheduling",
@@ -1189,7 +1209,7 @@ export function buildFollowUpGroups(params: {
       key: "waiting",
       label: "Waiting / Pending Info",
       count: waitingCount > 0 ? waitingCount : waitingItems.length,
-      href: "/ops?bucket=pending_info",
+      href: "/ops/queues/waiting",
       preview: waitingItems.slice(0, 3),
       summary: null,
     });
@@ -1201,7 +1221,7 @@ export function buildFollowUpGroups(params: {
       key: "exceptions",
       label: "Exceptions",
       count: exceptionCount > 0 ? exceptionCount : exceptionItems.length,
-      href: "/ops?bucket=failed",
+      href: "/ops/queues/exceptions",
       preview: exceptionItems.slice(0, 3),
       summary: null,
     });
@@ -1271,7 +1291,7 @@ export function buildPriorityChips(params: {
       key: "without_tech",
       label: "Without Tech",
       count: params.priorityCounts.scheduledTodayWithoutTech ?? 0,
-      href: "/ops/field",
+      href: "/ops/queues/without-tech",
       tone: "warn",
       urgent: true,
     });
@@ -1282,7 +1302,7 @@ export function buildPriorityChips(params: {
       key: "exceptions",
       label: "Needs Attention",
       count: params.priorityCounts.failed ?? 0,
-      href: "/ops?bucket=failed",
+      href: "/ops/queues/exceptions",
       tone: "danger",
       urgent: true,
     });
@@ -1293,7 +1313,7 @@ export function buildPriorityChips(params: {
       key: "waiting",
       label: "Waiting on Info",
       count: params.priorityCounts.pendingInfo ?? 0,
-      href: "/ops?bucket=pending_info",
+      href: "/ops/queues/waiting",
       tone: "neutral",
       urgent: false,
     });
@@ -1304,7 +1324,7 @@ export function buildPriorityChips(params: {
       key: "on_hold",
       label: "On Hold",
       count: params.priorityCounts.onHold ?? 0,
-      href: "/ops?bucket=on_hold",
+      href: "/ops/queues/waiting",
       tone: "neutral",
       urgent: false,
     });

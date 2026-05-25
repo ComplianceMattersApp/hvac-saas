@@ -114,7 +114,6 @@ export default async function TodayPage() {
         </div>
       </div>
 
-      <PreviewFooter />
     </div>
   );
 }
@@ -777,14 +776,6 @@ function EmptyState({ message }: { message: string }) {
   return (
     <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-sm text-slate-600">
       {message}
-    </div>
-  );
-}
-
-function PreviewFooter() {
-  return (
-    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2 text-[11px] uppercase tracking-[0.1em] text-slate-500">
-      Preview · Today V1 Phase 1 — not the default landing surface yet.
     </div>
   );
 }
