@@ -165,6 +165,7 @@ export default async function PaymentsRegisterPage({
               helperText="Recorded payments only. Rolling 30-day snapshot; not filter-dependent."
               tone="blue"
             />
+            <ReportStatCard label="Recorded total" value={totalRecordedDisplay} helperText="Sum of visible recorded rows only." tone="blue" />
             <ReportStatCard
               label="Failed attempts"
               value={viewSnapshot.failedAttemptsCount}
@@ -184,7 +185,6 @@ export default async function PaymentsRegisterPage({
               tone="slate"
             />
             <ReportStatCard label="Payments shown" value={register.rows.length} helperText="Payments matching the current filters." />
-            <ReportStatCard label="Recorded total" value={totalRecordedDisplay} helperText="Sum of visible recorded rows only." tone="blue" />
           </ReportStatGrid>
 
           <ReportFilterPanel
