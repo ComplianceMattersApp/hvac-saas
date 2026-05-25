@@ -86,6 +86,10 @@ If any item here conflicts with the active spine, the spine wins.
   - manual entries and Stripe webhook-confirmed rows coexist in `internal_invoice_payments`
   - no refund/dispute/saved-card/partial-payment/customer-portal/platform-fee/QBO promise appears as active behavior
   - manual/off-platform payment recording continues to coexist with Stripe-sourced payment rows
+- Confirm Financial Ledger / Payments Register V1 model lock is acknowledged before recurring billing or deeper financial dashboards:
+  - source spec: `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
+  - future model separates Payment Register Entry, Payment Allocation, Invoice Payment Projection, and Failed Payment Attempt
+  - ACH remains hidden/deferred until supported
 
 ### 2.4 Time Clock lane closeout confirmation (completed)
 - Time Clock V1 through V1.5A is complete for current intended scope.

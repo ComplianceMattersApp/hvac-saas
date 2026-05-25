@@ -12,6 +12,12 @@ The V1 goal is simple: let an operator track recurring service obligations for a
 
 This spec is intentionally not a billing, payment, portal, SMS, or automation design.
 
+Financial/payment model boundary:
+
+- Future recurring maintenance/service-plan billing must follow the Financial Ledger / Payments Register V1 model lock in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md).
+- Recurring billing must connect through billing periods and payment allocations.
+- Money must not attach directly to service visit links, visit count rows, or `maintenance_agreement_visits`.
+
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)
 
 Group 9A-9A is a docs/model decision pass only. No implementation changes are included in this slice.
@@ -1800,4 +1806,3 @@ Future implementation should include targeted validation for:
 - copied Work Items remaining editable on the Job
 - no invoice/payment side effects
 - no confusion with service case/job "service contract" classification paths
-

@@ -24,6 +24,12 @@ Compliance Matters has **built payment architecture and shipped tenant customer 
 - **Stripe (future)** = payment rail for acceptance and money movement
 - **QBO (optional future)** = accounting integration seam only
 
+Financial Ledger / Payments Register V1 model lock:
+- the bookkeeping-ready register/allocation model is defined in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md)
+- current `internal_invoice_payments` remains today's invoice-bound collected-payment truth
+- future financial reporting must distinguish Payment Register Entry, Payment Allocation, Invoice Payment Projection, and Failed Payment Attempt
+- Stripe is processor truth for Stripe transactions; Compliance Matters is tenant financial operating truth for all money received
+
 ### Meaning
 The app must be built now so that:
 - payment tracking works without processor dependency
