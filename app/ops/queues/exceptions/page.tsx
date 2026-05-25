@@ -9,14 +9,14 @@ import {
 } from "@/lib/ops/focused-queues";
 
 const exceptionSelect =
-  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, created_at, updated_at";
+  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, created_at";
 
 function jobTitle(job: any) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
 }
 
 function ageDays(job: any): number | null {
-  const source = String(job?.updated_at ?? job?.created_at ?? "").trim();
+  const source = String(job?.created_at ?? "").trim();
   if (!source) return null;
 
   const stamp = new Date(source).getTime();

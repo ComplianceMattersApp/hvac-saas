@@ -438,8 +438,35 @@ function chipToneClass(chip: PriorityChip): string {
   return "border-slate-200 bg-slate-50 text-slate-800 hover:bg-white";
 }
 
+function normalizeReasonToken(value: string | null | undefined): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[-_]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+function shouldShowReasonForGroup(groupKey: FollowUpGroup["key"], reason: string | null | undefined): boolean {
+  const normalizedReason = normalizeReasonToken(reason);
+  if (!normalizedReason) return false;
+
+  if (groupKey === "scheduling" && normalizedReason === "needs scheduling") {
+    return false;
+  }
+
+  if (groupKey === "payments" && normalizedReason === "payment follow up") {
+    return false;
+  }
+
+  if (groupKey === "service_plans" && normalizedReason === "service plan follow up") {
+    return false;
+  }
+
+  return true;
+}
+
 // -----------------------------------------------------------------------------
-// Follow-Up Center
+// Action Center
 // -----------------------------------------------------------------------------
 
 function FollowUpSection({
@@ -454,10 +481,10 @@ function FollowUpSection({
       <div className="flex items-end justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Follow-Up Center
+            Action Center
           </div>
           <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-            Stuck work
+            Work that needs a next step
           </h2>
         </div>
         {desktop ? (
@@ -468,7 +495,7 @@ function FollowUpSection({
       </div>
 
       {groups.length === 0 ? (
-        <EmptyState message="No follow-ups waiting right now." />
+        <EmptyState message="No next-step work waiting right now." />
       ) : (
         <ul className="mt-3 space-y-2">
           {groups.map((group) => (
@@ -492,7 +519,22 @@ function FollowUpSection({
                         <div className="truncate text-sm font-medium text-slate-900 group-hover:text-blue-700">
                           {item.title}
                         </div>
-                        <div className="truncate text-xs text-slate-600">{item.reason}</div>
+                        {(() => {
+                          const breadcrumbParts = [
+                            shouldShowReasonForGroup(group.key, item.reason) ? item.reason : null,
+                            item.customerName,
+                            item.city,
+                            item.ageDisplay,
+                          ].filter(Boolean);
+
+                          if (breadcrumbParts.length === 0) return null;
+
+                          return (
+                            <div className="truncate text-xs text-slate-500">
+                              {breadcrumbParts.join(" · ")}
+                            </div>
+                          );
+                        })()}
                       </Link>
                     </li>
                   ))}

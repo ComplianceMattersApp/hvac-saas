@@ -10,7 +10,7 @@ import {
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 
 const waitingSelect =
-  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, on_hold_reason, created_at, updated_at";
+  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, created_at";
 
 function jobTitle(job: any) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
@@ -48,7 +48,7 @@ function waitingStateLabel(job: any): string {
 }
 
 function ageLabel(job: any): string {
-  const source = String(job?.updated_at ?? job?.created_at ?? "").trim();
+  const source = String(job?.created_at ?? "").trim();
   if (!source) return "-";
 
   const stamp = new Date(source).getTime();

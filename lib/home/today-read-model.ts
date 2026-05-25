@@ -114,6 +114,9 @@ export type FollowUpItem = {
   concernKey: "scheduling" | "closeout" | "waiting" | "exceptions";
   href: string;
   scheduledDateDisplay: string | null;
+  customerName?: string | null;
+  city?: string | null;
+  ageDisplay?: string | null;
 };
 
 export type FollowUpGroup = {
@@ -657,6 +660,17 @@ async function safeLoadPriorityCounts(params: {
   };
 }
 
+function buildItemAgeDisplay(createdAt: unknown): string | null {
+  const raw = String(createdAt ?? "").trim();
+  if (!raw) return null;
+  const stamp = new Date(raw).getTime();
+  if (!Number.isFinite(stamp)) return null;
+  const days = Math.max(0, Math.floor((Date.now() - stamp) / 86_400_000));
+  if (days === 0) return "today";
+  if (days === 1) return "1 day old";
+  return `${days} days old`;
+}
+
 async function safeLoadFollowUps(params: {
   supabase: any;
   accountOwnerUserId: string;
@@ -694,6 +708,9 @@ async function safeLoadFollowUps(params: {
         });
         if (!reason) return null;
         const concernKey = followUpConcernKey(reason);
+        const firstName = job.customerFirstName ?? null;
+        const lastName = job.customerLastName ?? null;
+        const fullName = [firstName, lastName].map((s) => (s ?? "").trim()).filter(Boolean).join(" ");
         return {
           key: job.id,
           title: job.title,
@@ -703,6 +720,9 @@ async function safeLoadFollowUps(params: {
           scheduledDateDisplay: job.scheduledDate
             ? formatBusinessDateUS(job.scheduledDate) || null
             : null,
+          customerName: fullName || null,
+          city: job.city || null,
+          ageDisplay: buildItemAgeDisplay(row.created_at),
         } satisfies FollowUpItem;
       })
       .filter((row: FollowUpItem | null): row is FollowUpItem => row != null);
@@ -1183,7 +1203,7 @@ export function buildFollowUpGroups(params: {
   if (schedulingCount > 0 || schedulingItems.length > 0) {
     groups.push({
       key: "scheduling",
-      label: "Scheduling",
+      label: "Needs Scheduling",
       count: schedulingCount > 0 ? schedulingCount : schedulingItems.length,
       href: "/ops/call-list",
       preview: schedulingItems.slice(0, 3),
@@ -1195,7 +1215,7 @@ export function buildFollowUpGroups(params: {
   if (closeoutCount > 0 || closeoutItems.length > 0) {
     groups.push({
       key: "closeout",
-      label: "Closeout",
+      label: "Closeout & Review",
       count: closeoutCount > 0 ? closeoutCount : closeoutItems.length,
       href: "/ops/closeout-queue",
       preview: closeoutItems.slice(0, 3),
@@ -1230,7 +1250,7 @@ export function buildFollowUpGroups(params: {
   if ((params.servicePlansOverdue ?? 0) > 0 && params.role !== "tech") {
     groups.push({
       key: "service_plans",
-      label: "Service Plans",
+      label: "Service Plan Follow-Up",
       count: params.servicePlansOverdue ?? 0,
       href: "/service-plans",
       preview: [],
@@ -1241,7 +1261,7 @@ export function buildFollowUpGroups(params: {
   if (params.canViewBusinessPulse && (params.openInvoiceCount ?? 0) > 0) {
     groups.push({
       key: "payments",
-      label: "Payments",
+      label: "Payment Follow-Up",
       count: params.openInvoiceCount ?? 0,
       href: "/reports/payments",
       preview: [],

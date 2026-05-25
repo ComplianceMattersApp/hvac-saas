@@ -397,8 +397,53 @@ describe("buildFollowUpGroups", () => {
     });
 
     expect(groups.find((g) => g.key === "scheduling")?.count).toBe(12);
+    expect(groups.find((g) => g.key === "scheduling")?.label).toBe("Needs Scheduling");
     expect(groups.find((g) => g.key === "closeout")?.count).toBe(4);
+    expect(groups.find((g) => g.key === "closeout")?.label).toBe("Closeout & Review");
     expect(groups.find((g) => g.key === "payments")?.count).toBe(1);
+    expect(groups.find((g) => g.key === "payments")?.label).toBe("Payment Follow-Up");
+  });
+
+  it("maps waiting, exceptions, and without-tech groups to focused queue routes", () => {
+    const groups = buildFollowUpGroups({
+      role: "admin",
+      followUps: [
+        {
+          key: "j1",
+          title: "Follow-up",
+          reason: "Pending info",
+          concernKey: "waiting",
+          href: "/jobs/j1?tab=ops",
+          scheduledDateDisplay: null,
+        },
+      ],
+      priorityCounts: {
+        ...baseCounts,
+        pendingInfo: 2,
+        failed: 1,
+        scheduledTodayWithoutTech: 3,
+      },
+      servicePlansOverdue: 0,
+      openInvoiceCount: 0,
+      canViewBusinessPulse: false,
+    });
+
+    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops/queues/without-tech");
+    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops/queues/waiting");
+    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops/queues/exceptions");
+  });
+
+  it("labels service plan group as follow-up", () => {
+    const groups = buildFollowUpGroups({
+      role: "admin",
+      followUps: [],
+      priorityCounts: baseCounts,
+      servicePlansOverdue: 2,
+      openInvoiceCount: 0,
+      canViewBusinessPulse: true,
+    });
+
+    expect(groups.find((g) => g.key === "service_plans")?.label).toBe("Service Plan Follow-Up");
   });
 
   it("maps waiting, exceptions, and without-tech groups to focused queue routes", () => {
