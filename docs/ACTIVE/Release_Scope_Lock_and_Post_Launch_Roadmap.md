@@ -47,17 +47,17 @@ Recent closeout status snapshot (May 2026):
    - Register reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, Stripe/Supabase/prod changes
    - Remaining deferred: payment recording UI, corrections, allocations, dashboard financial cards, QBO sync, ACH, platform fees, recurring billing
 
-- **Payments Register V1C (Customer Profile Payment History) is now implemented (commit `55dab8c`):**
-  - V1A read-only register: `/reports/payments` with Owner/Admin/Billing gating, recorded/failed separation, method taxonomy (ACH hidden), filters, stat cards
-  - V1B CSV export: `/reports/payments/export` with financial-export gating, filter preservation, status field for failed identification, proper escaping
-  - Access gates use existing financial-access helper (`canExportFinancialData()`, `canViewFinancialRegister()`)
-  - Register reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, Stripe/Supabase/prod changes
-  - Remaining deferred: payment recording UI, corrections, allocations, customer payment history, dashboard financial cards, QBO sync, ACH, platform fees, recurring billing
-   - V1C customer profile payment history: `/customers/{id}` Payment History card section with Owner/Admin/Billing gating, recorded/failed/other status separation
-   - Per-payment details: amount (bold), status+method badges (colored), date, invoice #, job link, reference, notes
+- **Payments Register V1C (Customer Profile Payment History) is now implemented and browser smoke passed (commit `55dab8c`):**
+   - V1C customer profile payment history: `/customers/{id}` Payment History card section (read-only)
+   - Access remains Owner/Admin/Billing only via existing financial-access helper; Dispatcher/Technician/Contractor/Portal users are blocked by default
    - Reads from `internal_invoice_payments` scoped to account + customer (current truth only)
-   - No mutations, corrections, allocations, CSV export from profile, schema changes, Stripe/Supabase/prod changes
-   - Remaining deferred: payment recording from profile, customer portal history, corrections/allocations, dashboard cards, QBO sync, ACH, platform fees, recurring billing
+   - Recorded payments, failed attempts, and other statuses remain visibly separated for authorized users
+   - Per-payment details: amount (bold), status+method badges (colored), date, invoice #, job link, reference, notes
+   - Open Payments Register link is confirmed to open full `/reports/payments` with customer filter
+   - Full register recorded/failed separation and CSV export remain available
+   - ACH remains hidden/mapped to `other`
+   - No mutations, corrections, allocations, profile CSV export, schema changes, Stripe/Supabase/prod changes
+   - Remaining deferred: register-based payment recording/corrections, payment allocations, broader financial dashboard cards, QBO, ACH, platform fees, recurring billing, customer portal payment history
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

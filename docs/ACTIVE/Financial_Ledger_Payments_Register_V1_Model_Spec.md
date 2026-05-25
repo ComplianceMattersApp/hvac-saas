@@ -30,13 +30,15 @@ Current financial access model for sensitive financial actions:
   - Commit: `c9dc763`
 - **Payments Register V1C (Customer Profile Payment History) is now implemented:**
   - Customer profile payment history section on `/customers/{id}` page
-  - Access gated with `canViewFinancialRegister()` (Owner/Admin/Billing only; Dispatcher/Technician blocked by default)
+  - Access gated with `canViewFinancialRegister()` (Owner/Admin/Billing only; Dispatcher/Technician/Contractor/Portal users blocked by default)
+  - Section is read-only (no payment recording/corrections/allocations mutations)
   - Reads from `internal_invoice_payments` current truth only (scoped to account + customer)
   - Recorded payments, failed attempts, and other statuses visually separated by status section
   - Per-payment row shows: amount, status, method, paid date, invoice #, job title (linked), reference, notes
   - Empty state: "No recorded payments or failed attempts for this customer yet."
   - Footer link: "Open Payments Register →" with customer name pre-filtered search
   - Method taxonomy preserved (ACH hidden/mapped to 'other')
+  - Browser smoke passed for card render, recorded row visibility, open-register filtered navigation, recorded/failed section separation, and preserved full-register CSV export availability
   - Commit: `55dab8c`
 - Financial access-control prerequisite for Payments Register V1 is fully satisfied and leveraged.
 - Payments Register UI/actions remain read-only in this pass; recording/corrections/allocations remain deferred in future phases.
@@ -417,7 +419,7 @@ D. Manual payment field cleanup: payment date, source, method.
 
 E. Invoice payment history plus failed-attempt separation.
 
-F. Customer profile payment history.
+F. Customer profile payment history (completed in V1C).
 
 G. Dedicated Payments Register plus CSV.
 

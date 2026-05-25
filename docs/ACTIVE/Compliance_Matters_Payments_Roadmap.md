@@ -520,13 +520,14 @@ Not introduced in V1A/V1B:
 
 ## 5.6 Payments Register V1C (Customer Profile Payment History)
 
-**Status**: V1C (customer profile payment history) implemented (commit `55dab8c`).
+**Status**: V1C (customer profile payment history) implemented and browser smoke passed (commit `55dab8c`).
 
 ### V1C — Customer Profile Payment History Section
 
 - Implemented on `/customers/{id}` page with Payment History card section.
 - Access gated with `canViewFinancialRegister()`: Owner/Admin/Billing only; Dispatcher/Technician/Contractors/Portal users blocked by default (server-side enforced).
 - Payment history reads from `internal_invoice_payments` scoped to account + customer (current truth only).
+- Section is read-only in V1C (no payment-recording/correction/allocation mutations).
 - Recorded payments section: emerald divider, status/method badges.
 - Failed attempts section: red divider, status/method badges.
 - Other statuses section: gray divider (Pending, Reversed, etc.).
@@ -534,6 +535,7 @@ Not introduced in V1A/V1B:
 - Empty state: "No recorded payments or failed attempts for this customer yet."
 - Footer link: "Open Payments Register →" with customer name pre-filtered search.
 - Method taxonomy preserved (ACH hidden/mapped to 'other').
+- Browser smoke passed: card renders correctly, recorded payment row appears, open-register link resolves with customer filter, full register recorded/failed sections remain separated, and CSV export remains available on the full register.
 
 Not introduced in V1C:
 - No payment recording UI or server actions

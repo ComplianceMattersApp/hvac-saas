@@ -104,9 +104,10 @@ If any item here conflicts with the active spine, the spine wins.
 - Confirm Financial Ledger / Payments Register access-control prerequisite is satisfied:
   - source spec: `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`
   - **Payments Register V1A/V1B are now implemented (commit `c9dc763`)**: read-only `/reports/payments` register with Owner/Admin/Billing gating, recorded/failed separation, method taxonomy (ACH hidden), and filtered CSV export at `/reports/payments/export`
-  - **Payments Register V1C is now implemented (commit `55dab8c`)**: customer profile Payment History card section on `/customers/{id}` with Owner/Admin/Billing gating, recorded/failed/other status separation, per-payment details (amount, status, method, date, invoice, job link, reference, notes)
-  - Register/history reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, Stripe/Supabase/prod changes
-  - Future phases may add payment recording, corrections, allocations, dashboard cards, QBO, ACH, fees, recurring billing
+  - **Payments Register V1C is now implemented and browser smoke passed (commit `55dab8c`)**: customer profile Payment History card section on `/customers/{id}` with Owner/Admin/Billing gating, default block for Dispatcher/Technician/Contractor/Portal users, recorded/failed/other status separation, and per-payment details (amount, status, method, date, invoice, job link, reference, notes)
+  - V1C card is read-only; register/history reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, Stripe/Supabase/prod changes
+  - Browser smoke confirmed: card render, recorded payment row, Open Payments Register link, full register customer filter, recorded/failed section separation, and retained full-register CSV export availability
+  - Deferred remains explicit: register-based payment recording/corrections, allocations, broader financial dashboard cards, QBO, ACH, platform fees, recurring billing, customer portal payment history
 
 ### 2.4 Time Clock lane closeout confirmation (completed)
 - Time Clock V1 through V1.5A is complete for current intended scope.
