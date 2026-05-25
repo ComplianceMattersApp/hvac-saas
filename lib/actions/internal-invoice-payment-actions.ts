@@ -5,6 +5,10 @@ import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
+import {
+  requireInvoicePaymentRecordAccessOrRedirect,
+  requireTenantInvoicePaymentLinkAccessOrRedirect,
+} from '@/lib/auth/financial-access';
 import { resolveBillingModeByAccountOwnerId } from '@/lib/business/internal-business-profile';
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { resolveInternalInvoiceByJobId } from '@/lib/business/internal-invoice';
@@ -173,6 +177,13 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
 
+  requireInvoicePaymentRecordAccessOrRedirect({
+    actorUserId: userId,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo),
+  });
+
   await requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
@@ -295,6 +306,13 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
   if (!scopedJob?.id) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
+
+  requireTenantInvoicePaymentLinkAccessOrRedirect({
+    actorUserId: internalUser.user_id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo),
+  });
 
   await requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect({
     supabase,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
+import { requireFinancialExportAccessOrResponse } from "@/lib/auth/financial-access";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import {
   INVOICE_LEDGER_EXPORT_LIMIT,
@@ -43,6 +44,18 @@ export async function GET(request: NextRequest) {
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
+
+  const financialAccessResponse = requireFinancialExportAccessOrResponse({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    requestUrl: request.url,
+    unauthorizedRedirectPath: "/reports/invoices?banner=not_authorized",
+  });
+
+  if (financialAccessResponse) {
+    return financialAccessResponse;
+  }
 
   const filters = parseInvoiceLedgerFilters(request.nextUrl.searchParams);
   const ledger = billingMode === "internal_invoicing"

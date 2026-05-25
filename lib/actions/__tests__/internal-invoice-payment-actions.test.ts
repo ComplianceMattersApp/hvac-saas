@@ -123,7 +123,7 @@ describe('recordInternalInvoicePaymentFromForm', () => {
       userId: 'user-1',
       internalUser: {
         user_id: 'user-1',
-        role: 'office',
+        role: 'admin',
         is_active: true,
         account_owner_user_id: 'owner-1',
       },
@@ -276,6 +276,72 @@ describe('recordInternalInvoicePaymentFromForm', () => {
     expect(insertJobEventMock).not.toHaveBeenCalled();
   });
 
+  it('allows structural owner to record payment even when role is office', async () => {
+    const { supabase, writes } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'owner-1',
+      internalUser: {
+        user_id: 'owner-1',
+        role: 'office',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_recorded',
+    );
+
+    expect(writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(true);
+  });
+
+  it('denies office/dispatcher from recording payments when not structural owner', async () => {
+    const { supabase, writes } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'dispatcher-1',
+      internalUser: {
+        user_id: 'dispatcher-1',
+        role: 'office',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow('banner=not_authorized');
+
+    expect(writes).toHaveLength(0);
+    expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+  });
+
+  it('denies technician from recording payments', async () => {
+    const { supabase, writes } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow('banner=not_authorized');
+
+    expect(writes).toHaveLength(0);
+    expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+  });
+
   it('allows valid trial internal invoice payment record', async () => {
     const { supabase, writes } = makeSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
@@ -397,7 +463,7 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
       userId: 'user-1',
       internalUser: {
         user_id: 'user-1',
-        role: 'office',
+        role: 'admin',
         is_active: true,
         account_owner_user_id: 'owner-1',
       },
@@ -454,6 +520,71 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     );
 
     expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('allows structural owner to create checkout session even when role is office', async () => {
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'owner-1',
+      internalUser: {
+        user_id: 'owner-1',
+        role: 'office',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData({ no_redirect: '1' })),
+    ).resolves.toEqual(
+      expect.objectContaining({
+        ok: true,
+        checkoutSessionId: 'cs_123',
+      }),
+    );
+  });
+
+  it('denies office/dispatcher from creating checkout session when not structural owner', async () => {
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'dispatcher-1',
+      internalUser: {
+        user_id: 'dispatcher-1',
+        role: 'office',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData())).rejects.toThrow(
+      'banner=not_authorized',
+    );
+
+    expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
+    expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
+  });
+
+  it('denies technician from creating checkout session', async () => {
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData())).rejects.toThrow(
+      'banner=not_authorized',
+    );
+
+    expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
+    expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
   });
 
   it('passes correct account/job/invoice context to helper', async () => {

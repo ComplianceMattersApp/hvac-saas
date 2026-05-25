@@ -13,6 +13,7 @@ export default defineConfig({
       "lib/**/*.test.ts",
       "scripts/**/*.test.ts",
       "app/api/stripe/webhook/__tests__/route.test.ts",
+      "app/reports/invoices/export/__tests__/route.test.ts",
     ],
     clearMocks: true,
   },
