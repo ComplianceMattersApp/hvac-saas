@@ -640,6 +640,90 @@ describe("internal notification readers", () => {
     expect(unreadBadgeCount).toBe(1);
   });
 
+  it("hydrates proposal customer/location from payload snapshot when submission row is not readable", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-proposal-payload-fallback",
+            account_owner_user_id: "owner-1",
+            job_id: null,
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_intake_proposal_submitted",
+            subject: "New Contractor Intake Proposal",
+            body: "A contractor submitted an intake proposal pending internal finalization.",
+            payload: {
+              contractor_intake_submission_id: "proposal-payload-fallback",
+              proposal_customer_name: "Jamie Rivera",
+              proposal_location_nickname: "Back House",
+              proposal_location_summary: "410 Oak Ave, Berkeley, CA 94704",
+              proposal_job_type_label: "Service",
+              proposal_project_type_label: "Repair",
+            },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-21T12:00:00.000Z",
+          },
+        ],
+        // Simulate RLS-hidden submissions table in this session.
+        submissions: [],
+      }),
+    );
+
+    const { listInternalNotifications } = await import("@/lib/actions/notification-read-actions");
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "new_job_notifications",
+    });
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.proposal_enrichment?.customer_name).toBe("Jamie Rivera");
+    expect(notifications[0]?.proposal_enrichment?.location_nickname).toBe("Back House");
+    expect(notifications[0]?.proposal_enrichment?.address_summary).toBe("410 Oak Ave, Berkeley, CA 94704");
+    expect(notifications[0]?.proposal_enrichment?.job_type_label).toBe("Service");
+    expect(notifications[0]?.proposal_enrichment?.project_type_label).toBe("Repair");
+  });
+
+  it("keeps proposal enrichment null-safe when payload snapshot fields are missing", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-proposal-payload-missing",
+            account_owner_user_id: "owner-1",
+            job_id: null,
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "contractor_intake_proposal_submitted",
+            subject: "New Contractor Intake Proposal",
+            body: "A contractor submitted an intake proposal pending internal finalization.",
+            payload: {
+              contractor_intake_submission_id: "proposal-payload-missing",
+            },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-21T12:10:00.000Z",
+          },
+        ],
+        submissions: [],
+      }),
+    );
+
+    const { listInternalNotifications } = await import("@/lib/actions/notification-read-actions");
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "new_job_notifications",
+    });
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.proposal_enrichment?.customer_name).toBeNull();
+    expect(notifications[0]?.proposal_enrichment?.location_nickname).toBeNull();
+    expect(notifications[0]?.proposal_enrichment?.address_summary).toBeNull();
+  });
+
   it("excludes a proposal notification from the unread count once its read_at is set", async () => {
     // Simulates the state after finalizeContractorIntakeSubmissionFromForm has written read_at.
     createClientMock.mockResolvedValue(
@@ -745,8 +829,8 @@ describe("internal notification readers", () => {
             body: "A contractor submitted a new job that needs internal review and scheduling.",
             payload: { job_id: "job-scheduled-2" },
             status: "queued",
-            read_at: "2026-04-24T09:30:00.000Z",
-            created_at: "2026-04-24T09:00:00.000Z",
+            read_at: "2026-05-23T09:30:00.000Z",
+            created_at: "2026-05-23T09:00:00.000Z",
           },
         ],
         submissions: [],

@@ -223,6 +223,16 @@ function normalizeContentType(value: unknown) {
   return String(value ?? "").trim().toLowerCase();
 }
 
+function toTitleCaseLabel(value: string | null | undefined): string | null {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return null;
+  return normalized
+    .split(/[_\s]+/)
+    .filter(Boolean)
+    .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
+    .join(" ");
+}
+
 function validateContractorProposalAttachmentMetadata(input: {
   fileName: string;
   contentType: string;
@@ -1177,6 +1187,23 @@ async function sendInternalContractorIntakeProposalAlertEmail(params: {
         source: "contractor_intake_submissions",
         dedupe_key: dedupeKey,
         contractor_intake_submission_id: proposalId,
+        proposal_contractor_name: contractorName,
+        proposal_customer_name: customerName,
+        proposal_location_summary: proposedAddress,
+        proposal_job_type_label: toTitleCaseLabel(
+          String((proposal as any)?.proposed_job_type ?? "").trim(),
+        ),
+        proposal_project_type_label: toTitleCaseLabel(
+          String((proposal as any)?.proposed_project_type ?? "").trim(),
+        ),
+        proposal_notes_preview: proposalNotes
+          ? proposalNotes.length > 100
+            ? `${proposalNotes.slice(0, 100)}\u2026`
+            : proposalNotes
+          : null,
+        proposal_permit_number: String((proposal as any)?.proposed_permit_number ?? "").trim() || null,
+        proposal_permit_jurisdiction: String((proposal as any)?.proposed_jurisdiction ?? "").trim() || null,
+        proposal_permit_date: String((proposal as any)?.proposed_permit_date ?? "").trim() || null,
       },
       status: "queued",
       sent_at: null,
@@ -8161,12 +8188,37 @@ function canContractorWriteEvent(event_type: string) {
 
     if (proposalId) {
       try {
+        const proposalCustomerName = [customerFirstNameRaw, customerLastNameRaw]
+          .map((value) => String(value ?? "").trim())
+          .filter(Boolean)
+          .join(" ");
+        const proposalLocationSummary = [address_line1, city, state, zip]
+          .map((value) => String(value ?? "").trim())
+          .filter(Boolean)
+          .join(", ");
+        const proposalNotesPreview = String(proposalFields.proposed_job_notes ?? "").trim();
+
         await createContractorIntakeProposalAwarenessNotification({
           supabase,
           contractorIntakeSubmissionId: proposalId,
           accountOwnerUserId: proposalOwnerUserId,
           actorUserId: submittingUserId,
           contractorId: proposalContractorId,
+          proposalSnapshot: {
+            customerName: proposalCustomerName || null,
+            locationNickname: locationNickname || null,
+            locationSummary: proposalLocationSummary || null,
+            jobTypeLabel: toTitleCaseLabel(jobType),
+            projectTypeLabel: toTitleCaseLabel(projectType),
+            notesPreview: proposalNotesPreview
+              ? proposalNotesPreview.length > 100
+                ? `${proposalNotesPreview.slice(0, 100)}\u2026`
+                : proposalNotesPreview
+              : null,
+            permitNumber: permit_number || null,
+            permitJurisdiction: jurisdiction || null,
+            permitDate: permit_date || null,
+          },
         });
       } catch (error) {
         logContractorProposalSubmitFailure({

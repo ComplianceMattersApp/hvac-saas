@@ -39,6 +39,8 @@ export type ProposalEnrichment = {
   notes_preview: string | null;
 };
 
+type ProposalEnrichmentPatch = Partial<ProposalEnrichment>;
+
 export type JobEnrichment = {
   job_title: string | null;
   customer_name: string | null;
@@ -78,6 +80,23 @@ async function trackOpsNotificationTiming<T>(label: string, value: PromiseLike<T
   }
 }
 
+function mergeProposalEnrichment(
+  base: ProposalEnrichmentPatch,
+  override: ProposalEnrichmentPatch,
+): ProposalEnrichmentPatch {
+  return {
+    contractor_name: override.contractor_name ?? base.contractor_name ?? null,
+    customer_name: override.customer_name ?? base.customer_name ?? null,
+    address_summary: override.address_summary ?? base.address_summary ?? null,
+    location_nickname: override.location_nickname ?? base.location_nickname ?? null,
+    job_type_label: override.job_type_label ?? base.job_type_label ?? null,
+    project_type_label: override.project_type_label ?? base.project_type_label ?? null,
+    has_permit_details: override.has_permit_details ?? base.has_permit_details,
+    has_notes: override.has_notes ?? base.has_notes,
+    notes_preview: override.notes_preview ?? base.notes_preview ?? null,
+  };
+}
+
 async function buildProposalEnrichmentMap(
   supabase: any,
   rows: NotificationRow[]
@@ -93,6 +112,7 @@ async function buildProposalEnrichmentMap(
   // Collect submission IDs and contractor IDs already in the payload
   const submissionIds: string[] = [];
   const contractorIdBySubmissionId = new Map<string, string>();
+  const payloadEnrichmentBySubmissionId = new Map<string, ProposalEnrichmentPatch>();
 
   for (const row of proposalRowSubset) {
     const submissionId = proposalSubmissionId(row);
@@ -100,6 +120,13 @@ async function buildProposalEnrichmentMap(
     const payload = normalizeNotificationPayload(row.payload);
     const contractorId =
       firstNonEmptyPayloadValue(payload, ["contractor_id", "contractorId"]) ?? "";
+    const payloadPatch = proposalEnrichmentFromPayload(payload);
+
+    payloadEnrichmentBySubmissionId.set(
+      submissionId,
+      mergeProposalEnrichment(payloadEnrichmentBySubmissionId.get(submissionId) ?? {}, payloadPatch),
+    );
+
     submissionIds.push(submissionId);
     if (contractorId) contractorIdBySubmissionId.set(submissionId, contractorId);
   }
@@ -144,15 +171,16 @@ async function buildProposalEnrichmentMap(
   }
 
   for (const submissionId of uniqueSubmissionIds) {
+    const payloadPatch = payloadEnrichmentBySubmissionId.get(submissionId) ?? {};
     const sub = submissionById.get(submissionId);
     const contractorId =
       contractorIdBySubmissionId.get(submissionId) ??
       String(sub?.contractor_id ?? "").trim();
-    const contractorName = contractorNameById.get(contractorId) || null;
+    const contractorName = contractorNameById.get(contractorId) || payloadPatch.contractor_name || null;
 
     const firstName = String(sub?.proposed_customer_first_name ?? "").trim();
     const lastName = String(sub?.proposed_customer_last_name ?? "").trim();
-    const customerName = [firstName, lastName].filter(Boolean).join(" ") || null;
+    const customerName = [firstName, lastName].filter(Boolean).join(" ") || payloadPatch.customer_name || null;
 
     const addressLine = String(sub?.proposed_address_line1 ?? "").trim();
     const city = String(sub?.proposed_city ?? "").trim();
@@ -160,15 +188,22 @@ async function buildProposalEnrichmentMap(
     const zip = String(sub?.proposed_zip ?? "").trim();
     const cityState = [city, state].filter(Boolean).join(", ");
     const localitySummary = [cityState, zip].filter(Boolean).join(" ");
-    const addressSummary = [addressLine, localitySummary].filter(Boolean).join(", ") || localitySummary || null;
+    const addressSummary =
+      [addressLine, localitySummary].filter(Boolean).join(", ") ||
+      localitySummary ||
+      payloadPatch.address_summary ||
+      null;
 
-    const locationNickname = String(sub?.proposed_location_nickname ?? "").trim() || null;
+    const locationNickname =
+      String(sub?.proposed_location_nickname ?? "").trim() || payloadPatch.location_nickname || null;
 
     const rawJobType = String(sub?.proposed_job_type ?? "").trim().toLowerCase();
     const jobTypeLabel =
       rawJobType === "ecc" ? "ECC" :
       rawJobType === "service" ? "Service" :
-      rawJobType || null;
+      rawJobType ||
+      payloadPatch.job_type_label ||
+      null;
 
     const rawProjectType = String(sub?.proposed_project_type ?? "").trim().toLowerCase();
     const projectTypeLabel = rawProjectType
@@ -177,18 +212,18 @@ async function buildProposalEnrichmentMap(
           .filter(Boolean)
           .map((token) => token.charAt(0).toUpperCase() + token.slice(1))
           .join(" ")
-      : null;
+      : payloadPatch.project_type_label || null;
 
     const rawNotes = String(sub?.proposed_job_notes ?? "").trim();
     const notesPreview = rawNotes
       ? rawNotes.length > 100 ? rawNotes.slice(0, 100) + "\u2026" : rawNotes
-      : null;
+      : payloadPatch.notes_preview || null;
 
     const hasPermitDetails = Boolean(
       String(sub?.proposed_permit_number ?? "").trim() ||
       String(sub?.proposed_jurisdiction ?? "").trim() ||
       String(sub?.proposed_permit_date ?? "").trim()
-    );
+    ) || Boolean(payloadPatch.has_permit_details);
 
     enrichmentMap.set(submissionId, {
       contractor_name: contractorName,
@@ -198,7 +233,7 @@ async function buildProposalEnrichmentMap(
       job_type_label: jobTypeLabel,
       project_type_label: projectTypeLabel,
       has_permit_details: hasPermitDetails,
-      has_notes: Boolean(rawNotes),
+      has_notes: Boolean(rawNotes) || Boolean(payloadPatch.has_notes),
       notes_preview: notesPreview,
     });
   }
@@ -325,6 +360,50 @@ function firstNonEmptyPayloadValue(payload: NotificationPayload, keys: string[])
     if (value) return value;
   }
   return null;
+}
+
+function proposalEnrichmentFromPayload(payload: NotificationPayload): ProposalEnrichmentPatch {
+  const customerName = firstNonEmptyPayloadValue(payload, [
+    "proposal_customer_name",
+    "customer_name",
+    "proposed_customer_name",
+  ]);
+
+  const locationNickname = firstNonEmptyPayloadValue(payload, [
+    "proposal_location_nickname",
+    "location_nickname",
+    "proposed_location_nickname",
+  ]);
+
+  const addressSummary = firstNonEmptyPayloadValue(payload, [
+    "proposal_location_summary",
+    "location_summary",
+    "address_summary",
+    "proposed_address_summary",
+  ]);
+
+  const notesPreview = firstNonEmptyPayloadValue(payload, [
+    "proposal_notes_preview",
+    "notes_preview",
+  ]);
+
+  return {
+    contractor_name: firstNonEmptyPayloadValue(payload, ["proposal_contractor_name", "contractor_name"]),
+    customer_name: customerName,
+    address_summary: addressSummary,
+    location_nickname: locationNickname,
+    job_type_label: firstNonEmptyPayloadValue(payload, ["proposal_job_type_label", "job_type_label"]),
+    project_type_label: firstNonEmptyPayloadValue(payload, ["proposal_project_type_label", "project_type_label"]),
+    has_permit_details: Boolean(
+      firstNonEmptyPayloadValue(payload, [
+        "proposal_permit_number",
+        "proposal_permit_jurisdiction",
+        "proposal_permit_date",
+      ]),
+    ),
+    has_notes: Boolean(notesPreview),
+    notes_preview: notesPreview,
+  };
 }
 
 function proposalSubmissionId(row: NotificationRow): string | null {

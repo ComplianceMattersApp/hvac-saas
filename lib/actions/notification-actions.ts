@@ -108,6 +108,18 @@ type CreateContractorIntakeProposalAwarenessNotificationInput = {
   accountOwnerUserId: string;
   actorUserId: string;
   contractorId: string;
+  proposalSnapshot?: {
+    contractorName?: string | null;
+    customerName?: string | null;
+    locationNickname?: string | null;
+    locationSummary?: string | null;
+    jobTypeLabel?: string | null;
+    projectTypeLabel?: string | null;
+    notesPreview?: string | null;
+    permitNumber?: string | null;
+    permitJurisdiction?: string | null;
+    permitDate?: string | null;
+  };
 };
 
 function getSafeErrorDetails(error: unknown): { error_code: string | null; error_message: string | null } {
@@ -299,6 +311,31 @@ export async function createContractorIntakeProposalAwarenessNotification(
   const accountOwnerUserId = String(input.accountOwnerUserId ?? "").trim();
   const actorUserId = String(input.actorUserId ?? "").trim();
   const contractorId = String(input.contractorId ?? "").trim();
+  const snapshot = input.proposalSnapshot ?? {};
+
+  const payload: Record<string, unknown> = {
+    source: "contractor_intake_submissions",
+    contractor_intake_submission_id: contractorIntakeSubmissionId,
+    contractor_id: contractorId,
+    submitted_by_user_id: actorUserId,
+    account_owner_user_id: accountOwnerUserId,
+  };
+
+  const appendIfPresent = (key: string, value: string | null | undefined) => {
+    const normalized = String(value ?? "").trim();
+    if (normalized) payload[key] = normalized;
+  };
+
+  appendIfPresent("proposal_contractor_name", snapshot.contractorName);
+  appendIfPresent("proposal_customer_name", snapshot.customerName);
+  appendIfPresent("proposal_location_nickname", snapshot.locationNickname);
+  appendIfPresent("proposal_location_summary", snapshot.locationSummary);
+  appendIfPresent("proposal_job_type_label", snapshot.jobTypeLabel);
+  appendIfPresent("proposal_project_type_label", snapshot.projectTypeLabel);
+  appendIfPresent("proposal_notes_preview", snapshot.notesPreview);
+  appendIfPresent("proposal_permit_number", snapshot.permitNumber);
+  appendIfPresent("proposal_permit_jurisdiction", snapshot.permitJurisdiction);
+  appendIfPresent("proposal_permit_date", snapshot.permitDate);
 
   return insertInternalAwarenessNotification({
     supabase: input.supabase,
@@ -308,13 +345,7 @@ export async function createContractorIntakeProposalAwarenessNotification(
     notificationType: "contractor_intake_proposal_submitted",
     subject: "New Contractor Intake Proposal",
     body: "A contractor submitted an intake proposal pending internal finalization.",
-    payload: {
-      source: "contractor_intake_submissions",
-      contractor_intake_submission_id: contractorIntakeSubmissionId,
-      contractor_id: contractorId,
-      submitted_by_user_id: actorUserId,
-      account_owner_user_id: accountOwnerUserId,
-    },
+    payload,
   });
 }
 
