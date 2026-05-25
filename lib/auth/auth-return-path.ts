@@ -4,6 +4,10 @@ function isPortalPath(pathname: string) {
   return pathname === "/portal" || pathname.startsWith("/portal/") || pathname.startsWith("/portal?");
 }
 
+function isLegacyInternalOpsRootPath(pathname: string) {
+  return pathname === "/ops" || pathname.startsWith("/ops?");
+}
+
 function isAuthRoutePath(pathname: string) {
   return (
     pathname === "/login" ||
@@ -53,5 +57,13 @@ export function resolveSafeAuthReturnPath(params: {
   }
 
   // Internal users should not be routed into contractor portal paths.
-  return isPortalPath(normalized) ? params.fallbackPath : normalized;
+  if (isPortalPath(normalized)) return params.fallbackPath;
+
+  // During the /ops -> /today default migration, treat legacy root /ops
+  // return paths as default-home and send users to /today.
+  if (params.fallbackPath === "/today" && isLegacyInternalOpsRootPath(normalized)) {
+    return "/today";
+  }
+
+  return normalized;
 }
