@@ -180,7 +180,7 @@ export default async function RootLayout({
                   <div className="hidden min-w-0 flex-1 items-center justify-start gap-2 lg:flex">
                     <ShellCreateMenu items={createMenuItems} />
                     <nav aria-label="Primary navigation" className="flex min-w-0 items-center gap-1">
-                      <ShellNavLink href="/jobs">Jobs</ShellNavLink>
+                      <ShellNavLink href="/ops">Operations</ShellNavLink>
                       {isInternalUser ? (
                         <ShellNavLink href="/calendar">Calendar</ShellNavLink>
                       ) : null}

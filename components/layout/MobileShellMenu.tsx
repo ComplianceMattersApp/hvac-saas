@@ -118,8 +118,8 @@ export default function MobileShellMenu({
 
           <div className="my-1.5 border-t border-slate-200/80" />
           <div className={sectionLabelClass()}>Work</div>
-          <Link href="/jobs" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/jobs"))}>
-            Jobs
+          <Link href="/ops" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/ops"))}>
+            Operations
           </Link>
           {isInternalUser ? (
             <Link href="/calendar" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/calendar"))}>
