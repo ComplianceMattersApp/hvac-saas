@@ -112,6 +112,7 @@ describe("selectNextBestAction", () => {
     expect(result.kind).toBe("dispatcher_schedule");
     expect(result.headline).toContain("unassigned");
     expect(result.primaryLabel).toBe("Assign Technicians");
+    expect(result.primaryHref).toBe("/ops/queues/without-tech");
   });
 
   it("office: critical exceptions outrank everything else", () => {
@@ -122,6 +123,7 @@ describe("selectNextBestAction", () => {
       openInvoiceCount: 9,
     }));
     expect(result.kind).toBe("compliance_exception");
+    expect(result.primaryHref).toBe("/ops/queues/exceptions");
   });
 
   it("billing: prioritizes open invoices", () => {
@@ -240,6 +242,7 @@ describe("buildPriorityChips", () => {
     const withoutTech = chips.find((c) => c.key === "without_tech");
     expect(withoutTech?.count).toBe(3);
     expect(withoutTech?.urgent).toBe(true);
+    expect(withoutTech?.href).toBe("/ops/queues/without-tech");
   });
 
   it("flags exceptions chip as urgent", () => {
@@ -254,6 +257,20 @@ describe("buildPriorityChips", () => {
     const exceptions = chips.find((c) => c.key === "exceptions");
     expect(exceptions?.urgent).toBe(true);
     expect(exceptions?.tone).toBe("danger");
+    expect(exceptions?.href).toBe("/ops/queues/exceptions");
+  });
+
+  it("maps waiting and on-hold chips to the waiting queue", () => {
+    const chips = buildPriorityChips({
+      productMode: "hybrid",
+      role: "office",
+      priorityCounts: { ...baseCounts, pendingInfo: 2, onHold: 1 },
+      servicePlansOverdue: 0,
+      openInvoiceCount: 0,
+      canViewBusinessPulse: false,
+    });
+    expect(chips.find((c) => c.key === "waiting")?.href).toBe("/ops/queues/waiting");
+    expect(chips.find((c) => c.key === "on_hold")?.href).toBe("/ops/queues/waiting");
   });
 });
 
@@ -382,6 +399,48 @@ describe("buildFollowUpGroups", () => {
     expect(groups.find((g) => g.key === "scheduling")?.count).toBe(12);
     expect(groups.find((g) => g.key === "closeout")?.count).toBe(4);
     expect(groups.find((g) => g.key === "payments")?.count).toBe(1);
+  });
+
+  it("maps waiting, exceptions, and without-tech groups to focused queue routes", () => {
+    const groups = buildFollowUpGroups({
+      role: "admin",
+      followUps: [
+        {
+          key: "j1",
+          title: "Follow-up",
+          reason: "Pending info",
+          concernKey: "waiting",
+          href: "/jobs/j1?tab=ops",
+          scheduledDateDisplay: null,
+        },
+      ],
+      priorityCounts: {
+        ...baseCounts,
+        pendingInfo: 2,
+        failed: 1,
+        scheduledTodayWithoutTech: 3,
+      },
+      servicePlansOverdue: 0,
+      openInvoiceCount: 0,
+      canViewBusinessPulse: false,
+    });
+
+    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops/queues/without-tech");
+    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops/queues/waiting");
+    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops/queues/exceptions");
+  });
+
+  it("labels service plan group as follow-up", () => {
+    const groups = buildFollowUpGroups({
+      role: "admin",
+      followUps: [],
+      priorityCounts: baseCounts,
+      servicePlansOverdue: 2,
+      openInvoiceCount: 0,
+      canViewBusinessPulse: true,
+    });
+
+    expect(groups.find((g) => g.key === "service_plans")?.count).toBe(2);
   });
 });
 
