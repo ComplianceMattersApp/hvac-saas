@@ -90,6 +90,7 @@ export default async function NewJobPage(props: {
     err?: string;
     proposal_id?: string;
     maintenance_agreement_id?: string;
+    create_customer?: string;
   }>;
 }) {
   const supabase = await createClient();
@@ -199,6 +200,7 @@ export default async function NewJobPage(props: {
   const errorCode = String(sp?.err ?? "").trim() || null;
   const submittedProposalId = String(sp?.proposal_id ?? "").trim() || null;
   const maintenanceAgreementId = String(sp?.maintenance_agreement_id ?? "").trim();
+  const initialCreateNewCustomer = String(sp?.create_customer ?? "").trim() === "1";
   const requestedCustomerContext = source === "customer";
 
   // Optional: existing customer mode
@@ -360,6 +362,7 @@ export default async function NewJobPage(props: {
       locationSiteAccessHints={locationSiteAccessHints}
       maintenanceAgreementPrefill={maintenanceAgreementPrefill}
       maintenanceAgreementPrefillStatus={maintenanceAgreementPrefillStatus}
+      initialCreateNewCustomer={initialCreateNewCustomer}
     />
   );
 }

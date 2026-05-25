@@ -414,6 +414,7 @@ export default function NewJobForm({
   locationSiteAccessHints = [],
   maintenanceAgreementPrefill,
   maintenanceAgreementPrefillStatus = null,
+  initialCreateNewCustomer = false,
 }: {
   contractors: Contractor[];
   existingCustomer?: ExistingCustomer | null;
@@ -431,6 +432,7 @@ export default function NewJobForm({
   locationSiteAccessHints?: LocationSiteAccessHintRow[];
   maintenanceAgreementPrefill?: MaintenanceAgreementPrefill | null;
   maintenanceAgreementPrefillStatus?: "unavailable" | null;
+  initialCreateNewCustomer?: boolean;
 }) {
 
   const isContractorMode = Boolean(myContractor?.id);
@@ -457,7 +459,9 @@ export default function NewJobForm({
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>(
     existingCustomer?.id ?? "",
   );
-  const [createNewCustomer, setCreateNewCustomer] = useState<boolean>(false);
+  const [createNewCustomer, setCreateNewCustomer] = useState<boolean>(
+    initialCreateNewCustomer && isInternalMode && !isCustomerContextInternalMode,
+  );
   const [locationMode, setLocationMode] = useState<"existing" | "new" | null>(
     hasSeededCustomer
       ? (locations.length > 0 ? "existing" : "new")
