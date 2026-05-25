@@ -10,7 +10,7 @@ import {
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 const withoutTechSelect =
-  "id, title, status, ops_status, account_owner_user_id, scheduled_date, window_start, window_end, customer_first_name, customer_last_name, city, job_address, created_at";
+  "id, title, status, ops_status, scheduled_date, window_start, window_end, customer_first_name, customer_last_name, city, job_address, created_at";
 
 function jobTitle(job: any) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;

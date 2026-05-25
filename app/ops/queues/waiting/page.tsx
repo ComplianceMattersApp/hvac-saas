@@ -10,7 +10,7 @@ import {
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 
 const waitingSelect =
-  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, on_hold_reason, created_at, updated_at";
+  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, created_at, updated_at";
 
 function jobTitle(job: any) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
