@@ -335,3 +335,40 @@ export async function listPaymentsRegisterRows(params: {
     truncated,
   };
 }
+
+function csvEscape(value: string) {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+export function buildPaymentsRegisterCsv(rows: PaymentsRegisterRow[]) {
+  const header = [
+    "Paid Date",
+    "Amount",
+    "Status",
+    "Method",
+    "Customer",
+    "Invoice",
+    "Job Reference",
+    "Job Title",
+    "Reference",
+    "Notes",
+  ];
+
+  const lines = rows.map((row) => [
+    row.paidAtDisplay,
+    row.amountDisplay,
+    row.statusLabel,
+    row.methodLabel,
+    row.customerName,
+    row.invoiceNumber,
+    row.jobReference,
+    row.jobTitle,
+    row.reference,
+    row.notes,
+  ].map((value) => csvEscape(String(value ?? ""))).join(","));
+
+  return [header.map(csvEscape).join(","), ...lines].join("\r\n");
+}

@@ -25,6 +25,7 @@ import {
   PAYMENTS_REGISTER_METHOD_OPTIONS,
   PAYMENTS_REGISTER_PAGE_LIMIT,
   PAYMENTS_REGISTER_STATUS_OPTIONS,
+  buildPaymentsRegisterSearchParams,
   listPaymentsRegisterRows,
   parsePaymentsRegisterFilters,
 } from "@/lib/reports/payments-register";
@@ -186,6 +187,13 @@ export default async function PaymentsRegisterPage({
               <div className="flex flex-wrap items-end gap-2 xl:col-span-5 xl:justify-end">
                 <button type="submit" className={reportActionClass("primary")}>Apply filters</button>
                 <Link href="/reports/payments" className={reportActionClass()}>Reset</Link>
+                <Link
+                  href={`/reports/payments/export?${buildPaymentsRegisterSearchParams(filters).toString()}`}
+                  className={reportActionClass()}
+                  download
+                >
+                  Export CSV
+                </Link>
               </div>
             </form>
           </ReportFilterPanel>

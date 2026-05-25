@@ -133,6 +133,31 @@ describe('financial access helper', () => {
         },
       }),
     ).toBe(false);
+
+    // Verify dispatch and tech also cannot export
+    expect(
+      canExportFinancialData({
+        actorUserId: 'user-3',
+        internalUser: {
+          user_id: 'user-3',
+          role: 'dispatcher',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(false);
+
+    expect(
+      canExportFinancialData({
+        actorUserId: 'user-4',
+        internalUser: {
+          user_id: 'user-4',
+          role: 'tech',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+      }),
+    ).toBe(false);
   });
 
   it('inactive internal user fails', () => {
