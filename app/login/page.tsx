@@ -33,7 +33,7 @@ async function resolveLoginDestination(supabase: ReturnType<typeof createClient>
   if (internalUserError) throw internalUserError;
 
   if (internalUser?.user_id && internalUser.is_active) {
-    return "/ops";
+    return "/today";
   }
 
   return null;

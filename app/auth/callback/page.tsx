@@ -181,7 +181,7 @@ export default function AuthCallbackPage() {
   );
 }
 
-// Helper: route user to /ops or /portal based on role
+// Helper: route user to /today or /portal based on role
 async function routeByRole(
   supabase: any,
   router: any,
@@ -218,7 +218,7 @@ async function routeByRole(
     const resumePath = resolveSafeAuthReturnPath({
       actorKind: "internal",
       candidateNext: nextPath,
-      fallbackPath: "/ops",
+      fallbackPath: "/today",
     });
     router.push(resumePath);
   }

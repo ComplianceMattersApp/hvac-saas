@@ -12,7 +12,7 @@ function sleep(ms: number) {
 
 async function handoffRedirectAfterPasswordSet(
   supabase: ReturnType<typeof createClient>,
-  target: "/portal" | "/ops" | "/ops/admin"
+  target: "/portal" | "/today" | "/ops/admin"
 ) {
   // After updateUser(), session persistence can lag a moment. Wait briefly so
   // the destination SSR route sees the committed session on first load.
@@ -101,7 +101,7 @@ export default function SetPasswordPage() {
     setSuccessMsg("Password updated. Redirecting...");
 
     // Ensure contractor membership exists (creates it from pending invite if
-    // needed) and determine whether to route to /portal or /ops.
+    // needed) and determine whether to route to /portal or /today.
     const { isContractor, error: membershipError } = await ensureContractorMembershipFromInvite();
 
     if (membershipError) {

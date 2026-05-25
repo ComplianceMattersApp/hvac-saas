@@ -43,7 +43,7 @@ export function normalizeAuthReturnPath(candidateNext: string | null | undefined
 export function resolveSafeAuthReturnPath(params: {
   actorKind: AuthReturnActorKind;
   candidateNext: string | null | undefined;
-  fallbackPath: "/portal" | "/ops";
+  fallbackPath: "/portal" | "/ops" | "/today";
 }): string {
   const normalized = normalizeAuthReturnPath(params.candidateNext);
   if (!normalized) return params.fallbackPath;

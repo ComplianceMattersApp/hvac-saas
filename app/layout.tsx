@@ -70,7 +70,7 @@ export default async function RootLayout({
     profileFullName = profileRow?.full_name ? String(profileRow.full_name).trim() : null;
   }
 
-  let homeHref = "/ops";
+  let homeHref = "/today";
   let isContractor = false;
   let isInternalUser = false;
   let isAdmin = false;
@@ -83,7 +83,7 @@ export default async function RootLayout({
     homeHref = "/portal";
     isContractor = true;
   } else if (actorContext.kind === "internal" && actorContext.internalUser) {
-    homeHref = "/ops";
+    homeHref = "/today";
     isInternalUser = true;
     isAdmin = actorContext.internalUser.role === "admin";
     const accountOwnerUserId = String(actorContext.internalUser.account_owner_user_id ?? "").trim();

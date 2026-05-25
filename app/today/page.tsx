@@ -2,8 +2,7 @@
 //
 // Renders one route for both desktop and mobile, intentionally laid out from
 // a shared read model. Mobile is a ranked vertical action stream; desktop is
-// a multi-panel launchpad. This route is added for review and is NOT yet
-// the default landing surface.
+// a multi-panel launchpad.
 
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -11,14 +10,16 @@ import { redirect } from "next/navigation";
 import {
   buildTodayReadModel,
   type BusinessPulse,
-  type FollowUpItem,
+  type FollowUpGroup,
   type NextBestAction,
   type PriorityChip,
   type ResumeRecentItem,
+  type TeamCoverage,
   type TodayHeader,
   type TodayJobSummary,
   type TodayReadModel,
 } from "@/lib/home/today-read-model";
+import TodayWelcomeModal from "@/components/home/TodayWelcomeModal";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 export const dynamic = "force-dynamic";
@@ -40,29 +41,37 @@ export default async function TodayPage() {
 
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-3 pb-12 sm:px-5 sm:space-y-5 lg:space-y-6 lg:px-6">
-      <HeaderSection header={model.todayHeader} />
+      <TodayWelcomeModal initiallyOpen={model.showWelcomeModal} />
+      <HeaderSection header={model.todayHeader} briefing={model.dailyBriefing} />
 
       {/* MOBILE-FIRST RANKED STREAM (visible on mobile, hidden on lg+) */}
       <div className="space-y-4 lg:hidden">
         <NextBestActionCard action={model.nextBestAction} mobile />
 
+        <TodayWorkSection
+          label={model.todayWork.label}
+          jobs={model.todayWork.jobs.slice(0, 5)}
+          showFieldActions={model.todayWork.showFieldActions}
+        />
+
         {hasUrgentChip ? (
           <PriorityChipsSection chips={model.priorityChips} />
         ) : null}
-
-        <TodayWorkSection
-          label={model.todayWork.label}
-          jobs={model.todayWork.jobs.slice(0, 6)}
-          showFieldActions={model.todayWork.showFieldActions}
-        />
 
         {!hasUrgentChip && model.priorityChips.length > 0 ? (
           <PriorityChipsSection chips={model.priorityChips} />
         ) : null}
 
-        <FollowUpSection items={model.followUps.slice(0, 3)} />
+        <FollowUpSection groups={model.followUpGroups.slice(0, 3)} />
 
-        <ResumeRecentSection items={model.resumeRecentWork.slice(0, 3)} />
+        {model.teamCoverage.visible ? (
+          <TeamCoverageSection coverage={model.teamCoverage} mobile />
+        ) : null}
+
+        <ResumeRecentSection
+          items={model.resumeRecentWork.slice(0, 3)}
+          hasMore={model.resumeRecentHasMore}
+        />
 
         {model.businessPulse.visible ? (
           <BusinessPulseSection
@@ -86,14 +95,21 @@ export default async function TodayPage() {
               showFieldActions={model.todayWork.showFieldActions}
               desktop
             />
-            <FollowUpSection items={model.followUps} desktop />
+            <FollowUpSection groups={model.followUpGroups} desktop />
           </div>
 
           <div className="space-y-5">
             {model.businessPulse.visible ? (
               <BusinessPulseSection pulse={model.businessPulse} />
             ) : null}
-            <ResumeRecentSection items={model.resumeRecentWork} desktop />
+            {model.teamCoverage.visible ? (
+              <TeamCoverageSection coverage={model.teamCoverage} />
+            ) : null}
+            <ResumeRecentSection
+              items={model.resumeRecentWork}
+              hasMore={model.resumeRecentHasMore}
+              desktop
+            />
           </div>
         </div>
       </div>
@@ -107,7 +123,13 @@ export default async function TodayPage() {
 // Header
 // -----------------------------------------------------------------------------
 
-function HeaderSection({ header }: { header: TodayHeader }) {
+function HeaderSection({
+  header,
+  briefing,
+}: {
+  header: TodayHeader;
+  briefing: string;
+}) {
   return (
     <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -120,6 +142,9 @@ function HeaderSection({ header }: { header: TodayHeader }) {
           </h1>
           <p className="mt-1 text-sm leading-6 text-slate-600">
             {header.displayDate} · {header.roleLabel}
+          </p>
+          <p className="mt-2 max-w-3xl rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2 text-sm font-medium leading-6 text-slate-800">
+            {briefing}
           </p>
         </div>
 
@@ -281,13 +306,20 @@ function TodayWorkSection({
       {jobs.length === 0 ? (
         <EmptyState message="No jobs scheduled for today." />
       ) : (
-        <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-100 bg-slate-50/40">
-          {jobs.map((job) => (
-            <li key={job.id} className="px-3 py-3">
-              <TodayJobRow job={job} showFieldActions={showFieldActions} />
-            </li>
-          ))}
-        </ul>
+        <>
+          <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-100 bg-slate-50/40">
+            {jobs.map((job) => (
+              <li key={job.id} className="px-3 py-3">
+                <TodayJobRow job={job} showFieldActions={showFieldActions} />
+              </li>
+            ))}
+          </ul>
+          <div className="mt-3">
+            <Link href="/ops" className="text-xs font-semibold text-blue-700 hover:underline">
+              View Full Workboard
+            </Link>
+          </div>
+        </>
       )}
     </section>
   );
@@ -412,10 +444,10 @@ function chipToneClass(chip: PriorityChip): string {
 // -----------------------------------------------------------------------------
 
 function FollowUpSection({
-  items,
+  groups,
   desktop = false,
 }: {
-  items: FollowUpItem[];
+  groups: FollowUpGroup[];
   desktop?: boolean;
 }) {
   return (
@@ -436,31 +468,123 @@ function FollowUpSection({
         ) : null}
       </div>
 
-      {items.length === 0 ? (
+      {groups.length === 0 ? (
         <EmptyState message="No follow-ups waiting right now." />
       ) : (
         <ul className="mt-3 space-y-2">
-          {items.map((item) => (
-            <li key={item.key} className="rounded-xl border border-slate-100 bg-slate-50/40 px-3 py-2">
-              <Link href={item.href} className="block group">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-950 group-hover:text-blue-700">
-                      {item.title}
-                    </div>
-                    <div className="mt-0.5 text-xs text-slate-600">{item.reason}</div>
-                  </div>
-                  {item.scheduledDateDisplay ? (
-                    <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                      {item.scheduledDateDisplay}
-                    </span>
-                  ) : null}
-                </div>
-              </Link>
+          {groups.map((group) => (
+            <li key={group.key} className="rounded-xl border border-slate-100 bg-slate-50/40 px-3 py-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-slate-950">{group.label}</div>
+                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                  {group.count}
+                </span>
+              </div>
+
+              {group.summary ? (
+                <div className="mt-1 text-xs text-slate-600">{group.summary}</div>
+              ) : null}
+
+              {group.preview.length > 0 ? (
+                <ul className="mt-2 space-y-1.5">
+                  {group.preview.map((item) => (
+                    <li key={item.key}>
+                      <Link href={item.href} className="group block rounded-md px-1 py-0.5">
+                        <div className="truncate text-sm font-medium text-slate-900 group-hover:text-blue-700">
+                          {item.title}
+                        </div>
+                        <div className="truncate text-xs text-slate-600">{item.reason}</div>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : null}
+
+              <div className="mt-2">
+                <Link href={group.href} className="text-xs font-semibold text-blue-700 hover:underline">
+                  View all {group.count}
+                </Link>
+              </div>
             </li>
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Team Coverage
+// -----------------------------------------------------------------------------
+
+function TeamCoverageSection({
+  coverage,
+  mobile = false,
+}: {
+  coverage: TeamCoverage;
+  mobile?: boolean;
+}) {
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            Team Coverage
+          </div>
+          <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
+            Who’s assigned today
+          </h2>
+          <p className="mt-1 text-xs text-slate-600">{coverage.summaryLabel}</p>
+        </div>
+        <Link href={coverage.href} className="text-xs font-semibold text-blue-700 hover:underline">
+          Open Field Work
+        </Link>
+      </div>
+
+      {coverage.unassignedCount > 0 ? (
+        <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          {coverage.unassignedCount} scheduled {coverage.unassignedCount === 1 ? "visit needs" : "visits need"} assignment.
+        </div>
+      ) : null}
+
+      {coverage.assignments.length === 0 ? (
+        <EmptyState message={coverage.emptyStateMessage ?? "No assigned field work scheduled for today."} />
+      ) : (
+        <ul className="mt-3 space-y-2">
+          {coverage.assignments.slice(0, mobile ? 3 : 5).map((row) => (
+            <li key={row.key} className="rounded-xl border border-slate-100 bg-slate-50/40 px-3 py-2">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate text-sm font-semibold text-slate-950">{row.assigneeName}</div>
+                  <Link href={row.href} className="mt-0.5 block truncate text-xs font-medium text-blue-700 hover:underline">
+                    {row.jobTitle}
+                  </Link>
+                  <div className="mt-0.5 truncate text-xs text-slate-600">{row.customerLocationLabel}</div>
+                </div>
+                <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                  {row.statusLabel}
+                </span>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-3">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                  {row.windowLabel ?? "Window pending"}
+                </span>
+                <Link href={row.href} className="text-xs font-semibold text-blue-700 hover:underline">
+                  Open Job
+                </Link>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {coverage.hasMore ? (
+        <div className="mt-3">
+          <Link href={coverage.href} className="text-xs font-semibold text-blue-700 hover:underline">
+            View all assignments
+          </Link>
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -510,7 +634,7 @@ function BusinessPulseSection({
                   ? formatCurrency(pulse.openInvoiceBalanceCents)
                   : null
               }
-              href="/reports"
+              href="/reports/payments"
             />
           ) : null}
           {pulse.servicePlansActive !== null ? (
@@ -587,13 +711,15 @@ function formatCurrency(cents: number): string {
 
 function ResumeRecentSection({
   items,
+  hasMore,
   desktop = false,
 }: {
   items: ResumeRecentItem[];
+  hasMore: boolean;
   desktop?: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
+    <section id="resume-recent-work" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
         Resume Recent Work
       </div>
@@ -613,7 +739,12 @@ function ResumeRecentSection({
                     <div className="truncate text-sm font-semibold text-slate-950 group-hover:text-blue-700">
                       {item.title}
                     </div>
-                    <div className="mt-0.5 truncate text-xs text-slate-600">{item.subtitle}</div>
+                    <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-600">
+                      <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                        {item.itemType}
+                      </span>
+                      <span className="truncate">{item.subtitle}</span>
+                    </div>
                   </div>
                   {item.updatedAtDisplay ? (
                     <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
@@ -626,6 +757,14 @@ function ResumeRecentSection({
           ))}
         </ul>
       )}
+
+      {hasMore ? (
+        <div className="mt-3">
+          <Link href="/ops" className="text-xs font-semibold text-blue-700 hover:underline">
+            View more recent work
+          </Link>
+        </div>
+      ) : null}
     </section>
   );
 }

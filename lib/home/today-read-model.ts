@@ -29,7 +29,15 @@ import {
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { summarizeMaintenanceAgreementsForAccount } from "@/lib/maintenance-agreements/read-model";
-import { formatBusinessDateUS, startOfTodayUtcIsoLA } from "@/lib/utils/schedule-la";
+import {
+  displayWindowLA,
+  formatBusinessDateUS,
+  startOfTodayUtcIsoLA,
+} from "@/lib/utils/schedule-la";
+import {
+  getActiveJobAssignmentDisplayMap,
+  type ActiveJobAssignmentDisplay,
+} from "@/lib/staffing/human-layer";
 
 // -----------------------------------------------------------------------------
 // Public types
@@ -77,6 +85,16 @@ export type NextBestAction = {
   detail: string | null;
   primaryHref: string;
   primaryLabel: string;
+  focusKey:
+    | "need_scheduling"
+    | "without_tech"
+    | "closeout"
+    | "waiting"
+    | "exceptions"
+    | "open_invoices"
+    | "service_plans_due"
+    | "resume_recent"
+    | null;
   job?: TodayJobSummary | null;
 };
 
@@ -93,8 +111,18 @@ export type FollowUpItem = {
   key: string;
   title: string;
   reason: string;
+  concernKey: "scheduling" | "closeout" | "waiting" | "exceptions";
   href: string;
   scheduledDateDisplay: string | null;
+};
+
+export type FollowUpGroup = {
+  key: "scheduling" | "closeout" | "waiting" | "exceptions" | "service_plans" | "payments";
+  label: string;
+  count: number;
+  href: string;
+  preview: FollowUpItem[];
+  summary: string | null;
 };
 
 export type BusinessPulse = {
@@ -107,8 +135,30 @@ export type BusinessPulse = {
   unreadNotificationCount: number;
 };
 
+export type TeamCoverageAssignment = {
+  key: string;
+  assigneeName: string;
+  jobId: string;
+  jobTitle: string;
+  windowLabel: string | null;
+  customerLocationLabel: string;
+  statusLabel: string;
+  href: string;
+};
+
+export type TeamCoverage = {
+  visible: boolean;
+  summaryLabel: string;
+  assignments: TeamCoverageAssignment[];
+  unassignedCount: number;
+  hasMore: boolean;
+  href: string;
+  emptyStateMessage: string | null;
+};
+
 export type ResumeRecentItem = {
   key: string;
+  itemType: "Job";
   title: string;
   subtitle: string;
   href: string;
@@ -125,6 +175,7 @@ export type TodayReadModel = {
   productMode: ProductMode;
   role: InternalRole;
   todayHeader: TodayHeader;
+  dailyBriefing: string;
   nextBestAction: NextBestAction;
   todayWork: {
     label: string;
@@ -133,8 +184,12 @@ export type TodayReadModel = {
   };
   priorityChips: PriorityChip[];
   followUps: FollowUpItem[];
+  followUpGroups: FollowUpGroup[];
+  teamCoverage: TeamCoverage;
   businessPulse: BusinessPulse;
   resumeRecentWork: ResumeRecentItem[];
+  resumeRecentHasMore: boolean;
+  showWelcomeModal: boolean;
 };
 
 export type TodayReadModelRedirect = {
@@ -170,6 +225,15 @@ function formatTodayDateLA(now = new Date()): string {
     day: "numeric",
     year: "numeric",
   }).format(now);
+}
+
+function hasDismissedTodayWelcome(userMetadata: unknown): boolean {
+  const marker = (userMetadata as any)?.today_dashboard_v1_welcome;
+  if (!marker || typeof marker !== "object") return false;
+
+  const dismissed = Boolean((marker as any)?.dismissed);
+  const dismissedAt = String((marker as any)?.dismissed_at ?? "").trim();
+  return dismissed || dismissedAt.length > 0;
 }
 
 function todayBusinessDateLA(now = new Date()): string {
@@ -209,7 +273,7 @@ async function safeQueryAssignedJobIdsForUser(
 }
 
 const TODAY_JOB_SELECT =
-  "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, field_complete, deleted_at, updated_at, account_owner_user_id";
+  "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, field_complete, deleted_at, created_at";
 
 function normalizeJob(row: any): TodayJobSummary | null {
   const id = String(row?.id ?? "").trim();
@@ -231,6 +295,164 @@ function normalizeJob(row: any): TodayJobSummary | null {
   };
 }
 
+function formatStatusLabel(status: string | null, opsStatus: string | null): string {
+  const source = status ?? opsStatus ?? "scheduled";
+  return source.replaceAll("_", " ").replace(/\b\w/g, (ch) => ch.toUpperCase());
+}
+
+function coverageCustomerLocationLabel(job: TodayJobSummary): string {
+  const customer = [job.customerFirstName ?? "", job.customerLastName ?? ""]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+  const location = [job.jobAddress ?? "", job.city ?? ""]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+
+  if (customer && location) return `${customer} • ${location}`;
+  return customer || location || "Customer / location pending";
+}
+
+export function buildTeamCoverageSnapshot(params: {
+  role: InternalRole;
+  todayScheduledJobs: TodayJobSummary[];
+  assignmentDisplayMap: Record<string, ActiveJobAssignmentDisplay[]>;
+  maxRows: number;
+}): TeamCoverage {
+  const href = "/ops/field";
+
+  if (params.role === "tech" || params.role === "billing") {
+    return {
+      visible: false,
+      summaryLabel: "",
+      assignments: [],
+      unassignedCount: 0,
+      hasMore: false,
+      href,
+      emptyStateMessage: null,
+    };
+  }
+
+  const assignments: TeamCoverageAssignment[] = [];
+  let unassignedCount = 0;
+
+  const sortedJobs = [...params.todayScheduledJobs].sort((a, b) => {
+    const aKey = `${a.windowStart ?? ""}|${a.title}|${a.id}`;
+    const bKey = `${b.windowStart ?? ""}|${b.title}|${b.id}`;
+    return aKey.localeCompare(bKey);
+  });
+
+  for (const job of sortedJobs) {
+    const jobAssignments = params.assignmentDisplayMap[job.id] ?? [];
+    if (jobAssignments.length === 0) {
+      unassignedCount += 1;
+      continue;
+    }
+
+    for (const assignment of jobAssignments) {
+      const windowLabel = displayWindowLA(job.windowStart, job.windowEnd) || null;
+      assignments.push({
+        key: `${job.id}:${assignment.user_id}`,
+        assigneeName: assignment.display_name,
+        jobId: job.id,
+        jobTitle: job.title,
+        windowLabel,
+        customerLocationLabel: coverageCustomerLocationLabel(job),
+        statusLabel: formatStatusLabel(job.status, job.opsStatus),
+        href: `/jobs/${job.id}?tab=ops`,
+      });
+    }
+  }
+
+  const hasMore = assignments.length > params.maxRows;
+  const visibleAssignments = assignments.slice(0, params.maxRows);
+
+  const summaryLabel =
+    visibleAssignments.length > 0
+      ? `${visibleAssignments.length} assigned ${visibleAssignments.length === 1 ? "visit" : "visits"} today`
+      : unassignedCount > 0
+      ? "Scheduled work needs assignment."
+      : "No assigned field work scheduled for today.";
+
+  const emptyStateMessage =
+    visibleAssignments.length === 0
+      ? unassignedCount > 0
+        ? "Scheduled work needs assignment."
+        : "No assigned field work scheduled for today."
+      : null;
+
+  return {
+    visible: true,
+    summaryLabel,
+    assignments: visibleAssignments,
+    unassignedCount,
+    hasMore,
+    href,
+    emptyStateMessage,
+  };
+}
+
+async function safeLoadTeamCoverage(params: {
+  supabase: any;
+  role: InternalRole;
+  today: string;
+  maxRows: number;
+}): Promise<TeamCoverage> {
+  if (params.role === "tech" || params.role === "billing") {
+    return buildTeamCoverageSnapshot({
+      role: params.role,
+      todayScheduledJobs: [],
+      assignmentDisplayMap: {},
+      maxRows: params.maxRows,
+    });
+  }
+
+  try {
+    const { data, error } = await params.supabase
+      .from("jobs")
+      .select(TODAY_JOB_SELECT)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("field_complete", false)
+      .eq("scheduled_date", params.today)
+      .order("window_start", { ascending: true })
+      .limit(120);
+
+    if (error) {
+      return buildTeamCoverageSnapshot({
+        role: params.role,
+        todayScheduledJobs: [],
+        assignmentDisplayMap: {},
+        maxRows: params.maxRows,
+      });
+    }
+
+    const jobs = (data ?? [])
+      .map((row: any) => normalizeJob(row))
+      .filter((job: TodayJobSummary | null): job is TodayJobSummary => job != null);
+
+    const assignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
+      supabase: params.supabase,
+      jobIds: jobs.map((job: TodayJobSummary) => job.id),
+    }).catch(() => ({} as Record<string, ActiveJobAssignmentDisplay[]>));
+
+    return buildTeamCoverageSnapshot({
+      role: params.role,
+      todayScheduledJobs: jobs,
+      assignmentDisplayMap,
+      maxRows: params.maxRows,
+    });
+  } catch {
+    return buildTeamCoverageSnapshot({
+      role: params.role,
+      todayScheduledJobs: [],
+      assignmentDisplayMap: {},
+      maxRows: params.maxRows,
+    });
+  }
+}
+
 async function safeLoadTodayJobsForRole(params: {
   supabase: any;
   accountOwnerUserId: string;
@@ -238,7 +460,7 @@ async function safeLoadTodayJobsForRole(params: {
   userId: string;
   today: string;
 }): Promise<TodayJobSummary[]> {
-  const { supabase, accountOwnerUserId, role, userId, today } = params;
+  const { supabase, role, userId, today } = params;
 
   try {
     let assignedIds: string[] | null = null;
@@ -247,10 +469,14 @@ async function safeLoadTodayJobsForRole(params: {
       if (assignedIds.length === 0) return [];
     }
 
+    // NOTE: `public.jobs` has no `account_owner_user_id` column — tenant scope is
+    // enforced by RLS (`is_internal_user()`), matching the pattern used by /ops.
+    // Adding `.eq("account_owner_user_id", ...)` here used to silently break this
+    // query (PostgREST 400 swallowed by the try/catch) and was the reason /today
+    // showed empty states even when scheduled-today work existed.
     let q = supabase
       .from("jobs")
       .select(TODAY_JOB_SELECT)
-      .eq("account_owner_user_id", accountOwnerUserId)
       .is("deleted_at", null)
       .neq("status", "cancelled");
 
@@ -325,6 +551,7 @@ async function safeLoadPriorityCounts(params: {
   accountOwnerUserId: string;
   today: string;
 }): Promise<{
+  scheduledTodayWithoutTech: number | null;
   needScheduling: number | null;
   scheduledToday: number | null;
   pendingInfo: number | null;
@@ -332,34 +559,88 @@ async function safeLoadPriorityCounts(params: {
   failed: number | null;
   closeoutReady: number | null;
 }> {
-  const { supabase, accountOwnerUserId, today } = params;
+  const { supabase, today } = params;
 
-  const base = (q: any) =>
-    q.eq("account_owner_user_id", accountOwnerUserId).is("deleted_at", null);
+  // jobs is RLS-scoped; no explicit account_owner filter (column does not exist).
+  const base = (q: any) => q.is("deleted_at", null);
 
-  const [needScheduling, scheduledToday, pendingInfo, onHold, failed, closeoutReady] =
-    await Promise.all([
-      safeCount(supabase, "jobs", (q) =>
-        base(q).eq("ops_status", "need_to_schedule").neq("status", "cancelled"),
-      ),
-      safeCount(supabase, "jobs", (q) =>
-        base(q).eq("scheduled_date", today).neq("status", "cancelled"),
-      ),
-      safeCount(supabase, "jobs", (q) =>
-        base(q).eq("ops_status", "pending_info").neq("status", "cancelled"),
-      ),
-      safeCount(supabase, "jobs", (q) =>
-        base(q).eq("ops_status", "on_hold").neq("status", "cancelled"),
-      ),
-      safeCount(supabase, "jobs", (q) =>
-        base(q).in("ops_status", ["failed", "retest_needed", "pending_office_review"]).neq("status", "cancelled"),
-      ),
-      safeCount(supabase, "jobs", (q) =>
-        base(q).in("ops_status", ["invoice_required", "paperwork_required"]).neq("status", "cancelled"),
-      ),
-    ]);
+  const scheduledTodayWithoutTechPromise = (async (): Promise<number | null> => {
+    try {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id")
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .eq("field_complete", false)
+        .eq("scheduled_date", today)
+        .limit(400);
+
+      if (error) return null;
+
+      const todayIds: string[] = Array.from(
+        new Set(
+          (data ?? [])
+            .map((row: any) => String(row?.id ?? "").trim())
+            .filter(Boolean),
+        ),
+      );
+
+      if (todayIds.length === 0) return 0;
+
+      const { data: assignments, error: assignmentError } = await supabase
+        .from("job_assignments")
+        .select("job_id")
+        .eq("is_active", true)
+        .in("job_id", todayIds);
+
+      if (assignmentError) return null;
+
+      const assignedIds = new Set(
+        (assignments ?? [])
+          .map((row: any) => String(row?.job_id ?? "").trim())
+          .filter(Boolean),
+      );
+
+      return todayIds.reduce((count: number, id: string) => {
+        return count + (assignedIds.has(id) ? 0 : 1);
+      }, 0);
+    } catch {
+      return null;
+    }
+  })();
+
+  const [
+    scheduledTodayWithoutTech,
+    needScheduling,
+    scheduledToday,
+    pendingInfo,
+    onHold,
+    failed,
+    closeoutReady,
+  ] = await Promise.all([
+    scheduledTodayWithoutTechPromise,
+    safeCount(supabase, "jobs", (q) =>
+      base(q).eq("ops_status", "need_to_schedule").neq("status", "cancelled"),
+    ),
+    safeCount(supabase, "jobs", (q) =>
+      base(q).eq("scheduled_date", today).neq("status", "cancelled"),
+    ),
+    safeCount(supabase, "jobs", (q) =>
+      base(q).eq("ops_status", "pending_info").neq("status", "cancelled"),
+    ),
+    safeCount(supabase, "jobs", (q) =>
+      base(q).eq("ops_status", "on_hold").neq("status", "cancelled"),
+    ),
+    safeCount(supabase, "jobs", (q) =>
+      base(q).in("ops_status", ["failed", "retest_needed", "pending_office_review"]).neq("status", "cancelled"),
+    ),
+    safeCount(supabase, "jobs", (q) =>
+      base(q).in("ops_status", ["invoice_required", "paperwork_required"]).neq("status", "cancelled"),
+    ),
+  ]);
 
   return {
+    scheduledTodayWithoutTech,
     needScheduling,
     scheduledToday,
     pendingInfo,
@@ -372,25 +653,25 @@ async function safeLoadPriorityCounts(params: {
 async function safeLoadFollowUps(params: {
   supabase: any;
   accountOwnerUserId: string;
+  today: string;
 }): Promise<FollowUpItem[]> {
   try {
+    // jobs is RLS-scoped; tenant scope comes from RLS, not from a non-existent
+    // account_owner_user_id column. Include actionable stuck statuses AND jobs
+    // scheduled in the past that are not field-complete (“still open”).
     const { data, error } = await params.supabase
       .from("jobs")
       .select(TODAY_JOB_SELECT)
-      .eq("account_owner_user_id", params.accountOwnerUserId)
       .is("deleted_at", null)
-      .in("ops_status", [
-        "pending_info",
-        "on_hold",
-        "failed",
-        "retest_needed",
-        "pending_office_review",
-        "invoice_required",
-        "paperwork_required",
-      ])
       .neq("status", "cancelled")
-      .order("updated_at", { ascending: false })
-      .limit(15);
+      .or(
+        [
+          `ops_status.in.(need_to_schedule,pending_info,on_hold,failed,retest_needed,pending_office_review,invoice_required,paperwork_required)`,
+          `and(scheduled_date.lt.${params.today},field_complete.eq.false,ops_status.neq.closed)`,
+        ].join(","),
+      )
+      .order("created_at", { ascending: false })
+      .limit(25);
 
     if (error) return [];
 
@@ -398,12 +679,19 @@ async function safeLoadFollowUps(params: {
       .map((row: any) => {
         const job = normalizeJob(row);
         if (!job) return null;
-        const reason = followUpReason(job.opsStatus);
+        const reason = followUpReason({
+          opsStatus: job.opsStatus,
+          scheduledDate: job.scheduledDate,
+          today: params.today,
+          fieldComplete: job.fieldComplete,
+        });
         if (!reason) return null;
+        const concernKey = followUpConcernKey(reason);
         return {
           key: job.id,
           title: job.title,
           reason,
+          concernKey,
           href: `/jobs/${job.id}?tab=ops`,
           scheduledDateDisplay: job.scheduledDate
             ? formatBusinessDateUS(job.scheduledDate) || null
@@ -416,8 +704,15 @@ async function safeLoadFollowUps(params: {
   }
 }
 
-function followUpReason(opsStatus: string | null): string | null {
-  switch (opsStatus) {
+export function followUpReason(params: {
+  opsStatus: string | null;
+  scheduledDate: string | null;
+  today: string;
+  fieldComplete: boolean;
+}): string | null {
+  switch (params.opsStatus) {
+    case "need_to_schedule":
+      return "Needs scheduling";
     case "pending_info":
       return "Pending info";
     case "on_hold":
@@ -432,28 +727,54 @@ function followUpReason(opsStatus: string | null): string | null {
       return "Closeout — invoice required";
     case "paperwork_required":
       return "Closeout — paperwork required";
-    default:
-      return null;
   }
+  // Scheduled in the past, not field-complete — still-open exception.
+  if (
+    !params.fieldComplete &&
+    params.scheduledDate &&
+    params.scheduledDate < params.today &&
+    params.opsStatus !== "closed"
+  ) {
+    return "Past scheduled date — not completed";
+  }
+  return null;
+}
+
+function followUpConcernKey(reason: string): FollowUpItem["concernKey"] {
+  if (reason === "Needs scheduling" || reason === "Past scheduled date — not completed") {
+    return "scheduling";
+  }
+  if (reason.startsWith("Closeout")) return "closeout";
+  if (
+    reason === "Pending info" ||
+    reason === "On hold" ||
+    reason === "Pending office review"
+  ) {
+    return "waiting";
+  }
+  return "exceptions";
 }
 
 async function safeLoadRecentResume(params: {
   supabase: any;
   accountOwnerUserId: string;
   limit: number;
-}): Promise<ResumeRecentItem[]> {
+}): Promise<{ items: ResumeRecentItem[]; hasMore: boolean }> {
   try {
     const { data, error } = await params.supabase
       .from("jobs")
       .select(TODAY_JOB_SELECT)
-      .eq("account_owner_user_id", params.accountOwnerUserId)
       .is("deleted_at", null)
-      .order("updated_at", { ascending: false })
-      .limit(params.limit);
+      .order("created_at", { ascending: false })
+      .limit(params.limit + 1);
 
-    if (error) return [];
+    if (error) return { items: [], hasMore: false };
 
-    return (data ?? [])
+    const rows = Array.isArray(data) ? data : [];
+    const hasMore = rows.length > params.limit;
+    const trimmed = rows.slice(0, params.limit);
+
+    const items = trimmed
       .map((row: any) => {
         const job = normalizeJob(row);
         if (!job) return null;
@@ -462,12 +783,13 @@ async function safeLoadRecentResume(params: {
             .map((part) => part.trim())
             .filter(Boolean)
             .join(" ") || "Customer";
-        const updatedRaw = row?.updated_at ? String(row.updated_at) : null;
+        const updatedRaw = row?.created_at ? String(row.created_at) : null;
         const updatedAtDisplay = updatedRaw
           ? formatBusinessDateUS(updatedRaw.slice(0, 10)) || null
           : null;
         return {
           key: job.id,
+          itemType: "Job",
           title: job.title,
           subtitle: customer,
           href: `/jobs/${job.id}`,
@@ -475,8 +797,9 @@ async function safeLoadRecentResume(params: {
         } satisfies ResumeRecentItem;
       })
       .filter((row: ResumeRecentItem | null): row is ResumeRecentItem => row != null);
+    return { items, hasMore };
   } catch {
-    return [];
+    return { items: [], hasMore: false };
   }
 }
 
@@ -484,30 +807,61 @@ async function safeLoadOpenInvoiceSnapshot(params: {
   supabase: any;
   accountOwnerUserId: string;
 }): Promise<{ count: number | null; balanceCents: number | null }> {
-  // Best-effort read. Schema for internal invoices varies — we only read
-  // status/balance columns if they exist. Any error yields nulls.
+  // internal_invoices.status is currently one of: draft | issued | void.
+  // "Open" means issued but not fully paid; balance is derived by subtracting
+  // recorded payments in internal_invoice_payments from invoice total_cents.
   try {
-    const { data, error } = await params.supabase
+    const { data: invoices, error } = await params.supabase
       .from("internal_invoices")
-      .select("status, balance_due_cents, total_cents, amount_paid_cents")
+      .select("id, total_cents")
       .eq("account_owner_user_id", params.accountOwnerUserId)
-      .in("status", ["open", "sent", "partially_paid", "overdue"])
+      .eq("status", "issued")
       .limit(500);
 
     if (error) return { count: null, balanceCents: null };
-    const rows = Array.isArray(data) ? data : [];
-    if (rows.length === 0) return { count: 0, balanceCents: 0 };
+    const invoiceRows = Array.isArray(invoices) ? invoices : [];
+    if (invoiceRows.length === 0) return { count: 0, balanceCents: 0 };
 
-    const balance = rows.reduce((sum: number, row: any) => {
-      const explicit = Number(row?.balance_due_cents ?? NaN);
-      if (Number.isFinite(explicit)) return sum + explicit;
-      const total = Number(row?.total_cents ?? 0);
-      const paid = Number(row?.amount_paid_cents ?? 0);
-      const remaining = Math.max(0, total - paid);
-      return sum + (Number.isFinite(remaining) ? remaining : 0);
-    }, 0);
+    const invoiceIds = invoiceRows
+      .map((row: any) => String(row?.id ?? "").trim())
+      .filter(Boolean);
+    const totalsById = new Map<string, number>();
+    for (const row of invoiceRows) {
+      const id = String((row as any)?.id ?? "").trim();
+      if (!id) continue;
+      totalsById.set(id, Number((row as any)?.total_cents ?? 0) || 0);
+    }
 
-    return { count: rows.length, balanceCents: balance };
+    const paidById = new Map<string, number>();
+    if (invoiceIds.length > 0) {
+      const { data: payments, error: payErr } = await params.supabase
+        .from("internal_invoice_payments")
+        .select("invoice_id, amount_cents, payment_status")
+        .eq("account_owner_user_id", params.accountOwnerUserId)
+        .in("invoice_id", invoiceIds);
+      if (payErr) return { count: null, balanceCents: null };
+      for (const row of payments ?? []) {
+        const status = String((row as any)?.payment_status ?? "").trim().toLowerCase();
+        if (status !== "recorded") continue;
+        const id = String((row as any)?.invoice_id ?? "").trim();
+        if (!id) continue;
+        const amount = Number((row as any)?.amount_cents ?? 0) || 0;
+        paidById.set(id, (paidById.get(id) ?? 0) + amount);
+      }
+    }
+
+    let openCount = 0;
+    let outstanding = 0;
+    for (const [id, total] of totalsById.entries()) {
+      const paid = paidById.get(id) ?? 0;
+      const balance = Math.max(0, total - paid);
+      if (balance > 0) {
+        openCount += 1;
+        outstanding += balance;
+      }
+    }
+
+    return { count: openCount, balanceCents: outstanding };
   } catch {
     return { count: null, balanceCents: null };
   }
@@ -522,6 +876,7 @@ export type NextBestActionInputs = {
   productMode: ProductMode;
   todayJobs: TodayJobSummary[];
   priorityCounts: {
+    scheduledTodayWithoutTech: number | null;
     needScheduling: number | null;
     scheduledToday: number | null;
     pendingInfo: number | null;
@@ -530,7 +885,9 @@ export type NextBestActionInputs = {
     closeoutReady: number | null;
   };
   openInvoiceCount: number | null;
+  openInvoiceBalanceCents: number | null;
   servicePlansOverdue: number | null;
+  resumeRecentCount: number;
 };
 
 export function selectNextBestAction(inputs: NextBestActionInputs): NextBestAction {
@@ -540,7 +897,9 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
     todayJobs,
     priorityCounts,
     openInvoiceCount,
+    openInvoiceBalanceCents,
     servicePlansOverdue,
+    resumeRecentCount,
   } = inputs;
 
   const inProgress = todayJobs.find(
@@ -557,6 +916,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
         detail: techJobDetail(focus),
         primaryHref: `/jobs/${focus.id}?tab=ops`,
         primaryLabel: "Open Job",
+        focusKey: null,
         job: focus,
       };
     }
@@ -566,6 +926,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       detail: "New assignments will show up here as dispatch routes them to you.",
       primaryHref: "/ops/field",
       primaryLabel: "View My Work",
+      focusKey: null,
     };
   }
 
@@ -576,63 +937,41 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
         kind: "billing_money_stuck",
         headline: `${openInvoiceCount} open invoice${openInvoiceCount === 1 ? "" : "s"} awaiting payment`,
         detail: "Review open balances and follow up on the oldest first.",
-        primaryHref: "/reports",
-        primaryLabel: "Open Reports",
+        primaryHref: "/reports/payments",
+        primaryLabel: "Review Open Invoices",
+        focusKey: "open_invoices",
       };
     }
     return calmBillingDefault();
   }
 
-  // Office / dispatcher: schedule coverage first, then exceptions.
-  if (role === "office") {
-    if ((priorityCounts.needScheduling ?? 0) > 0) {
-      return {
-        kind: "dispatcher_schedule",
-        headline: `${priorityCounts.needScheduling} job${priorityCounts.needScheduling === 1 ? "" : "s"} need scheduling`,
-        detail: "Get unscheduled work onto the calendar.",
-        primaryHref: "/ops/call-list",
-        primaryLabel: "Open Unscheduled Work",
-      };
-    }
-    if ((priorityCounts.failed ?? 0) > 0 && productMode !== "hvac_service") {
-      return {
-        kind: "compliance_exception",
-        headline: `${priorityCounts.failed} exception${priorityCounts.failed === 1 ? "" : "s"} need review`,
-        detail: "Failed or retest-ready work waiting on office action.",
-        primaryHref: "/ops?bucket=failed",
-        primaryLabel: "Open Exceptions",
-      };
-    }
-    if ((priorityCounts.scheduledToday ?? 0) > 0) {
-      return {
-        kind: "dispatcher_schedule",
-        headline: `${priorityCounts.scheduledToday} visit${priorityCounts.scheduledToday === 1 ? "" : "s"} scheduled today`,
-        detail: "Confirm coverage and tech assignments.",
-        primaryHref: "/ops",
-        primaryLabel: "Open Operations",
-      };
-    }
-    return calmOfficeDefault();
-  }
+  const waitingCount = (priorityCounts.pendingInfo ?? 0) + (priorityCounts.onHold ?? 0);
+  const hasUrgentFinancial =
+    (openInvoiceCount ?? 0) >= 5 ||
+    (openInvoiceBalanceCents ?? 0) >= 500_000;
 
-  // Admin / owner: rank across compliance, money, recurring, schedule.
-  if (productMode === "ecc_hers" && (priorityCounts.failed ?? 0) > 0) {
+  if ((priorityCounts.failed ?? 0) > 0) {
     return {
       kind: "compliance_exception",
-      headline: `${priorityCounts.failed} compliance item${priorityCounts.failed === 1 ? "" : "s"} need review`,
-      detail: "Failed, retest, or pending office review jobs.",
+      headline: `${priorityCounts.failed} critical exception${priorityCounts.failed === 1 ? "" : "s"} need review`,
+      detail:
+        productMode === "ecc_hers"
+          ? "Compliance exceptions are blocking clean throughput."
+          : "Failed or escalated jobs are blocking throughput.",
       primaryHref: "/ops?bucket=failed",
-      primaryLabel: "Open Exceptions",
+      primaryLabel: "Review Exceptions",
+      focusKey: "exceptions",
     };
   }
 
-  if ((openInvoiceCount ?? 0) > 0) {
+  if ((priorityCounts.scheduledTodayWithoutTech ?? 0) > 0) {
     return {
-      kind: "billing_money_stuck",
-      headline: `${openInvoiceCount} open invoice${openInvoiceCount === 1 ? "" : "s"}`,
-      detail: "Review revenue waiting on payment.",
-      primaryHref: "/reports",
-      primaryLabel: "Open Reports",
+      kind: "dispatcher_schedule",
+      headline: `${priorityCounts.scheduledTodayWithoutTech} scheduled ${priorityCounts.scheduledTodayWithoutTech === 1 ? "visit is" : "visits are"} unassigned`,
+      detail: "Dispatch coverage is missing for work already on today’s board.",
+      primaryHref: "/ops/field",
+      primaryLabel: "Assign Technicians",
+      focusKey: "without_tech",
     };
   }
 
@@ -640,22 +979,10 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
     return {
       kind: "dispatcher_schedule",
       headline: `${priorityCounts.needScheduling} job${priorityCounts.needScheduling === 1 ? "" : "s"} need scheduling`,
-      detail: "Unscheduled work waiting for dispatch.",
+      detail: "Get unscheduled work onto the calendar before gaps widen.",
       primaryHref: "/ops/call-list",
-      primaryLabel: "Open Unscheduled Work",
-    };
-  }
-
-  if (
-    productMode !== "ecc_hers" &&
-    (servicePlansOverdue ?? 0) > 0
-  ) {
-    return {
-      kind: "service_plan_due",
-      headline: `${servicePlansOverdue} service plan${servicePlansOverdue === 1 ? "" : "s"} overdue`,
-      detail: "Recurring obligations slipping past due.",
-      primaryHref: "/service-plans",
-      primaryLabel: "Open Service Plans",
+      primaryLabel: "Open Scheduling Queue",
+      focusKey: "need_scheduling",
     };
   }
 
@@ -663,13 +990,69 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
     return {
       kind: "owner_exception",
       headline: `${priorityCounts.closeoutReady} job${priorityCounts.closeoutReady === 1 ? "" : "s"} ready for closeout`,
-      detail: "Finish certs or invoicing to recognize completion.",
+      detail: "Finish certs and invoicing so work can close cleanly.",
       primaryHref: "/ops/closeout-queue",
-      primaryLabel: "Open Closeout Queue",
+      primaryLabel: "Review Closeout",
+      focusKey: "closeout",
     };
   }
 
-  return calmOwnerDefault();
+  if (waitingCount > 0) {
+    return {
+      kind: "follow_up",
+      headline: `${waitingCount} waiting item${waitingCount === 1 ? "" : "s"} need follow-up`,
+      detail: "Pending info and on-hold work need office attention.",
+      primaryHref: "/ops?bucket=pending_info",
+      primaryLabel: "Review Waiting Work",
+      focusKey: "waiting",
+    };
+  }
+
+  if (productMode !== "ecc_hers" && (servicePlansOverdue ?? 0) > 0) {
+    return {
+      kind: "service_plan_due",
+      headline: `${servicePlansOverdue} service plan${servicePlansOverdue === 1 ? "" : "s"} overdue`,
+      detail: "Recurring obligations are slipping past due.",
+      primaryHref: "/service-plans",
+      primaryLabel: "Review Service Plans",
+      focusKey: "service_plans_due",
+    };
+  }
+
+  if (hasUrgentFinancial && (openInvoiceCount ?? 0) > 0) {
+    return {
+      kind: "billing_money_stuck",
+      headline: `${openInvoiceCount} open invoice${openInvoiceCount === 1 ? "" : "s"} need urgent payment follow-up`,
+      detail: "High-value receivables need immediate billing action.",
+      primaryHref: "/reports/payments",
+      primaryLabel: "Review Open Invoices",
+      focusKey: "open_invoices",
+    };
+  }
+
+  if ((openInvoiceCount ?? 0) > 0) {
+    return {
+      kind: "billing_money_stuck",
+      headline: `${openInvoiceCount} open invoice${openInvoiceCount === 1 ? "" : "s"}`,
+      detail: "Keep collections moving after operational priorities are handled.",
+      primaryHref: "/reports/payments",
+      primaryLabel: "Review Open Invoices",
+      focusKey: "open_invoices",
+    };
+  }
+
+  if (resumeRecentCount > 0) {
+    return {
+      kind: "follow_up",
+      headline: "Resume recent work",
+      detail: "No urgent queues are blocking today, pick up your latest active item.",
+      primaryHref: "/today#resume-recent-work",
+      primaryLabel: "Resume Recent Work",
+      focusKey: "resume_recent",
+    };
+  }
+
+  return role === "office" ? calmOfficeDefault() : calmOwnerDefault();
 }
 
 function calmOwnerDefault(): NextBestAction {
@@ -679,6 +1062,7 @@ function calmOwnerDefault(): NextBestAction {
     detail: "Your team is caught up on schedule, exceptions, and money for the moment.",
     primaryHref: "/ops",
     primaryLabel: "Open Operations",
+    focusKey: null,
   };
 }
 
@@ -689,6 +1073,7 @@ function calmOfficeDefault(): NextBestAction {
     detail: "No unscheduled, exception, or coverage gaps need immediate action.",
     primaryHref: "/ops",
     primaryLabel: "Open Operations",
+    focusKey: null,
   };
 }
 
@@ -697,8 +1082,9 @@ function calmBillingDefault(): NextBestAction {
     kind: "empty",
     headline: "No open balances waiting.",
     detail: "All invoiced work is paid or in flight.",
-    primaryHref: "/reports",
-    primaryLabel: "Open Reports",
+    primaryHref: "/reports/payments",
+    primaryLabel: "Open Payments",
+    focusKey: null,
   };
 }
 
@@ -707,6 +1093,143 @@ function techJobDetail(job: TodayJobSummary): string | null {
   const status = job.status === "on_the_way" ? "On the way" : job.status === "in_process" ? "In process" : null;
   const parts = [status, address].filter(Boolean);
   return parts.length > 0 ? parts.join(" • ") : null;
+}
+
+export function buildDailyBriefing(params: {
+  role: InternalRole;
+  todayJobsCount: number;
+  priorityCounts: NextBestActionInputs["priorityCounts"];
+  openInvoiceCount: number | null;
+  servicePlansOverdue: number | null;
+  followUpsCount: number;
+}): string {
+  const scheduled = params.priorityCounts.scheduledToday ?? params.todayJobsCount;
+  const withoutTech = params.priorityCounts.scheduledTodayWithoutTech ?? 0;
+  const needScheduling = params.priorityCounts.needScheduling ?? 0;
+  const closeoutReady = params.priorityCounts.closeoutReady ?? 0;
+  const waiting = (params.priorityCounts.pendingInfo ?? 0) + (params.priorityCounts.onHold ?? 0);
+
+  if (params.role === "tech" && scheduled > 0) {
+    const later = waiting > 0
+      ? `${waiting} ${waiting === 1 ? "other item needs" : "other items need"} follow-up later.`
+      : "You are clear after today’s route.";
+    return `Your next job is ready. ${later}`;
+  }
+
+  if (scheduled > 0 && needScheduling > 0 && closeoutReady > 0) {
+    return `Today has ${scheduled} scheduled ${scheduled === 1 ? "visit" : "visits"}, ${needScheduling} waiting to be scheduled, and ${closeoutReady} ready for closeout.`;
+  }
+
+  if (scheduled > 0 && withoutTech > 0) {
+    return `You have ${scheduled} scheduled ${scheduled === 1 ? "visit" : "visits"} today, and ${withoutTech} ${withoutTech === 1 ? "is" : "are"} missing technician coverage.`;
+  }
+
+  if (needScheduling > 0) {
+    return `Schedule pressure is high: ${needScheduling} ${needScheduling === 1 ? "job is" : "jobs are"} waiting for dispatch.`;
+  }
+
+  if (waiting > 0 || params.followUpsCount > 0) {
+    const count = Math.max(waiting, params.followUpsCount);
+    return `Today looks clear, but ${count} ${count === 1 ? "follow-up is" : "follow-ups are"} waiting.`;
+  }
+
+  if ((params.servicePlansOverdue ?? 0) > 0) {
+    return `${params.servicePlansOverdue} service ${params.servicePlansOverdue === 1 ? "plan is" : "plans are"} overdue and need attention.`;
+  }
+
+  if ((params.openInvoiceCount ?? 0) > 0) {
+    return `${params.openInvoiceCount} open ${params.openInvoiceCount === 1 ? "invoice is" : "invoices are"} waiting in payments.`;
+  }
+
+  return "Today is clear. No urgent queues need action right now.";
+}
+
+export function buildFollowUpGroups(params: {
+  role: InternalRole;
+  followUps: FollowUpItem[];
+  priorityCounts: NextBestActionInputs["priorityCounts"];
+  servicePlansOverdue: number | null;
+  openInvoiceCount: number | null;
+  canViewBusinessPulse: boolean;
+}): FollowUpGroup[] {
+  const schedulingItems = params.followUps.filter((item) => item.concernKey === "scheduling");
+  const closeoutItems = params.followUps.filter((item) => item.concernKey === "closeout");
+  const waitingItems = params.followUps.filter((item) => item.concernKey === "waiting");
+  const exceptionItems = params.followUps.filter((item) => item.concernKey === "exceptions");
+
+  const groups: FollowUpGroup[] = [];
+
+  const schedulingCount = (params.priorityCounts.needScheduling ?? 0) + (params.priorityCounts.scheduledTodayWithoutTech ?? 0);
+  if (schedulingCount > 0 || schedulingItems.length > 0) {
+    groups.push({
+      key: "scheduling",
+      label: "Scheduling",
+      count: schedulingCount > 0 ? schedulingCount : schedulingItems.length,
+      href: "/ops/call-list",
+      preview: schedulingItems.slice(0, 3),
+      summary: null,
+    });
+  }
+
+  const closeoutCount = params.priorityCounts.closeoutReady ?? 0;
+  if (closeoutCount > 0 || closeoutItems.length > 0) {
+    groups.push({
+      key: "closeout",
+      label: "Closeout",
+      count: closeoutCount > 0 ? closeoutCount : closeoutItems.length,
+      href: "/ops/closeout-queue",
+      preview: closeoutItems.slice(0, 3),
+      summary: closeoutItems.length === 0 ? `${closeoutCount} ${closeoutCount === 1 ? "job" : "jobs"} ready for closeout.` : null,
+    });
+  }
+
+  const waitingCount = (params.priorityCounts.pendingInfo ?? 0) + (params.priorityCounts.onHold ?? 0);
+  if (waitingCount > 0 || waitingItems.length > 0) {
+    groups.push({
+      key: "waiting",
+      label: "Waiting / Pending Info",
+      count: waitingCount > 0 ? waitingCount : waitingItems.length,
+      href: "/ops?bucket=pending_info",
+      preview: waitingItems.slice(0, 3),
+      summary: null,
+    });
+  }
+
+  const exceptionCount = params.priorityCounts.failed ?? 0;
+  if (exceptionCount > 0 || exceptionItems.length > 0) {
+    groups.push({
+      key: "exceptions",
+      label: "Exceptions",
+      count: exceptionCount > 0 ? exceptionCount : exceptionItems.length,
+      href: "/ops?bucket=failed",
+      preview: exceptionItems.slice(0, 3),
+      summary: null,
+    });
+  }
+
+  if ((params.servicePlansOverdue ?? 0) > 0 && params.role !== "tech") {
+    groups.push({
+      key: "service_plans",
+      label: "Service Plans",
+      count: params.servicePlansOverdue ?? 0,
+      href: "/service-plans",
+      preview: [],
+      summary: `${params.servicePlansOverdue} overdue ${params.servicePlansOverdue === 1 ? "plan" : "plans"}.`,
+    });
+  }
+
+  if (params.canViewBusinessPulse && (params.openInvoiceCount ?? 0) > 0) {
+    groups.push({
+      key: "payments",
+      label: "Payments",
+      count: params.openInvoiceCount ?? 0,
+      href: "/reports/payments",
+      preview: [],
+      summary: `${params.openInvoiceCount} open ${params.openInvoiceCount === 1 ? "invoice" : "invoices"} awaiting payment.`,
+    });
+  }
+
+  return groups.slice(0, params.role === "tech" ? 3 : 5);
 }
 
 // -----------------------------------------------------------------------------
@@ -720,13 +1243,22 @@ export function buildPriorityChips(params: {
   servicePlansOverdue: number | null;
   openInvoiceCount: number | null;
   canViewBusinessPulse: boolean;
+  primaryFocusKey?: NextBestAction["focusKey"];
 }): PriorityChip[] {
   const chips: PriorityChip[] = [];
+  const focusKey = params.primaryFocusKey ?? null;
+
+  const pushChip = (chip: PriorityChip) => {
+    if (focusKey && chip.key === focusKey) {
+      return;
+    }
+    chips.push(chip);
+  };
 
   if ((params.priorityCounts.needScheduling ?? 0) > 0) {
-    chips.push({
+    pushChip({
       key: "need_scheduling",
-      label: "Need Scheduling",
+      label: "Start Here: Scheduling",
       count: params.priorityCounts.needScheduling ?? 0,
       href: "/ops/call-list",
       tone: "warn",
@@ -734,8 +1266,19 @@ export function buildPriorityChips(params: {
     });
   }
 
+  if ((params.priorityCounts.scheduledTodayWithoutTech ?? 0) > 0) {
+    pushChip({
+      key: "without_tech",
+      label: "Without Tech",
+      count: params.priorityCounts.scheduledTodayWithoutTech ?? 0,
+      href: "/ops/field",
+      tone: "warn",
+      urgent: true,
+    });
+  }
+
   if ((params.priorityCounts.failed ?? 0) > 0) {
-    chips.push({
+    pushChip({
       key: "exceptions",
       label: "Needs Attention",
       count: params.priorityCounts.failed ?? 0,
@@ -746,7 +1289,7 @@ export function buildPriorityChips(params: {
   }
 
   if ((params.priorityCounts.pendingInfo ?? 0) > 0) {
-    chips.push({
+    pushChip({
       key: "waiting",
       label: "Waiting on Info",
       count: params.priorityCounts.pendingInfo ?? 0,
@@ -757,7 +1300,7 @@ export function buildPriorityChips(params: {
   }
 
   if ((params.priorityCounts.onHold ?? 0) > 0) {
-    chips.push({
+    pushChip({
       key: "on_hold",
       label: "On Hold",
       count: params.priorityCounts.onHold ?? 0,
@@ -768,9 +1311,9 @@ export function buildPriorityChips(params: {
   }
 
   if ((params.priorityCounts.closeoutReady ?? 0) > 0) {
-    chips.push({
+    pushChip({
       key: "closeout",
-      label: "Ready for Closeout",
+      label: "Next: Closeout",
       count: params.priorityCounts.closeoutReady ?? 0,
       href: "/ops/closeout-queue",
       tone: "info",
@@ -782,7 +1325,7 @@ export function buildPriorityChips(params: {
     params.productMode !== "ecc_hers" &&
     (params.servicePlansOverdue ?? 0) > 0
   ) {
-    chips.push({
+    pushChip({
       key: "service_plans_due",
       label: "Service Plans Due",
       count: params.servicePlansOverdue ?? 0,
@@ -793,11 +1336,11 @@ export function buildPriorityChips(params: {
   }
 
   if (params.canViewBusinessPulse && (params.openInvoiceCount ?? 0) > 0) {
-    chips.push({
+    pushChip({
       key: "open_invoices",
-      label: "Open Invoices",
+      label: "Money: Open Invoices",
       count: params.openInvoiceCount ?? 0,
-      href: "/reports",
+      href: "/reports/payments",
       tone: "info",
       urgent: false,
     });
@@ -839,6 +1382,7 @@ async function buildTodayReadModelForInternalActor(
   const role = internalUser.role;
   const today = todayBusinessDateLA();
   const canViewBusinessPulse = canViewBusinessPulseForRole(role);
+  const showWelcomeModal = !hasDismissedTodayWelcome(actor.user?.user_metadata ?? null);
 
   const productModePromise = resolveProductModeForAccountOwnerId({
     supabase,
@@ -898,12 +1442,19 @@ async function buildTodayReadModelForInternalActor(
     today,
   });
 
-  const followUpsPromise = safeLoadFollowUps({ supabase, accountOwnerUserId });
+  const followUpsPromise = safeLoadFollowUps({ supabase, accountOwnerUserId, today });
+
+  const teamCoveragePromise = safeLoadTeamCoverage({
+    supabase,
+    role,
+    today,
+    maxRows: 5,
+  });
 
   const recentPromise = safeLoadRecentResume({
     supabase,
     accountOwnerUserId,
-    limit: 6,
+    limit: 5,
   });
 
   const servicePlansPromise = (async () => {
@@ -931,6 +1482,7 @@ async function buildTodayReadModelForInternalActor(
     todayJobs,
     priorityCounts,
     followUps,
+    teamCoverage,
     recent,
     servicePlans,
     openInvoice,
@@ -943,6 +1495,7 @@ async function buildTodayReadModelForInternalActor(
     todayJobsPromise,
     priorityCountsPromise,
     followUpsPromise,
+    teamCoveragePromise,
     recentPromise,
     servicePlansPromise,
     openInvoicePromise,
@@ -952,13 +1505,33 @@ async function buildTodayReadModelForInternalActor(
   const servicePlansDueIn7 = servicePlans?.due_counts?.due_in_next_7_days ?? null;
   const servicePlansActive = servicePlans?.status_counts?.active ?? null;
 
+  const followUpGroups = buildFollowUpGroups({
+    role,
+    followUps,
+    priorityCounts,
+    servicePlansOverdue,
+    openInvoiceCount: openInvoice.count,
+    canViewBusinessPulse,
+  });
+
+  const dailyBriefing = buildDailyBriefing({
+    role,
+    todayJobsCount: todayJobs.length,
+    priorityCounts,
+    openInvoiceCount: openInvoice.count,
+    servicePlansOverdue,
+    followUpsCount: followUps.length,
+  });
+
   const nextBestAction = selectNextBestAction({
     role,
     productMode,
     todayJobs,
     priorityCounts,
     openInvoiceCount: openInvoice.count,
+    openInvoiceBalanceCents: openInvoice.balanceCents,
     servicePlansOverdue,
+    resumeRecentCount: recent.items.length,
   });
 
   const priorityChips = buildPriorityChips({
@@ -968,6 +1541,7 @@ async function buildTodayReadModelForInternalActor(
     servicePlansOverdue,
     openInvoiceCount: openInvoice.count,
     canViewBusinessPulse,
+    primaryFocusKey: nextBestAction.focusKey,
   });
 
   const todayHeader: TodayHeader = {
@@ -1005,16 +1579,21 @@ async function buildTodayReadModelForInternalActor(
     productMode,
     role,
     todayHeader,
+    dailyBriefing,
     nextBestAction,
     todayWork: {
       label: todayLabel,
-      jobs: todayJobs,
+      jobs: todayJobs.slice(0, 8),
       showFieldActions,
     },
     priorityChips,
     followUps: followUps.slice(0, role === "tech" ? 3 : 8),
+    followUpGroups,
+    teamCoverage,
     businessPulse,
-    resumeRecentWork: recent.slice(0, 6),
+    resumeRecentWork: recent.items,
+    resumeRecentHasMore: recent.hasMore,
+    showWelcomeModal,
   };
 }
 
