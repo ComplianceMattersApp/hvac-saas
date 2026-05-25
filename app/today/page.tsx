@@ -492,7 +492,11 @@ function FollowUpSection({
                         <div className="truncate text-sm font-medium text-slate-900 group-hover:text-blue-700">
                           {item.title}
                         </div>
-                        <div className="truncate text-xs text-slate-600">{item.reason}</div>
+                        <div className="truncate text-xs text-slate-500">
+                          {[item.reason, item.customerName, item.city, item.ageDisplay]
+                            .filter(Boolean)
+                            .join(" · ")}
+                        </div>
                       </Link>
                     </li>
                   ))}

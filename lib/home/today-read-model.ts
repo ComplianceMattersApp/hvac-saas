@@ -114,6 +114,9 @@ export type FollowUpItem = {
   concernKey: "scheduling" | "closeout" | "waiting" | "exceptions";
   href: string;
   scheduledDateDisplay: string | null;
+  customerName?: string | null;
+  city?: string | null;
+  ageDisplay?: string | null;
 };
 
 export type FollowUpGroup = {
@@ -657,6 +660,17 @@ async function safeLoadPriorityCounts(params: {
   };
 }
 
+function buildItemAgeDisplay(createdAt: unknown): string | null {
+  const raw = String(createdAt ?? "").trim();
+  if (!raw) return null;
+  const stamp = new Date(raw).getTime();
+  if (!Number.isFinite(stamp)) return null;
+  const days = Math.max(0, Math.floor((Date.now() - stamp) / 86_400_000));
+  if (days === 0) return "today";
+  if (days === 1) return "1 day old";
+  return `${days} days old`;
+}
+
 async function safeLoadFollowUps(params: {
   supabase: any;
   accountOwnerUserId: string;
@@ -694,6 +708,9 @@ async function safeLoadFollowUps(params: {
         });
         if (!reason) return null;
         const concernKey = followUpConcernKey(reason);
+        const firstName = job.customerFirstName ?? null;
+        const lastName = job.customerLastName ?? null;
+        const fullName = [firstName, lastName].map((s) => (s ?? "").trim()).filter(Boolean).join(" ");
         return {
           key: job.id,
           title: job.title,
@@ -703,6 +720,9 @@ async function safeLoadFollowUps(params: {
           scheduledDateDisplay: job.scheduledDate
             ? formatBusinessDateUS(job.scheduledDate) || null
             : null,
+          customerName: fullName || null,
+          city: job.city || null,
+          ageDisplay: buildItemAgeDisplay(row.created_at),
         } satisfies FollowUpItem;
       })
       .filter((row: FollowUpItem | null): row is FollowUpItem => row != null);
