@@ -87,6 +87,31 @@ If any item here conflicts with the active spine, the spine wins.
   - no refund/dispute/saved-card/partial-payment/customer-portal/platform-fee/QBO promise appears as active behavior
   - manual/off-platform payment recording continues to coexist with Stripe-sourced payment rows
 
+### 2.4 Time Clock lane closeout confirmation (completed)
+- Time Clock V1 through V1.5A is complete for current intended scope.
+- Completed scope includes:
+  - account-level Time Clock enable/disable
+  - per-user time tracking toggle and consolidated team controls
+  - employee `/time-clock` with Clock In / Start Lunch / End Lunch / Clock Out
+  - Ops Team Clock Status card
+  - admin `/ops/admin/time-clock` review/correction center
+  - correction controls for all admin entries with required reason and audit fields
+  - rolling 7-Day Time Review (recent review surface only)
+  - Report Center `/reports/time-clock` history view and CSV export
+- Latest reporting/export closeout commit: `3f81c71` (`feat(time-clock): add reporting history export`).
+- Durability/retention confirmation:
+  - time entries are durable records
+  - 7-day review is a recent admin surface, not a retention limit
+  - older lookup/export is available via Report Center history/export
+- Boundary confirmation:
+  - no delete/reset behavior
+  - no payroll engine
+  - no wage/overtime calculations
+  - no GPS/geofencing
+  - no job-costing behavior
+  - no contractor/customer portal time tracking
+  - no QBO/payroll sync behavior
+
 ### 2.3.1 Launch-readiness catch-up confirmations (completed)
 - Scope vs Line Items / Work Items terminology alignment is complete.
 - Confirmed UI no longer presents free-form scope and structured line items as duplicate concepts on validated core surfaces.

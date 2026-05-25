@@ -248,11 +248,11 @@ V1E closeout status:
 - Add `needs_review` and `voided` review handling UX.
 
 V1F closeout status:
-- Complete in repository: admin-only `/ops/admin/time-clock` review center with Today-first operational view.
-- Includes `Active Now`, `Today's Entries`, and `Needs Review` sections with account-scoped read helpers.
-- Admin correction action supports required adjustment reason and minimal updates (`clock_out_at`, optional `lunch_end_at`, status `closed|needs_review`, `adjusted_by_user_id`, `adjusted_at`, `adjustment_reason`).
+- Complete in repository: admin-only `/ops/admin/time-clock` review center with `Active Now`, rolling review, and `Needs Review` sections.
+- Admin correction controls are available for all admin review entries and require adjustment reason.
+- Admin correction action supports scoped entry corrections across `clock_in_at`, `lunch_start_at`, `lunch_end_at`, `clock_out_at`, and status (`closed|needs_review|voided`) with audit fields (`adjusted_by_user_id`, `adjusted_at`, `adjustment_reason`).
 - Server action is admin-gated and account-scoped; target entry must belong to current account owner scope.
-- No payroll approvals, exports/reporting, wage/overtime calculations, GPS/geofencing, job-costing, or contractor/customer-portal behavior added in this phase.
+- No payroll approvals, wage/overtime calculations, GPS/geofencing, job-costing, or contractor/customer-portal behavior added in this phase.
 
 ### V1G - 7-day admin time review
 - Expand admin review center from a today-only list to a rolling 7-day review surface.
@@ -279,6 +279,36 @@ V1.5A closeout status:
 - Includes newest-first historical visibility and simple CSV export using existing Report Center patterns.
 - Report fields include employee, status, clock in/out windows, duration, adjusted indicator, adjustment reason, adjusted by, and adjusted at.
 - Time entry history remains account-scoped and durable; no payroll, overtime, wages, GPS/geofencing, job-costing, contractor, portal, or approval behavior was added.
+
+### Time Clock lane closeout (V1 + V1.5A)
+- Time Clock V1 and V1.5A are complete for current intended scope.
+- Latest reporting/history closeout commit: `3f81c71` (`feat(time-clock): add reporting history export`).
+- Durability confirmation:
+	- time entries are durable records
+	- `/ops/admin/time-clock` 7-day review is a recent review surface only, not a retention limit
+	- `/reports/time-clock` provides older history lookup and export
+- Correction/audit confirmation:
+	- corrections require non-empty reason
+	- audit metadata remains preserved (`adjusted_by_user_id`, `adjusted_at`, `adjustment_reason`)
+	- no delete behavior was added
+- Scope guardrails confirmed:
+	- no payroll engine
+	- no wage/overtime calculations
+	- no GPS/geofencing
+	- no job-costing behavior
+	- no contractor/customer portal time tracking
+	- no QBO/payroll sync behavior
+
+Deferred/future items (parked unless explicitly reopened):
+- payroll-ready summaries
+- overtime rules
+- approval workflow
+- job labor costing
+- GPS/geofence verification
+- office view-only permission expansion
+- deeper Admin/Settings IA cleanup
+- payroll/QBO integration
+- contractor/portal time tracking
 
 ---
 

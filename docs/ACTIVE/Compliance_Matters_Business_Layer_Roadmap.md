@@ -36,10 +36,12 @@ It extends it.
 - `jobs` = visit execution truth
 - `service_cases` = continuity truth
 
-Time Clock / Team Time Tracking planning note (May 2026):
-- Time Clock is now staged in docs/model-only posture for V1A and is not implemented in runtime behavior in this pass.
-- Timekeeping source-of-truth is locked to a dedicated internal-user time-entry layer; `job_events` may later receive summaries but must not become timecard truth.
-- Planned sequence is locked as: V1A model/docs lock -> V1B schema/settings foundation -> V1C employee `/time-clock` -> V1D Ops/Home team-status card -> V1E admin review/correction center -> V1.5 weekly summary/export.
+Time Clock / Team Time Tracking closeout note (May 2026):
+- Time Clock V1 through V1.5A is complete for current intended scope.
+- Timekeeping source-of-truth remains locked to a dedicated durable internal-user time-entry layer; `job_events` may later receive summaries but must not become timecard truth.
+- Completed delivery includes employee runtime actions, admin review/correction controls with required reason/audit metadata, rolling 7-day admin review, and Report Center history/export.
+- Latest reporting/export closeout commit: `3f81c71`.
+- Boundary confirmation: no delete/reset behavior, no payroll engine, no wage/overtime calculations, no GPS/geofencing, no job-costing behavior, no contractor/customer portal time tracking, and no QBO/payroll sync behavior were added.
 
 ### Locked relationship rules
 - **Job** = work / visit record
