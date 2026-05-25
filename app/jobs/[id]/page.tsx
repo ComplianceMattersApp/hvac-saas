@@ -5376,13 +5376,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <p className="text-xs leading-5 text-amber-900/90">
                 Use this when the part, approval, access, or missing information is no longer blocking the job.
               </p>
-              <form action={releaseAndReevaluateFromForm} className="mt-2">
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
-                <SubmitButton loadingText="Updating..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+              <div className="mt-2">
+                <SubmitButton formAction={releaseAndReevaluateFromForm} loadingText="Updating..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
                   Mark Ready to Continue
                 </SubmitButton>
-              </form>
+              </div>
             </div>
           ) : null}
         </div>
