@@ -1771,7 +1771,6 @@ const teamSnapshotCards = [
   { key: "unassigned", label: "Unassigned", count: teamSnapshotUnassignedCount },
   { key: "in_progress", label: "In Progress", count: teamSnapshotInProgressCount },
   { key: "waiting", label: "Waiting", count: teamSnapshotWaitingCount },
-  { key: "needs_closeout", label: "Needs Closeout", count: teamSnapshotNeedsCloseoutCount },
 ];
 
 const teamSnapshotTotalCount = teamSnapshotCards.reduce((sum, card) => sum + card.count, 0);
@@ -2592,14 +2591,14 @@ return (
             )}
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2">
-            <div className="rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2">
-              <div className={`${opsUtilityLabelClass} text-slate-500`}>Exceptions</div>
+            <div className={`rounded-xl border px-3 py-2 ${exceptionCount > 0 ? "border-rose-200 bg-rose-50/70" : "border-slate-200 bg-slate-50/85"}`}>
+              <div className={`${opsUtilityLabelClass} ${exceptionCount > 0 ? "text-rose-700" : "text-slate-500"}`}>Needs Attention</div>
               <div className={`mt-1 text-lg font-semibold tabular-nums ${exceptionCount > 0 ? "text-rose-700" : "text-slate-900"}`}>
                 {exceptionCount}
               </div>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2">
-              <div className={`${opsUtilityLabelClass} text-slate-500`}>Closeout</div>
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Ready for Closeout</div>
               <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{prioritizedCloseoutJobs.length}</div>
             </div>
           </div>
@@ -2647,11 +2646,7 @@ return (
             </div>
           </div>
 
-          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-xl border border-slate-200 bg-white/88 px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-              <div className={`${opsUtilityLabelClass} text-slate-500`}>Active Jobs</div>
-              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{activeOpsWorkCount}</div>
-            </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
             <div className="rounded-xl border border-slate-200 bg-white/88 px-3 py-2 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
               <div className={`${opsUtilityLabelClass} text-slate-500`}>Scheduled Visits</div>
               <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{counts.get("scheduled") ?? 0}</div>
