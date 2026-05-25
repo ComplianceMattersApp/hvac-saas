@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createClientMock = vi.fn();
+const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
+  createAdminClient: (...args: unknown[]) => createAdminClientMock(...args),
 }));
 
 vi.mock("@/lib/auth/internal-user", () => ({
@@ -50,6 +52,8 @@ type SubmissionRow = {
   proposed_permit_date?: string | null;
 };
 
+let lastSupabaseFixture: any = null;
+
 function makeSupabase(fixture: {
   notifications: NotificationRow[];
   submissions: SubmissionRow[];
@@ -68,7 +72,7 @@ function makeSupabase(fixture: {
     window_end?: string | null;
   }>;
 }) {
-  return {
+  const client = {
     from(table: string) {
       const filters: Array<{ kind: "eq" | "is" | "in"; column: string; value: unknown }> = [];
 
@@ -156,12 +160,21 @@ function makeSupabase(fixture: {
       return query;
     },
   };
+
+  lastSupabaseFixture = client;
+  return client;
 }
 
 describe("internal notification readers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    createAdminClientMock.mockImplementation(() => {
+      if (!lastSupabaseFixture) {
+        throw new Error("createClient mock must be configured before createAdminClient");
+      }
+      return lastSupabaseFixture;
+    });
     requireInternalUserMock.mockResolvedValue({
       userId: "internal-1",
       internalUser: {

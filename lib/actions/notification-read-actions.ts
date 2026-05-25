@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { requireInternalUser } from "@/lib/auth/internal-user";
 import {
   matchesInternalNotificationFilter,
@@ -99,7 +99,8 @@ function mergeProposalEnrichment(
 
 async function buildProposalEnrichmentMap(
   supabase: any,
-  rows: NotificationRow[]
+  rows: NotificationRow[],
+  accountOwnerUserId: string,
 ): Promise<Map<string, ProposalEnrichment>> {
   const enrichmentMap = new Map<string, ProposalEnrichment>();
 
@@ -139,6 +140,7 @@ async function buildProposalEnrichmentMap(
     .select(
       "id, contractor_id, proposed_customer_first_name, proposed_customer_last_name, proposed_address_line1, proposed_city, proposed_state, proposed_zip, proposed_location_nickname, proposed_job_type, proposed_project_type, proposed_job_notes, proposed_permit_number, proposed_jurisdiction, proposed_permit_date"
     )
+    .eq("account_owner_user_id", accountOwnerUserId)
     .in("id", uniqueSubmissionIds);
 
   const submissionById = new Map<string, Record<string, unknown>>();
@@ -695,6 +697,7 @@ export async function listInternalNotifications(params: {
   filterKey?: InternalNotificationFilterKey | null;
 } = {}): Promise<NotificationRowForUI[]> {
   const { supabase, accountOwnerUserId, userId } = await requireScopedInternalNotificationContext();
+  const admin = createAdminClient();
 
   let query = supabase
     .from("notifications")
@@ -758,7 +761,7 @@ export async function listInternalNotifications(params: {
 
   const proposalEnrichmentMap = await trackOpsNotificationTiming(
     "ops:notifications:proposalEnrichment",
-    buildProposalEnrichmentMap(supabase, visibilityRows)
+    buildProposalEnrichmentMap(admin, visibilityRows, accountOwnerUserId)
   );
   const jobEnrichmentMap = await trackOpsNotificationTiming(
     "ops:notifications:jobEnrichment",
