@@ -298,3 +298,92 @@ export async function claimNullOwnerCustomer(customerId: string, _formData: Form
   revalidatePath(`/customers/${normalizedCustomerId}`);
   redirect(`/customers/${normalizedCustomerId}/edit`);
 }
+
+/**
+ * Standalone new-customer creation action.
+ * Requires an authenticated active internal user.
+ * Optionally creates a primary service location when address fields are provided.
+ * Does NOT create any job, estimate, invoice, or service case.
+ * On success, redirects to the new customer profile.
+ */
+export async function createCustomerFromForm(formData: FormData) {
+  const supabase = await createClient();
+
+  let internalUser;
+  try {
+    ({ internalUser } = await requireInternalUser({ supabase }));
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/login");
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  if (!accountOwnerUserId) throw new Error("Missing account owner scope");
+
+  await requireOperationalCustomerMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
+
+  const first_name = String(formData.get("first_name") ?? "").trim() || null;
+  const last_name = String(formData.get("last_name") ?? "").trim() || null;
+  const phone = String(formData.get("phone") ?? "").trim() || null;
+  const email = String(formData.get("email") ?? "").trim() || null;
+  const notes = String(formData.get("notes") ?? "").trim() || null;
+
+  if (!first_name && !last_name) {
+    throw new Error("At least a first name or last name is required.");
+  }
+
+  const full_name = toFullName(first_name, last_name) || null;
+
+  const admin = createAdminClient();
+
+  const { data: customer, error: custErr } = await admin
+    .from("customers")
+    .insert({
+      first_name,
+      last_name,
+      full_name,
+      phone,
+      email,
+      notes,
+      owner_user_id: accountOwnerUserId,
+    })
+    .select("id")
+    .single();
+
+  if (custErr) throw new Error(`Customer insert failed: ${custErr.message}`);
+  const customerId = customer.id as string;
+
+  // Optionally create primary service location
+  const address_line1 = String(formData.get("address_line1") ?? "").trim() || null;
+  const city = String(formData.get("city") ?? "").trim() || null;
+  const state = String(formData.get("state") ?? "").trim() || null;
+  const zip = String(formData.get("zip") ?? "").trim() || null;
+
+  const hasAddress = Boolean(address_line1 && city && zip);
+  if (hasAddress) {
+    const { error: locErr } = await admin
+      .from("locations")
+      .insert({
+        customer_id: customerId,
+        address_line1,
+        city,
+        state: state || null,
+        zip,
+        postal_code: zip,
+        owner_user_id: accountOwnerUserId,
+      });
+
+    if (locErr) throw new Error(`Location insert failed: ${locErr.message}`);
+  }
+
+  revalidatePath("/customers");
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/ops");
+
+  redirect(`/customers/${customerId}?created=1`);
+}

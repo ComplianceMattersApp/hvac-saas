@@ -1,15 +1,17 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { Clock3 } from "lucide-react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileShellMenu from "@/components/layout/MobileShellMenu";
+import ShellCreateMenu, { type ShellCreateItem } from "@/components/layout/ShellCreateMenu";
+import ShellNavLink from "@/components/layout/ShellNavLink";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
+import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 const geistSans = Geist({
@@ -73,6 +75,7 @@ export default async function RootLayout({
   let isInternalUser = false;
   let isAdmin = false;
   const estimatesEnabled = isEstimatesEnabled();
+  const servicePlansEnabled = isMaintenanceAgreementsEnabled();
   let unreadNotificationCount = 0;
   let productMode: ProductMode = "hybrid";
 
@@ -95,6 +98,38 @@ export default async function RootLayout({
   }
 
   const primaryJobCtaLabel = productMode === "hvac_service" ? "+ New Work Order" : "+ New Job";
+  const createMenuItems: ShellCreateItem[] = [
+    {
+      label: productMode === "hvac_service" ? "New Work Order" : "New Job",
+      href: "/jobs/new",
+      description: "Start a new job or service visit.",
+    },
+  ];
+
+  if (isInternalUser) {
+    createMenuItems.push({
+      label: "New Customer",
+      href: "/customers/new",
+      description: "Create a standalone customer record.",
+    });
+  }
+
+  if (isInternalUser && estimatesEnabled) {
+    createMenuItems.push({
+      label: "New Estimate",
+      href: "/estimates/new",
+      description: "Create an active estimate or proposal draft.",
+    });
+  }
+
+  if (isInternalUser && servicePlansEnabled) {
+    createMenuItems.push({
+      label: "New Service Plan",
+      href: "/service-plans",
+      description: "Open Service Plans; plan creation stays customer-scoped.",
+    });
+  }
+
   const showOperationalNotificationAwareness = !isInternalUser || productMode !== "hvac_service";
 
   const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
@@ -110,10 +145,6 @@ export default async function RootLayout({
   });
   const accountLabel = accountDisplayName;
   const unreadNotificationBadgeLabel = unreadNotificationCount > 99 ? "99+" : String(unreadNotificationCount);
-  const shellSecondaryLinkClass =
-    "inline-flex items-center justify-center rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70";
-  const shellUtilityLinkClass =
-    "inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70";
   return (
     <html lang="en">
       <body
@@ -124,7 +155,7 @@ export default async function RootLayout({
           {user ? (
             <>
               {/* Top Bar */}
-              <header className="fixed top-0 inset-x-0 z-50 border-b border-slate-300/80 bg-white/88 px-4 py-3 backdrop-blur-md shadow-[0_14px_28px_-24px_rgba(15,23,42,0.4)] sm:px-6 print:hidden">
+              <header className="fixed top-0 inset-x-0 z-50 border-b border-slate-300/80 bg-white/90 px-4 py-3 backdrop-blur-md shadow-[0_14px_28px_-24px_rgba(15,23,42,0.4)] sm:px-6 print:hidden">
                 <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-3 sm:gap-4">
                   {/* Brand — fixed left */}
                   <div className="shrink-0 flex items-center gap-3">
@@ -146,91 +177,54 @@ export default async function RootLayout({
                   <div className="hidden h-8 w-px shrink-0 bg-slate-200/90 lg:block" />
 
                   {/* Primary nav — expands between brand and utilities, aligned left */}
-                  <div className="hidden flex-1 items-center justify-start gap-3 sm:flex">
-                    <Link
-                      href="/jobs/new"
-                      className="inline-flex items-center justify-center rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_22px_-18px_rgba(37,99,235,0.58)] transition-all hover:-translate-y-px hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-0"
-                    >
-                      {primaryJobCtaLabel}
-                    </Link>
-                    {isInternalUser ? (
-                      <Link
-                        href="/calendar"
-                        className={shellSecondaryLinkClass}
-                      >
-                        View Calendar
-                      </Link>
-                    ) : null}
-                    <Link
-                      href="/customers"
-                      className={shellSecondaryLinkClass}
-                    >
-                      Search Customers
-                    </Link>
+                  <div className="hidden min-w-0 flex-1 items-center justify-start gap-2 lg:flex">
+                    <ShellCreateMenu items={createMenuItems} />
+                    <nav aria-label="Primary navigation" className="flex min-w-0 items-center gap-1">
+                      <ShellNavLink href="/jobs">Jobs</ShellNavLink>
+                      {isInternalUser ? (
+                        <ShellNavLink href="/calendar">Calendar</ShellNavLink>
+                      ) : null}
+                      {isInternalUser ? (
+                        <ShellNavLink href="/ops/field" exact>
+                          My Work
+                        </ShellNavLink>
+                      ) : null}
+                      <ShellNavLink href="/customers">Customers</ShellNavLink>
+                      {isInternalUser && servicePlansEnabled ? (
+                        <ShellNavLink href="/service-plans">Service Plans</ShellNavLink>
+                      ) : null}
+                      {isInternalUser && estimatesEnabled ? (
+                        <ShellNavLink href="/estimates">Estimates</ShellNavLink>
+                      ) : null}
+                      {isInternalUser ? (
+                        <ShellNavLink href="/reports">Reports</ShellNavLink>
+                      ) : null}
+                    </nav>
                   </div>
 
                   {/* Utility links — fixed right */}
                   <div className="hidden shrink-0 items-center gap-2 sm:flex">
                     {isInternalUser && showOperationalNotificationAwareness && (
-                      <Link
-                        href="/ops/notifications"
-                        className={shellUtilityLinkClass}
-                      >
+                      <ShellNavLink href="/ops/notifications" className="gap-1.5">
                         <span>Notifications</span>
                         {unreadNotificationCount > 0 ? (
                           <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1 text-[10px] font-semibold text-blue-700 shadow-[0_6px_12px_-10px_rgba(37,99,235,0.42)]">
                             {unreadNotificationBadgeLabel}
                           </span>
                         ) : null}
-                      </Link>
-                    )}
-                    {isInternalUser && (
-                      <Link
-                        href="/ops/field"
-                        className={shellUtilityLinkClass}
-                      >
-                        My Work
-                      </Link>
-                    )}
-                    {isInternalUser && estimatesEnabled && (
-                      <Link
-                        href="/estimates"
-                        className={shellUtilityLinkClass}
-                      >
-                        Estimates
-                      </Link>
-                    )}
-                    {isInternalUser && (
-                      <Link
-                        href="/time-clock"
-                        className={shellUtilityLinkClass}
-                      >
-                        <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>Time Clock</span>
-                      </Link>
-                    )}
-                    {isInternalUser && (
-                      <Link
-                        href="/reports"
-                        className={shellUtilityLinkClass}
-                      >
-                        Reports
-                      </Link>
-                    )}
-                    {isInternalUser && (
-                      <Link
-                        href="/notes"
-                        className={shellUtilityLinkClass}
-                      >
-                        Notes
-                      </Link>
+                      </ShellNavLink>
                     )}
                     <div className="ml-1 border-l border-slate-200/80 pl-2">
-                      <UserAccountMenu accountName={accountDisplayName} accountLabel={accountLabel} isAdmin={isAdmin} />
+                      <UserAccountMenu
+                        accountName={accountDisplayName}
+                        accountLabel={accountLabel}
+                        isAdmin={isAdmin}
+                        isInternalUser={isInternalUser}
+                      />
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 sm:hidden">
+                  <div className="flex items-center gap-2 lg:hidden">
                     <MobileShellMenu
                       isInternalUser={isInternalUser}
                       isAdmin={isAdmin}
@@ -239,6 +233,7 @@ export default async function RootLayout({
                       unreadNotificationCount={unreadNotificationCount}
                       unreadNotificationBadgeLabel={unreadNotificationBadgeLabel}
                       primaryJobCtaLabel={primaryJobCtaLabel}
+                      servicePlansEnabled={servicePlansEnabled}
                     />
                   </div>
                 </div>
