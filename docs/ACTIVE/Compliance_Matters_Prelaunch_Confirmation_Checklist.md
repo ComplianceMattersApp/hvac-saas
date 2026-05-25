@@ -98,8 +98,9 @@ If any item here conflicts with the active spine, the spine wins.
   - Billing / AR is not Admin and does not manage team access/admin settings unless separately assigned Admin
 - Confirm Financial Ledger / Payments Register access-control prerequisite is satisfied:
   - source spec: `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`
-  - Billing Register V1 may resume in the next implementation lane under Owner/Admin/Billing and existing helper/server-side gates
-  - Billing Register UI/actions remain deferred in this pass and require a separate implementation lane
+  - **Payments Register V1A/V1B are now implemented (commit `c9dc763`)**: read-only `/reports/payments` register with Owner/Admin/Billing gating, recorded/failed separation, method taxonomy (ACH hidden), and filtered CSV export at `/reports/payments/export`
+  - Register reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, Stripe/Supabase/prod changes
+  - Future phases may add payment recording, corrections, allocations, customer history, dashboard cards, QBO, ACH, fees, recurring billing
 
 ### 2.4 Time Clock lane closeout confirmation (completed)
 - Time Clock V1 through V1.5A is complete for current intended scope.

@@ -462,6 +462,58 @@ Not introduced in V1A-3F:
 
 ---
 
+## 5.5 Payments Register V1A/V1B (Read-Only Register & CSV Export)
+
+**Status**: V1A (read-only register) and V1B (CSV export) implemented (commit `c9dc763`).
+
+### V1A — Read-Only Payments Register Page
+
+- Implemented `/reports/payments` page at Report Center navigation.
+- Access gated with `requireFinancialRegisterAccessOrRedirect()`: Owner/Admin/Billing only; Dispatcher/Technician/Contractors/Portal users blocked by default.
+- Register reads from `internal_invoice_payments` current truth only (no new query/mutation logic).
+- UI sections:
+  - Stat cards: Visible rows, Recorded count, Failed count, Recorded total amount
+  - Filter panel: Status (Recorded/Failed/Pending/Reversed), Method (online_stripe/card/check/cash/digital/other), Date range (from/to), Text search (invoice/customer/job/reference/notes)
+  - Recorded payments table: Paid Date, Amount, Status, Method, Customer (link to `/customers/{id}`), Invoice (link to invoice), Job Reference (link to `/jobs/{id}`), Reference, Notes
+  - Failed attempts table: Same columns as recorded for clear separation/identification
+  - Other states table: Pending, Reversed, and other non-recorded statuses
+- Method taxonomy preserved:
+  - online_stripe, card, check, cash, digital, other
+  - ACH hidden and mapped to 'other' per V1 model
+- Failed attempts clearly separated by status field and table section so failed rows never appear as collected money.
+- All rows include navigation links where available (customer, invoice, job).
+
+### V1B — Filtered CSV Export
+
+- Implemented `/reports/payments/export` GET endpoint for filtered CSV download.
+- Access gated with `canExportFinancialData()`: Owner/Admin/Billing only; returns 401 redirect for unauthorized users.
+- Export preserves all active filters: status, method, date range, text search query.
+- CSV structure:
+  - Headers: Paid Date, Amount, Status, Method, Customer, Invoice, Job Reference, Job Title, Reference, Notes
+  - Data rows include all filtered register rows with proper escaping (quotes, commas, newlines)
+  - Status field included for failed attempt identification
+  - Method field includes normalized taxonomy (no ACH exposure)
+- Response headers:
+  - `Content-Type: text/csv;charset=utf-8`
+  - `Content-Disposition: attachment;filename="payments-register-{date}.csv"`
+  - `Cache-Control: no-cache, no-store, must-revalidate`
+
+Not introduced in V1A/V1B:
+- No payment recording UI or server actions
+- No corrections, allocations, or adjustments
+- No customer payment history rollup
+- No dashboard financial cards
+- No QBO integration
+- No ACH (remains hidden)
+- No platform fees
+- No recurring billing execution
+- No schema/migration changes
+- No Supabase RLS policy changes
+- No Stripe webhook changes
+- No production changes
+
+---
+
 ## 6. Payment foundation requirements (build now)
 
 ### 6.1 Data model rule

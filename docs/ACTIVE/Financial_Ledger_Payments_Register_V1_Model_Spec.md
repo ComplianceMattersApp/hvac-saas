@@ -7,9 +7,26 @@ Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, produc
 Implementation gate status:
 
 - Service Role Controls / Financial Access Controls V1A-2, V1A-3, and V1A-4 are implemented and documented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md).
-- Financial access-control prerequisite for Billing Register resume is satisfied.
-- Billing Register V1 may resume in the next implementation lane under Owner/Admin/Billing authority using existing financial-access helper/server-side gates.
-- Billing Register UI/actions remain deferred in this pass and are not implemented by this docs closeout.
+- **Payments Register V1A (Read-Only Register) is now implemented:**
+  - `/reports/payments` read-only page displays register rows from `internal_invoice_payments`
+  - Access gated to Owner/Admin/Billing only (Dispatcher/Technician blocked by default)
+  - Recorded payments separated from failed attempts in UI with status field
+  - Method taxonomy preserved: online_stripe, card, check, cash, digital, other (ACH hidden/mapped to 'other')
+  - Filter panel: status, method, date range, text search
+  - Stat cards: visible rows, recorded count, failed count, recorded total amount
+  - Commit: `c9dc763`
+- **Payments Register V1B (CSV Export) is now implemented:**
+  - Filtered CSV export at `/reports/payments/export`
+  - Exports current register rows with all filters preserved (status, method, date range, search)
+  - Access gated with `canExportFinancialData()` (Owner/Admin/Billing only)
+  - CSV includes: Paid Date, Amount, Status, Method, Customer, Invoice, Job Reference, Job Title, Reference, Notes
+  - Failed attempts clearly marked by status field in export
+  - Method taxonomy preserved (no ACH exposure)
+  - Proper CSV escaping for special characters (quotes, commas, newlines)
+  - Commit: `c9dc763`
+- Financial access-control prerequisite for Payments Register V1 is fully satisfied and leveraged.
+- Payments Register UI/actions remain read-only in this pass; recording/corrections/allocations remain deferred in future phases.
+- Payment correction, allocation, customer payment history, dashboard financial cards, QBO sync, ACH, platform fees, and recurring billing remain deferred.
 
 Current financial access model for sensitive financial actions:
 

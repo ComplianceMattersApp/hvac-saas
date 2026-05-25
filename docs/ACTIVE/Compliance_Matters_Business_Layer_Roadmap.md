@@ -2991,7 +2991,7 @@ For business-layer planning purposes:
 - Financial Ledger / Payments Register V1 locks the future model as Payment Register Entry plus Payment Allocation, with invoice paid/balance as a derived projection and failed attempts separated from collected money
 - Service Role Controls / Financial Access Controls V1A-2, V1A-3, and V1A-4 are implemented: Billing / AR is now a valid internal role and sensitive financial authority is structural owner/admin/billing with default blocks for dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users
 - Existing sensitive financial server-side gates are active for manual invoice payment recording, tenant payment-link/checkout-session creation, invoice ledger CSV export, invoice draft create/update, invoice issue, invoice void, and invoice email send/resend
-- Access-control prerequisite for Financial Ledger / Payments Register V1 is satisfied; Billing Register V1 may resume in the next implementation lane under existing helper/server-side gates
+- **Payments Register V1A/V1B are now implemented** (commit `c9dc763`): read-only `/reports/payments` register with Owner/Admin/Billing gating, recorded/failed separation, method taxonomy (ACH hidden), and filtered CSV export at `/reports/payments/export`. Register reads from `internal_invoice_payments` only; no mutations, corrections, allocations, QBO, ACH, platform fees, or recurring billing were added. Remaining deferred: payment recording, corrections, allocations, customer history, dashboard cards, QBO, ACH, fees, recurring
 
 ### Locked rule
 Do not use this document to override:
