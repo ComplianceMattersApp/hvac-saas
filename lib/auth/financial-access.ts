@@ -90,6 +90,16 @@ export function requireInvoicePaymentRecordAccessOrRedirect(params: FinancialAcc
   redirect(params.redirectTo);
 }
 
+export function requireFinancialRegisterAccessOrRedirect(params: FinancialAccessParams & {
+  redirectTo: string;
+}) {
+  if (canViewFinancialRegister(params)) {
+    return;
+  }
+
+  redirect(params.redirectTo);
+}
+
 export function requireInvoiceLifecycleAccessOrRedirect(params: FinancialAccessParams & {
   redirectTo: string;
 }) {

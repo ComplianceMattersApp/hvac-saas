@@ -14,6 +14,7 @@ import {
   canViewFinancialRegister,
   isStructuralAccountOwner,
   requireFinancialExportAccessOrResponse,
+  requireFinancialRegisterAccessOrRedirect,
   requireInvoiceLifecycleAccessOrRedirect,
 } from '@/lib/auth/financial-access';
 
@@ -161,6 +162,21 @@ describe('financial access helper', () => {
         redirectTo: '/jobs/job-1?tab=info&banner=not_authorized#internal-invoice-panel',
       }),
     ).toThrow('REDIRECT:/jobs/job-1?tab=info&banner=not_authorized#internal-invoice-panel');
+  });
+
+  it('financial register redirect helper denies tech when not structural owner', () => {
+    expect(() =>
+      requireFinancialRegisterAccessOrRedirect({
+        actorUserId: 'tech-1',
+        internalUser: {
+          user_id: 'tech-1',
+          role: 'tech',
+          is_active: true,
+          account_owner_user_id: 'owner-1',
+        },
+        redirectTo: '/reports/payments?banner=not_authorized',
+      }),
+    ).toThrow('REDIRECT:/reports/payments?banner=not_authorized');
   });
 
   it('contractor/non-internal fails route-friendly response check', () => {
