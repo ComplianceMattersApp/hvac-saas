@@ -3007,6 +3007,7 @@ Those belong to the payments roadmap.
 ## 15. Billing permissions (planned)
 
 This section is now subordinate to `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`. V1A-2, V1A-3, and V1A-4 are implemented and Billing / AR is now a real internal role with financial authority (not Admin authority). Access-control prerequisite for Billing Register resume is satisfied; Billing Register V1 may resume in the next implementation lane only through existing financial-access helper/server-side gates. Billing Register UI, payment register mutations, payment correction tools, and broad financial dashboards still require explicit next-lane implementation and must not proceed from this older planning section alone.
+This section is now subordinate to `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`. V1A-2, V1A-3, and V1A-4 are implemented and Billing / AR is now a real internal role with financial authority (not Admin authority). Access-control prerequisite for Billing Register resume is satisfied and verified by Payments Register V1A/V1B/V1C implementations (commit `c9dc763` and `55dab8c`); Billing Register V1 may resume in the next implementation lane only through existing financial-access helper/server-side gates. Billing Register UI, payment register mutations, payment correction tools, and broad financial dashboards still require explicit next-lane implementation and must not proceed from this older planning section alone.
 
 ### Office/Admin
 - full invoice management

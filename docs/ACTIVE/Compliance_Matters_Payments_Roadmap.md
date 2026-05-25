@@ -509,8 +509,46 @@ Not introduced in V1A/V1B:
 - No recurring billing execution
 - No schema/migration changes
 - No Supabase RLS policy changes
+
+
+## 6. Payment foundation requirements (build now)
+
+### 6.1 Data model rule
+- No Supabase RLS policy changes
 - No Stripe webhook changes
 - No production changes
+
+## 5.6 Payments Register V1C (Customer Profile Payment History)
+
+**Status**: V1C (customer profile payment history) implemented (commit `55dab8c`).
+
+### V1C — Customer Profile Payment History Section
+
+- Implemented on `/customers/{id}` page with Payment History card section.
+- Access gated with `canViewFinancialRegister()`: Owner/Admin/Billing only; Dispatcher/Technician/Contractors/Portal users blocked by default (server-side enforced).
+- Payment history reads from `internal_invoice_payments` scoped to account + customer (current truth only).
+- Recorded payments section: emerald divider, status/method badges.
+- Failed attempts section: red divider, status/method badges.
+- Other statuses section: gray divider (Pending, Reversed, etc.).
+- Per-payment row: amount (bold), status + method badges, paid date, invoice #, job title (linked), reference, notes.
+- Empty state: "No recorded payments or failed attempts for this customer yet."
+- Footer link: "Open Payments Register →" with customer name pre-filtered search.
+- Method taxonomy preserved (ACH hidden/mapped to 'other').
+
+Not introduced in V1C:
+- No payment recording UI or server actions
+- No corrections, allocations, or adjustments
+- No CSV export from customer profile (full register export already exists)
+- No dashboard financial cards
+- No QBO integration
+- No ACH (remains hidden)
+- No platform fees
+- No recurring billing execution
+- No schema/migration changes
+- No Supabase RLS policy changes
+- No Stripe webhook changes
+- No production changes
+- No customer portal payment history (internal profile only)
 
 ---
 

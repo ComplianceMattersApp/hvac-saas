@@ -41,11 +41,23 @@ Recent closeout status snapshot (May 2026):
 - Financial Ledger / Payments Register V1 model lock is now documented in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md): current `internal_invoice_payments` remains invoice-bound collected-payment truth, while future bookkeeping-ready work must introduce register/allocation semantics before recurring billing or deeper financial dashboards.
 - Service Role Controls / Financial Access Controls V1A-2, V1A-3, and V1A-4 are now implemented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md): Billing / AR is now implemented as a valid internal role; sensitive financial authority is Owner/Admin/Billing; dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users are blocked by default; and sensitive server-side financial actions are gated for manual invoice payment recording, tenant payment-link/checkout-session creation, invoice ledger CSV export, invoice draft create/update, invoice issue, invoice void, and invoice email send/resend.
 - **Payments Register V1A/V1B are now implemented (commit `c9dc763`):**
+   - V1A read-only register: `/reports/payments` with Owner/Admin/Billing gating, recorded/failed separation, method taxonomy (ACH hidden), filters, stat cards
+   - V1B CSV export: `/reports/payments/export` with financial-export gating, filter preservation, status field for failed identification, proper escaping
+   - Access gates use existing financial-access helper (`canExportFinancialData()`, `canViewFinancialRegister()`)
+   - Register reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, Stripe/Supabase/prod changes
+   - Remaining deferred: payment recording UI, corrections, allocations, dashboard financial cards, QBO sync, ACH, platform fees, recurring billing
+
+- **Payments Register V1C (Customer Profile Payment History) is now implemented (commit `55dab8c`):**
   - V1A read-only register: `/reports/payments` with Owner/Admin/Billing gating, recorded/failed separation, method taxonomy (ACH hidden), filters, stat cards
   - V1B CSV export: `/reports/payments/export` with financial-export gating, filter preservation, status field for failed identification, proper escaping
   - Access gates use existing financial-access helper (`canExportFinancialData()`, `canViewFinancialRegister()`)
   - Register reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, Stripe/Supabase/prod changes
   - Remaining deferred: payment recording UI, corrections, allocations, customer payment history, dashboard financial cards, QBO sync, ACH, platform fees, recurring billing
+   - V1C customer profile payment history: `/customers/{id}` Payment History card section with Owner/Admin/Billing gating, recorded/failed/other status separation
+   - Per-payment details: amount (bold), status+method badges (colored), date, invoice #, job link, reference, notes
+   - Reads from `internal_invoice_payments` scoped to account + customer (current truth only)
+   - No mutations, corrections, allocations, CSV export from profile, schema changes, Stripe/Supabase/prod changes
+   - Remaining deferred: payment recording from profile, customer portal history, corrections/allocations, dashboard cards, QBO sync, ACH, platform fees, recurring billing
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

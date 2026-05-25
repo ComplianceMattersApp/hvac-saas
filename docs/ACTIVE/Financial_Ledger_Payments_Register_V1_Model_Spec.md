@@ -24,9 +24,23 @@ Implementation gate status:
   - Method taxonomy preserved (no ACH exposure)
   - Proper CSV escaping for special characters (quotes, commas, newlines)
   - Commit: `c9dc763`
+
+Current financial access model for sensitive financial actions:
+  - Proper CSV escaping for special characters (quotes, commas, newlines)
+  - Commit: `c9dc763`
+- **Payments Register V1C (Customer Profile Payment History) is now implemented:**
+  - Customer profile payment history section on `/customers/{id}` page
+  - Access gated with `canViewFinancialRegister()` (Owner/Admin/Billing only; Dispatcher/Technician blocked by default)
+  - Reads from `internal_invoice_payments` current truth only (scoped to account + customer)
+  - Recorded payments, failed attempts, and other statuses visually separated by status section
+  - Per-payment row shows: amount, status, method, paid date, invoice #, job title (linked), reference, notes
+  - Empty state: "No recorded payments or failed attempts for this customer yet."
+  - Footer link: "Open Payments Register →" with customer name pre-filtered search
+  - Method taxonomy preserved (ACH hidden/mapped to 'other')
+  - Commit: `55dab8c`
 - Financial access-control prerequisite for Payments Register V1 is fully satisfied and leveraged.
 - Payments Register UI/actions remain read-only in this pass; recording/corrections/allocations remain deferred in future phases.
-- Payment correction, allocation, customer payment history, dashboard financial cards, QBO sync, ACH, platform fees, and recurring billing remain deferred.
+- Payment correction, allocation, financial dashboard cards, QBO sync, ACH, platform fees, and recurring billing remain deferred.
 
 Current financial access model for sensitive financial actions:
 
