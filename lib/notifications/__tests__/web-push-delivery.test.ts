@@ -239,6 +239,69 @@ describe("web-push-delivery", () => {
       );
     });
 
+    it("sends internal_note_tag only to the targeted recipient's active subscriptions", async () => {
+      process.env.ENABLE_WEB_PUSH = "true";
+      process.env.WEB_PUSH_PRIVATE_KEY = "test-private-key";
+      process.env.WEB_PUSH_SUBJECT = "test-subject";
+      process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY = "test-public-key";
+
+      const { sendWebPushNotificationForInternalNotification } = await import(
+        "@/lib/notifications/web-push-delivery"
+      );
+
+      const mockSupabase = makeMemorySupabase(
+        [
+          {
+            id: "sub-author",
+            user_id: "user-1",
+            endpoint: "https://push.example/author-device",
+            p256dh: "p256dh-author",
+            auth: "auth-author",
+          },
+          {
+            id: "sub-mentioned",
+            user_id: "user-2",
+            endpoint: "https://push.example/mentioned-device",
+            p256dh: "p256dh-mentioned",
+            auth: "auth-mentioned",
+          },
+        ],
+        {
+          notifications: [
+            {
+              id: "notif-mention-user-2",
+              job_id: "job-2",
+              recipient_ref: "user-2",
+              recipient_type: "internal",
+              account_owner_user_id: "owner-1",
+              notification_type: "internal_note_tag",
+            },
+          ],
+        },
+      );
+
+      await sendWebPushNotificationForInternalNotification({
+        supabase: mockSupabase,
+        notificationId: "notif-mention-user-2",
+        accountOwnerUserId: "owner-1",
+        recipientUserId: "user-2",
+        notificationType: "internal_note_tag",
+        jobId: "job-2",
+      });
+
+      expect(webPushSendNotificationMock).toHaveBeenCalledTimes(1);
+      expect(webPushSendNotificationMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          endpoint: "https://push.example/mentioned-device",
+        }),
+        expect.stringContaining("You were mentioned in an internal note"),
+      );
+
+      const deliveryAttempts = mockSupabase.getInsertedRows("notification_delivery_attempts");
+      expect(deliveryAttempts).toHaveLength(1);
+      expect(deliveryAttempts[0]?.push_subscription_id).toBe("sub-mentioned");
+    });
+
     it("sends to multiple active subscriptions", async () => {
       process.env.ENABLE_WEB_PUSH = "true";
       process.env.WEB_PUSH_PRIVATE_KEY = "test-private-key";
@@ -317,6 +380,52 @@ describe("web-push-delivery", () => {
       // No delivery attempt should be recorded (unsupported type skips silently)
       const deliveryAttempts = mockSupabase.getInsertedRows("notification_delivery_attempts");
       expect(deliveryAttempts).toHaveLength(0);
+    });
+
+    it("skips internal_note_tag push when the notification row has no recipient_ref", async () => {
+      process.env.ENABLE_WEB_PUSH = "true";
+      process.env.WEB_PUSH_PRIVATE_KEY = "test-private-key";
+      process.env.WEB_PUSH_SUBJECT = "test-subject";
+      process.env.NEXT_PUBLIC_WEB_PUSH_PUBLIC_KEY = "test-public-key";
+
+      const { sendWebPushNotificationForInternalNotification } = await import(
+        "@/lib/notifications/web-push-delivery"
+      );
+
+      const mockSupabase = makeMemorySupabase(
+        [
+          {
+            id: "sub-1",
+            endpoint: "https://push.example/device-1",
+            p256dh: "p256dh-1",
+            auth: "auth-1",
+          },
+        ],
+        {
+          notifications: [
+            {
+              id: "notif-missing-recipient",
+              job_id: "job-2",
+              recipient_ref: null,
+              recipient_type: "internal",
+              account_owner_user_id: "owner-1",
+              notification_type: "internal_note_tag",
+            },
+          ],
+        },
+      );
+
+      await sendWebPushNotificationForInternalNotification({
+        supabase: mockSupabase,
+        notificationId: "notif-missing-recipient",
+        accountOwnerUserId: "owner-1",
+        recipientUserId: "user-1",
+        notificationType: "internal_note_tag",
+        jobId: "job-2",
+      });
+
+      expect(webPushSendNotificationMock).not.toHaveBeenCalled();
+      expect(mockSupabase.getInsertedRows("notification_delivery_attempts")).toHaveLength(0);
     });
   });
 

@@ -26,6 +26,9 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => {
     throw new Error("test must pass an explicit supabase client");
   }),
+  createAdminClient: vi.fn(() => {
+    throw new Error("test must pass an explicit admin supabase client");
+  }),
 }));
 
 type PushSubscriptionFixtureRow = {
@@ -226,7 +229,7 @@ describe("push subscription helpers", () => {
         userAgent: "Chrome",
         deviceLabel: "Field phone",
       },
-      { supabase },
+      { supabase, adminSupabase: supabase },
     );
 
     expect(result.status).toBe("registered");
@@ -262,7 +265,7 @@ describe("push subscription helpers", () => {
         p256dh: "new-key",
         auth: "new-auth",
       },
-      { supabase },
+      { supabase, adminSupabase: supabase },
     );
 
     expect(result.status).toBe("updated");
@@ -275,6 +278,104 @@ describe("push subscription helpers", () => {
         is_active: true,
       }),
     );
+  });
+
+  it("rebinds a shared endpoint by deactivating another user's active row", async () => {
+    const supabase = new MemorySupabase([
+      makeRow({
+        id: "other-user-row",
+        user_id: "user-2",
+        account_owner_user_id: "owner-1",
+        endpoint: "https://push.example/shared-device",
+        is_active: true,
+      }),
+    ]);
+    const { registerCurrentInternalUserPushSubscription } = await import("@/lib/notifications/push-subscriptions");
+
+    const result = await registerCurrentInternalUserPushSubscription(
+      {
+        endpoint: "https://push.example/shared-device",
+        p256dh: "new-key",
+        auth: "new-auth",
+      },
+      { supabase, adminSupabase: supabase },
+    );
+
+    expect(result.status).toBe("registered");
+    expect(supabase.rows.find((row) => row.id === "other-user-row")?.is_active).toBe(false);
+    const currentUserRows = supabase.rows.filter(
+      (row) => row.user_id === "user-1" && row.account_owner_user_id === "owner-1",
+    );
+    expect(currentUserRows).toHaveLength(1);
+    expect(currentUserRows[0]).toEqual(
+      expect.objectContaining({
+        endpoint: "https://push.example/shared-device",
+        is_active: true,
+      }),
+    );
+  });
+
+  it("reactivates the current user's existing inactive row instead of inserting a duplicate", async () => {
+    const supabase = new MemorySupabase([
+      makeRow({
+        id: "existing-inactive",
+        endpoint: "https://push.example/device-1",
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        is_active: false,
+      }),
+    ]);
+    const { registerCurrentInternalUserPushSubscription } = await import("@/lib/notifications/push-subscriptions");
+
+    const result = await registerCurrentInternalUserPushSubscription(
+      {
+        endpoint: "https://push.example/device-1",
+        p256dh: "new-key",
+        auth: "new-auth",
+      },
+      { supabase, adminSupabase: supabase },
+    );
+
+    expect(result.status).toBe("updated");
+    expect(supabase.rows).toHaveLength(1);
+    expect(supabase.rows[0]).toEqual(
+      expect.objectContaining({
+        id: "existing-inactive",
+        endpoint: "https://push.example/device-1",
+        p256dh: "new-key",
+        auth: "new-auth",
+        is_active: true,
+      }),
+    );
+  });
+
+  it("does not affect other users on different endpoints", async () => {
+    const supabase = new MemorySupabase([
+      makeRow({
+        id: "other-user-other-endpoint",
+        user_id: "user-2",
+        account_owner_user_id: "owner-1",
+        endpoint: "https://push.example/other-device",
+        is_active: true,
+      }),
+    ]);
+    const { registerCurrentInternalUserPushSubscription } = await import("@/lib/notifications/push-subscriptions");
+
+    await registerCurrentInternalUserPushSubscription(
+      {
+        endpoint: "https://push.example/current-device",
+        p256dh: "new-key",
+        auth: "new-auth",
+      },
+      { supabase, adminSupabase: supabase },
+    );
+
+    expect(supabase.rows.find((row) => row.id === "other-user-other-endpoint")?.is_active).toBe(true);
+    expect(
+      supabase.rows.find(
+        (row) => row.user_id === "user-1" && row.endpoint === "https://push.example/current-device",
+      )?.is_active,
+    ).toBe(true);
   });
 
   it("lists only the current user's active subscriptions", async () => {
@@ -362,7 +463,7 @@ describe("push subscription helpers", () => {
 
     await registerCurrentInternalUserPushSubscription(
       { endpoint: "https://push.example/device", p256dh: "k", auth: "a" },
-      { supabase },
+      { supabase, adminSupabase: supabase },
     );
 
     expect(supabase.calls.map((call) => call.table)).toEqual([

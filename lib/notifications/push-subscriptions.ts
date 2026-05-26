@@ -1,5 +1,5 @@
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 
 const SAFE_PUSH_SUBSCRIPTION_SELECT =
   "id, account_owner_user_id, user_id, endpoint, user_agent, device_label, permission_state, is_active, last_seen_at, last_success_at, last_failure_at, last_failure_code, created_at, updated_at";
@@ -39,6 +39,7 @@ export type DeactivateCurrentUserPushSubscriptionInput = {
 
 type HelperParams = {
   supabase?: any;
+  adminSupabase?: any;
 };
 
 type CurrentInternalPushContext = {
@@ -54,6 +55,14 @@ type RegisterResult =
 type DeactivateResult = {
   deactivated: boolean;
   count: number;
+};
+
+type EndpointOwnershipRow = {
+  id: string;
+  account_owner_user_id: string | null;
+  user_id: string | null;
+  is_active: boolean | null;
+  updated_at: string | null;
 };
 
 function cleanText(value: unknown): string {
@@ -145,6 +154,7 @@ export async function registerCurrentInternalUserPushSubscription(
   }
 
   const now = new Date().toISOString();
+  const adminSupabase = params.adminSupabase ?? createAdminClient();
   const basePatch = {
     p256dh,
     auth,
@@ -157,18 +167,56 @@ export async function registerCurrentInternalUserPushSubscription(
     last_failure_code: null,
   };
 
-  const { data: existingRows, error: lookupError } = await context.supabase
+  const { data: endpointRows, error: endpointLookupError } = await adminSupabase
     .from("push_subscriptions")
-    .select("id")
-    .eq("account_owner_user_id", context.accountOwnerUserId)
-    .eq("user_id", context.userId)
-    .eq("endpoint", endpoint)
-    .eq("is_active", true)
-    .limit(1);
+    .select("id, account_owner_user_id, user_id, is_active, updated_at")
+    .eq("endpoint", endpoint);
 
-  if (lookupError) throw lookupError;
+  if (endpointLookupError) throw endpointLookupError;
 
-  const existingId = cleanText(existingRows?.[0]?.id);
+  const matchingRows = ((endpointRows ?? []) as EndpointOwnershipRow[]).filter(
+    (row) =>
+      cleanText(row.account_owner_user_id) === context.accountOwnerUserId &&
+      cleanText(row.user_id) === context.userId,
+  );
+
+  const canonicalRow = [...matchingRows].sort((left, right) => {
+    const leftActive = left.is_active ? 1 : 0;
+    const rightActive = right.is_active ? 1 : 0;
+    if (leftActive !== rightActive) return rightActive - leftActive;
+    return cleanText(right.updated_at).localeCompare(cleanText(left.updated_at));
+  })[0];
+
+  const rowsToDeactivate = ((endpointRows ?? []) as EndpointOwnershipRow[]).filter((row) => {
+    if (!row.is_active) return false;
+
+    const rowAccountOwnerUserId = cleanText(row.account_owner_user_id);
+    const rowUserId = cleanText(row.user_id);
+    const isCurrentOwnerRow =
+      rowAccountOwnerUserId === context.accountOwnerUserId && rowUserId === context.userId;
+
+    if (!isCurrentOwnerRow) return true;
+    return canonicalRow ? cleanText(row.id) !== cleanText(canonicalRow.id) : false;
+  });
+
+  for (const row of rowsToDeactivate) {
+    const rowId = cleanText(row.id);
+    if (!rowId) continue;
+
+    const { error: deactivateError } = await adminSupabase
+      .from("push_subscriptions")
+      .update({
+        is_active: false,
+        last_seen_at: now,
+      })
+      .eq("id", rowId)
+      .eq("endpoint", endpoint)
+      .eq("is_active", true);
+
+    if (deactivateError) throw deactivateError;
+  }
+
+  const existingId = cleanText(canonicalRow?.id);
   if (existingId) {
     const { data, error } = await context.supabase
       .from("push_subscriptions")
