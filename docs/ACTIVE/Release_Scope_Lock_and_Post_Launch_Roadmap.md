@@ -161,6 +161,17 @@ Recent closeout status snapshot (May 2026):
    - Historical backfill remains deferred
    - No UI behavior changed
    - No Service Plan Billing Period/QBO/ACH/refunds-disputes/saved-cards-autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior was added
+- **Phase 4I-B closeout (Sandbox Historical Allocation Backfill + Parity Verification) is complete (docs-only):**
+   - Phase 4I-B sandbox historical allocation backfill is complete
+   - Sandbox ref: `kvpesjdukqwwlgpkzfjm`
+   - Production ref `ornrnvxtwwtulohqwxop` was not queried or mutated
+   - Supabase CLI temp state was mixed; data mutation was executed through explicit sandbox URL/ref gate instead of CLI state
+   - Preflight: payment rows 3, allocation rows 0, missing allocation rows 3, statuses recorded 2/reversed 1, no unexpected statuses, no required-field gaps, no missing invoice/account/job mismatch, no duplicate allocation sources
+   - Backfill: attempted rows 3, returned rows 3, allocation statuses active 2/reversed 1
+   - Post-backfill parity: payment rows 3, allocation rows 3, missing allocation rows 0, status mapping mismatches 0, payload mismatches 0, duplicate allocation sources 0, per-invoice parity mismatches 0
+   - Global parity: recorded payment cents 10134, active allocation cents 10134, global parity matches true, reversed allocations active count 0
+   - Runtime boundaries preserved: no projection/read-path switch, no UI/report behavior changes, no manual payment behavior changes, no Stripe webhook behavior changes, no production mutation
+   - Validation snapshot: payment allocation + internal invoice payment tests 38 passed; payments register + invoice ledger tests 15 passed; `npx.cmd tsc --noEmit` passed; branch clean/synced
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

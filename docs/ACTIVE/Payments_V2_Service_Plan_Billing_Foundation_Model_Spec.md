@@ -153,6 +153,46 @@ Phase 4H closeout lock (Stripe Webhook Dual-Write, Stripe webhook scope only):
 - No UI behavior changed.
 - No Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior was added.
 
+Phase 4I-B closeout lock (Sandbox Historical Allocation Backfill + Parity Verification, docs-only):
+
+- Phase 4I-B sandbox historical allocation backfill is complete.
+- Sandbox ref: `kvpesjdukqwwlgpkzfjm`.
+- Production ref `ornrnvxtwwtulohqwxop` was not queried or mutated.
+- Supabase CLI temp state was mixed; data mutation was executed through explicit sandbox URL/ref gate rather than CLI state.
+- Preflight baseline:
+	- payment rows: 3
+	- allocation rows: 0
+	- missing allocation rows: 3
+	- statuses: recorded 2, reversed 1
+	- no unexpected statuses, no required-field gaps, no missing invoice/account/job mismatch, no duplicate allocation sources
+- Backfill results:
+	- attempted rows: 3
+	- returned rows: 3
+	- allocation statuses: active 2, reversed 1
+- Post-backfill parity:
+	- payment rows: 3
+	- allocation rows: 3
+	- missing allocation rows: 0
+	- status mapping mismatches: 0
+	- payload mismatches: 0
+	- duplicate allocation sources: 0
+	- per-invoice parity mismatches: 0
+	- global recorded payment cents: 10134
+	- global active allocation cents: 10134
+	- global parity matches: true
+	- reversed allocations active count: 0
+- Runtime boundaries preserved:
+	- no projection/read-path switch
+	- no UI/report behavior changes
+	- no manual payment behavior changes
+	- no Stripe webhook behavior changes
+	- no production mutation
+- Validation snapshot:
+	- payment allocation + internal invoice payment tests: 38 passed
+	- payments register + invoice ledger tests: 15 passed
+	- `npx.cmd tsc --noEmit` passed
+	- branch clean/synced
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
