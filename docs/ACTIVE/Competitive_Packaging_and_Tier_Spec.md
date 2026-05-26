@@ -237,6 +237,7 @@ Examples to preserve conceptual separation:
 - HVAC Service mode makes estimates/quoting central; tier/add-on decides depth.
 - `billing_mode` is not product identity.
 - tenant Stripe customer payments are not platform subscription billing.
+- first Service Plan Billing posture is billing-period plus normal internal invoice linkage paid through existing invoice payment infrastructure (not required auto-charge/autopay/subscription behavior).
 
 ## 11. Signup Implications
 

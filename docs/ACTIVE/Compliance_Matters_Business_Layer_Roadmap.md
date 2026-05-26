@@ -50,6 +50,13 @@ Time Clock / Team Time Tracking closeout note (May 2026):
 - **Estimate** = proposed commercial scope
 - **Invoice** = billed commercial scope
 - **Payment** = money collected against an internal invoice, when payment capability exists
+- **Payment Register Entry** = durable financial event truth (collected or attempted)
+- **Payment Allocation** = money-application relationship truth (invoice/billing-period/future obligation)
+- **Service Plan Billing Period** = commercial coverage-window truth for maintenance agreements
+
+Payments V2 Service Plan Billing Foundation model lock reference:
+- [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md)
+- First posture is billing-period plus normal internal invoice linkage and existing invoice payment truth; automation/autopay/subscription behavior remains deferred.
 
 Relationship intake and display lane closeout (May 2026):
 - This lane is complete for V1 and should be treated as closed unless real usage evidence reopens it.

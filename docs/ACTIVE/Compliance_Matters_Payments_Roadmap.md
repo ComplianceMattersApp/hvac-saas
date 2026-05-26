@@ -26,9 +26,11 @@ Compliance Matters has **built payment architecture and shipped tenant customer 
 
 Financial Ledger / Payments Register V1 model lock:
 - the bookkeeping-ready register/allocation model is defined in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md)
+- Payments V2 / Service Plan Billing Foundation Phase 2 model lock is defined in [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md)
 - current `internal_invoice_payments` remains today's invoice-bound collected-payment truth
 - future financial reporting must distinguish Payment Register Entry, Payment Allocation, Invoice Payment Projection, and Failed Payment Attempt
 - Stripe is processor truth for Stripe transactions; Compliance Matters is tenant financial operating truth for all money received
+- first Service Plan Billing posture is billing-period plus normal invoice linkage (no required auto-charge engine in first posture)
 
 Service Role Controls / Financial Access Controls V1A dependency:
 - V1A-2, V1A-3, and V1A-4 are implemented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md)

@@ -90,6 +90,11 @@ If any item here conflicts with the active spine, the spine wins.
   - source spec: `docs/ACTIVE/Financial_Ledger_Payments_Register_V1_Model_Spec.md`
   - future model separates Payment Register Entry, Payment Allocation, Invoice Payment Projection, and Failed Payment Attempt
   - ACH remains hidden/deferred until supported
+- Confirm Payments V2 / Service Plan Billing Foundation Phase 2 model lock is acknowledged before Service Plan billing implementation:
+  - source spec: `docs/ACTIVE/Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md`
+  - first posture is billing periods linked to normal internal invoices paid via existing invoice-payment infrastructure
+  - no required automatic recurring charge engine in first posture
+  - visit count and payment truth remain separate
 - Confirm Service Role Controls / Financial Access Controls V1A-2, V1A-3, and V1A-4 are implemented and accepted:
   - Billing / AR is now a valid internal role in app role model/parsers/UI
   - sensitive financial authority allows structural owner, admin, and billing

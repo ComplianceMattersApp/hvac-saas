@@ -63,6 +63,12 @@ Financial Ledger / Payments Register V1 defines the bookkeeping-ready payment tr
 
 This lane exists because tenant payment tracking must become tenant financial operating truth, not only job closeout support. Jobs and invoices can show whether work has been closed and billed, but tenants also need one app-level place to understand money received, failed payment signals, customer balances, and future allocations across invoices or recurring billing periods.
 
+Related model lock:
+
+- Service Plan Billing Foundation Phase 2 is documented in [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md).
+- First Service Plan Billing posture is billing-period commercial truth linked to normal internal invoices and existing invoice payment truth.
+- Auto-charge/autopay/subscription execution remains deferred unless explicitly reopened.
+
 Locked principle:
 
 - Stripe is processor truth for Stripe transactions.

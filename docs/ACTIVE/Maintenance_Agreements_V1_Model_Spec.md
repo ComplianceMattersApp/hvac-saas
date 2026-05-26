@@ -15,7 +15,9 @@ This spec is intentionally not a billing, payment, portal, SMS, or automation de
 Financial/payment model boundary:
 
 - Future recurring maintenance/service-plan billing must follow the Financial Ledger / Payments Register V1 model lock in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md).
+- Service Plan Billing Foundation Phase 2 model lock is documented in [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md).
 - Recurring billing must connect through billing periods and payment allocations.
+- First Service Plan Billing posture is billing-period plus normal internal invoice linkage, with customer payment through existing invoice payment infrastructure.
 - Money must not attach directly to service visit links, visit count rows, or `maintenance_agreement_visits`.
 
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)
