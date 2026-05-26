@@ -100,6 +100,14 @@ Current financial access model for sensitive financial actions:
     4. Phase 4H: Stripe webhook dual-write
     5. Phase 4I: historical backfill plus parity checks
     6. Later phase: allocation read-path switch only after parity gate passes
+- **Production Dormant Allocation Migration Catch-up (Phase 4E) is now complete:**
+  - Production schema catch-up completed on ref `ornrnvxtwwtulohqwxop`
+  - Applied in order: `20260526110000_internal_invoice_payments_reversal_audit_foundation.sql`, then `20260526130000_internal_invoice_payment_allocations_foundation.sql`
+  - Verified in production on `internal_invoice_payments`: `reversed_at`, `reversed_by_user_id`, `reversal_reason`, and reversal index
+  - Verified in production on `internal_invoice_payment_allocations`: required columns, PK/FK/check/unique constraints, required indexes, RLS enabled, SELECT/INSERT/UPDATE policies present, no DELETE policy, and scope assertion trigger/function present
+  - Verified forbidden/deferred columns absent: `counts_toward_collected_totals`, `target_service_plan_billing_period_id`, and customer-credit target fields
+  - Allocation row count verified at `0`; no backfill was run
+  - Runtime boundaries unchanged: no allocation writers, no projection/read-path switch, and no payment/manual/Stripe/webhook/checkout/UI/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes
 
 Current financial access model for sensitive financial actions:
 

@@ -95,6 +95,22 @@ Safer implementation sequence lock:
 5. Phase 4I: historical backfill plus parity checks.
 6. Later phase: allocation read-path switch only after parity gate passes.
 
+Phase 4E closeout lock (Production Dormant Allocation Migration Catch-up, docs/model only):
+
+- Phase 4E production dormant schema catch-up is complete.
+- Production ref was explicitly confirmed as `ornrnvxtwwtulohqwxop`.
+- Applied migrations in production order:
+	- `20260526110000_internal_invoice_payments_reversal_audit_foundation.sql`
+	- `20260526130000_internal_invoice_payment_allocations_foundation.sql`
+- Reversal audit schema was verified in production: `reversed_at`, `reversed_by_user_id`, `reversal_reason`, and owner/reversed-at index.
+- `internal_invoice_payment_allocations` was verified in production with required columns, constraints, indexes, RLS policies, and scope assertion trigger/function.
+- Forbidden/deferred columns remain absent (`counts_toward_collected_totals`, `target_service_plan_billing_period_id`, and customer-credit target fields).
+- Allocation row count is `0` in production.
+- No backfill was run.
+- No runtime allocation writers exist yet.
+- No read-path/projection switch was made.
+- No payment recording, Stripe webhook/checkout, UI, Service Plan Billing, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changed in this phase.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:

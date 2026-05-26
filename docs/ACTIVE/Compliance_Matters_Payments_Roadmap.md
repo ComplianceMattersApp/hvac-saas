@@ -194,6 +194,20 @@ Locked safer implementation sequence:
 5. Phase 4I: historical backfill + parity checks.
 6. Later phase: allocation read-path switch only after parity gate passes.
 
+Phase 4E closeout (Production Dormant Allocation Migration Catch-up, docs/model only):
+- Completed production dormant schema catch-up on production ref `ornrnvxtwwtulohqwxop`.
+- Applied migrations in production order:
+	- `20260526110000_internal_invoice_payments_reversal_audit_foundation.sql`
+	- `20260526130000_internal_invoice_payment_allocations_foundation.sql`
+- Verified reversal audit schema in production (`internal_invoice_payments`): `reversed_at`, `reversed_by_user_id`, `reversal_reason`, and reversal index.
+- Verified allocation schema in production (`internal_invoice_payment_allocations`): required columns, constraints, indexes, RLS, SELECT/INSERT/UPDATE policies, no DELETE policy, and scope assertion trigger/function.
+- Verified forbidden/deferred columns absent: `counts_toward_collected_totals`, `target_service_plan_billing_period_id`, and customer-credit target fields.
+- Verified allocation row count is `0`.
+- No backfill was run.
+- No runtime allocation writers exist yet.
+- No projection/read-path switch occurred.
+- No payment recording, manual payment behavior, Stripe webhook/checkout behavior, UI, Service Plan Billing behavior, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changed in this phase.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.
