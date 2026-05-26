@@ -89,6 +89,9 @@ export default async function JobAttachmentsPage({
   const { id: jobId } = await params;
   const { context } = searchParams ? await searchParams : { context: undefined };
   const isRefrigerantChargePhotoContext = context === "refrigerant-charge-photo";
+  const attachmentEvidenceContext = isRefrigerantChargePhotoContext
+    ? "refrigerant_charge_photo"
+    : null;
 
   if (!jobId) {
     throw new Error("Missing route param: id");
@@ -292,6 +295,7 @@ export default async function JobAttachmentsPage({
         jobId={job.id}
         initialItems={attachmentItems}
         attachmentInputMode={isRefrigerantChargePhotoContext ? "images" : "all"}
+        attachmentEvidenceContext={attachmentEvidenceContext}
       />
     </div>
   );

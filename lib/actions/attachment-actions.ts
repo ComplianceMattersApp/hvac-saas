@@ -11,6 +11,10 @@ import {
 } from "@/lib/auth/internal-attachment-scope";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
+import {
+  buildAttachmentCaptionWithEvidenceContext,
+  normalizeJobAttachmentEvidenceContext,
+} from "@/lib/jobs/refrigerant-charge-evidence";
 
 function safeFileName(name: string) {
   return name.replace(/[^\w.\- ()]/g, "_");
@@ -212,6 +216,7 @@ export async function createJobAttachmentUploadToken(input: {
   contentType: string;
   fileSize: number;
   caption?: string;
+  attachmentEvidenceContext?: string | null;
 }) {
   const supabase = await createClient();
 
@@ -232,6 +237,13 @@ export async function createJobAttachmentUploadToken(input: {
   }
 
   const cleanName = safeFileName(input.fileName);
+  const attachmentEvidenceContext = normalizeJobAttachmentEvidenceContext(
+    input.attachmentEvidenceContext,
+  );
+  const normalizedCaption = buildAttachmentCaptionWithEvidenceContext({
+    caption: input.caption,
+    context: attachmentEvidenceContext,
+  });
 
   // Generate an id for path stability
   const attachmentId = crypto.randomUUID();
@@ -247,7 +259,7 @@ export async function createJobAttachmentUploadToken(input: {
     file_name: cleanName,
     content_type: input.contentType,
     file_size: input.fileSize,
-    caption: input.caption ?? null,
+    caption: normalizedCaption,
   });
 
   if (insErr) throw new Error(insErr.message);
@@ -502,6 +514,7 @@ export async function finalizeInternalJobAttachmentUpload(input: {
   caption?: string;
   fileNames?: string[];
   attachmentIds?: string[];
+  attachmentEvidenceContext?: string | null;
 }) {
   const jobId = String(input.jobId ?? "").trim();
 
@@ -522,6 +535,9 @@ export async function finalizeInternalJobAttachmentUpload(input: {
 
   const note = String(input.note ?? "").trim();
   const caption = String(input.caption ?? "").trim();
+  const attachmentEvidenceContext = normalizeJobAttachmentEvidenceContext(
+    input.attachmentEvidenceContext,
+  );
   const requestedAttachmentIds = Array.isArray(input.attachmentIds)
     ? input.attachmentIds.map((value) => String(value ?? "").trim()).filter(Boolean)
     : [];
@@ -566,6 +582,7 @@ export async function finalizeInternalJobAttachmentUpload(input: {
       count: verifiedAttachmentIds.length,
       note: note || null,
       caption: caption || null,
+      attachment_evidence_context: attachmentEvidenceContext,
       attachment_ids: verifiedAttachmentIds,
       file_names: verifiedFileNames,
     },

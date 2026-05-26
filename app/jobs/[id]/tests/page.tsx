@@ -1,6 +1,6 @@
 // app/jobs/[id]/tests/page
 import { notFound, redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { isDuctlessMiniSplitSystem, resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import Link from "next/link";
 import PrintButton from "@/components/ui/PrintButton";
@@ -53,6 +53,10 @@ import { isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import {
+  REFRIGERANT_CHARGE_ATTACHMENT_TAG,
+  stripRefrigerantChargeEvidenceTag,
+} from "@/lib/jobs/refrigerant-charge-evidence";
 
 function getEffectiveResultLabel(t: any) {
   if (t.override_pass === true) return "PASS (override)";
@@ -895,6 +899,73 @@ export default async function JobTestsPage({
     focusedTypeRaw && !isEccTestApplicableToSystem(focusedTypeRaw, selectedSystemApplicability)
       ? ""
       : focusedTypeRaw;
+
+  let refrigerantEvidenceAttachments: Array<{
+    id: string;
+    fileName: string;
+    uploadedAt: string;
+    caption: string | null;
+    signedUrl: string | null;
+  }> = [];
+
+  if (focusedType === "refrigerant_charge") {
+    const { data: evidenceRows, error: evidenceErr } = await supabase
+      .from("attachments")
+      .select("id, bucket, storage_path, file_name, caption, created_at")
+      .eq("entity_type", "job")
+      .eq("entity_id", id)
+      .ilike("caption", `${REFRIGERANT_CHARGE_ATTACHMENT_TAG}%`)
+      .order("created_at", { ascending: false })
+      .limit(10);
+
+    if (evidenceErr) throw evidenceErr;
+
+    if (Array.isArray(evidenceRows) && evidenceRows.length) {
+      const attachmentAdmin = createAdminClient();
+      const signedEvidence = await Promise.all(
+        evidenceRows.map(async (row: any) => {
+          const bucket = String(row?.bucket ?? "").trim();
+          const storagePath = String(row?.storage_path ?? "")
+            .trim()
+            .replace(/^\/+/, "");
+
+          if (!bucket || !storagePath) {
+            return {
+              id: String(row?.id ?? "").trim(),
+              fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
+              uploadedAt: String(row?.created_at ?? "").trim(),
+              caption: stripRefrigerantChargeEvidenceTag(row?.caption),
+              signedUrl: null,
+            };
+          }
+
+          const { data: signed, error: signErr } = await attachmentAdmin.storage
+            .from(bucket)
+            .createSignedUrl(storagePath, 60 * 60);
+
+          if (signErr || !signed?.signedUrl) {
+            return {
+              id: String(row?.id ?? "").trim(),
+              fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
+              uploadedAt: String(row?.created_at ?? "").trim(),
+              caption: stripRefrigerantChargeEvidenceTag(row?.caption),
+              signedUrl: null,
+            };
+          }
+
+          return {
+            id: String(row?.id ?? "").trim(),
+            fileName: String(row?.file_name ?? "Attachment").trim() || "Attachment",
+            uploadedAt: String(row?.created_at ?? "").trim(),
+            caption: stripRefrigerantChargeEvidenceTag(row?.caption),
+            signedUrl: signed.signedUrl,
+          };
+        })
+      );
+
+      refrigerantEvidenceAttachments = signedEvidence.filter((row) => Boolean(row.id));
+    }
+  }
 
   const scenarioResult = resolveEccScenario({
   projectType: job.project_type,
@@ -4001,6 +4072,65 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         className={eccSecondaryButtonClass}
                       >
                         Attach refrigerant charge photo
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="rounded-md border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700">
+                    <div className="font-medium text-slate-900">Refrigerant Charge Photo Evidence</div>
+                    <div className="mt-1 text-slate-600">
+                      Photo evidence supports the field record. It does not automatically verify numeric pass/fail.
+                    </div>
+
+                    {refrigerantEvidenceAttachments.length ? (
+                      <div className="mt-2 space-y-2">
+                        {refrigerantEvidenceAttachments.slice(0, 3).map((attachment) => (
+                          <div
+                            key={attachment.id}
+                            className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2"
+                          >
+                            <div className="font-medium text-emerald-900">Refrigerant charge photo attached</div>
+                            <div className="mt-1 break-all text-emerald-800">{attachment.fileName}</div>
+                            <div className="mt-1 text-emerald-700">
+                              Uploaded{" "}
+                              {attachment.uploadedAt
+                                ? new Date(attachment.uploadedAt).toLocaleString()
+                                : "(date unavailable)"}
+                            </div>
+                            {attachment.caption ? (
+                              <div className="mt-1 text-emerald-700">{attachment.caption}</div>
+                            ) : null}
+                            {attachment.signedUrl ? (
+                              <a
+                                href={attachment.signedUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+                              >
+                                Open attachment
+                              </a>
+                            ) : null}
+                          </div>
+                        ))}
+
+                        {refrigerantEvidenceAttachments.length > 3 ? (
+                          <div className="text-slate-600">
+                            +{refrigerantEvidenceAttachments.length - 3} more refrigerant charge evidence file(s) in Attachments.
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="mt-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-slate-600">
+                        No refrigerant charge photo attached yet.
+                      </div>
+                    )}
+
+                    <div className="mt-2">
+                      <Link
+                        href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
+                        className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                      >
+                        View refrigerant charge photo attachments
                       </Link>
                     </div>
                   </div>

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { REFRIGERANT_CHARGE_ATTACHMENT_TAG } from "@/lib/jobs/refrigerant-charge-evidence";
 
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
@@ -51,7 +52,7 @@ type FixtureOptions = {
 };
 
 function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
-  const writes: Array<{ table: string; op: string }> = [];
+  const writes: Array<{ table: string; op: string; payload?: unknown }> = [];
   const storageOps: Array<{ op: "createSignedUploadUrl" | "createSignedUrl" | "remove"; path: string }> = [];
   const deletedAttachmentIds: string[] = [];
   const updatedAttachmentIds: string[] = [];
@@ -94,7 +95,7 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
       if (table === "attachments") {
         return {
           insert: vi.fn((values: Record<string, unknown>) => {
-            writes.push({ table, op: "insert" });
+            writes.push({ table, op: "insert", payload: values });
             return Promise.resolve({ data: values, error: null });
           }),
           update: vi.fn(() => ({
@@ -142,8 +143,8 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
 
       if (table === "job_events") {
         return {
-          insert: vi.fn(async () => {
-            writes.push({ table, op: "insert" });
+          insert: vi.fn(async (values: unknown) => {
+            writes.push({ table, op: "insert", payload: values });
             return { error: null };
           }),
         };
@@ -248,6 +249,31 @@ describe("attachment entitlement hardening", () => {
       );
       expect(fixture.writes.some((w) => w.table === "attachments" && w.op === "insert")).toBe(true);
       expect(fixture.storageOps.some((op) => op.op === "createSignedUploadUrl")).toBe(true);
+    });
+
+    it("tags refrigerant charge evidence captions when context is provided", async () => {
+      const fixture = makeAttachmentMutationFixture();
+      createClientMock.mockResolvedValue(fixture.supabase);
+      createAdminClientMock.mockReturnValue(fixture.adminClient);
+
+      const { createJobAttachmentUploadToken } = await import("@/lib/actions/attachment-actions");
+
+      await createJobAttachmentUploadToken({
+        jobId: "job-1",
+        fileName: "proof.pdf",
+        contentType: "application/pdf",
+        fileSize: 123,
+        caption: "Gauge manifold",
+        attachmentEvidenceContext: "refrigerant_charge_photo",
+      });
+
+      const insertWrite = fixture.writes.find(
+        (write) => write.table === "attachments" && write.op === "insert",
+      );
+      expect(insertWrite).toBeTruthy();
+      expect((insertWrite?.payload as Record<string, unknown>)?.caption).toBe(
+        `${REFRIGERANT_CHARGE_ATTACHMENT_TAG} Gauge manifold`,
+      );
     });
 
     it("allows valid trial upload-token generation", async () => {

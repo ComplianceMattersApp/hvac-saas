@@ -74,11 +74,13 @@ export default function JobAttachmentsInternal({
   jobId,
   initialItems,
   attachmentInputMode = "all",
+  attachmentEvidenceContext,
   summary,
 }: {
   jobId: string;
   initialItems: Item[];
   attachmentInputMode?: "all" | "images";
+  attachmentEvidenceContext?: string | null;
   summary?: AttachmentReviewSummary;
 }) {
   const router = useRouter();
@@ -135,6 +137,7 @@ export default function JobAttachmentsInternal({
       contentType: file.type || "application/octet-stream",
       fileSize: file.size,
       caption: caption.trim() || undefined,
+      attachmentEvidenceContext,
     });
 
     try {
@@ -183,6 +186,7 @@ export default function JobAttachmentsInternal({
           caption: caption.trim(),
           attachmentIds: uploadedIds,
           fileNames,
+          attachmentEvidenceContext,
         });
 
         setFiles([]);
