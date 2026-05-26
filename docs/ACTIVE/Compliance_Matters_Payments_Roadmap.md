@@ -171,6 +171,29 @@ Phase 4C closeout (Explicit Invoice Payment Allocation Table Foundation):
 - No read-path/projection switch; existing invoice-bound payment truth and paid/balance projection remain unchanged.
 - No UI, payment-recording flow, Stripe checkout/webhook behavior, Service Plan billing behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, or service-plan automation changes were introduced.
 
+Phase 4D closeout (Allocation Population / Backfill / Write Strategy, docs/model only):
+- Allocation rows are locked to future one-to-one population from `internal_invoice_payments`.
+- Allocation idempotency key is locked to `source_internal_invoice_payment_id`.
+- First mapping lock: `recorded -> active`, `pending/failed -> inactive`, `reversed -> reversed`.
+- `allocated_amount_cents` must preserve source `amount_cents` exactly, including signed/zero parity.
+- `target_invoice_id` must equal source payment `invoice_id`.
+- Failed/reversed source rows should still have allocation rows for lifecycle completeness, but they remain non-counting.
+- Invoice projection stays on compatibility helper semantics until allocation parity is proven.
+- No read-path/projection switch is allowed yet.
+- Backfill posture is locked to idempotent + retryable behavior.
+- Runtime allocation writers are locked to centralized helper posture.
+- Manual payment and Stripe webhook dual-write are locked as separate implementation slices.
+- Historical backfill is locked to run only after runtime write strategy is locked.
+- Production dormant schema migration planning/apply requires explicit approval before any runtime writer ships.
+
+Locked safer implementation sequence:
+1. Phase 4E: production dormant migration planning/apply, explicit approval only.
+2. Phase 4F: centralized allocation write helper foundation, not wired.
+3. Phase 4G: manual payment dual-write.
+4. Phase 4H: Stripe webhook dual-write.
+5. Phase 4I: historical backfill + parity checks.
+6. Later phase: allocation read-path switch only after parity gate passes.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

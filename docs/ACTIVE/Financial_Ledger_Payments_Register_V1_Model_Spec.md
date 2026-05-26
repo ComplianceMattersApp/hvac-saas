@@ -79,6 +79,27 @@ Current financial access model for sensitive financial actions:
   - No backfill and no runtime write-path adoption yet (manual/off-platform and Stripe webhook payment recording flows unchanged)
   - No read-path/projection switch in this phase; existing invoice-bound collected truth remains authoritative
   - No UI, Stripe checkout/webhook behavior, Service Plan billing behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, or platform fee execution changes
+- **Allocation Population / Backfill / Write Strategy (Phase 4D, docs/model only) is now locked:**
+  - Allocation rows are future-populated one-to-one from `internal_invoice_payments`
+  - Allocation idempotency key is `source_internal_invoice_payment_id`
+  - First mapping lock: `recorded -> active`, `pending/failed -> inactive`, `reversed -> reversed`
+  - `allocated_amount_cents` preserves source `amount_cents` exactly, including signed/zero parity
+  - `target_invoice_id` must equal source payment `invoice_id`
+  - Failed/reversed source rows should still have allocation rows for lifecycle completeness, but remain non-counting
+  - Projection remains on compatibility helper semantics until parity is proven
+  - No read-path/projection switch is allowed yet
+  - Backfill must be idempotent and retryable
+  - Runtime allocation writers must be centralized
+  - Manual payment and Stripe webhook dual-write are locked as separate implementation slices
+  - Historical backfill is locked to run after runtime write strategy is implemented/locked
+  - Production dormant schema migration planning/apply requires explicit approval before any runtime writer ships
+  - Locked safer implementation sequence:
+    1. Phase 4E: production dormant migration planning/apply, explicit approval only
+    2. Phase 4F: centralized allocation write helper foundation, not wired
+    3. Phase 4G: manual payment dual-write
+    4. Phase 4H: Stripe webhook dual-write
+    5. Phase 4I: historical backfill plus parity checks
+    6. Later phase: allocation read-path switch only after parity gate passes
 
 Current financial access model for sensitive financial actions:
 

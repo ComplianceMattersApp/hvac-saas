@@ -98,6 +98,27 @@ Recent closeout status snapshot (May 2026):
    - No backfill and no runtime allocation-row writes in this slice
    - No projection/read-path switch; invoice-bound payment truth remains unchanged
    - No UI/payment recording/Stripe checkout/webhook/Service Plan billing behavior changes were introduced
+- **Phase 4D closeout (Allocation Population / Backfill / Write Strategy, docs/model only) is now locked:**
+    - Allocation rows are locked to future one-to-one population from `internal_invoice_payments`
+    - Allocation idempotency key is locked to `source_internal_invoice_payment_id`
+    - Locked mapping: `recorded -> active`, `pending/failed -> inactive`, `reversed -> reversed`
+    - `allocated_amount_cents` must preserve source `amount_cents` exactly, including signed/zero parity
+    - `target_invoice_id` must equal source payment `invoice_id`
+    - Failed/reversed source rows should still have allocation rows for lifecycle completeness, but remain non-counting
+    - Projection remains on compatibility helper semantics until parity is proven
+    - No projection/read-path switch is allowed yet
+    - Backfill posture is locked to idempotent/retryable behavior
+    - Runtime allocation writers are locked to centralized helper posture
+    - Manual payment dual-write and Stripe webhook dual-write are locked as separate implementation slices
+    - Historical backfill is locked to run after runtime write strategy is implemented/locked
+    - Production dormant schema migration planning/apply requires explicit approval before any runtime writer ships
+    - Locked safer implementation sequence:
+       1. Phase 4E: production dormant migration planning/apply, explicit approval only
+       2. Phase 4F: centralized allocation write helper foundation, not wired
+       3. Phase 4G: manual payment dual-write
+       4. Phase 4H: Stripe webhook dual-write
+       5. Phase 4I: historical backfill plus parity checks
+       6. Later phase: allocation read-path switch only after parity gate passes
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

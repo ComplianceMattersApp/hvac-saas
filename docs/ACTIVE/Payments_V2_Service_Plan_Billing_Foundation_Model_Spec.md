@@ -70,6 +70,31 @@ Phase 4C closeout lock (Explicit Invoice Payment Allocation Table Foundation):
 - No read-path/projection switch was implemented; existing invoice-bound payment truth and projection behavior remain unchanged.
 - No UI, payment-recording flow, Stripe checkout/webhook behavior, Service Plan Billing Period behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, or service-plan automation behavior changed in this phase.
 
+Phase 4D closeout lock (Allocation Population / Backfill / Write Strategy, docs/model only):
+
+- Allocation population posture is locked to one-to-one rows derived from `internal_invoice_payments`.
+- Allocation idempotency key is locked to `source_internal_invoice_payment_id`.
+- Status mapping is locked for first population posture: `recorded -> active`, `pending/failed -> inactive`, `reversed -> reversed`.
+- `allocated_amount_cents` must preserve source `amount_cents` exactly, including signed/zero parity.
+- `target_invoice_id` must equal source payment `invoice_id`.
+- Failed and reversed source payments should have allocation rows for lifecycle completeness, but they must remain non-counting for collected totals.
+- Projection must remain on compatibility helper semantics until allocation parity is proven.
+- No read-path/projection switch is allowed yet.
+- Historical backfill posture is locked to idempotent and retryable behavior.
+- Runtime allocation writers must be centralized in one helper contract.
+- Manual payment dual-write and Stripe webhook dual-write must ship as separate implementation slices.
+- Historical backfill must run only after runtime write strategy is locked.
+- Production dormant schema migration planning/apply requires explicit approval before any runtime allocation writer ships.
+
+Safer implementation sequence lock:
+
+1. Phase 4E: production dormant migration planning/apply, explicit approval only.
+2. Phase 4F: centralized allocation write helper foundation, not wired.
+3. Phase 4G: manual payment dual-write.
+4. Phase 4H: Stripe webhook dual-write.
+5. Phase 4I: historical backfill plus parity checks.
+6. Later phase: allocation read-path switch only after parity gate passes.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
