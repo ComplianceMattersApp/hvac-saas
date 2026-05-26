@@ -23,7 +23,6 @@ type InternalBusinessProfileRow = {
   billing_mode: string | null;
   logo_url: string | null;
   profile_reviewed_at: string | null;
-  team_reviewed_at: string | null;
 };
 
 function toCleanString(value: unknown) {
@@ -78,8 +77,8 @@ export async function resolveAccountReadiness(
         },
         {
           key: "active_internal_users",
-          label: "Active internal users",
-          description: "Add at least one active internal user.",
+          label: "Team access",
+          description: "No active internal users found. Add or activate an internal user to finish setup.",
           status: "incomplete",
           href: "/ops/admin/internal-users",
         },
@@ -111,7 +110,7 @@ export async function resolveAccountReadiness(
   const [profileResult, activeInternalUsersResult, contractorsResult, entitlement] = await Promise.all([
     supabase
       .from("internal_business_profiles")
-      .select("display_name, support_email, support_phone, billing_mode, logo_url, profile_reviewed_at, team_reviewed_at")
+      .select("display_name, support_email, support_phone, billing_mode, logo_url, profile_reviewed_at")
       .eq("account_owner_user_id", ownerId)
       .maybeSingle(),
     supabase
@@ -151,7 +150,6 @@ export async function resolveAccountReadiness(
   const billingMode = toCleanString(profile?.billing_mode);
   const logoUrl = toCleanString(profile?.logo_url);
   const profileReviewed = Boolean(profile?.profile_reviewed_at);
-  const teamReviewed = Boolean(profile?.team_reviewed_at);
   const activeInternalUserCount = normalizeCount(activeInternalUsersResult.count);
   const contractorCount = normalizeCount(contractorsResult.count);
 
@@ -198,12 +196,12 @@ export async function resolveAccountReadiness(
     },
     {
       key: "active_internal_users",
-      label: "Active internal users",
+      label: "Team access",
       description:
-        teamReviewed && activeInternalUserCount > 0
-          ? `${activeInternalUserCount} active internal user${activeInternalUserCount === 1 ? "" : "s"} confirmed.`
-          : "Review your internal team and confirm setup.",
-      status: teamReviewed && activeInternalUserCount > 0 ? "complete" : "incomplete",
+        activeInternalUserCount > 0
+          ? `${activeInternalUserCount} active internal user${activeInternalUserCount === 1 ? "" : "s"}. Add more users later from Internal Users if your team grows.`
+          : "No active internal users found. Add or activate an internal user to finish setup.",
+      status: activeInternalUserCount > 0 ? "complete" : "incomplete",
       href: "/ops/admin/internal-users",
     },
   ];

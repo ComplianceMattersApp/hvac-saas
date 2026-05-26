@@ -116,7 +116,7 @@ describe("resolveAccountReadiness", () => {
     expect(summary.isOperationallyReady).toBe(true);
   });
 
-  it("provisioned fields present but no review timestamps => all required incomplete", async () => {
+  it("provisioned fields present but no review timestamps => only team access can be complete", async () => {
     const supabase = makeSupabase({
       profile: {
         display_name: "Acme HVAC",
@@ -132,16 +132,16 @@ describe("resolveAccountReadiness", () => {
 
     const summary = await resolveAccountReadiness("owner-1", supabase);
 
-    expect(summary.completedRequiredCount).toBe(0);
+    expect(summary.completedRequiredCount).toBe(1);
     expect(summary.isOperationallyReady).toBe(false);
     expect(summary.items.find((x) => x.key === "company_name")?.status).toBe("incomplete");
     expect(summary.items.find((x) => x.key === "support_email")?.status).toBe("incomplete");
     expect(summary.items.find((x) => x.key === "support_phone")?.status).toBe("incomplete");
     expect(summary.items.find((x) => x.key === "billing_mode")?.status).toBe("incomplete");
-    expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("incomplete");
+    expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("complete");
   });
 
-  it("profile reviewed but team not => 4 of 5 complete", async () => {
+  it("profile reviewed but team not => 5 of 5 complete when active users exist", async () => {
     const supabase = makeSupabase({
       profile: {
         display_name: "Acme HVAC",
@@ -157,9 +157,9 @@ describe("resolveAccountReadiness", () => {
 
     const summary = await resolveAccountReadiness("owner-1", supabase);
 
-    expect(summary.completedRequiredCount).toBe(4);
-    expect(summary.isOperationallyReady).toBe(false);
-    expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("incomplete");
+    expect(summary.completedRequiredCount).toBe(5);
+    expect(summary.isOperationallyReady).toBe(true);
+    expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("complete");
   });
 
   it("team reviewed but profile not => 1 of 5 complete", async () => {
@@ -181,6 +181,28 @@ describe("resolveAccountReadiness", () => {
     expect(summary.completedRequiredCount).toBe(1);
     expect(summary.isOperationallyReady).toBe(false);
     expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("complete");
+  });
+
+  it("team access item uses count-based copy when users exist", async () => {
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "external_billing",
+        logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: null,
+      },
+      activeInternalUsersCount: 2,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+    const item = summary.items.find((x) => x.key === "active_internal_users");
+
+    expect(item?.label).toBe("Team access");
+    expect(item?.description).toContain("2 active internal users");
+    expect(item?.description).toContain("Add more users later from Internal Users if your team grows.");
   });
 
   it("missing company name => incomplete", async () => {
@@ -284,7 +306,9 @@ describe("resolveAccountReadiness", () => {
     const summary = await resolveAccountReadiness("owner-1", supabase);
     const item = summary.items.find((x) => x.key === "active_internal_users");
 
+    expect(item?.label).toBe("Team access");
     expect(item?.status).toBe("incomplete");
+    expect(item?.description).toBe("No active internal users found. Add or activate an internal user to finish setup.");
     expect(summary.isOperationallyReady).toBe(false);
   });
 
