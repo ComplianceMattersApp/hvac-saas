@@ -35,6 +35,16 @@ Phase 3A closeout lock:
 - Authority lock remains Owner/Admin/Billing allowed; Dispatcher/Technician/Contractor/Portal/Public blocked by default.
 - Deferred register remains unchanged: allocations, service plan billing periods behavior implementation, customer portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, and platform fee execution remain deferred.
 
+Phase 4A closeout lock (Allocation Compatibility Foundation):
+
+- Phase 4A is complete as a compatibility-only foundation (`a0a2d23`), not allocation persistence.
+- No allocation schema/table exists yet.
+- No allocation rows are written yet.
+- Invoice paid/balance projection now routes through allocation-compatible helper semantics using existing `internal_invoice_payments` rows only.
+- Recorded-only collected truth is preserved; failed and reversed rows remain non-collected and excluded from collected totals.
+- Stripe webhook row behavior and manual/off-platform row behavior remain unchanged in this slice.
+- No Service Plan Billing Period behavior, `maintenance_agreement_visits`, payment recording flow, checkout/webhook behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, or partial payments behavior changed.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:

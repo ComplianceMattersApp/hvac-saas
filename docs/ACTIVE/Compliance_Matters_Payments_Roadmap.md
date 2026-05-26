@@ -132,6 +132,15 @@ Current support posture:
 - no customer portal or public payment self-service exists in V1
 - no saved cards, partial payments, ACH, or refund tooling exists in V1
 
+Phase 4A closeout (Allocation Compatibility Foundation):
+- Implemented as compatibility-only foundation in commit `a0a2d23`.
+- No allocation schema/table was introduced.
+- No allocation rows are written.
+- Existing invoice-bound paid/balance projection now routes through allocation-compatible helper semantics only.
+- Recorded-only collected-payment truth is preserved; failed and reversed rows remain non-collected.
+- Payments register and invoice ledger totals remain unchanged in this slice.
+- No Service Plan billing period, `maintenance_agreement_visits`, checkout/webhook behavior, payment recording behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, or partial payments changes were introduced.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

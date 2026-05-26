@@ -69,6 +69,12 @@ Recent closeout status snapshot (May 2026):
    - Reversal is non-destructive: original rows are preserved and status/audit fields are updated
    - Invoice paid/balance and register collected totals remain recorded-only; reversed rows do not count as collected money
    - Deferred register remains unchanged: allocations, service-plan billing periods execution, customer portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform-fee execution
+- **Allocation Compatibility Foundation (Phase 4A) is now implemented as compatibility-only (`a0a2d23`):**
+   - No allocation schema/table exists yet and no allocation rows are persisted
+   - Existing invoice-bound projection now routes through allocation-compatible helper semantics only
+   - Recorded rows remain collected truth; failed and reversed rows remain excluded from collected totals
+   - Reports safety confirmed in this slice: register and invoice-ledger collected totals remain unchanged
+   - No payment recording behavior, Stripe checkout/webhook behavior, Service Plan billing period behavior, `maintenance_agreement_visits`, portal, QBO, ACH, refunds/disputes, saved cards/autopay, or partial payments behavior changed
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

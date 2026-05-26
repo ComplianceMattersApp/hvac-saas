@@ -52,6 +52,13 @@ Current financial access model for sensitive financial actions:
   - Invoice paid/balance and collected totals continue counting only `recorded` rows (reversed excluded)
   - Browser/UI posture: reverse action appears only on eligible off-platform recorded rows; failed/stripe rows do not expose reversal mutation affordance
   - Commit target for this closeout remains pending until final approval
+- **Allocation Compatibility Foundation (Phase 4A) is now implemented as a compatibility layer (`a0a2d23`):**
+  - Added compatibility helper semantics only; no allocation schema/table exists yet
+  - No allocation rows are persisted/written
+  - Invoice paid/balance projection now derives through allocation-compatible helper mapping from existing invoice-bound payment rows
+  - Recorded-only collected truth is preserved; failed and reversed rows remain excluded from collected totals
+  - Stripe webhook-origin rows and manual/off-platform rows keep existing projection behavior
+  - No changes to payment recording flows, Stripe checkout/webhook behavior, Service Plan billing periods, `maintenance_agreement_visits`, customer portal, QBO, ACH, refunds/disputes, saved cards/autopay, or partial payments
 
 Current financial access model for sensitive financial actions:
 
