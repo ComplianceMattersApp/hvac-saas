@@ -45,6 +45,19 @@ Phase 4A closeout lock (Allocation Compatibility Foundation):
 - Stripe webhook row behavior and manual/off-platform row behavior remain unchanged in this slice.
 - No Service Plan Billing Period behavior, `maintenance_agreement_visits`, payment recording flow, checkout/webhook behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, or partial payments behavior changed.
 
+Phase 4B lock (Allocation Schema Model Lock, docs/model only):
+
+- First allocation table name is locked to `internal_invoice_payment_allocations`.
+- First source is locked to `source_internal_invoice_payment_id` referencing `internal_invoice_payments.id`.
+- First target is invoice-only with `target_invoice_id`; do not add `target_service_plan_billing_period_id` yet.
+- Customer-credit targets are future-only and remain deferred.
+- First posture is one source payment to one invoice allocation, with a unique constraint on `source_internal_invoice_payment_id`.
+- First posture explicitly excludes multi-invoice split behavior, overpayment/credit behavior, and partial-payment expansion beyond existing invoice payment behavior.
+- Allocation statuses locked for first implementation posture: `active`, `inactive`, `reversed`, `voided`.
+- Counting rule lock: only `active` allocations count toward invoice collected totals; `inactive`/`reversed`/`voided` do not count.
+- If `counts_toward_collected_totals` is stored in future schema, it must not be independent financial truth; either omit it or enforce consistency from status with a check constraint.
+- Phase 4C implementation boundary is additive table + RLS + indexes + tests only; no UI, no read-path/projection switch, no payment-recording changes, no Stripe/webhook changes, and no Service Plan Billing Period behavior changes.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
@@ -122,18 +135,21 @@ Allocation is the relationship that applies money from a payment/register entry 
 It must answer:
 
 - source payment/register entry
-- target type/id (invoice, service-plan billing period, or future obligation)
+- target id (invoice in first posture)
 - allocated amount
 - whether allocation contributes to invoice paid/balance projection
-- whether allocation covers a billing period
-- allocation lifecycle (active, reversed, corrected, voided, historical)
+- allocation lifecycle (active, inactive, reversed, voided)
 - allocation audit fields
 
 First posture lock:
 
 - Existing one-invoice payment behavior is representable as one payment-to-one-invoice allocation.
-- Multi-invoice split, overpayment carry-forward, partial allocation, and credit-wallet behavior remain deferred.
+- First source key is `source_internal_invoice_payment_id` with uniqueness to enforce one source payment to one allocation row.
+- First target key is `target_invoice_id` only.
+- Multi-invoice split, service-plan-billing-period target linkage, overpayment carry-forward, partial allocation expansion, and credit-wallet behavior remain deferred.
 - Allocation adoption must be additive and must not regress current invoice paid/balance projection.
+- Allocation statuses are locked to `active`, `inactive`, `reversed`, and `voided` in first posture.
+- Only `active` allocations count toward invoice collected totals in future allocation-backed reads.
 
 ## 3) Invoice Payment Projection Model Lock
 
@@ -273,7 +289,7 @@ Before implementation starts, owner should explicitly decide:
 
 1. Billing-period lifecycle states and transitions (including overdue/waived/cancelled semantics).
 2. First-period invoice issuance trigger posture (manual issue first vs limited assisted flow).
-3. Allocation introduction strategy (bridge compatibility first vs immediate explicit allocation table).
+3. Allocation introduction strategy is now resolved: first explicit table is `internal_invoice_payment_allocations` with invoice-only target and one-source-to-one-allocation posture.
 4. Correction/reversal operator workflow posture and minimum audit requirements.
 5. Platform-fee policy and disclosure posture (if/when reopened).
 6. Unpaid billing-period operational posture (warning-only first is recommended).

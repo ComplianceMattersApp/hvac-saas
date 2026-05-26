@@ -141,6 +141,24 @@ Phase 4A closeout (Allocation Compatibility Foundation):
 - Payments register and invoice ledger totals remain unchanged in this slice.
 - No Service Plan billing period, `maintenance_agreement_visits`, checkout/webhook behavior, payment recording behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, or partial payments changes were introduced.
 
+Phase 4B lock (Allocation Schema Model Lock, docs/model only):
+- First allocation table name is locked: `internal_invoice_payment_allocations`.
+- First source key is locked: `source_internal_invoice_payment_id` -> `internal_invoice_payments.id`.
+- First target is invoice only: `target_invoice_id`.
+- Deferred future expansion only: service-plan billing period target columns (including `target_service_plan_billing_period_id`) and customer-credit targets.
+- First posture lock: one source payment maps to one invoice allocation (unique `source_internal_invoice_payment_id`), no multi-invoice split, no overpayment/credit behavior, no partial-payment expansion beyond existing behavior.
+- Allocation statuses lock: `active`, `inactive`, `reversed`, `voided`.
+- Counting lock: only `active` allocations count toward invoice collected totals; `inactive`/`reversed`/`voided` do not count.
+- If `counts_toward_collected_totals` is stored later, it must be constrained to status-derived truth (or omitted).
+
+Phase 4C boundary lock (implementation shape):
+- Additive table + RLS + indexes + tests only.
+- No UI.
+- No read-path/projection switch.
+- No payment-recording changes.
+- No Stripe/webhook changes.
+- No Service Plan billing behavior changes.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

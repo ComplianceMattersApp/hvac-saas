@@ -59,6 +59,16 @@ Current financial access model for sensitive financial actions:
   - Recorded-only collected truth is preserved; failed and reversed rows remain excluded from collected totals
   - Stripe webhook-origin rows and manual/off-platform rows keep existing projection behavior
   - No changes to payment recording flows, Stripe checkout/webhook behavior, Service Plan billing periods, `maintenance_agreement_visits`, customer portal, QBO, ACH, refunds/disputes, saved cards/autopay, or partial payments
+- **Allocation Schema Model Lock (Phase 4B, docs/model only) is now locked:**
+  - First explicit table name is `internal_invoice_payment_allocations`
+  - First source key is `source_internal_invoice_payment_id` referencing `internal_invoice_payments.id`
+  - First target is invoice-only via `target_invoice_id`
+  - `target_service_plan_billing_period_id` and customer-credit target columns are deferred (future expansion only)
+  - First posture is one source payment to one invoice allocation, enforced by unique `source_internal_invoice_payment_id`
+  - First statuses are locked to `active`, `inactive`, `reversed`, `voided`
+  - Only `active` allocations count toward invoice collected totals; `inactive`/`reversed`/`voided` do not count
+  - If a future column like `counts_toward_collected_totals` is stored, it must not become independent financial truth; it must be omitted or constrained to remain status-consistent
+  - Phase 4C boundary is additive table + RLS + indexes + tests only, with no UI, no projection switch, no payment-recording changes, no Stripe/webhook changes, and no Service Plan billing behavior changes
 
 Current financial access model for sensitive financial actions:
 
@@ -251,27 +261,31 @@ Only `recorded` entries with successful allocations should reduce balances or co
 
 Conceptual fields:
 
-- `payment_register_entry_id`
-- `allocation_target_type`
-- `allocation_target_id`
+- `source_internal_invoice_payment_id`
+- `target_invoice_id`
 - `allocated_amount`
 - `allocation_status`
 - `created_at`
 - `created_by_user_id`
 
-Allowed target types:
-
-- `invoice`
-- `future_service_plan_billing_period`
-- `future_customer_credit`
-
 V1 implementation posture:
 
 - One payment to one invoice first is acceptable.
-- The model must not block future multi-allocation.
+- Unique `source_internal_invoice_payment_id` enforces one source payment to one allocation row in first posture.
+- First target is invoice only.
+- Statuses are locked to `active`, `inactive`, `reversed`, `voided`.
+- Only `active` allocations count in future allocation-backed collected totals.
 - Invoice paid/balance derives from successful allocations.
 - Manual invoice paid-state mutation is not payment truth.
 - Stripe-collected payment rows must still be webhook-only.
+
+Future expansion (explicitly deferred):
+
+- service-plan billing period target columns (including `target_service_plan_billing_period_id`)
+- customer credit target columns
+- multi-invoice split allocations
+- overpayment/credit carry-forward behavior
+- partial-payment expansion beyond existing invoice-payment behavior
 
 ## Manual Payment Requirements
 

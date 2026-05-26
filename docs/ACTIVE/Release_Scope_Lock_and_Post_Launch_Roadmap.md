@@ -75,6 +75,20 @@ Recent closeout status snapshot (May 2026):
    - Recorded rows remain collected truth; failed and reversed rows remain excluded from collected totals
    - Reports safety confirmed in this slice: register and invoice-ledger collected totals remain unchanged
    - No payment recording behavior, Stripe checkout/webhook behavior, Service Plan billing period behavior, `maintenance_agreement_visits`, portal, QBO, ACH, refunds/disputes, saved cards/autopay, or partial payments behavior changed
+- **Allocation Schema Model Lock (Phase 4B, docs/model only) is now locked:**
+   - First explicit table name: `internal_invoice_payment_allocations`
+   - First source key: `source_internal_invoice_payment_id` referencing `internal_invoice_payments.id`
+   - First target key: invoice-only `target_invoice_id`
+   - `target_service_plan_billing_period_id` and customer-credit target columns remain future expansion only
+   - First posture enforces one source payment to one invoice allocation via unique `source_internal_invoice_payment_id`
+   - First allocation statuses are locked: `active`, `inactive`, `reversed`, `voided`
+   - Counting lock: only `active` allocations count toward invoice collected totals
+   - If a future `counts_toward_collected_totals` field exists, it must be omitted or constrained to status consistency (not independent truth)
+- **Phase 4C boundary lock (next implementation slice):**
+   - Additive table + RLS + indexes + tests only
+   - No UI, no read-path/projection switch, no payment-recording changes
+   - No Stripe checkout/webhook behavior changes
+   - No Service Plan billing behavior changes
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
