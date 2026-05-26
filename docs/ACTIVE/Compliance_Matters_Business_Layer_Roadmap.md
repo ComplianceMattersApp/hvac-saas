@@ -58,6 +58,14 @@ Payments V2 Service Plan Billing Foundation model lock reference:
 - [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md)
 - First posture is billing-period plus normal internal invoice linkage and existing invoice payment truth; automation/autopay/subscription behavior remains deferred.
 
+Optional internal billing guardrail (May 2026):
+- Operational flow is not gated by internal billing attachment: jobs, work orders, service plans, maintenance visits, visit counting, and next-due workflows must remain available without internal invoice/payment records.
+- Internal invoice/payment usage is optional and varies by `billing_mode`, tenant setup, and later service-plan billing configuration.
+- External-billing/off-platform tenants must be able to perform and track work without internal payment attachment.
+- Future Service Plan Billing Period posture must support: internal invoice-backed, external/off-platform, manual, no-charge, waived, and not-billed-through-Compliance-Matters.
+- Payment status may drive billing/reporting warnings but must not hard-block operations in first posture unless explicitly designed and approved later.
+- Payment truth remains separate from visit/link truth and must not attach directly to `maintenance_agreement_visits`.
+
 Relationship intake and display lane closeout (May 2026):
 - This lane is complete for V1 and should be treated as closed unless real usage evidence reopens it.
 - Completed scope:

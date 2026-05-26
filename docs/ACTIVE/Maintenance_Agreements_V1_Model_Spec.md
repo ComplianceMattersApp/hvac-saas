@@ -18,6 +18,11 @@ Financial/payment model boundary:
 - Service Plan Billing Foundation Phase 2 model lock is documented in [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md).
 - Recurring billing must connect through billing periods and payment allocations.
 - First Service Plan Billing posture is billing-period plus normal internal invoice linkage, with customer payment through existing invoice payment infrastructure.
+- Internal invoice/payment linkage is optional and must not be required for operational workflow progression.
+- Jobs/work orders, service-plan visit creation/scheduling/completion, visit counting, and next-due confirmation must remain operationally available without internal payment attachment.
+- External-billing/off-platform postures must remain first-class supported paths for work tracking.
+- Future Service Plan Billing Period posture must allow internal invoice-backed, external/off-platform, manual, no-charge, waived, and not-billed-through-Compliance-Matters paths.
+- Payment status can drive warnings/reporting context, but must not hard-block service-plan operational workflow in current posture unless explicitly reopened later.
 - Money must not attach directly to service visit links, visit count rows, or `maintenance_agreement_visits`.
 
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)

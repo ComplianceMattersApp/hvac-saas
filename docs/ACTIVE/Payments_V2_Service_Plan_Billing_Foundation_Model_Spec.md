@@ -8,6 +8,16 @@ Scope: docs/model only. No product code, schema, migrations, Supabase commands, 
 
 Lock the minimum safe data/model posture so future implementation slices can add Service Plan Billing without breaking existing invoice/payment truth.
 
+## Optional Internal Billing Guardrail (May 2026)
+
+- Operational work must remain allowed without internal invoice/payment attachment: jobs, work orders, service plans, maintenance visits, visit counts, and next-due workflows must not require internal invoice or payment rows.
+- Internal invoicing/payment is optional by billing posture (`billing_mode`), tenant setup, and future service-plan billing configuration.
+- External-billing/off-platform tenants must still perform and track work even when no internal payment row exists.
+- Future Service Plan Billing Periods must support multiple postures: internal invoice-backed, external/off-platform, manual, no-charge, waived, and not-billed-through-Compliance-Matters.
+- Payment status may inform billing/reporting warnings, but must not hard-block operational workflows in first posture unless a later explicit design authorizes that behavior.
+- Payment truth remains financial truth only and must not attach directly to `maintenance_agreement_visits`.
+- Payment must not be required to create, schedule, complete, count, or confirm service-plan work.
+
 Phase 2 correction lock:
 
 - First Service Plan Billing V1 does not require an automatic recurring charge engine.
