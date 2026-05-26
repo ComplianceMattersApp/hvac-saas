@@ -104,4 +104,56 @@ describe("payment allocation compatibility helper", () => {
     expect(sumActiveInvoiceAllocationCents(allocations, "inv-2")).toBe(999);
     expect(sumActiveInvoiceAllocationCents(allocations, "inv-3")).toBe(0);
   });
+
+  it("preserves signed recorded amounts for legacy projection parity", () => {
+    const allocations = deriveCompatibilityInvoiceAllocations([
+      {
+        id: "pay-1",
+        account_owner_user_id: "owner-1",
+        invoice_id: "inv-1",
+        job_id: "job-1",
+        payment_status: "recorded",
+        payment_method: "cash",
+        amount_cents: 2000,
+        paid_at: "2026-05-01T00:00:00Z",
+        received_reference: null,
+        notes: null,
+        recorded_by_user_id: "user-1",
+        created_at: "2026-05-01T00:00:00Z",
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+      {
+        id: "pay-2",
+        account_owner_user_id: "owner-1",
+        invoice_id: "inv-1",
+        job_id: "job-1",
+        payment_status: "recorded",
+        payment_method: "other",
+        amount_cents: -500,
+        paid_at: "2026-05-01T00:00:00Z",
+        received_reference: null,
+        notes: null,
+        recorded_by_user_id: "user-1",
+        created_at: "2026-05-01T00:00:00Z",
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+      {
+        id: "pay-3",
+        account_owner_user_id: "owner-1",
+        invoice_id: "inv-1",
+        job_id: "job-1",
+        payment_status: "recorded",
+        payment_method: "other",
+        amount_cents: 0,
+        paid_at: "2026-05-01T00:00:00Z",
+        received_reference: null,
+        notes: null,
+        recorded_by_user_id: "user-1",
+        created_at: "2026-05-01T00:00:00Z",
+        updated_at: "2026-05-01T00:00:00Z",
+      },
+    ]);
+
+    expect(sumActiveInvoiceAllocationCents(allocations, "inv-1")).toBe(1500);
+  });
 });

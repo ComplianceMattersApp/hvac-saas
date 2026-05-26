@@ -25,7 +25,7 @@ export function deriveCompatibilityInvoiceAllocations(
       const invoiceId = String(row?.invoice_id ?? "").trim();
       const amountCents = Number(row?.amount_cents ?? 0) || 0;
 
-      if (!paymentId || !invoiceId || amountCents <= 0) {
+      if (!paymentId || !invoiceId) {
         return null;
       }
 
