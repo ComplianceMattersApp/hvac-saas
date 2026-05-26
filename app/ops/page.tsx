@@ -372,6 +372,502 @@ function subtractBusinessDays(date: Date, days: number) {
   return d;
 }
 
+  function workspaceTitle(job: any) {
+    return normalizeRetestLinkedJobTitle(job?.title) || `Job ${String(job?.id ?? "").slice(0, 8)}`;
+  }
+
+  function workspaceCustomerLocation(job: any) {
+    const customer = [String(job?.customer_first_name ?? "").trim(), String(job?.customer_last_name ?? "").trim()]
+      .filter(Boolean)
+      .join(" ");
+    const location = [String(job?.job_address ?? "").trim(), String(job?.city ?? "").trim()]
+      .filter(Boolean)
+      .join(", ");
+
+    if (customer && location) return `${customer} · ${location}`;
+    return customer || location || "Customer / location pending";
+  }
+
+  function workspaceAgeLabel(job: any) {
+    const source = String(job?.created_at ?? "").trim();
+    if (!source) return "-";
+    const stamp = new Date(source).getTime();
+    if (!Number.isFinite(stamp)) return "-";
+    const days = Math.max(0, Math.floor((Date.now() - stamp) / 86400000));
+    return `${days}d`;
+  }
+
+  function wsStatusReason(job: any, queueKey: string) {
+    const status = String(job?.ops_status ?? "").toLowerCase();
+    const lifecycle = String(job?.status ?? "").toLowerCase();
+
+    if (queueKey === "need_to_schedule") return "Awaiting scheduling";
+    if (queueKey === "field_work") {
+      if (lifecycle === "on_the_way") return "On the way";
+      if (lifecycle === "in_progress") return "In progress";
+      return "Scheduled field work";
+    }
+    if (queueKey === "without_tech") return "Scheduled without active tech assignment";
+    if (queueKey === "waiting") {
+      const waitingState = getActiveWaitingState({
+        ops_status: job?.ops_status ?? null,
+        pending_info_reason: job?.pending_info_reason ?? null,
+        on_hold_reason: job?.on_hold_reason ?? null,
+      });
+      return waitingState?.blockerReason || String(job?.pending_info_reason ?? "").trim() || "Dependency pending";
+    }
+    if (queueKey === "exceptions") {
+      if (status === "failed") return "Failed - needs review/correction";
+      if (status === "retest_needed") return "Retest needed";
+      if (status === "pending_office_review") return "Pending office review";
+      return "Exception requires follow-up";
+    }
+    if (queueKey === "closeout") {
+      if (status === "invoice_required") return "Invoice required";
+      if (status === "paperwork_required") return "Paperwork required";
+      return "Closeout follow-up";
+    }
+    return "Operational update";
+  }
+
+  const wsStartTodayUtc = startOfTodayUtcIsoLA();
+  const wsStartTomorrowUtc = startOfTomorrowUtcIsoLA();
+
+  if (panel !== "full_board") {
+    const workspaceSelect =
+      "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, created_at";
+
+    const _t_workspaceCounts = opsTimingEnabled ? Date.now() : 0;
+    let countsQ = supabase
+      .from("jobs")
+      .select("ops_status, status")
+      .neq("ops_status", "closed")
+      .neq("status", "cancelled")
+      .is("deleted_at", null);
+
+    if (contractorScopeFilter) countsQ = countsQ.eq("contractor_id", contractorScopeFilter);
+
+    let fieldWorkCountQ = supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .neq("ops_status", "closed")
+      .eq("field_complete", false)
+      .gte("scheduled_date", wsStartTodayUtc)
+      .lt("scheduled_date", wsStartTomorrowUtc);
+
+    if (contractorScopeFilter) fieldWorkCountQ = fieldWorkCountQ.eq("contractor_id", contractorScopeFilter);
+
+    let scheduledOpenRowsQ = supabase
+      .from("jobs")
+      .select(workspaceSelect)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("status", "open")
+      .eq("ops_status", "scheduled")
+      .order("scheduled_date", { ascending: true })
+      .order("window_start", { ascending: true });
+
+    if (contractorScopeFilter) scheduledOpenRowsQ = scheduledOpenRowsQ.eq("contractor_id", contractorScopeFilter);
+
+    const [countsResWs, fieldWorkCountRes, scheduledOpenRowsRes, unreadContractorUpdates, unreadNewWorkRequests] = await Promise.all([
+      countsQ,
+      fieldWorkCountQ,
+      scheduledOpenRowsQ,
+      listInternalContractorUpdateAwareness({ limit: 100, onlyUnread: true }),
+      listInternalNewWorkRequestAwareness({ limit: 100, onlyUnread: true }),
+    ]);
+
+    if (countsResWs.error) throw countsResWs.error;
+    if (fieldWorkCountRes.error) throw fieldWorkCountRes.error;
+    if (scheduledOpenRowsRes.error) throw scheduledOpenRowsRes.error;
+
+    const countsWs = new Map<string, number>();
+    for (const row of countsResWs.data ?? []) {
+      const key = String((row as any)?.ops_status ?? "").trim().toLowerCase();
+      const lifecycle = String((row as any)?.status ?? "").trim().toLowerCase();
+      if (!key) continue;
+      if ((key === "need_to_schedule" || key === "scheduled") && lifecycle !== "open") continue;
+      countsWs.set(key, (countsWs.get(key) ?? 0) + 1);
+    }
+
+    const scheduledOpenRows = (scheduledOpenRowsRes.data ?? []) as any[];
+    const scheduledIds = scheduledOpenRows
+      .map((row) => String(row?.id ?? "").trim())
+      .filter(Boolean);
+
+    const scheduledAssignmentMap = scheduledIds.length
+      ? await getActiveJobAssignmentDisplayMap({ supabase, jobIds: scheduledIds })
+      : {};
+
+    const scheduledWithoutTechSnapshot = buildScheduledWithoutTechSnapshot({
+      jobs: scheduledOpenRows,
+      assignmentDisplayMap: scheduledAssignmentMap,
+      previewLimit: 10,
+    });
+
+    const scheduledRowsById = new Map(
+      scheduledOpenRows.map((row: any) => [String(row?.id ?? "").trim(), row])
+    );
+
+    const withoutTechPreviewRows = (scheduledWithoutTechSnapshot.preview ?? [])
+      .map((job: any) => scheduledRowsById.get(String(job?.id ?? "").trim()))
+      .filter(Boolean) as any[];
+
+    const waitingCount =
+      (countsWs.get("pending_info") ?? 0) +
+      (countsWs.get("on_hold") ?? 0) +
+      (countsWs.get("waiting") ?? 0) +
+      (countsWs.get("pending_office_review") ?? 0);
+
+    const exceptionCount =
+      (countsWs.get("failed") ?? 0) +
+      (countsWs.get("retest_needed") ?? 0) +
+      (countsWs.get("pending_office_review") ?? 0) +
+      (countsWs.get("problem") ?? 0);
+
+    const closeoutCount =
+      (countsWs.get("invoice_required") ?? 0) +
+      (countsWs.get("paperwork_required") ?? 0);
+
+    const workspaceTabs = [
+      {
+        key: "need_to_schedule",
+        label: "Needs Scheduling",
+        count: countsWs.get("need_to_schedule") ?? 0,
+        href: `/ops/call-list${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+      },
+      {
+        key: "field_work",
+        label: "Field Work",
+        count: Number(fieldWorkCountRes.count ?? 0),
+        href: `/ops/field${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+      },
+      {
+        key: "without_tech",
+        label: "Without Tech",
+        count: scheduledWithoutTechSnapshot.count,
+        href: `/ops/queues/without-tech${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+      },
+      {
+        key: "waiting",
+        label: "Waiting / Pending Info",
+        count: waitingCount,
+        href: `/ops/queues/waiting${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+      },
+      {
+        key: "exceptions",
+        label: "Exceptions",
+        count: exceptionCount,
+        href: `/ops/queues/exceptions${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+      },
+      {
+        key: "closeout",
+        label: "Closeout & Review",
+        count: closeoutCount,
+        href: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+      },
+      {
+        key: "updates",
+        label: "Updates",
+        count: unreadContractorUpdates.length + unreadNewWorkRequests.length,
+        href: "/ops/notifications?state=unread",
+      },
+    ] as const;
+
+    const priorityOrder = [
+      "exceptions",
+      "waiting",
+      "without_tech",
+      "need_to_schedule",
+      "closeout",
+      "field_work",
+      "updates",
+    ];
+
+    const requestedWorkspaceKey = String(sp.bucket ?? "").trim().toLowerCase();
+    const fallbackWorkspaceKey =
+      priorityOrder.find((key) => (workspaceTabs.find((tab) => tab.key === key)?.count ?? 0) > 0) ??
+      "need_to_schedule";
+
+    const selectedWorkspaceKey = workspaceTabs.some((tab) => tab.key === requestedWorkspaceKey)
+      ? requestedWorkspaceKey
+      : fallbackWorkspaceKey;
+
+    const selectedWorkspaceTab =
+      workspaceTabs.find((tab) => tab.key === selectedWorkspaceKey) ?? workspaceTabs[0];
+
+    let selectedPreviewRows: any[] = [];
+
+    if (selectedWorkspaceKey === "need_to_schedule") {
+      let queueQ = supabase
+        .from("jobs")
+        .select(workspaceSelect)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .eq("status", "open")
+        .eq("ops_status", "need_to_schedule")
+        .order("created_at", { ascending: true })
+        .limit(10);
+      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
+      const queueRes = await queueQ;
+      if (queueRes.error) throw queueRes.error;
+      selectedPreviewRows = queueRes.data ?? [];
+    } else if (selectedWorkspaceKey === "field_work") {
+      let queueQ = supabase
+        .from("jobs")
+        .select(workspaceSelect)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .neq("ops_status", "closed")
+        .eq("field_complete", false)
+        .gte("scheduled_date", wsStartTodayUtc)
+        .lt("scheduled_date", wsStartTomorrowUtc)
+        .order("window_start", { ascending: true })
+        .limit(10);
+      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
+      const queueRes = await queueQ;
+      if (queueRes.error) throw queueRes.error;
+      selectedPreviewRows = queueRes.data ?? [];
+    } else if (selectedWorkspaceKey === "without_tech") {
+      selectedPreviewRows = withoutTechPreviewRows;
+    } else if (selectedWorkspaceKey === "waiting") {
+      let queueQ = supabase
+        .from("jobs")
+        .select(workspaceSelect)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .neq("ops_status", "closed")
+        .in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"])
+        .order("created_at", { ascending: true })
+        .limit(10);
+      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
+      const queueRes = await queueQ;
+      if (queueRes.error) throw queueRes.error;
+      selectedPreviewRows = queueRes.data ?? [];
+    } else if (selectedWorkspaceKey === "exceptions") {
+      let queueQ = supabase
+        .from("jobs")
+        .select(workspaceSelect)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .neq("ops_status", "closed")
+        .in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"])
+        .order("created_at", { ascending: true })
+        .limit(10);
+      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
+      const queueRes = await queueQ;
+      if (queueRes.error) throw queueRes.error;
+      selectedPreviewRows = queueRes.data ?? [];
+    } else if (selectedWorkspaceKey === "closeout") {
+      let queueQ = supabase
+        .from("jobs")
+        .select(workspaceSelect)
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .neq("ops_status", "closed")
+        .in("ops_status", ["invoice_required", "paperwork_required"])
+        .order("created_at", { ascending: true })
+        .limit(10);
+      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
+      const queueRes = await queueQ;
+      if (queueRes.error) throw queueRes.error;
+      selectedPreviewRows = queueRes.data ?? [];
+    }
+
+    if (opsTimingEnabled) {
+      console.log(`[ops:workspace:countsAndPreview] ${Date.now() - _t_workspaceCounts}ms`);
+      console.log(`[ops:totalBeforeRender] ${Date.now() - _t_total}ms`);
+    }
+
+    const operationalTenantIdentity = await operationalTenantIdentityPromise;
+
+    return (
+      <div className="mx-auto max-w-[92rem] space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6">
+        {notice === "estimates_unavailable" ? (
+          <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.24)]">
+            <div className="font-semibold">Estimates are not enabled for this environment yet.</div>
+            <div className="mt-1 text-amber-900/85">
+              Internal estimate routes remain fail-closed here until the estimate migration is intentionally applied and the feature flag is explicitly enabled.
+            </div>
+          </section>
+        ) : null}
+
+        <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_56%,rgba(219,234,254,0.56))] p-4 shadow-[0_22px_54px_-34px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/70 sm:p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">{operationalTenantIdentity.displayName}</div>
+              <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[2rem]">
+                Operations Workspace
+              </h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                Work operational queues, triage blockers, and move jobs forward.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Link href="/today" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
+                Go to Today
+              </Link>
+              <Link
+                href={`/ops${buildQueryString({
+                  bucket,
+                  contractor: contractorScopeFilter ?? "",
+                  q: q ?? "",
+                  sort,
+                  signal,
+                  panel: "full_board",
+                })}#ops-queues`}
+                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]"
+              >
+                Full operations board
+              </Link>
+            </div>
+          </div>
+        </section>
+
+        <section id="ops-workspace" className="rounded-3xl border border-slate-300/80 bg-white p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Queue Switcher</div>
+              <div className="text-lg font-semibold tracking-tight text-slate-950">Operations workbench</div>
+            </div>
+            <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
+              {workspaceTabs.reduce((sum, tab) => sum + tab.count, 0)} active jobs
+            </div>
+          </div>
+
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {workspaceTabs.map((tab) => {
+              const isActive = tab.key === selectedWorkspaceKey;
+              return (
+                <Link
+                  key={tab.key}
+                  href={`/ops${buildQueryString({
+                    bucket: tab.key,
+                    contractor: contractorScopeFilter ?? "",
+                    sort,
+                    panel: "",
+                  })}#ops-workspace`}
+                  className={[
+                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium leading-5 shadow-sm transition-colors sm:py-1 sm:text-[11px] sm:leading-none",
+                    isActive
+                      ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
+                      : "border-slate-300 bg-slate-50/90 text-slate-700 hover:bg-white",
+                  ].join(" ")}
+                >
+                  <span className={isActive ? "text-slate-200" : "text-current/80"}>{tab.label}</span>
+                  <span className="font-semibold tabular-nums">{tab.count}</span>
+                </Link>
+              );
+            })}
+          </div>
+
+          <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
+                <div className="text-[15px] font-semibold tracking-tight text-slate-950">{selectedWorkspaceTab.label}</div>
+                <div className="text-xs text-slate-600">{selectedWorkspaceTab.count} jobs</div>
+              </div>
+              <Link href={selectedWorkspaceTab.href} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
+                Open focused queue
+              </Link>
+            </div>
+
+            {selectedWorkspaceKey === "updates" ? (
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor Updates</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{unreadContractorUpdates.length}</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">New Work Requests</div>
+                  <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{unreadNewWorkRequests.length}</div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Notification Link</div>
+                  <Link href="/ops/notifications?state=unread" className="mt-1 inline-flex text-sm font-semibold text-blue-700 hover:text-blue-800 hover:underline">
+                    Open notifications
+                  </Link>
+                </div>
+              </div>
+            ) : selectedPreviewRows.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-2.5 py-2 text-[12px] font-medium leading-5 text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] sm:py-1.5 sm:text-[11px] sm:leading-4">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
+                <span>No jobs in this queue right now.</span>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {selectedPreviewRows.map((job: any) => (
+                  <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <Link href={`/jobs/${job.id}?tab=ops`} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
+                          {workspaceTitle(job)}
+                        </Link>
+                        <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700 sm:text-[11px] sm:leading-4">{workspaceCustomerLocation(job)}</div>
+                      </div>
+                      <Link href={`/jobs/${job.id}?tab=ops`} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
+                        Open Job
+                      </Link>
+                    </div>
+
+                    <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-3 sm:text-[11px] sm:leading-4">
+                      <div>
+                        <span className="font-medium text-slate-500">Status/Reason:</span> {wsStatusReason(job, selectedWorkspaceKey)}
+                      </div>
+                      <div>
+                        <span className="font-medium text-slate-500">Age/Time:</span>{" "}
+                        {selectedWorkspaceKey === "field_work" || selectedWorkspaceKey === "without_tech"
+                          ? (job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "Not scheduled") +
+                            (displayWindowLA(job?.window_start, job?.window_end) ? ` ${displayWindowLA(job?.window_start, job?.window_end)}` : "")
+                          : workspaceAgeLabel(job)}
+                      </div>
+                      <div>
+                        <span className="font-medium text-slate-500">Ops Status:</span> {String(job?.ops_status ?? "-")}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </article>
+        </section>
+
+        {showTeamClockStatusCard ? (
+          <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Operations</div>
+                <div className="text-[15px] font-semibold tracking-tight text-slate-950">Team Clock Status</div>
+              </div>
+              <Link href="/time-clock" className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
+                Open time clock
+              </Link>
+            </div>
+
+            {teamClockStatusRows.length === 0 ? (
+              <div className="text-xs text-slate-600">No team members are clocked in right now.</div>
+            ) : (
+              <div className="space-y-1.5">
+                {teamClockStatusRows.slice(0, 8).map((row) => (
+                  <div key={row.internalUserId} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
+                    <div className="min-w-0">
+                      <div className="truncate text-xs font-semibold text-slate-900">{row.displayName}</div>
+                      <div className="text-[11px] text-slate-600">Since {row.sinceAt}</div>
+                    </div>
+                    <span className="shrink-0 text-[11px] font-medium text-slate-700">{row.statusLabel} · {row.elapsed}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
+      </div>
+    );
+  }
+
   // ✅ Counts per ops_status (exclude "closed", respect contractor filter)
   let countsQ = supabase
     .from("jobs")
@@ -2538,8 +3034,436 @@ const activeOpsWorkCount = uniqueAllOpenOpsJobs.length;
 const exceptionCount = sortedExceptionJobs.length;
 const clockedInNowCount = teamClockStatusRows.filter((row) => row.statusLabel === "Clocked In").length;
 const onLunchCount = teamClockStatusRows.length - clockedInNowCount;
+const waitingPendingInfoCount = (counts.get("pending_info") ?? 0) + (counts.get("on_hold") ?? 0);
+const notificationsCount = contractorUpdatesCount + newWorkRequestCount;
+
+type WorkspaceQueueKey =
+  | "need_to_schedule"
+  | "field_work"
+  | "without_tech"
+  | "waiting"
+  | "exceptions"
+  | "closeout"
+  | "updates";
+
+const scheduledSnapshotById = new Map(
+  (scheduledSnapshotJobs ?? []).map((job: any) => [String(job?.id ?? ""), job])
+);
+
+const withoutTechPreviewJobs = (scheduledWithoutTechSnapshot.preview ?? [])
+  .map((job: any) => scheduledSnapshotById.get(String(job?.id ?? "")))
+  .filter(Boolean) as any[];
+
+const waitingPreviewJobs = prioritizeActionableJobs(
+  uniqueAllOpenOpsJobs.filter((job: any) => {
+    const waitingState = getActiveWaitingState({
+      ops_status: job?.ops_status ?? null,
+      pending_info_reason: job?.pending_info_reason ?? null,
+      on_hold_reason: job?.on_hold_reason ?? null,
+    });
+    return Boolean(waitingState?.status);
+  })
+);
+
+const workspaceQueues: Array<{
+  key: WorkspaceQueueKey;
+  label: string;
+  count: number;
+  fullHref: string;
+  previewJobs: any[];
+}> = [
+  {
+    key: "need_to_schedule",
+    label: "Needs Scheduling",
+    count: prioritizedCallListJobs.length,
+    fullHref: `/ops/call-list${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    previewJobs: prioritizedCallListJobs,
+  },
+  {
+    key: "field_work",
+    label: "Field Work",
+    count: prioritizedFieldWorkJobs.length,
+    fullHref: `/ops/field${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    previewJobs: prioritizedFieldWorkJobs,
+  },
+  {
+    key: "without_tech",
+    label: "Without Tech",
+    count: scheduledWithoutTechSnapshot.count,
+    fullHref: `/ops/queues/without-tech${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    previewJobs: withoutTechPreviewJobs,
+  },
+  {
+    key: "waiting",
+    label: "Waiting / Pending Info",
+    count: waitingPendingInfoCount,
+    fullHref: `/ops/queues/waiting${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    previewJobs: waitingPreviewJobs,
+  },
+  {
+    key: "exceptions",
+    label: "Exceptions",
+    count: exceptionCount,
+    fullHref: `/ops/queues/exceptions${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    previewJobs: sortedExceptionJobs,
+  },
+  {
+    key: "closeout",
+    label: "Closeout & Review",
+    count: prioritizedCloseoutJobs.length,
+    fullHref: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    previewJobs: prioritizedCloseoutJobs,
+  },
+  {
+    key: "updates",
+    label: "Updates",
+    count: notificationsCount,
+    fullHref: "/ops/notifications?state=unread",
+    previewJobs: [],
+  },
+];
+
+const workspaceDefaultPriority: WorkspaceQueueKey[] = [
+  "exceptions",
+  "waiting",
+  "without_tech",
+  "need_to_schedule",
+  "closeout",
+  "field_work",
+  "updates",
+];
+
+const requestedWorkspaceKeyRaw = String(sp.bucket ?? "").trim().toLowerCase();
+const requestedWorkspaceKey = workspaceQueues.some((queue) => queue.key === requestedWorkspaceKeyRaw)
+  ? (requestedWorkspaceKeyRaw as WorkspaceQueueKey)
+  : null;
+
+const highestPriorityWorkspaceKey =
+  workspaceDefaultPriority.find((key) => (workspaceQueues.find((queue) => queue.key === key)?.count ?? 0) > 0) ??
+  "need_to_schedule";
+
+const selectedWorkspaceKey = requestedWorkspaceKey ?? highestPriorityWorkspaceKey;
+const selectedWorkspaceQueue =
+  workspaceQueues.find((queue) => queue.key === selectedWorkspaceKey) ?? workspaceQueues[0];
+
+function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
+  if (queueKey === "need_to_schedule") return "Awaiting scheduling";
+  if (queueKey === "field_work") {
+    const lifecycle = String(job?.status ?? "").toLowerCase();
+    if (lifecycle === "on_the_way") return "On the way";
+    if (lifecycle === "in_progress") return "In progress";
+    return "Scheduled field work";
+  }
+  if (queueKey === "without_tech") return "Scheduled without active tech assignment";
+  if (queueKey === "waiting") return queueReason(job, "pending_info") || "Waiting on info or hold release";
+  if (queueKey === "exceptions") return queueReason(job, "attention") || "Needs exception review";
+  if (queueKey === "closeout") return closeoutLabel(job);
+  return "Operational update";
+}
+
+function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {
+  const scheduleDate = job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "";
+  const scheduleWindow = displayWindowLA(job?.window_start, job?.window_end);
+
+  if (queueKey === "field_work" || queueKey === "without_tech") {
+    if (scheduleDate && scheduleWindow) return `${scheduleDate} ${scheduleWindow}`;
+    return scheduleDate || scheduleWindow || "Schedule pending";
+  }
+
+  const statusAgeDays = resolveStatusAgeDays({
+    status: String(job?.ops_status ?? ""),
+    failedInstant: failedStatusSinceByJob(String(job?.id ?? "")),
+    pendingInfoInstant: pendingInfoSetAtByJob.get(String(job?.id ?? "")) ?? null,
+    fallbackUpdatedAt: String(job?.created_at ?? "").trim() || null,
+  });
+
+  if (statusAgeDays == null) return "-";
+  return formatStatusAgeCompact(statusAgeDays);
+}
 
 if (opsTimingEnabled) console.log(`[ops:totalBeforeRender] ${Date.now() - _t_total}ms`);
+
+if (panel !== "full_board") {
+  return (
+    <div className="mx-auto max-w-[92rem] space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6">
+      {notice === "estimates_unavailable" ? (
+        <section className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.24)]">
+          <div className="font-semibold">Estimates are not enabled for this environment yet.</div>
+          <div className="mt-1 text-amber-900/85">
+            Internal estimate routes remain fail-closed here until the estimate migration is intentionally applied and the feature flag is explicitly enabled.
+          </div>
+        </section>
+      ) : null}
+
+      <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,0.98)_56%,rgba(219,234,254,0.56))] p-4 shadow-[0_22px_54px_-34px_rgba(15,23,42,0.45)] ring-1 ring-slate-200/70 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <div className={`${opsUtilityLabelClass} text-blue-700`}>{internalBusinessDisplayName}</div>
+            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[2rem]">
+              Operations Workspace
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Work operational queues, triage blockers, and move jobs forward.
+            </p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/today" className={sectionActionLinkClass}>
+              Go to Today
+            </Link>
+            <Link
+              href={`/ops${buildQueryString({
+                bucket,
+                contractor: contractorScopeFilter ?? "",
+                q: q ?? "",
+                sort,
+                signal,
+                panel: "full_board",
+              })}#ops-queues`}
+              className={sectionActionLinkClass}
+            >
+              Full operations board
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      <section id="ops-workspace" className="rounded-3xl border border-slate-300/80 bg-white p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+          <div>
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Queue Switcher</div>
+            <div className="text-lg font-semibold tracking-tight text-slate-950">Operations workbench</div>
+          </div>
+          <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">{activeOpsWorkCount} active jobs</div>
+        </div>
+
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {workspaceQueues.map((queue) => {
+            const isActive = queue.key === selectedWorkspaceQueue.key;
+            return (
+              <Link
+                key={queue.key}
+                href={`/ops${buildQueryString({
+                  bucket: queue.key,
+                  contractor: contractorScopeFilter ?? "",
+                  q: q ?? "",
+                  sort,
+                  signal: "",
+                })}#ops-workspace`}
+                className={[
+                  opsQueueChipClass,
+                  isActive
+                    ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
+                    : "border-slate-300 bg-slate-50/90 text-slate-700 hover:bg-white",
+                ].join(" ")}
+              >
+                <span className={isActive ? "text-slate-200" : "text-current/80"}>{queue.label}</span>
+                <span className="font-semibold tabular-nums">{queue.count}</span>
+              </Link>
+            );
+          })}
+        </div>
+
+        <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+            <div>
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Active Queue</div>
+              <div className="text-[15px] font-semibold tracking-tight text-slate-950">
+                {selectedWorkspaceQueue.label}
+              </div>
+              <div className="text-xs text-slate-600">{selectedWorkspaceQueue.count} jobs</div>
+            </div>
+            <Link href={selectedWorkspaceQueue.fullHref} className={inlineSectionLinkClass}>
+              Open focused queue
+            </Link>
+          </div>
+
+          {selectedWorkspaceQueue.key === "updates" ? (
+            <div className="space-y-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>Contractor Updates</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{contractorUpdatesCount}</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>New Work Requests</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{newWorkRequestCount}</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>Retest Ready</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{retestReadyCount}</div>
+              </div>
+            </div>
+          ) : selectedWorkspaceQueue.previewJobs.length === 0 ? (
+            quietSectionEmptyState("No jobs in this queue right now.", "success")
+          ) : (
+            <div className="space-y-2">
+              {selectedWorkspaceQueue.previewJobs.slice(0, 10).map((job: any) => (
+                <div
+                  key={String(job?.id ?? "")}
+                  className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <Link
+                        href={`/jobs/${job.id}?tab=ops`}
+                        className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline"
+                      >
+                        {displayOpsCardTitle(job?.title)}
+                      </Link>
+                      <div className={`${opsSupportTextClass} mt-0.5 text-slate-700`}>
+                        {formatPersonNamePart(customerNameOnly(job))} · {addressLine(job)}
+                      </div>
+                    </div>
+                    <Link href={`/jobs/${job.id}?tab=ops`} className={inlineSectionLinkClass}>
+                      Open Job
+                    </Link>
+                  </div>
+
+                  <div className={`mt-1.5 grid gap-1 text-[12px] text-slate-600 sm:grid-cols-3 ${opsSupportTextClass}`}>
+                    <div>
+                      <span className="font-medium text-slate-500">Status/Reason:</span>{" "}
+                      {workspaceStatusReason(job, selectedWorkspaceQueue.key)}
+                    </div>
+                    <div>
+                      <span className="font-medium text-slate-500">Age/Time:</span>{" "}
+                      {workspaceAgeTime(job, selectedWorkspaceQueue.key)}
+                    </div>
+                    <div>
+                      <span className="font-medium text-slate-500">Assignment:</span>{" "}
+                      {assignmentSummaryForJob(String(job?.id ?? ""))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </article>
+      </section>
+
+      <section className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        {(isHvacServiceMode || showTeamClockStatusCard) ? (
+          <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <div>
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>Coverage</div>
+                <div className="text-[15px] font-semibold tracking-tight text-slate-950">Team coverage and workload</div>
+              </div>
+              <Link
+                href={`/ops/queues/without-tech${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`}
+                className={inlineSectionLinkClass}
+              >
+                Without tech: {scheduledWithoutTechSnapshot.count}
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>In Progress</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{teamSnapshotInProgressCount}</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>Unassigned</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{teamSnapshotUnassignedCount}</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>Scheduled Today</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{teamSnapshotScheduledTodayCount}</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>Needs Closeout</div>
+                <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{teamSnapshotNeedsCloseoutCount}</div>
+              </div>
+            </div>
+
+            <div className="mt-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Work by technician</div>
+              {workByTechnicianRows.length === 0 ? (
+                <div className="mt-1 text-xs text-slate-600">No assigned team work to summarize yet.</div>
+              ) : (
+                <div className="mt-1.5 space-y-1.5 text-xs text-slate-700">
+                  {workByTechnicianRows.slice(0, 6).map((row) => (
+                    <div key={row.name} className="flex items-center justify-between gap-3">
+                      <span className="truncate font-medium text-slate-800">{row.name}</span>
+                      <span className="shrink-0 text-slate-600">Open {row.open} / Scheduled {row.scheduled} / Waiting {row.waiting}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </article>
+        ) : null}
+
+        <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <div>
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Signals</div>
+              <div className="text-[15px] font-semibold tracking-tight text-slate-950">Notifications and collaboration</div>
+            </div>
+            <Link href="/ops/notifications?state=unread" className={inlineSectionLinkClass}>
+              Open notifications
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Contractor Updates</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{contractorUpdatesCount}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>New Work Requests</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{newWorkRequestCount}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Retest Ready</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{retestReadyCount}</div>
+            </div>
+          </div>
+
+          {showTeamClockStatusCard ? (
+            <div className="mt-2.5 rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Team clock status</div>
+                <Link href="/time-clock" className={inlineSectionLinkClass}>Time clock</Link>
+              </div>
+              {teamClockStatusRows.length === 0 ? (
+                <div className="text-xs text-slate-600">No team members are clocked in right now.</div>
+              ) : (
+                <div className="space-y-1.5">
+                  {teamClockStatusRows.slice(0, 6).map((row) => (
+                    <div key={row.internalUserId} className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-semibold text-slate-900">{row.displayName}</div>
+                        <div className="text-[11px] text-slate-600">Since {row.sinceAt}</div>
+                      </div>
+                      <span className="shrink-0 text-[11px] font-medium text-slate-700">{row.statusLabel} · {row.elapsed}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : null}
+
+          <div className="mt-2.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            Need the legacy all-in-one board or queue previews?
+            <Link
+              href={`/ops${buildQueryString({
+                bucket,
+                contractor: contractorScopeFilter ?? "",
+                q: q ?? "",
+                sort,
+                signal,
+                panel: "full_board",
+              })}#ops-queues`}
+              className="ml-1 font-semibold text-slate-700 underline-offset-2 hover:underline"
+            >
+              Open full operations board
+            </Link>
+          </div>
+        </article>
+      </section>
+    </div>
+  );
+}
+
 return (
   <div className="mx-auto max-w-[92rem] space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 lg:space-y-4.5 xl:px-6">
     {notice === "estimates_unavailable" ? (
