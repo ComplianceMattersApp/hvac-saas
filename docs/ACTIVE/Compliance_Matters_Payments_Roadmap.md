@@ -223,6 +223,17 @@ Phase 4F closeout (Centralized Allocation Write Helper Foundation, helper/tests 
 - No payment/manual/Stripe/webhook/checkout/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes in this phase.
 - Next slice remains Phase 4G manual payment dual-write, or Phase 4G-A helper smoke/parity if needed before runtime wiring.
 
+Phase 4G closeout (Manual Payment Dual-Write, manual/off-platform only):
+- Manual/off-platform payment dual-write is complete for manual payment recording and manual payment reversal actions only.
+- Manual `recorded` payment rows now invoke centralized allocation upsert and create/update allocation rows with source-payment idempotency.
+- Manual reversal now invokes centralized allocation upsert post-reversal and updates allocation status to `reversed` for the same source payment.
+- Payment row remains authoritative; allocation helper failures are non-blocking for manual payment record/reversal success.
+- No allocation deletes and no duplicate allocation rows introduced in this slice.
+- Stripe webhook dual-write remains deferred to Phase 4H.
+- Historical backfill remains deferred.
+- Projection/read path remains unchanged (compatibility helper from payment-row truth).
+- No UI, Stripe checkout/webhook, Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changes in this phase.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

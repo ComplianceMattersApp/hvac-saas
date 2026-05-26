@@ -126,6 +126,20 @@ Phase 4F closeout lock (Centralized Allocation Write Helper Foundation, helper/t
 - No payment recording, Stripe webhook/checkout, Service Plan Billing, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changed in this phase.
 - Next slice remains Phase 4G manual payment dual-write, or a narrow Phase 4G-A helper smoke/parity check if needed before runtime wiring.
 
+Phase 4G closeout lock (Manual Payment Dual-Write, manual/off-platform only):
+
+- Phase 4G manual payment dual-write is complete for manual/off-platform payment actions only.
+- Manual/off-platform recorded payment rows now invoke centralized allocation upsert and create/update allocation rows with `source_internal_invoice_payment_id` idempotency.
+- Manual payment reversal now invokes centralized allocation upsert after payment row reversal and updates allocation status to `reversed` for the same source payment.
+- Payment row remains authoritative; allocation write failures are non-blocking for manual payment record/reversal success.
+- No allocation deletes are performed in this slice.
+- No Stripe webhook dual-write was added; Stripe dual-write remains deferred to Phase 4H.
+- No historical backfill was run.
+- No read-path/projection switch was made; invoice paid/balance projection remains on compatibility helper/payment-row truth.
+- No UI behavior change.
+- No Stripe checkout/webhook behavior changes.
+- No Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changes.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:

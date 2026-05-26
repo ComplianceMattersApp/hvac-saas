@@ -141,6 +141,15 @@ Recent closeout status snapshot (May 2026):
    - No projection/read-path switch
    - No UI/payment/manual/Stripe/webhook/checkout/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes in this phase
    - Next slice remains Phase 4G manual payment dual-write, or a narrow Phase 4G-A helper smoke/parity pass if needed before runtime wiring
+- **Phase 4G closeout (Manual Payment Dual-Write) is complete (manual/off-platform scope only):**
+   - Manual/off-platform payment recording now invokes centralized allocation upsert and creates/updates allocation rows keyed by `source_internal_invoice_payment_id`
+   - Manual payment reversal now invokes centralized allocation upsert after payment row reversal and transitions allocation status to `reversed`
+   - Payment row remains authoritative; allocation dual-write failures are non-blocking for manual payment record/reversal success
+   - No allocation deletes and no duplicate allocation rows introduced in this slice
+   - Stripe webhook dual-write remains deferred to Phase 4H
+   - Historical backfill remains deferred
+   - No projection/read-path switch; invoice projection remains compatibility-helper/payment-row derived
+   - No UI/Stripe checkout/webhook/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes in this phase
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

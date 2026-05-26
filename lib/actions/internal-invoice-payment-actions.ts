@@ -17,6 +17,7 @@ import {
   INTERNAL_INVOICE_PAYMENT_METHODS,
   resolveInvoiceCollectedPaymentSummary,
 } from '@/lib/business/internal-invoice-payments';
+import { upsertInvoicePaymentAllocationForPaymentRow } from '@/lib/business/payment-allocations';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import {
   type TenantInvoiceCheckoutSessionActionState,
@@ -271,6 +272,28 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
     .single();
 
   if (insertErr) throw insertErr;
+
+  const allocationUpsertResult = await upsertInvoicePaymentAllocationForPaymentRow({
+    supabase,
+    paymentRow: {
+      id: String(insertedPayment?.id ?? '').trim(),
+      account_owner_user_id: internalUser.account_owner_user_id,
+      invoice_id: invoice.id,
+      amount_cents: amountCents,
+      payment_status: 'recorded',
+    },
+  });
+
+  if (!allocationUpsertResult.ok) {
+    console.warn('Manual payment allocation dual-write failed after payment row success', {
+      paymentId: insertedPayment?.id ?? null,
+      invoiceId: invoice.id,
+      jobId,
+      allocationStatus: allocationUpsertResult.allocationStatus,
+      allocationResultStatus: allocationUpsertResult.status,
+      allocationReason: allocationUpsertResult.reason,
+    });
+  }
 
   await insertJobEvent({
     supabase,
@@ -580,6 +603,28 @@ export async function reverseInternalInvoicePaymentFromForm(formData: FormData) 
 
   if (updateErr) {
     throw updateErr;
+  }
+
+  const allocationUpsertResult = await upsertInvoicePaymentAllocationForPaymentRow({
+    supabase: admin,
+    paymentRow: {
+      id: String(updatedPayment?.id ?? paymentId).trim(),
+      account_owner_user_id: internalUser.account_owner_user_id,
+      invoice_id: invoice.id,
+      amount_cents: Number(updatedPayment?.amount_cents ?? paymentRow.amount_cents ?? 0),
+      payment_status: 'reversed',
+    },
+  });
+
+  if (!allocationUpsertResult.ok) {
+    console.warn('Manual payment reversal allocation dual-write failed after payment row success', {
+      paymentId: updatedPayment?.id ?? paymentId,
+      invoiceId: invoice.id,
+      jobId,
+      allocationStatus: allocationUpsertResult.allocationStatus,
+      allocationResultStatus: allocationUpsertResult.status,
+      allocationReason: allocationUpsertResult.reason,
+    });
   }
 
   await insertJobEvent({

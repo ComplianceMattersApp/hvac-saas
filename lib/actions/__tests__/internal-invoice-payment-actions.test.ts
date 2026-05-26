@@ -8,6 +8,7 @@ const resolveBillingModeByAccountOwnerIdMock = vi.fn();
 const resolveInternalInvoiceByJobIdMock = vi.fn();
 const resolveInvoiceCollectedPaymentSummaryMock = vi.fn();
 const createTenantInvoiceCheckoutSessionMock = vi.fn();
+const upsertInvoicePaymentAllocationForPaymentRowMock = vi.fn();
 const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
@@ -67,6 +68,11 @@ vi.mock('@/lib/business/internal-invoice-payments', () => ({
 
 vi.mock('@/lib/actions/job-actions', () => ({
   insertJobEvent: (...args: unknown[]) => insertJobEventMock(...args),
+}));
+
+vi.mock('@/lib/business/payment-allocations', () => ({
+  upsertInvoicePaymentAllocationForPaymentRow: (...args: unknown[]) =>
+    upsertInvoicePaymentAllocationForPaymentRowMock(...args),
 }));
 
 function makeSupabaseFixture(params?: { insertError?: { message: string } | null }) {
@@ -229,6 +235,13 @@ describe('recordInternalInvoicePaymentFromForm', () => {
       connectedAccountId: 'acct_123',
       balanceDueCents: 8000,
     });
+    upsertInvoicePaymentAllocationForPaymentRowMock.mockResolvedValue({
+      ok: true,
+      status: 'created',
+      allocationId: 'alloc-1',
+      allocationStatus: 'active',
+      reason: null,
+    });
   });
 
   it('allows issued internal invoice payment record and writes job event', async () => {
@@ -245,6 +258,17 @@ describe('recordInternalInvoicePaymentFromForm', () => {
       expect.objectContaining({ accountOwnerUserId: 'owner-1' }),
     );
     expect(writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(true);
+    expect(upsertInvoicePaymentAllocationForPaymentRowMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentRow: expect.objectContaining({
+          id: 'pay-1',
+          account_owner_user_id: 'owner-1',
+          invoice_id: 'inv-1',
+          amount_cents: 2500,
+          payment_status: 'recorded',
+        }),
+      }),
+    );
     expect(insertJobEventMock).toHaveBeenCalledWith(
       expect.objectContaining({
         event_type: 'payment_recorded',
@@ -545,6 +569,40 @@ describe('recordInternalInvoicePaymentFromForm', () => {
     await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toEqual({
       message: 'insert failed',
     });
+
+    expect(upsertInvoicePaymentAllocationForPaymentRowMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps manual payment success when allocation dual-write helper fails', async () => {
+    const { supabase } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    upsertInvoicePaymentAllocationForPaymentRowMock.mockResolvedValueOnce({
+      ok: false,
+      status: 'failed',
+      allocationId: null,
+      allocationStatus: null,
+      reason: 'allocation insert failed',
+    });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const { recordInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(recordInternalInvoicePaymentFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_recorded',
+    );
+
+    expect(upsertInvoicePaymentAllocationForPaymentRowMock).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Manual payment allocation dual-write failed after payment row success',
+      expect.objectContaining({
+        paymentId: 'pay-1',
+        invoiceId: 'inv-1',
+        allocationResultStatus: 'failed',
+      }),
+    );
+
+    warnSpy.mockRestore();
   });
 });
 
@@ -897,6 +955,13 @@ describe('reverseInternalInvoicePaymentFromForm', () => {
       },
     });
     createAdminClientMock.mockReturnValue(adminFixture.admin);
+    upsertInvoicePaymentAllocationForPaymentRowMock.mockResolvedValue({
+      ok: true,
+      status: 'updated',
+      allocationId: 'alloc-1',
+      allocationStatus: 'reversed',
+      reason: null,
+    });
   });
 
   it('reverses a recorded off-platform payment and writes job event', async () => {
@@ -904,6 +969,18 @@ describe('reverseInternalInvoicePaymentFromForm', () => {
 
     await expect(reverseInternalInvoicePaymentFromForm(buildReverseFormData())).rejects.toThrow(
       'banner=internal_invoice_payment_reversed',
+    );
+
+    expect(upsertInvoicePaymentAllocationForPaymentRowMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paymentRow: expect.objectContaining({
+          id: 'pay-1',
+          account_owner_user_id: 'owner-1',
+          invoice_id: 'inv-1',
+          amount_cents: 2500,
+          payment_status: 'reversed',
+        }),
+      }),
     );
 
     expect(insertJobEventMock).toHaveBeenCalledWith(
@@ -1046,6 +1123,8 @@ describe('reverseInternalInvoicePaymentFromForm', () => {
     await expect(reverseInternalInvoicePaymentFromForm(buildReverseFormData())).rejects.toThrow(
       'banner=internal_invoice_payment_reversal_online_blocked',
     );
+
+    expect(upsertInvoicePaymentAllocationForPaymentRowMock).not.toHaveBeenCalled();
   });
 
   it('does not run Stripe checkout helper during reversal', async () => {
@@ -1056,5 +1135,35 @@ describe('reverseInternalInvoicePaymentFromForm', () => {
     );
 
     expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
+  it('keeps manual reversal success when allocation dual-write helper fails', async () => {
+    upsertInvoicePaymentAllocationForPaymentRowMock.mockResolvedValueOnce({
+      ok: false,
+      status: 'failed',
+      allocationId: null,
+      allocationStatus: null,
+      reason: 'allocation update failed',
+    });
+
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const { reverseInternalInvoicePaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(reverseInternalInvoicePaymentFromForm(buildReverseFormData())).rejects.toThrow(
+      'banner=internal_invoice_payment_reversed',
+    );
+
+    expect(upsertInvoicePaymentAllocationForPaymentRowMock).toHaveBeenCalledTimes(1);
+    expect(warnSpy).toHaveBeenCalledWith(
+      'Manual payment reversal allocation dual-write failed after payment row success',
+      expect.objectContaining({
+        paymentId: 'pay-1',
+        invoiceId: 'inv-1',
+        allocationResultStatus: 'failed',
+      }),
+    );
+
+    warnSpy.mockRestore();
   });
 });

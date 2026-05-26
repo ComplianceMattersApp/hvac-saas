@@ -120,6 +120,15 @@ Current financial access model for sensitive financial actions:
   - No projection/read-path switch
   - No UI/payment/manual/Stripe/webhook/checkout/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes in this phase
   - Next slice remains Phase 4G manual payment dual-write, or a narrow Phase 4G-A helper smoke/parity pass if needed before runtime wiring
+- **Manual Payment Dual-Write (Phase 4G) is now complete (manual/off-platform scope only):**
+  - Manual/off-platform recorded payment action now invokes centralized allocation upsert to create/update allocation rows keyed by `source_internal_invoice_payment_id`
+  - Manual payment reversal action now invokes centralized allocation upsert post-reversal to transition allocation status to `reversed`
+  - Payment row remains authoritative; allocation dual-write failures are non-blocking for manual payment record/reversal success
+  - No allocation deletes and no duplicate allocation rows introduced in this slice
+  - No Stripe webhook dual-write yet (deferred to Phase 4H)
+  - No historical backfill
+  - No read-path/projection switch; invoice paid/balance remains compatibility-helper/payment-row derived
+  - No UI, Stripe checkout/webhook, Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform-fee, customer-portal, or service-plan-automation behavior changes in this phase
 
 Current financial access model for sensitive financial actions:
 
