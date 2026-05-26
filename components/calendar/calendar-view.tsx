@@ -23,6 +23,7 @@ import {
 } from '@/lib/actions/job-actions';
 import { logCustomerContactAttemptFromForm } from '@/lib/actions/job-contact-actions';
 import { getDispatchCalendarData, type DispatchCalendarBlockEvent, type DispatchJob, type DispatchViewMode } from '@/lib/actions/calendar';
+import { getMonthVisibleRange } from '@/lib/calendar/month-visible-range';
 import { normalizeRetestLinkedJobTitle } from '@/lib/utils/job-title-display';
 import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
 
@@ -836,11 +837,17 @@ export async function CalendarView(props: Props) {
   const anchorForRange = parseISO(normalizeYmd(props.date) ?? todayDate);
   const monthStartDate = formatDate(startOfMonth(anchorForRange), 'yyyy-MM-dd');
   const monthEndDate = formatDate(endOfMonth(anchorForRange), 'yyyy-MM-dd');
+  const monthVisibleRange = getMonthVisibleRange(formatDate(anchorForRange, 'yyyy-MM-dd'));
 
   const data = await getDispatchCalendarData({
     mode: baseMode,
     anchorDate: props.date,
-    ...(uiView === 'month' || uiView === 'list'
+    ...(uiView === 'month'
+      ? {
+          rangeStartDate: monthVisibleRange.startDate,
+          rangeEndDate: monthVisibleRange.endDate,
+        }
+      : uiView === 'list'
       ? {
           rangeStartDate: monthStartDate,
           rangeEndDate: monthEndDate,

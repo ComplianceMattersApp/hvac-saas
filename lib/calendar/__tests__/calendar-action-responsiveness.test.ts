@@ -35,4 +35,10 @@ describe("calendar action responsiveness", () => {
   it("calendar contact logging remains wired to existing server action", () => {
     expect(calendarViewSource).toContain("logCustomerContactAttemptFromForm");
   });
+
+  it("month view dispatch range uses visible month grid bounds", () => {
+    expect(calendarViewSource).toContain("getMonthVisibleRange");
+    expect(calendarViewSource).toContain("rangeStartDate: monthVisibleRange.startDate");
+    expect(calendarViewSource).toContain("rangeEndDate: monthVisibleRange.endDate");
+  });
 });
