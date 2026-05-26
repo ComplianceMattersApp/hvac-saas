@@ -234,6 +234,18 @@ Phase 4G closeout (Manual Payment Dual-Write, manual/off-platform only):
 - Projection/read path remains unchanged (compatibility helper from payment-row truth).
 - No UI, Stripe checkout/webhook, Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changes in this phase.
 
+Phase 4H closeout (Stripe Webhook Dual-Write, Stripe webhook scope only):
+- Phase 4H Stripe webhook dual-write is complete.
+- Successful Stripe tenant invoice payment rows now invoke the centralized allocation helper and create/update `active` allocation rows.
+- Failed Stripe tenant invoice payment rows now invoke the centralized allocation helper and create/update `inactive` allocation rows.
+- Idempotent/replayed Stripe events now attempt allocation upsert against the resolved existing payment row without changing existing Stripe payment idempotency behavior.
+- Allocation helper failure is non-blocking after payment-row success; payment row remains authoritative.
+- Existing Stripe event routing and duplicate protection remain unchanged.
+- Projection/read path remains unchanged and still does not read persisted allocations.
+- Historical backfill remains deferred.
+- No UI behavior changed.
+- No Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior was added.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

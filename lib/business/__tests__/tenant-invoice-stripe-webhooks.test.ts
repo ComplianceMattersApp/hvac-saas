@@ -10,6 +10,7 @@ const mockBuildStripePaymentReference = vi.fn();
 const mockResolveTenantStripeConnectReadiness = vi.fn();
 const mockInsertJobEvent = vi.fn(async () => null);
 const mockGetStripeServerClient = vi.fn();
+const mockUpsertInvoicePaymentAllocationForPaymentRow = vi.fn();
 
 vi.mock('@/lib/business/internal-invoice', () => ({
   resolveInternalInvoiceByJobId: (...args: unknown[]) => mockResolveInternalInvoiceByJobId(...args),
@@ -39,7 +40,13 @@ vi.mock('@/lib/business/platform-billing-stripe', () => ({
   getStripeServerClient: (...args: unknown[]) => mockGetStripeServerClient(...args),
 }));
 
-function makeAdminInsertSuccess() {
+vi.mock('@/lib/business/payment-allocations', () => ({
+  upsertInvoicePaymentAllocationForPaymentRow: (...args: unknown[]) =>
+    mockUpsertInvoicePaymentAllocationForPaymentRow(...args),
+}));
+
+function makeAdminInsertSuccess(opts?: { existingPaymentId?: string | null }) {
+  const existingPaymentId = String(opts?.existingPaymentId ?? 'payment-existing').trim() || null;
   const single = vi.fn(async () => ({ data: { id: 'payment-1' }, error: null }));
   const select = vi.fn(() => ({ single }));
   const insert = vi.fn(() => ({ select }));
@@ -61,6 +68,22 @@ function makeAdminInsertSuccess() {
         })),
       };
       return query;
+    }
+
+    if (table === 'internal_invoice_payments') {
+      const selectQuery: any = {
+        eq: vi.fn(() => selectQuery),
+        or: vi.fn(() => selectQuery),
+        maybeSingle: vi.fn(async () => ({
+          data: existingPaymentId ? { id: existingPaymentId } : null,
+          error: null,
+        })),
+      };
+
+      return {
+        select: vi.fn(() => selectQuery),
+        insert,
+      };
     }
 
     return { insert };
@@ -153,6 +176,14 @@ describe('tenant invoice Stripe webhook handlers', () => {
         })),
       },
     });
+
+    mockUpsertInvoicePaymentAllocationForPaymentRow.mockResolvedValue({
+      ok: true,
+      status: 'created',
+      allocationId: 'alloc-1',
+      allocationStatus: 'active',
+      reason: null,
+    });
   });
 
   describe('connected-account verification gate', () => {
@@ -171,6 +202,17 @@ describe('tenant invoice Stripe webhook handlers', () => {
 
       expect(result.recorded).toBe(true);
       expect(insert).toHaveBeenCalledTimes(1);
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentRow: expect.objectContaining({
+            id: 'payment-1',
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            amount_cents: 5000,
+            payment_status: 'recorded',
+          }),
+        }),
+      );
     });
 
     it('charge.succeeded with missing connected account context does not record payment', async () => {
@@ -222,6 +264,17 @@ describe('tenant invoice Stripe webhook handlers', () => {
 
       expect(result.recorded).toBe(true);
       expect(insert).toHaveBeenCalledTimes(1);
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentRow: expect.objectContaining({
+            id: 'payment-1',
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            amount_cents: 5000,
+            payment_status: 'failed',
+          }),
+        }),
+      );
     });
 
     it('charge.failed with mismatched connected account does not record failed attempt', async () => {
@@ -260,6 +313,9 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('idempotency');
       expect(insert).not.toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'payment-existing' }),
+      );
     });
 
     it('charge.succeeded with existing Stripe payment identity does not double record', async () => {
@@ -280,6 +336,9 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('Payment already recorded');
       expect(insert).not.toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'payment-existing' }),
+      );
     });
 
     it('checkout.session.completed (payment mode) with matching connected account records payment', async () => {
@@ -316,6 +375,17 @@ describe('tenant invoice Stripe webhook handlers', () => {
           stripe_event_id: 'evt_checkout_match_1',
         }),
       );
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentRow: expect.objectContaining({
+            id: 'payment-1',
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            amount_cents: 5000,
+            payment_status: 'recorded',
+          }),
+        }),
+      );
     });
 
     it('checkout.session.completed duplicate event id is idempotent', async () => {
@@ -336,6 +406,9 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('idempotency');
       expect(insert).not.toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'payment-existing' }),
+      );
     });
 
     it('checkout.session.completed with existing Stripe payment identity does not double record', async () => {
@@ -356,6 +429,9 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('Payment already recorded');
       expect(insert).not.toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'payment-existing' }),
+      );
     });
 
     it('checkout.session.completed missing invoice metadata is ignored without throw', async () => {
@@ -392,6 +468,80 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('mismatch');
       expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('allocation helper failure does not fail charge.succeeded webhook flow after payment row success', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      mockUpsertInvoicePaymentAllocationForPaymentRow.mockResolvedValueOnce({
+        ok: false,
+        status: 'failed',
+        allocationId: null,
+        allocationStatus: null,
+        reason: 'alloc failed',
+      });
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_alloc_fail_success',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(true);
+      expect(insert).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Stripe webhook allocation dual-write failed after payment-row success',
+        expect.objectContaining({
+          webhookKind: 'charge_succeeded',
+          eventId: 'evt_alloc_fail_success',
+          paymentId: 'payment-1',
+          allocationResultStatus: 'failed',
+        }),
+      );
+
+      warnSpy.mockRestore();
+    });
+
+    it('allocation helper failure does not fail charge.failed webhook flow after payment row success', async () => {
+      const { recordTenantInvoicePaymentFailureFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      mockUpsertInvoicePaymentAllocationForPaymentRow.mockResolvedValueOnce({
+        ok: false,
+        status: 'failed',
+        allocationId: null,
+        allocationStatus: null,
+        reason: 'alloc failed',
+      });
+
+      const result = await recordTenantInvoicePaymentFailureFromStripeCharge({
+        charge: baseCharge({ failure_message: 'Card declined' } as Partial<Stripe.Charge>),
+        eventId: 'evt_alloc_fail_failed',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(true);
+      expect(insert).toHaveBeenCalledTimes(1);
+      expect(warnSpy).toHaveBeenCalledWith(
+        'Stripe webhook allocation dual-write failed after payment-row success',
+        expect.objectContaining({
+          webhookKind: 'charge_failed',
+          eventId: 'evt_alloc_fail_failed',
+          paymentId: 'payment-1',
+          allocationResultStatus: 'failed',
+        }),
+      );
+
+      warnSpy.mockRestore();
     });
   });
 

@@ -129,6 +129,16 @@ Current financial access model for sensitive financial actions:
   - No historical backfill
   - No read-path/projection switch; invoice paid/balance remains compatibility-helper/payment-row derived
   - No UI, Stripe checkout/webhook, Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform-fee, customer-portal, or service-plan-automation behavior changes in this phase
+- **Stripe Webhook Dual-Write (Phase 4H) is now complete (Stripe webhook scope only):**
+  - Successful Stripe tenant invoice payment rows now invoke centralized allocation helper and create/update `active` allocation rows
+  - Failed Stripe tenant invoice payment rows now invoke centralized allocation helper and create/update `inactive` allocation rows
+  - Idempotent/replayed Stripe events now attempt allocation upsert against resolved existing payment row without changing Stripe payment idempotency behavior
+  - Allocation helper failure is non-blocking after payment-row success; payment row remains authoritative
+  - Existing Stripe event routing and duplicate protection remain unchanged
+  - Projection/read path remains unchanged and still does not read persisted allocations
+  - Historical backfill remains deferred
+  - No UI behavior changed
+  - No Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform-fee, customer-portal, or service-plan-automation behavior was added
 
 Current financial access model for sensitive financial actions:
 

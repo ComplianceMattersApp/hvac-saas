@@ -150,6 +150,17 @@ Recent closeout status snapshot (May 2026):
    - Historical backfill remains deferred
    - No projection/read-path switch; invoice projection remains compatibility-helper/payment-row derived
    - No UI/Stripe checkout/webhook/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes in this phase
+- **Phase 4H closeout (Stripe Webhook Dual-Write) is complete (Stripe webhook scope only):**
+   - Phase 4H Stripe webhook dual-write is complete
+   - Successful Stripe tenant invoice payment rows now invoke centralized allocation helper and create/update `active` allocation rows
+   - Failed Stripe tenant invoice payment rows now invoke centralized allocation helper and create/update `inactive` allocation rows
+   - Idempotent/replayed Stripe events now attempt allocation upsert against resolved existing payment row without changing existing Stripe payment idempotency behavior
+   - Allocation helper failure is non-blocking after payment-row success; payment row remains authoritative
+   - Existing Stripe event routing and duplicate protection remain unchanged
+   - Projection/read path remains unchanged and still does not read persisted allocations
+   - Historical backfill remains deferred
+   - No UI behavior changed
+   - No Service Plan Billing Period/QBO/ACH/refunds-disputes/saved-cards-autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior was added
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

@@ -140,6 +140,19 @@ Phase 4G closeout lock (Manual Payment Dual-Write, manual/off-platform only):
 - No Stripe checkout/webhook behavior changes.
 - No Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changes.
 
+Phase 4H closeout lock (Stripe Webhook Dual-Write, Stripe webhook scope only):
+
+- Phase 4H Stripe webhook dual-write is complete.
+- Successful Stripe tenant invoice payment rows now invoke the centralized allocation helper and create/update `active` allocation rows.
+- Failed Stripe tenant invoice payment rows now invoke the centralized allocation helper and create/update `inactive` allocation rows.
+- Idempotent/replayed Stripe events now attempt allocation upsert against the resolved existing payment row without changing existing Stripe payment idempotency behavior.
+- Allocation helper failure is non-blocking after payment-row success; payment row remains authoritative.
+- Existing Stripe event routing and duplicate protection remain unchanged.
+- Projection/read path remains unchanged and still does not read persisted allocations.
+- Historical backfill remains deferred.
+- No UI behavior changed.
+- No Service Plan Billing Period, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior was added.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
