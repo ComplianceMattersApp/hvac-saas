@@ -395,6 +395,57 @@ describe("internal notification readers", () => {
     await expect(getInternalUnreadNotificationBadgeCount()).resolves.toBe(1);
   });
 
+  it("does not surface unscoped internal_note_tag rows with null recipient_ref", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-mention-unscoped",
+            account_owner_user_id: "owner-1",
+            job_id: "job-1",
+            recipient_ref: null,
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "internal_note_tag",
+            subject: "Mention alert",
+            body: "Open the job to review the tagged note.",
+            payload: { source: "job_events", event_type: "internal_note" },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-20T12:02:00.000Z",
+          },
+        ],
+        submissions: [],
+        jobs: [
+          {
+            id: "job-1",
+            title: "Service Visit",
+            customer_first_name: "Maya",
+            customer_last_name: "Lopez",
+            city: "Pasadena",
+            contractor_id: null,
+          },
+        ],
+      }),
+    );
+
+    const {
+      listInternalNotifications,
+      getInternalUnreadNotificationCount,
+      getInternalUnreadNotificationBadgeCount,
+    } = await import("@/lib/actions/notification-read-actions");
+
+    await expect(
+      listInternalNotifications({
+        limit: 20,
+        onlyUnread: true,
+        filterKey: "new_job_notifications",
+      }),
+    ).resolves.toEqual([]);
+    await expect(getInternalUnreadNotificationCount()).resolves.toBe(0);
+    await expect(getInternalUnreadNotificationBadgeCount()).resolves.toBe(0);
+  });
+
   it("shows internal_job_assigned to the assigned user in new-job notifications filter", async () => {
     createClientMock.mockResolvedValue(
       makeSupabase({

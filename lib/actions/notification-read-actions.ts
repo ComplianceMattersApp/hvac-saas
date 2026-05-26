@@ -320,8 +320,13 @@ async function requireScopedInternalNotificationContext() {
   return { supabase, accountOwnerUserId, userId: String(userId ?? "").trim() };
 }
 
-function isNotificationVisibleToUser(row: Pick<NotificationRow, "recipient_ref">, userId: string): boolean {
+function isNotificationVisibleToUser(
+  row: Pick<NotificationRow, "recipient_ref" | "notification_type">,
+  userId: string,
+): boolean {
   const recipientRef = String(row.recipient_ref ?? "").trim();
+  const notificationType = String(row.notification_type ?? "").trim().toLowerCase();
+  if (notificationType === "internal_note_tag" && !recipientRef) return false;
   if (!recipientRef) return true;
   return recipientRef === String(userId ?? "").trim();
 }

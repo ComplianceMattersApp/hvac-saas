@@ -229,7 +229,7 @@ export async function insertTargetedInternalNotification(
       payload,
       status: "queued",
     })
-    .select("id")
+    .select("id, recipient_ref, recipient_type")
     .single();
 
   if (error) {
@@ -251,6 +251,19 @@ export async function insertTargetedInternalNotification(
   const notificationId = String(data?.id ?? "").trim();
   if (!notificationId) {
     throw new Error("Failed to create targeted internal notification row");
+  }
+
+  const storedRecipientRef = String(data?.recipient_ref ?? "").trim();
+  const storedRecipientType = String(data?.recipient_type ?? "").trim().toLowerCase();
+  const storedRecipientTypeValid = storedRecipientType === "internal" || storedRecipientType === "internal_user";
+  if (!storedRecipientTypeValid || storedRecipientRef !== recipientUserId) {
+    // Defensive rollback: a targeted insert must never persist without an exact recipient scope.
+    await input.supabase
+      .from("notifications")
+      .delete()
+      .eq("id", notificationId)
+      .eq("account_owner_user_id", accountOwnerUserId);
+    throw new Error("TARGETED_INTERNAL_NOTIFICATION_SCOPE_MISMATCH");
   }
 
   console.info("[notification-actions] targeted notification insert succeeded", {

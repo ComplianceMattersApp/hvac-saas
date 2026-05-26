@@ -61,7 +61,10 @@ describe("createContractorIntakeProposalAwarenessNotification", () => {
     sendWebPushNotificationForInternalNotificationMock.mockRejectedValueOnce(
       new Error("push runtime ended"),
     );
-    const singleMock = vi.fn(async () => ({ data: { id: "notif-tag-1" }, error: null }));
+    const singleMock = vi.fn(async () => ({
+      data: { id: "notif-tag-1", recipient_ref: "user-2", recipient_type: "internal" },
+      error: null,
+    }));
     const selectMock = vi.fn(() => ({ single: singleMock }));
     const insertMock = vi.fn(() => ({ select: selectMock }));
     const fromMock = vi.fn(() => ({ insert: insertMock }));
@@ -240,7 +243,10 @@ describe("insertTargetedInternalNotification", () => {
   });
 
   it("creates a recipient-scoped internal in-app notification", async () => {
-    const singleMock = vi.fn(async () => ({ data: { id: "notif-tag-1" }, error: null }));
+    const singleMock = vi.fn(async () => ({
+      data: { id: "notif-tag-1", recipient_ref: "user-2", recipient_type: "internal" },
+      error: null,
+    }));
     const selectMock = vi.fn(() => ({ single: singleMock }));
     const insertMock = vi.fn(() => ({ select: selectMock }));
     const fromMock = vi.fn(() => ({ insert: insertMock }));
@@ -312,5 +318,52 @@ describe("insertTargetedInternalNotification", () => {
 
     expect(createdId).toBeNull();
     expect(fromMock).not.toHaveBeenCalled();
+  });
+
+  it("rolls back and throws when inserted row does not preserve recipient scope", async () => {
+    const deleteEqAccountOwnerMock = vi.fn(async () => ({ error: null }));
+    const deleteEqIdMock = vi.fn(() => ({
+      eq: deleteEqAccountOwnerMock,
+    }));
+    const deleteMock = vi.fn(() => ({
+      eq: deleteEqIdMock,
+    }));
+
+    const singleMock = vi.fn(async () => ({
+      data: { id: "notif-tag-2", recipient_ref: null, recipient_type: "internal" },
+      error: null,
+    }));
+    const selectMock = vi.fn(() => ({ single: singleMock }));
+    const insertMock = vi.fn(() => ({ select: selectMock }));
+
+    const fromMock = vi.fn((table: string) => {
+      if (table === "notifications") {
+        return {
+          insert: insertMock,
+          delete: deleteMock,
+        };
+      }
+      throw new Error(`Unexpected table: ${table}`);
+    });
+
+    const { insertTargetedInternalNotification } = await import("@/lib/actions/notification-actions");
+
+    await expect(
+      insertTargetedInternalNotification({
+        supabase: { from: fromMock },
+        jobId: "job-1",
+        accountOwnerUserId: "owner-1",
+        actorUserId: "actor-1",
+        recipientUserId: "user-2",
+        notificationType: "internal_note_tag",
+        subject: "You were tagged by Alex",
+        body: "Tag context",
+      }),
+    ).rejects.toThrow("TARGETED_INTERNAL_NOTIFICATION_SCOPE_MISMATCH");
+
+    expect(deleteMock).toHaveBeenCalledTimes(1);
+    expect(deleteEqIdMock).toHaveBeenCalledWith("id", "notif-tag-2");
+    expect(deleteEqAccountOwnerMock).toHaveBeenCalledWith("account_owner_user_id", "owner-1");
+    expect(sendWebPushNotificationForInternalNotificationMock).not.toHaveBeenCalled();
   });
 });
