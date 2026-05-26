@@ -4,6 +4,10 @@ import {
   resolvePlatformBillingAppUrl,
 } from "@/lib/business/platform-billing-stripe";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+import {
+  deriveCompatibilityInvoiceAllocations,
+  sumActiveInvoiceAllocationCents,
+} from "@/lib/business/payment-allocations";
 
 export const INTERNAL_INVOICE_PAYMENT_STATUSES = [
   "recorded",
@@ -202,10 +206,12 @@ export async function resolveInvoiceCollectedPaymentSummary(
     supabase,
   );
 
-  const amountPaidCents = paymentRows.reduce((sum, row) => {
-    if (row.payment_status !== "recorded") return sum;
-    return sum + (Number(row.amount_cents ?? 0) || 0);
-  }, 0);
+  // Phase 4 compatibility layer: derive invoice paid totals from allocation-compatible records.
+  const allocations = deriveCompatibilityInvoiceAllocations(paymentRows);
+  const amountPaidCents = sumActiveInvoiceAllocationCents(
+    allocations,
+    normalizedInvoiceId,
+  );
 
   const balanceDueCents = Math.max(0, invoiceTotalCents - amountPaidCents);
 
