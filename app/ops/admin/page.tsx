@@ -337,24 +337,26 @@ export default async function OpsAdminPage() {
               </div>
             )}
 
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-semibold text-slate-600">Optional setup</div>
-              <div className="mt-3 space-y-3">
-                {visibleOptionalItems.map((item) => (
-                  <div key={item.key} className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-700">
-                    <div>
-                      <div>{item.label}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">{item.description}</div>
+            {visibleOptionalItems.length > 0 ? (
+              <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
+                <div className="text-xs font-semibold text-slate-600">Optional setup</div>
+                <div className="mt-3 space-y-3">
+                  {visibleOptionalItems.map((item) => (
+                    <div key={item.key} className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-700">
+                      <div>
+                        <div>{item.label}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">{item.description}</div>
+                      </div>
+                      {item.href ? (
+                        <Link href={item.href} className={linkButtonClass}>
+                          Open
+                        </Link>
+                      ) : null}
                     </div>
-                    {item.href ? (
-                      <Link href={item.href} className={linkButtonClass}>
-                        Open
-                      </Link>
-                    ) : null}
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
+            ) : null}
           </section>
 
           <section id="people" className={panelClass}>
