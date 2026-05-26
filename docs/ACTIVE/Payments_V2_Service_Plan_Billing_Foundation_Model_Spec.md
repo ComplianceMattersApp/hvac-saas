@@ -58,6 +58,18 @@ Phase 4B lock (Allocation Schema Model Lock, docs/model only):
 - If `counts_toward_collected_totals` is stored in future schema, it must not be independent financial truth; either omit it or enforce consistency from status with a check constraint.
 - Phase 4C implementation boundary is additive table + RLS + indexes + tests only; no UI, no read-path/projection switch, no payment-recording changes, no Stripe/webhook changes, and no Service Plan Billing Period behavior changes.
 
+Phase 4C closeout lock (Explicit Invoice Payment Allocation Table Foundation):
+
+- Phase 4C is complete as an additive schema foundation with migration `20260526130000_internal_invoice_payment_allocations_foundation.sql`.
+- New table `internal_invoice_payment_allocations` is now present with first-posture invoice-only target (`target_invoice_id`) and one-source-to-one-allocation constraint (`source_internal_invoice_payment_id` unique).
+- First allocation statuses are implemented as `active`, `inactive`, `reversed`, `voided`.
+- Counting posture remains status-derived only: future countability is `allocation_status = 'active'`; no `counts_toward_collected_totals` field was added.
+- Strong source/target/account consistency is enforced in migration through FK constraints, account-scoped RLS policies, and write-time source/target scope assertion.
+- No backfill was performed.
+- No allocation rows are written yet by runtime payment flows in this phase.
+- No read-path/projection switch was implemented; existing invoice-bound payment truth and projection behavior remain unchanged.
+- No UI, payment-recording flow, Stripe checkout/webhook behavior, Service Plan Billing Period behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, or service-plan automation behavior changed in this phase.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:

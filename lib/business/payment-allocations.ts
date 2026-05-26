@@ -7,6 +7,21 @@ export type PaymentAllocationTargetType =
 
 export type PaymentAllocationStatus = "active" | "inactive";
 
+export type InvoicePaymentAllocationStatus =
+  | "active"
+  | "inactive"
+  | "reversed"
+  | "voided";
+
+export type InvoicePaymentAllocationRow = {
+  id: string;
+  account_owner_user_id: string;
+  source_internal_invoice_payment_id: string;
+  target_invoice_id: string;
+  allocated_amount_cents: number;
+  allocation_status: InvoicePaymentAllocationStatus;
+};
+
 export type PaymentAllocationCompatibilityRecord = {
   paymentRegisterEntryId: string;
   allocationTargetType: PaymentAllocationTargetType;
@@ -57,5 +72,25 @@ export function sumActiveInvoiceAllocationCents(
     if (allocation.allocationTargetId !== normalizedInvoiceId) return sum;
     if (allocation.allocationStatus !== "active") return sum;
     return sum + (Number(allocation.allocatedAmountCents ?? 0) || 0);
+  }, 0);
+}
+
+export function sumActivePersistedInvoiceAllocationCents(
+  allocations: InvoicePaymentAllocationRow[],
+  invoiceId: string,
+): number {
+  const normalizedInvoiceId = String(invoiceId ?? "").trim();
+  if (!normalizedInvoiceId) return 0;
+
+  return (allocations ?? []).reduce((sum, allocation) => {
+    if (String(allocation?.target_invoice_id ?? "").trim() !== normalizedInvoiceId) {
+      return sum;
+    }
+
+    if (allocation?.allocation_status !== "active") {
+      return sum;
+    }
+
+    return sum + (Number(allocation?.allocated_amount_cents ?? 0) || 0);
   }, 0);
 }

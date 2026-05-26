@@ -89,6 +89,15 @@ Recent closeout status snapshot (May 2026):
    - No UI, no read-path/projection switch, no payment-recording changes
    - No Stripe checkout/webhook behavior changes
    - No Service Plan billing behavior changes
+- **Phase 4C closeout (Explicit Invoice Payment Allocation Table Foundation) is complete (`20260526130000`):**
+   - Additive table `internal_invoice_payment_allocations` is now present with invoice-only target and one-source-to-one-allocation uniqueness
+   - Statuses are constrained to `active`, `inactive`, `reversed`, `voided`
+   - `counts_toward_collected_totals` was intentionally not added; future countability remains status-derived (`active` only)
+   - Account-scoped RLS SELECT/INSERT/UPDATE policies are in place; no DELETE policy
+   - Source-payment and target-invoice account/scope alignment is enforced at write time for first-posture integrity
+   - No backfill and no runtime allocation-row writes in this slice
+   - No projection/read-path switch; invoice-bound payment truth remains unchanged
+   - No UI/payment recording/Stripe checkout/webhook/Service Plan billing behavior changes were introduced
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

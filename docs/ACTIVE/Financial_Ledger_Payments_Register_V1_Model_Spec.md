@@ -69,6 +69,16 @@ Current financial access model for sensitive financial actions:
   - Only `active` allocations count toward invoice collected totals; `inactive`/`reversed`/`voided` do not count
   - If a future column like `counts_toward_collected_totals` is stored, it must not become independent financial truth; it must be omitted or constrained to remain status-consistent
   - Phase 4C boundary is additive table + RLS + indexes + tests only, with no UI, no projection switch, no payment-recording changes, no Stripe/webhook changes, and no Service Plan billing behavior changes
+- **Allocation Table Foundation (Phase 4C) is now implemented as additive schema only (`20260526130000`):**
+  - Added table `internal_invoice_payment_allocations` with first-posture columns and invoice-only target (`target_invoice_id`)
+  - Enforced one-allocation-per-source-payment via unique `source_internal_invoice_payment_id`
+  - Enforced first-posture statuses: `active`, `inactive`, `reversed`, `voided`
+  - Did not add `counts_toward_collected_totals`; countability remains status-derived (`active` only) for future allocation-aware reads
+  - Added account-scoped RLS SELECT/INSERT/UPDATE policies; no DELETE policy
+  - Added source/target/account consistency enforcement at write time for source payment and target invoice alignment
+  - No backfill and no runtime write-path adoption yet (manual/off-platform and Stripe webhook payment recording flows unchanged)
+  - No read-path/projection switch in this phase; existing invoice-bound collected truth remains authoritative
+  - No UI, Stripe checkout/webhook behavior, Service Plan billing behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, or platform fee execution changes
 
 Current financial access model for sensitive financial actions:
 

@@ -159,6 +159,18 @@ Phase 4C boundary lock (implementation shape):
 - No Stripe/webhook changes.
 - No Service Plan billing behavior changes.
 
+Phase 4C closeout (Explicit Invoice Payment Allocation Table Foundation):
+- Implemented as additive schema-only foundation in migration `20260526130000_internal_invoice_payment_allocations_foundation.sql`.
+- Added table `internal_invoice_payment_allocations` with first-posture source/target contract (`source_internal_invoice_payment_id` -> `internal_invoice_payments.id`, invoice-only `target_invoice_id`) and unique one-source-to-one-allocation posture.
+- Added status lock in schema: `active`, `inactive`, `reversed`, `voided`.
+- Did not add `counts_toward_collected_totals`; countability remains status-derived (`active` only) for future allocation-aware reads.
+- Added account-scoped RLS SELECT/INSERT/UPDATE and intentionally no DELETE policy.
+- Added write-time source/target/account consistency enforcement for first-posture alignment.
+- No allocation rows are written yet by runtime payment flows.
+- No backfill performed.
+- No read-path/projection switch; existing invoice-bound payment truth and paid/balance projection remain unchanged.
+- No UI, payment-recording flow, Stripe checkout/webhook behavior, Service Plan billing behavior, portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, or service-plan automation changes were introduced.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

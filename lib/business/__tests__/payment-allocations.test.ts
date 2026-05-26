@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   deriveCompatibilityInvoiceAllocations,
   sumActiveInvoiceAllocationCents,
+  sumActivePersistedInvoiceAllocationCents,
 } from "@/lib/business/payment-allocations";
 
 describe("payment allocation compatibility helper", () => {
@@ -155,5 +156,89 @@ describe("payment allocation compatibility helper", () => {
     ]);
 
     expect(sumActiveInvoiceAllocationCents(allocations, "inv-1")).toBe(1500);
+  });
+
+  it("counts only active persisted allocation rows for invoice totals", () => {
+    const total = sumActivePersistedInvoiceAllocationCents(
+      [
+        {
+          id: "alloc-1",
+          account_owner_user_id: "owner-1",
+          source_internal_invoice_payment_id: "pay-1",
+          target_invoice_id: "inv-1",
+          allocated_amount_cents: 3000,
+          allocation_status: "active",
+        },
+        {
+          id: "alloc-2",
+          account_owner_user_id: "owner-1",
+          source_internal_invoice_payment_id: "pay-2",
+          target_invoice_id: "inv-1",
+          allocated_amount_cents: 500,
+          allocation_status: "inactive",
+        },
+        {
+          id: "alloc-3",
+          account_owner_user_id: "owner-1",
+          source_internal_invoice_payment_id: "pay-3",
+          target_invoice_id: "inv-1",
+          allocated_amount_cents: 400,
+          allocation_status: "reversed",
+        },
+        {
+          id: "alloc-4",
+          account_owner_user_id: "owner-1",
+          source_internal_invoice_payment_id: "pay-4",
+          target_invoice_id: "inv-1",
+          allocated_amount_cents: 700,
+          allocation_status: "voided",
+        },
+        {
+          id: "alloc-5",
+          account_owner_user_id: "owner-1",
+          source_internal_invoice_payment_id: "pay-5",
+          target_invoice_id: "inv-2",
+          allocated_amount_cents: 999,
+          allocation_status: "active",
+        },
+      ],
+      "inv-1",
+    );
+
+    expect(total).toBe(3000);
+  });
+
+  it("preserves signed amount parity for active persisted allocation totals", () => {
+    const total = sumActivePersistedInvoiceAllocationCents(
+      [
+        {
+          id: "alloc-1",
+          account_owner_user_id: "owner-1",
+          source_internal_invoice_payment_id: "pay-1",
+          target_invoice_id: "inv-1",
+          allocated_amount_cents: 2000,
+          allocation_status: "active",
+        },
+        {
+          id: "alloc-2",
+          account_owner_user_id: "owner-1",
+          source_internal_invoice_payment_id: "pay-2",
+          target_invoice_id: "inv-1",
+          allocated_amount_cents: -500,
+          allocation_status: "active",
+        },
+        {
+          id: "alloc-3",
+          account_owner_user_id: "owner-1",
+          source_internal_invoice_payment_id: "pay-3",
+          target_invoice_id: "inv-1",
+          allocated_amount_cents: 0,
+          allocation_status: "active",
+        },
+      ],
+      "inv-1",
+    );
+
+    expect(total).toBe(1500);
   });
 });
