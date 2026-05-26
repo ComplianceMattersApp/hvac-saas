@@ -108,6 +108,18 @@ Current financial access model for sensitive financial actions:
   - Verified forbidden/deferred columns absent: `counts_toward_collected_totals`, `target_service_plan_billing_period_id`, and customer-credit target fields
   - Allocation row count verified at `0`; no backfill was run
   - Runtime boundaries unchanged: no allocation writers, no projection/read-path switch, and no payment/manual/Stripe/webhook/checkout/UI/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes
+- **Centralized Allocation Write Helper Foundation (Phase 4F) is now complete:**
+  - Added centralized helper foundation to create/update one persisted allocation row from one `internal_invoice_payments` row
+  - Helper uses `source_internal_invoice_payment_id` idempotency and invoice-only target posture
+  - Helper mapping follows locked Phase 4D rules: `recorded -> active`, `pending/failed -> inactive`, `reversed -> reversed`
+  - Helper preserves source `amount_cents` exactly, including signed/zero parity
+  - Helper is not wired into runtime payment flows yet
+  - No manual payment dual-write yet
+  - No Stripe webhook dual-write yet
+  - No historical backfill
+  - No projection/read-path switch
+  - No UI/payment/manual/Stripe/webhook/checkout/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes in this phase
+  - Next slice remains Phase 4G manual payment dual-write, or a narrow Phase 4G-A helper smoke/parity pass if needed before runtime wiring
 
 Current financial access model for sensitive financial actions:
 

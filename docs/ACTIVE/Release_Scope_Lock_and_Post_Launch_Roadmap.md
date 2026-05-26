@@ -129,6 +129,18 @@ Recent closeout status snapshot (May 2026):
    - Verified forbidden/deferred columns absent: `counts_toward_collected_totals`, `target_service_plan_billing_period_id`, and customer-credit target fields
    - Verified allocation row count is `0`; no backfill was run
    - Runtime boundaries unchanged: no allocation writers, no projection/read-path switch, no payment recording/manual payment/Stripe checkout/webhook/UI behavior changes, and no Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes
+- **Phase 4F closeout (Centralized Allocation Write Helper Foundation) is complete:**
+   - Added centralized helper foundation to create/update one persisted allocation row from one `internal_invoice_payments` row
+   - Helper uses `source_internal_invoice_payment_id` idempotency and invoice-only target posture
+   - Implemented mapping remains locked: `recorded -> active`, `pending/failed -> inactive`, `reversed -> reversed`
+   - Helper preserves source `amount_cents` exactly, including signed/zero parity
+   - Helper is not wired into runtime payment flows yet
+   - No manual payment dual-write yet
+   - No Stripe webhook dual-write yet
+   - No historical backfill
+   - No projection/read-path switch
+   - No UI/payment/manual/Stripe/webhook/checkout/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes in this phase
+   - Next slice remains Phase 4G manual payment dual-write, or a narrow Phase 4G-A helper smoke/parity pass if needed before runtime wiring
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

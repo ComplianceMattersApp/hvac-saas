@@ -208,6 +208,21 @@ Phase 4E closeout (Production Dormant Allocation Migration Catch-up, docs/model 
 - No projection/read-path switch occurred.
 - No payment recording, manual payment behavior, Stripe webhook/checkout behavior, UI, Service Plan Billing behavior, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changed in this phase.
 
+Phase 4F closeout (Centralized Allocation Write Helper Foundation, helper/tests only):
+- Centralized allocation write helper foundation is complete.
+- Added helper foundation to create/update one persisted allocation row from one `internal_invoice_payments` row.
+- Helper uses `source_internal_invoice_payment_id` as idempotency key and keeps invoice-only target posture.
+- Implemented locked mapping: `recorded -> active`, `pending/failed -> inactive`, `reversed -> reversed`.
+- Helper preserves source `amount_cents` exactly, including signed/zero parity.
+- Helper is not wired into runtime payment flows yet.
+- No manual payment dual-write yet.
+- No Stripe webhook dual-write yet.
+- No historical backfill.
+- No projection/read-path switch.
+- No UI behavior change.
+- No payment/manual/Stripe/webhook/checkout/Service Plan Billing/QBO/ACH/refunds/disputes/saved cards/autopay/partial payments/receipt automation/platform-fee/customer-portal/service-plan-automation behavior changes in this phase.
+- Next slice remains Phase 4G manual payment dual-write, or Phase 4G-A helper smoke/parity if needed before runtime wiring.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

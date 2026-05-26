@@ -111,6 +111,21 @@ Phase 4E closeout lock (Production Dormant Allocation Migration Catch-up, docs/m
 - No read-path/projection switch was made.
 - No payment recording, Stripe webhook/checkout, UI, Service Plan Billing, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changed in this phase.
 
+Phase 4F closeout lock (Centralized Allocation Write Helper Foundation, helper/tests only):
+
+- Phase 4F centralized allocation write helper foundation is complete.
+- A centralized helper now exists to create/update one persisted allocation row from one `internal_invoice_payments` row using `source_internal_invoice_payment_id` idempotency.
+- Helper mapping is implemented as locked in Phase 4D: `recorded -> active`, `pending/failed -> inactive`, `reversed -> reversed`.
+- Helper preserves source `amount_cents` exactly, including signed/zero parity, and uses invoice-only target posture (`target_invoice_id = payment.invoice_id`).
+- Helper is not wired into runtime payment flows yet.
+- No manual payment dual-write exists yet.
+- No Stripe webhook dual-write exists yet.
+- No historical backfill was run.
+- No read-path/projection switch was made.
+- No UI behavior changed.
+- No payment recording, Stripe webhook/checkout, Service Plan Billing, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform fee execution, customer portal, or service-plan automation behavior changed in this phase.
+- Next slice remains Phase 4G manual payment dual-write, or a narrow Phase 4G-A helper smoke/parity check if needed before runtime wiring.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
