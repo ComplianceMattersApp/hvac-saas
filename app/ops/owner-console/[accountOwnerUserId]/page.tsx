@@ -678,33 +678,88 @@ export default async function PlatformOwnerAccountSnapshotPage({ params }: { par
           <h2 className="text-base font-semibold text-slate-900">Readiness Checklist</h2>
           <p className="mt-1 text-sm text-slate-500">Existing account setup signals only. No support-side edits are available here.</p>
 
-          <div className="mt-4 space-y-3">
-            {requiredReadinessItems.map((item) => (
-              <div key={item.key} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+          {readiness.isOperationallyReady ? (
+            <div className="mt-4">
+              <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="font-medium text-slate-900">{item.label}</p>
-                  <Badge tone={item.status === "complete" ? "emerald" : "amber"}>
-                    {item.status === "complete" ? "Complete" : "Needs setup"}
-                  </Badge>
+                  <p className="font-semibold text-emerald-900">Account setup complete</p>
+                  <Badge tone="emerald">Complete</Badge>
                 </div>
-                <p className="mt-1 text-sm text-slate-600">{item.description}</p>
+                <p className="mt-1 text-sm text-emerald-900">Required setup signals are complete.</p>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-emerald-800">
+                  {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required items complete
+                </p>
               </div>
-            ))}
-          </div>
 
-          {optionalReadinessItems.length > 0 ? (
-            <div className="mt-5">
-              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Optional Signals</p>
-              <div className="mt-2 space-y-2">
-                {optionalReadinessItems.map((item) => (
-                  <div key={item.key} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
-                    <p className="text-sm font-medium text-slate-900">{item.label}</p>
-                    <p className="mt-0.5 text-xs text-slate-500">{item.description}</p>
+              <details className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <summary className="cursor-pointer text-sm font-semibold text-slate-900">View setup details</summary>
+                <div className="mt-3 space-y-3">
+                  {requiredReadinessItems.map((item) => (
+                    <div key={item.key} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium text-slate-900">{item.label}</p>
+                        <Badge tone={item.status === "complete" ? "emerald" : "amber"}>
+                          {item.status === "complete" ? "Complete" : "Needs setup"}
+                        </Badge>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-600">{item.description}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {optionalReadinessItems.length > 0 ? (
+                  <div className="mt-5">
+                    <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Optional Signals</p>
+                    <div className="mt-2 space-y-2">
+                      {optionalReadinessItems.map((item) => (
+                        <div key={item.key} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                          <p className="text-sm font-medium text-slate-900">{item.label}</p>
+                          <p className="mt-0.5 text-xs text-slate-500">{item.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </details>
+            </div>
+          ) : (
+            <>
+              <div className="mt-4 space-y-3">
+                {requiredReadinessItems.map((item) => (
+                  <div
+                    key={item.key}
+                    className={`rounded-2xl border p-4 ${
+                      item.status === "complete"
+                        ? "border-slate-200 bg-slate-50"
+                        : "border-amber-200 bg-amber-50"
+                    }`}
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="font-medium text-slate-900">{item.label}</p>
+                      <Badge tone={item.status === "complete" ? "emerald" : "amber"}>
+                        {item.status === "complete" ? "Complete" : "Needs setup"}
+                      </Badge>
+                    </div>
+                    <p className="mt-1 text-sm text-slate-600">{item.description}</p>
                   </div>
                 ))}
               </div>
-            </div>
-          ) : null}
+
+              {optionalReadinessItems.length > 0 ? (
+                <div className="mt-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Optional Signals</p>
+                  <div className="mt-2 space-y-2">
+                    {optionalReadinessItems.map((item) => (
+                      <div key={item.key} className="rounded-xl border border-slate-200 bg-white px-4 py-3">
+                        <p className="text-sm font-medium text-slate-900">{item.label}</p>
+                        <p className="mt-0.5 text-xs text-slate-500">{item.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
