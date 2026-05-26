@@ -39,6 +39,7 @@ import {
 import {
   collectTenantInvoicePaymentNowFromForm,
   recordInternalInvoicePaymentFromForm,
+  reverseInternalInvoicePaymentFromForm,
 } from "@/lib/actions/internal-invoice-payment-actions";
 import TenantInvoicePaymentLinkPanel from "./_components/TenantInvoicePaymentLinkPanel";
 import InternalInvoiceLineItemsTable, {
@@ -106,6 +107,31 @@ function formatInternalInvoiceItemType(type?: InternalInvoiceItemType | string |
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
 }
 
+function formatPaymentMethodLabel(method?: string | null) {
+  const normalized = String(method ?? "").trim().replace(/_/g, " ");
+  if (!normalized) return "Method unavailable";
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function formatPaymentStatusLabel(status?: string | null) {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (normalized === "recorded") return "Recorded";
+  if (normalized === "failed") return "Failed";
+  if (normalized === "reversed") return "Reversed";
+  if (normalized === "pending") return "Pending";
+  return "Unknown";
+}
+
+function isStripeSourcedPayment(payment: InternalInvoicePaymentRow) {
+  return (
+    String(payment.payment_method ?? "").trim() === "card_stripe_online" ||
+    String(payment.processor_name ?? "").trim().toLowerCase() === "stripe" ||
+    String(payment.stripe_event_id ?? "").trim().length > 0 ||
+    String(payment.stripe_checkout_session_id ?? "").trim().length > 0 ||
+    String(payment.stripe_payment_intent_id ?? "").trim().length > 0
+  );
+}
+
 function formatBillingAddress(a: {
   billing_address_line1?: string | null;
   billing_address_line2?: string | null;
@@ -135,6 +161,14 @@ function bannerMessage(value?: string | null) {
     internal_invoice_send_recipient_invalid: "Enter a valid billing recipient email before sending.",
     internal_invoice_payment_recorded: "Tracking-only payment recorded.",
     internal_invoice_payment_overpay_denied: "Payment amount cannot exceed the remaining balance.",
+    internal_invoice_payment_reversed: "Recorded payment reversed from Compliance Matters totals.",
+    internal_invoice_payment_reversal_reason_required: "A reversal reason is required.",
+    internal_invoice_payment_reversal_not_found: "Payment record was not found.",
+    internal_invoice_payment_reversal_already_reversed: "This payment is already reversed.",
+    internal_invoice_payment_reversal_failed_blocked: "Failed payment attempts cannot be reversed.",
+    internal_invoice_payment_reversal_not_recorded: "Only recorded payments can be reversed.",
+    internal_invoice_payment_reversal_online_blocked:
+      "Online Stripe payments cannot be reversed here. Use Stripe refund/reversal workflows and let webhooks update records.",
     internal_invoice_voided: "Invoice voided.",
     internal_invoice_missing: "Invoice was not found.",
   };
@@ -616,7 +650,55 @@ export default async function InternalInvoiceWorkspacePage({
                           <span className="font-semibold text-slate-900">{formatCurrencyFromCents(payment.amount_cents)}</span>
                           <span className="text-xs text-slate-500">{formatTimestampDateDisplayLA(payment.paid_at)}</span>
                         </div>
-                        <div className="mt-1 text-xs text-slate-500">{String(payment.payment_method).replace(/_/g, " ")}</div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <span>{formatPaymentMethodLabel(payment.payment_method)}</span>
+                          <span
+                            className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${
+                              payment.payment_status === "recorded"
+                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                                : payment.payment_status === "reversed"
+                                ? "border-amber-200 bg-amber-50 text-amber-800"
+                                : payment.payment_status === "failed"
+                                ? "border-rose-200 bg-rose-50 text-rose-800"
+                                : "border-slate-200 bg-slate-50 text-slate-700"
+                            }`}
+                          >
+                            {formatPaymentStatusLabel(payment.payment_status)}
+                          </span>
+                        </div>
+                        {payment.payment_status === "reversed" ? (
+                          <div className="mt-1 text-xs text-amber-800">
+                            Reversed{payment.reversal_reason ? `: ${payment.reversal_reason}` : "."}
+                            {payment.reversed_at ? ` (${formatTimestampDateDisplayLA(payment.reversed_at)})` : ""}
+                          </div>
+                        ) : null}
+                        {payment.payment_status === "recorded" ? (
+                          isStripeSourcedPayment(payment) ? (
+                            <div className="mt-2 text-xs text-amber-800">
+                              Online Stripe payment. This screen cannot reverse or refund Stripe charges.
+                            </div>
+                          ) : (
+                            <form action={reverseInternalInvoicePaymentFromForm} className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50/70 p-2.5">
+                              <input type="hidden" name="job_id" value={jobId} />
+                              <input type="hidden" name="payment_id" value={payment.id} />
+                              <input type="hidden" name="tab" value="info" />
+                              <input type="hidden" name="return_to" value={returnTo} />
+                              <label className={labelClass}>Reversal Reason</label>
+                              <input
+                                name="reversal_reason"
+                                className={inputClass}
+                                placeholder="Required correction reason"
+                                required
+                              />
+                              <div className="text-xs text-amber-900">
+                                This does not refund Stripe. It only corrects Compliance Matters records.
+                              </div>
+                              <SubmitButton loadingText="Reversing..." className={secondaryButtonClass}>
+                                Reverse Recorded Payment
+                              </SubmitButton>
+                            </form>
+                          )
+                        ) : null}
                       </div>
                     ))}
                   </div>

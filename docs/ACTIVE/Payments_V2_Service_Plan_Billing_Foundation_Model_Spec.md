@@ -1,6 +1,6 @@
 # Payments V2 / Service Plan Billing Foundation Model Spec
 
-Status: ACTIVE MODEL LOCK (Phase 2)
+Status: ACTIVE MODEL LOCK (Phase 2 + Phase 3A closeout)
 Owner lane: Payments V2 / Service Plan Billing Foundation
 Scope: docs/model only. No product code, schema, migrations, Supabase commands, Stripe behavior changes, checkout/session changes, env/flag changes, UI build, or provider integrations are authorized by this spec.
 
@@ -13,6 +13,17 @@ Phase 2 correction lock:
 - First Service Plan Billing V1 does not require an automatic recurring charge engine.
 - First posture is billing-period modeling plus normal internal invoices paid through existing invoice-payment infrastructure.
 - Auto-charge, autopay, saved cards, Stripe subscriptions, and automatic renewal remain deferred unless explicitly reopened.
+
+Phase 3A closeout lock:
+
+- Payments Register Mutation / Correction Foundation is now implemented as a minimal additive slice.
+- `internal_invoice_payments` now carries additive reversal audit metadata (`reversed_at`, `reversed_by_user_id`, `reversal_reason`).
+- Manual/off-platform `recorded` payment rows can be reversed by authorized financial users only, with required reason.
+- Stripe/online payment rows remain read-only for this correction flow; no refund/dispute/provider API behavior was added.
+- Reversed rows are historical (non-destructive), remain visible for audit, and do not count toward collected totals or invoice paid/balance projection.
+- Failed and already-reversed rows are blocked from reversal.
+- Authority lock remains Owner/Admin/Billing allowed; Dispatcher/Technician/Contractor/Portal/Public blocked by default.
+- Deferred register remains unchanged: allocations, service plan billing periods behavior implementation, customer portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, and platform fee execution remain deferred.
 
 ## Scope Boundaries (Locked)
 

@@ -42,6 +42,10 @@ export type InternalInvoicePaymentRow = {
   recorded_by_user_id: string;
   created_at: string;
   updated_at: string;
+  reversed_at?: string | null;
+  reversed_by_user_id?: string | null;
+  reversal_reason?: string | null;
+  processor_name?: string | null;
   stripe_checkout_session_id?: string | null;
   stripe_event_id?: string | null;
   stripe_payment_intent_id?: string | null;
@@ -77,6 +81,10 @@ const INTERNAL_INVOICE_PAYMENT_SELECT = [
   "recorded_by_user_id",
   "created_at",
   "updated_at",
+  "reversed_at",
+  "reversed_by_user_id",
+  "reversal_reason",
+  "processor_name",
   "stripe_checkout_session_id",
   "stripe_event_id",
   "stripe_payment_intent_id",
@@ -117,6 +125,10 @@ function normalizePaymentRow(row: any): InternalInvoicePaymentRow {
     recorded_by_user_id: String(row?.recorded_by_user_id ?? "").trim(),
     created_at: String(row?.created_at ?? "").trim(),
     updated_at: String(row?.updated_at ?? "").trim(),
+    reversed_at: String(row?.reversed_at ?? "").trim() || null,
+    reversed_by_user_id: String(row?.reversed_by_user_id ?? "").trim() || null,
+    reversal_reason: String(row?.reversal_reason ?? "").trim() || null,
+    processor_name: String(row?.processor_name ?? "").trim() || null,
     stripe_checkout_session_id: String(row?.stripe_checkout_session_id ?? "").trim() || null,
     stripe_event_id: String(row?.stripe_event_id ?? "").trim() || null,
     stripe_payment_intent_id: String(row?.stripe_payment_intent_id ?? "").trim() || null,

@@ -60,6 +60,15 @@ Recent closeout status snapshot (May 2026):
    - No mutations, corrections, allocations, profile CSV export, schema changes, Stripe/Supabase/prod changes
    - Remaining deferred: register-based payment recording/corrections, payment allocations, broader financial dashboard cards, QBO, ACH, platform fees, recurring billing, customer portal payment history
 
+- **Payments Reversal / Correction Foundation (Phase 3A) is now implemented in current sandbox closeout (commit pending):**
+   - Additive schema only: `internal_invoice_payments` now includes `reversed_at`, `reversed_by_user_id`, and `reversal_reason`
+   - Manual/off-platform recorded rows can be reversed by authorized financial users only (Owner/Admin/Billing) with required reason
+   - Failed and already-reversed rows are blocked from reversal
+   - Stripe/online rows are read-only in this correction flow; no refund/dispute/provider API behavior was added
+   - Reversal is non-destructive: original rows are preserved and status/audit fields are updated
+   - Invoice paid/balance and register collected totals remain recorded-only; reversed rows do not count as collected money
+   - Deferred register remains unchanged: allocations, service-plan billing periods execution, customer portal, QBO, ACH, refunds/disputes, saved cards/autopay, partial payments, receipt automation, platform-fee execution
+
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
 - Completed behavior/copy alignment:

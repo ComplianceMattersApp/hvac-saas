@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
 import {
@@ -133,6 +133,22 @@ function normalizePaymentMethod(value: FormDataEntryValue | null | undefined) {
   return INTERNAL_INVOICE_PAYMENT_METHODS.includes(normalized as any)
     ? (normalized as (typeof INTERNAL_INVOICE_PAYMENT_METHODS)[number])
     : null;
+}
+
+function isStripeSourcedPaymentRow(row: {
+  payment_method?: string | null;
+  processor_name?: string | null;
+  stripe_event_id?: string | null;
+  stripe_checkout_session_id?: string | null;
+  stripe_payment_intent_id?: string | null;
+}) {
+  return (
+    String(row.payment_method ?? '').trim() === 'card_stripe_online' ||
+    String(row.processor_name ?? '').trim().toLowerCase() === 'stripe' ||
+    String(row.stripe_event_id ?? '').trim().length > 0 ||
+    String(row.stripe_checkout_session_id ?? '').trim().length > 0 ||
+    String(row.stripe_payment_intent_id ?? '').trim().length > 0
+  );
 }
 
 async function requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect(params: {
@@ -393,6 +409,205 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
 
     throw error;
   }
+}
+
+export async function reverseInternalInvoicePaymentFromForm(formData: FormData) {
+  const jobId = getTrimmedString(formData.get('job_id'));
+  const paymentId = getTrimmedString(formData.get('payment_id'));
+  const tab = getTrimmedString(formData.get('tab')) || 'info';
+  const returnTo = getTrimmedString(formData.get('return_to'));
+  const reversalReason = getTrimmedString(formData.get('reversal_reason'));
+
+  if (!jobId) {
+    throw new Error('Job ID is required.');
+  }
+
+  if (!paymentId) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_reversal_not_found', returnTo));
+  }
+
+  if (!reversalReason) {
+    redirect(
+      buildInternalInvoiceReturnHref(
+        jobId,
+        tab,
+        'internal_invoice_payment_reversal_reason_required',
+        returnTo,
+      ),
+    );
+  }
+
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const { userId, internalUser } = await requireInternalUser({ supabase });
+
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: 'id',
+  });
+
+  if (!scopedJob?.id) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  requireInvoicePaymentRecordAccessOrRedirect({
+    actorUserId: userId,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo),
+  });
+
+  await requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  if (billingMode !== 'internal_invoicing') {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoicing_billing_pending', returnTo));
+  }
+
+  const invoice = await resolveInternalInvoiceByJobId({
+    supabase,
+    jobId,
+  });
+
+  if (!invoice) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_missing', returnTo));
+  }
+
+  if (invoice.account_owner_user_id !== internalUser.account_owner_user_id || invoice.job_id !== jobId) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  const { data: paymentRowRaw, error: paymentErr } = await admin
+    .from('internal_invoice_payments')
+    .select(
+      [
+        'id',
+        'account_owner_user_id',
+        'invoice_id',
+        'job_id',
+        'payment_status',
+        'payment_method',
+        'amount_cents',
+        'processor_name',
+        'stripe_event_id',
+        'stripe_checkout_session_id',
+        'stripe_payment_intent_id',
+      ].join(', '),
+    )
+    .eq('id', paymentId)
+    .maybeSingle();
+
+  if (paymentErr) {
+    throw paymentErr;
+  }
+
+  if (!paymentRowRaw) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_reversal_not_found', returnTo));
+  }
+
+  const paymentRow = paymentRowRaw as unknown as {
+    id: string;
+    account_owner_user_id: string;
+    invoice_id: string;
+    job_id: string;
+    payment_status: string;
+    payment_method: string | null;
+    amount_cents: number;
+    processor_name: string | null;
+    stripe_event_id: string | null;
+    stripe_checkout_session_id: string | null;
+    stripe_payment_intent_id: string | null;
+  };
+
+  if (
+    paymentRow.account_owner_user_id !== internalUser.account_owner_user_id ||
+    paymentRow.job_id !== jobId ||
+    paymentRow.invoice_id !== invoice.id
+  ) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  const paymentStatus = String(paymentRow.payment_status ?? '').trim().toLowerCase();
+  if (paymentStatus === 'reversed') {
+    redirect(
+      buildInternalInvoiceReturnHref(
+        jobId,
+        tab,
+        'internal_invoice_payment_reversal_already_reversed',
+        returnTo,
+      ),
+    );
+  }
+
+  if (paymentStatus === 'failed') {
+    redirect(
+      buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_reversal_failed_blocked', returnTo),
+    );
+  }
+
+  if (paymentStatus !== 'recorded') {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_reversal_not_recorded', returnTo));
+  }
+
+  if (isStripeSourcedPaymentRow(paymentRow)) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_reversal_online_blocked', returnTo));
+  }
+
+  const { data: updatedPayment, error: updateErr } = await admin
+    .from('internal_invoice_payments')
+    .update({
+      payment_status: 'reversed',
+      reversed_at: new Date().toISOString(),
+      reversed_by_user_id: userId,
+      reversal_reason: reversalReason,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', paymentId)
+    .eq('account_owner_user_id', internalUser.account_owner_user_id)
+    .eq('job_id', jobId)
+    .eq('invoice_id', invoice.id)
+    .eq('payment_status', 'recorded')
+    .select('id, amount_cents')
+    .single();
+
+  if (updateErr) {
+    throw updateErr;
+  }
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: 'payment_reversed',
+    userId,
+    meta: {
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      payment_id: updatedPayment?.id ?? paymentId,
+      amount_cents: Number(updatedPayment?.amount_cents ?? paymentRow.amount_cents ?? 0),
+      reason: reversalReason,
+      source: 'manual_reversal',
+    },
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoice`);
+  revalidatePath('/jobs');
+  revalidatePath('/ops');
+  revalidatePath('/reports/invoices');
+  revalidatePath('/reports/payments');
+  if (invoice.customer_id) {
+    revalidatePath(`/customers/${invoice.customer_id}`);
+  }
+
+  redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_reversed', returnTo));
 }
 
 export async function collectTenantInvoicePaymentNowFromForm(formData: FormData): Promise<void> {

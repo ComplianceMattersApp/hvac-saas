@@ -43,6 +43,15 @@ Current financial access model for sensitive financial actions:
 - Financial access-control prerequisite for Payments Register V1 is fully satisfied and leveraged.
 - Payments Register UI/actions remain read-only in this pass; recording/corrections/allocations remain deferred in future phases.
 - Payment correction, allocation, financial dashboard cards, QBO sync, ACH, platform fees, and recurring billing remain deferred.
+- **Payments Register Mutation / Correction Foundation (Phase 3A) is now implemented:**
+  - Additive reversal audit fields added to `internal_invoice_payments`: `reversed_at`, `reversed_by_user_id`, `reversal_reason`
+  - Manual/off-platform `recorded` rows can be reversed by authorized financial users with required reason
+  - Stripe/online rows are read-only in this correction flow (no refund/dispute/provider API behavior)
+  - Failed and already-reversed rows are blocked from reversal
+  - Reversal is non-destructive: original payment row is preserved and marked `reversed` with audit metadata
+  - Invoice paid/balance and collected totals continue counting only `recorded` rows (reversed excluded)
+  - Browser/UI posture: reverse action appears only on eligible off-platform recorded rows; failed/stripe rows do not expose reversal mutation affordance
+  - Commit target for this closeout remains pending until final approval
 
 Current financial access model for sensitive financial actions:
 

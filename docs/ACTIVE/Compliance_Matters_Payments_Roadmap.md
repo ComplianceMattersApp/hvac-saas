@@ -823,6 +823,32 @@ Includes:
 - merchant-of-record / recipient logic
 - optional platform fee logic if desired
 
+### Phase P2A / 3A — Payment Reversal / Correction Foundation (closed)
+
+Status: implemented in current sandbox closeout and validated.
+
+Includes:
+- additive reversal audit fields on `internal_invoice_payments` (`reversed_at`, `reversed_by_user_id`, `reversal_reason`)
+- server-side reversal mutation for manual/off-platform `recorded` rows only
+- required reversal reason and durable audit metadata capture
+- authority gate reuse: Owner/Admin/Billing allowed; Dispatcher/Technician/Contractor/Portal/Public blocked by default
+- failed/already-reversed rows blocked from reversal
+- Stripe/online rows blocked from reversal in this flow with explicit safe copy (no refund/dispute/provider API behavior)
+- non-destructive correction posture (no payment-row deletes)
+- projection safety preserved: reversed rows do not count toward invoice paid/balance or collected totals
+
+Explicit non-goals preserved in this phase:
+- no allocation engine
+- no service-plan billing-period execution behavior
+- no customer portal payment self-service
+- no QBO sync/export behavior
+- no ACH enablement
+- no refunds/disputes execution
+- no saved cards/autopay
+- no partial-payment expansion
+- no receipt automation
+- no platform-fee execution
+
 ### Phase P4 — Optional QBO sync (later)
 Accounting convenience only.
 
