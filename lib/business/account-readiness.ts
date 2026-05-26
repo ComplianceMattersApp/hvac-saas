@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
+import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 
 export type AccountReadinessItem = {
   key: string;
@@ -44,7 +45,7 @@ export async function resolveAccountReadiness(
   if (!ownerId) {
     return {
       completedRequiredCount: 0,
-      totalRequiredCount: 5,
+      totalRequiredCount: 6,
       isOperationallyReady: false,
       items: [
         {
@@ -83,9 +84,16 @@ export async function resolveAccountReadiness(
           href: "/ops/admin/internal-users",
         },
         {
+          key: "app_subscription",
+          label: "App subscription",
+          description: "Set up your Compliance Matters subscription before the trial ends.",
+          status: "incomplete",
+          href: "/ops/admin/company-profile#account-billing",
+        },
+        {
           key: "company_logo",
           label: "Company logo",
-          description: "Optional: upload a logo in Company Profile.",
+          description: "Add your logo for branded documents and messages.",
           status: "optional",
           href: "/ops/admin/company-profile",
         },
@@ -97,17 +105,17 @@ export async function resolveAccountReadiness(
           href: "/ops/admin/contractors",
         },
         {
-          key: "platform_account_status",
-          label: "Platform account status",
-          description: "Optional: review platform entitlement status visibility.",
+          key: "accept_customer_payments",
+          label: "Accept customer payments",
+          description: "Let customers pay invoices online through Compliance Matters.",
           status: "optional",
-          href: "/ops/admin/company-profile",
+          href: "/ops/admin/company-profile#accept-payments",
         },
       ],
     };
   }
 
-  const [profileResult, activeInternalUsersResult, contractorsResult, entitlement] = await Promise.all([
+  const [profileResult, activeInternalUsersResult, contractorsResult, entitlement, tenantStripeReadiness] = await Promise.all([
     supabase
       .from("internal_business_profiles")
       .select("display_name, support_email, support_phone, billing_mode, logo_url, profile_reviewed_at")
@@ -123,6 +131,7 @@ export async function resolveAccountReadiness(
       .select("id", { count: "exact", head: true })
       .eq("owner_user_id", ownerId),
     resolveAccountEntitlement(ownerId, supabase),
+    resolveTenantStripeConnectReadiness(ownerId, supabase),
   ]);
 
   if (profileResult.error) {
@@ -152,6 +161,12 @@ export async function resolveAccountReadiness(
   const profileReviewed = Boolean(profile?.profile_reviewed_at);
   const activeInternalUserCount = normalizeCount(activeInternalUsersResult.count);
   const contractorCount = normalizeCount(contractorsResult.count);
+  const subscriptionHandledInternally = entitlement.isInternalComped;
+  const hasBillingLinks = entitlement.billingCustomerLinked && entitlement.billingSubscriptionLinked;
+  const hasActiveSubscriptionStatusWithoutLinks =
+    entitlement.entitlementStatus === "active" || entitlement.entitlementStatus === "grace";
+  const isAppSubscriptionComplete =
+    subscriptionHandledInternally || hasBillingLinks || hasActiveSubscriptionStatusWithoutLinks;
 
   const requiredItems: AccountReadinessItem[] = [
     {
@@ -204,18 +219,20 @@ export async function resolveAccountReadiness(
       status: activeInternalUserCount > 0 ? "complete" : "incomplete",
       href: "/ops/admin/internal-users",
     },
+    {
+      key: "app_subscription",
+      label: "App subscription",
+      description: subscriptionHandledInternally
+        ? "Subscription is handled internally."
+        : isAppSubscriptionComplete
+          ? "Subscription setup is complete."
+          : "Set up your Compliance Matters subscription before the trial ends.",
+      status: isAppSubscriptionComplete ? "complete" : "incomplete",
+      href: "/ops/admin/company-profile#account-billing",
+    },
   ];
 
   const optionalItems: AccountReadinessItem[] = [
-    {
-      key: "company_logo",
-      label: "Company logo",
-      description: logoUrl
-        ? "Logo is uploaded."
-        : "Optional: upload a logo in Company Profile.",
-      status: "optional",
-      href: "/ops/admin/company-profile",
-    },
     {
       key: "contractor_directory",
       label: "Contractor directory",
@@ -227,13 +244,30 @@ export async function resolveAccountReadiness(
       href: "/ops/admin/contractors",
     },
     {
-      key: "platform_account_status",
-      label: "Platform account status",
-      description: `Optional: platform account status is ${entitlement.entitlementStatus}.`,
+      key: "accept_customer_payments",
+      label: "Accept customer payments",
+      description: "Let customers pay invoices online through Compliance Matters.",
       status: "optional",
-      href: "/ops/admin/company-profile",
+      href: "/ops/admin/company-profile#accept-payments",
     },
   ];
+
+  if (!logoUrl) {
+    optionalItems.unshift({
+      key: "company_logo",
+      label: "Company logo",
+      description: "Add your logo for branded documents and messages.",
+      status: "optional",
+      href: "/ops/admin/company-profile",
+    });
+  }
+
+  if (tenantStripeReadiness.isReady) {
+    const acceptPaymentsIndex = optionalItems.findIndex((item) => item.key === "accept_customer_payments");
+    if (acceptPaymentsIndex >= 0) {
+      optionalItems.splice(acceptPaymentsIndex, 1);
+    }
+  }
 
   const completedRequiredCount = requiredItems.filter((item) => item.status === "complete").length;
   const totalRequiredCount = requiredItems.length;

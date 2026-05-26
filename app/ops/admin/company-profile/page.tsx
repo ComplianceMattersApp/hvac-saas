@@ -488,7 +488,7 @@ function PlatformAccountSection({
     : null;
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
+    <div id="account-billing" className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)] scroll-mt-24">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
         <div className="text-sm font-semibold text-slate-950">Account &amp; Billing</div>
         <div className="mt-1 text-sm text-slate-600">
@@ -606,7 +606,7 @@ function TenantStripePaymentsSection({
       : "Connect Stripe Account";
 
   return (
-    <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
+    <div id="accept-payments" className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)] scroll-mt-24">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
         <div className="text-sm font-semibold text-slate-950">Tenant customer invoice payments</div>
         <div className="mt-1 text-sm text-slate-600">

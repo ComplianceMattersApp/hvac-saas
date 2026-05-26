@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
-import { getPlatformBillingAvailability } from "@/lib/business/platform-billing-stripe";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 
@@ -93,10 +92,13 @@ export default async function OpsAdminPage() {
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
-  const platformBillingAvailability = getPlatformBillingAvailability();
   const requiredItems = readiness.items.filter((item) => item.status !== "optional");
   const incompleteRequiredItems = requiredItems.filter((item) => item.status === "incomplete");
   const optionalItems = readiness.items.filter((item) => item.status === "optional");
+  const visibleOptionalItems = optionalItems.filter((item) => {
+    if (item.key === "contractor_directory" && productMode === "hvac_service") return false;
+    return true;
+  });
   const readinessPercent =
     readiness.totalRequiredCount > 0
       ? Math.round((readiness.completedRequiredCount / readiness.totalRequiredCount) * 100)
@@ -116,7 +118,7 @@ export default async function OpsAdminPage() {
         "Start with People & Access, then use Internal Team and Contractor tools as needed.",
     },
     hybrid: {
-      badge: "All-in-One",
+      badge: "All-in-One workspace",
       heroHint: "Owner all-in-one workspace. Service and compliance tools remain available together.",
       peopleCopy: "Start with People & Access, then use Internal Team and optional contractor tools when needed.",
     },
@@ -229,17 +231,16 @@ export default async function OpsAdminPage() {
   ]);
   const peopleCards = cards.filter((card) => {
     if (card.section !== "people") return false;
-    if (productMode !== "hvac_service") return true;
     return !collaborationCardHrefs.has(card.href);
   });
   const collaborationCards =
     productMode === "hvac_service"
-      ? cards.filter((card) => card.section === "people" && collaborationCardHrefs.has(card.href))
-      : [];
+      ? []
+      : cards.filter((card) => card.section === "people" && collaborationCardHrefs.has(card.href));
   const organizationCards = cards.filter((card) => card.section === "organization");
   const peopleSectionDescription =
     productMode === "hvac_service"
-      ? "Use this area for account access, internal staff, and optional outside collaboration tools."
+      ? "Use this area for account access and internal staff tools."
       : modeContext.peopleCopy;
 
   return (
@@ -257,9 +258,6 @@ export default async function OpsAdminPage() {
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="inline-flex min-h-8 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
                 {modeContext.badge}
-              </span>
-              <span className="inline-flex min-h-8 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                {modeContext.heroHint}
               </span>
             </div>
           </div>
@@ -294,7 +292,6 @@ export default async function OpsAdminPage() {
             </nav>
           </div>
         </aside>
-
         <div className="space-y-6">
           <section id="setup" className={panelClass}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -321,11 +318,14 @@ export default async function OpsAdminPage() {
                 {incompleteRequiredItems.map((item) => (
                   <div key={item.key} className="flex flex-wrap items-center justify-between gap-3 text-sm text-amber-900">
                     <div>
-                      <span className="font-semibold">Needs confirmation:</span> {item.label}
+                      <div>
+                        <span className="font-semibold">Needs confirmation:</span> {item.label}
+                      </div>
+                      <div className="mt-0.5 text-xs text-amber-800">{item.description}</div>
                     </div>
                     {item.href ? (
                       <Link href={item.href} className={linkButtonClass}>
-                        Open
+                        {item.key === "app_subscription" ? "Set up subscription" : "Open"}
                       </Link>
                     ) : null}
                   </div>
@@ -340,9 +340,12 @@ export default async function OpsAdminPage() {
             <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
               <div className="text-xs font-semibold text-slate-600">Optional setup</div>
               <div className="mt-3 space-y-3">
-                {optionalItems.map((item) => (
+                {visibleOptionalItems.map((item) => (
                   <div key={item.key} className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-700">
-                    <div>{item.label}</div>
+                    <div>
+                      <div>{item.label}</div>
+                      <div className="mt-0.5 text-xs text-slate-500">{item.description}</div>
+                    </div>
                     {item.href ? (
                       <Link href={item.href} className={linkButtonClass}>
                         Open
@@ -350,14 +353,6 @@ export default async function OpsAdminPage() {
                     ) : null}
                   </div>
                 ))}
-                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 pt-3 text-sm text-slate-700">
-                  <div>
-                    Platform billing setup {platformBillingAvailability.checkoutAvailable ? "is available." : "is not configured yet."}
-                  </div>
-                  <Link href="/ops/admin/company-profile" className={linkButtonClass}>
-                    Open
-                  </Link>
-                </div>
               </div>
             </div>
           </section>

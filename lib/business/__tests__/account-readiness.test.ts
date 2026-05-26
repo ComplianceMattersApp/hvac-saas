@@ -14,6 +14,13 @@ function makeSupabase(opts?: {
     support_phone: string | null;
     billing_mode: string | null;
     logo_url: string | null;
+    stripe_connected_account_id?: string | null;
+    stripe_connect_onboarding_status?: string | null;
+    stripe_charges_enabled?: boolean | null;
+    stripe_payouts_enabled?: boolean | null;
+    stripe_details_submitted?: boolean | null;
+    stripe_connect_disabled_reason?: string | null;
+    stripe_connect_last_synced_at?: string | null;
     profile_reviewed_at?: string | null;
     team_reviewed_at?: string | null;
   } | null;
@@ -78,7 +85,7 @@ describe("resolveAccountReadiness", () => {
     vi.clearAllMocks();
     resolveAccountEntitlementMock.mockResolvedValue({
       planKey: "starter",
-      entitlementStatus: "trial",
+      entitlementStatus: "active",
       isEntitlementActive: true,
       isInternalComped: false,
       internalCompedSignal: "none",
@@ -86,9 +93,9 @@ describe("resolveAccountReadiness", () => {
       activeSeatCount: 1,
       trialEndsAt: null,
       entitlementValidUntil: null,
-      billingCustomerLinked: false,
-      billingSubscriptionLinked: false,
-      billingSubscriptionStatus: null,
+      billingCustomerLinked: true,
+      billingSubscriptionLinked: true,
+      billingSubscriptionStatus: "active",
       billingCurrentPeriodEnd: null,
       billingCancelAtPeriodEnd: false,
     });
@@ -111,8 +118,8 @@ describe("resolveAccountReadiness", () => {
 
     const summary = await resolveAccountReadiness("owner-1", supabase);
 
-    expect(summary.completedRequiredCount).toBe(5);
-    expect(summary.totalRequiredCount).toBe(5);
+    expect(summary.completedRequiredCount).toBe(6);
+    expect(summary.totalRequiredCount).toBe(6);
     expect(summary.isOperationallyReady).toBe(true);
   });
 
@@ -132,7 +139,7 @@ describe("resolveAccountReadiness", () => {
 
     const summary = await resolveAccountReadiness("owner-1", supabase);
 
-    expect(summary.completedRequiredCount).toBe(1);
+    expect(summary.completedRequiredCount).toBe(2);
     expect(summary.isOperationallyReady).toBe(false);
     expect(summary.items.find((x) => x.key === "company_name")?.status).toBe("incomplete");
     expect(summary.items.find((x) => x.key === "support_email")?.status).toBe("incomplete");
@@ -141,7 +148,7 @@ describe("resolveAccountReadiness", () => {
     expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("complete");
   });
 
-  it("profile reviewed but team not => 5 of 5 complete when active users exist", async () => {
+  it("profile reviewed but team not => 6 of 6 complete when active users exist", async () => {
     const supabase = makeSupabase({
       profile: {
         display_name: "Acme HVAC",
@@ -157,12 +164,12 @@ describe("resolveAccountReadiness", () => {
 
     const summary = await resolveAccountReadiness("owner-1", supabase);
 
-    expect(summary.completedRequiredCount).toBe(5);
+    expect(summary.completedRequiredCount).toBe(6);
     expect(summary.isOperationallyReady).toBe(true);
     expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("complete");
   });
 
-  it("team reviewed but profile not => 1 of 5 complete", async () => {
+  it("team reviewed but profile not => 2 of 6 complete", async () => {
     const supabase = makeSupabase({
       profile: {
         display_name: "Acme HVAC",
@@ -178,9 +185,88 @@ describe("resolveAccountReadiness", () => {
 
     const summary = await resolveAccountReadiness("owner-1", supabase);
 
-    expect(summary.completedRequiredCount).toBe(1);
+    expect(summary.completedRequiredCount).toBe(2);
     expect(summary.isOperationallyReady).toBe(false);
     expect(summary.items.find((x) => x.key === "active_internal_users")?.status).toBe("complete");
+  });
+
+  it("app subscription is required and incomplete when trial has no billing links", async () => {
+    resolveAccountEntitlementMock.mockResolvedValueOnce({
+      planKey: "starter",
+      entitlementStatus: "trial",
+      isEntitlementActive: true,
+      isInternalComped: false,
+      internalCompedSignal: "none",
+      seatLimit: null,
+      activeSeatCount: 1,
+      trialEndsAt: null,
+      entitlementValidUntil: null,
+      billingCustomerLinked: false,
+      billingSubscriptionLinked: false,
+      billingSubscriptionStatus: null,
+      billingCurrentPeriodEnd: null,
+      billingCancelAtPeriodEnd: false,
+    });
+
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "external_billing",
+        logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
+      },
+      activeInternalUsersCount: 1,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+    const item = summary.items.find((x) => x.key === "app_subscription");
+
+    expect(item?.status).toBe("incomplete");
+    expect(item?.label).toBe("App subscription");
+    expect(item?.description).toBe("Set up your Compliance Matters subscription before the trial ends.");
+    expect(item?.href).toBe("/ops/admin/company-profile#account-billing");
+    expect(summary.isOperationallyReady).toBe(false);
+  });
+
+  it("app subscription is complete when account is internally comped", async () => {
+    resolveAccountEntitlementMock.mockResolvedValueOnce({
+      planKey: "starter",
+      entitlementStatus: "active",
+      isEntitlementActive: true,
+      isInternalComped: true,
+      internalCompedSignal: "notes_marker",
+      seatLimit: null,
+      activeSeatCount: 1,
+      trialEndsAt: null,
+      entitlementValidUntil: null,
+      billingCustomerLinked: false,
+      billingSubscriptionLinked: false,
+      billingSubscriptionStatus: null,
+      billingCurrentPeriodEnd: null,
+      billingCancelAtPeriodEnd: false,
+    });
+
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "external_billing",
+        logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
+      },
+      activeInternalUsersCount: 1,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+    const item = summary.items.find((x) => x.key === "app_subscription");
+
+    expect(item?.status).toBe("complete");
+    expect(item?.description).toBe("Subscription is handled internally.");
   });
 
   it("team access item uses count-based copy when users exist", async () => {
@@ -331,7 +417,79 @@ describe("resolveAccountReadiness", () => {
     const item = summary.items.find((x) => x.key === "company_logo");
 
     expect(item?.status).toBe("optional");
+    expect(item?.description).toBe("Add your logo for branded documents and messages.");
     expect(summary.isOperationallyReady).toBe(true);
+  });
+
+  it("uploaded logo is hidden from optional items", async () => {
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "internal_invoicing",
+        logo_url: "storage://attachments/company-profile/logo.png",
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
+      },
+      activeInternalUsersCount: 1,
+      contractorsCount: 0,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+    const item = summary.items.find((x) => x.key === "company_logo");
+
+    expect(item).toBeUndefined();
+    expect(summary.isOperationallyReady).toBe(true);
+  });
+
+  it("accept customer payments appears as optional when Stripe Connect is not ready", async () => {
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "internal_invoicing",
+        logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
+      },
+      activeInternalUsersCount: 1,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+    const item = summary.items.find((x) => x.key === "accept_customer_payments");
+
+    expect(item?.status).toBe("optional");
+    expect(item?.description).toBe("Let customers pay invoices online through Compliance Matters.");
+    expect(item?.href).toBe("/ops/admin/company-profile#accept-payments");
+  });
+
+  it("accept customer payments is hidden when Stripe Connect is ready", async () => {
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "internal_invoicing",
+        logo_url: null,
+        stripe_connected_account_id: "acct_123",
+        stripe_connect_onboarding_status: "complete",
+        stripe_charges_enabled: true,
+        stripe_payouts_enabled: true,
+        stripe_details_submitted: true,
+        stripe_connect_disabled_reason: null,
+        stripe_connect_last_synced_at: "2026-04-26T00:00:00Z",
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
+      },
+      activeInternalUsersCount: 1,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+    const item = summary.items.find((x) => x.key === "accept_customer_payments");
+
+    expect(item).toBeUndefined();
   });
 
   it("no contractors remains optional", async () => {
@@ -361,8 +519,6 @@ describe("resolveAccountReadiness", () => {
       profileError: { message: "db down" },
     });
 
-    await expect(resolveAccountReadiness("owner-1", supabase)).rejects.toThrow(
-      "Failed to resolve account readiness business profile",
-    );
+    await expect(resolveAccountReadiness("owner-1", supabase)).rejects.toThrow("db down");
   });
 });
