@@ -16,7 +16,8 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 - Support V0/V1/V2 model
 - Post-launch roadmap order
 
-Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No codebase split. No customer portal in current scope. Deferred and runbook-gated items remain parked unless explicitly reopened.
+Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No codebase split. No customer portal in current scope. Current intended release is complete at the current quality bar. The active closeout lane is True App Package / Device-App Experience. Deferred and runbook-gated items remain parked unless explicitly reopened.
+Canonical note: detailed deferred/remaining register authority stays in [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) Section 4.1; this spine mirrors that register instead of expanding duplicate long lists.
 
 **Estimate Multi-Option Proposal Model Lock:**
 Future Good / Better / Best proposal support is locked in [Estimate_Multi_Option_Proposal_Model_Spec.md](./Estimate_Multi_Option_Proposal_Model_Spec.md): one parent Estimate / Proposal with child Option Packages, editable labels, stored sort order, option-scoped line items/totals, and single-select primary option approval intent. Three linked estimates and fake option headers inside flat estimate line items are rejected. This is docs/model only and does not authorize schema, UI, approval, conversion, payment, email, portal, QBO, or SMS work.
@@ -1159,7 +1160,7 @@ Current Program Status Note (May 2026)
     - QII remains selectable/ad hoc, not universal default-required
     - any AHRI/QII closeout-gate decision is a separate future pass
     - broader ECC report/export/PDF formatting remains future polish
-    - native/app-store packaging remains future/parked
+    - true app package/device-app experience is the current closeout lane; native-store expansion beyond that lane remains future/parked
 
 1. System Identity
 
@@ -2201,9 +2202,9 @@ additional dispatch UX micro-polish beyond the current unified drag/drop baselin
 deeper notification prioritization/escalation layers
 broader role model refinement
 future branding/settings/business-profile formalization
-App-store/mobile native distribution remains intentionally deferred for current launch scope; web product launch readiness is the priority baseline.
-Field-ready installable/PWA access readiness V1 Slice 1 is limited to metadata/installability baseline hardening only (manifest/layout metadata coherence and home-screen launch QA checklist). Service worker/offline caching remains deferred to a separate planned slice.
-Field-ready installable/PWA access readiness V1B-1 (Proxy Verification + Portal Loading Polish) is complete: `proxy.ts` is confirmed active under Next.js 16 (the correct convention; `middleware.ts` is deprecated and must not be added), protected unauthenticated deep links preserve `?next=` for tested routes, and `app/portal/loading.tsx` provides a mobile-friendly contractor portal loading skeleton. Service worker/offline caching and native app-store distribution remain deferred. No auth, session, contractor/internal separation, first-owner routing, Estimates/Support flags, or source-of-truth boundaries changed.
+True App Package / Device-App Experience is the current closeout lane for current intended release.
+Field-ready installable/PWA access readiness V1 Slice 1 remains the metadata/installability baseline hardening layer (manifest/layout metadata coherence and home-screen launch QA checklist).
+Field-ready installable/PWA access readiness V1B-1 (Proxy Verification + Portal Loading Polish) is complete: `proxy.ts` is confirmed active under Next.js 16 (the correct convention; `middleware.ts` is deprecated and must not be added), protected unauthenticated deep links preserve `?next=` for tested routes, and `app/portal/loading.tsx` provides a mobile-friendly contractor portal loading skeleton. Future native-store distribution and expanded offline packaging beyond this closeout lane remain deferred unless explicitly reopened in the canonical register.
 
 Note:
 Payment P1 foundation is closed at the current baseline.

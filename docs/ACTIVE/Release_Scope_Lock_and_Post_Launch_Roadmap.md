@@ -245,7 +245,8 @@ Execution companion note: for practical first-customer support posture and expan
 | Invoice/payment truth and honesty | Complete for current scope | Tenant customer payments V1 current scope is implemented: connected-account direct-charge checkout path, webhook-only payment truth persistence, invoice paid projection, duplicate protection, and honest Payments V2 deferred-feature boundaries. |
 | Support Case / Call Log V1 | Complete / production-smoke-passed | Support Case V1 implemented and production-smoke-passed (May 2026). Owner/support-internal only. Mutates only `support_cases` and `support_case_notes`. No impersonation. No tenant mutation. See `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`. |
 | Product-mode matrix documentation | Complete | Matrix documented as shared-engine, presentation/configuration direction without pre-release switching requirement. |
-| Mobile/PWA baseline | Complete baseline | Installability baseline and route/access smoke documented; offline/native packaging remains deferred. |
+| Mobile/PWA baseline | Complete baseline | Installability baseline and route/access smoke documented. |
+| True App Package / Device-App Experience | Active closeout lane | Current intended release is complete at the current quality bar; active closeout work is focused on true app package/device-app experience hardening. Deferred/future items remain parked in Section 4.1 unless explicitly reopened. |
 | First-owner/operator readiness runbook | Complete as controlled runbook | First-owner provisioning runbook is active with strict guardrails, dry-run/apply gates, and verification checklist. |
 
 ### 2.2 Completion interpretation
@@ -272,6 +273,7 @@ The following is now locked as in-scope for owner-release quality:
 7. Reports/decision surfaces and invoice/payment-tracking honesty at current non-execution boundary.
 8. Admin/setup and first-owner/operator controlled readiness path.
 9. Mobile/PWA baseline installable web posture.
+10. True App Package / Device-App Experience closeout lane.
 
 Release scope lock statements:
 - No codebase split.
@@ -292,7 +294,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 5. QBO integration (last-last, optional downstream accounting sync/export only).
 6. Recurring services / maintenance agreements (customer-owned agreement V1; Group 9A-2 backend foundation committed in `b126ff6`; Group 9A-3 read-only customer profile section committed in `09edc9f`; Group 9A-4 customer profile create/edit V1 committed in `9f81d6f`; Group 9A-5B due/overdue summary read model committed with `summarizeMaintenanceAgreementsForAccount` in `lib/maintenance-agreements/read-model.ts`; Group 9A-6 feature-gated read-only ops Service Plans card committed in `1776042` (`app/ops/page.tsx`), fail-safe and non-blocking on read error; Group 9A-7B manual Create Work Order from Service Plan prefill V1 committed in `3c186e5` with compact customer-card entry point, lightweight params only (`customer_id`, `maintenance_agreement_id`), server-side scoped prefill resolver on `/jobs/new`, editable service-maintenance defaults, and non-blocking invalid/unavailable fallback; Group 9A-8B read-only Service Plans drilldown route plus ops link implemented and pushed with internal/account-scoped `/service-plans`, feature-gated visibility, account-scoped capped drilldown helper, and no heavier `/ops` drilldown query; Group 9A-9A docs/model decisions now record preferred future linkage via `maintenance_agreement_visits`, completed-valid-work counting gate, derived V1 visit-balance projection, manual `next_due_date` posture, and V2-ledger parking; Group 9A-9B link-table foundation implemented and pushed in commit `6bf7329` with new `maintenance_agreement_visits` table in migration `20260513110000_maintenance_agreement_visits_link_foundation.sql`, durable link structure with `(agreement_id, job_id)` uniqueness, link_source enum (service_plan_prefill/manual/system_future), count_status lifecycle (linked/eligible/counted/excluded/reversed), READ helpers (`listMaintenanceAgreementVisitsForAgreement`, `listMaintenanceAgreementLinksForJob`, `summarizeMaintenanceAgreementVisitLinksForAgreement`), account-scoped RLS policies (SELECT/INSERT/UPDATE only; no DELETE), and 4 new vitest-passed link-helper tests; feature gated by `ENABLE_MAINTENANCE_AGREEMENTS` (default `false`); no automatic job generation; no persisted job/agreement linkage wired; no automatic counting; no due-date or balance-deduction logic; production remains inactive until migration apply and flag enablement are intentionally approved; Group 9A-9C link-row creation when job is created from service plan implemented and pushed in commit `071915a` with automatic link creation after job succeeds (`createMaintenanceAgreementVisitLinkFromJobCreation` action in `lib/maintenance-agreements/agreement-actions.ts`), link_source='service_plan_prefill', count_status='linked', counts_toward_visit_balance=false, non-blocking failure on invalid scopes, strict account/agreement/job scope validation, and 2 new vitest-passed link creation tests; Group 9A-9E service-plan Work Items prefill + runtime link-order fix implemented and pushed in commit `c4a08d9` with agreement default Work Items persistence, `/jobs/new` Step 5 Work Item prefill, service/maintenance job persistence for service-plan-origin jobs, and link creation moved before `postCreate(...)` redirect so link rows are no longer unreachable at runtime; Group 9A-10B count eligibility read-only projection implemented and pushed in commit `0588a26`; Group 9A-10C manual `Mark Visit Counted` on eligible linked job detail implemented and pushed in commit `1b69336` with always-visible placement fix in `2ae1a4b`; manual action updates only link row count fields, does not mutate agreement, does not advance `next_due_date`, and adds no invoice/payment behavior; Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card, internal read-only drilldown is available on `/service-plans`, manual work-order prefill from customer agreements is implemented on `/jobs/new`, automatic link creation from job creation is active, and link-table foundation with read helpers plus controlled manual counting is ready for future reversal wiring; see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md)).
 7. Customer portal (requires separate customer/location-scoped external visibility design).
-8. Service worker/offline/native app-store packaging.
+8. Native-store distribution and expanded offline packaging beyond the current app/device closeout lane.
 9. Product-mode configuration next slices (admin mutation/edit UI, signup capture, tier/add-on enforcement, and full mode-aware navigation/report/starter-kit behavior).
 10. Mode-aware navigation rendering.
 11. Mode-aware starter kits.
@@ -372,7 +374,7 @@ Product Mode V2 sandbox migration apply closeout note:
    - switching back to ECC works
 - Intentionally skipped checks:
    - optional allowed-values mutation test (extra mutation risk avoidance)
-   - cross-account HVAC/ECC fixture smoke (no fixture/account context switch available)
+   - cross-account HVAC/ECC fixture smoke (future strategic app-to-app handoff lane; non-blocking for current intended release)
 - Production remained untouched:
    - no production migration
    - no production db push
@@ -396,7 +398,7 @@ Product Mode V2 sandbox row validation closeout note:
 - Browser smoke (partial): `/jobs/new` loaded, form rendered without errors, job family section correctly gated behind customer selection.
 - Skipped checks (documented scope limitations):
    - HVAC Service fixture smoke (no HVAC fixture account in sandbox)
-   - Cross-account browser switching (single session only)
+   - Cross-account browser switching (future strategic app-to-app handoff lane; non-blocking for current intended release)
    - Contractor-session smoke (no contractor auth available)
    - Full job-family default verification (requires customer selection workflow; partial validation only)
    - Draft jobType persistence (requires full job creation; deferred)
@@ -501,6 +503,7 @@ Product Mode V2 production migration execution closeout note:
 This register captures only still-open lanes. Completed lanes listed in this document remain closed and are not reopened by this section.
 
 Category key:
+- `0` Current closeout lane
 - `1` Active monitoring
 - `2` Runbook-gated
 - `3` Field-feedback gated
@@ -518,7 +521,7 @@ Category key:
 | Product mode/tier/add-on/per-seat expansion (admin mutation, tier enforcement, full mode-aware surfaces) | 4 | Baseline product-mode foundation exists; broader packaging/enforcement and full mode-aware behavior are intentionally future slices. | Future Product Mode and packaging roadmap slices explicitly approved. |
 | Customer portal | 4 | Out of current release scope; requires a separate customer/location visibility and authority model. | Explicit reopen decision with dedicated portal design and scope approval. |
 | QBO integration | 5 | QBO remains optional downstream and intentionally last-last, not source-of-truth or launch-critical. | Later explicit downstream accounting integration decision after core payment lanes mature. |
-| PWA/native/offline/app-store packaging | 4 | Installability baseline is complete, but offline/native packaging is intentionally deferred. | Later roadmap slot after core operational/commercial lanes stabilize. |
+| True App Package / Device-App Experience | 0 | Installability baseline is complete; the current closeout lane is true app package/device-app experience. | Close this lane when owner-approved app/device acceptance criteria are met; keep deferred/future lanes unchanged unless explicitly reopened. |
 | Service Plans V2/expansion | 3 | Service Plans lane is closed for now; additional capability is intentionally blocked unless field evidence justifies reopen. | Real workflow bugs or strongly validated field feedback to reopen scope. |
 | Performance measured follow-up backlog | 1 | Broad campaign is intentionally parked; only measured regressions should trigger further work. | Measured evidence on real daily-use surfaces with benchmark-backed follow-up slices. |
 | Pre-launch hardening checklist items | 2 | Hardening items are intentionally staged for controlled pre-launch execution rather than ad-hoc implementation. | Pre-launch checklist/runbook execution window and sign-off. |
@@ -651,7 +654,7 @@ Recommended order after owner-release:
 7. QBO integration last-last (optional downstream accounting sync/export only).
 8. Product-mode configuration layer (settings/visibility/presets).
 9. Customer portal only if explicitly reopened.
-10. Native/offline/app-store packaging later.
+10. True App Package / Device-App Experience closeout lane (current).
 
 Ordering rationale:
 - support safety first,
@@ -679,15 +682,19 @@ Ordering rationale:
    - Risk: users infer unsupported payment add-ons from invoice/payment surfaces.
    - Mitigation: preserve strict wording honesty for current V1 behavior and point deferred add-ons to the Payments V2 register (refunds, disputes, saved cards, partial payments, receipt messaging, public portal, platform fees, ACH, QBO sync).
 
-5. First-owner provisioning gates
+5. App/device closeout execution drift
+   - Risk: app/device closeout is mistaken as deferred because of older packaging wording.
+   - Mitigation: treat True App Package / Device-App Experience as the active closeout lane and keep deferred/future register decisions in Section 4.1 as canonical.
+
+6. First-owner provisioning gates
    - Risk: uncontrolled apply/invite use outside runbook.
    - Mitigation: keep provisioning operator-controlled with dry-run/apply discipline.
 
-6. Support Console gates
+7. Support Console gates
    - Risk: pressure to bypass runbook and enable quickly.
    - Mitigation: no-go unless all governance/migration/grant/smoke/audit gates pass.
 
-7. Estimates gates
+8. Estimates gates
    - Risk: enablement pressure before migration/flag/smoke controls are satisfied.
    - Mitigation: runbook-first, internal-only boundaries, immediate rollback readiness.
 

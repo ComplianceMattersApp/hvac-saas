@@ -517,7 +517,7 @@ If any item here conflicts with the active spine, the spine wins.
   1. Performance/responsiveness batch closeout and documentation (closed for the current pass)
   2. Support Console production-readiness planning (controlled, read-only, audited, careful flag-enable planning, no impersonation, no tenant mutation unless explicitly approved later)
   3. Estimates production-readiness planning (internal production-enablement decision only; migration/feature-flag/smoke/rollback plan required) â€” readiness audit complete, production readiness hardening guard committed, internal-only enablement runbook drafted; production enablement requires explicit gate approval per `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
-  4. Field-ready installable/PWA access readiness (web/PWA-style readiness; app-store/native remains deferred)
+  4. Field-ready installable/PWA plus True App Package / Device-App Experience closeout lane (current active closeout lane)
   5. Final launch confirmation sweep (intake, internal job creation, scheduling, field lifecycle, invoice-tracking honesty, reports, flags, disabled/deferred features, production smoke)
   6. First-owner/operator handoff dry-run (owner setup, operator checklist, account readiness, support readiness, launch operations)
   7. Controlled tester onboarding only after the above are acceptably complete
@@ -528,7 +528,8 @@ If any item here conflicts with the active spine, the spine wins.
 ### 2.3.7 Field-ready installable/PWA access readiness V1 (Slice 1 baseline hardening)
 - Completed scope for this slice is web/PWA metadata/installability baseline hardening only (`app/manifest.ts`, `app/layout.tsx`), with no auth/routing/data/server-action/source-of-truth behavior changes.
 - Current posture remains web-first app-like install readiness.
-- Native app-store distribution remains intentionally deferred.
+- True App Package / Device-App Experience is the current closeout lane.
+- Native app-store distribution expansion beyond this lane remains intentionally deferred unless explicitly reopened.
 - Service worker/offline caching remains intentionally deferred to a separate planned slice.
 - Chromium install prompt readiness may still require a future service-worker slice and is not implemented here.
 - iOS install flow remains manual Add to Home Screen guidance (no automatic browser install prompt path).
@@ -776,7 +777,8 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 
 Summary of locked posture:
 - Notifications, calendar, contractor portal, reports, admin/setup, job workspace, ops, product mode matrix, and customer continuity V1 are closed for the current owner-release pass.
-- Deferred/parked items (customer portal, QBO, tenant payment execution, estimates/support-console production enablement, mode-switch UI, native packaging) are not release blockers unless the owner explicitly reopens them.
+- Deferred/parked items (customer portal, QBO, tenant payment execution, estimates/support-console production enablement, mode-switch UI) are not release blockers unless the owner explicitly reopens them.
+- True App Package / Device-App Experience is current active closeout work, not a deferred blocker.
 - Runbook-gated items (estimates enablement, support console enablement, first-owner provisioning) remain parked behind their runbooks.
 - No codebase split. ECC/HERS-first with HVAC Service-ready shared foundation.
 
@@ -812,11 +814,11 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Confirmed: internal/comped owner provisioning remains operator-controlled and is not a public self-serve path.
 - **Pre-launch operator runbook item:** before onboarding the first real production account, operator must run dry-run first, verify the intended Supabase project, then run apply with both `ALLOW_FIRST_OWNER_PROVISIONING=true` and `ALLOW_PRODUCTION_FIRST_OWNER_PROVISIONING=true`. Note: the production-flag is also required for any hosted Supabase project (including sandbox) because `.supabase.co` URLs are classified as production-like remote targets.
 - Runbook reference: `docs/ACTIVE/First_Owner_Provisioning_Runbook.md`.
-- **Operator handoff readiness packet documented (2026-05-07):** `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` §11 now contains the full operator handoff/readiness packet: current status, future operator sequence (10 steps), safety gates, evidence template, and explicit non-goals. No onboarding was executed. Release remains parked pending remaining product/readiness work.
+- **Operator handoff readiness packet documented (2026-05-07):** `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` §11 contains the operator handoff/readiness packet (current status, future operator sequence, safety gates, evidence template, explicit non-goals). No onboarding was executed. Current intended release is complete at the current quality bar; remaining work is app/device closeout plus deferred/future registers in `docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md`.
 
 ### 2.5 Admin readiness checklist confirmation
 - Runbook reference: `docs/ACTIVE/First_Owner_Provisioning_Runbook.md`.
-- **Operator handoff readiness packet documented (2026-05-07):** `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` §12 now contains the full operator handoff/readiness packet: current status, future operator sequence (10 steps), safety gates, evidence template, and explicit non-goals. No onboarding was executed. Release remains parked pending remaining product/readiness work.
+- **Operator handoff readiness packet reference:** Use the canonical packet pointer in section 2.4 (`docs/ACTIVE/First_Owner_Provisioning_Runbook.md` §11) to avoid duplicate release-status wording.
 - **Product mode capture planning (future implementation):** First owner provisioning will eventually require `--product-mode hvac_service|ecc_hers|hybrid` flag. Product mode will be written to `account_settings` during apply, after owner identity resolution and before invite send. Missing/invalid product_mode will block provisioning apply once implemented. See `docs/ACTIVE/Product_Mode_Signup_Spec.md` §6.5 and `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` §11 for phase 1/2/3 planning. Phase 1 does not require backfilling existing accounts. Production account_settings migration must be applied before production provisioning writes product_mode.
 - **Product Mode V2 production migration execution closeout (completed):** production migration `20260509120000_account_settings_product_mode_v1.sql` was applied successfully on project ref `ornrnvxtwwtulohqwxop` using isolated worktree `C:/Users/eddie/hvac-saas-productmode-dryrun`, with final pre-apply dry-run targeting only `20260509120000` and explicit approval before apply. Apply exited `0`. Post-apply verification passed: `public.account_settings` exists; expected columns present (`account_owner_user_id`, `product_mode`, `product_mode_updated_at`, `product_mode_updated_by_user_id`, `created_at`, `updated_at`); PK/FKs/check/RLS/policy (`account_settings_select_account_scope`)/trigger (`account_settings_set_updated_at`) verified; row count `0`; migration history confirms `20260509120000` applied. No-write smoke passed (`/jobs/new` internal load, manual ECC/Service selection stable, `/estimates` unchanged, Support/People & Access unchanged, no admin product-mode edit UI, no signup product-mode capture, contractor admin/access unchanged). Warnings: expected benign idempotent trigger/policy drop notices during apply, intermittent `net::ERR_ABORTED` navigation requests with successful destination loads, and Supabase CLI update notice. Boundaries preserved: no account_settings rows/backfill/owner-hybrid write/customer product-mode rows, no signup capture/admin edit UI/tier-add-on enforcement, no navigation-report-starter-kit drift, no billing-payments changes, no contractor authority changes, no Estimates/Support behavior changes, and no Vercel/env flag changes.
 - **Support Console foundation production migration readiness closeout (planning only):** verdict is **ready after listed inputs**. Future production scope is only `supabase/migrations/20260501120000_support_access_v1a_foundation.sql`. The migration is additive/dormant if `ENABLE_SUPPORT_CONSOLE` remains false/unset. It must not create support users/grants/sessions, must not enable Support Console, and must not bundle Estimates or Product Mode migrations. Normal `db push` from current repo state is unsafe because later pending migrations exist; future execution should use an isolated single-migration artifact/worktree, verify production ref `ornrnvxtwwtulohqwxop`, run dry-run, stop for approval, then apply only after approval.
@@ -1717,7 +1719,7 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
 - Tenant/customer-facing support grant visibility remains a later slice.
 - Read-only account overview remains a later slice.
 - Support mutation remains a much-later explicit decision, if ever.
-- App-store/mobile native distribution remains deferred; current launch focus is web/PWA-style readiness, not Apple App Store or Google Play distribution.
+- True App Package / Device-App Experience remains the active closeout lane; app-store/mobile native distribution expansion remains deferred unless explicitly reopened.
 
 ---
 
@@ -1789,7 +1791,7 @@ This pack is a prerequisite to controlled tester onboarding. Do not onboard test
   - switching back to ECC works
 - Skipped checks by design:
   - optional allowed-values mutation test skipped to avoid extra mutation risk
-  - cross-account HVAC/ECC fixture smoke skipped because fixture/account context switching was unavailable
+  - cross-account HVAC/ECC fixture smoke skipped because fixture/account context switching was unavailable; this is a future strategic app-to-app handoff lane and is non-blocking for current intended release
 - Production untouched confirmation:
   - no production migration
   - no production db push
