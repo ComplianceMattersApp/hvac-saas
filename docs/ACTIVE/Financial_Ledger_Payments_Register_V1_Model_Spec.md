@@ -149,6 +149,15 @@ Current financial access model for sensitive financial actions:
   - Global parity: recorded payment cents 10134, active allocation cents 10134, global parity matches true, reversed allocations active count 0
   - Runtime boundaries preserved: no projection/read-path switch, no UI/report behavior changes, no manual payment behavior changes, no Stripe webhook behavior changes, no production mutation
   - Validation snapshot: payment allocation + internal invoice payment tests 38 passed; payments register + invoice ledger tests 15 passed; `npx.cmd tsc --noEmit` passed; branch clean/synced
+- **Production Historical Allocation Backfill Preflight + No-Op Decision (Phase 4I-C) is now complete (docs-only):**
+  - Production ref confirmed: `ornrnvxtwwtulohqwxop`
+  - Trusted production read access confirmed
+  - SELECT-only audit performed with `mutation_performed=false`
+  - Preflight metrics: payment rows 0, allocation rows 0, missing allocation rows 0, payment status breakdown `{}`, unexpected statuses `[]`, required field gaps 0, missing invoice 0, account mismatch 0, job mismatch 0, duplicate allocation sources 0, status mapping mismatches 0, payload mismatches 0, per-invoice parity mismatches 0, global recorded payment cents 0, global active allocation cents 0, global parity matches true, reversed allocations active by mistake 0
+  - Production backfill is not needed because there are no production payment rows
+  - No projection/read-path switch occurred
+  - Payment row truth remains authoritative
+  - Allocation table remains ready for future rows through manual and Stripe dual-write
 
 Current financial access model for sensitive financial actions:
 

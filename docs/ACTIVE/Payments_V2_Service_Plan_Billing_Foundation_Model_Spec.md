@@ -193,6 +193,36 @@ Phase 4I-B closeout lock (Sandbox Historical Allocation Backfill + Parity Verifi
 	- `npx.cmd tsc --noEmit` passed
 	- branch clean/synced
 
+Phase 4I-C closeout lock (Production Historical Allocation Backfill Preflight + No-Op Decision, docs-only):
+
+- Phase 4I-C production historical allocation backfill preflight is complete.
+- Production ref confirmed: `ornrnvxtwwtulohqwxop`.
+- Trusted production read access confirmed.
+- SELECT-only audit was performed.
+- `mutation_performed=false`.
+- Preflight result:
+	- production payment row count: 0
+	- production allocation row count: 0
+	- missing allocation row count: 0
+	- payment status breakdown: {}
+	- unexpected statuses: []
+	- required field gaps: 0
+	- missing invoice count: 0
+	- account mismatch count: 0
+	- job mismatch count: 0
+	- duplicate allocation sources: 0
+	- status mapping mismatches: 0
+	- payload mismatches: 0
+	- per-invoice parity mismatch count: 0
+	- global recorded payment cents: 0
+	- global active allocation cents: 0
+	- global parity matches: true
+	- reversed allocations active by mistake: 0
+- Production backfill is not needed because there are no production payment rows.
+- No projection/read-path switch has occurred.
+- Payment row truth remains authoritative.
+- Allocation table remains ready for future rows through manual and Stripe dual-write.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
