@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileShellMenu from "@/components/layout/MobileShellMenu";
+import BrowserPushSubscriptionAutoReconciler from "@/components/layout/BrowserPushSubscriptionAutoReconciler";
 import ShellCreateMenu, { type ShellCreateItem } from "@/components/layout/ShellCreateMenu";
 import ShellNavLink from "@/components/layout/ShellNavLink";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
@@ -154,6 +155,13 @@ export default async function RootLayout({
 
           {user ? (
             <>
+              {isInternalUser && user.id ? (
+                <BrowserPushSubscriptionAutoReconciler
+                  userId={user.id}
+                  accountOwnerUserId={String(actorContext.internalUser?.account_owner_user_id ?? "")}
+                />
+              ) : null}
+
               {/* Top Bar */}
               <header className="fixed top-0 inset-x-0 z-50 border-b border-slate-300/80 bg-white/90 px-4 py-3 backdrop-blur-md shadow-[0_14px_28px_-24px_rgba(15,23,42,0.4)] sm:px-6 print:hidden">
                 <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-3 sm:gap-4">
