@@ -91,20 +91,20 @@ function formatSubmittedAt(value: string) {
 
 const JOB_AWARE_EVENT_HEADLINES: Record<string, string> = {
   contractor_note: "Contractor note added",
-  contractor_correction_submission: "Correction submission received",
+  contractor_correction_submission: "Contractor submitted a correction for review",
   contractor_schedule_updated: "Contractor scheduling updated",
   contractor_job_created: "New contractor job submitted",
-  retest_ready_requested: "Retest ready requested",
+  retest_ready_requested: "Contractor requested retest review",
   internal_note_tag: "You were mentioned in an internal note",
   internal_job_assigned: "You were assigned to a job",
 };
 
 const JOB_AWARE_EVENT_HELPER_TEXT: Record<string, string> = {
   contractor_note: "Review contractor note and update next action if needed.",
-  contractor_correction_submission: "Review submitted corrections and confirm disposition.",
+  contractor_correction_submission: "Review contractor correction and confirm disposition.",
   contractor_schedule_updated: "Confirm scheduling details and update dispatch plan.",
   contractor_job_created: "Review the submitted request and schedule next steps.",
-  retest_ready_requested: "Confirm retest readiness and schedule follow-up.",
+  retest_ready_requested: "Review retest request and determine the next step.",
   internal_note_tag: "Open the job to review the internal note.",
   internal_job_assigned: "Open the job to review dispatch details and next steps.",
 };
@@ -124,10 +124,10 @@ function notificationTypeLabel(value?: string | null) {
   const key = String(value ?? "").trim().toLowerCase();
   const labels: Record<string, string> = {
     contractor_report_sent: "Contractor Report Sent",
-    retest_ready_requested: "Retest Ready Requested",
+    retest_ready_requested: "Retest Review Requested",
     contractor_job_created: "Contractor Job Submitted",
     contractor_note: "Contractor Note",
-    contractor_correction_submission: "Correction Submission",
+    contractor_correction_submission: "Correction Submitted",
     contractor_schedule_updated: "Contractor Schedule Updated",
     internal_note_tag: "Internal Note Mention",
     internal_job_assigned: "Job Assigned",
@@ -172,6 +172,8 @@ function JobAwareNotificationCard({
     jobId && type === "internal_note_tag"
       ? `/jobs/${jobId}?tab=ops#internal-notes`
       : jobId && type === "internal_job_assigned"
+      ? `/jobs/${jobId}?tab=ops`
+      : jobId && (type === "contractor_correction_submission" || type === "retest_ready_requested")
       ? `/jobs/${jobId}?tab=ops`
       : jobId
       ? `/jobs/${jobId}`

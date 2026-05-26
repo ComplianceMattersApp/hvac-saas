@@ -4,9 +4,37 @@ const revalidatePathMock = vi.fn();
 const sendWebPushNotificationForInternalNotificationMock = vi.fn(
   async (..._args: unknown[]) => undefined,
 );
+const createAdminClientMock = vi.fn();
+const resolveNotificationAccountOwnerUserIdMock = vi.fn();
+const resolveInternalOpsRecipientEmailsMock = vi.fn();
+const resolveOperationalTenantIdentityMock = vi.fn();
+const sendEmailMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+}));
+
+vi.mock("@/lib/supabase/server", () => ({
+  createAdminClient: (...args: unknown[]) => createAdminClientMock(...args),
+}));
+
+vi.mock("@/lib/notifications/account-owner", () => ({
+  resolveNotificationAccountOwnerUserId: (...args: unknown[]) =>
+    resolveNotificationAccountOwnerUserIdMock(...args),
+}));
+
+vi.mock("@/lib/notifications/internal-email-recipients", () => ({
+  resolveInternalOpsRecipientEmails: (...args: unknown[]) =>
+    resolveInternalOpsRecipientEmailsMock(...args),
+}));
+
+vi.mock("@/lib/email/operational-tenant-branding", () => ({
+  resolveOperationalTenantIdentity: (...args: unknown[]) =>
+    resolveOperationalTenantIdentityMock(...args),
+}));
+
+vi.mock("@/lib/email/sendEmail", () => ({
+  sendEmail: (...args: unknown[]) => sendEmailMock(...args),
 }));
 
 vi.mock("@/lib/notifications/web-push-delivery", () => ({
@@ -19,6 +47,15 @@ describe("createContractorIntakeProposalAwarenessNotification", () => {
     vi.clearAllMocks();
     vi.resetModules();
     sendWebPushNotificationForInternalNotificationMock.mockResolvedValue(undefined);
+    resolveNotificationAccountOwnerUserIdMock.mockResolvedValue("owner-1");
+    resolveInternalOpsRecipientEmailsMock.mockResolvedValue([]);
+    resolveOperationalTenantIdentityMock.mockResolvedValue({
+      displayName: "Compliance Matters",
+      logoUrl: null,
+      supportPhone: null,
+      supportEmail: null,
+    });
+    sendEmailMock.mockResolvedValue(undefined);
   });
 
   it("creates the internal awareness notification row for proposal submission", async () => {
@@ -365,5 +402,196 @@ describe("insertTargetedInternalNotification", () => {
     expect(deleteEqIdMock).toHaveBeenCalledWith("id", "notif-tag-2");
     expect(deleteEqAccountOwnerMock).toHaveBeenCalledWith("account_owner_user_id", "owner-1");
     expect(sendWebPushNotificationForInternalNotificationMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("insertInternalNotificationForEvent email parity", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+    resolveNotificationAccountOwnerUserIdMock.mockResolvedValue("owner-1");
+    resolveInternalOpsRecipientEmailsMock.mockResolvedValue(["ops@example.com"]);
+    resolveOperationalTenantIdentityMock.mockResolvedValue({
+      displayName: "Compliance Matters",
+      logoUrl: null,
+      supportPhone: null,
+      supportEmail: "ops@example.com",
+    });
+    sendEmailMock.mockResolvedValue(undefined);
+  });
+
+  function makeAdminSupabase() {
+    const notificationInserts: Array<Record<string, unknown>> = [];
+    const notificationUpdates: Array<Record<string, unknown>> = [];
+
+    const admin = {
+      from(table: string) {
+        if (table === "job_events") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    eq() {
+                      return {
+                        order() {
+                          return {
+                            limit() {
+                              return {
+                                maybeSingle: async () => ({ data: { id: "event-1" }, error: null }),
+                              };
+                            },
+                          };
+                        },
+                      };
+                    },
+                  };
+                },
+              };
+            },
+          };
+        }
+
+        if (table === "jobs") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    maybeSingle: async () => ({
+                      data: {
+                        id: "job-1",
+                        title: "ECC Follow-up",
+                        city: "Pasadena",
+                        job_address: "100 Main St",
+                        customer_first_name: "Maya",
+                        customer_last_name: "Lopez",
+                        contractors: { name: "Rapid Comfort" },
+                        locations: { address_line1: "100 Main St", city: "Pasadena", state: "CA", zip: "91101" },
+                      },
+                      error: null,
+                    }),
+                  };
+                },
+              };
+            },
+          };
+        }
+
+        if (table === "notifications") {
+          return {
+            select() {
+              return {
+                eq() {
+                  return {
+                    eq() {
+                      return {
+                        contains() {
+                          return {
+                            in() {
+                              return {
+                                order() {
+                                  return {
+                                    limit() {
+                                      return {
+                                        maybeSingle: async () => ({ data: null, error: null }),
+                                      };
+                                    },
+                                  };
+                                },
+                              };
+                            },
+                          };
+                        },
+                      };
+                    },
+                  };
+                },
+              };
+            },
+            insert(payload: Record<string, unknown>) {
+              notificationInserts.push(payload);
+              return {
+                select() {
+                  return {
+                    single: async () => ({ data: { id: "email-notif-1" }, error: null }),
+                  };
+                },
+              };
+            },
+            update(payload: Record<string, unknown>) {
+              notificationUpdates.push(payload);
+              return {
+                eq: async () => ({ error: null }),
+              };
+            },
+          };
+        }
+
+        throw new Error(`Unexpected table ${table}`);
+      },
+    };
+
+    return { admin, notificationInserts, notificationUpdates };
+  }
+
+  it("sends internal retest review request email using ops/admin recipient model", async () => {
+    const rpcMock = vi.fn(async () => ({ data: "notif-inapp-1", error: null }));
+    const { admin, notificationInserts, notificationUpdates } = makeAdminSupabase();
+    createAdminClientMock.mockReturnValue(admin);
+
+    const { insertInternalNotificationForEvent } = await import("@/lib/actions/notification-actions");
+
+    await insertInternalNotificationForEvent({
+      supabase: { rpc: rpcMock },
+      jobId: "job-1",
+      eventType: "retest_ready_requested",
+      actorUserId: "actor-1",
+    });
+
+    expect(resolveInternalOpsRecipientEmailsMock).toHaveBeenCalledWith({
+      admin,
+      accountOwnerUserId: "owner-1",
+    });
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: ["ops@example.com"],
+        subject: "Retest review requested: ECC Follow-up",
+      }),
+    );
+    expect(notificationInserts[0]).toEqual(
+      expect.objectContaining({
+        channel: "email",
+        notification_type: "internal_retest_ready_requested_email",
+      }),
+    );
+    expect(notificationUpdates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: "sent" })]),
+    );
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not throw when contractor review email delivery fails", async () => {
+    const rpcMock = vi.fn(async () => ({ data: "notif-inapp-2", error: null }));
+    const { admin, notificationUpdates } = makeAdminSupabase();
+    createAdminClientMock.mockReturnValue(admin);
+    sendEmailMock.mockRejectedValueOnce(new Error("provider unavailable"));
+
+    const { insertInternalNotificationForEvent } = await import("@/lib/actions/notification-actions");
+
+    await expect(
+      insertInternalNotificationForEvent({
+        supabase: { rpc: rpcMock },
+        jobId: "job-1",
+        eventType: "contractor_correction_submission",
+        actorUserId: "actor-1",
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(notificationUpdates).toEqual(
+      expect.arrayContaining([expect.objectContaining({ status: "failed" })]),
+    );
+    expect(rpcMock).toHaveBeenCalledTimes(1);
   });
 });

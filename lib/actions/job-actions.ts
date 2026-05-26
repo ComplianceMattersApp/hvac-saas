@@ -54,6 +54,7 @@ import { buildInternalProposalAlertEmailHtml } from "@/lib/email/operational-pro
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { sendEmail } from "@/lib/email/sendEmail";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
+import { resolveInternalOpsRecipientEmails } from "@/lib/notifications/internal-email-recipients";
 import { buildNotePreview, normalizeTaggedUserIds } from "@/lib/notifications/internal-note-tagging";
 import { assertAssignableInternalUser, resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { getThresholdRuleForTest } from "@/lib/ecc/rule-profiles";
@@ -898,47 +899,6 @@ function buildContractorIntakeAlertEmailHtml(args: {
       <p style="margin: 0;">Please review scheduling and next steps in Ops.</p>
     `,
   });
-}
-
-async function resolveInternalOpsRecipientEmails(params: {
-  admin: any;
-  accountOwnerUserId: string;
-}): Promise<string[]> {
-  const { admin, accountOwnerUserId } = params;
-
-  const { data: internalRows, error: internalErr } = await admin
-    .from("internal_users")
-    .select("user_id, role, is_active")
-    .eq("account_owner_user_id", accountOwnerUserId)
-    .eq("is_active", true)
-    .in("role", ["admin", "office"]);
-
-  if (internalErr) throw internalErr;
-
-  const recipientUserIds = Array.from(
-    new Set(
-      (internalRows ?? [])
-        .map((row: any) => String(row?.user_id ?? "").trim())
-        .filter(Boolean),
-    ),
-  );
-
-  if (recipientUserIds.length === 0) return [];
-
-  const { data: profileRows, error: profileErr } = await admin
-    .from("profiles")
-    .select("id, email")
-    .in("id", recipientUserIds);
-
-  if (profileErr) throw profileErr;
-
-  return Array.from(
-    new Set(
-      (profileRows ?? [])
-        .map((row: any) => String(row?.email ?? "").trim().toLowerCase())
-        .filter((email: string) => email.includes("@")),
-    ),
-  );
 }
 
 async function sendInternalContractorIntakeAlertEmail(params: {

@@ -1,6 +1,11 @@
 import { revalidatePath } from "next/cache";
+import { createAdminClient } from "@/lib/supabase/server";
 import { resolveNotificationAccountOwnerUserId } from "@/lib/notifications/account-owner";
+import { resolveInternalOpsRecipientEmails } from "@/lib/notifications/internal-email-recipients";
 import { sendWebPushNotificationForInternalNotification } from "@/lib/notifications/web-push-delivery";
+import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
+import { escapeHtml, renderOperationalEmailLayout, resolveAppUrl } from "@/lib/email/layout";
+import { sendEmail } from "@/lib/email/sendEmail";
 
 export type NotificationTriggerEventType =
   | "contractor_report_sent"
@@ -38,21 +43,29 @@ type FindExistingContractorReportEmailDeliveryInput = {
   dedupeKey: string;
 };
 
+type InternalReviewRequestEmailEventType =
+  | "contractor_correction_submission"
+  | "retest_ready_requested";
+
+type InternalReviewRequestEmailNotificationType =
+  | "internal_contractor_correction_submission_email"
+  | "internal_retest_ready_requested_email";
+
 const EVENT_TO_SUBJECT: Record<NotificationTriggerEventType, string> = {
   contractor_report_sent: "Contractor report sent",
-  retest_ready_requested: "Retest ready requested",
+  retest_ready_requested: "Retest review requested",
   contractor_job_created: "Contractor job submitted",
   contractor_note: "Contractor note received",
-  contractor_correction_submission: "Contractor correction submission received",
+  contractor_correction_submission: "Contractor submitted a correction for review",
   contractor_schedule_updated: "Contractor provided scheduling",
 };
 
 const EVENT_TO_BODY: Record<NotificationTriggerEventType, string> = {
   contractor_report_sent: "A contractor report was sent to the portal.",
-  retest_ready_requested: "Contractor requested retest readiness review.",
+  retest_ready_requested: "A contractor requested retest review.",
   contractor_job_created: "A contractor submitted a new job that needs internal review and scheduling.",
   contractor_note: "A contractor added a note.",
-  contractor_correction_submission: "A contractor submitted corrections for review.",
+  contractor_correction_submission: "A contractor submitted a correction for review.",
   contractor_schedule_updated: "A contractor submitted scheduling data with a new job.",
 };
 
@@ -66,6 +79,14 @@ const INTERNAL_NEW_WORK_JOB_NOTIFICATION_TYPES = [
   "internal_contractor_job_intake_email",
 ] as const;
 
+const INTERNAL_REVIEW_REQUEST_EMAIL_NOTIFICATION_TYPE_BY_EVENT: Record<
+  InternalReviewRequestEmailEventType,
+  InternalReviewRequestEmailNotificationType
+> = {
+  contractor_correction_submission: "internal_contractor_correction_submission_email",
+  retest_ready_requested: "internal_retest_ready_requested_email",
+};
+
 type MarkInternalNewWorkNotificationsResolvedInput = {
   supabase: any;
   accountOwnerUserId: string;
@@ -76,6 +97,331 @@ type MarkInternalNewWorkNotificationsResolvedInput = {
 
 function isInternalAwarenessEventType(value: NotificationTriggerEventType): boolean {
   return value !== "contractor_report_sent";
+}
+
+function isInternalReviewRequestEmailEventType(
+  value: NotificationTriggerEventType,
+): value is InternalReviewRequestEmailEventType {
+  return value === "contractor_correction_submission" || value === "retest_ready_requested";
+}
+
+function formatServiceAddress(job: any): string {
+  const loc = Array.isArray(job?.locations)
+    ? job.locations.find((x: any) => x) ?? null
+    : job?.locations ?? null;
+
+  const line1 = String(loc?.address_line1 ?? "").trim() || String(job?.job_address ?? "").trim();
+  const line2 = String(loc?.address_line2 ?? "").trim();
+  const city = String(loc?.city ?? "").trim() || String(job?.city ?? "").trim();
+  const state = String(loc?.state ?? "").trim();
+  const zip = String(loc?.zip ?? "").trim();
+
+  const cityStateZip = [city, [state, zip].filter(Boolean).join(" ")].filter(Boolean).join(", ");
+  return [line1, line2, cityStateZip].filter(Boolean).join(", ");
+}
+
+function resolveOpsAlertAppUrl(): string | null {
+  const appUrl = resolveAppUrl();
+  if (appUrl) {
+    try {
+      const parsed = new URL(appUrl);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return appUrl.replace(/\/$/, "");
+      }
+    } catch {
+      // Ignore malformed app URLs and continue to fallback.
+    }
+  }
+
+  const siteUrl = String(process.env.SITE_URL ?? "").trim();
+  if (siteUrl) {
+    try {
+      const parsed = new URL(siteUrl);
+      if (parsed.protocol === "http:" || parsed.protocol === "https:") {
+        return siteUrl.replace(/\/$/, "");
+      }
+    } catch {
+      // Ignore malformed site URLs and continue to fallback.
+    }
+  }
+
+  if (process.env.NODE_ENV !== "production") return "http://localhost:3000";
+  return null;
+}
+
+function buildInternalContractorReviewRequestEmailHtml(args: {
+  requestTypeLabel: string;
+  summaryLine: string;
+  contractorName: string;
+  customerName: string;
+  jobTitle: string;
+  serviceAddress: string;
+  jobUrl: string | null;
+  companyDisplayName: string;
+  companyLogoUrl: string | null;
+  supportPhone: string | null;
+  supportEmail: string | null;
+}) {
+  const ctaBlock = args.jobUrl
+    ? `
+      <div style="margin: 14px 0 2px 0;">
+        <a href="${escapeHtml(args.jobUrl)}" style="display: inline-block; border-radius: 8px; background: #1d4ed8; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 10px 14px;">Open Job Review</a>
+      </div>
+      <div style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">If the button does not open, use this link: <a href="${escapeHtml(args.jobUrl)}">${escapeHtml(args.jobUrl)}</a></div>
+    `
+    : "";
+
+  return renderOperationalEmailLayout({
+    title: args.requestTypeLabel,
+    companyDisplayName: args.companyDisplayName,
+    companyLogoUrl: args.companyLogoUrl,
+    supportPhone: args.supportPhone,
+    supportEmail: args.supportEmail,
+    bodyHtml: `
+      <p style="margin: 0 0 12px 0; font-size: 14px; line-height: 1.6; color: #334155;">${escapeHtml(args.summaryLine)}</p>
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse: collapse; border: 1px solid #dbe4f0; border-radius: 12px; overflow: hidden; background: #ffffff;">
+        <tr>
+          <td colspan="2" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155; font-weight: 700; border-bottom: 1px solid #dbe4f0;">Review Context</td>
+        </tr>
+        <tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Request Type</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(args.requestTypeLabel)}</td></tr>
+        <tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Contractor</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(args.contractorName)}</td></tr>
+        <tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Customer</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(args.customerName)}</td></tr>
+        <tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Job</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(args.jobTitle)}</td></tr>
+        <tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Location</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${escapeHtml(args.serviceAddress)}</td></tr>
+      </table>
+      ${ctaBlock}
+      <p style="margin: 14px 0 0 0; font-size: 13px; line-height: 1.6; color: #475569;">Review the job before updating test outcomes or closeout status.</p>
+    `,
+  });
+}
+
+async function findExistingInternalReviewRequestEmailDelivery(input: {
+  supabase: any;
+  notificationType: InternalReviewRequestEmailNotificationType;
+  dedupeKey: string;
+}): Promise<{ id: string; status: string | null } | null> {
+  const dedupeKey = String(input.dedupeKey ?? "").trim();
+  if (!dedupeKey) return null;
+
+  const { data, error } = await input.supabase
+    .from("notifications")
+    .select("id, status")
+    .eq("channel", "email")
+    .eq("notification_type", input.notificationType)
+    .contains("payload", { dedupe_key: dedupeKey })
+    .in("status", ["queued", "sent"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id) return null;
+
+  return {
+    id: String(data.id),
+    status: data.status ?? null,
+  };
+}
+
+async function markInternalReviewRequestEmailDeliveryNotification(input: {
+  supabase: any;
+  notificationId: string;
+  status: "sent" | "failed";
+  sentAt?: string | null;
+  errorDetail?: string | null;
+}): Promise<void> {
+  const notificationId = String(input.notificationId ?? "").trim();
+  if (!notificationId) return;
+
+  const patch: Record<string, unknown> = {
+    status: input.status,
+  };
+
+  if (input.status === "sent") {
+    patch.sent_at = input.sentAt ?? new Date().toISOString();
+  }
+
+  if (input.status === "failed") {
+    const errorDetail = String(input.errorDetail ?? "").trim();
+    if (errorDetail) {
+      patch.body = `Operational email delivery failed: ${errorDetail}`;
+    }
+  }
+
+  const { error } = await input.supabase.from("notifications").update(patch).eq("id", notificationId);
+  if (error) throw error;
+}
+
+async function sendInternalContractorReviewRequestEmailForEvent(input: {
+  jobId: string;
+  accountOwnerUserId: string;
+  eventType: InternalReviewRequestEmailEventType;
+}): Promise<void> {
+  const jobId = String(input.jobId ?? "").trim();
+  const accountOwnerUserId = String(input.accountOwnerUserId ?? "").trim();
+  if (!jobId || !accountOwnerUserId) return;
+
+  const admin = createAdminClient();
+
+  const { data: latestEvent, error: latestEventErr } = await admin
+    .from("job_events")
+    .select("id")
+    .eq("job_id", jobId)
+    .eq("event_type", input.eventType)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (latestEventErr) throw latestEventErr;
+  if (!latestEvent?.id) return;
+
+  const notificationType = INTERNAL_REVIEW_REQUEST_EMAIL_NOTIFICATION_TYPE_BY_EVENT[input.eventType];
+  const dedupeKey = `${notificationType}:${jobId}:${String(latestEvent.id)}`;
+
+  const existingDelivery = await findExistingInternalReviewRequestEmailDelivery({
+    supabase: admin,
+    notificationType,
+    dedupeKey,
+  });
+
+  if (existingDelivery) return;
+
+  const recipientEmails = await resolveInternalOpsRecipientEmails({
+    admin,
+    accountOwnerUserId,
+  });
+
+  if (recipientEmails.length === 0) return;
+
+  const { data: job, error: jobErr } = await admin
+    .from("jobs")
+    .select(
+      `
+      id,
+      title,
+      job_type,
+      project_type,
+      city,
+      job_address,
+      customer_first_name,
+      customer_last_name,
+      contractor_id,
+      contractors:contractor_id ( name ),
+      locations:location_id (address_line1, address_line2, city, state, zip)
+      `,
+    )
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!job?.id) return;
+
+  const contractorName = String((job as any)?.contractors?.name ?? "").trim() || "Contractor";
+  const customerName = [
+    String((job as any)?.customer_first_name ?? "").trim(),
+    String((job as any)?.customer_last_name ?? "").trim(),
+  ]
+    .filter(Boolean)
+    .join(" ") || "Customer";
+
+  const jobTitle = String((job as any)?.title ?? "").trim() || "Untitled job";
+  const serviceAddress = formatServiceAddress(job) || String((job as any)?.city ?? "").trim() || "Address not available";
+  const appUrl = resolveOpsAlertAppUrl();
+  const jobUrl = appUrl ? `${appUrl}/jobs/${jobId}?tab=ops` : null;
+
+  const requestTypeLabel =
+    input.eventType === "contractor_correction_submission"
+      ? "Correction submitted for review"
+      : "Retest review requested";
+
+  const subject =
+    input.eventType === "contractor_correction_submission"
+      ? `Correction submitted for review: ${jobTitle}`
+      : `Retest review requested: ${jobTitle}`;
+
+  const summaryLine =
+    input.eventType === "contractor_correction_submission"
+      ? `A contractor submitted a correction for review on ${jobTitle}. Review the job before updating the test or closeout status.`
+      : `A contractor requested retest review on ${jobTitle}. Review the job and determine the next step.`;
+
+  const tenantIdentity = await resolveOperationalTenantIdentity({
+    supabase: admin,
+    accountOwnerUserId,
+  });
+
+  const html = buildInternalContractorReviewRequestEmailHtml({
+    requestTypeLabel,
+    summaryLine,
+    contractorName,
+    customerName,
+    jobTitle,
+    serviceAddress,
+    jobUrl,
+    companyDisplayName: tenantIdentity.displayName,
+    companyLogoUrl: tenantIdentity.logoUrl,
+    supportPhone: tenantIdentity.supportPhone,
+    supportEmail: tenantIdentity.supportEmail,
+  });
+
+  const payload: Record<string, unknown> = {
+    source: "job_events",
+    dedupe_key: dedupeKey,
+    event_type: input.eventType,
+    event_id: String(latestEvent.id),
+    request_type_label: requestTypeLabel,
+    contractor_name: contractorName,
+    customer_name: customerName,
+    job_title: jobTitle,
+    job_id: jobId,
+    job_url: jobUrl,
+    service_address: serviceAddress,
+  };
+
+  const { data: queuedDelivery, error: queueErr } = await admin
+    .from("notifications")
+    .insert({
+      job_id: jobId,
+      account_owner_user_id: accountOwnerUserId,
+      recipient_type: "internal",
+      recipient_ref: null,
+      channel: "email",
+      notification_type: notificationType,
+      subject,
+      body: summaryLine,
+      payload,
+      status: "queued",
+      sent_at: null,
+    })
+    .select("id")
+    .single();
+
+  if (queueErr) throw queueErr;
+  if (!queuedDelivery?.id) throw new Error("Failed to create contractor review email notification row");
+
+  try {
+    await sendEmail({
+      to: recipientEmails,
+      subject,
+      html,
+    });
+
+    await markInternalReviewRequestEmailDeliveryNotification({
+      supabase: admin,
+      notificationId: String(queuedDelivery.id),
+      status: "sent",
+    });
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : "Unknown send error";
+
+    await markInternalReviewRequestEmailDeliveryNotification({
+      supabase: admin,
+      notificationId: String(queuedDelivery.id),
+      status: "failed",
+      errorDetail: errorMessage,
+    });
+
+    throw error;
+  }
 }
 
 type InsertInternalAwarenessNotificationInput = {
@@ -457,6 +803,22 @@ export async function insertInternalNotificationForEvent(
     body: EVENT_TO_BODY[input.eventType],
     payload,
   });
+
+  if (isInternalReviewRequestEmailEventType(input.eventType)) {
+    try {
+      await sendInternalContractorReviewRequestEmailForEvent({
+        jobId,
+        accountOwnerUserId,
+        eventType: input.eventType,
+      });
+    } catch (error) {
+      console.error("contractor_review_internal_email_alert_failed", {
+        jobId,
+        eventType: input.eventType,
+        error: error instanceof Error ? error.message : "Unknown contractor review email error",
+      });
+    }
+  }
 }
 
 export async function findExistingContractorReportEmailDelivery(

@@ -56,6 +56,7 @@ describe("contractor awareness notification matching", () => {
     const updateTypes = [
       "contractor_note",
       "contractor_correction_submission",
+      "retest_ready_requested",
       "contractor_schedule_updated",
     ];
     for (const type of updateTypes) {

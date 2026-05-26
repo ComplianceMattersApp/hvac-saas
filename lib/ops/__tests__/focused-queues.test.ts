@@ -36,7 +36,7 @@ describe("focused ops queue filtering", () => {
     expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j3", "j4"]);
   });
 
-  it("exceptions queue includes failed/retest/review/problem states", () => {
+  it("exceptions queue includes failed/retest/problem states", () => {
     const rows = buildExceptionQueueRows([
       { id: "j1", ops_status: "failed", created_at: "2026-01-01T00:00:00.000Z" },
       { id: "j2", ops_status: "retest_needed", created_at: "2026-01-02T00:00:00.000Z" },
@@ -45,7 +45,7 @@ describe("focused ops queue filtering", () => {
       { id: "j5", ops_status: "on_hold", created_at: "2026-01-05T00:00:00.000Z" },
     ]);
 
-    expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j3", "j4"]);
+    expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j4"]);
   });
 
   it("without-tech queue includes only scheduled open jobs without active assignment", () => {

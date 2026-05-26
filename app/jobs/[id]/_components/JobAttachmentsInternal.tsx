@@ -11,6 +11,7 @@ import {
   shareJobAttachmentToContractor,
   updateInternalJobAttachmentCaption,
 } from "@/lib/actions/attachment-actions";
+import type { AttachmentReviewSummary } from "@/lib/jobs/attachment-review-summary";
 
 type Item = {
   id: string;
@@ -73,10 +74,12 @@ export default function JobAttachmentsInternal({
   jobId,
   initialItems,
   attachmentInputMode = "all",
+  summary,
 }: {
   jobId: string;
   initialItems: Item[];
   attachmentInputMode?: "all" | "images";
+  summary?: AttachmentReviewSummary;
 }) {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
@@ -102,6 +105,14 @@ export default function JobAttachmentsInternal({
   const isImageCaptureMode = attachmentInputMode === "images";
   const hasFiles = files.length > 0;
   const canAct = !isPending && hasFiles;
+  const totalCount = initialItems?.length ?? 0;
+  const contractorUploadCount = Number(summary?.contractorUploadCount ?? 0) || 0;
+  const correctionReviewUploadCount = Number(summary?.correctionReviewUploadCount ?? 0) || 0;
+  const reviewAnchorUploadCount = Number(summary?.reviewAnchorUploadCount ?? 0) || 0;
+
+  const hasNeedsReview = correctionReviewUploadCount > 0;
+  const hasReviewAnchorUploads = !hasNeedsReview && reviewAnchorUploadCount > 0;
+  const hasContractorUploads = !hasNeedsReview && !hasReviewAnchorUploads && contractorUploadCount > 0;
 
   function openPicker() {
     setError(null);
@@ -282,10 +293,28 @@ export default function JobAttachmentsInternal({
   return (
     <div className="mb-6 overflow-hidden rounded-xl border border-slate-200/80 bg-white/96 text-gray-900 shadow-[0_12px_24px_-28px_rgba(15,23,42,0.22)]">
       <div className="flex items-center justify-between border-b border-slate-200 bg-slate-50/70 px-4 py-3">
-        <div className="text-sm font-semibold">Upload & Share</div>
-        <div className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-          {initialItems?.length ?? 0} files
+        <div className="flex items-center gap-2">
+          <div className="text-sm font-semibold">Attachments</div>
+          <div className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+            {totalCount} file{totalCount === 1 ? "" : "s"}
+          </div>
+          {hasNeedsReview ? (
+            <div className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-900">
+              Needs review {correctionReviewUploadCount}
+            </div>
+          ) : null}
+          {hasReviewAnchorUploads ? (
+            <div className="inline-flex rounded-full border border-blue-300 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-900">
+              New contractor upload {reviewAnchorUploadCount}
+            </div>
+          ) : null}
+          {hasContractorUploads ? (
+            <div className="inline-flex rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+              Contractor upload {contractorUploadCount}
+            </div>
+          ) : null}
         </div>
+        <div className="text-xs font-medium text-slate-600">Upload & Share</div>
       </div>
 
       <div className="p-4 space-y-4">

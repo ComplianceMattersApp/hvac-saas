@@ -332,7 +332,11 @@ function isNotificationVisibleToUser(
 }
 
 function isHiddenInternalNotificationType(value: string): boolean {
-  return value === "contractor_report_sent";
+  return (
+    value === "contractor_report_sent" ||
+    value === "internal_contractor_correction_submission_email" ||
+    value === "internal_retest_ready_requested_email"
+  );
 }
 
 function isProposalNotificationType(value: string): boolean {

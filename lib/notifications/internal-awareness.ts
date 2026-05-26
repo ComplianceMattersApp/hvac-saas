@@ -1,6 +1,7 @@
 export const CONTRACTOR_UPDATE_NOTIFICATION_TYPES = [
   "contractor_note",
   "contractor_correction_submission",
+  "retest_ready_requested",
   "contractor_schedule_updated",
 ] as const;
 

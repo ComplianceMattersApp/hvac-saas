@@ -10,7 +10,6 @@ export const WAITING_QUEUE_STATUSES = [
 export const EXCEPTION_QUEUE_STATUSES = [
   "failed",
   "retest_needed",
-  "pending_office_review",
   "problem",
 ] as const;
 

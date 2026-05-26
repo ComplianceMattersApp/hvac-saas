@@ -642,7 +642,7 @@ async function safeLoadPriorityCounts(params: {
       base(q).eq("ops_status", "on_hold").neq("status", "cancelled"),
     ),
     safeCount(supabase, "jobs", (q) =>
-      base(q).in("ops_status", ["failed", "retest_needed", "pending_office_review"]).neq("status", "cancelled"),
+      base(q).in("ops_status", ["failed", "retest_needed"]).neq("status", "cancelled"),
     ),
     safeCount(supabase, "jobs", (q) =>
       base(q).in("ops_status", ["invoice_required", "paperwork_required"]).neq("status", "cancelled"),

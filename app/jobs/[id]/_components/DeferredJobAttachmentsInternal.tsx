@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { signScopedInternalJobDetailAttachments } from "@/lib/actions/internal-job-detail-read-boundary";
+import { buildAttachmentReviewSummary } from "@/lib/jobs/attachment-review-summary";
 
 import JobAttachmentsInternal from "./JobAttachmentsInternal";
 
@@ -26,6 +27,21 @@ export default async function DeferredJobAttachmentsInternal({
 
   if (attachmentErr) throw new Error(attachmentErr.message);
 
+  const { data: reviewEvents, error: reviewEventsErr } = await supabase
+    .from("job_events")
+    .select("event_type, created_at, meta")
+    .eq("job_id", jobId)
+    .in("event_type", [
+      "contractor_note",
+      "contractor_correction_submission",
+      "attachment_added",
+      "retest_ready_requested",
+    ])
+    .order("created_at", { ascending: false })
+    .limit(300);
+
+  if (reviewEventsErr) throw new Error(reviewEventsErr.message);
+
   const signedAttachmentResult = await signScopedInternalJobDetailAttachments({
     accountOwnerUserId,
     jobId,
@@ -36,10 +52,22 @@ export default async function DeferredJobAttachmentsInternal({
     return notFound();
   }
 
+  const visibleAttachmentIds = new Set(
+    signedAttachmentResult.items
+      .map((item) => String(item.id ?? "").trim())
+      .filter(Boolean),
+  );
+
+  const summary = buildAttachmentReviewSummary({
+    events: (reviewEvents ?? []) as Array<{ event_type: string | null; created_at: string | null; meta: unknown }>,
+    visibleAttachmentIds,
+  });
+
   return (
     <JobAttachmentsInternal
       jobId={jobId}
       initialItems={signedAttachmentResult.items}
+      summary={summary}
     />
   );
 }

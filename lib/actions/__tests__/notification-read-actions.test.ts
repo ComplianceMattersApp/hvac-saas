@@ -984,6 +984,52 @@ describe("internal notification readers", () => {
     expect(notif.job_enrichment?.contractor_name).toBe("Cool Air Services");
   });
 
+  it("includes retest_ready_requested in contractor update filters", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-retest-ready",
+            account_owner_user_id: "owner-1",
+            job_id: "job-retest",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "retest_ready_requested",
+            subject: "Retest review requested",
+            body: "A contractor requested retest review.",
+            payload: {},
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-22T11:00:00.000Z",
+          },
+        ],
+        submissions: [],
+        jobs: [
+          {
+            id: "job-retest",
+            title: "ECC Retest Candidate",
+            customer_first_name: "Nora",
+            customer_last_name: "Diaz",
+            city: "Pasadena",
+            contractor_id: "contractor-r",
+          },
+        ],
+        contractors: [{ id: "contractor-r", name: "North Star HVAC" }],
+      }),
+    );
+
+    const { listInternalNotifications } = await import("@/lib/actions/notification-read-actions");
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+      filterKey: "contractor_updates",
+    });
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.notification_type).toBe("retest_ready_requested");
+    expect(notifications[0]?.job_enrichment?.job_title).toBe("ECC Retest Candidate");
+  });
+
   it("attaches job_enrichment when job_id is provided in JSON payload", async () => {
     createClientMock.mockResolvedValue(
       makeSupabase({
@@ -1086,6 +1132,62 @@ describe("internal notification readers", () => {
 
     expect(notifications).toHaveLength(1);
     expect(notifications[0]?.notification_type).toBe("contractor_note");
+    expect(unreadCount).toBe(1);
+    expect(unreadBadgeCount).toBe(1);
+  });
+
+  it("excludes contractor review email delivery rows from feed and unread awareness counts", async () => {
+    createClientMock.mockResolvedValue(
+      makeSupabase({
+        notifications: [
+          {
+            id: "notif-review-email",
+            account_owner_user_id: "owner-1",
+            job_id: "job-1",
+            recipient_type: "internal",
+            channel: "email",
+            notification_type: "internal_retest_ready_requested_email",
+            subject: "Retest review requested: ECC Follow-up",
+            body: "A contractor requested retest review.",
+            payload: { dedupe_key: "internal_retest_ready_requested_email:job-1:event-1" },
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-23T11:00:00.000Z",
+          },
+          {
+            id: "notif-review-inapp",
+            account_owner_user_id: "owner-1",
+            job_id: "job-1",
+            recipient_type: "internal",
+            channel: "in_app",
+            notification_type: "retest_ready_requested",
+            subject: "Retest review requested",
+            body: "A contractor requested retest review.",
+            payload: {},
+            status: "queued",
+            read_at: null,
+            created_at: "2026-04-23T10:59:00.000Z",
+          },
+        ],
+        submissions: [],
+      }),
+    );
+
+    const {
+      listInternalNotifications,
+      getInternalUnreadNotificationCount,
+      getInternalUnreadNotificationBadgeCount,
+    } = await import("@/lib/actions/notification-read-actions");
+
+    const notifications = await listInternalNotifications({
+      limit: 20,
+      onlyUnread: true,
+    });
+    const unreadCount = await getInternalUnreadNotificationCount();
+    const unreadBadgeCount = await getInternalUnreadNotificationBadgeCount();
+
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0]?.notification_type).toBe("retest_ready_requested");
     expect(unreadCount).toBe(1);
     expect(unreadBadgeCount).toBe(1);
   });
