@@ -230,6 +230,15 @@ Recent closeout status snapshot (May 2026):
    - Billing periods remain non-blocking for work orders, visits, next due date, and visit counting
    - Phase 5E-B is complete; next slice remains Phase 5E-C
 
+- **Phase 5F-A2 closeout (Billing Period Manual Mutation Model Lock) is complete (docs/model only):**
+   - Manual billing-period mutation starts customer-profile-only inside existing Maintenance Agreement cards
+   - Mutation authority is locked to Owner/Admin/Billing financial authority; read visibility remains broader/internal under existing Maintenance Agreement visibility
+   - First mutation slice is locked to create/edit/cancel only; no delete. Cancellation uses `billing_period_status = cancelled`
+   - Required manual-mutation fields are locked to coverage start/end, billing cadence, amount, currency, billing posture, and lifecycle status, with account/customer/agreement derived from scoped context
+   - Coverage-window validation is locked to valid dates, end date >= start date, exact duplicate window rejection, overlap rejection for non-cancelled rows, and cancelled rows not blocking future windows
+   - No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or work-blocking behavior are introduced by the first mutation slice
+   - Phase 5F-A2 is a model lock only; implementation remains deferred to the future mutation slice
+
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
 - Completed behavior/copy alignment:

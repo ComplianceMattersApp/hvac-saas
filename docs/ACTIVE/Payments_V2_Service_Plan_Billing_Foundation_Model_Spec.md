@@ -363,6 +363,17 @@ Phase 5E-B closeout (Customer Profile Read-Only Billing Period Visibility):
 - Billing periods remain non-blocking for work orders, visits, next due date, and visit counting.
 - Phase 5E-B is complete; next slice remains Phase 5E-C.
 
+Phase 5F-A2 closeout (Billing Period Manual Mutation Model Lock, docs/model only):
+- Manual billing-period mutation starts customer-profile-only inside existing Maintenance Agreement cards.
+- Mutation authority is locked to Owner/Admin/Billing financial authority; read visibility remains broader/internal under existing Maintenance Agreement visibility.
+- First mutation slice is locked to create/edit/cancel only; no delete. Cancellation is the non-destructive end-state and uses `billing_period_status = cancelled`.
+- Required manual-mutation fields are locked to coverage start/end, billing cadence, amount, currency, billing posture, and lifecycle status, with account/customer/agreement derived from scoped context.
+- Posture-specific validation is locked: `internal_invoice` allows `draft`/`pending_billing` only with no invoice id and amount > 0; `external_off_platform` allows `draft`/`externally_billed` and amount > 0; `manual` allows `draft`/`pending_billing` and amount > 0; `no_charge` normalizes to `no_charge` with amount 0; `waived` normalizes to `waived` with reason required; `not_billed_through_compliance_matters` normalizes to `not_billed` with reason required.
+- Coverage-window validation is locked to valid dates, end date >= start date, exact duplicate window rejection, overlap rejection for non-cancelled rows, and cancelled rows not blocking future windows.
+- Edits are locked to non-linked rows only.
+- No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or work-blocking behavior are introduced by the first mutation slice.
+- Phase 5F-A2 is a model lock only; implementation remains deferred to the future mutation slice.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
