@@ -176,6 +176,14 @@ Phase 5F-B1 closeout (Manual Billing Period Server Actions Foundation):
 - No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or service-plan operational blocking were introduced.
 - Validation snapshot: billing-period action tests passed, billing-period read-model tests passed, maintenance-agreements suite passed, financial-access suite passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
 
+Phase 5F-B2 closeout (Customer Profile Billing Period UI Wiring):
+- Customer-profile billing-period mutation UI wiring is complete inside existing Maintenance Agreement cards.
+- Mutation controls are customer-profile-only and use the already-tested server actions for create, edit, and cancel.
+- Owner/Admin/Billing controls are shown only when the clean financial-access signal is available; read-only viewers remain read-only.
+- Delete is not exposed.
+- No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or service-plan operational blocking were introduced.
+- Browser smoke was attempted, but the available session was not authorized for the target customer profile, so the smoke path remained blocked by access rather than implementation.
+
 ## Group 9A-9A Model Snapshot
 
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)

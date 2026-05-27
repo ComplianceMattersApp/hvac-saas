@@ -23,6 +23,11 @@ import {
   updateMaintenanceAgreementFromForm,
 } from "@/lib/maintenance-agreements/agreement-actions";
 import {
+  cancelMaintenanceAgreementBillingPeriodFromForm,
+  createMaintenanceAgreementBillingPeriodFromForm,
+  updateMaintenanceAgreementBillingPeriodFromForm,
+} from "@/lib/maintenance-agreements/billing-period-actions";
+import {
   MAINTENANCE_AGREEMENT_FREQUENCIES,
   MAINTENANCE_AGREEMENT_STATUSES,
   MAINTENANCE_AGREEMENT_TYPES,
@@ -50,7 +55,7 @@ import {
 } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
 import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/lib/reports/payments-register";
-import { canViewFinancialRegister } from "@/lib/auth/financial-access";
+import { canManageInvoiceLifecycle, canViewFinancialRegister } from "@/lib/auth/financial-access";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 
 
@@ -310,6 +315,48 @@ function opsBadgeClass(v?: string | null) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
+const BILLING_PERIOD_BILLING_CADENCES = ["monthly", "quarterly", "semi_annual", "annual"] as const;
+const BILLING_PERIOD_STATUSES = [
+  "draft",
+  "pending_billing",
+  "invoice_linked",
+  "externally_billed",
+  "no_charge",
+  "waived",
+  "not_billed",
+  "cancelled",
+] as const;
+const BILLING_PERIOD_POSTURES = [
+  "internal_invoice",
+  "external_off_platform",
+  "manual",
+  "no_charge",
+  "waived",
+  "not_billed_through_compliance_matters",
+] as const;
+
+function billingPeriodPostureLabel(value: string) {
+  if (value === "internal_invoice") return "Internal invoice";
+  if (value === "external_off_platform") return "External off-platform";
+  if (value === "manual") return "Manual";
+  if (value === "no_charge") return "No charge";
+  if (value === "waived") return "Waived";
+  if (value === "not_billed_through_compliance_matters") return "Not billed through Compliance Matters";
+  return value;
+}
+
+function billingPeriodStatusLabel(value: string) {
+  if (value === "draft") return "Draft";
+  if (value === "pending_billing") return "Pending billing";
+  if (value === "invoice_linked") return "Invoice linked";
+  if (value === "externally_billed") return "Externally billed";
+  if (value === "no_charge") return "No charge";
+  if (value === "waived") return "Waived";
+  if (value === "not_billed") return "Not billed";
+  if (value === "cancelled") return "Cancelled";
+  return value;
+}
+
 function summaryOrder() {
   return [
     "need_to_schedule",
@@ -331,6 +378,7 @@ export default async function CustomerDetailPage(props: {
     maSaved?: string;
     maError?: string;
     maFocus?: string;
+    banner?: string;
     rcSaved?: string;
     rcError?: string;
     rcLocSaved?: string;
@@ -357,6 +405,7 @@ export default async function CustomerDetailPage(props: {
   const maintenanceAgreementSaved = String(sp.maSaved ?? "").trim().toLowerCase();
   const maintenanceAgreementError = String(sp.maError ?? "").trim();
   const maintenanceAgreementFocusId = String(sp.maFocus ?? "").trim();
+  const billingPeriodBanner = String(sp.banner ?? "").trim().toLowerCase();
   const roleContactSaved = String(sp.rcSaved ?? "").trim() === "1";
   const roleContactError = String(sp.rcError ?? "").trim() === "1";
   const locationRoleContactSaved = String(sp.rcLocSaved ?? "").trim() === "1";
@@ -719,11 +768,16 @@ export default async function CustomerDetailPage(props: {
   // Payment History: load only for authorized financial viewers
   let customerPaymentHistory: CustomerPaymentHistoryRow[] = [];
   let canViewPaymentHistory = false;
+  let canManageBillingPeriods = false;
 
   if (isInternalViewer) {
     try {
       const { internalUser: iu } = await requireInternalUser({ supabase, userId: userData.user.id });
       canViewPaymentHistory = canViewFinancialRegister({
+        internalUser: iu,
+        resourceAccountOwnerUserId: visibilityScope.accountOwnerUserId,
+      });
+      canManageBillingPeriods = canManageInvoiceLifecycle({
         internalUser: iu,
         resourceAccountOwnerUserId: visibilityScope.accountOwnerUserId,
       });
@@ -743,9 +797,35 @@ export default async function CustomerDetailPage(props: {
     }
   }
 
+  const createBillingPeriodAction = createMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
+  const updateBillingPeriodAction = updateMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
+  const cancelBillingPeriodAction = cancelMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <div className="mx-auto max-w-7xl space-y-7 p-4 md:space-y-8 md:p-6">
+        {billingPeriodBanner === "created" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Billing period created.
+          </div>
+        )}
+        {billingPeriodBanner === "updated" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Billing period updated.
+          </div>
+        )}
+        {billingPeriodBanner === "cancelled" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Billing period cancelled.
+          </div>
+        )}
+        {(billingPeriodBanner === "validation_error" || billingPeriodBanner === "duplicate_or_overlap_error" || billingPeriodBanner === "access_denied") && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            {billingPeriodBanner === "validation_error" && "Could not save billing period. Verify the required fields and status/posture rules."}
+            {billingPeriodBanner === "duplicate_or_overlap_error" && "A billing period with the same or overlapping coverage window already exists for this agreement."}
+            {billingPeriodBanner === "access_denied" && "You do not have permission to manage billing periods for this customer."}
+          </div>
+        )}
         {hasJobsError && (
           <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             This customer has non-archived jobs and cannot be archived. Remove or archive all jobs first.
@@ -1977,6 +2057,160 @@ export default async function CustomerDetailPage(props: {
                           </p>
                         </div>
 
+                        {canManageBillingPeriods ? (
+                          <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                              Add Billing Period
+                            </summary>
+                            <form action={createBillingPeriodAction} className="mt-3 grid gap-3 md:grid-cols-2">
+                              <input type="hidden" name="maintenance_agreement_id" value={agr.id} />
+
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Coverage Start Date</label>
+                                <input
+                                  type="date"
+                                  name="coverage_start_date"
+                                  required
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Coverage End Date</label>
+                                <input
+                                  type="date"
+                                  name="coverage_end_date"
+                                  required
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Billing Cadence</label>
+                                <select
+                                  name="billing_cadence"
+                                  defaultValue="monthly"
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                >
+                                  {BILLING_PERIOD_BILLING_CADENCES.map((value) => (
+                                    <option key={value} value={value}>
+                                      {value.replace(/_/g, " ")}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Amount Due (cents)</label>
+                                <input
+                                  name="amount_due_cents"
+                                  type="number"
+                                  min="0"
+                                  step="1"
+                                  required
+                                  placeholder="25000"
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Currency</label>
+                                <input
+                                  name="currency"
+                                  defaultValue="usd"
+                                  maxLength={3}
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 uppercase"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Billing Posture</label>
+                                <select
+                                  name="billing_posture"
+                                  defaultValue="internal_invoice"
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                >
+                                  {BILLING_PERIOD_POSTURES.map((value) => (
+                                    <option key={value} value={value}>
+                                      {billingPeriodPostureLabel(value)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Billing Period Status</label>
+                                <select
+                                  name="billing_period_status"
+                                  defaultValue="draft"
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                >
+                                  {BILLING_PERIOD_STATUSES.map((value) => (
+                                    <option key={value} value={value}>
+                                      {billingPeriodStatusLabel(value)}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Billing Due Date (Optional)</label>
+                                <input
+                                  type="date"
+                                  name="billing_due_date"
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="mb-1 block text-xs font-medium text-slate-700">External Reference (Optional)</label>
+                                <input
+                                  name="external_reference"
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                />
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <label className="mb-1 block text-xs font-medium text-slate-700">External Notes (Optional)</label>
+                                <textarea
+                                  name="external_notes"
+                                  rows={2}
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                />
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <label className="mb-1 block text-xs font-medium text-slate-700">Status Reason (Optional)</label>
+                                <textarea
+                                  name="status_reason"
+                                  rows={2}
+                                  className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                />
+                              </div>
+
+                              <div className="md:col-span-2 space-y-1 text-xs text-slate-500">
+                                <div>Create a billing period record only. This does not generate or link an invoice.</div>
+                                <div>Billing periods are for billing visibility only and do not control service visits.</div>
+                                <div>Internal invoice: Tracks a period intended for internal invoicing later. No invoice is created here.</div>
+                                <div>External off-platform: Use when billing is handled outside Compliance Matters.</div>
+                                <div>Manual: Use for internally tracked manual commercial handling without invoice linkage.</div>
+                                <div>No charge: Use for zero-dollar coverage.</div>
+                                <div>Waived: Use when charges are waived and a reason should be recorded.</div>
+                                <div>Not billed through Compliance Matters: Use when coverage is tracked here but billing happens elsewhere.</div>
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <button
+                                  type="submit"
+                                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                                >
+                                  Add Billing Period
+                                </button>
+                              </div>
+                            </form>
+                          </details>
+                        ) : null}
+
                         {agreementBillingPeriods.length > 0 ? (
                           <ul className="mt-3 space-y-2">
                             {agreementBillingPeriods.map((billingPeriod) => {
@@ -2043,6 +2277,198 @@ export default async function CustomerDetailPage(props: {
                                       {shortExternalNotes ? <div>Notes: {shortExternalNotes}</div> : null}
                                     </div>
                                   ) : null}
+
+                                  {canManageBillingPeriods ? (
+                                    <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                                      {!billingPeriod.internal_invoice_id ? (
+                                        <details className="rounded-lg border border-slate-200 bg-white p-3">
+                                          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                                            Edit Billing Period
+                                          </summary>
+                                          <form action={updateBillingPeriodAction} className="mt-3 grid gap-3 md:grid-cols-2">
+                                            <input type="hidden" name="maintenance_agreement_id" value={agr.id} />
+                                            <input type="hidden" name="billing_period_id" value={billingPeriod.id} />
+
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Coverage Start Date</label>
+                                              <input
+                                                type="date"
+                                                name="coverage_start_date"
+                                                required
+                                                defaultValue={billingPeriod.coverage_start_date}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Coverage End Date</label>
+                                              <input
+                                                type="date"
+                                                name="coverage_end_date"
+                                                required
+                                                defaultValue={billingPeriod.coverage_end_date}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Billing Cadence</label>
+                                              <select
+                                                name="billing_cadence"
+                                                defaultValue={billingPeriod.billing_cadence}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              >
+                                                {BILLING_PERIOD_BILLING_CADENCES.map((value) => (
+                                                  <option key={value} value={value}>
+                                                    {value.replace(/_/g, " ")}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            </div>
+
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Amount Due (cents)</label>
+                                              <input
+                                                name="amount_due_cents"
+                                                type="number"
+                                                min="0"
+                                                step="1"
+                                                required
+                                                defaultValue={String(billingPeriod.amount_due_cents)}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Currency</label>
+                                              <input
+                                                name="currency"
+                                                defaultValue={billingPeriod.currency}
+                                                maxLength={3}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 uppercase"
+                                              />
+                                            </div>
+
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Billing Posture</label>
+                                              <select
+                                                name="billing_posture"
+                                                defaultValue={billingPeriod.billing_posture}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              >
+                                                {BILLING_PERIOD_POSTURES.map((value) => (
+                                                  <option key={value} value={value}>
+                                                    {billingPeriodPostureLabel(value)}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            </div>
+
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Billing Period Status</label>
+                                              <select
+                                                name="billing_period_status"
+                                                defaultValue={billingPeriod.billing_period_status}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              >
+                                                {BILLING_PERIOD_STATUSES.map((value) => (
+                                                  <option key={value} value={value}>
+                                                    {billingPeriodStatusLabel(value)}
+                                                  </option>
+                                                ))}
+                                              </select>
+                                            </div>
+
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Billing Due Date (Optional)</label>
+                                              <input
+                                                type="date"
+                                                name="billing_due_date"
+                                                defaultValue={billingPeriod.billing_due_date ?? ""}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">External Reference (Optional)</label>
+                                              <input
+                                                name="external_reference"
+                                                defaultValue={billingPeriod.external_reference ?? ""}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">External Notes (Optional)</label>
+                                              <textarea
+                                                name="external_notes"
+                                                rows={2}
+                                                defaultValue={billingPeriod.external_notes ?? ""}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Status Reason (Optional)</label>
+                                              <textarea
+                                                name="status_reason"
+                                                rows={2}
+                                                defaultValue={billingPeriod.status_reason ?? ""}
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+
+                                            <div className="md:col-span-2">
+                                              <button
+                                                type="submit"
+                                                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                                              >
+                                                Save Billing Period
+                                              </button>
+                                            </div>
+                                          </form>
+                                        </details>
+                                      ) : (
+                                        <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                                          Edit is disabled for invoice-linked billing periods.
+                                        </div>
+                                      )}
+
+                                      <details className="rounded-lg border border-rose-200 bg-rose-50 p-3">
+                                        <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-rose-700">
+                                          Cancel Billing Period
+                                        </summary>
+                                        <form action={cancelBillingPeriodAction} className="mt-3 grid gap-3">
+                                          <input type="hidden" name="maintenance_agreement_id" value={agr.id} />
+                                          <input type="hidden" name="billing_period_id" value={billingPeriod.id} />
+
+                                          <div>
+                                            <label className="mb-1 block text-xs font-medium text-rose-800">Reason</label>
+                                            <textarea
+                                              name="status_reason"
+                                              rows={2}
+                                              required
+                                              defaultValue={billingPeriod.status_reason ?? ""}
+                                              className="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-slate-900"
+                                            />
+                                          </div>
+
+                                          <div className="space-y-1 text-xs text-rose-800">
+                                            <div>Cancelling preserves billing history and does not affect work orders, visits, or next due date.</div>
+                                          </div>
+
+                                          <div>
+                                            <button
+                                              type="submit"
+                                              className="inline-flex items-center rounded-lg border border-rose-200 bg-white px-4 py-2 text-sm font-medium text-rose-700 hover:bg-rose-100"
+                                            >
+                                              Cancel Billing Period
+                                            </button>
+                                          </div>
+                                        </form>
+                                      </details>
+                                    </div>
+                                  ) : null}
                                 </li>
                               );
                             })}
@@ -2050,6 +2476,12 @@ export default async function CustomerDetailPage(props: {
                         ) : (
                           <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
                             No billing periods have been created for this service plan yet.
+                          </div>
+                        )}
+
+                        {canManageBillingPeriods ? null : (
+                          <div className="mt-3 text-xs text-slate-500">
+                            Billing-period mutation controls are hidden for this viewer.
                           </div>
                         )}
                       </div>
