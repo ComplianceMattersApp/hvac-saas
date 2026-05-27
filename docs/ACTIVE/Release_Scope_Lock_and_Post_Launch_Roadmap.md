@@ -255,6 +255,15 @@ Recent closeout status snapshot (May 2026):
    - No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or service-plan operational blocking were introduced
    - Browser smoke was attempted, but the available session was not authorized for the target customer profile, so the smoke path remained blocked by access rather than implementation
 
+- **Phase 5F-B3 closeout (Sandbox Billing Period UI Smoke) is complete (sandbox UI + read-only verification):**
+   - Sandbox target confirmed: `kvpesjdukqwwlgpkzfjm`; tested customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6`; maintenance agreement `454b3737-fa39-46be-8925-45131a571693`
+   - Customer-profile create/edit/cancel workflow passed; cancellation remained status-based and row remained visible as history
+   - Exact same-window reuse after cancellation remained blocked by current model/schema behavior and is treated as a future model decision (not a smoke failure)
+   - Adjacent replacement billing period creation succeeded
+   - No invoice generation/linking, no payment rows, no allocation rows, no Stripe/webhook behavior, no `maintenance_agreement_visits` mutation, and no `next_due_date` mutation occurred
+   - Billing periods remain non-operational and non-blocking for work orders, visits, visit counting, and next due behavior
+   - Commit `d751b23` fixed async server-client resolution in billing-period actions and added regression coverage
+
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
 - Completed behavior/copy alignment:

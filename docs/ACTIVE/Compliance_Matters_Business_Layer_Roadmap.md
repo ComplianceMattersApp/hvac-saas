@@ -223,6 +223,15 @@ Phase 5F-B2 closeout (Customer Profile Billing Period UI Wiring):
 - No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or service-plan operational blocking were introduced.
 - Browser smoke was attempted, but the available session was not authorized for the target customer profile, so the smoke path remained blocked by access rather than implementation.
 
+Phase 5F-B3 closeout (Sandbox Billing Period UI Smoke):
+- Phase 5F-B3 sandbox UI smoke is complete on sandbox ref `kvpesjdukqwwlgpkzfjm` for customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6` and maintenance agreement `454b3737-fa39-46be-8925-45131a571693`.
+- Customer-profile create/edit/cancel workflow passed in sandbox; cancelled row remained visible as history.
+- Exact same-window reuse after cancellation is blocked by current model/schema behavior and is tracked as a future model decision, not a smoke failure.
+- Adjacent replacement billing period creation succeeded.
+- No invoice generation/linking, no payment creation, no allocation creation, no Stripe/webhook behavior, no `maintenance_agreement_visits` mutation, and no `next_due_date` mutation occurred.
+- Billing periods remain non-operational and do not block work orders, visits, visit counting, or next due behavior.
+- Commit `d751b23` fixed async server-client resolution in billing-period actions and added regression coverage.
+
 Relationship intake and display lane closeout (May 2026):
 - This lane is complete for V1 and should be treated as closed unless real usage evidence reopens it.
 - Completed scope:

@@ -444,6 +444,16 @@ Phase 5F-B2 closeout (Customer Profile Billing Period UI Wiring):
 - No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or service-plan operational blocking were introduced.
 - Browser smoke was attempted, but the available session was not authorized for the target customer profile, so the smoke path remained blocked by access rather than implementation.
 
+Phase 5F-B3 closeout (Sandbox Billing Period UI Smoke):
+- Phase 5F-B3 sandbox UI smoke is complete on sandbox ref `kvpesjdukqwwlgpkzfjm` for customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6` and maintenance agreement `454b3737-fa39-46be-8925-45131a571693`.
+- Billing period customer-profile create/edit/cancel workflow passed; cancelled row remained visible as history.
+- Exact same-window reuse after cancellation is still blocked by current model/schema behavior and remains a future model decision item.
+- Adjacent replacement billing period creation succeeded.
+- No invoice generation/linking, no internal invoice payment creation, no allocation creation, no Stripe/webhook behavior, no `maintenance_agreement_visits` mutation, and no `next_due_date` mutation occurred.
+- Billing periods remain non-operational for service execution and do not block work orders, visits, visit counting, or next due behavior.
+- Forbidden payment/invoice/autopay/subscription action labels remained absent in the customer-profile billing UI smoke.
+- Commit `d751b23` resolved async billing-period action client handling and added regression coverage.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

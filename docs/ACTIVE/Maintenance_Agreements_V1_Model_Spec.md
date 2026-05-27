@@ -184,6 +184,16 @@ Phase 5F-B2 closeout (Customer Profile Billing Period UI Wiring):
 - No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or service-plan operational blocking were introduced.
 - Browser smoke was attempted, but the available session was not authorized for the target customer profile, so the smoke path remained blocked by access rather than implementation.
 
+Phase 5F-B3 closeout (Sandbox Billing Period UI Smoke):
+- Phase 5F-B3 sandbox UI smoke is complete on sandbox ref `kvpesjdukqwwlgpkzfjm` for customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6` and maintenance agreement `454b3737-fa39-46be-8925-45131a571693`.
+- Customer-profile billing period create/edit/cancel workflow passed in sandbox.
+- Cancellation is status-based and non-destructive; cancelled row remained visible as billing history.
+- Exact same-window reuse after cancellation was blocked by current model/schema behavior; this is tracked as a future model decision rather than a smoke failure.
+- Adjacent non-overlapping replacement period creation succeeded.
+- No invoice generation/linking, no internal invoice payment creation, no allocation creation, no Stripe/webhook behavior, no `maintenance_agreement_visits` mutation, and no `next_due_date` mutation occurred.
+- Billing periods remain non-operational and do not block work orders, visits, visit counting, or next due behavior.
+- Commit `d751b23` fixed billing-period action async client resolution (`await createClient`) before `requireInternalUser` and added regression coverage.
+
 ## Group 9A-9A Model Snapshot
 
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)
