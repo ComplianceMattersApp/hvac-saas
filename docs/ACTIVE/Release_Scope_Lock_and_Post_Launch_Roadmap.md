@@ -278,6 +278,17 @@ Recent closeout status snapshot (May 2026):
    - Status/display lock: link sets `invoice_linked`; paid/partial/unpaid remains derived from invoice/payment truth; voided linked invoice surfaces `invoice_void` display state; invoice webhook/payment events must not auto-mutate billing-period lifecycle in first posture
    - Explicit deferrals remain: invoice generation, non-job invoice model expansion, billing-period invoice line items, automatic invoice issue/send, automatic payment-link creation, Stripe checkout from billing periods, billing-period-targeted allocations, portal/self-service, autopay/subscriptions, and QBO/ACH/refunds/disputes/saved cards/partial payments/receipt automation/platform-fee execution
 
+- **Phase 5G-B1 closeout (Billing Period Manual Invoice Link/Unlink Server Actions) is complete (server-actions only):**
+   - Added server-action wrappers in `lib/maintenance-agreements/billing-period-actions.ts`: `linkInternalInvoiceToBillingPeriodFromForm` and `unlinkInternalInvoiceFromBillingPeriodFromForm`
+   - No UI changes were introduced in this slice
+   - Access is enforced to active internal Owner/Admin/Billing only via existing internal-user + financial-authority checks; dispatcher/technician/non-financial roles are denied
+   - Manual link eligibility is enforced for required ids, same-account scope, non-cancelled and currently-unlinked billing periods, non-void and currently-unclaimed invoices, invoice customer alignment where invoice customer scope exists, and required invoice-job linkage to the same maintenance agreement via `maintenance_agreement_visits`
+   - Manual unlink/correction is enforced for required reason and currently-linked period requirement; unlink is non-destructive
+   - State transitions are active: link sets `internal_invoice_id` and `billing_period_status = invoice_linked`; unlink clears `internal_invoice_id`, sets `billing_period_status = pending_billing`, and stores `status_reason`
+   - Both actions set `updated_by_user_id`, revalidate customer profile path, and redirect with explicit query-param banners: `billing_period_invoice_linked`, `billing_period_invoice_unlinked`, `billing_period_invoice_link_denied`, `billing_period_invoice_link_invalid`, `billing_period_invoice_link_conflict`, `billing_period_invoice_unlink_reason_required`
+   - Runtime boundaries are preserved: no invoice generation, no invoice line-item generation, no invoice issue/send/email behavior, no payment-link creation, no payment/allocation row mutation, no Stripe behavior change, no projection/read-path switch, no `maintenance_agreement_visits` mutation, and no `next_due_date` behavior change
+   - Validation snapshot: focused billing-period action tests passed, billing-period read-model tests passed, maintenance-agreements suite passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed
+
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
 - Completed behavior/copy alignment:

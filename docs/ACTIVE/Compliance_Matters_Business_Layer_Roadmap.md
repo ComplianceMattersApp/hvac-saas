@@ -274,6 +274,30 @@ Phase 5G-A2 closeout (Billing Period Invoice Linkage Model Lock, docs/model only
   - autopay/subscriptions
   - QBO/ACH/refunds/disputes/saved cards/partial payments/receipt automation/platform-fee execution
 
+Phase 5G-B1 closeout (Billing Period Manual Invoice Link/Unlink Server Actions):
+- Phase 5G-B1 is complete as server-action-only implementation; no UI was added.
+- Added manual link/unlink server-action wrappers in `lib/maintenance-agreements/billing-period-actions.ts`:
+  - `linkInternalInvoiceToBillingPeriodFromForm`
+  - `unlinkInternalInvoiceFromBillingPeriodFromForm`
+- Access is enforced to active internal Owner/Admin/Billing only via existing financial authority checks.
+- Manual link eligibility is now enforced for required ids, same-account scope, non-cancelled/unlinked billing period state, non-void/unclaimed invoice state, invoice customer alignment where scoped, and required invoice-job linkage to the same maintenance agreement through `maintenance_agreement_visits`.
+- Manual unlink/correction behavior is now enforced for required reason and currently-linked period requirement; unlink is non-destructive and clears only relationship state.
+- State transitions are now active:
+  - link sets `internal_invoice_id` and `billing_period_status = invoice_linked`
+  - unlink clears `internal_invoice_id`, sets `billing_period_status = pending_billing`, and stores `status_reason`
+  - both paths set `updated_by_user_id`, revalidate the customer profile path, and redirect with explicit query-param banners
+- Runtime boundaries are preserved:
+  - no invoice generation
+  - no invoice line-item generation
+  - no invoice issue/send/email behavior
+  - no payment-link creation
+  - no payment row/allocation row mutation
+  - no Stripe behavior change
+  - no projection/read-path switch
+  - no `maintenance_agreement_visits` mutation
+  - no `next_due_date` behavior change
+- Validation snapshot: focused billing-period action tests passed, billing-period read-model tests passed, maintenance-agreements suite passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
+
 Relationship intake and display lane closeout (May 2026):
 - This lane is complete for V1 and should be treated as closed unless real usage evidence reopens it.
 - Completed scope:

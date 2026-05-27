@@ -496,6 +496,28 @@ Phase 5G-A2 closeout (Billing Period Invoice Linkage Model Lock, docs/model only
 	- autopay/subscriptions
 	- QBO/ACH/refunds/disputes/saved cards/partial payments/receipt automation/platform-fee execution
 
+Phase 5G-B1 closeout (Billing Period Manual Invoice Link/Unlink Server Actions):
+- Phase 5G-B1 is complete as server-action-only implementation; no UI was added.
+- Added link/unlink server actions in `lib/maintenance-agreements/billing-period-actions.ts` (`linkInternalInvoiceToBillingPeriodFromForm`, `unlinkInternalInvoiceFromBillingPeriodFromForm`).
+- Financial authority enforcement is active for Owner/Admin/Billing only (active internal user + account scope); dispatcher/technician/non-financial roles are denied.
+- Manual link eligibility enforcement is active for required ids, same-account scope, non-cancelled/unlinked periods, non-void/unclaimed invoices, invoice-customer alignment where scoped, and required invoice-job linkage to the same maintenance agreement via `maintenance_agreement_visits`.
+- Manual unlink/correction enforcement is active for required reason and currently-linked period requirement; unlink is non-destructive.
+- Success state transitions are active:
+	- link sets `internal_invoice_id` and `billing_period_status = invoice_linked`
+	- unlink clears `internal_invoice_id`, sets `billing_period_status = pending_billing`, and stores `status_reason`
+	- both paths revalidate/redirect customer profile with explicit banners for success/denial/invalid/conflict
+- No invoice/payment/Stripe/allocation/projection/operational boundary regressions were introduced:
+	- no invoice generation
+	- no invoice line-item generation
+	- no invoice issue/send/email behavior
+	- no payment-link creation
+	- no payment row or allocation row mutation
+	- no Stripe behavior change
+	- no projection/read-path switch
+	- no `maintenance_agreement_visits` mutation
+	- no `next_due_date` behavior change
+- Validation snapshot: focused billing-period action tests passed, billing-period read-model tests passed, maintenance-agreements suite passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

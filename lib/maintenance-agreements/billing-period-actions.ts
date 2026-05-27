@@ -12,7 +12,13 @@ type Banner =
   | "cancelled"
   | "validation_error"
   | "duplicate_or_overlap_error"
-  | "access_denied";
+  | "access_denied"
+  | "billing_period_invoice_linked"
+  | "billing_period_invoice_unlinked"
+  | "billing_period_invoice_link_denied"
+  | "billing_period_invoice_link_invalid"
+  | "billing_period_invoice_link_conflict"
+  | "billing_period_invoice_unlink_reason_required";
 
 type AgreementRow = {
   id: string;
@@ -29,6 +35,14 @@ type BillingPeriodRow = {
   coverage_start_date: string;
   coverage_end_date: string;
   billing_period_status: string;
+};
+
+type InternalInvoiceRow = {
+  id: string;
+  account_owner_user_id: string;
+  customer_id: string | null;
+  job_id: string;
+  status: string;
 };
 
 type CreateOrUpdateInput = {
@@ -50,6 +64,16 @@ type CreateOrUpdateInput = {
 
 type CancelInput = {
   maintenanceAgreementId: string;
+  billingPeriodId: string;
+  statusReason: string;
+};
+
+type LinkInput = {
+  billingPeriodId: string;
+  internalInvoiceId: string;
+};
+
+type UnlinkInput = {
   billingPeriodId: string;
   statusReason: string;
 };
@@ -267,6 +291,44 @@ function parseCancelForm(formData: FormData) {
   };
 }
 
+function parseLinkForm(formData: FormData) {
+  const billingPeriodId = parseUuid(formData.get("billing_period_id"), "Billing period", true);
+  if (!billingPeriodId.ok) return billingPeriodId;
+
+  const internalInvoiceId = parseUuid(formData.get("internal_invoice_id"), "Internal invoice", true);
+  if (!internalInvoiceId.ok) return internalInvoiceId;
+
+  return {
+    ok: true as const,
+    value: {
+      billingPeriodId: billingPeriodId.value as string,
+      internalInvoiceId: internalInvoiceId.value as string,
+    } satisfies LinkInput,
+  };
+}
+
+function parseUnlinkForm(formData: FormData) {
+  const billingPeriodId = parseUuid(formData.get("billing_period_id"), "Billing period", true);
+  if (!billingPeriodId.ok) return billingPeriodId;
+
+  const statusReason = optionalClean(formData.get("status_reason"));
+  if (!statusReason) {
+    return {
+      ok: false as const,
+      reasonRequired: true as const,
+      error: "Status reason is required.",
+    };
+  }
+
+  return {
+    ok: true as const,
+    value: {
+      billingPeriodId: billingPeriodId.value as string,
+      statusReason,
+    } satisfies UnlinkInput,
+  };
+}
+
 function normalizeStatusForPosture(input: {
   billingPosture: string;
   billingPeriodStatus: string;
@@ -351,7 +413,10 @@ function parseBillingPeriodRecords(rows: unknown) {
   return (Array.isArray(rows) ? rows : []) as BillingPeriodRow[];
 }
 
-async function resolveInternalUserAccess(customerPath: string | null | undefined) {
+async function resolveInternalUserAccess(
+  customerPath: string | null | undefined,
+  deniedBanner: Banner = "access_denied",
+) {
   try {
     const supabase = await createClient();
     const { internalUser, userId } = await requireInternalUser({ supabase });
@@ -363,13 +428,13 @@ async function resolveInternalUserAccess(customerPath: string | null | undefined
         resourceAccountOwnerUserId: internalUser.account_owner_user_id,
       })
     ) {
-      redirectToCustomerProfile(customerPath, "access_denied");
+      redirectToCustomerProfile(customerPath, deniedBanner);
     }
 
     return { internalUser, userId };
   } catch (error) {
     if (isInternalAccessError(error)) {
-      redirectToCustomerProfile(customerPath, "access_denied");
+      redirectToCustomerProfile(customerPath, deniedBanner);
     }
 
     throw error;
@@ -445,6 +510,66 @@ async function loadBillingPeriod(admin: any, billingPeriodId: string) {
   };
 }
 
+async function loadInternalInvoice(admin: any, internalInvoiceId: string) {
+  const { data, error } = await admin
+    .from("internal_invoices")
+    .select("id, account_owner_user_id, customer_id, job_id, status")
+    .eq("id", internalInvoiceId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id) {
+    return { ok: false as const };
+  }
+
+  return {
+    ok: true as const,
+    invoice: {
+      id: clean(data.id),
+      account_owner_user_id: clean(data.account_owner_user_id),
+      customer_id: clean(data.customer_id) || null,
+      job_id: clean(data.job_id),
+      status: clean(data.status).toLowerCase(),
+    } as InternalInvoiceRow,
+  };
+}
+
+async function isInvoiceClaimedByAnotherBillingPeriod(params: {
+  admin: any;
+  accountOwnerUserId: string;
+  internalInvoiceId: string;
+  currentBillingPeriodId: string;
+}) {
+  const { data, error } = await params.admin
+    .from("maintenance_agreement_billing_periods")
+    .select("id")
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .eq("internal_invoice_id", params.internalInvoiceId)
+    .neq("id", params.currentBillingPeriodId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data?.id);
+}
+
+async function hasInvoiceJobLinkedToAgreement(params: {
+  admin: any;
+  accountOwnerUserId: string;
+  agreementId: string;
+  jobId: string;
+}) {
+  const { data, error } = await params.admin
+    .from("maintenance_agreement_visits")
+    .select("id")
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .eq("agreement_id", params.agreementId)
+    .eq("job_id", params.jobId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return Boolean(data?.id);
+}
+
 async function loadAgreementPeriods(
   admin: any,
   agreementId: string,
@@ -509,6 +634,22 @@ function rejectConflict(customerPath: string | null | undefined): never {
 
 function rejectAccessDenied(customerPath: string | null | undefined): never {
   redirectToCustomerProfile(customerPath, "access_denied");
+}
+
+function rejectInvoiceLinkDenied(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_link_denied");
+}
+
+function rejectInvoiceLinkInvalid(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_link_invalid");
+}
+
+function rejectInvoiceLinkConflict(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_link_conflict");
+}
+
+function rejectInvoiceUnlinkReasonRequired(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_unlink_reason_required");
 }
 
 function buildCreatePayload(
@@ -730,6 +871,156 @@ async function cancelBillingPeriod(customerPath: string, formData: FormData) {
   redirectToCustomerProfile(customerPath, "cancelled");
 }
 
+async function linkInternalInvoiceToBillingPeriod(customerPath: string, formData: FormData) {
+  const access = await resolveInternalUserAccess(customerPath, "billing_period_invoice_link_denied");
+  const parsed = parseLinkForm(formData);
+  if (!parsed.ok) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const admin = createAdminClient();
+  const billingPeriodResult = await loadBillingPeriod(admin, parsed.value.billingPeriodId);
+  if (!billingPeriodResult.ok) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const billingPeriod = billingPeriodResult.billingPeriod;
+  if (billingPeriod.account_owner_user_id !== access.internalUser.account_owner_user_id) {
+    rejectInvoiceLinkDenied(customerPath);
+  }
+
+  if (clean(billingPeriod.billing_period_status).toLowerCase() === "cancelled") {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  if (billingPeriod.internal_invoice_id) {
+    rejectInvoiceLinkConflict(customerPath);
+  }
+
+  const agreementResult = await loadAgreement(admin, billingPeriod.maintenance_agreement_id);
+  if (!agreementResult.ok) {
+    if (agreementResult.accessDenied) {
+      rejectInvoiceLinkDenied(customerPath);
+    }
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const agreement = agreementResult.agreement;
+  if (agreement.account_owner_user_id !== access.internalUser.account_owner_user_id) {
+    rejectInvoiceLinkDenied(customerPath);
+  }
+
+  const invoiceResult = await loadInternalInvoice(admin, parsed.value.internalInvoiceId);
+  if (!invoiceResult.ok) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const invoice = invoiceResult.invoice;
+  if (invoice.account_owner_user_id !== agreement.account_owner_user_id) {
+    rejectInvoiceLinkDenied(customerPath);
+  }
+
+  if (invoice.status === "void") {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const claimedByAnotherPeriod = await isInvoiceClaimedByAnotherBillingPeriod({
+    admin,
+    accountOwnerUserId: agreement.account_owner_user_id,
+    internalInvoiceId: invoice.id,
+    currentBillingPeriodId: billingPeriod.id,
+  });
+  if (claimedByAnotherPeriod) {
+    rejectInvoiceLinkConflict(customerPath);
+  }
+
+  if (invoice.customer_id && invoice.customer_id !== agreement.customer_id) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  if (!invoice.job_id) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const linkedToAgreement = await hasInvoiceJobLinkedToAgreement({
+    admin,
+    accountOwnerUserId: agreement.account_owner_user_id,
+    agreementId: agreement.id,
+    jobId: invoice.job_id,
+  });
+  if (!linkedToAgreement) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const { data, error } = await admin
+    .from("maintenance_agreement_billing_periods")
+    .update({
+      internal_invoice_id: invoice.id,
+      billing_period_status: "invoice_linked",
+      updated_by_user_id: access.userId,
+    })
+    .eq("id", billingPeriod.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error) {
+    if (error.code === "23505") {
+      rejectInvoiceLinkConflict(customerPath);
+    }
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  if (!data?.id) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_linked");
+}
+
+async function unlinkInternalInvoiceFromBillingPeriod(customerPath: string, formData: FormData) {
+  const access = await resolveInternalUserAccess(customerPath, "billing_period_invoice_link_denied");
+  const parsed = parseUnlinkForm(formData);
+  if (!parsed.ok) {
+    if ("reasonRequired" in parsed && parsed.reasonRequired) {
+      rejectInvoiceUnlinkReasonRequired(customerPath);
+    }
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const admin = createAdminClient();
+  const billingPeriodResult = await loadBillingPeriod(admin, parsed.value.billingPeriodId);
+  if (!billingPeriodResult.ok) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const billingPeriod = billingPeriodResult.billingPeriod;
+  if (billingPeriod.account_owner_user_id !== access.internalUser.account_owner_user_id) {
+    rejectInvoiceLinkDenied(customerPath);
+  }
+
+  if (!billingPeriod.internal_invoice_id) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  const { data, error } = await admin
+    .from("maintenance_agreement_billing_periods")
+    .update({
+      internal_invoice_id: null,
+      billing_period_status: "pending_billing",
+      status_reason: parsed.value.statusReason,
+      updated_by_user_id: access.userId,
+    })
+    .eq("id", billingPeriod.id)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data?.id) {
+    rejectInvoiceLinkInvalid(customerPath);
+  }
+
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_unlinked");
+}
+
 export async function createMaintenanceAgreementBillingPeriodFromForm(
   customerPath: string,
   formData: FormData,
@@ -749,4 +1040,18 @@ export async function cancelMaintenanceAgreementBillingPeriodFromForm(
   formData: FormData,
 ) {
   await cancelBillingPeriod(customerPath, formData);
+}
+
+export async function linkInternalInvoiceToBillingPeriodFromForm(
+  customerPath: string,
+  formData: FormData,
+) {
+  await linkInternalInvoiceToBillingPeriod(customerPath, formData);
+}
+
+export async function unlinkInternalInvoiceFromBillingPeriodFromForm(
+  customerPath: string,
+  formData: FormData,
+) {
+  await unlinkInternalInvoiceFromBillingPeriod(customerPath, formData);
 }

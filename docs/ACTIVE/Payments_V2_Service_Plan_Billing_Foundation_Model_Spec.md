@@ -443,6 +443,43 @@ Phase 5G-A2 closeout (Billing Period Invoice Linkage Model Lock, docs/model only
 	- autopay/subscriptions
 	- QBO/ACH/refunds/disputes/saved cards/partial payments/receipt automation/platform-fee execution
 
+Phase 5G-B1 closeout (Billing Period Manual Invoice Link/Unlink Server Actions):
+- Phase 5G-B1 is complete as server-action-only implementation; no UI changes were introduced.
+- Added manual link/unlink server-action wrappers in `lib/maintenance-agreements/billing-period-actions.ts`:
+	- `linkInternalInvoiceToBillingPeriodFromForm`
+	- `unlinkInternalInvoiceFromBillingPeriodFromForm`
+- Access is enforced to active internal Owner/Admin/Billing only through existing internal-user and financial-authority gating; dispatcher/technician/non-financial roles are denied.
+- Manual link eligibility enforcement is active:
+	- required `billing_period_id` and `internal_invoice_id`
+	- same-account scope checks for billing period, maintenance agreement, and invoice
+	- cancelled billing periods are rejected
+	- already-linked billing periods are rejected
+	- void invoices are rejected
+	- invoices already claimed by another billing period are rejected
+	- invoice customer must match the maintenance-agreement customer where invoice customer scope exists
+	- invoice job must already be linked to the same maintenance agreement via `maintenance_agreement_visits`
+- Manual unlink/correction enforcement is active:
+	- required `billing_period_id` and `status_reason`
+	- period must currently have `internal_invoice_id`
+	- unlink is non-destructive and clears `internal_invoice_id` only
+	- unlink sets `billing_period_status = pending_billing` and persists `status_reason`
+- Success behavior is active:
+	- link sets `internal_invoice_id` and `billing_period_status = invoice_linked`
+	- both link and unlink set `updated_by_user_id`
+	- customer profile path is revalidated and redirected with query-param banners (`billing_period_invoice_linked`, `billing_period_invoice_unlinked`)
+	- denial/invalid/conflict banners are surfaced (`billing_period_invoice_link_denied`, `billing_period_invoice_link_invalid`, `billing_period_invoice_link_conflict`, `billing_period_invoice_unlink_reason_required`)
+- Runtime boundaries are preserved:
+	- no invoice generation
+	- no invoice line-item generation
+	- no invoice issue/send/email behavior
+	- no payment-link creation
+	- no payment/allocation row mutation
+	- no Stripe behavior change
+	- no projection/read-path switch
+	- no `maintenance_agreement_visits` mutation
+	- no `next_due_date` behavior change
+- Validation snapshot: focused billing-period action tests passed, billing-period read-model tests passed, maintenance-agreements suite passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
