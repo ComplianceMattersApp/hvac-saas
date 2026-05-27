@@ -209,6 +209,13 @@ Recent closeout status snapshot (May 2026):
    - Local migration reset/apply validation succeeded; sandbox/production apply remains separate and was not executed in this phase
    - Runtime boundaries preserved: no UI, no invoice generation, no payment behavior changes, no allocation projection/read-path switch, no Stripe checkout/webhook behavior changes, and no service-plan operational behavior changes
    - Billing periods remain non-blocking for jobs/visits/work orders/visit counting/next-due workflows
+- **Phase 5C-2 closeout (Production Dormant Billing Period Migration Apply) is complete:**
+   - Migration `20260526150000_maintenance_agreement_billing_periods_foundation.sql` applied to production (`ornrnvxtwwtulohqwxop`) on 2026-05-26
+   - Linked ref returned to CMTest sandbox `kvpesjdukqwwlgpkzfjm` after apply
+   - Table `public.maintenance_agreement_billing_periods` verified in production: all 20 required columns, no forbidden fields, all constraints/indexes/RLS/policies/triggers/functions confirmed
+   - Row count `0`; no billing period rows created, no invoice generation, no backfill
+   - No UI, payment, Stripe, allocation, projection, or service-plan operational behavior changed
+   - Phase 5C fully closed across repo, sandbox, and production; next slice is Phase 5D read-model planning/foundation
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

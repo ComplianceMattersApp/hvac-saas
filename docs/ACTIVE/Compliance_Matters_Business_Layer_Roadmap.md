@@ -177,6 +177,12 @@ Phase 5C closeout (Service Plan Billing Period Schema Foundation, schema/tests/d
 - No UI, invoice generation, payment behavior, allocation projection/read-path switch, Stripe checkout/webhook behavior, or service-plan runtime workflow changes were introduced.
 - Local migration chain validation succeeded; sandbox/production apply remains a separate approval-gated step.
 
+Phase 5C-2 closeout (Production Dormant Billing Period Migration Apply):
+- Migration `20260526150000_maintenance_agreement_billing_periods_foundation.sql` applied to production (`ornrnvxtwwtulohqwxop`) on 2026-05-26; linked ref returned to CMTest sandbox `kvpesjdukqwwlgpkzfjm` after apply.
+- Table `public.maintenance_agreement_billing_periods` verified in production: all 20 required columns, no forbidden fields, all constraints/indexes/RLS/policies/triggers/functions confirmed, row count `0`.
+- No billing period rows created, no invoice generation, no backfill, no UI/payment/Stripe/allocation/projection/service-plan behavior changed.
+- Phase 5C is fully closed across repo, sandbox, and production. Next slice is Phase 5D read-model planning/foundation.
+
 Relationship intake and display lane closeout (May 2026):
 - This lane is complete for V1 and should be treated as closed unless real usage evidence reopens it.
 - Completed scope:

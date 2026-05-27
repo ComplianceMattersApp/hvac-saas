@@ -396,6 +396,14 @@ Phase 5C closeout (Service Plan Billing Period Schema Foundation, schema/tests/d
 - Billing periods remain non-blocking for jobs/work orders/visits/visit counting/next-due workflows.
 - Sandbox/production migration apply remains separate and was not executed in this phase.
 
+Phase 5C-2 closeout (Production Dormant Billing Period Migration Apply):
+- Migration `20260526150000_maintenance_agreement_billing_periods_foundation.sql` applied to production (`ornrnvxtwwtulohqwxop`) on 2026-05-26.
+- Linked ref returned to CMTest sandbox `kvpesjdukqwwlgpkzfjm` after apply.
+- Table `public.maintenance_agreement_billing_periods` verified in production: all 20 required columns present, no forbidden fields, all constraints/indexes/RLS/policies/triggers/functions confirmed.
+- Row count is `0`. No billing period rows created, no invoice generation, no backfill.
+- No UI, payment, Stripe, allocation, projection, or service-plan operational behavior changed.
+- Phase 5C is fully closed across repo, sandbox, and production. Next slice is Phase 5D read-model planning/foundation.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

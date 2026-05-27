@@ -339,6 +339,17 @@ Phase 5C closeout (Service Plan Billing Period Schema Foundation, schema/tests/d
 - Billing periods remain non-blocking for jobs/work orders/visits/visit counting/next-due workflows.
 - Sandbox and production migration apply remain separate and are not part of Phase 5C closeout.
 
+Phase 5C-2 closeout (Production Dormant Billing Period Migration Apply, production schema verification only):
+- Migration `20260526150000_maintenance_agreement_billing_periods_foundation.sql` applied to production (`ornrnvxtwwtulohqwxop`) on 2026-05-26.
+- Linked ref returned to CMTest sandbox `kvpesjdukqwwlgpkzfjm` after apply.
+- Table `public.maintenance_agreement_billing_periods` verified in production: all 20 required columns present, no forbidden fields.
+- All constraints/indexes confirmed: PK, 6 FK constraints, 5 check constraints, unique coverage window, partial unique `ma_billing_periods_internal_invoice_unique_idx` — no identifier truncation.
+- RLS enabled; SELECT/INSERT/UPDATE policies present; no DELETE policy.
+- `maintenance_agreement_billing_periods_set_updated_at` and `maintenance_agreement_billing_periods_assert_scope` triggers present; `assert_maintenance_agreement_billing_period_scope` function present.
+- Row count is `0`. No billing period rows created, no invoice generation, no backfill.
+- No UI, payment, Stripe, allocation, projection, or service-plan operational behavior changed.
+- Phase 5C is fully closed across repo, sandbox, and production. Next slice is Phase 5D read-model planning/foundation.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
