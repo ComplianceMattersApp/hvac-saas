@@ -404,6 +404,13 @@ Phase 5C-2 closeout (Production Dormant Billing Period Migration Apply):
 - No UI, payment, Stripe, allocation, projection, or service-plan operational behavior changed.
 - Phase 5C is fully closed across repo, sandbox, and production. Next slice is Phase 5D read-model planning/foundation.
 
+Phase 5D-B closeout (Service Plan Billing Period Read-Model Helper Foundation):
+- Added read-only billing-period helper module with account/agreement/customer list functions and pure derivation helpers for coverage, posture, lifecycle, and amount labels.
+- Invoice-backed rows now derive payment display state from internal invoice truth and recorded payments only; `payment_attention` does not change paid totals.
+- The helper does not query payment allocation rows directly and omits forbidden payment, allocation, visit, next-due, and blocking fields.
+- No UI, invoice generation/linking action, payment behavior, allocation read-path switch, or service-plan operational behavior changed.
+- Phase 5D-B is complete; next slice remains Phase 5D-C.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

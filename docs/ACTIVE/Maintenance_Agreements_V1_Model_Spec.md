@@ -144,6 +144,15 @@ Phase 5C-2 closeout (Production Dormant Billing Period Migration Apply):
 - No billing period rows created, no invoice generation, no backfill, no UI/payment/Stripe/allocation/projection/service-plan behavior changed.
 - Phase 5C is fully closed across repo, sandbox, and production. Next slice is Phase 5D read-model planning/foundation.
 
+Phase 5D-B closeout (Service Plan Billing Period Read-Model Helper Foundation):
+- Added read-only helper module `lib/maintenance-agreements/billing-period-read-model.ts` for billing-period list helpers and pure label/state derivation.
+- Invoice-backed rows derive payment state from internal invoice truth and recorded payments only; pending/failed/reversed rows can surface `payment_attention` without changing paid math.
+- The helper avoids direct payment-allocation reads and keeps forbidden payment, allocation, visit, next-due, and blocking fields out of the read model.
+- No UI, mutation, invoice generation/linking action, payment behavior change, allocation read-path switch, or service-plan blocking was introduced.
+- Phase 5D-B is complete; next slice remains Phase 5D-C.
+
+## Group 9A-9A Model Snapshot
+
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)
 
 Group 9A-9A is a docs/model decision pass only. No implementation changes are included in this slice.

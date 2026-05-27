@@ -217,6 +217,13 @@ Recent closeout status snapshot (May 2026):
    - No UI, payment, Stripe, allocation, projection, or service-plan operational behavior changed
    - Phase 5C fully closed across repo, sandbox, and production; next slice is Phase 5D read-model planning/foundation
 
+- **Phase 5D-B closeout (Service Plan Billing Period Read-Model Helper Foundation) is complete:**
+   - Added read-only helper module `lib/maintenance-agreements/billing-period-read-model.ts` for account/agreement/customer list helpers and pure label/state derivation
+   - Invoice-backed rows derive payment display state from current internal invoice truth and recorded payments only; `payment_attention` does not inflate paid totals
+   - The helper does not query payment allocation rows directly and keeps forbidden payment/allocation/visit/next-due/blocking fields out of the read model
+   - No UI, mutation, invoice generation/linking action, payment behavior change, allocation read-path switch, or service-plan blocking was introduced
+   - Phase 5D-B is complete; next slice remains Phase 5D-C
+
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
 - Completed behavior/copy alignment:
