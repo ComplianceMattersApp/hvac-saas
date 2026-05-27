@@ -807,3 +807,76 @@ ext_due_date changes, no service-plan operational blocking.
   - git diff --check
   - git status -sb clean/synced
 - Next recommended phase: Phase 5G-B4 A-to-Z sandbox Stripe payment smoke using linked billing-period path.
+
+---
+
+## Phase 5G-B4E Finding - App-Level Dedupe Was Insufficient Under Live Concurrency (May 27, 2026)
+
+- Baseline app-level dedupe commit:
+	- 456dbb94064bf379518f44390318fe2f91270de4
+	- fix(payments): dedupe stripe webhook payment identity
+- Fresh live webhook smoke after B4D still produced duplicate payment truth.
+- Root cause: app-level pre-insert identity lookup was race-prone under concurrent live delivery of `charge.succeeded` and `checkout.session.completed`; both handlers could pass lookup before either insert became visible.
+- Observed failure shape:
+	- Duplicate `internal_invoice_payments` recorded rows
+	- Duplicate active `internal_invoice_payment_allocations` rows
+	- Duplicate `payment_recorded` job events
+	- Inflated paid total
+- Historical duplicate sandbox evidence rows were intentionally preserved and not repaired in this phase.
+
+## Phase 5G-B4F Fix - DB-Enforced Stripe Payment Identity Dedupe + Conflict Recovery (May 27, 2026)
+
+- Fix commit:
+	- 389fbfe
+	- fix(payments): enforce stripe identity dedupe in db and webhook recovery
+- Intent and behavior:
+	- Preserve event-level `stripe_event_id` idempotency.
+	- Enforce DB-level payment-identity uniqueness for recorded Stripe online payments.
+	- On unique conflict, resolve the canonical payment row, enrich missing identity fields, and return safe no-op success.
+	- Prevent duplicate payment rows under concurrent `charge.succeeded` and `checkout.session.completed` delivery.
+	- Keep one active allocation row per canonical recorded payment.
+	- Preserve failed-payment behavior.
+- Migration for this phase was applied to sandbox before smoke validation.
+- Production migration apply is intentionally separate and must be explicitly approved/recorded in its own production execution artifact.
+
+## Phase 5G-B4G Linked Billing-Period Smoke - Passed (May 27, 2026)
+
+- Fixture:
+	- Invoice: `92858983-7ed7-40bf-abba-681757347420` / `INV-20260527-B05C4FF8`
+	- Billing period: `2f6e1318-7f93-4213-b089-cb0cfb86275d`
+	- Agreement: `454b3737-fa39-46be-8925-45131a571693`
+	- Job: `105bfcbd-28c6-4bc0-ad6e-a3012a2d1fa9`
+	- Checkout session: `cs_test_a1f9fJn51SHyVqjqo3YAmH3LW9oC2VeE9iaSl41dSO7n69YGYtKmNrqZdc`
+	- Payment intent: `pi_3TbkfJ7itDepDR181dw3ipuJ`
+	- Charge: `ch_3TbkfJ7itDepDR1812I2YJUc`
+	- `charge.succeeded`: `evt_3TbkfJ7itDepDR181A4isyRF`
+	- `checkout.session.completed`: `evt_1TbkfL7itDepDR18iSHzVc2G`
+- Result:
+	- Both webhook events delivered HTTP 200.
+	- Exactly one recorded `internal_invoice_payments` row.
+	- Exactly one active `internal_invoice_payment_allocations` row.
+	- Exactly one `payment_recorded` job event.
+	- Invoice UI showed `Paid`, `Paid $17.50`, `Balance $0.00`.
+	- Billing period remained linked (`invoice_linked`).
+	- `maintenance_agreement_visits` remained 5.
+	- `next_due_date` remained `2026-09-15`.
+	- No invoice generation from billing period.
+	- No line-item generation from billing period.
+	- No service-plan operational mutation.
+
+## Additional Normal Invoice Regression Smoke - Passed (May 27, 2026)
+
+- Fixture:
+	- Job: `f6600de6-63d9-4551-94c1-a0b3a8db9a5c`
+	- Invoice: `db473f15-e689-48c8-b5fe-5473c286489b` / `INV-20260527-44C5BD3E`
+	- Checkout session: `cs_test_a1Ztci5TJIj4FGdlMjPcxvSOav4UUmt1YloB33E90zZhFk3Y0rkQy0LjEe`
+	- Payment intent: `pi_3TbnvA7itDepDR181vsnUqou`
+	- Charge: `py_3TbnvA7itDepDR181leExVTK`
+	- `charge.succeeded`: `evt_3TbnvA7itDepDR181oH2H05y`
+	- `checkout.session.completed`: `evt_1TbnvD7itDepDR18BRWaeldg`
+- Result:
+	- Both webhook events delivered HTTP 200.
+	- Exactly one recorded `internal_invoice_payments` row.
+	- Exactly one active `internal_invoice_payment_allocations` row.
+	- Exactly one `payment_recorded` job event.
+	- Invoice UI showed `Paid`, `Paid $17.50`, `Balance $0.00`.

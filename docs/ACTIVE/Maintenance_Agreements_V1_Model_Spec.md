@@ -348,13 +348,13 @@ Recorded table purpose:
 
 Recorded table schema:
 
-- Primary key: `(agreement_id, job_id)` — ensures one-link-per-agreement-job pair
+- Primary key: `(agreement_id, job_id)` â€” ensures one-link-per-agreement-job pair
 - Core fields:
-  - `link_source`: enum `service_plan_prefill` | `manual` | `system_future` — origin of link creation
-  - `count_status`: enum `linked` | `eligible` | `counted` | `excluded` | `reversed` — lifecycle state
-  - `counts_toward_visit_balance`: boolean — controls V1 "used visits" projection
-  - `counted_at`, `counted_by_user_id` — marks when link moved to `counted` status
-  - `reversed_at`, `reversed_by_user_id`, `reversal_reason` — future reversal audit trail fields (not populated in V1)
+  - `link_source`: enum `service_plan_prefill` | `manual` | `system_future` â€” origin of link creation
+  - `count_status`: enum `linked` | `eligible` | `counted` | `excluded` | `reversed` â€” lifecycle state
+  - `counts_toward_visit_balance`: boolean â€” controls V1 "used visits" projection
+  - `counted_at`, `counted_by_user_id` â€” marks when link moved to `counted` status
+  - `reversed_at`, `reversed_by_user_id`, `reversal_reason` â€” future reversal audit trail fields (not populated in V1)
 - New links default to `count_status='linked'` and `counts_toward_visit_balance=false`
 - Links with `count_status='counted'` and `counts_toward_visit_balance=true` project into used visits
 - Excluded/reversed links do not count as used visits
@@ -364,7 +364,7 @@ Recorded RLS policy model:
 - SELECT policy: account-scoped via strict `account_owner_user_id` match on both agreement and job through their respective customer/account relationships
 - INSERT policy: account-scoped via explicit `account_owner_user_id` match (requires job to be customer-linked and agreement to belong to the same account owner)
 - UPDATE policy: account-scoped via same account-owner-user-id match
-- DELETE policy: intentionally absent (no delete path in V1 — use reversal status instead)
+- DELETE policy: intentionally absent (no delete path in V1 â€” use reversal status instead)
 - Index coverage: account_owner_user_id, agreement_id, job_id, count_status for fast queries
 
 Recorded read helpers:
@@ -380,7 +380,7 @@ Recorded behavior:
 - Used visits project only from links with `count_status='counted'` and `counts_toward_visit_balance=true`
 - Excluded/reversed status preserves link history without counting
 - No automatic counting wired in V1 (remains parked)
-- No DELETE policy — reversals use status updates only
+- No DELETE policy â€” reversals use status updates only
 
 Validation recorded:
 
@@ -412,7 +412,7 @@ Environment activation rule:
 Watch items:
 
 - Current RLS policy scopes job ownership through `jobs.customer_id` to `customers.owner_user_id` match. Jobs without a customer linkage will fail the INSERT policy check until/if model assumptions broaden to accept job-agency or job-system-assigned cases.
-- Count-state transitions (linked → eligible → counted, or reversal flows) are not wired yet. Future count mutation handlers and reversal UI tooling remain parked for V2 or later.
+- Count-state transitions (linked â†’ eligible â†’ counted, or reversal flows) are not wired yet. Future count mutation handlers and reversal UI tooling remain parked for V2 or later.
 - Once link helpers are wired into runtime/UI (future), test coverage should expand to include prefix-filtering, pagination, and performance characteristics.
 
 ## Group 9A-9C Closeout Snapshot (create link row when work order is created from service plan)
@@ -941,9 +941,9 @@ Recorded stale-state protection:
 Recorded mutation contract:
 
 - Updates only:
-	- `maintenance_agreements.next_due_date` → set to suggested date value
-	- `maintenance_agreements.updated_by_user_id` → set to current internal user ID
-	- `updated_at` → updated via normal DB timestamp behavior
+	- `maintenance_agreements.next_due_date` â†’ set to suggested date value
+	- `maintenance_agreements.updated_by_user_id` â†’ set to current internal user ID
+	- `updated_at` â†’ updated via normal DB timestamp behavior
 - Does not mutate:
 	- `maintenance_agreement_visits` link row (count_status remains `counted`)
 	- `jobs` table (job record unchanged)
@@ -967,19 +967,19 @@ Recorded preconditions/blocking rules:
 
 | Condition | Blocking | Banner | Test |
 |-----------|----------|--------|------|
-| Valid state, baseline matches | ✅ Proceed | confirm_next_due_saved | ✅ |
-| Stale baseline (current ≠ baseline) | ✅ Block | confirm_next_due_stale_state | ✅ |
-| Custom/manual frequency | ✅ Block | confirm_next_due_custom_frequency | ✅ |
-| Agreement not active | ✅ Block | confirm_next_due_agreement_inactive | ✅ |
-| Link not counted or not counts_toward_visit_balance | ✅ Block | confirm_next_due_not_counted | ✅ |
-| Feature flag disabled | ✅ Block | confirm_next_due_unavailable | ✅ |
-| Out-of-scope (account/customer mismatch) | ✅ Block | (scope validation error) | ✅ |
+| Valid state, baseline matches | âœ… Proceed | confirm_next_due_saved | âœ… |
+| Stale baseline (current â‰  baseline) | âœ… Block | confirm_next_due_stale_state | âœ… |
+| Custom/manual frequency | âœ… Block | confirm_next_due_custom_frequency | âœ… |
+| Agreement not active | âœ… Block | confirm_next_due_agreement_inactive | âœ… |
+| Link not counted or not counts_toward_visit_balance | âœ… Block | confirm_next_due_not_counted | âœ… |
+| Feature flag disabled | âœ… Block | confirm_next_due_unavailable | âœ… |
+| Out-of-scope (account/customer mismatch) | âœ… Block | (scope validation error) | âœ… |
 
 Recorded revalidation paths:
 
-- `/jobs/{jobId}` — refreshes job detail UI and suggestion block
-- `/service-plans` — refreshes service plans drilldown if user navigates there
-- `/customers/{customerId}` — refreshes customer profile if user navigates there
+- `/jobs/{jobId}` â€” refreshes job detail UI and suggestion block
+- `/service-plans` â€” refreshes service plans drilldown if user navigates there
+- `/customers/{customerId}` â€” refreshes customer profile if user navigates there
 
 Validation recorded:
 
@@ -993,12 +993,12 @@ Validation recorded:
 
 Test scenarios validated:
 
-1. **Success**: Valid interval frequency, matched baseline → agreement.next_due_date updates to suggested date, updated_by_user_id populated, revalidation triggered ✅
-2. **Stale-state protection**: Current agreement.next_due_date ≠ baseline → fails with stale_state banner, no update ✅
-3. **Custom frequency blocking**: frequency='custom' → fails with custom_frequency banner, button not rendered ✅
-4. **Inactive agreement blocking**: status≠'active' → fails with agreement_inactive banner ✅
-5. **Non-counted link blocking**: count_status≠'counted' or counts_toward_visit_balance=false → fails with not_counted banner ✅
-6. **Feature flag enforcement**: flag disabled → fails with unavailable banner ✅
+1. **Success**: Valid interval frequency, matched baseline â†’ agreement.next_due_date updates to suggested date, updated_by_user_id populated, revalidation triggered âœ…
+2. **Stale-state protection**: Current agreement.next_due_date â‰  baseline â†’ fails with stale_state banner, no update âœ…
+3. **Custom frequency blocking**: frequency='custom' â†’ fails with custom_frequency banner, button not rendered âœ…
+4. **Inactive agreement blocking**: statusâ‰ 'active' â†’ fails with agreement_inactive banner âœ…
+5. **Non-counted link blocking**: count_statusâ‰ 'counted' or counts_toward_visit_balance=false â†’ fails with not_counted banner âœ…
+6. **Feature flag enforcement**: flag disabled â†’ fails with unavailable banner âœ…
 
 Browser smoke testing decision:
 
@@ -1195,7 +1195,7 @@ Recorded read-model artifacts:
 
 - `MaintenanceAgreementVisitLinkRow` type extended with four metadata fields.
 - `normalizeMaintenanceAgreementVisitLinkRow` extended to normalize metadata fields safely to `string | null`.
-- New export: `hasMaintenanceAgreementVisitConfirmedNextDue(link)` — returns confirmed boolean from `next_due_confirmed_at` or `confirmed_next_due_date`.
+- New export: `hasMaintenanceAgreementVisitConfirmedNextDue(link)` â€” returns confirmed boolean from `next_due_confirmed_at` or `confirmed_next_due_date`.
 - Four metadata fields added to `select(...)` lists in:
 	- `listMaintenanceAgreementVisitsForAgreement`
 	- `listMaintenanceAgreementLinksForJob`
@@ -1260,7 +1260,7 @@ Supplemental Docker-backed schema verification (completed after Docker became av
 
 - `supabase db dump --linked --schema public` executed successfully
 - All four metadata columns confirmed present and nullable in dump
-- FK confirmed: `maintenance_agreement_visits_next_due_confirmed_by_user_id_fkey` → `auth.users(id)` ON DELETE SET NULL
+- FK confirmed: `maintenance_agreement_visits_next_due_confirmed_by_user_id_fkey` â†’ `auth.users(id)` ON DELETE SET NULL
 - RLS confirmed enabled: `ALTER TABLE public.maintenance_agreement_visits ENABLE ROW LEVEL SECURITY` present in dump
 - Policies confirmed present:
 	- `maintenance_agreement_visits_select_account_scope`
@@ -2042,11 +2042,11 @@ Future implementation should include targeted validation for:
 
 ---
 
-## Phase 5G-B2 Closeout — Customer Profile Billing Period Invoice Link/Unlink UI Wiring (May 27, 2026)
+## Phase 5G-B2 Closeout â€” Customer Profile Billing Period Invoice Link/Unlink UI Wiring (May 27, 2026)
 
 - Customer profile (pp/customers/[id]/page.tsx) wires UI-only controls inside each Maintenance Agreement card's Billing Periods block:
-  - Link Existing Invoice form → linkInternalInvoiceToBillingPeriodFromForm (Phase 5G-B1 server action). Visible only when the billing period is not cancelled AND has no internal_invoice_id.
-  - Unlink Invoice form → unlinkInternalInvoiceFromBillingPeriodFromForm (Phase 5G-B1 server action). Visible only when the billing period has an internal_invoice_id. Reason (status_reason) is required.
+  - Link Existing Invoice form â†’ linkInternalInvoiceToBillingPeriodFromForm (Phase 5G-B1 server action). Visible only when the billing period is not cancelled AND has no internal_invoice_id.
+  - Unlink Invoice form â†’ unlinkInternalInvoiceFromBillingPeriodFromForm (Phase 5G-B1 server action). Visible only when the billing period has an internal_invoice_id. Reason (status_reason) is required.
 - Access/visibility gated to Owner/Admin/Billing via existing canManageInvoiceLifecycle signal already wired as canManageBillingPeriods. Dispatcher/Technician/non-financial roles see no link or unlink controls.
 - Helper copy (verbatim):
   - Link: `"Linking connects this billing period to an existing invoice for visibility only. It does not generate, issue, send, or collect payment."`
@@ -2104,3 +2104,76 @@ ext_due_date changes, no service-plan operational blocking.
   - git diff --check
   - git status -sb clean/synced
 - Next recommended phase: Phase 5G-B4 A-to-Z sandbox Stripe payment smoke using linked billing-period path.
+
+---
+
+## Phase 5G-B4E Finding - App-Level Dedupe Was Insufficient Under Live Concurrency (May 27, 2026)
+
+- Baseline app-level dedupe commit:
+	- 456dbb94064bf379518f44390318fe2f91270de4
+	- fix(payments): dedupe stripe webhook payment identity
+- Fresh live webhook smoke after B4D still produced duplicate payment truth.
+- Root cause: app-level pre-insert identity lookup was race-prone under concurrent live delivery of `charge.succeeded` and `checkout.session.completed`; both handlers could pass lookup before either insert became visible.
+- Observed failure shape:
+	- Duplicate `internal_invoice_payments` recorded rows
+	- Duplicate active `internal_invoice_payment_allocations` rows
+	- Duplicate `payment_recorded` job events
+	- Inflated paid total
+- Historical duplicate sandbox evidence rows were intentionally preserved and not repaired in this phase.
+
+## Phase 5G-B4F Fix - DB-Enforced Stripe Payment Identity Dedupe + Conflict Recovery (May 27, 2026)
+
+- Fix commit:
+	- 389fbfe
+	- fix(payments): enforce stripe identity dedupe in db and webhook recovery
+- Intent and behavior:
+	- Preserve event-level `stripe_event_id` idempotency.
+	- Enforce DB-level payment-identity uniqueness for recorded Stripe online payments.
+	- On unique conflict, resolve the canonical payment row, enrich missing identity fields, and return safe no-op success.
+	- Prevent duplicate payment rows under concurrent `charge.succeeded` and `checkout.session.completed` delivery.
+	- Keep one active allocation row per canonical recorded payment.
+	- Preserve failed-payment behavior.
+- Migration for this phase was applied to sandbox before smoke validation.
+- Production migration apply is intentionally separate and must be explicitly approved/recorded in its own production execution artifact.
+
+## Phase 5G-B4G Linked Billing-Period Smoke - Passed (May 27, 2026)
+
+- Fixture:
+	- Invoice: `92858983-7ed7-40bf-abba-681757347420` / `INV-20260527-B05C4FF8`
+	- Billing period: `2f6e1318-7f93-4213-b089-cb0cfb86275d`
+	- Agreement: `454b3737-fa39-46be-8925-45131a571693`
+	- Job: `105bfcbd-28c6-4bc0-ad6e-a3012a2d1fa9`
+	- Checkout session: `cs_test_a1f9fJn51SHyVqjqo3YAmH3LW9oC2VeE9iaSl41dSO7n69YGYtKmNrqZdc`
+	- Payment intent: `pi_3TbkfJ7itDepDR181dw3ipuJ`
+	- Charge: `ch_3TbkfJ7itDepDR1812I2YJUc`
+	- `charge.succeeded`: `evt_3TbkfJ7itDepDR181A4isyRF`
+	- `checkout.session.completed`: `evt_1TbkfL7itDepDR18iSHzVc2G`
+- Result:
+	- Both webhook events delivered HTTP 200.
+	- Exactly one recorded `internal_invoice_payments` row.
+	- Exactly one active `internal_invoice_payment_allocations` row.
+	- Exactly one `payment_recorded` job event.
+	- Invoice UI showed `Paid`, `Paid $17.50`, `Balance $0.00`.
+	- Billing period remained linked (`invoice_linked`).
+	- `maintenance_agreement_visits` remained 5.
+	- `next_due_date` remained `2026-09-15`.
+	- No invoice generation from billing period.
+	- No line-item generation from billing period.
+	- No service-plan operational mutation.
+
+## Additional Normal Invoice Regression Smoke - Passed (May 27, 2026)
+
+- Fixture:
+	- Job: `f6600de6-63d9-4551-94c1-a0b3a8db9a5c`
+	- Invoice: `db473f15-e689-48c8-b5fe-5473c286489b` / `INV-20260527-44C5BD3E`
+	- Checkout session: `cs_test_a1Ztci5TJIj4FGdlMjPcxvSOav4UUmt1YloB33E90zZhFk3Y0rkQy0LjEe`
+	- Payment intent: `pi_3TbnvA7itDepDR181vsnUqou`
+	- Charge: `py_3TbnvA7itDepDR181leExVTK`
+	- `charge.succeeded`: `evt_3TbnvA7itDepDR181oH2H05y`
+	- `checkout.session.completed`: `evt_1TbnvD7itDepDR18BRWaeldg`
+- Result:
+	- Both webhook events delivered HTTP 200.
+	- Exactly one recorded `internal_invoice_payments` row.
+	- Exactly one active `internal_invoice_payment_allocations` row.
+	- Exactly one `payment_recorded` job event.
+	- Invoice UI showed `Paid`, `Paid $17.50`, `Balance $0.00`.

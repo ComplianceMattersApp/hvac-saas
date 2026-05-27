@@ -1,10 +1,10 @@
-Compliance Matters Software — Spine v4.0 (Current Operational Source of Truth)
+Compliance Matters Software ï¿½ Spine v4.0 (Current Operational Source of Truth)
 
 Status: ACTIVE SOURCE OF TRUTH
 Purpose: Align future development, audits, and thread handoffs to the current, stabilized system state.
 
 **Note on Product Modes:**
-See [Compliance_Matters_Business_Layer_Roadmap.md § 3 Product Mode Matrix](./Compliance_Matters_Business_Layer_Roadmap.md#3-product-mode-matrix--eccherms-version-vs-hvac-service-version) for architectural guidance on the two product configurations (ECC/HERS and HVAC Service). Future development should respect product-mode separation to prevent buyer-story drift.
+See [Compliance_Matters_Business_Layer_Roadmap.md ï¿½ 3 Product Mode Matrix](./Compliance_Matters_Business_Layer_Roadmap.md#3-product-mode-matrix--eccherms-version-vs-hvac-service-version) for architectural guidance on the two product configurations (ECC/HERS and HVAC Service). Future development should respect product-mode separation to prevent buyer-story drift.
 
 **Release Scope Lock (May 2026):**
 Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical current decision surface covering:
@@ -123,7 +123,7 @@ Recent closeout snapshot (May 2026):
 - Boundary confirmation: no delete/reset behavior, no payroll engine, no wage/overtime calculations, no GPS/geofencing, no job-costing, no contractor/customer portal time tracking, and no QBO/payroll sync behavior were added.
 - Dedicated Closeout Queue V1, Calendar Work Context/Includes display, Ops Command Center premium layout/work board, job detail command-center polish, external billing one-click closeout UX, internal invoice workspace/send clarity, internal invoice print/save PDF, premium internal invoice and appointment email templates, appointment header polish, and Ops tenant logo polish are complete and treated as closed for this pass.
 - Estimates Section 2 production migration-and-smoke closeout passed in production (`ornrnvxtwwtulohqwxop`): approved Section 2 migrations (`20260519110000`, `20260520110000`, `20260520120000`, `20260520130000`) were applied with read-only schema/index verification passed; flat chain passed (`EST-20260521-0DEEAAB2` -> job `123ddddd-9305-47fb-a000-e81977ef343a` -> invoice `INV-20260521-6B51BC7E`); multi-option chain passed (`EST-20260521-4FF043F3`, selected option `Better` -> job `88ade054-3543-4685-a9d2-81da637cda8f` -> invoice `INV-20260521-D6518867`); idempotency/negative checks passed; validation passed (`254/254` estimate tests, `3/3` invoice provenance, TypeScript clean, clean git diff/status); no invoice issue/send, payment collection, Stripe tenant payment execution, QBO/SMS/email/provider/portal behavior occurred. Watch item only: dev-mode invoice-page SSR hydration/webpack error recovered to client rendering and did not block workflow. Final status: Section 2 internal estimate chain is complete and production-smoke passed; remaining estimate work is future UX/polish/customer-facing scope, not an internal-chain blocker.
-- Section 2K — Estimate Proposal Email Delivery / Customer Approval Flow is complete and docs-closed: secure proposal-link foundation is production-smoke proven; Customer Delivery UI is streamlined; provider-backed proposal email send smoke passed; public proposal-link approval smoke passed; internal in-app notification on customer approval is implemented and deployed-smoke proven (with duplicate-approval suppression); active-link cache-miss regeneration fallback smoke passed; local `EMAIL_DELIVERY_MODE=preview` smoke passed with rendered output written to `.tmp/email-outbox` and no real email delivery; token safety verified (`raw token` and `token_hash` are not persisted in events, communications, or notification payloads). Final workflow is now locked as Build proposal -> Finalize Proposal -> Customer Delivery -> Send Proposal Email / Copy Link -> Customer Approves -> Internal Notification -> Review/Convert when ready. Explicit non-actions remain: no SMS/text proposal delivery, no payment collection from proposal, no QBO behavior, no invoice issue/send behavior from proposal approval, no automatic job conversion, no automatic invoice conversion, no customer portal login dependency, no e-signature/legal artifact model, and no live SMS behavior.
+- Section 2K ï¿½ Estimate Proposal Email Delivery / Customer Approval Flow is complete and docs-closed: secure proposal-link foundation is production-smoke proven; Customer Delivery UI is streamlined; provider-backed proposal email send smoke passed; public proposal-link approval smoke passed; internal in-app notification on customer approval is implemented and deployed-smoke proven (with duplicate-approval suppression); active-link cache-miss regeneration fallback smoke passed; local `EMAIL_DELIVERY_MODE=preview` smoke passed with rendered output written to `.tmp/email-outbox` and no real email delivery; token safety verified (`raw token` and `token_hash` are not persisted in events, communications, or notification payloads). Final workflow is now locked as Build proposal -> Finalize Proposal -> Customer Delivery -> Send Proposal Email / Copy Link -> Customer Approves -> Internal Notification -> Review/Convert when ready. Explicit non-actions remain: no SMS/text proposal delivery, no payment collection from proposal, no QBO behavior, no invoice issue/send behavior from proposal approval, no automatic job conversion, no automatic invoice conversion, no customer portal login dependency, no e-signature/legal artifact model, and no live SMS behavior.
 - Remaining estimate polish is parked and non-blocking: public proposal Service Location wording/presentation audit (must never show business address in service-location slot), optional proposal email visual polish via local preview mode only, visual-only Customer Delivery UI tweaks unless field workflow evidence reopens behavior, optional notification routing enhancements (assignment/admin/internal-email), optional multi-option customer card presentation polish, and future public-proposal Service Location/card wording polish.
 - ECC subcool tolerance is now +/-3F.
 - Pricebook runtime seed display name is now Diagnostic instead of Diagnostic Fee.
@@ -192,7 +192,7 @@ Current Program Status Note (May 2026)
   - this is compliance-risk-reduction wording alignment only; future real SMS remains deferred pending consent/opt-out/quiet-hours/provider/audit/legal-provider review gates and explicit activation decision
   - guardrail framing: this is neutral communication-readiness hardening designed to preserve clean actor/recipient boundaries for future marketplace-style evolution, not Eddie-specific behavior
   - model-spec pointer: `docs/ACTIVE/SMS_Compliance_and_Consent_Model_Spec.md` now defines the future provider-powered SMS control contract and activation gates
-  - recipient/contact role model pointer: `docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md` defines the required first-class recipient/contact role model (audit decision C — 2026-05-14); this model must exist before any live SMS recipient selection; job snapshot phone fields are explicitly blocked from becoming SMS recipient truth
+  - recipient/contact role model pointer: `docs/ACTIVE/SMS_Recipient_and_Contact_Role_Model_Spec.md` defines the required first-class recipient/contact role model (audit decision C ï¿½ 2026-05-14); this model must exist before any live SMS recipient selection; job snapshot phone fields are explicitly blocked from becoming SMS recipient truth
   - schema design plan pointer: `docs/ACTIVE/SMS_Recipient_Consent_Schema_Design_Plan.md` proposes future schema tables (recipient registry, consent, suppression, audit trail) and enums; ready for schema design review
   - SMS Slice A Recipient Registry Foundation is complete and pushed in commit `afddb9c`:
     - migration created: `supabase/migrations/20260515120000_contact_recipients_slice_a_foundation.sql` (contact registry foundation only)
@@ -461,7 +461,7 @@ Current Program Status Note (May 2026)
     - action purpose: supports simplified V1 admin-owned workflow avoiding queue-shaped submit/approve/reject UI exposure
     - action posture: admin-only via `requireInternalRole("admin")`, account-scoped from authenticated internal-user context, accepts only `version_id` from form, re-validates all data server-side
     - action accepts: latest draft or latest pending_review versions (combined readiness allows both states)
-    - action validation: runs `validateOnTheWayTemplateBody()` — requires sandbox-readiness standard (no unknown tokens, STOP language present, no prohibited wording, estimated segments <= 2, canApproveForSandbox = true)
+    - action validation: runs `validateOnTheWayTemplateBody()` ï¿½ requires sandbox-readiness standard (no unknown tokens, STOP language present, no prohibited wording, estimated segments <= 2, canApproveForSandbox = true)
     - action mutations: sets version_status = approved_for_sandbox, internal_review_status = approved, legal_review_status = not_requested, provider_review_status = not_requested, approved_by_user_id, approved_at; updates parent sandbox_version_id only
     - action non-mutations: does not set current_version_id, does not set lifecycle_status, does not enable SMS, does not call provider/Twilio/webhook, does not write job_events
     - action safety: uses pointer-failure rollback posture when parent sandbox_version_id update fails
@@ -749,8 +749,8 @@ Current Program Status Note (May 2026)
 - Group 9A-9B Maintenance Agreement Visits Link Table Foundation is complete and pushed in commit `6bf7329`:
   - new link table: `maintenance_agreement_visits` in migration `supabase/migrations/20260513110000_maintenance_agreement_visits_link_foundation.sql`
   - durable `(agreement_id, job_id)` unique link with lifecycle fields (`link_source`, `count_status`, `counted_at`, `reversed_at`, reversal audit trail)
-  - link-source values: `service_plan_prefill`, `manual`, `system_future` — distinguishes prefill vs manual vs future origins
-  - count-status lifecycle: `linked`, `eligible`, `counted`, `excluded`, `reversed` — enables future reversibility without V1 count mutations
+  - link-source values: `service_plan_prefill`, `manual`, `system_future` ï¿½ distinguishes prefill vs manual vs future origins
+  - count-status lifecycle: `linked`, `eligible`, `counted`, `excluded`, `reversed` ï¿½ enables future reversibility without V1 count mutations
   - RLS: SELECT/INSERT/UPDATE account-scoped policies; no DELETE policy
   - read helpers in `lib/maintenance-agreements/read-model.ts`: `listMaintenanceAgreementVisitsForAgreement`, `listMaintenanceAgreementLinksForJob`, `summarizeMaintenanceAgreementVisitLinksForAgreement`
   - 4 new vitest-passed link-helper tests added to `lib/maintenance-agreements/__tests__/read-model.test.ts`
@@ -829,7 +829,7 @@ Current Program Status Note (May 2026)
 
 - Group 9A-3 Customer Profile Read-Only Agreement Display is complete and pushed in commit `09edc9f`:
   - feature flag: `lib/maintenance-agreements/agreement-exposure.ts` (`ENABLE_MAINTENANCE_AGREEMENTS`, defaults `false`)
-  - customer profile: `app/customers/[id]/page.tsx` — guarded read + Maintenance Agreements section (internal viewer + flag on only)
+  - customer profile: `app/customers/[id]/page.tsx` ï¿½ guarded read + Maintenance Agreements section (internal viewer + flag on only)
   - tests: `lib/maintenance-agreements/__tests__/agreement-exposure.test.ts` (14 tests; 21 total with read-model)
   - validation recorded: `npx.cmd vitest run lib/maintenance-agreements/__tests__` passed (`21` tests), `npx.cmd tsc --noEmit` passed
   - production guard: `ENABLE_MAINTENANCE_AGREEMENTS` defaults `false`; production does not attempt reads before migration apply
@@ -1578,7 +1578,7 @@ Locked V1 rules:
 
 Implementation note:
 This V1 solves relationship-aware intake and service-case continuity.
-It does not yet establish full follow-up lineage semantics such as “this visit happened because of Job A” as a first-class generalized model beyond the selected anchor and shared service case.
+It does not yet establish full follow-up lineage semantics such as ï¿½this visit happened because of Job Aï¿½ as a first-class generalized model beyond the selected anchor and shared service case.
 
 8. Service Case Container Model (Locked)
 8.1 Container rule
@@ -1885,7 +1885,7 @@ optional further visual/operator refinements
 optional additional filter/speed affordances
 10.5 Product rule
 
-Do not classify calendar/dispatch as “missing” unless discussing a specific UX enhancement not yet exposed.
+Do not classify calendar/dispatch as ï¿½missingï¿½ unless discussing a specific UX enhancement not yet exposed.
 
 10.6 Calendar status display rule
 
@@ -2342,15 +2342,15 @@ role / permission semantics
 do not overload user profiles to represent company identity
 keep the initial implementation narrow and identity-focused only
 
-18.3.1 First Owner Onboarding / Account Provisioning V1 (Implemented — Complete)
+18.3.1 First Owner Onboarding / Account Provisioning V1 (Implemented ï¿½ Complete)
 
 For V1 launch readiness, standard company/account onboarding now supports public self-serve signup at `/signup`, while invite-only platform-admin/operator provisioning remains active for controlled/manual fallback and special-case onboarding.
 
 **Implementation status: V1 complete.** Implemented across four slices:
-- `lib/business/first-owner-provisioning.ts` — idempotent provisioning helper; dry-run / apply modes
-- `scripts/provision-first-owner.ts` — operator script; requires explicit allow flags, and hosted `.supabase.co` targets require both allow flags for dry-run and apply
-- `lib/auth/first-owner-routing.ts` — first-owner marker detection and `/ops/admin` routing seam
-- `app/set-password/page.tsx` — updated to route first-owner acceptance to `/ops/admin`
+- `lib/business/first-owner-provisioning.ts` ï¿½ idempotent provisioning helper; dry-run / apply modes
+- `scripts/provision-first-owner.ts` ï¿½ operator script; requires explicit allow flags, and hosted `.supabase.co` targets require both allow flags for dry-run and apply
+- `lib/auth/first-owner-routing.ts` ï¿½ first-owner marker detection and `/ops/admin` routing seam
+- `app/set-password/page.tsx` ï¿½ updated to route first-owner acceptance to `/ops/admin`
 
 Confirmed V1 sequence:
 - operator runs provisioning script (dry-run first, then apply with explicit allow flags)
@@ -2383,7 +2383,7 @@ This direction preserves controlled onboarding quality, protects `account_owner_
 
 If Compliance Matters is later packaged as an app, login still uses the same server-side account provisioning/auth model; app shell packaging does not replace tenant onboarding or account ownership setup.
 
-18.4 Equipment Domain — Canonical Role Vocabulary and Field Contract
+18.4 Equipment Domain ï¿½ Canonical Role Vocabulary and Field Contract
 
 The job_equipment table uses equipment_role as the single canonical classification field.
 
@@ -2850,7 +2850,7 @@ Current implementation rule:
 
 19.9 Roadmap phases
 
-Phase P0 — Tracking only (current live state)
+Phase P0 ï¿½ Tracking only (current live state)
 
 Includes:
 - payment visibility
@@ -2858,7 +2858,7 @@ Includes:
 - operational payment awareness
 - manual/external reference support
 
-Phase P1 — Payment-ready foundation (closed; complete enough at current baseline)
+Phase P1 ï¿½ Payment-ready foundation (closed; complete enough at current baseline)
 
 Includes:
 - payment domain model
@@ -2913,7 +2913,7 @@ Does not include:
 - live refunds/disputes
 - processor-led payment execution
 
-Phase P2 — Customer payment acceptance (later planning phase; not immediate implementation)
+Phase P2 ï¿½ Customer payment acceptance (later planning phase; not immediate implementation)
 
 Recommended first live scope:
 - customer pays invoice online
@@ -2925,7 +2925,7 @@ Recommended first live scope:
 Separate future track (not part of tenant invoice/payment tracking phases above):
 - Platform subscription billing execution remains a platform-billing roadmap item and must not be conflated with tenant internal invoice billed/collected tracking truth.
 
-Phase P3 — Contractor/platform payout layer (later)
+Phase P3 ï¿½ Contractor/platform payout layer (later)
 
 Only after customer payment acceptance is stable.
 
@@ -2936,7 +2936,7 @@ Includes:
 - refund/dispute responsibility
 - optional platform fee activation if desired
 
-Phase P4 — Optional QBO sync (later)
+Phase P4 ï¿½ Optional QBO sync (later)
 
 Accounting convenience only.
 
@@ -3774,7 +3774,7 @@ This roadmap is subordinate to the Active Spine. If code or planning detail conf
 
 ---
 
-## Phase 5G-B2 Closeout — Customer Profile Billing Period Invoice Link/Unlink UI Wiring (May 27, 2026)
+## Phase 5G-B2 Closeout ï¿½ Customer Profile Billing Period Invoice Link/Unlink UI Wiring (May 27, 2026)
 
 - Customer profile (pp/customers/[id]/page.tsx) wires UI-only controls inside each Maintenance Agreement card's Billing Periods block:
   - Link Existing Invoice form ? linkInternalInvoiceToBillingPeriodFromForm (Phase 5G-B1 server action). Visible only when the billing period is not cancelled AND has no internal_invoice_id.
@@ -3836,3 +3836,76 @@ ext_due_date changes, no service-plan operational blocking.
   - git diff --check
   - git status -sb clean/synced
 - Next recommended phase: Phase 5G-B4 A-to-Z sandbox Stripe payment smoke using linked billing-period path.
+
+---
+
+## Phase 5G-B4E Finding - App-Level Dedupe Was Insufficient Under Live Concurrency (May 27, 2026)
+
+- Baseline app-level dedupe commit:
+  - 456dbb94064bf379518f44390318fe2f91270de4
+  - fix(payments): dedupe stripe webhook payment identity
+- Fresh live webhook smoke after B4D still produced duplicate payment truth.
+- Root cause: app-level pre-insert identity lookup was race-prone under concurrent live delivery of `charge.succeeded` and `checkout.session.completed`; both handlers could pass lookup before either insert became visible.
+- Observed failure shape:
+  - Duplicate `internal_invoice_payments` recorded rows
+  - Duplicate active `internal_invoice_payment_allocations` rows
+  - Duplicate `payment_recorded` job events
+  - Inflated paid total
+- Historical duplicate sandbox evidence rows were intentionally preserved and not repaired in this phase.
+
+## Phase 5G-B4F Fix - DB-Enforced Stripe Payment Identity Dedupe + Conflict Recovery (May 27, 2026)
+
+- Fix commit:
+  - 389fbfe
+  - fix(payments): enforce stripe identity dedupe in db and webhook recovery
+- Intent and behavior:
+  - Preserve event-level `stripe_event_id` idempotency.
+  - Enforce DB-level payment-identity uniqueness for recorded Stripe online payments.
+  - On unique conflict, resolve the canonical payment row, enrich missing identity fields, and return safe no-op success.
+  - Prevent duplicate payment rows under concurrent `charge.succeeded` and `checkout.session.completed` delivery.
+  - Keep one active allocation row per canonical recorded payment.
+  - Preserve failed-payment behavior.
+- Migration for this phase was applied to sandbox before smoke validation.
+- Production migration apply is intentionally separate and must be explicitly approved/recorded in its own production execution artifact.
+
+## Phase 5G-B4G Linked Billing-Period Smoke - Passed (May 27, 2026)
+
+- Fixture:
+  - Invoice: `92858983-7ed7-40bf-abba-681757347420` / `INV-20260527-B05C4FF8`
+  - Billing period: `2f6e1318-7f93-4213-b089-cb0cfb86275d`
+  - Agreement: `454b3737-fa39-46be-8925-45131a571693`
+  - Job: `105bfcbd-28c6-4bc0-ad6e-a3012a2d1fa9`
+  - Checkout session: `cs_test_a1f9fJn51SHyVqjqo3YAmH3LW9oC2VeE9iaSl41dSO7n69YGYtKmNrqZdc`
+  - Payment intent: `pi_3TbkfJ7itDepDR181dw3ipuJ`
+  - Charge: `ch_3TbkfJ7itDepDR1812I2YJUc`
+  - `charge.succeeded`: `evt_3TbkfJ7itDepDR181A4isyRF`
+  - `checkout.session.completed`: `evt_1TbkfL7itDepDR18iSHzVc2G`
+- Result:
+  - Both webhook events delivered HTTP 200.
+  - Exactly one recorded `internal_invoice_payments` row.
+  - Exactly one active `internal_invoice_payment_allocations` row.
+  - Exactly one `payment_recorded` job event.
+  - Invoice UI showed `Paid`, `Paid $17.50`, `Balance $0.00`.
+  - Billing period remained linked (`invoice_linked`).
+  - `maintenance_agreement_visits` remained 5.
+  - `next_due_date` remained `2026-09-15`.
+  - No invoice generation from billing period.
+  - No line-item generation from billing period.
+  - No service-plan operational mutation.
+
+## Additional Normal Invoice Regression Smoke - Passed (May 27, 2026)
+
+- Fixture:
+  - Job: `f6600de6-63d9-4551-94c1-a0b3a8db9a5c`
+  - Invoice: `db473f15-e689-48c8-b5fe-5473c286489b` / `INV-20260527-44C5BD3E`
+  - Checkout session: `cs_test_a1Ztci5TJIj4FGdlMjPcxvSOav4UUmt1YloB33E90zZhFk3Y0rkQy0LjEe`
+  - Payment intent: `pi_3TbnvA7itDepDR181vsnUqou`
+  - Charge: `py_3TbnvA7itDepDR181leExVTK`
+  - `charge.succeeded`: `evt_3TbnvA7itDepDR181oH2H05y`
+  - `checkout.session.completed`: `evt_1TbnvD7itDepDR18BRWaeldg`
+- Result:
+  - Both webhook events delivered HTTP 200.
+  - Exactly one recorded `internal_invoice_payments` row.
+  - Exactly one active `internal_invoice_payment_allocations` row.
+  - Exactly one `payment_recorded` job event.
+  - Invoice UI showed `Paid`, `Paid $17.50`, `Balance $0.00`.
