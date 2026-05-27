@@ -3540,3 +3540,24 @@ The following implementation groups have been closed as of May 2026.
 - Owner smoke passed: Support Cases panel, case creation, case detail, internal notes, status update, account snapshot counts.
 - Group 8 (Support / Owner Operations) next planned work is the full Support Console production enablement (runbook-gated, deferred) and any further Support Case V1 improvements.
 - Full spec and closeout record: `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`.
+
+---
+
+## Phase 5G-B2 Closeout — Customer Profile Billing Period Invoice Link/Unlink UI Wiring (May 27, 2026)
+
+- Customer profile (pp/customers/[id]/page.tsx) wires UI-only controls inside each Maintenance Agreement card's Billing Periods block:
+  - Link Existing Invoice form → linkInternalInvoiceToBillingPeriodFromForm (Phase 5G-B1 server action). Visible only when the billing period is not cancelled AND has no internal_invoice_id.
+  - Unlink Invoice form → unlinkInternalInvoiceFromBillingPeriodFromForm (Phase 5G-B1 server action). Visible only when the billing period has an internal_invoice_id. Reason (status_reason) is required.
+- Access/visibility gated to Owner/Admin/Billing via existing canManageInvoiceLifecycle signal already wired as canManageBillingPeriods. Dispatcher/Technician/non-financial roles see no link or unlink controls.
+- Helper copy (verbatim):
+  - Link: `"Linking connects this billing period to an existing invoice for visibility only. It does not generate, issue, send, or collect payment."`
+  - Unlink: `"Unlinking preserves invoice and payment history. It only removes this billing-period relationship."`
+- Six new query-param banners surfaced on the customer profile: illing_period_invoice_linked, illing_period_invoice_unlinked, illing_period_invoice_link_denied, illing_period_invoice_link_invalid, illing_period_invoice_link_conflict, illing_period_invoice_unlink_reason_required.
+- Boundaries preserved (no new behavior added):
+  - No invoice generation, no line-item creation, no issue/send/email of invoices.
+  - No payment links, payment rows, allocation rows, or Stripe behavior changes.
+  - No projection/read-path switch; invoice_summary and payment-display state remain derived from the existing read model.
+  - No mutation of maintenance_agreement_visits, no 
+ext_due_date changes, no service-plan operational blocking.
+  - No portal/customer self-service, no autopay/subscription/auto-renewal.
+- Tests: lib/customers/__tests__/customer-detail-page-wiring.test.ts extended (11 tests, all passing); lib/maintenance-agreements/__tests__/billing-period-actions.test.ts (16) and illing-period-read-model.test.ts (9) unchanged and still passing; full maintenance-agreements suite 105/105.

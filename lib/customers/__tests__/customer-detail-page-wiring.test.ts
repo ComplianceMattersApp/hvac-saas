@@ -83,4 +83,73 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).not.toContain("Subscription");
     expect(customerPageSource).not.toContain("Payment required before service");
   });
+
+  it("wires Link Existing Invoice control inside billing period block", () => {
+    expect(customerPageSource).toContain("linkInternalInvoiceToBillingPeriodFromForm");
+    expect(customerPageSource).toContain("linkBillingPeriodInvoiceAction");
+    expect(customerPageSource).toContain("Link Existing Invoice");
+    expect(customerPageSource).toContain("Existing Internal Invoice ID");
+    expect(customerPageSource).toContain(
+      "Linking connects this billing period to an existing invoice for visibility only. It does not generate, issue, send, or collect payment.",
+    );
+    // Visibility gated to financial managers
+    expect(customerPageSource).toContain("canManageBillingPeriods");
+    // Hidden when cancelled or already linked
+    expect(customerPageSource).toContain(
+      "billingPeriod.billing_period_status !== \"cancelled\" && !billingPeriod.internal_invoice_id",
+    );
+  });
+
+  it("wires Unlink Invoice control inside billing period block", () => {
+    expect(customerPageSource).toContain("unlinkInternalInvoiceFromBillingPeriodFromForm");
+    expect(customerPageSource).toContain("unlinkBillingPeriodInvoiceAction");
+    expect(customerPageSource).toContain("Unlink Invoice");
+    expect(customerPageSource).toContain(
+      "Unlinking preserves invoice and payment history. It only removes this billing-period relationship.",
+    );
+    // Reason required for unlink
+    expect(customerPageSource).toMatch(/action=\{unlinkBillingPeriodInvoiceAction\}[\s\S]*?name="status_reason"[\s\S]*?required/);
+    // Hidden when no linked invoice
+    expect(customerPageSource).toContain("{billingPeriod.internal_invoice_id ? (");
+  });
+
+  it("wires new billing-period invoice link banners", () => {
+    expect(customerPageSource).toContain("billing_period_invoice_linked");
+    expect(customerPageSource).toContain("billing_period_invoice_unlinked");
+    expect(customerPageSource).toContain("billing_period_invoice_link_denied");
+    expect(customerPageSource).toContain("billing_period_invoice_link_invalid");
+    expect(customerPageSource).toContain("billing_period_invoice_link_conflict");
+    expect(customerPageSource).toContain("billing_period_invoice_unlink_reason_required");
+    expect(customerPageSource).toContain(
+      "Billing period linked to existing invoice for visibility. No invoice was generated, sent, or charged.",
+    );
+    expect(customerPageSource).toContain(
+      "Billing period unlinked from invoice. Invoice and payment history are preserved.",
+    );
+  });
+
+  it("preserves existing billing-period and work-order affordances after link/unlink wiring", () => {
+    expect(customerPageSource).toContain("Add Billing Period");
+    expect(customerPageSource).toContain("Edit Billing Period");
+    expect(customerPageSource).toContain("Cancel Billing Period");
+    expect(customerPageSource).toContain("Create Work Order");
+  });
+
+  it("does not expose invoice generation, payment, or autopay button labels inside billing periods", () => {
+    // Disclaimer helper copy intentionally describes what link/unlink does NOT do
+    // (e.g. "does not generate, issue, send, or collect payment"). Only forbid
+    // actionable, title-case affordances that would imply such behavior is offered.
+    expect(customerPageSource).not.toContain("Generate Invoice");
+    expect(customerPageSource).not.toContain("Create Invoice");
+    expect(customerPageSource).not.toContain("Issue Invoice");
+    expect(customerPageSource).not.toContain("Send Invoice");
+    expect(customerPageSource).not.toContain("Email Invoice");
+    expect(customerPageSource).not.toContain("Collect Payment");
+    expect(customerPageSource).not.toContain("Pay Now");
+    expect(customerPageSource).not.toContain("Create Payment Link");
+    expect(customerPageSource).not.toContain("Stripe Checkout");
+    expect(customerPageSource).not.toContain("Autopay");
+    expect(customerPageSource).not.toContain("Subscription");
+    expect(customerPageSource).not.toContain("Payment required before service");
+  });
 });

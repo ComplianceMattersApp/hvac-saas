@@ -25,6 +25,8 @@ import {
 import {
   cancelMaintenanceAgreementBillingPeriodFromForm,
   createMaintenanceAgreementBillingPeriodFromForm,
+  linkInternalInvoiceToBillingPeriodFromForm,
+  unlinkInternalInvoiceFromBillingPeriodFromForm,
   updateMaintenanceAgreementBillingPeriodFromForm,
 } from "@/lib/maintenance-agreements/billing-period-actions";
 import {
@@ -800,6 +802,8 @@ export default async function CustomerDetailPage(props: {
   const createBillingPeriodAction = createMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
   const updateBillingPeriodAction = updateMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
   const cancelBillingPeriodAction = cancelMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
+  const linkBillingPeriodInvoiceAction = linkInternalInvoiceToBillingPeriodFromForm.bind(null, customerPath);
+  const unlinkBillingPeriodInvoiceAction = unlinkInternalInvoiceFromBillingPeriodFromForm.bind(null, customerPath);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -819,11 +823,25 @@ export default async function CustomerDetailPage(props: {
             Billing period cancelled.
           </div>
         )}
-        {(billingPeriodBanner === "validation_error" || billingPeriodBanner === "duplicate_or_overlap_error" || billingPeriodBanner === "access_denied") && (
+        {billingPeriodBanner === "billing_period_invoice_linked" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Billing period linked to existing invoice for visibility. No invoice was generated, sent, or charged.
+          </div>
+        )}
+        {billingPeriodBanner === "billing_period_invoice_unlinked" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Billing period unlinked from invoice. Invoice and payment history are preserved.
+          </div>
+        )}
+        {(billingPeriodBanner === "validation_error" || billingPeriodBanner === "duplicate_or_overlap_error" || billingPeriodBanner === "access_denied" || billingPeriodBanner === "billing_period_invoice_link_denied" || billingPeriodBanner === "billing_period_invoice_link_invalid" || billingPeriodBanner === "billing_period_invoice_link_conflict" || billingPeriodBanner === "billing_period_invoice_unlink_reason_required") && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
             {billingPeriodBanner === "validation_error" && "Could not save billing period. Verify the required fields and status/posture rules."}
             {billingPeriodBanner === "duplicate_or_overlap_error" && "A billing period with the same or overlapping coverage window already exists for this agreement."}
             {billingPeriodBanner === "access_denied" && "You do not have permission to manage billing periods for this customer."}
+            {billingPeriodBanner === "billing_period_invoice_link_denied" && "You do not have permission to link or unlink invoices on billing periods for this customer."}
+            {billingPeriodBanner === "billing_period_invoice_link_invalid" && "Could not link invoice. Verify the invoice belongs to this customer and is eligible for linking."}
+            {billingPeriodBanner === "billing_period_invoice_link_conflict" && "Could not link invoice. It is already linked to another billing period or conflicts with this billing period."}
+            {billingPeriodBanner === "billing_period_invoice_unlink_reason_required" && "A reason is required to unlink an invoice from a billing period."}
           </div>
         )}
         {hasJobsError && (
@@ -2467,6 +2485,69 @@ export default async function CustomerDetailPage(props: {
                                           </div>
                                         </form>
                                       </details>
+
+                                      {billingPeriod.billing_period_status !== "cancelled" && !billingPeriod.internal_invoice_id ? (
+                                        <details className="rounded-lg border border-sky-200 bg-sky-50 p-3">
+                                          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-sky-700">
+                                            Link Existing Invoice
+                                          </summary>
+                                          <form action={linkBillingPeriodInvoiceAction} className="mt-3 grid gap-3">
+                                            <input type="hidden" name="billing_period_id" value={billingPeriod.id} />
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-sky-800">Existing Internal Invoice ID</label>
+                                              <input
+                                                name="internal_invoice_id"
+                                                type="text"
+                                                required
+                                                placeholder="00000000-0000-0000-0000-000000000000"
+                                                className="w-full rounded-lg border border-sky-200 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+                                            <div className="text-xs text-sky-800">
+                                              Linking connects this billing period to an existing invoice for visibility only. It does not generate, issue, send, or collect payment.
+                                            </div>
+                                            <div>
+                                              <button
+                                                type="submit"
+                                                className="inline-flex items-center rounded-lg border border-sky-200 bg-white px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
+                                              >
+                                                Link Existing Invoice
+                                              </button>
+                                            </div>
+                                          </form>
+                                        </details>
+                                      ) : null}
+
+                                      {billingPeriod.internal_invoice_id ? (
+                                        <details className="rounded-lg border border-slate-300 bg-white p-3">
+                                          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-700">
+                                            Unlink Invoice
+                                          </summary>
+                                          <form action={unlinkBillingPeriodInvoiceAction} className="mt-3 grid gap-3">
+                                            <input type="hidden" name="billing_period_id" value={billingPeriod.id} />
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-slate-700">Reason</label>
+                                              <textarea
+                                                name="status_reason"
+                                                rows={2}
+                                                required
+                                                className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+                                            <div className="text-xs text-slate-600">
+                                              Unlinking preserves invoice and payment history. It only removes this billing-period relationship.
+                                            </div>
+                                            <div>
+                                              <button
+                                                type="submit"
+                                                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                                              >
+                                                Unlink Invoice
+                                              </button>
+                                            </div>
+                                          </form>
+                                        </details>
+                                      ) : null}
                                     </div>
                                   ) : null}
                                 </li>
