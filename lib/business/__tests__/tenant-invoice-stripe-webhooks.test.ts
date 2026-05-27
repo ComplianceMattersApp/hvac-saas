@@ -66,10 +66,27 @@ function makeIdentityRow(overrides?: Partial<Record<string, unknown>>) {
 function makeAdminInsertSuccess(opts?: {
   existingPaymentId?: string | null;
   identityRows?: Array<Record<string, unknown>>;
+  identityRowsByCall?: Array<Array<Record<string, unknown>>>;
+  insertError?: { message?: string; code?: string } | null;
+  insertedPaymentId?: string;
+  existingJobEventPaymentIds?: string[];
 }) {
   const existingPaymentId = String(opts?.existingPaymentId ?? 'payment-existing').trim() || null;
   const identityRows = Array.isArray(opts?.identityRows) ? opts!.identityRows : [];
-  const single = vi.fn(async () => ({ data: { id: 'payment-1' }, error: null }));
+  const insertError = opts?.insertError ?? null;
+  const insertedPaymentId = String(opts?.insertedPaymentId ?? 'payment-1').trim() || 'payment-1';
+  const identityRowsByCall = Array.isArray(opts?.identityRowsByCall)
+    ? opts.identityRowsByCall
+    : null;
+  let identityCallIndex = 0;
+  const existingJobEventPaymentIds = new Set(
+    (opts?.existingJobEventPaymentIds ?? []).map((value) => String(value ?? '').trim()).filter(Boolean),
+  );
+
+  const single = vi.fn(async () => ({
+    data: insertError ? null : { id: insertedPaymentId },
+    error: insertError,
+  }));
   const select = vi.fn(() => ({ single }));
   const insert = vi.fn(() => ({ select }));
   const updateMaybeSingle = vi.fn(async () => ({ data: { id: 'payment-existing' }, error: null }));
@@ -102,7 +119,10 @@ function makeAdminInsertSuccess(opts?: {
         or: vi.fn(() => selectQuery),
         order: vi.fn(() => selectQuery),
         limit: vi.fn(async (count: number) => ({
-          data: identityRows.slice(0, count),
+          data: (identityRowsByCall
+            ? (identityRowsByCall[identityCallIndex++] ?? [])
+            : identityRows
+          ).slice(0, count),
           error: null,
         })),
         maybeSingle: vi.fn(async () => ({
@@ -115,6 +135,29 @@ function makeAdminInsertSuccess(opts?: {
         select: vi.fn(() => selectQuery),
         insert,
         update,
+      };
+    }
+
+    if (table === 'job_events') {
+      const selectQuery: any = {
+        _metaFilter: null as { payment_id?: string } | null,
+        eq: vi.fn(() => selectQuery),
+        contains: vi.fn((_: string, value: { payment_id?: string }) => {
+          selectQuery._metaFilter = value;
+          return selectQuery;
+        }),
+        limit: vi.fn(async () => {
+          const paymentId = String(selectQuery?._metaFilter?.payment_id ?? '').trim();
+          const found = paymentId && existingJobEventPaymentIds.has(paymentId);
+          return {
+            data: found ? [{ id: `evt-existing-${paymentId}` }] : [],
+            error: null,
+          };
+        }),
+      };
+
+      return {
+        select: vi.fn(() => selectQuery),
       };
     }
 
@@ -346,6 +389,7 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('idempotency');
       expect(insert).not.toHaveBeenCalled();
+      expect(mockInsertJobEvent).not.toHaveBeenCalled();
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({ paymentId: 'payment-existing' }),
       );
@@ -377,6 +421,7 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('Payment already recorded');
       expect(insert).not.toHaveBeenCalled();
+      expect(mockInsertJobEvent).not.toHaveBeenCalled();
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({ paymentId: 'payment-existing' }),
       );
@@ -447,6 +492,7 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('idempotency');
       expect(insert).not.toHaveBeenCalled();
+      expect(mockInsertJobEvent).not.toHaveBeenCalled();
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({ paymentId: 'payment-existing' }),
       );
@@ -479,6 +525,7 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('Payment already recorded');
       expect(insert).not.toHaveBeenCalled();
+      expect(mockInsertJobEvent).not.toHaveBeenCalled();
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({ paymentId: 'payment-existing' }),
       );
@@ -510,6 +557,12 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.paymentId).toBe('payment-charge-first');
       expect(insert).not.toHaveBeenCalled();
       expect(update).toHaveBeenCalled();
+      const firstUpdateCall = (update.mock.calls?.[0] ?? null) as unknown[] | null;
+      const updatePatch = (firstUpdateCall?.[0] ?? null) as Record<string, unknown> | null;
+      expect(updatePatch).toMatchObject({
+        stripe_checkout_session_id: 'cs_test_1',
+      });
+      expect(mockInsertJobEvent).not.toHaveBeenCalled();
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({ paymentId: 'payment-charge-first' }),
       );
@@ -541,9 +594,191 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(result.paymentId).toBe('payment-checkout-first');
       expect(insert).not.toHaveBeenCalled();
       expect(update).toHaveBeenCalled();
+      expect(mockInsertJobEvent).not.toHaveBeenCalled();
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({ paymentId: 'payment-checkout-first' }),
       );
+    });
+
+    it('charge.succeeded first then checkout.session.completed yields one payment insert and one payment_recorded job event', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge, recordTenantInvoicePaymentFromCheckoutSession } =
+        await import('@/lib/business/tenant-invoice-stripe-webhooks');
+
+      const chargeFirst = makeAdminInsertSuccess({ insertedPaymentId: 'payment-canonical' });
+
+      const firstResult = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_charge_first',
+        connectedAccountId: 'acct_connected_1',
+        admin: chargeFirst.admin,
+      });
+
+      const checkoutSecond = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-canonical',
+            stripe_payment_intent_id: 'pi_test_1',
+            processor_charge_id: 'ch_test_1',
+            stripe_checkout_session_id: null,
+          }),
+        ],
+      });
+
+      const secondResult = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession(),
+        eventId: 'evt_checkout_second',
+        connectedAccountId: 'acct_connected_1',
+        admin: checkoutSecond.admin,
+      });
+
+      expect(firstResult.recorded).toBe(true);
+      expect(secondResult.recorded).toBe(false);
+      expect(chargeFirst.insert).toHaveBeenCalledTimes(1);
+      expect(checkoutSecond.insert).not.toHaveBeenCalled();
+      expect(mockInsertJobEvent).toHaveBeenCalledTimes(1);
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledTimes(2);
+    });
+
+    it('checkout.session.completed first then charge.succeeded yields one payment insert and one payment_recorded job event', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge, recordTenantInvoicePaymentFromCheckoutSession } =
+        await import('@/lib/business/tenant-invoice-stripe-webhooks');
+
+      const checkoutFirst = makeAdminInsertSuccess({ insertedPaymentId: 'payment-canonical' });
+
+      const firstResult = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession(),
+        eventId: 'evt_checkout_first',
+        connectedAccountId: 'acct_connected_1',
+        admin: checkoutFirst.admin,
+      });
+
+      const chargeSecond = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-canonical',
+            stripe_checkout_session_id: 'cs_test_1',
+            stripe_payment_intent_id: 'pi_test_1',
+            processor_charge_id: 'ch_test_1',
+          }),
+        ],
+      });
+
+      const secondResult = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_charge_second',
+        connectedAccountId: 'acct_connected_1',
+        admin: chargeSecond.admin,
+      });
+
+      expect(firstResult.recorded).toBe(true);
+      expect(secondResult.recorded).toBe(false);
+      expect(checkoutFirst.insert).toHaveBeenCalledTimes(1);
+      expect(chargeSecond.insert).not.toHaveBeenCalled();
+      expect(mockInsertJobEvent).toHaveBeenCalledTimes(1);
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledTimes(2);
+    });
+
+    it('checkout.session.completed insert conflict (23505) re-resolves canonical row and returns no-op success', async () => {
+      const { recordTenantInvoicePaymentFromCheckoutSession } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+
+      const { admin, insert, update } = makeAdminInsertSuccess({
+        insertError: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint',
+        },
+        identityRowsByCall: [
+          [],
+          [
+            makeIdentityRow({
+              id: 'payment-canonical',
+              stripe_checkout_session_id: 'cs_test_1',
+              stripe_payment_intent_id: 'pi_test_1',
+              processor_charge_id: 'ch_test_1',
+            }),
+          ],
+        ],
+      });
+
+      const result = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession(),
+        eventId: 'evt_checkout_conflict',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.paymentId).toBe('payment-canonical');
+      expect(result.reason).toContain('Payment already recorded');
+      expect(insert).toHaveBeenCalledTimes(1);
+      expect(update).toHaveBeenCalled();
+      expect(mockInsertJobEvent).not.toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'payment-canonical' }),
+      );
+    });
+
+    it('charge.succeeded insert conflict (23505) re-resolves canonical row and returns no-op success', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+
+      const { admin, insert, update } = makeAdminInsertSuccess({
+        insertError: {
+          code: '23505',
+          message: 'duplicate key value violates unique constraint',
+        },
+        identityRowsByCall: [
+          [],
+          [
+            makeIdentityRow({
+              id: 'payment-canonical',
+              stripe_checkout_session_id: 'cs_test_1',
+              stripe_payment_intent_id: 'pi_test_1',
+              processor_charge_id: 'ch_test_1',
+            }),
+          ],
+        ],
+      });
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_charge_conflict',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.paymentId).toBe('payment-canonical');
+      expect(result.reason).toContain('Payment already recorded');
+      expect(insert).toHaveBeenCalledTimes(1);
+      expect(update).toHaveBeenCalled();
+      expect(mockInsertJobEvent).not.toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'payment-canonical' }),
+      );
+    });
+
+    it('does not emit duplicate payment_recorded job event for same canonical payment id', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+
+      const { admin } = makeAdminInsertSuccess({
+        insertedPaymentId: 'payment-1',
+        existingJobEventPaymentIds: ['payment-1'],
+      });
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_existing_job_event',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(true);
+      expect(mockInsertJobEvent).not.toHaveBeenCalled();
     });
 
     it('checkout.session.completed missing invoice metadata is ignored without throw', async () => {

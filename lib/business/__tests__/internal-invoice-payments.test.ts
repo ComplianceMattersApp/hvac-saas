@@ -4,6 +4,7 @@ import {
   listInvoicePaymentRows,
   resolveInvoiceCollectedPaymentSummary,
   isStripeEventAlreadyRecorded,
+  isStripePaymentAlreadyRecorded,
   validateInvoiceEligibleForOnlinePayment,
   buildStripePaymentReference,
 } from '@/lib/business/internal-invoice-payments';
@@ -261,6 +262,54 @@ describe('internal invoice payment resolver', () => {
 
       expect(result1).toBe(false);
       expect(result2).toBe(false);
+      expect(supabase.from).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Stripe payment identity idempotency', () => {
+    it('returns true when any identity query returns a first row', async () => {
+      const supabase = {
+        from: vi.fn(() => {
+          const query: any = {
+            eq: vi.fn(() => query),
+            or: vi.fn(() => query),
+            limit: vi.fn(async () => ({
+              data: [{ id: 'pay-1' }, { id: 'pay-2' }],
+              error: null,
+            })),
+          };
+
+          return {
+            select: vi.fn(() => query),
+          };
+        }),
+      };
+
+      const exists = await isStripePaymentAlreadyRecorded({
+        accountOwnerUserId: 'owner-1',
+        invoiceId: 'inv-1',
+        stripeCheckoutSessionId: 'cs_1',
+        stripePaymentIntentId: 'pi_1',
+        processorChargeId: 'ch_1',
+        supabase,
+      });
+
+      expect(exists).toBe(true);
+    });
+
+    it('returns false when no identity value is provided', async () => {
+      const supabase = { from: vi.fn() };
+
+      const exists = await isStripePaymentAlreadyRecorded({
+        accountOwnerUserId: 'owner-1',
+        invoiceId: 'inv-1',
+        stripeCheckoutSessionId: '',
+        stripePaymentIntentId: null,
+        processorChargeId: undefined,
+        supabase,
+      });
+
+      expect(exists).toBe(false);
       expect(supabase.from).not.toHaveBeenCalled();
     });
   });
