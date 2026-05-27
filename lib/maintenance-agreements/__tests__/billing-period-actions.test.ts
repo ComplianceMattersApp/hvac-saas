@@ -244,6 +244,41 @@ describe("billing period server actions", () => {
     });
   });
 
+  it("awaits the server client before internal auth checks in create action", async () => {
+    const serverClient = {
+      auth: {
+        getUser: vi.fn(async () => ({ data: { user: { id: USER_ID } }, error: null })),
+      },
+    };
+    createClientMock.mockResolvedValueOnce(serverClient);
+
+    requireInternalUserMock.mockImplementationOnce(async ({ supabase }: any) => {
+      expect(supabase).toBe(serverClient);
+      expect(typeof supabase?.auth?.getUser).toBe("function");
+      return {
+        userId: USER_ID,
+        internalUser: {
+          user_id: USER_ID,
+          role: "billing",
+          is_active: true,
+          account_owner_user_id: OWNER_ID,
+        },
+      };
+    });
+
+    const admin = makeAdminClient();
+    createAdminClientMock.mockReturnValue(admin);
+
+    const { createMaintenanceAgreementBillingPeriodFromForm } = await import("@/lib/maintenance-agreements/billing-period-actions");
+
+    const target = await expectRedirect(() =>
+      createMaintenanceAgreementBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildFormData()),
+    );
+
+    expect(target).toBe(`/customers/${CUSTOMER_ID}?banner=created`);
+    expect(requireInternalUserMock).toHaveBeenCalledWith({ supabase: serverClient });
+  });
+
   it("denies office/tech roles and internal access failures", async () => {
     const officeAdmin = makeAdminClient();
     createAdminClientMock.mockReturnValue(officeAdmin);

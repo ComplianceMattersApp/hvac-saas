@@ -353,7 +353,7 @@ function parseBillingPeriodRecords(rows: unknown) {
 
 async function resolveInternalUserAccess(customerPath: string | null | undefined) {
   try {
-    const supabase = createClient();
+    const supabase = await createClient();
     const { internalUser, userId } = await requireInternalUser({ supabase });
 
     if (
