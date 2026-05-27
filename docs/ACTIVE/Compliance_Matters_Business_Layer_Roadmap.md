@@ -3561,3 +3561,47 @@ The following implementation groups have been closed as of May 2026.
 ext_due_date changes, no service-plan operational blocking.
   - No portal/customer self-service, no autopay/subscription/auto-renewal.
 - Tests: lib/customers/__tests__/customer-detail-page-wiring.test.ts extended (11 tests, all passing); lib/maintenance-agreements/__tests__/billing-period-actions.test.ts (16) and illing-period-read-model.test.ts (9) unchanged and still passing; full maintenance-agreements suite 105/105.
+
+---
+
+## Phase 5G-B3 Closeout - Billing Period Invoice Link/Unlink Sandbox Smoke (May 27, 2026)
+
+- Status: Complete in CMTest sandbox (project ref kvpesjdukqwwlgpkzfjm).
+- Safety guardrails held: no production access, no production mutation, no code changes, no schema changes, no commit during smoke.
+- Fixture used:
+  - Customer: ad18fa80-2817-476b-8fca-bdcf4ff3c3d6
+  - Maintenance agreement: 454b3737-fa39-46be-8925-45131a571693
+  - Billing period: 644d9e9d-4d8c-4064-9a0b-e614ca012363
+  - Invoice: acd0e4ac-5235-4a29-bf3e-b2f42cb87c45
+- UI smoke result:
+  - Link Existing Invoice succeeded through customer-profile UI using existing server action wiring.
+  - Unlink Invoice succeeded through customer-profile UI using existing server action wiring.
+  - Final post-unlink billing-period state: internal_invoice_id = null, billing_period_status = pending_billing, status_reason = "Phase5G-B3 sandbox unlink smoke".
+- Eligibility was confirmed for the link path:
+  - Same account: true
+  - Same customer: true
+  - Invoice not void: true
+  - Invoice not claimed after unlink: true
+  - Invoice job linked to same maintenance agreement via maintenance_agreement_visits: true
+- Runtime boundary confirmation:
+  - Billing-period invoice relationship is visibility-only.
+  - Unlink preserves invoice/payment history and clears only the billing-period relationship.
+  - No invoice generation, no line-item creation, no issue/send/email/payment-link behavior.
+  - No new payment rows, no new allocation rows (internal_invoice_payment_allocations), no Stripe/webhook behavior.
+  - No projection/read-path switch.
+  - No maintenance_agreement_visits mutation.
+  - No next_due_date mutation.
+- Side-effect counts remained unchanged:
+  - internal_invoices = 22
+  - internal_invoice_line_items = 28
+  - internal_invoice_payments = 3
+  - internal_invoice_payment_allocations = 3
+  - maintenance_agreement_visits = 10
+- Validation run passed:
+  - customer-detail-page-wiring.test.ts: 11/11
+  - billing-period-actions.test.ts + billing-period-read-model.test.ts: 25/25
+  - maintenance-agreements suite: 105/105
+  - npx.cmd tsc --noEmit
+  - git diff --check
+  - git status -sb clean/synced
+- Next recommended phase: Phase 5G-B4 A-to-Z sandbox Stripe payment smoke using linked billing-period path.
