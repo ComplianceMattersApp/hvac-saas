@@ -411,6 +411,12 @@ Phase 5D-B closeout (Service Plan Billing Period Read-Model Helper Foundation):
 - No UI, invoice generation/linking action, payment behavior, allocation read-path switch, or service-plan operational behavior changed.
 - Phase 5D-B is complete; next slice remains Phase 5D-C.
 
+Phase 5E-B closeout (Customer Profile Read-Only Billing Period Visibility):
+- Customer-profile-only read-only Billing Periods visibility was added inside each internal Maintenance Agreement card on `app/customers/[id]/page.tsx`.
+- Billing periods remain display-only: no billing-period mutations, no invoice generation/linking, no payment/Stripe/allocation/projection behavior changes, and no service-work blocking.
+- Billing periods remain non-blocking for work orders, visits, next due date, and visit counting.
+- Phase 5E-B is complete; next slice remains Phase 5E-C.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

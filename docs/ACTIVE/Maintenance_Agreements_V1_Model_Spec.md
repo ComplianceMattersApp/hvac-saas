@@ -151,6 +151,12 @@ Phase 5D-B closeout (Service Plan Billing Period Read-Model Helper Foundation):
 - No UI, mutation, invoice generation/linking action, payment behavior change, allocation read-path switch, or service-plan blocking was introduced.
 - Phase 5D-B is complete; next slice remains Phase 5D-C.
 
+Phase 5E-B closeout (Customer Profile Read-Only Billing Period Visibility):
+- Added customer-profile-only read-only Billing Periods visibility inside each internal Maintenance Agreement card on `app/customers/[id]/page.tsx`.
+- Billing periods are display-only: no billing-period mutations, no invoice generation/linking, no payment/Stripe/allocation/projection behavior changes, and no operational service-work blocking were introduced.
+- Billing periods remain non-blocking for work orders, visits, next due date, and visit counting.
+- Phase 5E-B is complete; next slice remains Phase 5E-C.
+
 ## Group 9A-9A Model Snapshot
 
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)

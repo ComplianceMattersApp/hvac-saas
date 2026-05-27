@@ -32,6 +32,10 @@ import {
   type MaintenanceAgreementVisitLinkSummary,
   type MaintenanceAgreementRow,
 } from "@/lib/maintenance-agreements/read-model";
+import {
+  listMaintenanceAgreementBillingPeriodsForCustomer,
+  type MaintenanceAgreementBillingPeriodReadModelRow,
+} from "@/lib/maintenance-agreements/billing-period-read-model";
 import VisitScopeBuilder from "@/components/jobs/VisitScopeBuilder";
 import { sanitizeVisitScopeItems } from "@/lib/jobs/visit-scope";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
@@ -125,6 +129,25 @@ function formatDate(value?: string | null) {
   if (!raw) return "—";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return formatDateOnlyDisplay(raw);
   return formatTimestampDateDisplayLA(raw) || "—";
+}
+
+function formatBillingPeriodPaymentDisplayStateLabel(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "not_invoice_backed") return "Not invoice-backed";
+  if (normalized === "invoice_draft") return "Invoice draft";
+  if (normalized === "unpaid") return "Unpaid";
+  if (normalized === "partially_paid") return "Partially paid";
+  if (normalized === "paid") return "Paid";
+  if (normalized === "invoice_void") return "Invoice void";
+  if (normalized === "payment_attention") return "Payment attention";
+  return "—";
+}
+
+function formatShortNote(value?: string | null, maxLength = 120) {
+  const raw = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (!raw) return null;
+  if (raw.length <= maxLength) return raw;
+  return `${raw.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
 function formatPhone(phone?: string | null) {
@@ -624,6 +647,30 @@ export default async function CustomerDetailPage(props: {
     } catch {
       // Fail safely — table may not exist in this environment
       customerAgreements = [];
+    }
+  }
+
+  let customerBillingPeriods: MaintenanceAgreementBillingPeriodReadModelRow[] = [];
+  const billingPeriodsByAgreementId = new Map<string, MaintenanceAgreementBillingPeriodReadModelRow[]>();
+  if (maintenanceAgreementsEnabled && customerAgreements.length > 0) {
+    try {
+      customerBillingPeriods = await listMaintenanceAgreementBillingPeriodsForCustomer({
+        supabase,
+        accountOwnerUserId: visibilityScope.accountOwnerUserId,
+        customerId,
+      });
+
+      for (const billingPeriod of customerBillingPeriods) {
+        const agreementId = String(billingPeriod.maintenance_agreement_id ?? "").trim();
+        if (!agreementId) continue;
+        if (!billingPeriodsByAgreementId.has(agreementId)) {
+          billingPeriodsByAgreementId.set(agreementId, []);
+        }
+        billingPeriodsByAgreementId.get(agreementId)!.push(billingPeriod);
+      }
+    } catch {
+      // Fail safely if the billing-period projection is unavailable in this environment.
+      customerBillingPeriods = [];
     }
   }
 
@@ -1778,6 +1825,7 @@ export default async function CustomerDetailPage(props: {
                   const statusBadge = agr.status === "active"
                     ? "border-emerald-200 bg-emerald-50 text-emerald-700"
                     : "border-slate-200 bg-slate-100 text-slate-600";
+                  const agreementBillingPeriods = billingPeriodsByAgreementId.get(agr.id) ?? [];
 
                   return (
                     <div
@@ -1914,6 +1962,96 @@ export default async function CustomerDetailPage(props: {
                             </div>
                           )}
                         </div>
+                      </div>
+
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                            Billing Periods
+                          </div>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Billing periods are for billing visibility only and do not control service visits.
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Work orders, visits, next due date, and visit counting continue independently of billing period status.
+                          </p>
+                        </div>
+
+                        {agreementBillingPeriods.length > 0 ? (
+                          <ul className="mt-3 space-y-2">
+                            {agreementBillingPeriods.map((billingPeriod) => {
+                              const paymentDisplayStateLabel = formatBillingPeriodPaymentDisplayStateLabel(
+                                billingPeriod.payment_display_state,
+                              );
+                              const paymentDisplayTone =
+                                billingPeriod.payment_display_state === "payment_attention"
+                                  ? "border-amber-200 bg-amber-50 text-amber-800"
+                                  : "border-slate-200 bg-slate-50 text-slate-700";
+                              const invoiceSummaryLabel = billingPeriod.invoice_summary
+                                ? `${billingPeriod.invoice_summary.invoice_number ?? billingPeriod.invoice_summary.invoice_id} · ${billingPeriod.invoice_summary.invoice_status}`
+                                : null;
+                              const dueDateLabel = billingPeriod.billing_due_date
+                                ? formatDate(billingPeriod.billing_due_date)
+                                : "No due date";
+                              const shortExternalNotes = formatShortNote(billingPeriod.external_notes);
+                              const shortStatusReason = formatShortNote(billingPeriod.status_reason);
+
+                              return (
+                                <li key={billingPeriod.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                                  <div className="flex flex-wrap items-start justify-between gap-2">
+                                    <div className="min-w-0">
+                                      <div className="text-sm font-medium text-slate-900">
+                                        {billingPeriod.coverage_label}
+                                      </div>
+                                      <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-700">
+                                          {billingPeriod.amount_label}
+                                        </span>
+                                        <span className="text-slate-300">&middot;</span>
+                                        <span>{dueDateLabel}</span>
+                                      </div>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${paymentDisplayTone}`}>
+                                        {paymentDisplayStateLabel}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-700">
+                                      {billingPeriod.posture_label}
+                                    </span>
+                                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-700">
+                                      {billingPeriod.lifecycle_label}
+                                    </span>
+                                    {invoiceSummaryLabel ? (
+                                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-700">
+                                        Invoice {invoiceSummaryLabel}
+                                      </span>
+                                    ) : null}
+                                    {billingPeriod.external_reference ? (
+                                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-700">
+                                        External ref {billingPeriod.external_reference}
+                                      </span>
+                                    ) : null}
+                                  </div>
+
+                                  {(shortStatusReason || shortExternalNotes) ? (
+                                    <div className="mt-2 space-y-1 text-xs text-slate-500">
+                                      {shortStatusReason ? <div>Reason: {shortStatusReason}</div> : null}
+                                      {shortExternalNotes ? <div>Notes: {shortExternalNotes}</div> : null}
+                                    </div>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        ) : (
+                          <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs text-slate-500">
+                            No billing periods have been created for this service plan yet.
+                          </div>
+                        )}
                       </div>
 
                       <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">

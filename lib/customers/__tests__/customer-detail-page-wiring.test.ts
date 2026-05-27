@@ -45,4 +45,25 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("View Location");
     expect(customerPageSource).toContain("Site / Access Contact");
   });
+
+  it("includes read-only billing periods inside maintenance agreement cards", () => {
+    expect(customerPageSource).toContain("Billing Periods");
+    expect(customerPageSource).toContain(
+      "Billing periods are for billing visibility only and do not control service visits.",
+    );
+    expect(customerPageSource).toContain(
+      "Work orders, visits, next due date, and visit counting continue independently of billing period status.",
+    );
+    expect(customerPageSource).toContain(
+      "No billing periods have been created for this service plan yet.",
+    );
+    expect(customerPageSource).toContain("listMaintenanceAgreementBillingPeriodsForCustomer");
+    expect(customerPageSource).toContain("billingPeriodsByAgreementId");
+    expect(customerPageSource).toContain("payment_display_state");
+    expect(customerPageSource).not.toContain("collect now");
+    expect(customerPageSource).not.toContain("generate invoice");
+    expect(customerPageSource).not.toContain("link invoice");
+    expect(customerPageSource).not.toContain("autopay");
+    expect(customerPageSource).not.toContain("subscription");
+  });
 });

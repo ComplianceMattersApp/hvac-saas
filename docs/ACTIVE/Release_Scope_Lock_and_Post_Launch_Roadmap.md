@@ -224,6 +224,12 @@ Recent closeout status snapshot (May 2026):
    - No UI, mutation, invoice generation/linking action, payment behavior change, allocation read-path switch, or service-plan blocking was introduced
    - Phase 5D-B is complete; next slice remains Phase 5D-C
 
+- **Phase 5E-B closeout (Customer Profile Read-Only Billing Period Visibility) is complete:**
+   - Customer-profile-only read-only Billing Periods visibility was added inside each internal Maintenance Agreement card on `app/customers/[id]/page.tsx`
+   - Billing periods remain display-only: no billing-period mutations, no invoice generation/linking, no payment/Stripe/allocation/projection behavior changes, and no service-work blocking
+   - Billing periods remain non-blocking for work orders, visits, next due date, and visit counting
+   - Phase 5E-B is complete; next slice remains Phase 5E-C
+
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
 - Completed behavior/copy alignment:
