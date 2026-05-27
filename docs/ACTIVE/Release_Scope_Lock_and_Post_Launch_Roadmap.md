@@ -335,6 +335,17 @@ Recent closeout status snapshot (May 2026):
     - Required future schema/model candidates: `service_plan_invoice_generation_audit`, `customer_stripe_payment_profiles`, `customer_stripe_payment_methods`, `maintenance_agreement_autopay_settings`, `autopay_consent_events`, `invoice_payment_attempts`, and deferred `scheduled_billing_jobs`
     - Recommended sequence lock: 6A docs/model lock -> 6B generated draft invoice -> 6C sandbox smoke -> 6D schema/model lock for saved method/consent -> 6E setup flow -> 6F manual charge -> 6G scheduled attempts -> 6H failed retry/attention -> 6I production enablement checklist
 
+- **Phase 6B closeout (Manual Generate Draft Invoice from Billing Period) is complete (server-action only):**
+   - Added server action `generateDraftInvoiceFromBillingPeriodFromForm` in `lib/maintenance-agreements/billing-period-actions.ts`
+   - Access remains Owner/Admin/Billing only; Dispatcher/Technician denied via existing financial authority checks
+   - Eligibility gates enforced: same-account billing period, non-cancelled, currently unlinked, `internal_invoice` posture, positive amount due, same-account/customer anchor job, and required existing anchor-job link through `maintenance_agreement_visits`
+   - Zero-amount generation is blocked in this phase (`amount_due_cents > 0`)
+   - Generated invoice uses existing job-scoped invoice contract (`job_id` retained), starts as `draft`, and adds one deterministic service-plan billing line item from period amount and coverage-window/cadence description
+   - On success, billing period is linked back (`internal_invoice_id`) and moved to `invoice_linked` status
+   - Duplicate prevention in first slice uses existing guards (period-link precondition, anchor active-invoice check, and conditional null-link update) without adding new schema
+   - No migration was added in Phase 6B; `service_plan_invoice_generation_audit` remains deferred
+   - Boundaries preserved: no invoice issue/send/email, no payment-link/Stripe/saved-card/autopay/scheduler behavior, no payment/allocation rows, no `maintenance_agreement_visits` mutation, and no `next_due_date` mutation
+
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
 - Completed behavior/copy alignment:

@@ -565,6 +565,46 @@ Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method 
 	8. Phase 6H failed payment retry/attention workflow
 	9. Phase 6I production enablement checklist
 
+Phase 6B closeout (Manual Generate Draft Invoice from Billing Period, server-action only):
+- Phase 6B is complete as server-action foundation only; no UI wiring is included in this slice.
+- Added `generateDraftInvoiceFromBillingPeriodFromForm` in `lib/maintenance-agreements/billing-period-actions.ts`.
+- Access lock is enforced through existing financial authority rules: Owner/Admin/Billing allowed; Dispatcher/Technician denied.
+- Eligibility enforcement is active:
+	- billing period must exist in same account scope
+	- billing period must not be `cancelled`
+	- billing period must not already have `internal_invoice_id`
+	- billing posture must be `internal_invoice`
+	- amount due must be positive (`amount_due_cents > 0`)
+	- anchor job must exist in same account scope
+	- anchor job customer must match maintenance-agreement customer where scoped
+	- anchor job must already be linked to the same maintenance agreement through `maintenance_agreement_visits`
+	- anchor job must not already have an active non-void invoice
+- Draft invoice creation behavior is active:
+	- creates a normal `internal_invoices` row with required `job_id` preserved
+	- invoice starts in `draft` status
+	- `source_type` remains `job`
+	- no issue/send/email/payment-link behavior is triggered
+- Controlled line-item behavior is active:
+	- one deterministic service-plan billing line item is inserted
+	- amount is sourced from `billing_period.amount_due_cents`
+	- description is deterministic from cadence + coverage window (`MM/DD/YYYY-MM/DD/YYYY`)
+	- line provenance remains compatible with current invoice line-item constraints (`source_kind = manual`)
+- Billing period link behavior is active:
+	- after successful invoice + line creation, billing period updates to `internal_invoice_id = <generated invoice id>` and `billing_period_status = invoice_linked`
+	- link update is guarded with `.is("internal_invoice_id", null)` to reduce duplicate-link races
+	- no visit-counting or `next_due_date` mutations occur
+- Idempotency/audit decision for Phase 6B:
+	- no schema migration was added in this slice
+	- first-slice duplicate protection uses existing relationship guards (`internal_invoice_id` null precondition + conditional link update), plus active-invoice check on anchor job and existing `internal_invoices` active-unique posture
+	- dedicated generation audit table remains a future additive candidate (`service_plan_invoice_generation_audit`) and is deferred
+- Runtime boundaries preserved:
+	- no payment row creation
+	- no allocation row creation
+	- no Stripe behavior
+	- no saved-card/autopay/scheduler behavior
+	- no `maintenance_agreement_visits` mutation
+	- no `next_due_date` mutation
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:

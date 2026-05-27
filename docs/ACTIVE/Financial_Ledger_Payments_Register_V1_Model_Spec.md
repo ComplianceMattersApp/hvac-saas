@@ -247,6 +247,37 @@ Current financial access model for sensitive financial actions:
     8. Phase 6H failed payment retry/attention workflow
     9. Phase 6I production enablement checklist
 
+- **Phase 6B closeout (Manual Generate Draft Invoice from Billing Period) is now complete (server-action only):**
+  - Added `generateDraftInvoiceFromBillingPeriodFromForm` in `lib/maintenance-agreements/billing-period-actions.ts`
+  - Access remains Owner/Admin/Billing only via existing financial authority gating; Dispatcher/Technician denied
+  - Eligibility enforcement is active:
+    - billing period exists in same account
+    - billing period is non-cancelled and currently unlinked (`internal_invoice_id` null)
+    - billing posture is `internal_invoice`
+    - `amount_due_cents` must be positive (> 0); zero-amount generation is blocked in this slice
+    - operator-provided anchor job exists in same account/customer scope
+    - anchor job is already linked to same maintenance agreement through `maintenance_agreement_visits`
+    - anchor job has no active non-void invoice
+  - Draft invoice creation behavior:
+    - creates normal job-scoped `internal_invoices` row (`job_id` preserved)
+    - invoice starts `draft`
+    - one deterministic service-plan billing line item is inserted (`source_kind = manual`)
+    - line amount derives from billing period amount; description is deterministic from cadence + coverage window
+  - Billing-period link behavior:
+    - on success updates billing period to `internal_invoice_id = generated_invoice_id` and `billing_period_status = invoice_linked`
+    - conditional link guard (`internal_invoice_id is null`) prevents duplicate relationship claims in race windows
+  - Idempotency/audit decision for this slice:
+    - no migration added in Phase 6B
+    - first-slice duplicate protection uses existing link-state guard + anchor active-invoice guard + conditional link update
+    - dedicated `service_plan_invoice_generation_audit` table remains deferred
+  - Forbidden side effects remain preserved:
+    - no invoice issue/send/email
+    - no payment-link/Stripe/saved-card/autopay/scheduler behavior
+    - no payment rows
+    - no allocation rows
+    - no `maintenance_agreement_visits` mutation
+    - no `next_due_date` mutation
+
 Current financial access model for sensitive financial actions:
 
 - authorized: structural owner, admin, billing

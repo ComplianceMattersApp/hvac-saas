@@ -18,7 +18,11 @@ type Banner =
   | "billing_period_invoice_link_denied"
   | "billing_period_invoice_link_invalid"
   | "billing_period_invoice_link_conflict"
-  | "billing_period_invoice_unlink_reason_required";
+  | "billing_period_invoice_unlink_reason_required"
+  | "billing_period_invoice_generated"
+  | "billing_period_invoice_generate_denied"
+  | "billing_period_invoice_generate_invalid"
+  | "billing_period_invoice_generate_conflict";
 
 type AgreementRow = {
   id: string;
@@ -43,6 +47,14 @@ type InternalInvoiceRow = {
   customer_id: string | null;
   job_id: string;
   status: string;
+};
+
+type AnchorJobRow = {
+  id: string;
+  account_owner_user_id: string;
+  customer_id: string | null;
+  location_id: string | null;
+  service_case_id: string | null;
 };
 
 type CreateOrUpdateInput = {
@@ -78,11 +90,48 @@ type UnlinkInput = {
   statusReason: string;
 };
 
+type GenerateDraftInvoiceInput = {
+  billingPeriodId: string;
+  anchorJobId: string;
+};
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INTERNAL_INVOICE_STATUSES = new Set(["draft", "pending_billing"]);
 const EXTERNAL_OFF_PLATFORM_STATUSES = new Set(["draft", "externally_billed"]);
 const MANUAL_STATUSES = new Set(["draft", "pending_billing"]);
+
+function buildInternalInvoiceNumber() {
+  const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+  const suffix = crypto.randomUUID().slice(0, 8).toUpperCase();
+  return `INV-${datePart}-${suffix}`;
+}
+
+function formatScaledInt(value: number, scale: number) {
+  const sign = value < 0 ? "-" : "";
+  const normalized = Math.abs(Math.trunc(value));
+  const divisor = 10 ** scale;
+  const whole = Math.floor(normalized / divisor);
+  const fraction = String(normalized % divisor).padStart(scale, "0");
+  return `${sign}${whole}.${fraction}`;
+}
+
+function formatCoverageRangeForDescription(startDate: string, endDate: string) {
+  const start = `${startDate.slice(5, 7)}/${startDate.slice(8, 10)}/${startDate.slice(0, 4)}`;
+  const end = `${endDate.slice(5, 7)}/${endDate.slice(8, 10)}/${endDate.slice(0, 4)}`;
+  return `${start}-${end}`;
+}
+
+function buildGeneratedBillingPeriodLineDescription(params: {
+  coverageStartDate: string;
+  coverageEndDate: string;
+  billingCadence: string;
+}) {
+  const cadence = clean(params.billingCadence).toLowerCase().replace(/[_\s]+/g, " ");
+  const cadenceLabel = cadence || "scheduled";
+  const range = formatCoverageRangeForDescription(params.coverageStartDate, params.coverageEndDate);
+  return `Service Plan Billing Period (${cadenceLabel}): ${range}`;
+}
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -329,6 +378,22 @@ function parseUnlinkForm(formData: FormData) {
   };
 }
 
+function parseGenerateDraftInvoiceForm(formData: FormData) {
+  const billingPeriodId = parseUuid(formData.get("billing_period_id"), "Billing period", true);
+  if (!billingPeriodId.ok) return billingPeriodId;
+
+  const anchorJobId = parseUuid(formData.get("anchor_job_id"), "Anchor job", true);
+  if (!anchorJobId.ok) return anchorJobId;
+
+  return {
+    ok: true as const,
+    value: {
+      billingPeriodId: billingPeriodId.value as string,
+      anchorJobId: anchorJobId.value as string,
+    } satisfies GenerateDraftInvoiceInput,
+  };
+}
+
 function normalizeStatusForPosture(input: {
   billingPosture: string;
   billingPeriodStatus: string;
@@ -534,6 +599,30 @@ async function loadInternalInvoice(admin: any, internalInvoiceId: string) {
   };
 }
 
+async function loadAnchorJob(admin: any, anchorJobId: string) {
+  const { data, error } = await admin
+    .from("jobs")
+    .select("id, account_owner_user_id, customer_id, location_id, service_case_id")
+    .eq("id", anchorJobId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id) {
+    return { ok: false as const };
+  }
+
+  return {
+    ok: true as const,
+    job: {
+      id: clean(data.id),
+      account_owner_user_id: clean(data.account_owner_user_id),
+      customer_id: clean(data.customer_id) || null,
+      location_id: clean(data.location_id) || null,
+      service_case_id: clean(data.service_case_id) || null,
+    } satisfies AnchorJobRow,
+  };
+}
+
 async function isInvoiceClaimedByAnotherBillingPeriod(params: {
   admin: any;
   accountOwnerUserId: string;
@@ -650,6 +739,18 @@ function rejectInvoiceLinkConflict(customerPath: string | null | undefined): nev
 
 function rejectInvoiceUnlinkReasonRequired(customerPath: string | null | undefined): never {
   redirectToCustomerProfile(customerPath, "billing_period_invoice_unlink_reason_required");
+}
+
+function rejectInvoiceGenerateDenied(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_generate_denied");
+}
+
+function rejectInvoiceGenerateInvalid(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_generate_invalid");
+}
+
+function rejectInvoiceGenerateConflict(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_generate_conflict");
 }
 
 function buildCreatePayload(
@@ -1021,6 +1122,189 @@ async function unlinkInternalInvoiceFromBillingPeriod(customerPath: string, form
   redirectToCustomerProfile(customerPath, "billing_period_invoice_unlinked");
 }
 
+async function generateDraftInvoiceFromBillingPeriod(customerPath: string, formData: FormData) {
+  const access = await resolveInternalUserAccess(customerPath, "billing_period_invoice_generate_denied");
+  const parsed = parseGenerateDraftInvoiceForm(formData);
+  if (!parsed.ok) {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const admin = createAdminClient();
+  const billingPeriodResult = await loadBillingPeriod(admin, parsed.value.billingPeriodId);
+  if (!billingPeriodResult.ok) {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const billingPeriod = billingPeriodResult.billingPeriod;
+  if (billingPeriod.account_owner_user_id !== access.internalUser.account_owner_user_id) {
+    rejectInvoiceGenerateDenied(customerPath);
+  }
+
+  if (clean(billingPeriod.billing_period_status).toLowerCase() === "cancelled") {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  if (billingPeriod.internal_invoice_id) {
+    rejectInvoiceGenerateConflict(customerPath);
+  }
+
+  const agreementResult = await loadAgreement(admin, billingPeriod.maintenance_agreement_id);
+  if (!agreementResult.ok) {
+    if (agreementResult.accessDenied) {
+      rejectInvoiceGenerateDenied(customerPath);
+    }
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const agreement = agreementResult.agreement;
+  if (agreement.account_owner_user_id !== access.internalUser.account_owner_user_id) {
+    rejectInvoiceGenerateDenied(customerPath);
+  }
+
+  const anchorJobResult = await loadAnchorJob(admin, parsed.value.anchorJobId);
+  if (!anchorJobResult.ok) {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const anchorJob = anchorJobResult.job;
+  if (anchorJob.account_owner_user_id !== agreement.account_owner_user_id) {
+    rejectInvoiceGenerateDenied(customerPath);
+  }
+
+  if (anchorJob.customer_id && anchorJob.customer_id !== agreement.customer_id) {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const linkedToAgreement = await hasInvoiceJobLinkedToAgreement({
+    admin,
+    accountOwnerUserId: agreement.account_owner_user_id,
+    agreementId: agreement.id,
+    jobId: anchorJob.id,
+  });
+  if (!linkedToAgreement) {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const { data: existingInvoiceForAnchorJob, error: existingInvoiceError } = await admin
+    .from("internal_invoices")
+    .select("id")
+    .eq("account_owner_user_id", agreement.account_owner_user_id)
+    .eq("job_id", anchorJob.id)
+    .neq("status", "void")
+    .maybeSingle();
+  if (existingInvoiceError) throw existingInvoiceError;
+  if (existingInvoiceForAnchorJob?.id) {
+    rejectInvoiceGenerateConflict(customerPath);
+  }
+
+  const { data: fullBillingPeriod, error: fullBillingPeriodError } = await admin
+    .from("maintenance_agreement_billing_periods")
+    .select("amount_due_cents, coverage_start_date, coverage_end_date, billing_cadence, billing_posture")
+    .eq("id", billingPeriod.id)
+    .maybeSingle();
+  if (fullBillingPeriodError) throw fullBillingPeriodError;
+  if (!fullBillingPeriod) {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const amountDueCents = Number(fullBillingPeriod.amount_due_cents ?? 0);
+  if (!Number.isInteger(amountDueCents) || amountDueCents <= 0) {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  if (clean(fullBillingPeriod.billing_posture).toLowerCase() !== "internal_invoice") {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const coverageStartDate = clean(fullBillingPeriod.coverage_start_date);
+  const coverageEndDate = clean(fullBillingPeriod.coverage_end_date);
+  if (!DATE_RE.test(coverageStartDate) || !DATE_RE.test(coverageEndDate) || coverageEndDate < coverageStartDate) {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const lineDescription = buildGeneratedBillingPeriodLineDescription({
+    coverageStartDate,
+    coverageEndDate,
+    billingCadence: clean(fullBillingPeriod.billing_cadence),
+  });
+
+  const { data: createdInvoice, error: createInvoiceError } = await admin
+    .from("internal_invoices")
+    .insert({
+      account_owner_user_id: agreement.account_owner_user_id,
+      job_id: anchorJob.id,
+      customer_id: agreement.customer_id,
+      location_id: anchorJob.location_id,
+      service_case_id: anchorJob.service_case_id,
+      invoice_number: buildInternalInvoiceNumber(),
+      status: "draft",
+      invoice_date: new Date().toISOString().slice(0, 10),
+      source_type: "job",
+      subtotal_cents: amountDueCents,
+      total_cents: amountDueCents,
+      notes: null,
+      created_by_user_id: access.userId,
+      updated_by_user_id: access.userId,
+    })
+    .select("id, status")
+    .maybeSingle();
+
+  if (createInvoiceError) {
+    if (createInvoiceError.code === "23505") {
+      rejectInvoiceGenerateConflict(customerPath);
+    }
+    throw createInvoiceError;
+  }
+
+  if (!createdInvoice?.id || clean(createdInvoice.status).toLowerCase() !== "draft") {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+
+  const { error: createLineError } = await admin
+    .from("internal_invoice_line_items")
+    .insert({
+      invoice_id: clean(createdInvoice.id),
+      sort_order: 1,
+      source_kind: "manual",
+      item_name_snapshot: "Service Plan Billing Period",
+      item_type_snapshot: "service",
+      description_snapshot: lineDescription,
+      quantity: "1.00",
+      unit_price: formatScaledInt(amountDueCents, 2),
+      line_subtotal: formatScaledInt(amountDueCents, 2),
+      created_by_user_id: access.userId,
+      updated_by_user_id: access.userId,
+    });
+  if (createLineError) {
+    throw createLineError;
+  }
+
+  const { data: linkedPeriod, error: linkError } = await admin
+    .from("maintenance_agreement_billing_periods")
+    .update({
+      internal_invoice_id: clean(createdInvoice.id),
+      billing_period_status: "invoice_linked",
+      updated_by_user_id: access.userId,
+    })
+    .eq("id", billingPeriod.id)
+    .is("internal_invoice_id", null)
+    .select("id")
+    .maybeSingle();
+
+  if (linkError) {
+    if (linkError.code === "23505") {
+      rejectInvoiceGenerateConflict(customerPath);
+    }
+    throw linkError;
+  }
+
+  if (!linkedPeriod?.id) {
+    rejectInvoiceGenerateConflict(customerPath);
+  }
+
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_generated");
+}
+
 export async function createMaintenanceAgreementBillingPeriodFromForm(
   customerPath: string,
   formData: FormData,
@@ -1054,4 +1338,11 @@ export async function unlinkInternalInvoiceFromBillingPeriodFromForm(
   formData: FormData,
 ) {
   await unlinkInternalInvoiceFromBillingPeriod(customerPath, formData);
+}
+
+export async function generateDraftInvoiceFromBillingPeriodFromForm(
+  customerPath: string,
+  formData: FormData,
+) {
+  await generateDraftInvoiceFromBillingPeriod(customerPath, formData);
 }

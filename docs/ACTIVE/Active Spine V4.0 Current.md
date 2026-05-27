@@ -152,6 +152,31 @@ Recommended sequence lock:
 8. 6H failed payment retry/attention flow
 9. 6I production enablement checklist
 
+**Phase 6B closeout (Manual Generate Draft Invoice from Billing Period):**
+Phase 6B is complete as server-action foundation only (no UI changes in this slice). Added `generateDraftInvoiceFromBillingPeriodFromForm` in `lib/maintenance-agreements/billing-period-actions.ts`.
+
+Enforced model contract:
+- Access: Owner/Admin/Billing only via existing financial authority gates.
+- Eligibility: billing period same-account, non-cancelled, unlinked, `internal_invoice` posture, positive amount due, and anchor job same-account/customer scope with required existing `maintenance_agreement_visits` linkage to the same agreement.
+- Duplicate protection: block when billing period already linked, block when anchor job already has active non-void invoice, and guard link update with `internal_invoice_id is null` condition.
+
+Implemented behavior:
+- Creates normal job-scoped `internal_invoices` draft (`job_id` retained).
+- Inserts one deterministic service-plan billing line item from billing-period amount and cadence/coverage description.
+- Links billing period to generated invoice and sets `billing_period_status = invoice_linked` after successful creation.
+
+Boundaries preserved:
+- no invoice issue/send/email behavior
+- no payment-link creation
+- no payment or allocation rows
+- no Stripe/saved-card/autopay/scheduling behavior
+- no `maintenance_agreement_visits` mutation
+- no `next_due_date` mutation
+
+Migration posture:
+- No migration added in Phase 6B.
+- Dedicated generation audit table remains deferred (`service_plan_invoice_generation_audit`).
+
 **Service Role Controls / Financial Access Controls V1A Model Lock:**
 V1A-2, V1A-3, and V1A-4 are implemented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md): Billing / AR is now a valid internal role; sensitive financial authority is structural owner/admin/billing; dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users are blocked by default for sensitive financial actions; and server-side gates are active for manual invoice payment recording, tenant payment-link/checkout-session creation, invoice ledger CSV export, invoice draft create/update, invoice issue, invoice void, and invoice email send/resend. Billing / AR is not Admin and does not receive admin/team-management authority by default. **Payments Register V1A/V1B now implement these gates**: `/reports/payments` register page and `/reports/payments/export` CSV export both verify Owner/Admin/Billing authority; Dispatcher/Technician are blocked by default. Access-control prerequisite is satisfied and leveraged by Payments Register implementation.
 

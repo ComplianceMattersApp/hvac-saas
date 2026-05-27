@@ -361,6 +361,32 @@ Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method 
   8. Phase 6H failed payment retry/attention flow
   9. Phase 6I production enablement checklist
 
+Phase 6B closeout (Manual Generate Draft Invoice from Billing Period, server-action only):
+- Phase 6B is complete as server-action foundation only with no UI additions in this slice.
+- Added `generateDraftInvoiceFromBillingPeriodFromForm` with existing Owner/Admin/Billing financial authority gating.
+- Enforced eligibility contract:
+  - billing period must be same-account, non-cancelled, and currently unlinked
+  - billing posture must be `internal_invoice`
+  - billing period amount must be positive
+  - anchor job must be same-account/customer scope and already linked to same maintenance agreement via `maintenance_agreement_visits`
+  - anchor job must not already have an active non-void invoice
+- Implemented draft creation contract:
+  - creates normal `internal_invoices` row with required `job_id` preserved
+  - invoice status is `draft`
+  - adds one deterministic service-plan billing line item sourced from billing period amount
+- Implemented relationship writeback contract:
+  - sets billing period `internal_invoice_id` and `billing_period_status = invoice_linked` on success
+  - uses conditional null-link update guard to reduce duplicate-link races
+- Idempotency/audit posture for Phase 6B:
+  - no migration added
+  - first-slice duplicate protection uses existing model constraints and guarded updates
+  - dedicated generation audit table remains deferred (`service_plan_invoice_generation_audit`)
+- Explicit non-goals preserved:
+  - no invoice issue/send/email
+  - no payment or allocation mutation
+  - no Stripe/autopay/saved-card/scheduling behavior
+  - no `maintenance_agreement_visits` or `next_due_date` mutation
+
 Relationship intake and display lane closeout (May 2026):
 - This lane is complete for V1 and should be treated as closed unless real usage evidence reopens it.
 - Completed scope:

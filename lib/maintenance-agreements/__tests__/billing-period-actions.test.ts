@@ -43,10 +43,12 @@ const INVOICE_TWO_ID = "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb";
 function buildSelectable(rows: MockRow[]) {
   const eqFilters: Array<[string, unknown]> = [];
   const neqFilters: Array<[string, unknown]> = [];
+  const isFilters: Array<[string, unknown]> = [];
 
   const exec = () =>
     rows.filter((row) => eqFilters.every(([column, value]) => row[column] === value))
-      .filter((row) => neqFilters.every(([column, value]) => row[column] !== value));
+      .filter((row) => neqFilters.every(([column, value]) => row[column] !== value))
+      .filter((row) => isFilters.every(([column, value]) => row[column] === value));
 
   const build = (): any => ({
     select: () => build(),
@@ -56,6 +58,10 @@ function buildSelectable(rows: MockRow[]) {
     },
     neq: (column: string, value: unknown) => {
       neqFilters.push([column, value]);
+      return build();
+    },
+    is: (column: string, value: unknown) => {
+      isFilters.push([column, value]);
       return build();
     },
     order: () => build(),
@@ -101,15 +107,29 @@ function makeInvoiceRow(input: Partial<MockRow> & { id: string }) {
   };
 }
 
+function makeJobRow(input: Partial<MockRow> & { id: string }) {
+  return {
+    account_owner_user_id: OWNER_ID,
+    customer_id: CUSTOMER_ID,
+    location_id: null,
+    service_case_id: null,
+    ...input,
+  };
+}
+
 function makeAdminClient(params?: {
   agreement?: MockRow | null;
   customer?: MockRow | null;
   periods?: MockRow[];
   invoices?: MockRow[];
+  jobs?: MockRow[];
   visitLinks?: MockRow[];
   insertReturns?: MockRow | null;
   updateReturns?: MockRow | null;
   updateError?: { code?: string; message?: string } | null;
+  invoiceInsertReturns?: MockRow | null;
+  invoiceInsertError?: { code?: string; message?: string } | null;
+  lineItemInsertError?: { code?: string; message?: string } | null;
 }) {
   const agreement = params?.agreement === undefined
     ? {
@@ -121,9 +141,12 @@ function makeAdminClient(params?: {
   const customer = params?.customer === undefined ? { id: CUSTOMER_ID, owner_user_id: OWNER_ID } : params.customer;
   const periods = params?.periods ?? [];
   const invoices = params?.invoices ?? [];
+  const jobs = params?.jobs ?? [];
   const visitLinks = params?.visitLinks ?? [];
   const insertCalls: unknown[] = [];
   const updateCalls: unknown[] = [];
+  const invoiceInsertCalls: unknown[] = [];
+  const lineItemInsertCalls: unknown[] = [];
   const seenTables: string[] = [];
   const deleteMock = vi.fn(() => {
     throw new Error("delete should not be used");
@@ -166,16 +189,35 @@ function makeAdminClient(params?: {
           },
           update: (payload: unknown) => {
             updateCalls.push(payload);
-            return {
-              eq: () => ({
-                select: () => ({
-                  maybeSingle: async () => ({
-                    data: params?.updateError ? null : (params?.updateReturns ?? { id: PERIOD_ONE_ID }),
-                    error: params?.updateError ?? null,
-                  }),
+            const eqFilters: Array<[string, unknown]> = [];
+            const isFilters: Array<[string, unknown]> = [];
+            const resolveRow = () => {
+              if (params?.updateReturns !== undefined) return params.updateReturns;
+              const match = periods.find((row) =>
+                eqFilters.every(([column, value]) => row[column] === value) &&
+                isFilters.every(([column, value]) => row[column] === value)
+              );
+              return match ? { id: String(match.id) } : null;
+            };
+
+            const build = (): any => ({
+              eq: (column: string, value: unknown) => {
+                eqFilters.push([column, value]);
+                return build();
+              },
+              is: (column: string, value: unknown) => {
+                isFilters.push([column, value]);
+                return build();
+              },
+              select: () => ({
+                maybeSingle: async () => ({
+                  data: params?.updateError ? null : (resolveRow() ?? null),
+                  error: params?.updateError ?? null,
                 }),
               }),
-            };
+            });
+
+            return build();
           },
           delete: deleteMock,
         };
@@ -184,6 +226,34 @@ function makeAdminClient(params?: {
       if (table === "internal_invoices") {
         return {
           select: () => buildSelectable(invoices),
+          insert: (payload: unknown) => {
+            invoiceInsertCalls.push(payload);
+            return {
+              select: () => ({
+                maybeSingle: async () => ({
+                  data: params?.invoiceInsertError
+                    ? null
+                    : (params?.invoiceInsertReturns ?? { id: INVOICE_ONE_ID, status: "draft" }),
+                  error: params?.invoiceInsertError ?? null,
+                }),
+              }),
+            };
+          },
+        };
+      }
+
+      if (table === "internal_invoice_line_items") {
+        return {
+          insert: async (payload: unknown) => {
+            lineItemInsertCalls.push(payload);
+            return { error: params?.lineItemInsertError ?? null };
+          },
+        };
+      }
+
+      if (table === "jobs") {
+        return {
+          select: () => buildSelectable(jobs),
         };
       }
 
@@ -193,7 +263,7 @@ function makeAdminClient(params?: {
         };
       }
 
-      if (["internal_invoice_payments", "internal_invoice_payment_allocations", "jobs", "stripe"].includes(table)) {
+      if (["internal_invoice_payments", "internal_invoice_payment_allocations", "stripe"].includes(table)) {
         throw new Error(`Forbidden table touched: ${table}`);
       }
 
@@ -201,6 +271,8 @@ function makeAdminClient(params?: {
     }),
     _insertCalls: insertCalls,
     _updateCalls: updateCalls,
+    _invoiceInsertCalls: invoiceInsertCalls,
+    _lineItemInsertCalls: lineItemInsertCalls,
     _seenTables: seenTables,
     _deleteMock: deleteMock,
   };
@@ -247,6 +319,21 @@ function buildUnlinkFormData(overrides?: Record<string, string>) {
   const values = {
     billing_period_id: PERIOD_ONE_ID,
     status_reason: "Correction: linked wrong invoice",
+    ...overrides,
+  };
+
+  for (const [key, value] of Object.entries(values)) {
+    formData.set(key, value);
+  }
+
+  return formData;
+}
+
+function buildGenerateDraftInvoiceFormData(overrides?: Record<string, string>) {
+  const formData = new FormData();
+  const values = {
+    billing_period_id: PERIOD_ONE_ID,
+    anchor_job_id: JOB_ONE_ID,
     ...overrides,
   };
 
@@ -737,6 +824,245 @@ describe("billing period server actions", () => {
       unlinkInternalInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildUnlinkFormData()),
     );
     expect(noInvoiceLinked).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_link_invalid`);
+  });
+
+  it("generates draft invoice from billing period for Owner/Admin/Billing and links the period", async () => {
+    const admin = makeAdminClient({
+      periods: [
+        makeBillingPeriodRow({
+          id: PERIOD_ONE_ID,
+          internal_invoice_id: null,
+          billing_period_status: "pending_billing",
+          billing_posture: "internal_invoice",
+          amount_due_cents: 25000,
+          coverage_start_date: "2026-07-01",
+          coverage_end_date: "2026-07-31",
+          billing_cadence: "monthly",
+        }),
+      ],
+      jobs: [makeJobRow({ id: JOB_ONE_ID, customer_id: CUSTOMER_ID })],
+      invoices: [],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+      updateReturns: { id: PERIOD_ONE_ID },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const { generateDraftInvoiceFromBillingPeriodFromForm } = await import(
+      "@/lib/maintenance-agreements/billing-period-actions"
+    );
+
+    const target = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(
+        `/customers/${CUSTOMER_ID}`,
+        buildGenerateDraftInvoiceFormData(),
+      )
+    );
+
+    expect(target).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generated`);
+    expect(admin._invoiceInsertCalls).toHaveLength(1);
+    expect(admin._invoiceInsertCalls[0]).toMatchObject({
+      account_owner_user_id: OWNER_ID,
+      job_id: JOB_ONE_ID,
+      customer_id: CUSTOMER_ID,
+      status: "draft",
+      source_type: "job",
+      subtotal_cents: 25000,
+      total_cents: 25000,
+      created_by_user_id: USER_ID,
+      updated_by_user_id: USER_ID,
+    });
+    expect(admin._lineItemInsertCalls).toHaveLength(1);
+    expect(admin._lineItemInsertCalls[0]).toMatchObject({
+      invoice_id: INVOICE_ONE_ID,
+      source_kind: "manual",
+      item_name_snapshot: "Service Plan Billing Period",
+      item_type_snapshot: "service",
+      quantity: "1.00",
+      unit_price: "250.00",
+      line_subtotal: "250.00",
+      created_by_user_id: USER_ID,
+      updated_by_user_id: USER_ID,
+    });
+    expect(String((admin._lineItemInsertCalls[0] as any)?.description_snapshot ?? "")).toContain("Service Plan Billing Period (monthly): 07/01/2026-07/31/2026");
+    expect(admin._updateCalls.at(-1)).toMatchObject({
+      internal_invoice_id: INVOICE_ONE_ID,
+      billing_period_status: "invoice_linked",
+      updated_by_user_id: USER_ID,
+    });
+  });
+
+  it("denies dispatcher/technician for generate draft invoice action", async () => {
+    const { generateDraftInvoiceFromBillingPeriodFromForm } = await import(
+      "@/lib/maintenance-agreements/billing-period-actions"
+    );
+
+    const dispatcherAdmin = makeAdminClient();
+    createAdminClientMock.mockReturnValue(dispatcherAdmin);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+      internalUser: {
+        user_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc",
+        role: "dispatcher",
+        is_active: true,
+        account_owner_user_id: OWNER_ID,
+      },
+    });
+
+    const dispatcherTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(
+        `/customers/${CUSTOMER_ID}`,
+        buildGenerateDraftInvoiceFormData(),
+      )
+    );
+    expect(dispatcherTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_denied`);
+
+    const technicianAdmin = makeAdminClient();
+    createAdminClientMock.mockReturnValue(technicianAdmin);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+      internalUser: {
+        user_id: "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+        role: "technician",
+        is_active: true,
+        account_owner_user_id: OWNER_ID,
+      },
+    });
+
+    const technicianTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(
+        `/customers/${CUSTOMER_ID}`,
+        buildGenerateDraftInvoiceFormData(),
+      )
+    );
+    expect(technicianTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_denied`);
+  });
+
+  it("blocks cancelled/already-linked/zero-amount periods and missing visit linkage for generation", async () => {
+    const { generateDraftInvoiceFromBillingPeriodFromForm } = await import(
+      "@/lib/maintenance-agreements/billing-period-actions"
+    );
+
+    createAdminClientMock.mockReturnValue(makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_period_status: "cancelled", billing_posture: "internal_invoice" })],
+      jobs: [makeJobRow({ id: JOB_ONE_ID })],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+    }));
+    const cancelledTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+    expect(cancelledTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_invalid`);
+
+    createAdminClientMock.mockReturnValue(makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, internal_invoice_id: INVOICE_TWO_ID, billing_posture: "internal_invoice" })],
+      jobs: [makeJobRow({ id: JOB_ONE_ID })],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+    }));
+    const linkedTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+    expect(linkedTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_conflict`);
+
+    createAdminClientMock.mockReturnValue(makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, amount_due_cents: 0, billing_posture: "internal_invoice" })],
+      jobs: [makeJobRow({ id: JOB_ONE_ID })],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+    }));
+    const zeroAmountTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+    expect(zeroAmountTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_invalid`);
+
+    createAdminClientMock.mockReturnValue(makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice" })],
+      jobs: [makeJobRow({ id: JOB_ONE_ID })],
+      visitLinks: [{ id: "visit-mismatch", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_TWO_ID }],
+    }));
+    const visitMismatchTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+    expect(visitMismatchTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_invalid`);
+  });
+
+  it("blocks wrong-account/wrong-customer anchor job scope", async () => {
+    const { generateDraftInvoiceFromBillingPeriodFromForm } = await import(
+      "@/lib/maintenance-agreements/billing-period-actions"
+    );
+
+    createAdminClientMock.mockReturnValue(makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice" })],
+      jobs: [makeJobRow({ id: JOB_ONE_ID, account_owner_user_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee" })],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+    }));
+    const wrongAccountTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+    expect(wrongAccountTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_denied`);
+
+    createAdminClientMock.mockReturnValue(makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice" })],
+      jobs: [makeJobRow({ id: JOB_ONE_ID, customer_id: "ffffffff-ffff-4fff-8fff-ffffffffffff" })],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+    }));
+    const wrongCustomerTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+    expect(wrongCustomerTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_invalid`);
+  });
+
+  it("blocks duplicate generation when anchor job already has active invoice or period link race occurs", async () => {
+    const { generateDraftInvoiceFromBillingPeriodFromForm } = await import(
+      "@/lib/maintenance-agreements/billing-period-actions"
+    );
+
+    createAdminClientMock.mockReturnValue(makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, internal_invoice_id: null, billing_posture: "internal_invoice" })],
+      jobs: [makeJobRow({ id: JOB_ONE_ID })],
+      invoices: [makeInvoiceRow({ id: INVOICE_TWO_ID, job_id: JOB_ONE_ID, status: "draft" })],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+    }));
+    const existingInvoiceTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+    expect(existingInvoiceTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_conflict`);
+
+    createAdminClientMock.mockReturnValue(makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, internal_invoice_id: null, billing_posture: "internal_invoice" })],
+      jobs: [makeJobRow({ id: JOB_ONE_ID })],
+      invoices: [],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+      updateReturns: null,
+    }));
+    const raceTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+    expect(raceTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_conflict`);
+  });
+
+  it("preserves forbidden side effects during generation (no payments/allocations/Stripe/visits/next_due mutations)", async () => {
+    const admin = makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, internal_invoice_id: null, billing_posture: "internal_invoice" })],
+      jobs: [makeJobRow({ id: JOB_ONE_ID })],
+      invoices: [],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+      updateReturns: { id: PERIOD_ONE_ID },
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const { generateDraftInvoiceFromBillingPeriodFromForm } = await import(
+      "@/lib/maintenance-agreements/billing-period-actions"
+    );
+
+    await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+
+    expect(admin._seenTables).toContain("internal_invoices");
+    expect(admin._seenTables).toContain("internal_invoice_line_items");
+    expect(admin._seenTables).toContain("jobs");
+    expect(admin._seenTables).toContain("maintenance_agreement_visits");
+    expect(admin._seenTables).not.toContain("internal_invoice_payments");
+    expect(admin._seenTables).not.toContain("internal_invoice_payment_allocations");
+    expect(admin._seenTables).not.toContain("stripe");
   });
 
   it("maps race-condition unique conflicts to link_conflict banner", async () => {

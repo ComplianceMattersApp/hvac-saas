@@ -586,6 +586,31 @@ Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method 
 	8. Phase 6H failed payment retry/attention flow
 	9. Phase 6I production enablement checklist
 
+Phase 6B closeout (Manual Generate Draft Invoice from Billing Period, server-action only):
+- Phase 6B is complete as server-action foundation only; no UI changes are included in this slice.
+- Added `generateDraftInvoiceFromBillingPeriodFromForm` in `lib/maintenance-agreements/billing-period-actions.ts`.
+- Access remains Owner/Admin/Billing only via existing financial authority gates.
+- Eligibility checks are active for period/account/posture/amount/anchor-job scope and required agreement linkage through `maintenance_agreement_visits`.
+- Zero-amount generation is blocked in this slice (`amount_due_cents > 0` required).
+- Draft invoice creation now supports manual operator generation from billing period using the existing job-scoped invoice model:
+	- invoice status starts `draft`
+	- `job_id` remains required and is sourced from operator-selected anchor job
+	- one deterministic service-plan billing line item is inserted using billing-period amount
+- Billing period link behavior is active after successful invoice creation:
+	- sets `internal_invoice_id`
+	- sets `billing_period_status = invoice_linked`
+	- uses conditional null-link guard to reduce race-condition duplicate claims
+- Idempotency/audit decision in this phase:
+	- no migration added
+	- first-slice duplicate prevention relies on link-state guard, active-invoice guard on anchor job, and conditional link update
+	- dedicated `service_plan_invoice_generation_audit` table remains future/deferred
+- Runtime boundaries preserved:
+	- no issue/send/email
+	- no payment-link creation
+	- no payment/allocation rows
+	- no Stripe/saved-card/autopay/scheduler behavior
+	- no visit or `next_due_date` mutation
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

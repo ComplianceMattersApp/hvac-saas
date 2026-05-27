@@ -324,6 +324,40 @@ Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method 
 	8. Phase 6H failed payment retry/attention workflow
 	9. Phase 6I production enablement checklist
 
+Phase 6B closeout (Manual Generate Draft Invoice from Billing Period, server-action only):
+- Phase 6B is complete as server-action foundation only with no UI changes in this slice.
+- Added `generateDraftInvoiceFromBillingPeriodFromForm` in `lib/maintenance-agreements/billing-period-actions.ts`.
+- Access enforcement remains Owner/Admin/Billing only through existing financial authority gating; Dispatcher/Technician are denied.
+- Generation eligibility enforcement is active:
+	- billing period must be in account scope
+	- billing period must be non-cancelled and currently unlinked (`internal_invoice_id` null)
+	- billing posture must be `internal_invoice`
+	- amount due must be positive (`amount_due_cents > 0`)
+	- anchor job must be same-account and customer-aligned where customer scope exists
+	- anchor job must already be linked to the same maintenance agreement via `maintenance_agreement_visits`
+	- anchor job must not already have an active non-void invoice
+- Draft invoice creation behavior is active and bounded:
+	- creates standard job-scoped `internal_invoices` record (`job_id` retained)
+	- created invoice status is `draft`
+	- no issue/send/email/payment-link flow is triggered
+- Controlled line-item creation is active:
+	- exactly one service-plan billing line is inserted
+	- amount derives from `billing_period.amount_due_cents`
+	- description is deterministic from billing cadence + coverage window
+	- line-item provenance remains within existing allowed invoice line-item model (`source_kind = manual`)
+- Link behavior is active:
+	- on success, billing period is updated to `internal_invoice_id = generated_invoice_id` and `billing_period_status = invoice_linked`
+	- conditional update guard (`internal_invoice_id is null`) is used to reduce duplicate-link races
+	- no mutation of `maintenance_agreement_visits` or `next_due_date`
+- Idempotency/audit decision:
+	- no migration was added in Phase 6B
+	- first-slice idempotency is handled by existing link-state and active-invoice guards plus conditional link update
+	- dedicated generation audit table remains deferred as a future additive model (`service_plan_invoice_generation_audit`)
+- Runtime boundaries remain preserved:
+	- no payment or allocation rows
+	- no Stripe/saved-card/autopay/scheduler behavior
+	- no visit or next-due lifecycle mutation
+
 ## Group 9A-9A Model Snapshot
 
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)
