@@ -198,6 +198,17 @@ Recent closeout status snapshot (May 2026):
    - External/no-charge guardrails lock: external/off-platform/manual never create fake CM payment rows; no-charge/waived/not-billed are never treated as collected money; external references/notes/status metadata allowed
    - Operational guardrails lock: jobs/work orders/visits do not require billing period; visit counting does not require invoice/payment; billing period status does not mutate `maintenance_agreement_visits`; payment status does not advance `next_due_date`; unpaid may inform warnings/reporting only; non-internal-billing tenants remain supported
    - Phase 5C acceptance criteria lock: additive table only, strict RLS/account scope, same-account agreement/customer/invoice checks, and no UI/invoice generation/payment behavior changes/projection switch/service-plan visit-count behavior changes
+- **Phase 5C closeout (Service Plan Billing Period Schema Foundation) is complete (schema/tests/docs only):**
+   - Implemented additive migration: `20260526150000_maintenance_agreement_billing_periods_foundation.sql`
+   - Added table: `maintenance_agreement_billing_periods` with locked first-posture fields/statuses/postures and no forbidden financial/visit/next-due/Stripe/QBO fields
+   - Added required schema guards: coverage-end >= coverage-start, nonnegative amount, lowercase 3-letter currency constraint
+   - Added uniqueness guards: one coverage-window row per account/agreement/start/end and optional one billing-period claim per internal invoice
+   - Added same-account integrity trigger/function for agreement/customer/invoice consistency where available
+   - Added account-scoped RLS SELECT/INSERT/UPDATE policies and no DELETE policy
+   - Validation completed: focused schema test, maintenance-agreements suite, relevant payment allocation/internal invoice tests, TypeScript noEmit, and git diff check
+   - Local migration reset/apply validation succeeded; sandbox/production apply remains separate and was not executed in this phase
+   - Runtime boundaries preserved: no UI, no invoice generation, no payment behavior changes, no allocation projection/read-path switch, no Stripe checkout/webhook behavior changes, and no service-plan operational behavior changes
+   - Billing periods remain non-blocking for jobs/visits/work orders/visit counting/next-due workflows
 
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.

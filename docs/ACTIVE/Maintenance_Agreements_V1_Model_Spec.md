@@ -125,6 +125,19 @@ Phase 5B model lock (Service Plan Billing Period, docs/model only):
 	- no projection/read-path switch
 	- no service-plan visit/count behavior changes
 
+Phase 5C closeout (Service Plan Billing Period Schema Foundation, schema/tests/docs only):
+
+- Phase 5C schema foundation is complete as additive migration `20260526150000_maintenance_agreement_billing_periods_foundation.sql`.
+- Added table `maintenance_agreement_billing_periods` with first-posture fields only; product/UI language remains Service Plan Billing Period.
+- Locked lifecycle statuses and billing posture values are enforced in schema checks.
+- Coverage-window validity, nonnegative amount, currency-format validation, duplicate coverage-window prevention, and optional internal-invoice uniqueness are enforced.
+- Same-account scope integrity is enforced through trigger/function checks for maintenance agreement account, optional customer agreement match, and optional internal invoice account/customer consistency where available.
+- Account-scoped RLS is enabled with SELECT/INSERT/UPDATE and no DELETE policy.
+- No payment/allocation/visit/next-due mutation fields were added.
+- Service-plan operations remain non-blocking and unchanged: jobs/work orders/visits/visit counting/next-due workflows do not require billing periods or payments.
+- No UI, invoice generation, payment behavior, allocation projection/read-path switch, Stripe checkout/webhook behavior, or service-plan runtime behavior changed in this phase.
+- Local migration validation succeeded; sandbox/production migration apply remains separate from this closeout.
+
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)
 
 Group 9A-9A is a docs/model decision pass only. No implementation changes are included in this slice.

@@ -323,6 +323,22 @@ Phase 5B model lock (Service Plan Billing Period, docs/model only):
 	- no projection/read-path switch
 	- no service-plan visit/count behavior changes
 
+Phase 5C closeout (Service Plan Billing Period Schema Foundation, schema/tests/docs only):
+
+- Phase 5C schema foundation is complete as an additive migration: `20260526150000_maintenance_agreement_billing_periods_foundation.sql`.
+- Added table: `maintenance_agreement_billing_periods` (product/UI language remains Service Plan Billing Period).
+- Locked first-posture fields, lifecycle statuses, billing posture values, coverage-window constraints, nonnegative amount constraints, and currency format constraints are implemented.
+- Duplicate coverage-window prevention is implemented per account/agreement/start/end.
+- Optional internal invoice claim uniqueness is implemented when `internal_invoice_id` is present.
+- Same-account integrity is enforced via trigger/function checks across maintenance agreement, optional customer, and optional internal invoice scope.
+- Account-scoped RLS is implemented with SELECT/INSERT/UPDATE policies and no DELETE policy.
+- No forbidden first-posture fields were added (no payment/allocation/visit-count/next-due/Stripe/QBO/payment-status-truth fields).
+- Validation completed: focused schema foundation test, maintenance-agreements suite, relevant payment allocation/internal invoice tests, `npx.cmd tsc --noEmit`, and `git diff --check`.
+- Local migration validation completed via `supabase db reset --local --no-seed --yes`.
+- No UI, invoice generation, payment behavior, allocation projection/read-path switch, Stripe checkout/webhook behavior, or service-plan operational behavior changed in this phase.
+- Billing periods remain non-blocking for jobs/work orders/visits/visit counting/next-due workflows.
+- Sandbox and production migration apply remain separate and are not part of Phase 5C closeout.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:

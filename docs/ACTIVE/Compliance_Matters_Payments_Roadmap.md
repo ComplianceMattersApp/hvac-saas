@@ -384,6 +384,18 @@ Phase 5B closeout (Service Plan Billing Period Model Lock, docs/model only):
 	- no projection/read-path switch
 	- no service-plan visit/count behavior changes
 
+Phase 5C closeout (Service Plan Billing Period Schema Foundation, schema/tests/docs only):
+- Implemented additive migration `20260526150000_maintenance_agreement_billing_periods_foundation.sql`.
+- Added `maintenance_agreement_billing_periods` as first-posture Service Plan Billing Period schema with locked status/posture/coverage/amount/currency constraints.
+- Added first-posture uniqueness guards: one coverage window per account/agreement/start/end and optional one-claim-per-internal-invoice when invoice link is present.
+- Added same-account integrity trigger/function enforcing maintenance agreement account, optional customer-to-agreement match, and optional internal-invoice account/customer consistency where available.
+- Added account-scoped RLS policies for SELECT/INSERT/UPDATE with no DELETE policy.
+- Added focused schema foundation contract tests; related maintenance-agreements and payment allocation/internal-invoice test suites remained green.
+- Local migration validation succeeded via local reset/apply chain.
+- No UI, no invoice generation, no payment behavior, no allocation projection/read-path switch, no Stripe checkout/webhook behavior, and no service-plan operational behavior changes were introduced.
+- Billing periods remain non-blocking for jobs/work orders/visits/visit counting/next-due workflows.
+- Sandbox/production migration apply remains separate and was not executed in this phase.
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.
