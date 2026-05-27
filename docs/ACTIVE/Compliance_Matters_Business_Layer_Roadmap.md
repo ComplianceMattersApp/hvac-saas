@@ -66,6 +66,106 @@ Optional internal billing guardrail (May 2026):
 - Payment status may drive billing/reporting warnings but must not hard-block operations in first posture unless explicitly designed and approved later.
 - Payment truth remains separate from visit/link truth and must not attach directly to `maintenance_agreement_visits`.
 
+Phase 5B Service Plan Billing Period model lock (docs/model only):
+
+- Table/terminology lock:
+  - database table name: `maintenance_agreement_billing_periods`
+  - product/UI language: Service Plan Billing Period
+  - rationale: aligns with `maintenance_agreements` while preserving service-plan language
+- Source-of-truth boundaries lock:
+  - Maintenance Agreement = recurring service obligation truth
+  - Maintenance Agreement Visit = operational visit/link/counting truth
+  - Billing Period = commercial coverage-window truth
+  - Internal Invoice = billed commercial truth
+  - Internal Invoice Payment = collected money truth
+  - Payment Allocation = payment-to-invoice relationship truth
+  - paid/unpaid billing state is derived display/read truth only and cannot become operational truth
+- First posture lock:
+  - billing periods are commercial coverage records
+  - billing period may optionally link to one normal internal invoice
+  - first implementation links only to existing normal job-scoped internal invoices
+  - first billing-period schema slice does not expand `internal_invoices` beyond required `job_id`
+  - no auto-create invoices in foundation slice
+  - invoice/payment linkage is optional and never required for billing-period existence
+- Required fields lock:
+  - `id`
+  - `account_owner_user_id`
+  - `maintenance_agreement_id`
+  - optional denormalized `customer_id`
+  - `coverage_start_date`
+  - `coverage_end_date`
+  - `billing_due_date`
+  - `billing_cadence`
+  - `amount_due_cents`
+  - `currency`
+  - `billing_posture`
+  - `billing_period_status`
+  - nullable `internal_invoice_id`
+  - external/off-platform reference fields
+  - no-charge/waiver/not-billed reason fields
+  - created/updated audit fields
+- Forbidden first-posture fields lock:
+  - payment IDs
+  - allocation IDs
+  - maintenance-agreement-visit IDs
+  - visit-count fields
+  - `next_due_date` mutation fields
+  - operational blocking flags
+  - direct Stripe/subscription IDs
+  - QBO IDs
+- Lifecycle statuses lock:
+  - `draft`
+  - `pending_billing`
+  - `invoice_linked`
+  - `externally_billed`
+  - `no_charge`
+  - `waived`
+  - `not_billed`
+  - `cancelled`
+- Billing posture values lock:
+  - `internal_invoice`
+  - `external_off_platform`
+  - `manual`
+  - `no_charge`
+  - `waived`
+  - `not_billed_through_compliance_matters`
+- Derived payment display state lock (read-model only):
+  - `not_invoice_backed`
+  - `invoice_draft`
+  - `unpaid`
+  - `partially_paid`
+  - `paid`
+  - `invoice_void`
+  - `payment_attention`
+  - derives from linked invoice/payment truth where applicable and does not block operational work
+- Invoice linkage rules lock:
+  - billing period may link to one internal invoice
+  - linkage must be same account/customer scope
+  - linkage should prefer service-plan-originated/job-related invoice when available
+  - first posture disallows multiple billing periods claiming the same invoice
+  - payment allocations remain invoice-targeted and do not directly target billing periods yet
+- External/off-platform/no-charge guardrails lock:
+  - external/off-platform/manual billing never creates fake CM payment rows
+  - no-charge/waived/not-billed postures are never treated as collected money
+  - external references/notes/status metadata are allowed
+  - operational work remains allowed without internal billing
+- Operational guardrails lock:
+  - jobs/work orders/visits do not require billing period
+  - visit counting does not require invoice/payment
+  - billing period status does not mutate `maintenance_agreement_visits`
+  - payment status does not advance `next_due_date`
+  - unpaid status may inform warnings/reporting only
+  - tenants not using internal billing remain supported
+- Phase 5C schema-foundation acceptance criteria lock:
+  - additive table only
+  - RLS/account-scope enforced
+  - same-account agreement/customer/invoice checks
+  - no UI
+  - no invoice generation
+  - no payment behavior changes
+  - no projection/read-path switch
+  - no service-plan visit/count behavior changes
+
 Relationship intake and display lane closeout (May 2026):
 - This lane is complete for V1 and should be treated as closed unless real usage evidence reopens it.
 - Completed scope:

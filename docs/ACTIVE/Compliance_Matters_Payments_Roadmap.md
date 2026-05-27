@@ -317,6 +317,73 @@ Phase 4I-C closeout (Production Historical Allocation Backfill Preflight + No-Op
 - Payment row truth remains authoritative.
 - Allocation table remains ready for future rows through manual and Stripe dual-write.
 
+Phase 5B closeout (Service Plan Billing Period Model Lock, docs/model only):
+- Table/terminology lock:
+	- database table name: `maintenance_agreement_billing_periods`
+	- product/UI language: Service Plan Billing Period
+	- rationale: aligns with `maintenance_agreements` while preserving service-plan language
+- Source-of-truth boundaries lock:
+	- Maintenance Agreement = recurring service obligation truth
+	- Maintenance Agreement Visit = operational visit/link/counting truth
+	- Billing Period = commercial coverage-window truth
+	- Internal Invoice = billed commercial truth
+	- Internal Invoice Payment = collected money truth
+	- Payment Allocation = payment-to-invoice relationship truth
+	- paid/unpaid billing state is derived and cannot become operational truth
+- First posture lock:
+	- billing periods are commercial coverage records
+	- billing period may optionally link to one normal internal invoice
+	- first implementation links only to existing normal job-scoped internal invoices
+	- first schema slice does not expand `internal_invoices` beyond required `job_id`
+	- no auto-create invoices in foundation slice
+	- invoice/payment linkage not required for billing-period existence
+- Required fields lock:
+	- `id`, `account_owner_user_id`, `maintenance_agreement_id`, optional denormalized `customer_id`
+	- `coverage_start_date`, `coverage_end_date`, `billing_due_date`, `billing_cadence`
+	- `amount_due_cents`, `currency`, `billing_posture`, `billing_period_status`
+	- nullable `internal_invoice_id`
+	- external/off-platform reference fields
+	- no-charge/waiver/not-billed reason fields
+	- created/updated audit fields
+- Forbidden first-posture fields lock:
+	- payment IDs, allocation IDs, maintenance_agreement_visit IDs, visit-count fields
+	- next_due_date mutation fields, operational blocking flags
+	- direct Stripe/subscription IDs, QBO IDs
+- Lifecycle statuses lock:
+	- `draft`, `pending_billing`, `invoice_linked`, `externally_billed`, `no_charge`, `waived`, `not_billed`, `cancelled`
+- Billing posture values lock:
+	- `internal_invoice`, `external_off_platform`, `manual`, `no_charge`, `waived`, `not_billed_through_compliance_matters`
+- Derived payment display state lock (read-model only):
+	- `not_invoice_backed`, `invoice_draft`, `unpaid`, `partially_paid`, `paid`, `invoice_void`, `payment_attention`
+	- derives from linked invoice/payment truth and does not block operational work
+- Invoice linkage rules lock:
+	- billing period may link to one internal invoice
+	- same account/customer scope required
+	- prefer service-plan-originated/job-related invoice when available
+	- first posture disallows multiple billing periods claiming same invoice
+	- payment allocations remain invoice-targeted and do not directly target billing periods yet
+- External/off-platform/no-charge guardrails lock:
+	- external/off-platform/manual billing does not create fake CM payment rows
+	- no-charge/waived/not-billed postures are never treated as collected money
+	- external references/notes/status metadata allowed
+	- operational work remains allowed without internal billing
+- Operational guardrails lock:
+	- jobs/work orders/visits do not require billing periods
+	- visit counting does not require invoice/payment
+	- billing period status does not mutate `maintenance_agreement_visits`
+	- payment status does not advance `next_due_date`
+	- unpaid status may inform warnings/reporting only
+	- non-internal-billing tenants remain supported
+- Phase 5C schema-foundation acceptance criteria lock:
+	- additive table only
+	- RLS/account-scope enforced
+	- same-account agreement/customer/invoice checks
+	- no UI
+	- no invoice generation
+	- no payment behavior changes
+	- no projection/read-path switch
+	- no service-plan visit/count behavior changes
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.

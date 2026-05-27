@@ -158,6 +158,19 @@ Current financial access model for sensitive financial actions:
   - No projection/read-path switch occurred
   - Payment row truth remains authoritative
   - Allocation table remains ready for future rows through manual and Stripe dual-write
+- **Service Plan Billing Period Model Lock (Phase 5B) is now complete (docs/model only):**
+  - Table/terminology: database table name is locked to `maintenance_agreement_billing_periods`; product/UI language remains Service Plan Billing Period
+  - Source-of-truth boundaries: Maintenance Agreement = recurring obligation truth; Maintenance Agreement Visit = operational visit/link/counting truth; Billing Period = commercial coverage-window truth; Internal Invoice = billed commercial truth; Internal Invoice Payment = collected money truth; Payment Allocation = payment-to-invoice relationship truth; paid/unpaid billing state remains derived read-model only
+  - First posture: billing periods are commercial coverage records; may optionally link to one normal internal invoice; first implementation links only to existing normal job-scoped invoices; no `internal_invoices` expansion beyond required `job_id`; no invoice auto-generation; invoice/payment linkage optional
+  - Required fields lock: `id`, `account_owner_user_id`, `maintenance_agreement_id`, optional denormalized `customer_id`, `coverage_start_date`, `coverage_end_date`, `billing_due_date`, `billing_cadence`, `amount_due_cents`, `currency`, `billing_posture`, `billing_period_status`, nullable `internal_invoice_id`, external/off-platform reference fields, no-charge/waiver/not-billed reason fields, created/updated audit fields
+  - Forbidden first-posture fields: payment IDs, allocation IDs, maintenance-agreement-visit IDs, visit-count fields, next-due mutation fields, operational blocking flags, direct Stripe/subscription IDs, QBO IDs
+  - Lifecycle statuses lock: `draft`, `pending_billing`, `invoice_linked`, `externally_billed`, `no_charge`, `waived`, `not_billed`, `cancelled`
+  - Billing posture values lock: `internal_invoice`, `external_off_platform`, `manual`, `no_charge`, `waived`, `not_billed_through_compliance_matters`
+  - Derived payment display state lock (read-model only): `not_invoice_backed`, `invoice_draft`, `unpaid`, `partially_paid`, `paid`, `invoice_void`, `payment_attention`; this derives from invoice/payment truth where applicable and does not block operations
+  - Invoice linkage rules: billing period may link to one internal invoice; linkage must be same account/customer scope; should prefer service-plan-originated/job-related invoice when available; first posture disallows multiple billing periods claiming same invoice; payment allocations remain invoice-targeted (no direct billing-period allocation target)
+  - External/off-platform/manual/no-charge guardrails: never create fake CM payment rows; no-charge/waived/not-billed never treated as collected money; external references/notes/status metadata allowed; operational work remains allowed without internal billing
+  - Operational guardrails: jobs/work orders/visits do not require billing period; visit counting does not require invoice/payment; billing period status does not mutate `maintenance_agreement_visits`; payment status does not advance `next_due_date`; unpaid state may inform warnings/reporting only; non-internal-billing tenants remain supported
+  - Phase 5C acceptance criteria lock: additive table only; RLS/account scope; same-account agreement/customer/invoice checks; no UI; no invoice generation; no payment behavior changes; no projection/read-path switch; no service-plan visit/count behavior changes
 
 Current financial access model for sensitive financial actions:
 
