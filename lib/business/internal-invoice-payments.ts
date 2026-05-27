@@ -306,7 +306,7 @@ export async function isStripePaymentAlreadyRecorded(params: {
     .eq("account_owner_user_id", accountOwnerUserId)
     .eq("invoice_id", invoiceId)
     .or(identityClauses.join(","))
-    .maybeSingle();
+    .limit(1);
 
   if (error) {
     throw new Error(
@@ -314,7 +314,8 @@ export async function isStripePaymentAlreadyRecorded(params: {
     );
   }
 
-  return Boolean(data?.id);
+  const first = Array.isArray(data) ? data[0] : null;
+  return Boolean(first?.id);
 }
 
 /**

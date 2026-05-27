@@ -141,6 +141,35 @@ describe('Stripe webhook route — charge events', () => {
     );
   });
 
+  it('acknowledges charge.succeeded when payment identity is already recorded', async () => {
+    mockRecordTenantInvoicePaymentFromStripeCharge.mockResolvedValue({
+      recorded: false,
+      reason: 'Payment already recorded for Stripe payment identity',
+      paymentId: 'payment-existing',
+    });
+
+    const response = await postWebhook({
+      id: 'evt_charge_existing_identity',
+      account: 'acct_connected_1',
+      type: 'charge.succeeded',
+      data: {
+        object: {
+          id: 'ch_test_existing_identity',
+          amount: 10000,
+          created: 1747756800,
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            job_id: 'job-1',
+          },
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordTenantInvoicePaymentFromStripeCharge).toHaveBeenCalledTimes(1);
+  });
+
   it('ignores charge.succeeded without invoice_id (platform subscription preservation)', async () => {
     const response = await postWebhook({
       id: 'evt_platform_sub',

@@ -45,11 +45,37 @@ vi.mock('@/lib/business/payment-allocations', () => ({
     mockUpsertInvoicePaymentAllocationForPaymentRow(...args),
 }));
 
-function makeAdminInsertSuccess(opts?: { existingPaymentId?: string | null }) {
+function makeIdentityRow(overrides?: Partial<Record<string, unknown>>) {
+  return {
+    id: 'payment-existing',
+    stripe_checkout_session_id: null,
+    stripe_payment_intent_id: null,
+    processor_charge_id: null,
+    processor_payment_reference: null,
+    received_reference: null,
+    stripe_event_id: null,
+    stripe_charged_at: null,
+    paid_at: null,
+    notes: null,
+    payment_status: 'recorded',
+    created_at: '2026-05-19T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeAdminInsertSuccess(opts?: {
+  existingPaymentId?: string | null;
+  identityRows?: Array<Record<string, unknown>>;
+}) {
   const existingPaymentId = String(opts?.existingPaymentId ?? 'payment-existing').trim() || null;
+  const identityRows = Array.isArray(opts?.identityRows) ? opts!.identityRows : [];
   const single = vi.fn(async () => ({ data: { id: 'payment-1' }, error: null }));
   const select = vi.fn(() => ({ single }));
   const insert = vi.fn(() => ({ select }));
+  const updateMaybeSingle = vi.fn(async () => ({ data: { id: 'payment-existing' }, error: null }));
+  const updateSelect = vi.fn(() => ({ maybeSingle: updateMaybeSingle }));
+  const updateEq = vi.fn(() => ({ select: updateSelect }));
+  const update = vi.fn(() => ({ eq: updateEq }));
   const from = vi.fn((table: string) => {
     if (table === 'internal_invoices') {
       const query: any = {
@@ -74,6 +100,11 @@ function makeAdminInsertSuccess(opts?: { existingPaymentId?: string | null }) {
       const selectQuery: any = {
         eq: vi.fn(() => selectQuery),
         or: vi.fn(() => selectQuery),
+        order: vi.fn(() => selectQuery),
+        limit: vi.fn(async (count: number) => ({
+          data: identityRows.slice(0, count),
+          error: null,
+        })),
         maybeSingle: vi.fn(async () => ({
           data: existingPaymentId ? { id: existingPaymentId } : null,
           error: null,
@@ -83,6 +114,7 @@ function makeAdminInsertSuccess(opts?: { existingPaymentId?: string | null }) {
       return {
         select: vi.fn(() => selectQuery),
         insert,
+        update,
       };
     }
 
@@ -93,6 +125,7 @@ function makeAdminInsertSuccess(opts?: { existingPaymentId?: string | null }) {
     admin: { from },
     from,
     insert,
+    update,
   };
 }
 
@@ -322,7 +355,15 @@ describe('tenant invoice Stripe webhook handlers', () => {
       const { recordTenantInvoicePaymentFromStripeCharge } = await import(
         '@/lib/business/tenant-invoice-stripe-webhooks'
       );
-      const { admin, insert } = makeAdminInsertSuccess();
+      const { admin, insert } = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-existing',
+            stripe_payment_intent_id: 'pi_test_1',
+            processor_charge_id: 'ch_test_1',
+          }),
+        ],
+      });
 
       mockIsStripePaymentAlreadyRecorded.mockResolvedValueOnce(true);
 
@@ -415,7 +456,16 @@ describe('tenant invoice Stripe webhook handlers', () => {
       const { recordTenantInvoicePaymentFromCheckoutSession } = await import(
         '@/lib/business/tenant-invoice-stripe-webhooks'
       );
-      const { admin, insert } = makeAdminInsertSuccess();
+      const { admin, insert } = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-existing',
+            stripe_payment_intent_id: 'pi_test_1',
+            processor_charge_id: 'ch_test_1',
+            stripe_checkout_session_id: 'cs_test_1',
+          }),
+        ],
+      });
 
       mockIsStripePaymentAlreadyRecorded.mockResolvedValueOnce(true);
 
@@ -431,6 +481,68 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(insert).not.toHaveBeenCalled();
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({ paymentId: 'payment-existing' }),
+      );
+    });
+
+    it('charge.succeeded first then checkout.session.completed uses one canonical payment row and enriches session id', async () => {
+      const { recordTenantInvoicePaymentFromCheckoutSession } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert, update } = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-charge-first',
+            stripe_payment_intent_id: 'pi_test_1',
+            processor_charge_id: 'ch_test_1',
+            stripe_checkout_session_id: null,
+          }),
+        ],
+      });
+
+      const result = await recordTenantInvoicePaymentFromCheckoutSession({
+        session: baseCheckoutSession(),
+        eventId: 'evt_checkout_after_charge',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.paymentId).toBe('payment-charge-first');
+      expect(insert).not.toHaveBeenCalled();
+      expect(update).toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'payment-charge-first' }),
+      );
+    });
+
+    it('checkout.session.completed first then charge.succeeded uses one canonical payment row', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert, update } = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-checkout-first',
+            stripe_checkout_session_id: 'cs_test_1',
+            stripe_payment_intent_id: 'pi_test_1',
+            processor_charge_id: 'ch_test_1',
+          }),
+        ],
+      });
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_charge_after_checkout',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.paymentId).toBe('payment-checkout-first');
+      expect(insert).not.toHaveBeenCalled();
+      expect(update).toHaveBeenCalled();
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({ paymentId: 'payment-checkout-first' }),
       );
     });
 
