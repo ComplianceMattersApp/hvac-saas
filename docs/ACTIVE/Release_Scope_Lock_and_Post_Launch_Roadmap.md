@@ -289,6 +289,52 @@ Recent closeout status snapshot (May 2026):
    - Runtime boundaries are preserved: no invoice generation, no invoice line-item generation, no invoice issue/send/email behavior, no payment-link creation, no payment/allocation row mutation, no Stripe behavior change, no projection/read-path switch, no `maintenance_agreement_visits` mutation, and no `next_due_date` behavior change
    - Validation snapshot: focused billing-period action tests passed, billing-period read-model tests passed, maintenance-agreements suite passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed
 
+- **Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method Audit) is complete (docs/model only):**
+    - Phase 6A records model-lock audit outcomes only; no runtime/code/schema mutations are included in this closeout
+    - Audit confirms Service Plan Billing Foundation V1 is stable for manual billing-period operations and identifies additive requirements for generated invoices, Stripe-saved methods, consent, manual saved-method charge, scheduled attempts, and retry attention handling
+    - Locked source-of-truth boundaries are explicit:
+       - Maintenance Agreement = recurring service obligation truth
+       - Billing Period = commercial coverage-window truth
+       - Internal Invoice = billed commercial truth
+       - Internal Invoice Payment = collected/failed payment event truth when materially recorded
+       - Payment Allocation = invoice-targeted allocation truth
+       - Stripe = processor/payment method/money movement truth
+       - Compliance Matters Autopay Setting = future instruction/consent/audit truth
+       - operational surfaces (`maintenance_agreement_visits`, `next_due_date`) remain non-automated by payment outcomes
+    - Invoice generation model lock:
+       - one billing period -> at most one active generated invoice in first posture
+       - first generation posture remains manual Generate Draft Invoice only
+       - `internal_invoices` stays job-scoped in first implementation (`job_id` still required)
+       - generation requires explicit operator-selected anchor job linked through `maintenance_agreement_visits`
+       - no auto-send, no auto-charge, no scheduler in generation slice
+       - deterministic service-plan line-item generation with explicit taxability/pricebook mapping and idempotent generation audit keying
+    - Stripe-saved method model lock:
+       - no PAN/CVC/raw credential storage in Compliance Matters
+       - SetupIntent-first in connected-account context
+       - profile scope is tenant account + tenant customer
+       - multiple methods with one default allowed
+       - disconnected/stale profile blocks attempts
+    - Autopay consent model lock:
+       - default off
+       - agreement-scoped consent with version/time/source/actor/channel evidence
+       - saved method does not imply consent
+       - lifecycle states remain distinct (`enabled`, `disabled`, `paused`, `revoked`)
+    - Manual charge saved-method lock:
+       - precedes scheduled autopay
+       - requires issued non-void invoice with positive balance due + active consent + active saved method + connected-account readiness
+       - attempt row creation only; webhook remains money-truth writer
+    - Scheduled autopay lock:
+       - deferred until manual charge posture proves stable
+       - scheduler enqueues attempts only and must never directly mark invoices paid
+       - invalid contexts are skipped explicitly
+    - Failed payment/retry lock:
+       - failures are attention signals, not collected money
+       - failures do not mutate visits or `next_due_date`
+       - `requires_action` pauses automation until customer re-auth
+       - retries are explicit/bounded (no infinite loops)
+    - Required future schema/model candidates: `service_plan_invoice_generation_audit`, `customer_stripe_payment_profiles`, `customer_stripe_payment_methods`, `maintenance_agreement_autopay_settings`, `autopay_consent_events`, `invoice_payment_attempts`, and deferred `scheduled_billing_jobs`
+    - Recommended sequence lock: 6A docs/model lock -> 6B generated draft invoice -> 6C sandbox smoke -> 6D schema/model lock for saved method/consent -> 6E setup flow -> 6F manual charge -> 6G scheduled attempts -> 6H failed retry/attention -> 6I production enablement checklist
+
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
 - Completed behavior/copy alignment:

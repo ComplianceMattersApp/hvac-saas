@@ -111,6 +111,47 @@ Phase 5G-A2 is complete as docs/model only. First invoice relationship posture i
 **Phase 5G-B1 closeout (Billing Period Manual Invoice Link/Unlink Server Actions):**
 Phase 5G-B1 is complete as server-actions only. Added wrappers `linkInternalInvoiceToBillingPeriodFromForm` and `unlinkInternalInvoiceFromBillingPeriodFromForm` in `lib/maintenance-agreements/billing-period-actions.ts`, with no UI changes in this slice. Access enforcement is active for internal Owner/Admin/Billing only via existing internal-user and financial-authority checks; dispatcher/technician/non-financial roles are denied. Link eligibility enforcement is active for required ids, same-account scope, non-cancelled and currently-unlinked billing periods, non-void and currently-unclaimed invoices, invoice customer alignment where invoice customer scope exists, and required invoice-job linkage to the same maintenance agreement through `maintenance_agreement_visits`. Unlink/correction enforcement is active for required reason and currently-linked period requirement, and remains non-destructive. State transitions are active: link sets `internal_invoice_id` and `billing_period_status = invoice_linked`; unlink clears `internal_invoice_id`, sets `billing_period_status = pending_billing`, and stores `status_reason`; both paths set `updated_by_user_id`, revalidate customer profile, and redirect with explicit success/denial/invalid/conflict banners. Runtime boundaries remain locked: no invoice generation, no invoice line-item generation, no invoice issue/send/email behavior, no payment-link creation, no payment/allocation row mutation, no Stripe behavior change, no projection/read-path switch, no `maintenance_agreement_visits` mutation, and no `next_due_date` behavior change. Validation passed for focused billing-period action tests, billing-period read-model tests, maintenance-agreements suite, `npx.cmd tsc --noEmit`, and `git diff --check`.
 
+**Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method Audit):**
+Phase 6A is complete as docs/model lock only with no implementation changes in this slice. Audit outcome: Service Plan Billing Foundation V1 remains stable for manual billing-period operations, and automated recurring billing requires additive model lanes for generated invoices, Stripe-saved payment methods, explicit autopay consent, manual saved-method charge, scheduled autopay attempts, and failed-payment retry/attention flow.
+
+Locked source-of-truth boundaries:
+- Maintenance Agreement = recurring service obligation truth
+- Billing Period = commercial coverage-window truth
+- Internal Invoice = billed commercial truth
+- Internal Invoice Payment = collected/failed payment event truth when materially recorded
+- Payment Allocation = invoice-targeted allocation truth
+- Stripe = processor/payment method/money movement truth
+- Compliance Matters Autopay Setting = future instruction/consent/audit truth
+- `maintenance_agreement_visits` and `next_due_date` remain operational truth and do not auto-mutate from payment outcomes
+
+Model locks:
+- Invoice generation: one billing period can generate at most one active invoice in first posture, with manual Generate Draft Invoice only; `internal_invoices` remains job-scoped (`job_id` required), operator-selected anchor job linkage is required, and generation must be idempotent/audited.
+- Stripe-saved methods: SetupIntent-first in connected-account context; Compliance Matters stores only safe references/metadata and never raw credentials.
+- Autopay consent: default off, agreement-scoped, explicit evidence required, and saved method presence never implies consent.
+- Manual saved-method charge: precedes scheduler, requires issued non-void invoice with positive balance due + active consent + active method + connected-account readiness, and remains webhook-confirmed for money truth.
+- Scheduled autopay: deferred until manual charge posture is proven; scheduler enqueues attempts only and never directly marks invoices paid.
+- Failed payment/retry: failures are attention state only, do not mutate visits/next due, and must use bounded retry policy with `requires_action` pause semantics.
+
+Required future schema/model candidates:
+- `service_plan_invoice_generation_audit`
+- `customer_stripe_payment_profiles`
+- `customer_stripe_payment_methods`
+- `maintenance_agreement_autopay_settings`
+- `autopay_consent_events`
+- `invoice_payment_attempts`
+- deferred `scheduled_billing_jobs`
+
+Recommended sequence lock:
+1. 6A docs/model lock
+2. 6B Generate Draft Invoice from Billing Period
+3. 6C sandbox smoke for generated invoice
+4. 6D saved method + consent schema/model lock
+5. 6E saved method setup flow
+6. 6F manual saved-method charge
+7. 6G scheduled autopay attempts
+8. 6H failed payment retry/attention flow
+9. 6I production enablement checklist
+
 **Service Role Controls / Financial Access Controls V1A Model Lock:**
 V1A-2, V1A-3, and V1A-4 are implemented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md): Billing / AR is now a valid internal role; sensitive financial authority is structural owner/admin/billing; dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users are blocked by default for sensitive financial actions; and server-side gates are active for manual invoice payment recording, tenant payment-link/checkout-session creation, invoice ledger CSV export, invoice draft create/update, invoice issue, invoice void, and invoice email send/resend. Billing / AR is not Admin and does not receive admin/team-management authority by default. **Payments Register V1A/V1B now implement these gates**: `/reports/payments` register page and `/reports/payments/export` CSV export both verify Owner/Admin/Billing authority; Dispatcher/Technician are blocked by default. Access-control prerequisite is satisfied and leveraged by Payments Register implementation.
 

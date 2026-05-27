@@ -249,6 +249,81 @@ Phase 5G-B1 closeout (Billing Period Manual Invoice Link/Unlink Server Actions):
 - Runtime boundaries remain preserved: no invoice generation, no invoice line-item generation, no invoice issue/send/email behavior, no payment-link creation, no payment/allocation row mutation, no Stripe behavior change, no projection/read-path switch, no `maintenance_agreement_visits` mutation, and no `next_due_date` behavior change.
 - Validation snapshot: focused billing-period action tests passed, billing-period read-model tests passed, maintenance-agreements suite passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
 
+Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method Audit, docs/model only):
+- Service Plan Billing Foundation V1 is complete, but full recurring-service automation requires a dedicated lane for generated invoices, Stripe-saved payment methods, explicit autopay consent, manual charge saved payment method, scheduled autopay attempts, and failed-payment/retry/attention workflow.
+- Locked source-of-truth boundaries:
+	- Maintenance Agreement = recurring service obligation truth
+	- Billing Period = commercial coverage-window truth
+	- Internal Invoice = billed commercial truth
+	- Internal Invoice Payment = collected/failed payment event truth when materially recorded
+	- Payment Allocation = invoice-targeted allocation truth
+	- Stripe = processor/payment method/money movement truth
+	- Compliance Matters Autopay Setting = future instruction/consent/audit truth
+	- Visits and `next_due_date` = operational truth and must never auto-mutate from payment success alone
+- Invoice generation model lock:
+	- one billing period may generate at most one active generated invoice in V1
+	- keep `internal_invoices` job-scoped in Phase 6B; do not expand away from required `job_id`
+	- generated invoice requires explicit operator-selected anchor job linked to the same maintenance agreement via `maintenance_agreement_visits`
+	- first generation slice is draft-only with no auto-send, no auto-charge, no scheduled job, and no saved-card logic
+	- one controlled service-plan billing line item only
+	- amount from `billing_period.amount_due_cents`; description from deterministic coverage-window/cadence template
+	- taxability/pricebook mapping must be explicit, not inferred
+	- duplicate prevention requires link-state block (`billing_period.internal_invoice_id` set) and generation idempotency/audit keyed by account + billing period + generation kind
+	- voided invoice surfaces via derived display only (no automatic lifecycle rewrite)
+	- cancelled billing period blocks new generation
+	- generation can transition to `invoice_linked` only after successful link
+- Stripe-saved payment method model lock:
+	- Compliance Matters must never store full card number, CVC, raw bank/card data, or payment credentials
+	- Stripe stores payment method and money movement; Compliance Matters stores only safe references/metadata
+	- SetupIntent-first saved-method flow in connected-account context
+	- Stripe customer profile scope = tenant account + tenant customer
+	- multiple service plans for one customer may share the same Stripe customer/payment profile
+	- multiple saved methods may exist with one default marker
+	- connected-account disconnect/change marks profile stale and blocks charge attempts
+- Autopay consent model lock:
+	- autopay disabled by default
+	- consent scoped per maintenance agreement
+	- persist consent version/timestamp/source/actor/capture channel/evidence reference
+	- customer consent path preferred
+	- tenant-captured authorization remains future-only unless explicitly modeled with source flag + stronger audit
+	- saved card present does not imply autopay enabled
+	- autopay lifecycle states are distinct (`enabled`, `disabled`, `paused`, `revoked`)
+	- disable/revoke are state transitions, not hard deletes
+- Manual charge saved-method lock:
+	- manual `Charge Saved Payment Method` precedes scheduled autopay
+	- preconditions: issued invoice, non-void invoice, positive balance due, non-cancelled billing period, active consent, connected-account readiness, active saved method
+	- charge initiation creates payment-attempt record
+	- webhook remains sole collected-money truth
+	- Stripe idempotency key basis = account + invoice + attempt ordinal
+- Scheduled autopay lock:
+	- deferred until manual saved-method charge posture is proven
+	- scheduler evaluates due issued invoices and enqueues attempts only
+	- scheduler never marks invoices paid
+	- scheduler skips draft/void/cancelled-context invoices, missing consent, stale profile, disconnected Stripe, and in-flight attempts
+- Failed payment/retry lock:
+	- failed payment creates attention state, not collected money
+	- failed payment does not mutate visits or `next_due_date`
+	- `requires_action` failures pause autopay until customer re-authenticates
+	- retry policy is explicit and bounded; infinite loops are forbidden
+- Required future schema/model candidates (future additive posture):
+	- `service_plan_invoice_generation_audit`
+	- `customer_stripe_payment_profiles`
+	- `customer_stripe_payment_methods`
+	- `maintenance_agreement_autopay_settings`
+	- `autopay_consent_events`
+	- `invoice_payment_attempts`
+	- `scheduled_billing_jobs` (deferred)
+- Recommended implementation sequence:
+	1. Phase 6A docs/model lock
+	2. Phase 6B manual Generate Draft Invoice from Billing Period
+	3. Phase 6C sandbox smoke for generated draft invoice
+	4. Phase 6D Stripe saved-method + autopay consent schema/model lock
+	5. Phase 6E saved payment method setup flow
+	6. Phase 6F manual Charge Saved Payment Method for issued invoice
+	7. Phase 6G scheduled autopay attempts
+	8. Phase 6H failed payment retry/attention workflow
+	9. Phase 6I production enablement checklist
+
 ## Group 9A-9A Model Snapshot
 
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)

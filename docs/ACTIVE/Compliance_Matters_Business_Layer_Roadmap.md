@@ -298,6 +298,69 @@ Phase 5G-B1 closeout (Billing Period Manual Invoice Link/Unlink Server Actions):
   - no `next_due_date` behavior change
 - Validation snapshot: focused billing-period action tests passed, billing-period read-model tests passed, maintenance-agreements suite passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
 
+Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method Audit, docs/model only):
+- Phase 6A is complete as docs/model lock only with no implementation changes.
+- Audit result: current Service Plan Billing Foundation remains valid for manual operations; automation requires additive model lanes for generated invoices, saved payment methods, consent, manual saved-method charge, scheduling, and failure/retry behavior.
+- Locked source-of-truth boundaries:
+  - Maintenance Agreement = recurring service obligation truth
+  - Billing Period = commercial coverage-window truth
+  - Internal Invoice = billed commercial truth
+  - Internal Invoice Payment = collected/failed payment event truth when materially recorded
+  - Payment Allocation = invoice-targeted allocation truth
+  - Stripe = processor/payment method/money movement truth
+  - Compliance Matters Autopay Setting = future instruction/consent/audit truth
+  - operational surfaces (`maintenance_agreement_visits`, `next_due_date`) remain independent of payment success/failure state
+- Invoice generation model lock:
+  - one billing period can produce at most one active generated invoice in first posture
+  - keep `internal_invoices` job-scoped in first implementation; no Phase 6B removal of required `job_id`
+  - generation requires explicit operator-selected anchor job linked to same maintenance agreement via `maintenance_agreement_visits`
+  - first implementation posture is manual Generate Draft Invoice only
+  - no auto-send/auto-charge/scheduled run in first generation slice
+  - deterministic single service-plan billing line item, explicit taxability/pricebook mapping, and idempotent generation audit keying are required
+- Stripe-saved method model lock:
+  - Compliance Matters stores only references/metadata and consent/audit fields; no PAN/CVC/raw credential storage
+  - SetupIntent-first in connected-account context
+  - payment profile scope = tenant account + tenant customer
+  - multiple methods allowed with one default
+  - stale/disconnected connected-account profile blocks attempts
+- Autopay consent model lock:
+  - default off
+  - agreement-scoped consent
+  - explicit evidence fields required (version/time/source/actor/channel)
+  - saved method alone never implies consent
+  - lifecycle states remain distinct (`enabled`, `disabled`, `paused`, `revoked`)
+- Manual charge saved-method lock:
+  - manual charge precedes scheduler
+  - preconditions require issued/non-void invoice with balance due + active consent + active saved method + connected-account readiness
+  - attempt row creation and webhook-as-money-truth posture are required
+- Scheduled autopay lock:
+  - deferred until manual charge posture proves stable
+  - scheduler enqueues attempts only, never directly marks invoices paid
+  - invalid contexts must be skipped explicitly
+- Failed payment/retry lock:
+  - failed attempts produce attention state only
+  - no visit or `next_due_date` mutation
+  - `requires_action` pauses automation until re-auth
+  - retry policy must be explicit and bounded
+- Required future schema/model candidates:
+  - `service_plan_invoice_generation_audit`
+  - `customer_stripe_payment_profiles`
+  - `customer_stripe_payment_methods`
+  - `maintenance_agreement_autopay_settings`
+  - `autopay_consent_events`
+  - `invoice_payment_attempts`
+  - `scheduled_billing_jobs` (deferred)
+- Recommended implementation sequence:
+  1. Phase 6A docs/model lock
+  2. Phase 6B Generate Draft Invoice from Billing Period
+  3. Phase 6C sandbox smoke
+  4. Phase 6D schema/model lock for saved method + consent
+  5. Phase 6E saved method setup
+  6. Phase 6F manual saved-method charge
+  7. Phase 6G scheduled autopay attempts
+  8. Phase 6H failed payment retry/attention flow
+  9. Phase 6I production enablement checklist
+
 Relationship intake and display lane closeout (May 2026):
 - This lane is complete for V1 and should be treated as closed unless real usage evidence reopens it.
 - Completed scope:
