@@ -374,6 +374,14 @@ Phase 5F-A2 closeout (Billing Period Manual Mutation Model Lock, docs/model only
 - No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or work-blocking behavior are introduced by the first mutation slice.
 - Phase 5F-A2 is a model lock only; implementation remains deferred to the future mutation slice.
 
+Phase 5F-B1 closeout (Manual Billing Period Server Actions Foundation):
+- Manual billing-period server actions are complete and server-action only; no UI was added in this slice.
+- Mutation authority is enforced to Owner/Admin/Billing through the active internal-user and financial-access gate.
+- Create/edit/cancel actions validate customer-profile/agreement scope, required coverage fields, posture/status rules, duplicate/overlap windows, and cancel-by-status-only behavior.
+- Delete remains forbidden; cancellation remains the only end-state and uses `billing_period_status = cancelled`.
+- No invoice generation/linking, payment rows, allocation rows, Stripe calls, projection/read-path changes, or service-plan operational blocking were introduced.
+- Validation snapshot: billing-period action tests passed, billing-period read-model tests passed, maintenance-agreements suite passed, financial-access suite passed, `npx.cmd tsc --noEmit` passed, and `git diff --check` passed.
+
 ## Scope Boundaries (Locked)
 
 This model lock does not authorize implementation of:
