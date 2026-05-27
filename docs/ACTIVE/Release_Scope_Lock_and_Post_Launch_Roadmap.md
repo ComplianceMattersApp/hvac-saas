@@ -264,6 +264,20 @@ Recent closeout status snapshot (May 2026):
    - Billing periods remain non-operational and non-blocking for work orders, visits, visit counting, and next due behavior
    - Commit `d751b23` fixed async server-client resolution in billing-period actions and added regression coverage
 
+- **Phase 5G-A2 closeout (Billing Period Invoice Linkage Model Lock) is complete (docs/model only):**
+   - First invoice relationship posture is manual link to an existing internal invoice
+   - Invoice generation from billing periods is deferred
+   - Invoice schema expansion is deferred
+   - Billing-period invoice line-item generation is deferred
+   - Linking is relationship-only in first posture: no payment rows, no allocation rows, no Stripe calls, no payment link creation, no invoice issue/send behavior, and no invoice email behavior
+   - Billing-period paid state remains derived display from existing invoice/payment truth only
+   - Billing periods remain non-operational and non-blocking for work execution
+   - Manual link eligibility is locked to Owner/Admin/Billing authority, same-account scope, non-cancelled billing period, unlinked billing period (`internal_invoice_id` null), non-void invoice, unclaimed invoice, customer-scope alignment where invoice customer scope exists, and required invoice-job linkage to the same maintenance agreement via `maintenance_agreement_visits`
+   - Manual unlink/correction posture is locked to Owner/Admin/Billing authority, required reason, non-destructive behavior, no invoice/payment/allocation mutation, clearing `internal_invoice_id` only, and returning billing-period lifecycle status to `pending_billing` unless later model approval changes this
+   - Prior invoice/payment history must remain visible and unchanged after unlink
+   - Status/display lock: link sets `invoice_linked`; paid/partial/unpaid remains derived from invoice/payment truth; voided linked invoice surfaces `invoice_void` display state; invoice webhook/payment events must not auto-mutate billing-period lifecycle in first posture
+   - Explicit deferrals remain: invoice generation, non-job invoice model expansion, billing-period invoice line items, automatic invoice issue/send, automatic payment-link creation, Stripe checkout from billing periods, billing-period-targeted allocations, portal/self-service, autopay/subscriptions, and QBO/ACH/refunds/disputes/saved cards/partial payments/receipt automation/platform-fee execution
+
 Customer/location relationship handling polish closeout (May 2026):
 - Completed for current release scope as a polish/hardening lane, not a new CRM module.
 - Completed behavior/copy alignment:

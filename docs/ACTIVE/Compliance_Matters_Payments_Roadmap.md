@@ -454,6 +454,48 @@ Phase 5F-B3 closeout (Sandbox Billing Period UI Smoke):
 - Forbidden payment/invoice/autopay/subscription action labels remained absent in the customer-profile billing UI smoke.
 - Commit `d751b23` resolved async billing-period action client handling and added regression coverage.
 
+Phase 5G-A2 closeout (Billing Period Invoice Linkage Model Lock, docs/model only):
+- First invoice relationship posture is manual link to an existing internal invoice.
+- Invoice generation from billing periods is deferred.
+- Invoice schema expansion is deferred.
+- Billing-period invoice line-item generation is deferred.
+- Linking remains relationship-only in first posture: no payment rows, no allocation rows, no Stripe calls, no payment link creation, no invoice issue/send behavior, and no invoice email behavior.
+- Billing-period paid state remains derived display from existing invoice/payment truth only.
+- Billing periods remain non-operational and non-blocking for work execution.
+- Manual link eligibility is locked to:
+	- Owner/Admin/Billing financial authority only
+	- same-account billing period and invoice scope
+	- non-cancelled billing period only
+	- billing period must not already have `internal_invoice_id`
+	- invoice must not be void
+	- invoice must not already be claimed by another billing period
+	- invoice customer must match maintenance-agreement customer where invoice customer scope exists
+	- first posture requires invoice job linkage to the same maintenance agreement through `maintenance_agreement_visits`, not same-customer-only matching
+- Manual unlink/correction posture is locked to:
+	- Owner/Admin/Billing financial authority only
+	- required unlink reason
+	- non-destructive behavior (no deletes)
+	- no mutation of invoice/payment/allocation rows
+	- clear `internal_invoice_id` only
+	- return billing-period lifecycle status to `pending_billing` unless a later approved model changes this rule
+	- preserve prior invoice/payment history
+- Status/display lock:
+	- link sets billing-period status to `invoice_linked`
+	- paid/partial/unpaid remains derived from invoice/payment truth
+	- voided linked invoice should surface `invoice_void` display state without auto-mutation of billing/payment truth
+	- invoice webhook/payment events must not auto-mutate billing-period lifecycle in first posture
+- Explicit deferrals remain:
+	- invoice generation
+	- non-job invoice model expansion
+	- billing-period invoice line items
+	- automatic invoice issue/send
+	- automatic payment link creation
+	- Stripe checkout from billing periods
+	- billing-period-targeted allocations
+	- customer portal/self-service
+	- autopay/subscriptions
+	- QBO/ACH/refunds/disputes/saved cards/partial payments/receipt automation/platform-fee execution
+
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 - Implemented slices include: admin-only checkout route, admin-only billing portal route, webhook entitlement sync route, and minimal admin/company-profile status/actions.
