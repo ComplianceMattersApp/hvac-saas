@@ -12,6 +12,112 @@
 - Guardrails confirmed: no `tenant_customer_autopay_consents` creation, no `maintenance_agreement_visits` mutation, no `maintenance_agreements.next_due_date` mutation, no Stripe Billing subscription behavior, no ACH/bank-debit behavior.
 - Validation closeout: TypeScript no-emit pass, targeted Vitest matrix pass (8 files / 100 tests), `git diff --check` pass, `_tmp_*` cleanup confirmed, and implementation commit scope limited to intended code/tests only.
 
+## Phase 6G-A Closeout (Scheduled Autopay Attempts Model/Audit Lock, Docs-Only)
+
+- Scope lock: audit/model/planning only. No code implementation, migrations, scheduler jobs, Supabase mutation, Stripe calls, webhook changes, or commit authorization.
+
+Source-of-truth boundaries:
+- Scheduler is attempt orchestration truth only.
+- Attempt table is workflow/audit truth only.
+- `internal_invoice_payments` remains webhook-confirmed collected-money truth.
+- `internal_invoice_payment_allocations` remains allocation truth.
+- Stripe remains processor/credential truth.
+- No `maintenance_agreement_visits` mutation.
+- No `next_due_date` mutation.
+- Failed autopay creates attention, not collected money.
+
+Eligibility rules:
+- issued invoice only; not void; balance due > 0.
+- same account/customer/payment-profile/consent scope.
+- linked billing period, if present, not cancelled.
+- linked maintenance agreement, if present, active/autopay-eligible.
+- active saved payment method.
+- enabled valid consent.
+- connected account ready and matching.
+- no in-flight scheduled_autopay attempt for same invoice.
+- respect consent `max_amount_cents` when set.
+- profile/method not stale/disconnected/invalid.
+- re-check invoice status/balance before submit.
+- already-paid invoice blocks as `blocked_precondition`.
+
+Scheduler trigger model:
+- first implementation is manual/internal runner.
+- dry-run and commit modes.
+- no cron in first slice.
+- evaluate issued invoices only; exclude drafts.
+- evaluate due-today and overdue issued invoices first.
+- batch by `account_owner_user_id`.
+- per-account failure isolation.
+
+Attempt lifecycle/idempotency:
+- `attempt_kind = scheduled_autopay`.
+- persisted statuses: `blocked_precondition`, `pending`, `submitted`, `succeeded`, `failed_declined`, `failed_requires_action`, `retry_scheduled`, `abandoned`.
+- `eligible` is dry-run/read-model output only, not persisted status.
+- idempotency key: `scheduled_autopay:account_owner_user_id:invoice_id:cycle_key:ordinal`.
+- no duplicate pending/submitted/retry_scheduled attempt for same invoice/kind.
+- no duplicate Stripe PaymentIntent for same attempt.
+- snapshot amount/balance at creation and revalidate before submit.
+
+Stripe charge model:
+- reuse shared saved-card charge path from manual charge.
+- scheduler entry calls shared service with `scheduled_autopay` attempt kind.
+- PaymentIntent metadata includes `account_owner_user_id`, `customer_id`, `invoice_id`, `attempt_id`, `billing_period_id`, `maintenance_agreement_id`.
+- only pre-webhook transition allowed: `submitted`.
+- `requires_action -> failed_requires_action` attention.
+- declines -> `failed_declined` attention.
+- payment rows created only by webhook handlers.
+
+Retry/failure/attention:
+- no auto-retry loop in first 6G implementation.
+- failed_declined/failed_requires_action open attention.
+- requires_action means customer re-authentication required.
+- failed attempt does not block service visits.
+- failed attempt does not mutate next_due_date.
+- failed_requires_action pauses further scheduled submissions for consent/agreement until resolved.
+- manual operator retry before automated retry.
+
+Reporting/visibility:
+- invoice workspace shows attempt history separately from recorded payments.
+- customer profile shows autopay consent and latest attempt outcome.
+- maintenance agreement card shows autopay attention summary.
+- payments register does not mix failed attempts into collected totals.
+- collected totals derive from recorded payment truth only.
+
+Security/access:
+- Owner/Admin/Billing only: consent enable/disable/pause/revoke, scheduler dry-run/commit-run, retry submission.
+- Dispatcher/Technician read-only where allowed.
+- server-side financial access checks required.
+
+Dry-run:
+- mandatory first implementation slice.
+- output includes invoices evaluated, eligible count, blocked count by reason, in-flight attempts, consent/method/profile/readiness snapshot flags, proposed amount snapshots, and explicit no Stripe calls/no writes.
+- commit mode is opt-in and separate.
+
+Schema:
+- no schema change required for 6G-B dry-run eligibility read model.
+- no schema change strictly required for 6G-C attempt creation (`scheduled_autopay` + core statuses already exist).
+- keep `eligible` non-persisted.
+- optional future additive fields only: `scheduler_run_id`, `cycle_key`, `last_blocked_reason_at`.
+
+Risks:
+- race between eligibility and submit.
+- duplicate attempts without strict idempotency.
+- requires_action loop without pause gate.
+- cross-tenant scheduler failure cascade.
+- missing billing-period linkage for some invoices.
+- attention UX gaps.
+
+Recommended sequence:
+1. 6G-B eligibility read model + dry-run tests only.
+2. 6G-C scheduled_autopay attempt creation only, no Stripe submit.
+3. 6G-D submit scheduled attempts via shared saved-card charge path.
+4. 6G-E sandbox smoke.
+5. 6G-F docs closeout.
+6. 6H retry/attention expansion.
+
+Execution confirmation:
+- Docs-only model lock closeout; no implementation/data mutation occurred.
+
 ---
 
 ## 1. Core decision
