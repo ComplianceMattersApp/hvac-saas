@@ -147,8 +147,9 @@ function makeEligibleRevalidation(): ScheduledAutopayDryRunResult {
   } as ScheduledAutopayDryRunResult;
 }
 
-function makeBlockedRevalidation(reason: string): ScheduledAutopayDryRunResult {
+function makeBlockedRevalidation(reasons: string | string[]): ScheduledAutopayDryRunResult {
   const base = makeEligibleRevalidation();
+  const blockedReasonCodes = Array.isArray(reasons) ? reasons : [reasons];
   return {
     ...base,
     eligibleInvoicesCount: 0,
@@ -157,7 +158,7 @@ function makeBlockedRevalidation(reason: string): ScheduledAutopayDryRunResult {
       {
         ...base.invoicesEvaluated[0],
         eligibility: "blocked",
-        blockedReasonCodes: [reason] as any,
+        blockedReasonCodes: blockedReasonCodes as any,
       },
     ],
   };
@@ -246,7 +247,7 @@ function makeAdmin(rows?: Array<Record<string, unknown>>) {
 }
 
 describe("scheduled autopay attempt submission", () => {
-  it("submits one pending scheduled_autopay attempt through shared saved-card charge path", async () => {
+  it("submits one pending scheduled_autopay attempt when the only in-flight blocker is the current attempt", async () => {
     const ctx = makeAdmin();
     const submitMock = vi.fn(async () => ({
       ok: true,
@@ -336,6 +337,26 @@ describe("scheduled autopay attempt submission", () => {
     expect(ctx.attempts.get(ATTEMPT_ID)?.attempt_status).toBe("blocked_precondition");
   });
 
+  it("blocks when another retry_scheduled attempt exists for the same invoice", async () => {
+    const ctx = makeAdmin([
+      makeAttemptRow({ id: ATTEMPT_ID }),
+      makeAttemptRow({ id: "attempt-2", attempt_status: "retry_scheduled", stripe_payment_intent_id: null }),
+    ]);
+
+    const result = await submitScheduledAutopayAttempts({
+      admin: ctx.admin,
+      accountOwnerUserId: OWNER_ID,
+      attemptId: ATTEMPT_ID,
+      revalidateDryRun: vi.fn(async () => makeEligibleRevalidation()),
+      submitAttemptThroughStripe: vi.fn(),
+      stripe: { paymentIntents: { create: vi.fn() } } as any,
+    });
+
+    expect(result.blockedDuplicateInFlightCount).toBe(1);
+    expect(result.results[0]?.outcome).toBe("blocked_duplicate_inflight");
+    expect(result.results[0]?.blockedReasonCodes).toContain("duplicate_inflight_attempt");
+  });
+
   it("blocks when revalidation reports non-issued invoice", async () => {
     const ctx = makeAdmin();
 
@@ -367,6 +388,23 @@ describe("scheduled autopay attempt submission", () => {
     expect(result.results[0]?.blockedReasonCodes).toContain("invoice_void");
   });
 
+  it("blocks when self in-flight is combined with another eligibility blocker", async () => {
+    const ctx = makeAdmin();
+
+    const result = await submitScheduledAutopayAttempts({
+      admin: ctx.admin,
+      accountOwnerUserId: OWNER_ID,
+      attemptId: ATTEMPT_ID,
+      revalidateDryRun: vi.fn(async () => makeBlockedRevalidation(["in_flight_attempt_exists", "invoice_not_issued"])),
+      submitAttemptThroughStripe: vi.fn(),
+      stripe: { paymentIntents: { create: vi.fn() } } as any,
+    });
+
+    expect(result.blockedPreconditionCount).toBe(1);
+    expect(result.results[0]?.outcome).toBe("blocked_precondition");
+    expect(result.results[0]?.blockedReasonCodes).toContain("invoice_not_issued");
+  });
+
   it("blocks when amount snapshot no longer matches proposed amount", async () => {
     const ctx = makeAdmin([makeAttemptRow({ amount_cents_snapshot: 4200 })]);
 
@@ -381,6 +419,39 @@ describe("scheduled autopay attempt submission", () => {
 
     expect(result.results[0]?.blockedReasonCodes).toContain("amount_snapshot_mismatch");
     expect(ctx.attempts.get(ATTEMPT_ID)?.attempt_status).toBe("blocked_precondition");
+  });
+
+  it("blocks a non-pending target attempt before revalidation", async () => {
+    const ctx = makeAdmin([makeAttemptRow({ attempt_status: "retry_scheduled", stripe_payment_intent_id: null })]);
+
+    const result = await submitScheduledAutopayAttempts({
+      admin: ctx.admin,
+      accountOwnerUserId: OWNER_ID,
+      attemptId: ATTEMPT_ID,
+      revalidateDryRun: vi.fn(async () => makeEligibleRevalidation()),
+      submitAttemptThroughStripe: vi.fn(),
+      stripe: { paymentIntents: { create: vi.fn() } } as any,
+    });
+
+    expect(result.blockedPreconditionCount).toBe(1);
+    expect(result.results[0]?.outcome).toBe("blocked_precondition");
+    expect(result.results[0]?.blockedReasonCodes).toContain("attempt_status_not_pending");
+  });
+
+  it("blocks when revalidation reports already-paid invoice", async () => {
+    const ctx = makeAdmin();
+
+    const result = await submitScheduledAutopayAttempts({
+      admin: ctx.admin,
+      accountOwnerUserId: OWNER_ID,
+      attemptId: ATTEMPT_ID,
+      revalidateDryRun: vi.fn(async () => makeBlockedRevalidation("invoice_already_paid")),
+      submitAttemptThroughStripe: vi.fn(),
+      stripe: { paymentIntents: { create: vi.fn() } } as any,
+    });
+
+    expect(result.blockedPreconditionCount).toBe(1);
+    expect(result.results[0]?.blockedReasonCodes).toContain("invoice_already_paid");
   });
 
   it("blocks missing consent/method/profile/connect readiness via revalidation", async () => {

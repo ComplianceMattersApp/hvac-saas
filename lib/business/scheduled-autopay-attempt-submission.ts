@@ -421,15 +421,21 @@ export async function submitScheduledAutopayAttempts(params: {
       continue;
     }
 
+    const blockedReasonCodes = Array.isArray(eligibility.blockedReasonCodes)
+      ? eligibility.blockedReasonCodes
+      : [];
     const normalizedBlockedReasons = normalizeBlockedReasonsForCurrentAttempt({
-      blockedReasonCodes: Array.isArray(eligibility.blockedReasonCodes)
-        ? eligibility.blockedReasonCodes
-        : [],
+      blockedReasonCodes,
       eligibility,
       attemptId,
     });
+    const selfInFlightAttemptId = clean(eligibility.snapshots.inFlightAttempt.attemptId);
+    const isSelfInFlightOnlyBlocker =
+      selfInFlightAttemptId === clean(attemptId)
+      && blockedReasonCodes.length > 0
+      && blockedReasonCodes.every((reason) => reason === "in_flight_attempt_exists");
 
-    if (eligibility.eligibility !== "eligible" || normalizedBlockedReasons.length > 0) {
+    if (eligibility.eligibility !== "eligible" && !isSelfInFlightOnlyBlocker) {
       const reasonCode = normalizedBlockedReasons[0] ?? "blocked_precondition";
       await markAttemptBlockedPrecondition({
         admin,
