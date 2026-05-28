@@ -47,6 +47,7 @@ type ScenarioState = {
     tenant_stripe_customer_id: string;
     stripe_connected_account_id: string;
     stripe_customer_id: string;
+    stripe_payment_method_id: string;
     payment_method_status: string;
     payment_method_type: string;
     detached_at: string | null;
@@ -129,6 +130,7 @@ function makeDefaultState(): Required<ScenarioState> {
       tenant_stripe_customer_id: "tsc-1",
       stripe_connected_account_id: "acct_ready_1",
       stripe_customer_id: "cus_123",
+      stripe_payment_method_id: "pm_123",
       payment_method_status: "active",
       payment_method_type: "card",
       detached_at: null,
@@ -348,6 +350,7 @@ describe("scheduled autopay eligibility dry run", () => {
         tenant_stripe_customer_id: "tsc-1",
         stripe_connected_account_id: "acct_ready_1",
         stripe_customer_id: "cus_123",
+        stripe_payment_method_id: "pm_123",
         payment_method_status: "inactive",
         payment_method_type: "card",
         detached_at: null,
@@ -361,6 +364,7 @@ describe("scheduled autopay eligibility dry run", () => {
         tenant_stripe_customer_id: "tsc-1",
         stripe_connected_account_id: "acct_ready_1",
         stripe_customer_id: "cus_123",
+        stripe_payment_method_id: "pm_123",
         payment_method_status: "expired_display_only",
         payment_method_type: "card",
         detached_at: null,
@@ -374,6 +378,7 @@ describe("scheduled autopay eligibility dry run", () => {
         tenant_stripe_customer_id: "tsc-1",
         stripe_connected_account_id: "acct_ready_1",
         stripe_customer_id: "cus_123",
+        stripe_payment_method_id: "pm_123",
         payment_method_status: "detached",
         payment_method_type: "card",
         detached_at: null,

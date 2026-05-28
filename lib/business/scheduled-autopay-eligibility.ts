@@ -88,6 +88,7 @@ type SavedPaymentMethodContext = {
   tenant_stripe_customer_id: string | null;
   stripe_connected_account_id: string | null;
   stripe_customer_id: string | null;
+  stripe_payment_method_id: string | null;
   payment_method_status: string | null;
   payment_method_type: string | null;
   detached_at: string | null;
@@ -158,6 +159,7 @@ export type ScheduledAutopayInvoiceEligibilitySnapshot = {
   savedPaymentMethodReadiness: {
     methodFound: boolean;
     methodId: string | null;
+    stripePaymentMethodId: string | null;
     methodStatus: string | null;
     methodType: string | null;
     tenantStripeCustomerId: string | null;
@@ -314,6 +316,7 @@ function buildDefaultDependencies(
             "tenant_stripe_customer_id",
             "stripe_connected_account_id",
             "stripe_customer_id",
+            "stripe_payment_method_id",
             "payment_method_status",
             "payment_method_type",
             "detached_at",
@@ -623,6 +626,7 @@ function evaluateInvoiceEligibility(
       savedPaymentMethodReadiness: {
         methodFound: Boolean(methodId),
         methodId,
+        stripePaymentMethodId: clean(params.method?.stripe_payment_method_id) || null,
         methodStatus: methodStatus || null,
         methodType: clean(params.method?.payment_method_type) || null,
         tenantStripeCustomerId: clean(params.method?.tenant_stripe_customer_id) || null,
@@ -665,10 +669,15 @@ export async function runScheduledAutopayEligibilityDryRun(params: {
   supabase?: SupabaseLike;
   dependencies?: ScheduledAutopayEligibilityDependencies;
   evaluatedAt?: string;
+  candidateInvoiceIds?: string[];
 }): Promise<ScheduledAutopayDryRunResult> {
   const accountOwnerUserId = clean(params.accountOwnerUserId);
   const evaluatedAt = clean(params.evaluatedAt) || new Date().toISOString();
   const dependencies = params.dependencies ?? buildDefaultDependencies({ supabase: params.supabase as SupabaseLike });
+  const candidateInvoiceIds = Array.isArray(params.candidateInvoiceIds)
+    ? params.candidateInvoiceIds.map((value) => clean(value)).filter(Boolean)
+    : [];
+  const candidateInvoiceIdSet = new Set(candidateInvoiceIds);
 
   if (!accountOwnerUserId) {
     return {
@@ -691,10 +700,14 @@ export async function runScheduledAutopayEligibilityDryRun(params: {
     };
   }
 
-  const [connectReadiness, invoiceRows] = await Promise.all([
+  const [connectReadiness, allInvoiceRows] = await Promise.all([
     dependencies.resolveConnectReadiness(accountOwnerUserId),
     dependencies.listCandidateInvoices(accountOwnerUserId),
   ]);
+
+  const invoiceRows = candidateInvoiceIdSet.size > 0
+    ? allInvoiceRows.filter((row) => candidateInvoiceIdSet.has(clean(row.id)))
+    : allInvoiceRows;
 
   const invoicesEvaluated = await Promise.all(
     invoiceRows.map(async (invoiceRow) => {
