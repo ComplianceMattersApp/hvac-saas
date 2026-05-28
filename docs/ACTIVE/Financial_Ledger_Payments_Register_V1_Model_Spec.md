@@ -4,6 +4,16 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Ledger / Payments Register V1
 Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, production, recurring billing, platform fee, or ACH UI work is authorized by this spec.
 
+## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
+
+- Closed implementation commit: `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`), pushed with `HEAD == origin/main` and clean tree.
+- Manual saved-card charge for issued invoices is now implemented as one-time internal action and remains explicitly outside autopay/subscription scope.
+- Register-truth lock is preserved: `tenant_saved_method_payment_attempts` rows are workflow/audit truth only; webhook-created `internal_invoice_payments` rows are collected-money truth; allocation row creation occurs after payment truth exists.
+- Attempt resolution now links to payment truth via internal payment id after webhook-confirmed success.
+- Fresh sandbox smoke proof: invoice `INV-20260528-1CFFCB88` (`7f79e75b-06b5-4924-bd0c-91b78740f2d7`), attempt `99949838-81f3-442a-9de1-4bc736b4c40b`, payment `3788c9ff-700d-43ab-8339-46e4cbf24ae3`, allocation `2b702b07-690a-4e4d-82f2-6f6ed6e40627`, charge `ch_3Tbxg47itDepDR180C1KhPco`, amount `$17.50`, webhook HTTP 200, and UI Paid / Balance `$0.00`.
+- Verified non-actions: no `tenant_customer_autopay_consents` row creation, no maintenance-visit or next-due mutations, no Stripe Billing subscription behavior, and no ACH/bank-debit behavior.
+- Validation proof: `npx.cmd tsc --noEmit` passed; targeted Vitest matrix passed (8 files, 100 tests); `git diff --check` passed; temp `_tmp_*` files removed; no docs/migrations/env/secrets were included in implementation commit.
+
 Implementation gate status:
 
 - Service Role Controls / Financial Access Controls V1A-2, V1A-3, and V1A-4 are implemented and documented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md).

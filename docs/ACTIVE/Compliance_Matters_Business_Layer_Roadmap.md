@@ -14,6 +14,15 @@
 **Authority:** Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md` and `docs/ACTIVE/Compliance_Matters_Payments_Roadmap.md`  
 **Purpose:** Define the future business/commercial layer that expands the current operational platform without regressing the live workflow or conflicting with the active spine.
 
+## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
+
+- Implementation closeout is complete in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`), pushed and synced.
+- Manual one-time saved-card charge is now implemented for eligible issued invoices only; it is not autopay and does not create a subscription.
+- Source-of-truth wording remains locked for this lane: manual attempt rows in `tenant_saved_method_payment_attempts` are workflow/audit truth; webhook-created `internal_invoice_payments` are collected-money truth; allocations are written after payment truth.
+- Fresh sandbox smoke proof: invoice `INV-20260528-1CFFCB88` (`7f79e75b-06b5-4924-bd0c-91b78740f2d7`), attempt `99949838-81f3-442a-9de1-4bc736b4c40b`, payment `3788c9ff-700d-43ab-8339-46e4cbf24ae3`, allocation `2b702b07-690a-4e4d-82f2-6f6ed6e40627`, charge `ch_3Tbxg47itDepDR180C1KhPco`, amount `$17.50`, webhook HTTP 200, and UI Paid / Balance `$0.00`.
+- Operational and recurring-service boundaries remained intact: no autopay consent creation, no visit mutation, no next-due-date mutation, no Stripe Billing subscription behavior, and no ACH/bank-debit behavior.
+- Validation remained green: `npx.cmd tsc --noEmit`, targeted Vitest matrix (8 files, 100 tests), `git diff --check`, and `_tmp_*` cleanup.
+
 ---
 
 ## 1. Document role

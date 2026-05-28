@@ -4,6 +4,15 @@ Status: ACTIVE IMPLEMENTATION TRACKING SPEC
 Owner lane: Group 9A - Recurring Services / Maintenance Agreements  
 Scope: model guidance plus Group 9A-2 backend foundation closeout documentation. Backend foundation is committed in repo but is not production-active until migration apply is intentionally executed through the environment process.
 
+## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
+
+- Implementation is closed in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`) with push complete and clean post-push tree.
+- Manual one-time saved-card charge is available only on eligible issued invoice workspace and is explicitly not autopay.
+- Source-of-truth lock remains unchanged: manual attempt row in `tenant_saved_method_payment_attempts` is workflow/audit truth; webhook-created `internal_invoice_payments` is collected-money truth; allocation follows payment truth.
+- Fresh sandbox smoke proof used invoice `INV-20260528-1CFFCB88` (`7f79e75b-06b5-4924-bd0c-91b78740f2d7`) with attempt `99949838-81f3-442a-9de1-4bc736b4c40b`, payment `3788c9ff-700d-43ab-8339-46e4cbf24ae3`, allocation `2b702b07-690a-4e4d-82f2-6f6ed6e40627`, and charge `ch_3Tbxg47itDepDR180C1KhPco` for `$17.50`; webhook deliveries were HTTP 200 and UI moved to Paid / Balance `$0.00`.
+- Recurring-services operational boundaries were preserved: no `maintenance_agreement_visits` mutation, no `maintenance_agreements.next_due_date` mutation, no autopay-consent creation, no Stripe subscription behavior, and no ACH/bank-debit behavior.
+- Validation closeout remained green: TypeScript no-emit pass, targeted Vitest matrix pass (8 files / 100 tests), `git diff --check` pass, and `_tmp_*` cleanup confirmed.
+
 ## Purpose
 
 Maintenance Agreements V1 defines the future customer-owned recurring service agreement model for Compliance Matters Software.

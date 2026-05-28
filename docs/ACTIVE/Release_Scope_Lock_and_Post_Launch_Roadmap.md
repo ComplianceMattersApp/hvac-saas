@@ -5,6 +5,15 @@ Mode: Documentation/planning only
 Authority: Subordinate to Active Spine and existing ACTIVE runbooks/roadmaps  
 Date: 2026-05-08
 
+## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
+
+- Phase 6F implementation is closed in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`) with push complete and post-push clean tree.
+- Delivered behavior: manual one-time saved-card charge control for eligible issued invoice workspace; explicitly not autopay and no subscription creation.
+- Locked truth boundaries remain unchanged: manual attempt row (`tenant_saved_method_payment_attempts`) is workflow/audit truth; webhook-created `internal_invoice_payments` is collected-money truth; allocation follows payment truth.
+- Fresh sandbox smoke proof: invoice `INV-20260528-1CFFCB88` (`7f79e75b-06b5-4924-bd0c-91b78740f2d7`), attempt `99949838-81f3-442a-9de1-4bc736b4c40b`, payment `3788c9ff-700d-43ab-8339-46e4cbf24ae3`, allocation `2b702b07-690a-4e4d-82f2-6f6ed6e40627`, charge `ch_3Tbxg47itDepDR180C1KhPco`, amount `$17.50`, webhook HTTP 200, UI post-state Paid / Balance `$0.00`.
+- Release-scope guardrails verified: no `tenant_customer_autopay_consents` creation, no `maintenance_agreement_visits` mutation, no `maintenance_agreements.next_due_date` mutation, no Stripe Billing subscription behavior, and no ACH/bank-debit behavior.
+- Validation closeout: TypeScript no-emit pass, targeted Vitest matrix pass (8 files, 100 tests), `git diff --check` pass, `_tmp_*` cleanup confirmed.
+
 ---
 
 ## 1) Executive Summary

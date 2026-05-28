@@ -4,6 +4,17 @@ Status: ACTIVE MODEL LOCK (Phase 2 + Phase 3A closeout)
 Owner lane: Payments V2 / Service Plan Billing Foundation
 Scope: docs/model only. No product code, schema, migrations, Supabase commands, Stripe behavior changes, checkout/session changes, env/flag changes, UI build, or provider integrations are authorized by this spec.
 
+## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
+
+- Closed implementation commit: `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`), pushed to `origin/main` with clean working tree.
+- Manual one-time saved-card charge is implemented for eligible issued invoices only.
+- Source-of-truth lock is preserved: manual attempt row in `tenant_saved_method_payment_attempts` is workflow/audit truth; webhook-created `internal_invoice_payments` is collected-money truth; allocation row is written only after payment truth exists.
+- Stripe charge path is connected-account PaymentIntent with saved customer/payment method context; this is explicitly not autopay and does not create subscriptions.
+- Attempt resolution links to created payment truth (`resolved_internal_invoice_payment_id`) after webhook success.
+- Fresh sandbox smoke proof: invoice `INV-20260528-1CFFCB88` (`7f79e75b-06b5-4924-bd0c-91b78740f2d7`), attempt `99949838-81f3-442a-9de1-4bc736b4c40b`, payment `3788c9ff-700d-43ab-8339-46e4cbf24ae3`, allocation `2b702b07-690a-4e4d-82f2-6f6ed6e40627`, Stripe charge `ch_3Tbxg47itDepDR180C1KhPco`, amount `$17.50`, Stripe webhooks HTTP 200, UI post-state Paid / Balance `$0.00`.
+- Non-action guardrails verified: no `tenant_customer_autopay_consents` creation, no `maintenance_agreement_visits` mutation, no `maintenance_agreements.next_due_date` mutation, no Stripe Billing subscription behavior, and no ACH/bank-debit behavior.
+- Validation proof: `npx.cmd tsc --noEmit` passed; targeted Vitest matrix passed (8 files, 100 tests); `git diff --check` passed; `_tmp_*` artifacts removed; commit included only intended implementation/test files and no docs/migrations/env/secrets.
+
 ## Purpose
 
 Lock the minimum safe data/model posture so future implementation slices can add Service Plan Billing without breaking existing invoice/payment truth.
