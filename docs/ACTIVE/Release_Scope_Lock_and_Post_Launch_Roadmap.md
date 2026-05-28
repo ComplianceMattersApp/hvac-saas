@@ -15,6 +15,16 @@ Date: 2026-05-08
 - Validation closeout: TypeScript no-emit pass, targeted Vitest matrix pass (8 files, 100 tests), `git diff --check` pass, `_tmp_*` cleanup confirmed.
 
 ## Phase 6G-A Closeout (Scheduled Autopay Attempts Model/Audit Lock, Docs-Only)
+### Phase 6G-E4 Closeout (Fresh Scheduled Autopay Submit Smoke, Docs-Only)
+
+- Phase 6G-E4 passed after the 6G-E3 self-attempt revalidation fix in commit `c7329a8a9b19d392f6dd7196ca7145f86d62e713`.
+- Sandbox-only smoke used owner `9e82acca-c271-41bc-89af-396f37c1990c`, customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6`, invoice `63e28e1c-1be9-43bb-923d-940d80887cb2` (`INV-20260528-9D731258`), job `91e31a74-cc1b-4585-8dc3-6812351fbbdf`, consent `3c24c9e6-6f78-4fe4-8619-9094782827bb`, and fresh pending attempt `67dc6700-83d9-4dd0-8af1-d8ae931db14a`.
+- 6G-B returned the invoice eligible, 6G-C created the fresh pending scheduled_autopay attempt, and 6G-D submitted it successfully with Stripe PaymentIntent `pi_3Tc6bF7itDepDR181kf2LE2p`, charge `ch_3Tc6bF7itDepDR181J27CvPs`, and webhook event `evt_3Tc6bF7itDepDR181B08QHZd`.
+- Webhook truth created exactly one `internal_invoice_payments` row and exactly one `internal_invoice_payment_allocations` row; invoice projection became paid with balance `$0.00`.
+- UI verification after refresh showed Issued / Paid / Paid `$17.50` / Balance `$0.00` with one recorded Stripe payment row.
+- Guardrails held: submit helper did not directly create payment or allocation rows, did not mark invoice paid, did not mutate visits or `next_due_date`, did not create invoice issue/send/email or payment-link side effects, and no production access occurred.
+- No code changed during the smoke; all requested validation commands passed.
+- Recommended next lane after this closeout is Phase 6G-F docs closeout, then Phase 6H failed-payment retry and attention workflow expansion.
 
 - Scope lock: audit/model/planning only. No implementation, migrations, scheduler jobs, Supabase mutation, Stripe calls, webhook behavior changes, or commit authorization.
 
