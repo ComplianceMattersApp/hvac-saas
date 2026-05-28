@@ -344,6 +344,60 @@ Recent closeout status snapshot (May 2026):
    - On success, billing period is linked back (`internal_invoice_id`) and moved to `invoice_linked` status
    - Duplicate prevention in first slice uses existing guards (period-link precondition, anchor active-invoice check, and conditional null-link update) without adding new schema
    - No migration was added in Phase 6B; `service_plan_invoice_generation_audit` remains deferred
+
+- **Phase 6C closeout (Billing Period Draft Invoice sandbox UI smoke) is complete:**
+   - Complete in sandbox ref `kvpesjdukqwwlgpkzfjm`; production ref `ornrnvxtwwtulohqwxop` was not active
+   - Real customer-profile UI path was used; no manual DB mutation was used
+   - Verified fixture:
+      - customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6`
+      - agreement `454b3737-fa39-46be-8925-45131a571693`
+      - billing period `0ee5a88a-2fb0-43ba-84c6-81ad8cc4f779`
+      - anchor job `3c8d43ad-729c-4e39-a8e6-1d471a3aa692`
+      - visit link `36265267-fbdb-4402-b1c7-c3e7aae3f746`
+   - Baseline before submit:
+      - billing period `internal_invoice_id = null`, status `pending_billing`, amount `1950`, cadence `monthly`, coverage `2026-12-01` to `2026-12-31`
+      - anchor active non-void invoice count `0`
+      - agreement visit count `5`
+      - agreement `next_due_date = 2026-09-15`
+   - UI smoke passed:
+      - eligible period rendered `Generate Draft Invoice`
+      - verified anchor id entered via UI; submit succeeded
+      - success banner confirmed draft generation with no issue/send/email/charge/payment-link behavior
+   - Generated invoice verified:
+      - id `e2f20d3d-7f3c-4035-b44b-4f167d9d3d98`, number `INV-20260528-C655AA85`
+      - job `3c8d43ad-729c-4e39-a8e6-1d471a3aa692`
+      - status `draft`, `source_type = job`, total `1950`
+      - `issued_at = null`, `sent_at = null`, `payment_link_url = null`, `stripe_payment_intent_id = null`
+   - Generated line item verified:
+      - id `e0552fed-a8ec-48c6-b368-b91a8f176601`
+      - quantity `1`, unit price `$19.50`, line total `$19.50`
+      - description `Service Plan Billing Period (monthly): 12/01/2026-12/31/2026`
+   - Billing period post-state:
+      - `internal_invoice_id = e2f20d3d-7f3c-4035-b44b-4f167d9d3d98`
+      - `billing_period_status = invoice_linked`
+   - Duplicate guard verified:
+      - generate control no longer rendered after link
+      - linked state showed invoice reference and `Unlink Invoice`
+      - no synthetic duplicate submit was performed
+      - invoice count moved `0 -> 1` only; line-item count moved `0 -> 1` only
+   - No-side-effect verification passed:
+      - no new `internal_invoice_payments` rows
+      - no new `internal_invoice_payment_allocations` rows
+      - no Stripe behavior and no payment link
+      - no `maintenance_agreement_visits` mutation (count remained `5`)
+      - no `next_due_date` mutation (remained `2026-09-15`)
+      - invoice workspace showed Draft, 1 charge, $19.50, Unpaid, with no paid/payment-link state
+   - Validation passed post-smoke:
+      - `billing-period-actions.test.ts` `22/22`
+      - `billing-period-read-model.test.ts` `9/9`
+      - maintenance-agreements suite `111/111`
+      - `customer-detail-page-wiring.test.ts` `12/12`
+      - `internal-invoice-scope-hardening.test.ts` `56/56`
+      - `financial-access.test.ts` `9/9`
+      - `npx.cmd tsc --noEmit` passed
+      - `git diff --check` clean
+   - Recorded implementation commit for 6B-UI/6C-prep: `5ecbba727caae8ae7586617e164c3ff37eab1600`
+   - Phase 6C is now closed; next lane is Phase 6D (Stripe saved-method + autopay consent schema/model lock)
    - Boundaries preserved: no invoice issue/send/email, no payment-link/Stripe/saved-card/autopay/scheduler behavior, no payment/allocation rows, no `maintenance_agreement_visits` mutation, and no `next_due_date` mutation
 
 Customer/location relationship handling polish closeout (May 2026):

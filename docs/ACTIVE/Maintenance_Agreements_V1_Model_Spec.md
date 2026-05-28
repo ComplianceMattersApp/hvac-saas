@@ -358,6 +358,61 @@ Phase 6B closeout (Manual Generate Draft Invoice from Billing Period, server-act
 	- no Stripe/saved-card/autopay/scheduler behavior
 	- no visit or next-due lifecycle mutation
 
+Phase 6C closeout (Billing Period Draft Invoice Sandbox UI Smoke):
+- Phase 6C is complete in sandbox ref `kvpesjdukqwwlgpkzfjm`; production ref `ornrnvxtwwtulohqwxop` was not active.
+- Real customer-profile UI path was used; no manual DB mutation was used.
+- Fixture:
+	- customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6`
+	- agreement `454b3737-fa39-46be-8925-45131a571693`
+	- billing period `0ee5a88a-2fb0-43ba-84c6-81ad8cc4f779`
+	- verified anchor job `3c8d43ad-729c-4e39-a8e6-1d471a3aa692`
+	- visit link `36265267-fbdb-4402-b1c7-c3e7aae3f746`
+- Baseline before action:
+	- billing period started unlinked (`internal_invoice_id = null`) and `pending_billing`
+	- amount `1950`, cadence `monthly`, coverage `2026-12-01` to `2026-12-31`
+	- anchor active non-void invoice count `0`
+	- agreement visit count `5`
+	- agreement `next_due_date = 2026-09-15`
+- UI smoke result:
+	- eligible billing period rendered `Generate Draft Invoice`
+	- verified anchor job id entered through UI and submit succeeded
+	- success banner rendered with draft-only/no issue-send-email-charge-payment-link semantics
+- Generated invoice:
+	- `e2f20d3d-7f3c-4035-b44b-4f167d9d3d98` / `INV-20260528-C655AA85`
+	- `job_id = 3c8d43ad-729c-4e39-a8e6-1d471a3aa692`
+	- status `draft`, `source_type = job`, total `1950`
+	- `issued_at = null`, `sent_at = null`, `payment_link_url = null`, `stripe_payment_intent_id = null`
+- Generated line item:
+	- `e0552fed-a8ec-48c6-b368-b91a8f176601`
+	- quantity `1`, unit price `$19.50`, line total `$19.50`
+	- `Service Plan Billing Period (monthly): 12/01/2026-12/31/2026`
+- Billing period post-state:
+	- `internal_invoice_id = e2f20d3d-7f3c-4035-b44b-4f167d9d3d98`
+	- `billing_period_status = invoice_linked`
+- Duplicate guard verification:
+	- generate control no longer rendered after link
+	- linked state exposed invoice reference and `Unlink Invoice`
+	- no synthetic duplicate submit was performed
+	- invoice count `0 -> 1` only and line-item count `0 -> 1` only
+- No-side-effect verification:
+	- no new `internal_invoice_payments` rows
+	- no new `internal_invoice_payment_allocations` rows
+	- no Stripe behavior and no payment link
+	- no `maintenance_agreement_visits` mutation (count remained `5`)
+	- agreement `next_due_date` remained `2026-09-15`
+	- invoice workspace rendered Draft, 1 charge, $19.50, Unpaid, with no paid/payment-link state
+- Validation after smoke remained green:
+	- `billing-period-actions.test.ts` `22/22`
+	- `billing-period-read-model.test.ts` `9/9`
+	- maintenance-agreements suite `111/111`
+	- `customer-detail-page-wiring.test.ts` `12/12`
+	- `internal-invoice-scope-hardening.test.ts` `56/56`
+	- `financial-access.test.ts` `9/9`
+	- `npx.cmd tsc --noEmit` passed
+	- `git diff --check` clean
+- Phase 6B-UI / 6C-prep commit: `5ecbba727caae8ae7586617e164c3ff37eab1600`.
+- Phase 6C is closed. Next lane is Phase 6D (Stripe saved-method + autopay consent schema/model lock).
+
 ## Group 9A-9A Model Snapshot
 
 ## Group 9A-9A Model Snapshot (service plan job linkage + visit balance planning decisions)
