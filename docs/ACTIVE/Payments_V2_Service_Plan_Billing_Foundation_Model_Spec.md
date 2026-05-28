@@ -27,6 +27,21 @@ Scope: docs/model only. No product code, schema, migrations, Supabase commands, 
 - Schema/read-model recommendation: use existing attempt table fields first (`retry_count`, `next_retry_at`, `requires_action_type`, `blocked_reason_code`, `failure_code`, `failure_message`, resolved fields) plus a derived attention read model before any additive schema.
 - Customer communication remains deferred: failed-payment email/SMS, portal/self-service card-update + retry flows, retry reminders, and notification automation.
 - Locked sequence after this closeout: 6H-B read model/attention projection only, 6H-C invoice workspace read-only attention UI, 6H-D manual retry action with strict guards, 6H-E sandbox failed-path smoke, 6H-F docs closeout/production readiness gate.
+### Phase 6H-B Closeout (Failed Autopay Attention Read Model / Projection Only)
+
+- Phase 6H-B is complete in commit `e2690e2e36c0e40b2797d73bac8985693b18f381` (`feat(payments): add failed autopay attention read model`).
+- Added server-side read-only projection module `lib/business/failed-autopay-attention-read-model.ts` with focused tests in `lib/business/__tests__/failed-autopay-attention-read-model.test.ts`.
+- Projection scope is account-owned failed scheduled-autopay attention only (`failed_declined`, `failed_requires_action`, meaningful `blocked_precondition`) with counts by status/category and operator-facing recommended action.
+- Truth boundaries remain locked: `tenant_saved_method_payment_attempts` = attempt/attention truth; `internal_invoice_payments` = payment-event truth; `internal_invoice_payment_allocations` = allocation truth; Stripe = processor/payment-method truth; visits and `maintenance_agreements.next_due_date` remain operational truth and are not payment-mutated.
+- No Stripe behavior change, no schema change, no production enablement change, and no payment/allocation/invoice/visit/next_due writes outside existing webhook payment truth behavior.
+
+### Phase 6H-C Closeout (Invoice Workspace Read-Only Failed-Autopay Attention UI)
+
+- Phase 6H-C is complete in commit `5b383e842a62d0cc95f7b1d90ca3865b735f5e87` (`feat(payments): show failed autopay attention on invoice workspace`).
+- Invoice workspace now loads the failed-autopay attention read model server-side and renders a read-only "Failed Scheduled Autopay Attention" panel for internal operator visibility.
+- Panel surfaces open attention items, category, attempt status, timestamp, recommended operator action, and safe context metadata; no retry action is exposed.
+- This remains visibility-only: no Stripe calls, no payment/allocation/invoice mutations, no visit/next_due mutation, and no customer email/SMS/portal update-card flow launch in this slice.
+- Deferred lanes remain locked: 6H-D manual retry action, 6H-E failed/`requires_action` sandbox smoke, and customer communication/self-service update-card flows.
 ### Phase 6G-E4 Closeout (Fresh Scheduled Autopay Submit Smoke, Docs-Only)
 
 - Phase 6G-E4 passed after the 6G-E3 self-attempt revalidation fix in commit `c7329a8a9b19d392f6dd7196ca7145f86d62e713`.
