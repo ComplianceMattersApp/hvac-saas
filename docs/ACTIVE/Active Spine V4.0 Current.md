@@ -128,7 +128,7 @@ Model locks:
 - Invoice generation: one billing period can generate at most one active invoice in first posture, with manual Generate Draft Invoice only; `internal_invoices` remains job-scoped (`job_id` required), operator-selected anchor job linkage is required, and generation must be idempotent/audited.
 - Stripe-saved methods: SetupIntent-first in connected-account context; Compliance Matters stores only safe references/metadata and never raw credentials.
 - Autopay consent: default off, agreement-scoped, explicit evidence required, and saved method presence never implies consent.
-- Manual saved-method charge: precedes scheduler, requires issued non-void invoice with positive balance due + active consent + active method + connected-account readiness, and remains webhook-confirmed for money truth.
+- Manual saved-method charge: precedes scheduler, requires issued non-void invoice with positive balance due + same-account customer/payment-method context + connected-account readiness + active method + valid saved-method reuse authorization captured by the setup flow or an explicit one-time/manual-charge authorization record, and remains webhook-confirmed for money truth. Scheduled autopay still requires maintenance-agreement-scoped tenant_customer_autopay_consents.
 - Scheduled autopay: deferred until manual charge posture is proven; scheduler enqueues attempts only and never directly marks invoices paid.
 - Failed payment/retry: failures are attention state only, do not mutate visits/next due, and must use bounded retry policy with `requires_action` pause semantics.
 

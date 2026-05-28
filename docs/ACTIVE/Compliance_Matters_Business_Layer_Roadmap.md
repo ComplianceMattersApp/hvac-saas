@@ -341,10 +341,10 @@ Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method 
   - lifecycle states remain distinct (`enabled`, `disabled`, `paused`, `revoked`)
 - Manual charge saved-method lock:
   - manual charge precedes scheduler
-  - preconditions require issued/non-void invoice with balance due + active consent + active saved method + connected-account readiness
+  - preconditions require issued/non-void invoice with balance due + same-account customer/payment-method context + connected-account readiness + active saved method + valid saved-method reuse authorization captured by the setup flow or an explicit one-time/manual-charge authorization record
   - attempt row creation and webhook-as-money-truth posture are required
 - Scheduled autopay lock:
-  - deferred until manual charge posture proves stable
+  - deferred until manual charge posture proves stable; scheduled autopay still requires maintenance-agreement-scoped tenant_customer_autopay_consents
   - scheduler enqueues attempts only, never directly marks invoices paid
   - invalid contexts must be skipped explicitly
 - Failed payment/retry lock:

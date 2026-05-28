@@ -321,10 +321,10 @@ Recent closeout status snapshot (May 2026):
        - lifecycle states remain distinct (`enabled`, `disabled`, `paused`, `revoked`)
     - Manual charge saved-method lock:
        - precedes scheduled autopay
-       - requires issued non-void invoice with positive balance due + active consent + active saved method + connected-account readiness
+       - requires issued non-void invoice with positive balance due + same-account customer/payment-method context + connected-account readiness + active saved method + valid saved-method reuse authorization captured by the setup flow or an explicit one-time/manual-charge authorization record
        - attempt row creation only; webhook remains money-truth writer
     - Scheduled autopay lock:
-       - deferred until manual charge posture proves stable
+       - deferred until manual charge posture proves stable; scheduled autopay still requires maintenance-agreement-scoped tenant_customer_autopay_consents
        - scheduler enqueues attempts only and must never directly mark invoices paid
        - invalid contexts are skipped explicitly
     - Failed payment/retry lock:

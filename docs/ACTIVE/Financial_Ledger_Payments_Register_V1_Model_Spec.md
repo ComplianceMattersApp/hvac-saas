@@ -214,12 +214,12 @@ Current financial access model for sensitive financial actions:
     - disable/revoke are state transitions, never hard deletes
   - Manual charge saved-method lock:
     - manual `Charge Saved Payment Method` precedes scheduled autopay
-    - preconditions: issued invoice, non-void invoice, positive balance due, non-cancelled billing period, active consent, connected-account readiness, active saved method
+    - preconditions: issued invoice, non-void invoice, positive balance due, non-cancelled billing period, same-account customer/payment-method context, connected-account readiness, active saved method, and valid saved-method reuse authorization captured by the setup flow or an explicit one-time/manual-charge authorization record
     - charge initiation creates payment-attempt record
     - webhook remains sole collected-money truth
     - Stripe idempotency key basis = account + invoice + attempt ordinal
   - Scheduled autopay lock:
-    - deferred until manual saved-method charge posture is proven
+    - deferred until manual saved-method charge posture is proven; scheduled autopay still requires maintenance-agreement-scoped tenant_customer_autopay_consents
     - scheduler evaluates due issued invoices and enqueues attempts only
     - scheduler never marks invoices paid
     - scheduler skips draft/void/cancelled-context invoices, missing consent, stale profile, disconnected Stripe, and in-flight attempts
