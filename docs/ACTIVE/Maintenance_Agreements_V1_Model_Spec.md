@@ -14,6 +14,17 @@ Scope: model guidance plus Group 9A-2 backend foundation closeout documentation.
 - Validation closeout remained green: TypeScript no-emit pass, targeted Vitest matrix pass (8 files / 100 tests), `git diff --check` pass, and `_tmp_*` cleanup confirmed.
 
 ## Phase 6G-A Closeout (Scheduled Autopay Attempts Model/Audit Lock, Docs-Only)
+### Phase 6H-A Closeout (Failed Autopay Retry / Attention Workflow Model Lock, Docs-Only)
+
+- Phase 6H-A audit/model lock is complete as read-only analysis with no code, schema, docs-outside-scope, sandbox data, production data, Stripe charge, or UI mutation.
+- Canonical attempt states remain unchanged: `pending`, `submitted`, `succeeded`, `failed_declined`, `failed_requires_action`, `blocked_precondition`, `retry_scheduled`, `abandoned`.
+- Submit-path lock: declines map to `failed_declined`; authentication-required maps to `failed_requires_action`; readiness/scope/invoice/precondition failures remain `blocked_precondition`; stale amount snapshot blocks submit; duplicate in-flight remains blocked; 6G-E3 self-in-flight exception remains narrow/safe.
+- Webhook lock: `charge.failed` is currently routed; `payment_intent.payment_failed` is not currently routed; failed webhook rows are non-collected `internal_invoice_payments` truth; failed allocations stay non-counting (`inactive`); saved-method attempt failure resolution remains webhook-linked where identity is present.
+- Current surfaces: Payments Register separates recorded vs failed rows; Customer Payment History separates Failed Attempts; invoice workspace has manual saved-card failure banners, but no scheduled-autopay-specific attention read model yet.
+- Retry/attention policy recommendation (V1): manual-first retry, no automatic infinite retry, `failed_requires_action` pauses further scheduled submissions for same consent/agreement/customer path until operator resolution, `failed_declined` opens attention and allows manual retry only after revalidation, and failed autopay does not block service visits by default.
+- Schema/read-model recommendation: use existing attempt table fields first (`retry_count`, `next_retry_at`, `requires_action_type`, `blocked_reason_code`, `failure_code`, `failure_message`, resolved fields) plus a derived attention read model before any additive schema.
+- Customer communication remains deferred: failed-payment email/SMS, portal/self-service card-update + retry flows, retry reminders, and notification automation.
+- Locked sequence after this closeout: 6H-B read model/attention projection only, 6H-C invoice workspace read-only attention UI, 6H-D manual retry action with strict guards, 6H-E sandbox failed-path smoke, 6H-F docs closeout/production readiness gate.
 ### Phase 6G-E4 Closeout (Fresh Scheduled Autopay Submit Smoke, Docs-Only)
 
 - Phase 6G-E4 passed after the 6G-E3 self-attempt revalidation fix in commit `c7329a8a9b19d392f6dd7196ca7145f86d62e713`.
