@@ -6,6 +6,7 @@ import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
 import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { retryFailedScheduledAutopayAttemptManually } from "@/lib/business/failed-autopay-manual-retry";
 import { startManualSavedMethodPaymentAttempt } from "@/lib/business/tenant-saved-method-payment-attempts";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import { startTenantSavedCardSetupCheckoutSession } from "@/lib/business/tenant-saved-payment-method-setups";
@@ -32,6 +33,14 @@ type ManualSavedCardInvoiceBanner =
   | "internal_invoice_saved_card_charge_failed_declined"
   | "internal_invoice_saved_card_charge_failed_requires_action"
   | "internal_invoice_saved_card_charge_failed";
+
+type FailedAutopayRetryInvoiceBanner =
+  | "internal_invoice_failed_autopay_retry_denied"
+  | "internal_invoice_failed_autopay_retry_invalid"
+  | "internal_invoice_failed_autopay_retry_blocked"
+  | "internal_invoice_failed_autopay_retry_submitted"
+  | "internal_invoice_failed_autopay_retry_failed_declined"
+  | "internal_invoice_failed_autopay_retry_failed_requires_action";
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -82,7 +91,7 @@ function normalizeInvoiceWorkspacePath(jobId: string, returnPath: string | null 
 function redirectToInvoiceWorkspace(
   jobId: string,
   returnPath: string | null | undefined,
-  banner: ManualSavedCardInvoiceBanner,
+  banner: ManualSavedCardInvoiceBanner | FailedAutopayRetryInvoiceBanner,
 ): never {
   const pathname = normalizeInvoiceWorkspacePath(jobId, returnPath);
   const url = new URL(pathname, "https://app.local");
@@ -90,6 +99,92 @@ function redirectToInvoiceWorkspace(
   url.hash = "invoice-workspace";
   revalidatePath(pathname);
   redirect(`${url.pathname}${url.search}${url.hash}`);
+}
+
+export async function retryFailedScheduledAutopayAttemptFromForm(formData: FormData): Promise<void> {
+  const jobId = parseUuid(formData.get("job_id"));
+  const invoiceId = parseUuid(formData.get("invoice_id"));
+  const failedAttemptId = parseUuid(formData.get("failed_attempt_id"));
+  const returnPath = clean(formData.get("return_to"));
+  const retryReason = clean(formData.get("retry_reason")) || "manual_retry";
+
+  if (!jobId || !invoiceId || !failedAttemptId) {
+    redirectToInvoiceWorkspace(clean(jobId), returnPath, "internal_invoice_failed_autopay_retry_invalid");
+  }
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    const supabase = await createClient();
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_denied");
+    }
+    throw error;
+  }
+
+  const { internalUser, userId } = authz;
+  const accountOwnerUserId = clean(internalUser.account_owner_user_id);
+  if (!accountOwnerUserId) {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_denied");
+  }
+
+  if (
+    !canManageInvoiceLifecycle({
+      actorUserId: userId,
+      internalUser,
+      resourceAccountOwnerUserId: accountOwnerUserId,
+    })
+  ) {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_denied");
+  }
+
+  const supabase = await createClient();
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId,
+    jobId: jobId!,
+    select: "id",
+  });
+
+  if (!scopedJob?.id) {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_denied");
+  }
+
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId,
+  });
+
+  if (billingMode !== "internal_invoicing") {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_denied");
+  }
+
+  const admin = createAdminClient();
+  const result = await retryFailedScheduledAutopayAttemptManually({
+    admin,
+    accountOwnerUserId,
+    failedAttemptId: failedAttemptId!,
+    actorUserId: userId,
+    retryReason,
+  });
+
+  if (result.outcome === "submitted") {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_submitted");
+  }
+
+  if (result.outcome === "failed_declined") {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_failed_declined");
+  }
+
+  if (result.outcome === "failed_requires_action") {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_failed_requires_action");
+  }
+
+  if (result.outcome === "blocked_precondition") {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_blocked");
+  }
+
+  redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_failed_autopay_retry_invalid");
 }
 
 export async function startCustomerSavedPaymentMethodSetupFromForm(

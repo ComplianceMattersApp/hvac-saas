@@ -25,6 +25,7 @@ import {
   type InternalInvoicePaymentRow,
 } from "@/lib/business/internal-invoice-payments";
 import { loadFailedAutopayAttentionItems } from "@/lib/business/failed-autopay-attention-read-model";
+import { runScheduledAutopayEligibilityDryRun } from "@/lib/business/scheduled-autopay-eligibility";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import {
   addInternalInvoiceLineItemFromForm,
@@ -43,7 +44,10 @@ import {
   recordInternalInvoicePaymentFromForm,
   reverseInternalInvoicePaymentFromForm,
 } from "@/lib/actions/internal-invoice-payment-actions";
-import { chargeSavedCardForIssuedInvoiceFromForm } from "@/lib/actions/customer-saved-payment-method-actions";
+import {
+  chargeSavedCardForIssuedInvoiceFromForm,
+  retryFailedScheduledAutopayAttemptFromForm,
+} from "@/lib/actions/customer-saved-payment-method-actions";
 import TenantInvoicePaymentLinkPanel from "./_components/TenantInvoicePaymentLinkPanel";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
@@ -207,6 +211,16 @@ function bannerMessage(value?: string | null) {
     internal_invoice_saved_card_charge_failed_requires_action:
       "Saved-card charge requires customer action. No automatic retry was scheduled.",
     internal_invoice_saved_card_charge_failed: "Saved-card charge failed before submission to Stripe.",
+    internal_invoice_failed_autopay_retry_denied: "You do not have permission to retry this scheduled autopay attempt.",
+    internal_invoice_failed_autopay_retry_invalid: "Failed-autopay retry request was invalid.",
+    internal_invoice_failed_autopay_retry_blocked:
+      "Failed-autopay retry is currently blocked by invoice or payment readiness checks.",
+    internal_invoice_failed_autopay_retry_submitted:
+      "Failed-autopay retry submitted to Stripe. Payment records update only after webhook confirmation.",
+    internal_invoice_failed_autopay_retry_failed_declined:
+      "Failed-autopay retry was declined by Stripe. Invoice payment records were not marked paid.",
+    internal_invoice_failed_autopay_retry_failed_requires_action:
+      "Failed-autopay retry requires customer action. No automatic retry was scheduled.",
   };
   return messages[key] ?? null;
 }
@@ -479,6 +493,20 @@ export default async function InternalInvoiceWorkspacePage({
       })
     : null;
   const failedAutopayAttentionItems = failedAutopayAttention?.items ?? [];
+  const failedAutopayRetryEligibility =
+    invoice && failedAutopayAttentionItems.length > 0 && canManageFinancialInvoiceLifecycle
+      ? await runScheduledAutopayEligibilityDryRun({
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          supabase,
+          candidateInvoiceIds: [invoice.id],
+        })
+      : null;
+  const canShowFailedAutopayRetryControl = Boolean(
+    invoice
+    && canManageFinancialInvoiceLifecycle
+    && failedAutopayAttentionItems.length > 0
+    && failedAutopayRetryEligibility?.eligibleInvoicesCount,
+  );
 
   return (
     <div id="invoice-workspace" className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6">
@@ -715,6 +743,29 @@ export default async function InternalInvoiceWorkspacePage({
                             ) : null}
                             {item.consent.consentStatus ? <span>Consent: {item.consent.consentStatus}</span> : null}
                           </div>
+                          {canShowFailedAutopayRetryControl ? (
+                            <form
+                              action={retryFailedScheduledAutopayAttemptFromForm}
+                              className="mt-3 rounded-lg border border-amber-200 bg-white/90 px-3 py-3"
+                            >
+                              <input type="hidden" name="job_id" value={jobId} />
+                              <input type="hidden" name="invoice_id" value={invoice.id} />
+                              <input type="hidden" name="failed_attempt_id" value={item.attemptId} />
+                              <input type="hidden" name="return_to" value={returnTo} />
+                              <input
+                                type="hidden"
+                                name="retry_reason"
+                                value="manual_retry_from_invoice_workspace"
+                              />
+                              <div className="text-sm font-semibold text-slate-950">Retry saved card</div>
+                              <div className="mt-1 text-xs leading-5 text-slate-600">
+                                This will attempt the saved payment method again. Payment is only recorded after Stripe confirms it through webhook.
+                              </div>
+                              <SubmitButton loadingText="Retrying..." className={`${secondaryButtonClass} mt-3`}>
+                                Retry saved card
+                              </SubmitButton>
+                            </form>
+                          ) : null}
                         </div>
                       ))}
                     </div>
