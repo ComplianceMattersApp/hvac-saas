@@ -106,3 +106,38 @@ describe("tenant saved payment method setup schema foundation migration", () => 
     expect(sql).not.toMatch(/DELETE\s+FROM\s+public\.internal_invoice_payments/i);
   });
 });
+
+describe("checkout session id constraint fix migration", () => {
+  const fixMigrationPath = join(
+    process.cwd(),
+    "supabase",
+    "migrations",
+    "20260527120000_fix_checkout_session_id_constraint.sql",
+  );
+
+  const fixSql = readFileSync(fixMigrationPath, "utf8");
+
+  it("replaces the too-strict constraint with one that accepts cs_test_ and cs_live_ format", () => {
+    expect(fixSql).toContain("DROP CONSTRAINT IF EXISTS tenant_saved_payment_method_setups_checkout_session_id_format_c");
+    expect(fixSql).toContain("ADD CONSTRAINT tenant_saved_payment_method_setups_checkout_session_id_format_c");
+    expect(fixSql).toContain("^cs_(test|live)_[A-Za-z0-9]+$");
+    // old strict pattern must not appear in the fix migration
+    expect(fixSql).not.toContain("'^cs_[A-Za-z0-9]+$'");
+  });
+
+  it("does not touch any other table or constraint", () => {
+    expect(fixSql).not.toMatch(/DROP\s+TABLE/i);
+    // Exactly one DROP CONSTRAINT and one ADD CONSTRAINT — the expected pair
+    const dropConstraintCount = (fixSql.match(/DROP\s+CONSTRAINT/gi) ?? []).length;
+    const addConstraintCount = (fixSql.match(/ADD\s+CONSTRAINT/gi) ?? []).length;
+    expect(dropConstraintCount).toBe(1);
+    expect(addConstraintCount).toBe(1);
+    // Both reference only the expected constraint name
+    expect(fixSql).toContain("tenant_saved_payment_method_setups_checkout_session_id_format_c");
+    // All ALTER TABLE references are on the expected table
+    const alteredTables = [...fixSql.matchAll(/ALTER\s+TABLE\s+public\.(\S+)/gi)].map(m => m[1]);
+    for (const tableName of alteredTables) {
+      expect(tableName).toBe("tenant_saved_payment_method_setups");
+    }
+  });
+});

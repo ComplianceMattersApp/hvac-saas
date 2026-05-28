@@ -12,6 +12,8 @@ import {
   recordTenantInvoicePaymentFromStripeCharge,
   recordTenantInvoicePaymentFailureFromStripeCharge,
 } from "@/lib/business/tenant-invoice-stripe-webhooks";
+import { recordTenantSavedPaymentMethodSetupFromCheckoutSession } from "@/lib/business/tenant-saved-payment-method-setups";
+import { createAdminClient } from "@/lib/supabase/server";
 
 const HANDLED_EVENT_TYPES = new Set([
   "checkout.session.completed",
@@ -65,16 +67,32 @@ export async function POST(request: Request) {
   try {
     if (event.type === "checkout.session.completed") {
       const session = event.data.object as Stripe.Checkout.Session;
+      const connectedAccountId = typeof event.account === "string"
+        ? event.account.trim()
+        : "";
 
       if (session.mode === "payment") {
-        const connectedAccountId = typeof event.account === "string"
-          ? event.account.trim()
-          : "";
-
         await recordTenantInvoicePaymentFromCheckoutSession({
           session,
           eventId: event.id,
           connectedAccountId,
+          stripe,
+        });
+
+        return NextResponse.json({ received: true });
+      }
+
+      if (session.mode === "setup") {
+        const admin = createAdminClient();
+
+        await recordTenantSavedPaymentMethodSetupFromCheckoutSession({
+          session,
+          eventId: event.id,
+          connectedAccountId,
+          eventType: event.type,
+          livemode: event.livemode,
+          apiVersion: event.api_version ?? null,
+          admin,
           stripe,
         });
 

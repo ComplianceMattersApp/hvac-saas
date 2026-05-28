@@ -3,12 +3,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mockRecordTenantInvoicePaymentFromStripeCharge = vi.fn();
 const mockRecordTenantInvoicePaymentFailureFromStripeCharge = vi.fn();
 const mockRecordTenantInvoicePaymentFromCheckoutSession = vi.fn();
+const mockRecordTenantSavedPaymentMethodSetupFromCheckoutSession = vi.fn();
+const mockCreateAdminClient = vi.fn(() => ({ from: vi.fn() }));
 
 vi.mock('@/lib/business/tenant-invoice-stripe-webhooks', () => ({
   recordTenantInvoicePaymentFromCheckoutSession: mockRecordTenantInvoicePaymentFromCheckoutSession,
   recordTenantInvoicePaymentFromStripeCharge: mockRecordTenantInvoicePaymentFromStripeCharge,
   recordTenantInvoicePaymentFailureFromStripeCharge:
     mockRecordTenantInvoicePaymentFailureFromStripeCharge,
+}));
+
+vi.mock('@/lib/business/tenant-saved-payment-method-setups', () => ({
+  recordTenantSavedPaymentMethodSetupFromCheckoutSession:
+    mockRecordTenantSavedPaymentMethodSetupFromCheckoutSession,
+}));
+
+vi.mock('@/lib/supabase/server', () => ({
+  createAdminClient: mockCreateAdminClient,
 }));
 
 vi.mock('@/lib/business/platform-billing-stripe', () => ({
@@ -105,6 +116,41 @@ describe('Stripe webhook route — charge events', () => {
 
     expect(response.status).toBe(200);
     expect(mockRecordTenantInvoicePaymentFromCheckoutSession).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes setup-mode checkout.session.completed to saved-method setup recorder', async () => {
+    mockRecordTenantSavedPaymentMethodSetupFromCheckoutSession.mockResolvedValue({
+      recorded: true,
+      setupId: 'setup-1',
+      paymentMethodId: 'pm_1',
+    });
+
+    const response = await postWebhook({
+      id: 'evt_checkout_setup_1',
+      account: 'acct_connected_9',
+      type: 'checkout.session.completed',
+      data: {
+        object: {
+          id: 'cs_setup_1',
+          mode: 'setup',
+          metadata: {
+            setup_id: 'setup-1',
+            account_owner_user_id: 'owner-1',
+            customer_id: 'cust-1',
+          },
+        },
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(mockRecordTenantSavedPaymentMethodSetupFromCheckoutSession).toHaveBeenCalledTimes(1);
+    expect(mockRecordTenantSavedPaymentMethodSetupFromCheckoutSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: 'evt_checkout_setup_1',
+        connectedAccountId: 'acct_connected_9',
+      }),
+    );
+    expect(mockRecordTenantInvoicePaymentFromCheckoutSession).not.toHaveBeenCalled();
   });
 
   it('routes charge.succeeded with invoice_id and forwards connected account context', async () => {

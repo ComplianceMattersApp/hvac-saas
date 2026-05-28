@@ -9,6 +9,7 @@ import {
   archiveCustomerFromForm,
   updateCustomerNotesFromForm,
 } from "@/lib/actions/customer-actions";
+import { startCustomerSavedPaymentMethodSetupFromForm } from "@/lib/actions/customer-saved-payment-method-actions";
 import {
   addCustomerRoleContactFromForm,
   addLocationRoleContactFromForm,
@@ -126,6 +127,18 @@ type JobRow = {
   } | null;
 };
 
+type CustomerSavedPaymentMethodRow = {
+  id: string;
+  payment_method_status: string;
+  payment_method_type: string;
+  is_default: boolean;
+  display_brand: string | null;
+  display_last4: string | null;
+  display_exp_month: number | null;
+  display_exp_year: number | null;
+  updated_at: string | null;
+};
+
 function isUuid(v: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     v
@@ -137,6 +150,22 @@ function formatDate(value?: string | null) {
   if (!raw) return "—";
   if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return formatDateOnlyDisplay(raw);
   return formatTimestampDateDisplayLA(raw) || "—";
+}
+
+function formatSavedCardLabel(row: CustomerSavedPaymentMethodRow) {
+  const brand = String(row.display_brand ?? "").trim();
+  const last4 = String(row.display_last4 ?? "").trim();
+  const expMonth = Number(row.display_exp_month ?? 0);
+  const expYear = Number(row.display_exp_year ?? 0);
+
+  const brandLabel = brand ? brand : "Card";
+  const last4Label = last4 ? `•••• ${last4}` : "••••";
+  const expLabel =
+    expMonth > 0 && expYear > 0
+      ? `Exp ${String(expMonth).padStart(2, "0")}/${String(expYear).slice(-2)}`
+      : "Exp —";
+
+  return `${brandLabel} ${last4Label} • ${expLabel}`;
 }
 
 function formatBillingPeriodPaymentDisplayStateLabel(value?: string | null) {
@@ -772,6 +801,8 @@ export default async function CustomerDetailPage(props: {
   let customerPaymentHistory: CustomerPaymentHistoryRow[] = [];
   let canViewPaymentHistory = false;
   let canManageBillingPeriods = false;
+  let canManageSavedPaymentMethodSetup = false;
+  let customerSavedPaymentMethods: CustomerSavedPaymentMethodRow[] = [];
 
   if (isInternalViewer) {
     try {
@@ -784,6 +815,7 @@ export default async function CustomerDetailPage(props: {
         internalUser: iu,
         resourceAccountOwnerUserId: visibilityScope.accountOwnerUserId,
       });
+      canManageSavedPaymentMethodSetup = canManageBillingPeriods;
 
       if (canViewPaymentHistory) {
         customerPaymentHistory = await listCustomerPaymentHistory({
@@ -793,10 +825,51 @@ export default async function CustomerDetailPage(props: {
           limit: 50,
         });
       }
+
+      if (canManageSavedPaymentMethodSetup) {
+        const { data: methodRows, error: methodError } = await supabase
+          .from("tenant_customer_payment_methods")
+          .select(
+            [
+              "id",
+              "payment_method_status",
+              "payment_method_type",
+              "is_default",
+              "display_brand",
+              "display_last4",
+              "display_exp_month",
+              "display_exp_year",
+              "updated_at",
+            ].join(", "),
+          )
+          .eq("account_owner_user_id", visibilityScope.accountOwnerUserId)
+          .eq("customer_id", customerId)
+          .order("is_default", { ascending: false })
+          .order("updated_at", { ascending: false })
+          .limit(5);
+
+        if (methodError) {
+          throw methodError;
+        }
+
+        customerSavedPaymentMethods = (Array.isArray(methodRows) ? methodRows : []).map((row: any) => ({
+          id: String(row.id ?? "").trim(),
+          payment_method_status: String(row.payment_method_status ?? "").trim(),
+          payment_method_type: String(row.payment_method_type ?? "").trim(),
+          is_default: Boolean(row.is_default),
+          display_brand: String(row.display_brand ?? "").trim() || null,
+          display_last4: String(row.display_last4 ?? "").trim() || null,
+          display_exp_month: Number.isInteger(row.display_exp_month) ? Number(row.display_exp_month) : null,
+          display_exp_year: Number.isInteger(row.display_exp_year) ? Number(row.display_exp_year) : null,
+          updated_at: String(row.updated_at ?? "").trim() || null,
+        }));
+      }
     } catch {
       // Fail safely if read fails
       customerPaymentHistory = [];
       canViewPaymentHistory = false;
+      canManageSavedPaymentMethodSetup = false;
+      customerSavedPaymentMethods = [];
     }
   }
 
@@ -806,6 +879,7 @@ export default async function CustomerDetailPage(props: {
   const generateDraftInvoiceFromBillingPeriodAction = generateDraftInvoiceFromBillingPeriodFromForm.bind(null, customerPath);
   const linkBillingPeriodInvoiceAction = linkInternalInvoiceToBillingPeriodFromForm.bind(null, customerPath);
   const unlinkBillingPeriodInvoiceAction = unlinkInternalInvoiceFromBillingPeriodFromForm.bind(null, customerPath);
+  const startSavedPaymentMethodSetupAction = startCustomerSavedPaymentMethodSetupFromForm.bind(null, customerPath);
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -840,6 +914,16 @@ export default async function CustomerDetailPage(props: {
             Draft invoice generated from billing period. No invoice was issued, sent, emailed, charged, or linked to payment.
           </div>
         )}
+        {billingPeriodBanner === "saved_payment_method_setup_returned" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Saved card setup returned from Stripe. Final saved-method status is recorded after webhook verification.
+          </div>
+        )}
+        {billingPeriodBanner === "saved_payment_method_setup_cancelled" && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            Saved card setup was cancelled before completion. No charge was created and autopay remains off.
+          </div>
+        )}
         {(billingPeriodBanner === "validation_error" || billingPeriodBanner === "duplicate_or_overlap_error" || billingPeriodBanner === "access_denied" || billingPeriodBanner === "billing_period_invoice_link_denied" || billingPeriodBanner === "billing_period_invoice_link_invalid" || billingPeriodBanner === "billing_period_invoice_link_conflict" || billingPeriodBanner === "billing_period_invoice_unlink_reason_required" || billingPeriodBanner === "billing_period_invoice_generate_denied" || billingPeriodBanner === "billing_period_invoice_generate_invalid" || billingPeriodBanner === "billing_period_invoice_generate_anchor_invalid" || billingPeriodBanner === "billing_period_invoice_generate_conflict") && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
             {billingPeriodBanner === "validation_error" && "Could not save billing period. Verify the required fields and status/posture rules."}
@@ -853,6 +937,14 @@ export default async function CustomerDetailPage(props: {
             {billingPeriodBanner === "billing_period_invoice_generate_invalid" && "Could not generate draft invoice. Verify billing period eligibility and required fields."}
             {billingPeriodBanner === "billing_period_invoice_generate_anchor_invalid" && "Could not generate draft invoice. Anchor job is invalid or is not linked to this service plan."}
             {billingPeriodBanner === "billing_period_invoice_generate_conflict" && "Could not generate draft invoice. Billing period is already linked or the anchor job already has an active invoice."}
+          </div>
+        )}
+        {(billingPeriodBanner === "saved_payment_method_setup_denied" || billingPeriodBanner === "saved_payment_method_setup_invalid" || billingPeriodBanner === "saved_payment_method_setup_connect_not_ready" || billingPeriodBanner === "saved_payment_method_setup_failed") && (
+          <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+            {billingPeriodBanner === "saved_payment_method_setup_denied" && "You do not have permission to set up a saved card for this customer."}
+            {billingPeriodBanner === "saved_payment_method_setup_invalid" && "Could not start saved card setup. Verify customer scope and required setup inputs."}
+            {billingPeriodBanner === "saved_payment_method_setup_connect_not_ready" && "Could not start saved card setup. Tenant Stripe Connect account is not ready."}
+            {billingPeriodBanner === "saved_payment_method_setup_failed" && "Could not start saved card setup due to a Stripe setup error. Try again."}
           </div>
         )}
         {hasJobsError && (
@@ -996,6 +1088,59 @@ export default async function CustomerDetailPage(props: {
             customerId={customerId}
             customerName={customerDisplayName(customer)}
           />
+        )}
+
+        {canManageSavedPaymentMethodSetup && (
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+              <div className="space-y-1">
+                <h2 className="text-sm font-semibold text-slate-900">Saved Card Setup</h2>
+                <p className="text-xs text-slate-600">
+                  Card details are entered in Stripe-hosted checkout. Compliance Matters does not store full card number or CVC.
+                </p>
+                <p className="text-xs text-slate-600">
+                  Saving a card does not enable autopay. autopay consent is managed separately in a later phase.
+                </p>
+              </div>
+
+              <form action={startSavedPaymentMethodSetupAction} className="shrink-0">
+                <input type="hidden" name="customer_id" value={customerId} />
+                <input type="hidden" name="return_path" value={customerPath} />
+                <button
+                  type="submit"
+                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                >
+                  Set up saved card
+                </button>
+              </form>
+            </div>
+
+            <div className="mt-3">
+              {customerSavedPaymentMethods.length > 0 ? (
+                <ul className="space-y-2">
+                  {customerSavedPaymentMethods.map((methodRow) => (
+                    <li key={methodRow.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                      <div className="text-sm text-slate-800">
+                        {formatSavedCardLabel(methodRow)}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs text-slate-600">
+                        {methodRow.is_default ? (
+                          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700">Default</span>
+                        ) : null}
+                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5">
+                          {String(methodRow.payment_method_status || "unknown").replace(/_/g, " ")}
+                        </span>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-500">
+                  No saved card is on file for this customer yet.
+                </div>
+              )}
+            </div>
+          </section>
         )}
 
         {/* Overview */}

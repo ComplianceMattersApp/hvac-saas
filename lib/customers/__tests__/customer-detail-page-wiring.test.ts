@@ -179,4 +179,20 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).not.toContain("Subscription");
     expect(customerPageSource).not.toContain("Payment required before service");
   });
+
+  it("wires saved-card setup controls with no-charge and no-autopay copy", () => {
+    expect(customerPageSource).toContain("startCustomerSavedPaymentMethodSetupFromForm");
+    expect(customerPageSource).toContain("startSavedPaymentMethodSetupAction");
+    expect(customerPageSource).toContain("Saved Card Setup");
+    expect(customerPageSource).toContain("Set up saved card");
+    expect(customerPageSource).toContain("Saving a card does not enable autopay");
+    expect(customerPageSource).toContain("No saved card is on file for this customer yet.");
+    expect(customerPageSource).toContain("saved_payment_method_setup_returned");
+    expect(customerPageSource).toContain("saved_payment_method_setup_cancelled");
+    expect(customerPageSource).toContain("saved_payment_method_setup_denied");
+    expect(customerPageSource).toContain("saved_payment_method_setup_connect_not_ready");
+    expect(customerPageSource).toContain("saved_payment_method_setup_failed");
+    expect(customerPageSource).not.toContain("Enable Autopay");
+    expect(customerPageSource).not.toContain("Start Subscription");
+  });
 });
