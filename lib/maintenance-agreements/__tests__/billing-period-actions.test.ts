@@ -937,7 +937,7 @@ describe("billing period server actions", () => {
     expect(technicianTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_denied`);
   });
 
-  it("blocks cancelled/already-linked/zero-amount periods and missing visit linkage for generation", async () => {
+  it("blocks cancelled/already-linked/zero-amount periods and invalid/missing anchor linkage for generation", async () => {
     const { generateDraftInvoiceFromBillingPeriodFromForm } = await import(
       "@/lib/maintenance-agreements/billing-period-actions"
     );
@@ -974,29 +974,39 @@ describe("billing period server actions", () => {
 
     createAdminClientMock.mockReturnValue(makeAdminClient({
       periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice" })],
+      jobs: [],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+    }));
+    const missingAnchorTarget = await expectRedirect(() =>
+      generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
+    );
+    expect(missingAnchorTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_anchor_invalid`);
+
+    createAdminClientMock.mockReturnValue(makeAdminClient({
+      periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice" })],
       jobs: [makeJobRow({ id: JOB_ONE_ID })],
       visitLinks: [{ id: "visit-mismatch", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_TWO_ID }],
     }));
     const visitMismatchTarget = await expectRedirect(() =>
       generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
     );
-    expect(visitMismatchTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_invalid`);
+    expect(visitMismatchTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_anchor_invalid`);
   });
 
-  it("blocks wrong-account/wrong-customer anchor job scope", async () => {
+  it("blocks wrong-account linkage and wrong-customer anchor job scope", async () => {
     const { generateDraftInvoiceFromBillingPeriodFromForm } = await import(
       "@/lib/maintenance-agreements/billing-period-actions"
     );
 
     createAdminClientMock.mockReturnValue(makeAdminClient({
       periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice" })],
-      jobs: [makeJobRow({ id: JOB_ONE_ID, account_owner_user_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee" })],
-      visitLinks: [{ id: "visit-1", account_owner_user_id: OWNER_ID, agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
+      jobs: [makeJobRow({ id: JOB_ONE_ID, customer_id: CUSTOMER_ID })],
+      visitLinks: [{ id: "visit-1", account_owner_user_id: "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee", agreement_id: AGREEMENT_ID, job_id: JOB_ONE_ID }],
     }));
     const wrongAccountTarget = await expectRedirect(() =>
       generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
     );
-    expect(wrongAccountTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_denied`);
+    expect(wrongAccountTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_anchor_invalid`);
 
     createAdminClientMock.mockReturnValue(makeAdminClient({
       periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice" })],
@@ -1006,7 +1016,7 @@ describe("billing period server actions", () => {
     const wrongCustomerTarget = await expectRedirect(() =>
       generateDraftInvoiceFromBillingPeriodFromForm(`/customers/${CUSTOMER_ID}`, buildGenerateDraftInvoiceFormData())
     );
-    expect(wrongCustomerTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_invalid`);
+    expect(wrongCustomerTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_invoice_generate_anchor_invalid`);
   });
 
   it("blocks duplicate generation when anchor job already has active invoice or period link race occurs", async () => {

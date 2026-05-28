@@ -22,6 +22,7 @@ type Banner =
   | "billing_period_invoice_generated"
   | "billing_period_invoice_generate_denied"
   | "billing_period_invoice_generate_invalid"
+  | "billing_period_invoice_generate_anchor_invalid"
   | "billing_period_invoice_generate_conflict";
 
 type AgreementRow = {
@@ -51,7 +52,6 @@ type InternalInvoiceRow = {
 
 type AnchorJobRow = {
   id: string;
-  account_owner_user_id: string;
   customer_id: string | null;
   location_id: string | null;
   service_case_id: string | null;
@@ -602,7 +602,7 @@ async function loadInternalInvoice(admin: any, internalInvoiceId: string) {
 async function loadAnchorJob(admin: any, anchorJobId: string) {
   const { data, error } = await admin
     .from("jobs")
-    .select("id, account_owner_user_id, customer_id, location_id, service_case_id")
+    .select("id, customer_id, location_id, service_case_id")
     .eq("id", anchorJobId)
     .maybeSingle();
 
@@ -615,7 +615,6 @@ async function loadAnchorJob(admin: any, anchorJobId: string) {
     ok: true as const,
     job: {
       id: clean(data.id),
-      account_owner_user_id: clean(data.account_owner_user_id),
       customer_id: clean(data.customer_id) || null,
       location_id: clean(data.location_id) || null,
       service_case_id: clean(data.service_case_id) || null,
@@ -747,6 +746,10 @@ function rejectInvoiceGenerateDenied(customerPath: string | null | undefined): n
 
 function rejectInvoiceGenerateInvalid(customerPath: string | null | undefined): never {
   redirectToCustomerProfile(customerPath, "billing_period_invoice_generate_invalid");
+}
+
+function rejectInvoiceGenerateAnchorInvalid(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_invoice_generate_anchor_invalid");
 }
 
 function rejectInvoiceGenerateConflict(customerPath: string | null | undefined): never {
@@ -1163,16 +1166,12 @@ async function generateDraftInvoiceFromBillingPeriod(customerPath: string, formD
 
   const anchorJobResult = await loadAnchorJob(admin, parsed.value.anchorJobId);
   if (!anchorJobResult.ok) {
-    rejectInvoiceGenerateInvalid(customerPath);
+    rejectInvoiceGenerateAnchorInvalid(customerPath);
   }
 
   const anchorJob = anchorJobResult.job;
-  if (anchorJob.account_owner_user_id !== agreement.account_owner_user_id) {
-    rejectInvoiceGenerateDenied(customerPath);
-  }
-
   if (anchorJob.customer_id && anchorJob.customer_id !== agreement.customer_id) {
-    rejectInvoiceGenerateInvalid(customerPath);
+    rejectInvoiceGenerateAnchorInvalid(customerPath);
   }
 
   const linkedToAgreement = await hasInvoiceJobLinkedToAgreement({
@@ -1182,7 +1181,7 @@ async function generateDraftInvoiceFromBillingPeriod(customerPath: string, formD
     jobId: anchorJob.id,
   });
   if (!linkedToAgreement) {
-    rejectInvoiceGenerateInvalid(customerPath);
+    rejectInvoiceGenerateAnchorInvalid(customerPath);
   }
 
   const { data: existingInvoiceForAnchorJob, error: existingInvoiceError } = await admin

@@ -73,15 +73,35 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Billing period created.");
     expect(customerPageSource).toContain("Billing period updated.");
     expect(customerPageSource).toContain("Billing period cancelled.");
+    expect(customerPageSource).toContain("Generate Draft Invoice");
+    expect(customerPageSource).toContain("anchor_job_id");
+    expect(customerPageSource).toContain("canGenerateDraftInvoice");
     expect(customerPageSource).toContain("You do not have permission to manage billing periods for this customer.");
     expect(customerPageSource).not.toContain("Delete Billing Period");
-    expect(customerPageSource).not.toContain("Generate Invoice");
     expect(customerPageSource).not.toContain("Link Invoice");
-    expect(customerPageSource).not.toContain("Collect Payment");
-    expect(customerPageSource).not.toContain("Pay Now");
     expect(customerPageSource).not.toContain("Autopay");
     expect(customerPageSource).not.toContain("Subscription");
     expect(customerPageSource).not.toContain("Payment required before service");
+  });
+
+  it("wires Generate Draft Invoice control inside eligible billing period blocks", () => {
+    expect(customerPageSource).toContain("generateDraftInvoiceFromBillingPeriodFromForm");
+    expect(customerPageSource).toContain("generateDraftInvoiceFromBillingPeriodAction");
+    expect(customerPageSource).toContain("Generate Draft Invoice");
+    expect(customerPageSource).toContain("Anchor Job ID");
+    expect(customerPageSource).toContain("anchor_job_id");
+    expect(customerPageSource).toContain("Creates a draft invoice only from this billing period.");
+    expect(customerPageSource).toContain(
+      "Does not issue, send, email, collect payment, or create a payment link.",
+    );
+    expect(customerPageSource).toContain(
+      "Anchor job must already belong to this maintenance agreement.",
+    );
+    expect(customerPageSource).toContain("canGenerateDraftInvoice");
+    expect(customerPageSource).toContain("billingPeriod.billing_period_status !== \"cancelled\"");
+    expect(customerPageSource).toContain("!billingPeriod.internal_invoice_id");
+    expect(customerPageSource).toContain("billingPeriod.billing_posture === \"internal_invoice\"");
+    expect(customerPageSource).toContain("Number(billingPeriod.amount_due_cents) > 0");
   });
 
   it("wires Link Existing Invoice control inside billing period block", () => {
@@ -120,11 +140,19 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("billing_period_invoice_link_invalid");
     expect(customerPageSource).toContain("billing_period_invoice_link_conflict");
     expect(customerPageSource).toContain("billing_period_invoice_unlink_reason_required");
+    expect(customerPageSource).toContain("billing_period_invoice_generated");
+    expect(customerPageSource).toContain("billing_period_invoice_generate_denied");
+    expect(customerPageSource).toContain("billing_period_invoice_generate_invalid");
+    expect(customerPageSource).toContain("billing_period_invoice_generate_anchor_invalid");
+    expect(customerPageSource).toContain("billing_period_invoice_generate_conflict");
     expect(customerPageSource).toContain(
       "Billing period linked to existing invoice for visibility. No invoice was generated, sent, or charged.",
     );
     expect(customerPageSource).toContain(
       "Billing period unlinked from invoice. Invoice and payment history are preserved.",
+    );
+    expect(customerPageSource).toContain(
+      "Draft invoice generated from billing period. No invoice was issued, sent, emailed, charged, or linked to payment.",
     );
   });
 
@@ -144,7 +172,6 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).not.toContain("Issue Invoice");
     expect(customerPageSource).not.toContain("Send Invoice");
     expect(customerPageSource).not.toContain("Email Invoice");
-    expect(customerPageSource).not.toContain("Collect Payment");
     expect(customerPageSource).not.toContain("Pay Now");
     expect(customerPageSource).not.toContain("Create Payment Link");
     expect(customerPageSource).not.toContain("Stripe Checkout");
