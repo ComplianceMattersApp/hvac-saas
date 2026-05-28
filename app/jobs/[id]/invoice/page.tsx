@@ -24,6 +24,7 @@ import {
   resolveInvoiceCollectedPaymentLedger,
   type InternalInvoicePaymentRow,
 } from "@/lib/business/internal-invoice-payments";
+import { loadFailedAutopayAttentionItems } from "@/lib/business/failed-autopay-attention-read-model";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import {
   addInternalInvoiceLineItemFromForm,
@@ -122,6 +123,23 @@ function formatPaymentStatusLabel(status?: string | null) {
   if (normalized === "reversed") return "Reversed";
   if (normalized === "pending") return "Pending";
   return "Unknown";
+}
+
+function formatAutopayAttentionCategoryLabel(category?: string | null) {
+  const normalized = String(category ?? "").trim().toLowerCase();
+  if (normalized === "payment_declined") return "Payment Declined";
+  if (normalized === "authentication_required") return "Authentication Required";
+  if (normalized === "precondition_blocked") return "Setup Blocked";
+  return "Unknown Failure";
+}
+
+function formatAutopayAttentionActionLabel(action?: string | null) {
+  const normalized = String(action ?? "").trim().toLowerCase();
+  if (normalized === "review_payment_method") return "Review payment method";
+  if (normalized === "request_customer_authentication") return "Request customer authentication";
+  if (normalized === "fix_payment_setup") return "Fix payment setup";
+  if (normalized === "retry_after_review") return "Retry after review";
+  return "No action available";
 }
 
 function isStripeSourcedPayment(payment: InternalInvoicePaymentRow) {
@@ -452,6 +470,16 @@ export default async function InternalInvoiceWorkspacePage({
     && canManageFinancialInvoiceLifecycle,
   );
 
+  const failedAutopayAttention = invoice
+    ? await loadFailedAutopayAttentionItems({
+        admin: supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        invoiceId: invoice.id,
+        limit: 8,
+      })
+    : null;
+  const failedAutopayAttentionItems = failedAutopayAttention?.items ?? [];
+
   return (
     <div id="invoice-workspace" className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6">
       <section className={`${panelClass} overflow-hidden bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-5 sm:p-6`}>
@@ -619,6 +647,78 @@ export default async function InternalInvoiceWorkspacePage({
                       </Link>
                     </div>
                   </div>
+                )}
+              </section>
+            ) : null}
+
+            {invoice.status === "issued" ? (
+              <section className={`${panelClass} p-4 sm:p-5`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Failed Scheduled Autopay Attention</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Read-only attention projection</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  This panel is projection-only. No retry, no write actions, and no customer messages are triggered from this workspace.
+                </p>
+
+                {failedAutopayAttentionItems.length === 0 ? (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
+                    No open failed scheduled-autopay attention items for this invoice.
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Open Items</div>
+                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{failedAutopayAttentionItems.length}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Authentication Required</div>
+                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{failedAutopayAttention?.countsByCategory.authentication_required ?? 0}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Declined</div>
+                        <div className="mt-0.5 text-sm font-semibold text-slate-900">{failedAutopayAttention?.countsByCategory.payment_declined ?? 0}</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                      {failedAutopayAttentionItems.map((item) => (
+                        <div key={item.attemptId} className="rounded-xl border border-amber-200/80 bg-amber-50/50 px-3 py-3 text-sm text-slate-700">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="font-semibold text-slate-900">
+                              {formatAutopayAttentionCategoryLabel(item.attentionCategory)}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-700">
+                                {item.attemptStatus.replaceAll("_", " ")}
+                              </span>
+                              <span className="text-xs text-slate-500">
+                                {item.lastAttemptAt ? formatTimestampDateDisplayLA(item.lastAttemptAt) : "Timestamp unavailable"}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="mt-1 text-xs text-slate-700">
+                            Recommended operator action: <span className="font-semibold text-slate-900">{formatAutopayAttentionActionLabel(item.recommendedOperatorAction)}</span>
+                          </div>
+                          {item.failureMessage ? (
+                            <div className="mt-1 text-xs text-slate-600">Failure: {item.failureMessage}</div>
+                          ) : null}
+                          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+                            {item.failureCode ? <span>Code: {item.failureCode}</span> : null}
+                            {item.blockedReasonCode ? <span>Blocked: {item.blockedReasonCode}</span> : null}
+                            {item.requiresActionType ? <span>Action Type: {item.requiresActionType}</span> : null}
+                            <span>Retry Count: {item.retryCount}</span>
+                            {item.nextRetryAt ? <span>Next Retry: {formatTimestampDateDisplayLA(item.nextRetryAt)}</span> : null}
+                            {item.paymentMethod.last4 ? (
+                              <span>
+                                Method: {item.paymentMethod.brand || "card"} •••• {item.paymentMethod.last4}
+                              </span>
+                            ) : null}
+                            {item.consent.consentStatus ? <span>Consent: {item.consent.consentStatus}</span> : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
                 )}
               </section>
             ) : null}
