@@ -569,11 +569,12 @@ Phase 6A closeout (Service Plan Automated Billing + Stripe-Saved Payment Method 
 	- retry policy is explicit, bounded, and non-looping
 - Required future schema/model candidates:
 	- `service_plan_invoice_generation_audit`
-	- `customer_stripe_payment_profiles`
-	- `customer_stripe_payment_methods`
-	- `maintenance_agreement_autopay_settings`
-	- `autopay_consent_events`
-	- `invoice_payment_attempts`
+	- `tenant_stripe_customers`
+	- `tenant_customer_payment_methods`
+	- `tenant_saved_payment_method_setups`
+	- `tenant_customer_autopay_consents`
+	- `tenant_saved_method_payment_attempts`
+	- `tenant_stripe_event_receipts`
 	- `scheduled_billing_jobs` (deferred)
 - Recommended implementation sequence:
 	1. Phase 6A docs/model lock
@@ -664,6 +665,40 @@ Phase 6C closeout (Billing Period Draft Invoice Sandbox UI Smoke):
 	- `git diff --check` clean
 - Phase 6B-UI / 6C-prep commit recorded: `5ecbba727caae8ae7586617e164c3ff37eab1600`.
 - Phase 6C is now closed. Next lane is Phase 6D (saved-method + autopay consent schema/model lock).
+
+Phase 6D-C closeout (Saved Payment Method + Autopay Consent Schema/Model Lock, docs/model only):
+- Phase 6D-C is complete as docs/model lock only. No implementation, migration, Stripe API call, sandbox mutation, production touch, or webhook behavior change is included.
+- Locked additive schema surfaces:
+	- `tenant_stripe_customers`
+	- `tenant_customer_payment_methods`
+	- `tenant_saved_payment_method_setups`
+	- `tenant_customer_autopay_consents`
+	- `tenant_saved_method_payment_attempts`
+	- `tenant_stripe_event_receipts`
+- `account_owner_user_id` must use the same account-owner column type already used by existing production tenant-owned tables; this lane does not lock a divergent text-vs-UUID type.
+- Card-first saved-method posture is locked:
+	- first implementation remains card-first
+	- ACH/bank attributes remain future/deferred display-safe metadata only
+	- no ACH/bank-debit behavior is activated in this phase
+- Hard storage boundary remains locked:
+	- Compliance Matters may store safe references/display metadata only
+	- Compliance Matters must never store full card number, CVC, raw bank/card credentials, Stripe secrets, client secrets, or reusable payment credentials
+- Consent boundary remains locked:
+	- saved method present does not imply autopay enabled
+	- autopay enabled requires explicit maintenance-agreement-scoped consent
+	- consent lifecycle remains distinct: `disabled`, `enabled`, `paused`, `revoked`, `stale_or_invalid`
+- Attempt/payment-truth boundary remains locked:
+	- `tenant_saved_method_payment_attempts` is workflow/audit truth
+	- attempt status may reflect submission/result correlation
+	- invoice paid state and collected money truth remain only in `internal_invoice_payments` and allocation truth after webhook confirmation
+	- manual charge actions and schedulers must never directly mark invoices paid
+- Event identity posture:
+	- `tenant_stripe_event_receipts` is the additive event-receipt surface for setup lifecycle, payment-method lifecycle, off-session attempt outcomes, duplicate handling, and connected-account-context verification
+- Operational boundaries remain preserved:
+	- no visit mutation
+	- no `next_due_date` mutation
+	- no Stripe Billing Subscriptions for tenant recurring billing now
+- Phase 6D-C is closed. Next lane is Phase 6E (saved payment method setup flow).
 
 Platform subscription onboarding status (separate from tenant payment execution):
 - Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.

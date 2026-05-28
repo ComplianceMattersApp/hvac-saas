@@ -134,11 +134,12 @@ Model locks:
 
 Required future schema/model candidates:
 - `service_plan_invoice_generation_audit`
-- `customer_stripe_payment_profiles`
-- `customer_stripe_payment_methods`
-- `maintenance_agreement_autopay_settings`
-- `autopay_consent_events`
-- `invoice_payment_attempts`
+- `tenant_stripe_customers`
+- `tenant_customer_payment_methods`
+- `tenant_saved_payment_method_setups`
+- `tenant_customer_autopay_consents`
+- `tenant_saved_method_payment_attempts`
+- `tenant_stripe_event_receipts`
 - deferred `scheduled_billing_jobs`
 
 Recommended sequence lock:
@@ -238,6 +239,42 @@ Validation remained green:
 - `git diff --check` clean
 
 Phase 6B-UI / 6C-prep implementation commit recorded: `5ecbba727caae8ae7586617e164c3ff37eab1600`. Phase 6C is now closed. Next lane is Phase 6D (Stripe saved-method + autopay consent schema/model lock).
+
+**Phase 6D-C closeout (Saved Payment Method + Autopay Consent Schema/Model Lock):**
+Phase 6D-C is complete as docs/model lock only. No implementation, migration, Stripe API call, sandbox mutation, production touch, or webhook behavior change occurred in this slice.
+
+Locked additive schema surfaces:
+- `tenant_stripe_customers`
+- `tenant_customer_payment_methods`
+- `tenant_saved_payment_method_setups`
+- `tenant_customer_autopay_consents`
+- `tenant_saved_method_payment_attempts`
+- `tenant_stripe_event_receipts`
+
+Account-scope field lock:
+- `account_owner_user_id` must use the same account-owner column type already used by existing production tenant-owned tables
+- this phase does not lock a divergent text-vs-UUID type
+
+Saved-method and consent locks:
+- first implementation remains card-first
+- ACH/bank attributes are future/deferred display-safe metadata only and do not activate ACH/bank-debit behavior
+- Compliance Matters stores only safe references/display metadata and must never store full card number, CVC, raw bank/card credentials, Stripe secrets, client secrets, or reusable payment credentials
+- saved method present does not imply autopay enabled
+- autopay enabled requires explicit maintenance-agreement-scoped consent
+
+Attempt/payment-truth boundary:
+- `tenant_saved_method_payment_attempts` is workflow/audit truth
+- attempt status may reflect submission/result correlation
+- invoice paid state and collected money truth remain only in `internal_invoice_payments` and allocation truth after webhook confirmation
+- manual charge actions and schedulers must never directly mark invoices paid
+
+Event identity and operational boundaries:
+- `tenant_stripe_event_receipts` is the additive event-receipt surface for setup lifecycle, payment-method lifecycle, off-session attempt outcomes, duplicate handling, and connected-account-context verification
+- no visit mutation
+- no `next_due_date` mutation
+- no Stripe Billing Subscriptions for tenant recurring billing now
+
+Phase 6D-C is now closed. Next lane is Phase 6E (saved payment method setup flow).
 
 **Service Role Controls / Financial Access Controls V1A Model Lock:**
 V1A-2, V1A-3, and V1A-4 are implemented in [Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md](./Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md): Billing / AR is now a valid internal role; sensitive financial authority is structural owner/admin/billing; dispatcher/office, technician, contractor/portal users, inactive users, and unauthenticated users are blocked by default for sensitive financial actions; and server-side gates are active for manual invoice payment recording, tenant payment-link/checkout-session creation, invoice ledger CSV export, invoice draft create/update, invoice issue, invoice void, and invoice email send/resend. Billing / AR is not Admin and does not receive admin/team-management authority by default. **Payments Register V1A/V1B now implement these gates**: `/reports/payments` register page and `/reports/payments/export` CSV export both verify Owner/Admin/Billing authority; Dispatcher/Technician are blocked by default. Access-control prerequisite is satisfied and leveraged by Payments Register implementation.
