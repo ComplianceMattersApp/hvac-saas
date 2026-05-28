@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
+import { loadScopedInternalJobForMutation } from "@/lib/auth/internal-job-scope";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
+import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { startManualSavedMethodPaymentAttempt } from "@/lib/business/tenant-saved-method-payment-attempts";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
 import { startTenantSavedCardSetupCheckoutSession } from "@/lib/business/tenant-saved-payment-method-setups";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
@@ -15,6 +18,20 @@ type SavedMethodBanner =
   | "saved_payment_method_setup_invalid"
   | "saved_payment_method_setup_connect_not_ready"
   | "saved_payment_method_setup_failed";
+
+type ManualSavedCardInvoiceBanner =
+  | "internal_invoice_saved_card_charge_denied"
+  | "internal_invoice_saved_card_charge_invalid"
+  | "internal_invoice_saved_card_charge_connect_not_ready"
+  | "internal_invoice_saved_card_charge_missing_saved_method"
+  | "internal_invoice_saved_card_charge_missing_authorization"
+  | "internal_invoice_saved_card_charge_inflight"
+  | "internal_invoice_saved_card_charge_requires_issued"
+  | "internal_invoice_saved_card_charge_no_balance_due"
+  | "internal_invoice_saved_card_charge_submitted"
+  | "internal_invoice_saved_card_charge_failed_declined"
+  | "internal_invoice_saved_card_charge_failed_requires_action"
+  | "internal_invoice_saved_card_charge_failed";
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -44,6 +61,35 @@ function parseUuid(value: unknown) {
   const normalized = clean(value);
   if (!normalized || !UUID_RE.test(normalized)) return null;
   return normalized;
+}
+
+function normalizeInvoiceWorkspacePath(jobId: string, returnPath: string | null | undefined) {
+  const fallback = `/jobs/${jobId}/invoice`;
+  const raw = clean(returnPath);
+  if (!raw) return fallback;
+
+  try {
+    const parsed = new URL(raw, "https://app.local");
+    if (parsed.pathname !== `/jobs/${jobId}/invoice`) {
+      return fallback;
+    }
+    return parsed.pathname;
+  } catch {
+    return fallback;
+  }
+}
+
+function redirectToInvoiceWorkspace(
+  jobId: string,
+  returnPath: string | null | undefined,
+  banner: ManualSavedCardInvoiceBanner,
+): never {
+  const pathname = normalizeInvoiceWorkspacePath(jobId, returnPath);
+  const url = new URL(pathname, "https://app.local");
+  url.searchParams.set("banner", banner);
+  url.hash = "invoice-workspace";
+  revalidatePath(pathname);
+  redirect(`${url.pathname}${url.search}${url.hash}`);
 }
 
 export async function startCustomerSavedPaymentMethodSetupFromForm(
@@ -159,4 +205,117 @@ export async function startCustomerSavedPaymentMethodSetupFromForm(
   }
 
   redirect(checkoutSessionUrl!);
+}
+
+export async function chargeSavedCardForIssuedInvoiceFromForm(formData: FormData): Promise<void> {
+  const jobId = parseUuid(formData.get("job_id"));
+  const invoiceId = parseUuid(formData.get("invoice_id"));
+  const customerId = parseUuid(formData.get("customer_id"));
+  const selectedTenantCustomerPaymentMethodId = parseUuid(formData.get("tenant_customer_payment_method_id"));
+  const returnPath = clean(formData.get("return_to"));
+
+  if (!jobId || !invoiceId || !customerId) {
+    redirectToInvoiceWorkspace(clean(jobId), returnPath, "internal_invoice_saved_card_charge_invalid");
+  }
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    const supabase = await createClient();
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_denied");
+    }
+    throw error;
+  }
+
+  const { internalUser, userId } = authz;
+  const accountOwnerUserId = clean(internalUser.account_owner_user_id);
+  if (!accountOwnerUserId) {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_denied");
+  }
+
+  if (
+    !canManageInvoiceLifecycle({
+      actorUserId: userId,
+      internalUser,
+      resourceAccountOwnerUserId: accountOwnerUserId,
+    })
+  ) {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_denied");
+  }
+
+  const supabase = await createClient();
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId,
+    jobId: jobId!,
+    select: "id",
+  });
+
+  if (!scopedJob?.id) {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_denied");
+  }
+
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId,
+  });
+  if (billingMode !== "internal_invoicing") {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_denied");
+  }
+
+  const admin = createAdminClient();
+  const readiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, admin);
+  if (!readiness.isReady || !clean(readiness.connectedAccountId)) {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_connect_not_ready");
+  }
+
+  const result = await startManualSavedMethodPaymentAttempt({
+    admin,
+    accountOwnerUserId,
+    customerId: customerId!,
+    invoiceId: invoiceId!,
+    triggeredByUserId: userId,
+    selectedTenantCustomerPaymentMethodId,
+  });
+
+  if (!result.ok) {
+    const reason = clean(result.blockedReason).toLowerCase();
+    if (reason === "connect_not_ready") {
+      redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_connect_not_ready");
+    }
+    if (reason === "missing_active_saved_payment_method") {
+      redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_missing_saved_method");
+    }
+    if (reason === "missing_saved_method_reuse_authorization") {
+      redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_missing_authorization");
+    }
+    if (reason === "duplicate_inflight_attempt") {
+      redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_inflight");
+    }
+    if (reason === "invoice_not_issued") {
+      redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_requires_issued");
+    }
+    if (reason === "invoice_no_balance_due") {
+      redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_no_balance_due");
+    }
+    if (reason.includes("denied") || reason.includes("mismatch") || reason.includes("not_found")) {
+      redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_denied");
+    }
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_invalid");
+  }
+
+  if (result.attemptStatus === "failed_requires_action") {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_failed_requires_action");
+  }
+
+  if (result.attemptStatus === "failed_declined") {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_failed_declined");
+  }
+
+  if (result.attemptStatus === "succeeded" || result.attemptStatus === "submitted") {
+    redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_submitted");
+  }
+
+  redirectToInvoiceWorkspace(jobId!, returnPath, "internal_invoice_saved_card_charge_failed");
 }

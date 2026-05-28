@@ -32,4 +32,18 @@ describe("customer saved payment method actions wiring", () => {
     expect(source).not.toContain("redirect(result.checkoutSessionUrl)");
     expect(source).toContain("saved_payment_method_setup_failed");
   });
+
+  it("wires manual saved-card invoice charge through attempt service and preserves payment truth boundaries", () => {
+    expect(source).toContain("chargeSavedCardForIssuedInvoiceFromForm");
+    expect(source).toContain("startManualSavedMethodPaymentAttempt");
+    expect(source).toContain("internal_invoice_saved_card_charge_submitted");
+    expect(source).toContain("internal_invoice_saved_card_charge_missing_authorization");
+    expect(source).toContain("internal_invoice_saved_card_charge_inflight");
+    expect(source).toContain("internal_invoice_saved_card_charge_failed_requires_action");
+    expect(source).toContain("loadScopedInternalJobForMutation");
+    expect(source).toContain("resolveBillingModeByAccountOwnerId");
+    expect(source).not.toContain('.from("internal_invoice_payments")');
+    expect(source).not.toContain('.from("internal_invoice_payment_allocations")');
+    expect(source).not.toContain('.from("tenant_customer_autopay_consents")');
+  });
 });

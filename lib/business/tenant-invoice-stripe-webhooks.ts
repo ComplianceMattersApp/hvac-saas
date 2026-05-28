@@ -2,7 +2,6 @@
 
 import Stripe from 'stripe';
 import { createAdminClient } from '@/lib/supabase/server';
-import { resolveInternalInvoiceByJobId } from '@/lib/business/internal-invoice';
 import { getStripeServerClient } from '@/lib/business/platform-billing-stripe';
 import {
   isStripeEventAlreadyRecorded,
@@ -12,11 +11,38 @@ import {
   resolveInvoiceCollectedPaymentSummary,
 } from '@/lib/business/internal-invoice-payments';
 import { upsertInvoicePaymentAllocationForPaymentRow } from '@/lib/business/payment-allocations';
+import {
+  mapAttemptFailureStatus,
+  resolveManualSavedMethodAttemptFromWebhook,
+} from '@/lib/business/tenant-saved-method-payment-attempts';
 import { resolveTenantStripeConnectReadiness } from '@/lib/business/tenant-stripe-connect-readiness';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 
 function toCleanString(value: unknown): string {
   return String(value ?? '').trim();
+}
+
+async function resolveInternalInvoiceById(params: {
+  admin: any;
+  invoiceId: string;
+}) {
+  const invoiceId = toCleanString(params.invoiceId);
+  if (!invoiceId) return null;
+
+  const { data, error } = await params.admin
+    .from('internal_invoices')
+    .select('id, account_owner_user_id, job_id, invoice_number, status, total_cents')
+    .eq('id', invoiceId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  if (toCleanString(data.status).toLowerCase() === 'void') {
+    return null;
+  }
+
+  return data;
 }
 
 type StripePaymentIdentityRow = {
@@ -780,6 +806,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
   const charge = params.charge;
   const eventId = toCleanString(params.eventId);
   const eventConnectedAccountId = toCleanString(params.connectedAccountId);
+  const attemptIdFromMetadata = toCleanString(charge.metadata?.attempt_id) || null;
 
   if (!eventId) {
     return {
@@ -807,6 +834,18 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
           jobId: toCleanString(charge.metadata?.job_id),
         },
       });
+
+      await resolveManualSavedMethodAttemptFromWebhook({
+        admin,
+        accountOwnerUserId: toCleanString(charge.metadata?.account_owner_user_id),
+        invoiceId: toCleanString(charge.metadata?.invoice_id),
+        stripePaymentIntentId: toCleanString(charge.payment_intent) || null,
+        stripeChargeId: toCleanString(charge.id) || null,
+        stripeEventId: eventId,
+        attemptIdFromMetadata: toCleanString(charge.metadata?.attempt_id) || null,
+        outcome: 'succeeded',
+        resolvedInternalInvoicePaymentId: existingPaymentId,
+      });
     }
 
     return {
@@ -827,10 +866,9 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     };
   }
 
-  // Validate invoice exists, belongs to account owner, and is issued
-  const invoice = await resolveInternalInvoiceByJobId({
-    supabase: admin,
-    jobId,
+  const invoice = await resolveInternalInvoiceById({
+    admin,
+    invoiceId,
   });
 
   if (!invoice) {
@@ -846,6 +884,8 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
       reason: 'Invoice does not belong to account owner',
     };
   }
+
+  const effectiveJobId = toCleanString(invoice.job_id) || jobId;
 
   if (!eventConnectedAccountId) {
     console.warn('Tenant invoice webhook skipped: missing connected account context', {
@@ -978,8 +1018,20 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
           webhookKind: 'charge_succeeded',
           eventId,
           invoiceId,
-          jobId,
+          jobId: effectiveJobId,
         },
+      });
+
+      await resolveManualSavedMethodAttemptFromWebhook({
+        admin,
+        accountOwnerUserId,
+        invoiceId,
+        stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+        stripeChargeId: stripeRef.processor_charge_id,
+        stripeEventId: eventId,
+        attemptIdFromMetadata,
+        outcome: 'succeeded',
+        resolvedInternalInvoicePaymentId: existingPaymentId,
       });
     }
 
@@ -1020,8 +1072,20 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
         webhookKind: 'charge_succeeded',
         eventId,
         invoiceId,
-        jobId,
+        jobId: effectiveJobId,
       },
+    });
+
+    await resolveManualSavedMethodAttemptFromWebhook({
+      admin,
+      accountOwnerUserId,
+      invoiceId,
+      stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+      stripeChargeId: stripeRef.processor_charge_id,
+      stripeEventId: eventId,
+      attemptIdFromMetadata,
+      outcome: 'succeeded',
+      resolvedInternalInvoicePaymentId: canonicalPaymentId,
     });
 
     return {
@@ -1037,7 +1101,7 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     .insert({
       account_owner_user_id: accountOwnerUserId,
       invoice_id: invoiceId,
-      job_id: jobId,
+      job_id: effectiveJobId,
       payment_status: 'recorded',
       payment_method: 'card_stripe_online',
       amount_cents: chargeAmountCents,
@@ -1090,8 +1154,20 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
             webhookKind: 'charge_succeeded',
             eventId,
             invoiceId,
-            jobId,
+            jobId: effectiveJobId,
           },
+        });
+
+        await resolveManualSavedMethodAttemptFromWebhook({
+          admin,
+          accountOwnerUserId,
+          invoiceId,
+          stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+          stripeChargeId: stripeRef.processor_charge_id,
+          stripeEventId: eventId,
+          attemptIdFromMetadata,
+          outcome: 'succeeded',
+          resolvedInternalInvoicePaymentId: canonicalPaymentId,
         });
 
         return {
@@ -1120,14 +1196,26 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
       webhookKind: 'charge_succeeded',
       eventId,
       invoiceId,
-      jobId,
+      jobId: effectiveJobId,
     },
+  });
+
+  await resolveManualSavedMethodAttemptFromWebhook({
+    admin,
+    accountOwnerUserId,
+    invoiceId,
+    stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+    stripeChargeId: stripeRef.processor_charge_id,
+    stripeEventId: eventId,
+    attemptIdFromMetadata,
+    outcome: 'succeeded',
+    resolvedInternalInvoicePaymentId: toCleanString(insertedPayment?.id) || null,
   });
 
   // Log job event for audit trail
   await insertPaymentRecordedJobEventIfMissing({
     admin,
-    jobId,
+    jobId: effectiveJobId,
     paymentId: insertedPayment?.id ?? null,
     meta: {
       invoice_id: invoiceId,
@@ -1167,6 +1255,7 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
   const charge = params.charge;
   const eventId = toCleanString(params.eventId);
   const eventConnectedAccountId = toCleanString(params.connectedAccountId);
+  const attemptIdFromMetadata = toCleanString(charge.metadata?.attempt_id) || null;
 
   if (!eventId) {
     return {
@@ -1194,6 +1283,18 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
           jobId: toCleanString(charge.metadata?.job_id),
         },
       });
+
+      await resolveManualSavedMethodAttemptFromWebhook({
+        admin,
+        accountOwnerUserId: toCleanString(charge.metadata?.account_owner_user_id),
+        invoiceId: toCleanString(charge.metadata?.invoice_id),
+        stripePaymentIntentId: toCleanString(charge.payment_intent) || null,
+        stripeChargeId: toCleanString(charge.id) || null,
+        stripeEventId: eventId,
+        attemptIdFromMetadata,
+        outcome: 'failed_declined',
+        resolvedInternalInvoicePaymentId: existingPaymentId,
+      });
     }
 
     return {
@@ -1214,10 +1315,9 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
     };
   }
 
-  // Validate invoice exists
-  const invoice = await resolveInternalInvoiceByJobId({
-    supabase: admin,
-    jobId,
+  const invoice = await resolveInternalInvoiceById({
+    admin,
+    invoiceId,
   });
 
   if (!invoice || invoice.account_owner_user_id !== accountOwnerUserId) {
@@ -1226,6 +1326,8 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
       reason: 'Invoice not found or does not belong to account owner',
     };
   }
+
+  const effectiveJobId = toCleanString(invoice.job_id) || jobId;
 
   if (!eventConnectedAccountId) {
     console.warn('Tenant invoice failure webhook skipped: missing connected account context', {
@@ -1284,6 +1386,11 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
   // Build Stripe payment reference
   const stripeRef = buildStripePaymentReference(charge);
   const chargeAmountCents = Number(charge.amount) || 0;
+  const failedOutcome = mapAttemptFailureStatus({
+    failureCode: toCleanString(charge.failure_code),
+    failureMessage: toCleanString(charge.failure_message),
+    paymentIntentStatus: null,
+  });
 
   // Insert failed payment row (does not count toward balance)
   const { data: insertedPayment, error: insertErr } = await admin
@@ -1291,7 +1398,7 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
     .insert({
       account_owner_user_id: accountOwnerUserId,
       invoice_id: invoiceId,
-      job_id: jobId,
+      job_id: effectiveJobId,
       payment_status: 'failed',
       payment_method: 'card_stripe_online',
       amount_cents: chargeAmountCents,
@@ -1329,14 +1436,28 @@ export async function recordTenantInvoicePaymentFailureFromStripeCharge(params: 
       webhookKind: 'charge_failed',
       eventId,
       invoiceId,
-      jobId,
+      jobId: effectiveJobId,
     },
+  });
+
+  await resolveManualSavedMethodAttemptFromWebhook({
+    admin,
+    accountOwnerUserId,
+    invoiceId,
+    stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+    stripeChargeId: stripeRef.processor_charge_id,
+    stripeEventId: eventId,
+    attemptIdFromMetadata,
+    outcome: failedOutcome,
+    resolvedInternalInvoicePaymentId: toCleanString(insertedPayment?.id) || null,
+    failureCode: toCleanString(charge.failure_code) || null,
+    failureMessage: toCleanString(charge.failure_message) || null,
   });
 
   // Log job event for audit trail
   await insertJobEvent({
     supabase: admin,
-    jobId,
+    jobId: effectiveJobId,
     event_type: 'payment_recorded',
     userId: null,
     meta: {

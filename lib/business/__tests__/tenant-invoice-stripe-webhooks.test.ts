@@ -11,6 +11,8 @@ const mockResolveTenantStripeConnectReadiness = vi.fn();
 const mockInsertJobEvent = vi.fn(async () => null);
 const mockGetStripeServerClient = vi.fn();
 const mockUpsertInvoicePaymentAllocationForPaymentRow = vi.fn();
+const mockResolveManualSavedMethodAttemptFromWebhook = vi.fn();
+const mockMapAttemptFailureStatus = vi.fn();
 
 vi.mock('@/lib/business/internal-invoice', () => ({
   resolveInternalInvoiceByJobId: (...args: unknown[]) => mockResolveInternalInvoiceByJobId(...args),
@@ -45,6 +47,12 @@ vi.mock('@/lib/business/payment-allocations', () => ({
     mockUpsertInvoicePaymentAllocationForPaymentRow(...args),
 }));
 
+vi.mock('@/lib/business/tenant-saved-method-payment-attempts', () => ({
+  resolveManualSavedMethodAttemptFromWebhook: (...args: unknown[]) =>
+    mockResolveManualSavedMethodAttemptFromWebhook(...args),
+  mapAttemptFailureStatus: (...args: unknown[]) => mockMapAttemptFailureStatus(...args),
+}));
+
 function makeIdentityRow(overrides?: Partial<Record<string, unknown>>) {
   return {
     id: 'payment-existing',
@@ -70,6 +78,7 @@ function makeAdminInsertSuccess(opts?: {
   insertError?: { message?: string; code?: string } | null;
   insertedPaymentId?: string;
   existingJobEventPaymentIds?: string[];
+  invoiceRow?: Record<string, unknown>;
 }) {
   const existingPaymentId = String(opts?.existingPaymentId ?? 'payment-existing').trim() || null;
   const identityRows = Array.isArray(opts?.identityRows) ? opts!.identityRows : [];
@@ -78,6 +87,15 @@ function makeAdminInsertSuccess(opts?: {
   const identityRowsByCall = Array.isArray(opts?.identityRowsByCall)
     ? opts.identityRowsByCall
     : null;
+  const invoiceRow = {
+    id: 'inv-1',
+    account_owner_user_id: 'owner-1',
+    job_id: 'job-1',
+    invoice_number: 'INV-001',
+    status: 'issued',
+    total_cents: 5000,
+    ...(opts?.invoiceRow ?? {}),
+  };
   let identityCallIndex = 0;
   const existingJobEventPaymentIds = new Set(
     (opts?.existingJobEventPaymentIds ?? []).map((value) => String(value ?? '').trim()).filter(Boolean),
@@ -99,14 +117,7 @@ function makeAdminInsertSuccess(opts?: {
         select: vi.fn(() => query),
         eq: vi.fn(() => query),
         maybeSingle: vi.fn(async () => ({
-          data: {
-            id: 'inv-1',
-            account_owner_user_id: 'owner-1',
-            job_id: 'job-1',
-            invoice_number: 'INV-001',
-            status: 'issued',
-            total_cents: 5000,
-          },
+          data: invoiceRow,
           error: null,
         })),
       };
@@ -232,6 +243,8 @@ describe('tenant invoice Stripe webhook handlers', () => {
       stripe_payment_intent_id: 'pi_test_1',
       stripe_charged_at: '2026-05-19T00:00:00.000Z',
     });
+    mockResolveManualSavedMethodAttemptFromWebhook.mockResolvedValue({ matched: false });
+    mockMapAttemptFailureStatus.mockReturnValue('failed_declined');
     mockResolveTenantStripeConnectReadiness.mockResolvedValue({
       connectedAccountId: 'acct_connected_1',
       onboardingStatus: 'complete',
@@ -287,6 +300,56 @@ describe('tenant invoice Stripe webhook handlers', () => {
             amount_cents: 5000,
             payment_status: 'recorded',
           }),
+        }),
+      );
+    });
+
+    it('manual saved-card charge.succeeded without job_id metadata records payment and links attempt', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess({
+        insertedPaymentId: 'payment-manual-1',
+      });
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge({
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            attempt_id: 'attempt-1',
+          },
+        }),
+        eventId: 'evt_manual_charge_success_1',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(true);
+      expect(insert).toHaveBeenCalledTimes(1);
+      expect(insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          invoice_id: 'inv-1',
+          job_id: 'job-1',
+          stripe_event_id: 'evt_manual_charge_success_1',
+        }),
+      );
+      expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
+        expect.objectContaining({
+          paymentRow: expect.objectContaining({
+            id: 'payment-manual-1',
+            invoice_id: 'inv-1',
+            payment_status: 'recorded',
+          }),
+        }),
+      );
+      expect(mockResolveManualSavedMethodAttemptFromWebhook).toHaveBeenCalledWith(
+        expect.objectContaining({
+          accountOwnerUserId: 'owner-1',
+          invoiceId: 'inv-1',
+          attemptIdFromMetadata: 'attempt-1',
+          outcome: 'succeeded',
+          resolvedInternalInvoicePaymentId: 'payment-manual-1',
         }),
       );
     });
@@ -424,6 +487,61 @@ describe('tenant invoice Stripe webhook handlers', () => {
       expect(mockInsertJobEvent).not.toHaveBeenCalled();
       expect(mockUpsertInvoicePaymentAllocationForPaymentRow).toHaveBeenCalledWith(
         expect.objectContaining({ paymentId: 'payment-existing' }),
+      );
+    });
+
+    it('duplicate charge.succeeded identity keeps one canonical payment/allocation path', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+
+      const first = makeAdminInsertSuccess({ insertedPaymentId: 'payment-canonical-1' });
+      const firstResult = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge({
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            attempt_id: 'attempt-dup-1',
+          },
+        }),
+        eventId: 'evt_charge_dup_first',
+        connectedAccountId: 'acct_connected_1',
+        admin: first.admin,
+      });
+
+      const second = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-canonical-1',
+            stripe_payment_intent_id: 'pi_test_1',
+            processor_charge_id: 'ch_test_1',
+          }),
+        ],
+      });
+      mockIsStripePaymentAlreadyRecorded.mockResolvedValueOnce(true);
+
+      const secondResult = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge({
+          metadata: {
+            account_owner_user_id: 'owner-1',
+            invoice_id: 'inv-1',
+            attempt_id: 'attempt-dup-1',
+          },
+        }),
+        eventId: 'evt_charge_dup_second',
+        connectedAccountId: 'acct_connected_1',
+        admin: second.admin,
+      });
+
+      expect(firstResult.recorded).toBe(true);
+      expect(secondResult.recorded).toBe(false);
+      expect(first.insert).toHaveBeenCalledTimes(1);
+      expect(second.insert).not.toHaveBeenCalled();
+      expect(mockResolveManualSavedMethodAttemptFromWebhook).toHaveBeenCalledWith(
+        expect.objectContaining({
+          attemptIdFromMetadata: 'attempt-dup-1',
+          resolvedInternalInvoicePaymentId: 'payment-canonical-1',
+        }),
       );
     });
 
@@ -922,13 +1040,13 @@ describe('tenant invoice Stripe webhook handlers', () => {
       const { recordTenantInvoicePaymentFromStripeCharge } = await import(
         '@/lib/business/tenant-invoice-stripe-webhooks'
       );
-      const { admin } = makeAdminInsertSuccess();
-
-      mockResolveInternalInvoiceByJobId.mockResolvedValue({
-        id: 'inv-1',
-        invoice_number: 'INV-001',
-        account_owner_user_id: 'owner-2',
-        status: 'issued',
+      const { admin } = makeAdminInsertSuccess({
+        invoiceRow: {
+          id: 'inv-1',
+          invoice_number: 'INV-001',
+          account_owner_user_id: 'owner-2',
+          status: 'issued',
+        },
       });
 
       const result = await recordTenantInvoicePaymentFromStripeCharge({

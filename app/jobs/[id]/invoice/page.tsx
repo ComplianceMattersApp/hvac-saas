@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
+import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
 import { createClient } from "@/lib/supabase/server";
 import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-boundary";
 import { loadScopedInternalJobDetailReadBoundary } from "@/lib/actions/internal-job-detail-read-boundary";
@@ -41,6 +42,7 @@ import {
   recordInternalInvoicePaymentFromForm,
   reverseInternalInvoicePaymentFromForm,
 } from "@/lib/actions/internal-invoice-payment-actions";
+import { chargeSavedCardForIssuedInvoiceFromForm } from "@/lib/actions/customer-saved-payment-method-actions";
 import TenantInvoicePaymentLinkPanel from "./_components/TenantInvoicePaymentLinkPanel";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
@@ -171,6 +173,22 @@ function bannerMessage(value?: string | null) {
       "Online Stripe payments cannot be reversed here. Use Stripe refund/reversal workflows and let webhooks update records.",
     internal_invoice_voided: "Invoice voided.",
     internal_invoice_missing: "Invoice was not found.",
+    internal_invoice_saved_card_charge_denied: "You do not have permission to charge a saved card for this invoice.",
+    internal_invoice_saved_card_charge_invalid: "Saved-card charge request was invalid.",
+    internal_invoice_saved_card_charge_connect_not_ready: "Saved-card charge is unavailable until Stripe Connect is ready.",
+    internal_invoice_saved_card_charge_missing_saved_method: "No active saved card is available for this customer.",
+    internal_invoice_saved_card_charge_missing_authorization:
+      "Saved-card reuse authorization was not found for this payment method.",
+    internal_invoice_saved_card_charge_inflight: "A saved-card charge attempt is already in progress for this invoice.",
+    internal_invoice_saved_card_charge_requires_issued: "Invoice must be issued before charging a saved card.",
+    internal_invoice_saved_card_charge_no_balance_due: "Invoice has no balance due.",
+    internal_invoice_saved_card_charge_submitted:
+      "Saved-card charge submitted to Stripe. Payment records update only after webhook confirmation.",
+    internal_invoice_saved_card_charge_failed_declined:
+      "Saved-card charge was declined by Stripe. Invoice payment records were not marked paid.",
+    internal_invoice_saved_card_charge_failed_requires_action:
+      "Saved-card charge requires customer action. No automatic retry was scheduled.",
+    internal_invoice_saved_card_charge_failed: "Saved-card charge failed before submission to Stripe.",
   };
   return messages[key] ?? null;
 }
@@ -376,6 +394,39 @@ export default async function InternalInvoiceWorkspacePage({
     (internalInvoiceEmailDeliveries as InternalInvoiceEmailDeliveryRecord[]).find((delivery) => delivery.status === "sent") ?? null;
   const internalInvoicePaymentRows: InternalInvoicePaymentRow[] = internalInvoicePaymentLedger?.rows ?? [];
   const paymentSummary = internalInvoicePaymentLedger?.summary ?? null;
+  const canManageFinancialInvoiceLifecycle = canManageInvoiceLifecycle({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const invoiceCustomerId = String(invoice?.customer_id ?? "").trim() || null;
+  const savedCardMethodRows =
+    invoice
+    && invoice.status === "issued"
+    && invoiceCustomerId
+    && canManageFinancialInvoiceLifecycle
+      ? await (async () => {
+          const { data, error } = await supabase
+            .from("tenant_customer_payment_methods")
+            .select("id, is_default, payment_method_status, display_brand, display_last4")
+            .eq("account_owner_user_id", internalUser.account_owner_user_id)
+            .eq("customer_id", invoiceCustomerId)
+            .eq("payment_method_status", "active")
+            .order("is_default", { ascending: false })
+            .order("updated_at", { ascending: false })
+            .limit(3);
+
+          if (error) {
+            throw error;
+          }
+
+          return Array.isArray(data) ? data : [];
+        })()
+      : [];
+
+  const defaultSavedCardMethod = savedCardMethodRows[0] ?? null;
+  const hasActiveSavedCard = Boolean(defaultSavedCardMethod?.id);
   const paymentStatusLabel = paymentSummary?.paymentStatus === "paid"
     ? "Paid"
     : paymentSummary?.paymentStatus === "partial"
@@ -391,6 +442,15 @@ export default async function InternalInvoiceWorkspacePage({
   });
   const checkoutSessionUrlFromQuery = String(checkoutSessionUrl ?? "").trim() || null;
   const checkoutSessionIdFromQuery = String(checkoutSessionId ?? "").trim() || null;
+  const canShowManualSavedCardCharge = Boolean(
+    invoice
+    && invoice.status === "issued"
+    && Number(paymentSummary?.balanceDueCents ?? 0) > 0
+    && !String(invoice.status ?? "").trim().toLowerCase().includes("void")
+    && hasActiveSavedCard
+    && tenantStripeReadiness.isReady
+    && canManageFinancialInvoiceLifecycle,
+  );
 
   return (
     <div id="invoice-workspace" className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6">
@@ -570,6 +630,34 @@ export default async function InternalInvoiceWorkspacePage({
                 <p className="mt-1 text-sm leading-6 text-slate-600">
                   Manual entries can be recorded here. Online card payments are recorded after Stripe webhook confirmation.
                 </p>
+
+                {canShowManualSavedCardCharge ? (
+                  <form
+                    action={chargeSavedCardForIssuedInvoiceFromForm}
+                    className="mt-4 space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4"
+                  >
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
+                    <input type="hidden" name="customer_id" value={invoiceCustomerId ?? ""} />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <input
+                      type="hidden"
+                      name="tenant_customer_payment_method_id"
+                      value={String(defaultSavedCardMethod?.id ?? "")}
+                    />
+                    <div className="text-sm font-semibold text-emerald-950">One-time saved-card charge</div>
+                    <div className="text-sm leading-6 text-slate-700">
+                      Uses the active saved card on file for this customer.
+                      This is not autopay, no subscription is created, and invoice payment is recorded only after Stripe webhook confirmation.
+                    </div>
+                    <div className="text-xs text-slate-600">
+                      Card: {String(defaultSavedCardMethod?.display_brand ?? "Card")} •••• {String(defaultSavedCardMethod?.display_last4 ?? "")}
+                    </div>
+                    <SubmitButton loadingText="Submitting to Stripe..." className={darkButtonClass}>
+                      Charge saved card
+                    </SubmitButton>
+                  </form>
+                ) : null}
 
                 {invoicePaymentLinkUiState.showCreateButton ? (
                   <form action={collectTenantInvoicePaymentNowFromForm} className="mt-4 space-y-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
