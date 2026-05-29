@@ -3340,6 +3340,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   const showMobileInvoiceOpenAttention =
     job.job_type === "service" && Boolean(internalInvoiceTruth) && !showInternalInvoicingPlaceholder;
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
+  const showMobileContractorContext = job.job_type === "ecc" && Boolean(contractorId);
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[92rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
@@ -3680,6 +3681,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               />
             </Suspense>
           </section>
+
+          {showMobileContractorContext ? (
+            <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-3 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Contractor</div>
+              <div className="mt-1 text-base font-semibold text-slate-950">{contractorName || "Assigned contractor"}</div>
+            </section>
+          ) : null}
 
           {(showEccNotice || sp?.schedule_required === "1" || activeWaitingState || showExternalDataEntryPrompt || showInternalInvoicingPlaceholder || showMobileInvoiceOpenAttention || markVisitCountedLinkId || suggestedNextDueProjection || isCloseoutPending) ? (
             <section className="space-y-2">
