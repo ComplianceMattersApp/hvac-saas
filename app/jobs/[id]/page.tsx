@@ -1331,7 +1331,6 @@ export default async function JobDetailPage({
       ecc_test_runs (
         id,
         test_type,
-        data,
         computed,
         computed_pass,
         override_pass,
