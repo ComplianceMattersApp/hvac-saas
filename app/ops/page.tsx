@@ -436,6 +436,8 @@ function subtractBusinessDays(date: Date, days: number) {
   if (panel !== "full_board") {
     const workspaceSelect =
       "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, created_at";
+    const scheduledSnapshotSelect =
+      "id, status, ops_status, scheduled_date, window_start";
 
     const _t_workspaceCounts = opsTimingEnabled ? Date.now() : 0;
     let countsQ = supabase
@@ -461,7 +463,7 @@ function subtractBusinessDays(date: Date, days: number) {
 
     let scheduledOpenRowsQ = supabase
       .from("jobs")
-      .select(workspaceSelect)
+      .select(scheduledSnapshotSelect)
       .is("deleted_at", null)
       .neq("status", "cancelled")
       .eq("status", "open")
@@ -506,14 +508,6 @@ function subtractBusinessDays(date: Date, days: number) {
       assignmentDisplayMap: scheduledAssignmentMap,
       previewLimit: 10,
     });
-
-    const scheduledRowsById = new Map(
-      scheduledOpenRows.map((row: any) => [String(row?.id ?? "").trim(), row])
-    );
-
-    const withoutTechPreviewRows = (scheduledWithoutTechSnapshot.preview ?? [])
-      .map((job: any) => scheduledRowsById.get(String(job?.id ?? "").trim()))
-      .filter(Boolean) as any[];
 
     const waitingCount =
       (countsWs.get("pending_info") ?? 0) +
@@ -599,6 +593,32 @@ function subtractBusinessDays(date: Date, days: number) {
       workspaceTabs.find((tab) => tab.key === selectedWorkspaceKey) ?? workspaceTabs[0];
 
     let selectedPreviewRows: any[] = [];
+
+    let withoutTechPreviewRows: any[] = [];
+    if (selectedWorkspaceKey === "without_tech") {
+      const withoutTechPreviewIds = (scheduledWithoutTechSnapshot.preview ?? [])
+        .map((job: any) => String(job?.id ?? "").trim())
+        .filter(Boolean);
+
+      if (withoutTechPreviewIds.length > 0) {
+        const withoutTechPreviewRes = await supabase
+          .from("jobs")
+          .select(workspaceSelect)
+          .in("id", withoutTechPreviewIds)
+          .is("deleted_at", null)
+          .neq("status", "cancelled");
+
+        if (withoutTechPreviewRes.error) throw withoutTechPreviewRes.error;
+
+        const withoutTechRowsById = new Map(
+          (withoutTechPreviewRes.data ?? []).map((row: any) => [String(row?.id ?? "").trim(), row])
+        );
+
+        withoutTechPreviewRows = withoutTechPreviewIds
+          .map((id) => withoutTechRowsById.get(id))
+          .filter(Boolean) as any[];
+      }
+    }
 
     if (selectedWorkspaceKey === "need_to_schedule") {
       let queueQ = supabase
