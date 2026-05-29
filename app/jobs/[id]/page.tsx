@@ -23,7 +23,6 @@ import {
   createRetestJobFromForm,
   promoteCompanionScopeToServiceJobFromForm,
   addPublicNoteFromForm,
-  addInternalNoteFromForm,
   getOnTheWayUndoEligibility,
   revertOnTheWayFromForm,
 } from "@/lib/actions/job-actions";
@@ -51,7 +50,6 @@ import ContractorReportPanel from "./_components/ContractorReportPanel";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import {
   getActiveJobAssignmentDisplayMap,
-  getAssignableInternalUsers,
 } from "@/lib/staffing/human-layer";
 import {
   type BillingMode,
@@ -109,7 +107,7 @@ import ContactLoggingQuickActions from "./_components/ContactLoggingQuickActions
 import DeferredTimelineBody from "./_components/DeferredTimelineBody";
 import DeferredSharedNotesBody from "./_components/DeferredSharedNotesBody";
 import DeferredInternalNotesBody from "./_components/DeferredInternalNotesBody";
-import InternalNoteMentionComposer from "./_components/InternalNoteMentionComposer";
+import DeferredInternalNoteMentionComposer from "./_components/DeferredInternalNoteMentionComposer";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
@@ -1209,12 +1207,6 @@ export default async function JobDetailPage({
   const internalUser = actorResolution.internalUser;
   const contractors = await timedPhase("contractorsRead", () =>
     getContractors(internalUser.account_owner_user_id),
-  );
-  const internalTagCandidates = await timedPhase("internalTagCandidatesRead", () =>
-    getAssignableInternalUsers({
-      supabase,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-    }),
   );
 
   let isInternalUser = true;
@@ -3950,17 +3942,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                       message={internalNoteBannerMessage}
                     />
                   ) : null}
-                  <InternalNoteMentionComposer
-                    action={addInternalNoteFromForm}
-                    jobId={String(job.id)}
-                    tab={tab}
-                    candidates={internalTagCandidates}
-                    textareaClassName={`${workspaceTextareaClass} text-base`}
-                    selectClassName={workspaceInputClass}
-                    helperTextClassName="text-sm leading-5 text-slate-500"
-                    buttonClassName={secondaryButtonClass}
-                    returnAnchor="mobile-internal-notes"
-                  />
+                  <Suspense fallback={<div className="h-12 animate-pulse rounded-xl bg-slate-100" />}>
+                    <DeferredInternalNoteMentionComposer
+                      jobId={String(job.id)}
+                      tab={tab}
+                      accountOwnerUserId={internalUser.account_owner_user_id}
+                      textareaClassName={`${workspaceTextareaClass} text-base`}
+                      selectClassName={workspaceInputClass}
+                      helperTextClassName="text-sm leading-5 text-slate-500"
+                      buttonClassName={secondaryButtonClass}
+                      returnAnchor="mobile-internal-notes"
+                    />
+                  </Suspense>
                   <Suspense fallback={<NarrativeNotesBodyFallback />}>
                     <DeferredInternalNotesBody
                       jobId={String(job.id)}
@@ -6653,16 +6646,17 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               />
             ) : null}
 
-            <InternalNoteMentionComposer
-              action={addInternalNoteFromForm}
-              jobId={String(job.id)}
-              tab={tab}
-              candidates={internalTagCandidates}
-              textareaClassName={workspaceTextareaClass}
-              selectClassName={workspaceInputClass}
-              helperTextClassName="text-xs text-slate-500"
-              buttonClassName={secondaryButtonClass}
-            />
+            <Suspense fallback={<div className="h-12 animate-pulse rounded-xl bg-slate-100" />}>
+              <DeferredInternalNoteMentionComposer
+                jobId={String(job.id)}
+                tab={tab}
+                accountOwnerUserId={internalUser.account_owner_user_id}
+                textareaClassName={workspaceTextareaClass}
+                selectClassName={workspaceInputClass}
+                helperTextClassName="text-xs text-slate-500"
+                buttonClassName={secondaryButtonClass}
+              />
+            </Suspense>
 
             <Suspense fallback={<NarrativeNotesBodyFallback />}>
               <DeferredInternalNotesBody
