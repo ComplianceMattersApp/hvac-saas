@@ -37,7 +37,8 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("Responsible Account");
     expect(jobPageSource).toContain("Site / Access Contact");
     expect(jobPageSource).toContain("Billing");
-    expect(jobPageSource).toContain("Account phone");
+    expect(jobPageSource).toContain("Phone:");
+    expect(jobPageSource).toContain("Email:");
     expect(jobPageSource).toContain("Access phone");
     expect(jobPageSource).toContain("billingRecipientEmail");
   });

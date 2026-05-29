@@ -4570,19 +4570,19 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="mt-1 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:mt-1.5 sm:grid-cols-2">
             {customerPhone !== "—" ? (
               <div>
-                <span className="font-semibold text-slate-500">Account phone:</span> {customerPhone}
+                <span className="font-semibold text-slate-500">Phone:</span> {customerPhone}
               </div>
             ) : null}
             {customerEmail !== "—" ? (
               <div className="break-all">
-                <span className="font-semibold text-slate-500">Account email:</span> {customerEmail}
+                <span className="font-semibold text-slate-500">Email:</span> {customerEmail}
               </div>
             ) : null}
           </div>
         </div>
 
         <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400"><MapPinIcon className="h-3.5 w-3.5" />Service Address</div>
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400"><MapPinIcon className="h-3.5 w-3.5" />Address</div>
           <div className="mt-1 text-xs text-slate-700">{serviceAddressDisplay}</div>
         </div>
 
@@ -4978,7 +4978,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     <div className="space-y-3 xl:order-3">
       {job.job_type === "ecc" ? (
         <div className={`${workspaceSubtleCardClass} border-slate-200/70 p-4 ${hasPermitDetails ? "bg-white/92" : "bg-slate-50/88"}`}>
-          <div className="mb-3 flex items-start justify-between gap-3">
+                <div className="mb-3 flex items-start justify-between gap-3">
             <div>
               <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ClipboardIcon className="h-3.5 w-3.5" />Permit</div>
               <div className="mt-1 text-sm text-slate-600">
@@ -4995,7 +4995,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           {hasPermitDetails ? (
             <div className="space-y-2">
               <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Permit #</div>
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Number</div>
                 <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
               </div>
               <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
@@ -5003,7 +5003,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitJurisdiction || "Not added"}</div>
               </div>
               <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Permit Date</div>
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Date</div>
                 <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitDateLabel || "Not added"}</div>
               </div>
             </div>
@@ -6168,7 +6168,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <div className="space-y-1">
                       <label className={workspaceFieldLabelClass}>
-                        Scheduled Date
+                        Date
                       </label>
                       <input
                         type="date"
@@ -6234,7 +6234,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   <summary className="cursor-pointer list-none">
                     <CollapsibleHeader
                       title="Permit Information"
-                      subtitle="Permit Number, jurisdiction, and permit date."
+                      subtitle="Number, jurisdiction, and date."
                       icon={<ClipboardIcon className="h-4 w-4" />}
                     />
                   </summary>
@@ -6247,7 +6247,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
                     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                       <div className="space-y-1">
-                        <label className={workspaceFieldLabelClass}>Permit Number</label>
+                        <label className={workspaceFieldLabelClass}>Number</label>
                         <input
                           name="permit_number"
                           defaultValue={job.permit_number ?? ""}
@@ -6267,7 +6267,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                       </div>
 
                       <div className="space-y-1">
-                        <label className={workspaceFieldLabelClass}>Permit Date</label>
+                        <label className={workspaceFieldLabelClass}>Date</label>
                         <input
                           type="date"
                           name="permit_date"
