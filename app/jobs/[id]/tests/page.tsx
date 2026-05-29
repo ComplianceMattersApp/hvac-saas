@@ -2462,7 +2462,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               )
             ) : (
               <>
-                <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
+                <div className="text-sm font-semibold text-slate-900">Inputs</div>
                 <form
                   id={ductSaveFormId}
                   action={saveDuctLeakageDataFromForm}
@@ -2474,8 +2474,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="project_type" value={job.project_type} />
 
                   <div className="rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-500">
-                    Cooling Method uses tonnage-based airflow. Heating Method uses Heating Output, or Heating Input +
-                    Efficiency. Enter measured leakage to calculate result.
+                    Pick the method, enter measured leakage, then save draft or complete.
                   </div>
 
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -2497,7 +2496,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                           (String(job.project_type ?? "").trim().toLowerCase() === "alteration" ? 10 : 5)
                         }
                       />
-                      <div className="text-xs text-slate-600">Editable per run; defaults from profile if unchanged.</div>
+                      <div className="text-xs text-slate-600">Per-run value. Defaults from profile.</div>
                     </div>
 
                     <DuctLeakageMethodFields
@@ -2558,7 +2557,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`ovr-reason-${runDL.id}`}>
-                        Override Reason (required if override set)
+                        Override Reason
                       </label>
                       <input
                         id={`ovr-reason-${runDL.id}`}
@@ -2568,6 +2567,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         placeholder="Explain override"
                         autoComplete="off"
                       />
+                      <div className="text-xs text-slate-600">Required when override is set.</div>
                     </div>
                   </div>
                 </form>
