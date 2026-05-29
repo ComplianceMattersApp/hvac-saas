@@ -72,6 +72,31 @@ export default async function JobsPage({
 }: {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const timingEnabled = process.env.JOBS_TIMING_DEBUG === "true";
+  const routeStartMs = timingEnabled ? Date.now() : 0;
+  const phaseDurationsMs: Record<string, number> = {};
+
+  const setPhaseValue = (phaseName: string, durationMs: number) => {
+    if (!timingEnabled) return;
+    phaseDurationsMs[phaseName] = durationMs;
+  };
+
+  const timedPhase = async <T,>(phaseName: string, factory: () => PromiseLike<T>) => {
+    const startMs = timingEnabled ? Date.now() : 0;
+    try {
+      const value = await factory();
+      if (timingEnabled) {
+        setPhaseValue(phaseName, Date.now() - startMs);
+      }
+      return value;
+    } catch (error) {
+      if (timingEnabled) {
+        setPhaseValue(phaseName, Date.now() - startMs);
+      }
+      throw error;
+    }
+  };
+
   const today = new Intl.DateTimeFormat("en-CA", {
   timeZone: "America/Los_Angeles",
   year: "numeric",
@@ -83,29 +108,35 @@ export default async function JobsPage({
   const queueRaw = Array.isArray(sp.queue) ? sp.queue[0] : sp.queue;
   const queue = safeQueue(queueRaw);
 
-  const supabase = await createClient();
+  const supabase = await timedPhase("authActorSetup", () => createClient());
 
 
 // Smart count: Attention Today
-const { count: attentionTodayCount } = await supabase
-  .from("jobs")
-  .select("id", { count: "exact", head: true })
-  .is("deleted_at", null)
-  .neq("status", "cancelled")
-  .not("follow_up_date", "is", null)
-  .lte("follow_up_date", today)
-  .in("ops_status", ["need_to_schedule", "pending_info", "retest_needed"]);
-
-const { count: allCount } = await supabase
-  .from("jobs")
-  .select("id", { count: "exact", head: true })
-  .is("deleted_at", null);
-
-  const { data: countsData } = await supabase
-  .from("jobs")
-  .select("ops_status", { count: "exact" })
-  .is("deleted_at", null)
-  .neq("status", "cancelled");
+const [
+  { count: attentionTodayCount },
+  { count: allCount },
+  { data: countsData },
+] = await timedPhase("countsReads", async () =>
+  Promise.all([
+    supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .not("follow_up_date", "is", null)
+      .lte("follow_up_date", today)
+      .in("ops_status", ["need_to_schedule", "pending_info", "retest_needed"]),
+    supabase
+      .from("jobs")
+      .select("id", { count: "exact", head: true })
+      .is("deleted_at", null),
+    supabase
+      .from("jobs")
+      .select("ops_status", { count: "exact" })
+      .is("deleted_at", null)
+      .neq("status", "cancelled"),
+  ]),
+);
 
 const counts: Record<string, number> = {};
 
@@ -137,10 +168,12 @@ if (countsData) {
 }
 
 
-  const { data: jobs, error } = await query
-    .order("follow_up_date", { ascending: true, nullsFirst: false })
-    .order("created_at", { ascending: true })
-    .limit(200);
+  const { data: jobs, error } = await timedPhase("jobsListRead", async () =>
+    query
+      .order("follow_up_date", { ascending: true, nullsFirst: false })
+      .order("created_at", { ascending: true })
+      .limit(200),
+  );
 
   if (error) {
 
@@ -158,10 +191,12 @@ if (countsData) {
     .map((job: any) => String(job?.id ?? "").trim())
     .filter(Boolean);
 
-  const activeAssignmentDisplayMap = await getActiveJobAssignmentDisplayMap({
-    supabase,
-    jobIds,
-  });
+  const activeAssignmentDisplayMap = await timedPhase("assignmentDisplayMapRead", () =>
+    getActiveJobAssignmentDisplayMap({
+      supabase,
+      jobIds,
+    }),
+  );
 
           const customerIds = Array.from(
       new Set((jobs ?? []).map((j: any) => j.customer_id).filter(Boolean))
@@ -171,27 +206,49 @@ if (countsData) {
       new Set((jobs ?? []).map((j: any) => j.location_id).filter(Boolean))
     ) as string[];
 
-    const [custRes, locRes] = await Promise.all([
-      customerIds.length
-        ? supabase
-            .from("customers")
-            .select("id, full_name, first_name, last_name, phone")
-            .in("id", customerIds)
-        : Promise.resolve({ data: [] as any[], error: null }),
+    const [custRes, locRes] = await timedPhase("customerLocationEnrichmentRead", async () =>
+      Promise.all([
+        customerIds.length
+          ? supabase
+              .from("customers")
+              .select("id, full_name, first_name, last_name, phone")
+              .in("id", customerIds)
+          : Promise.resolve({ data: [] as any[], error: null }),
 
-      locationIds.length
-        ? supabase
-            .from("locations")
-            .select("id, address_line1, city, state, zip")
-            .in("id", locationIds)
-        : Promise.resolve({ data: [] as any[], error: null }),
-    ]);
+        locationIds.length
+          ? supabase
+              .from("locations")
+              .select("id, address_line1, city, state, zip")
+              .in("id", locationIds)
+          : Promise.resolve({ data: [] as any[], error: null }),
+      ]),
+    );
 
     if (custRes.error) throw custRes.error;
     if (locRes.error) throw locRes.error;
 
     const customersById = new Map((custRes.data ?? []).map((c: any) => [c.id, c]));
     const locationsById = new Map((locRes.data ?? []).map((l: any) => [l.id, l]));
+
+  if (timingEnabled) {
+    console.info(
+      "[jobs-page-timing]",
+      JSON.stringify({
+        routeLabels: {
+          queue,
+          listCount: Array.isArray(jobs) ? jobs.length : 0,
+        },
+        phasesMs: {
+          authActorSetup: phaseDurationsMs.authActorSetup ?? 0,
+          countsReads: phaseDurationsMs.countsReads ?? 0,
+          jobsListRead: phaseDurationsMs.jobsListRead ?? 0,
+          assignmentDisplayMapRead: phaseDurationsMs.assignmentDisplayMapRead ?? 0,
+          customerLocationEnrichmentRead: phaseDurationsMs.customerLocationEnrichmentRead ?? 0,
+          totalServerRenderBeforeResponse: Date.now() - routeStartMs,
+        },
+      }),
+    );
+  }
 
   return (
     <div className="p-6 space-y-4">
@@ -250,7 +307,7 @@ if (countsData) {
         </div>
       ) : (
         <div className="rounded border divide-y">
-          {jobs.map((job) => {
+          {jobs.map((job: any) => {
             const c: any = job.customer_id ? customersById.get(job.customer_id) : null;
 const l: any = job.location_id ? locationsById.get(job.location_id) : null;
 

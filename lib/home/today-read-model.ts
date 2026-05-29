@@ -1393,29 +1393,131 @@ export function buildPriorityChips(params: {
 // Orchestration entrypoint
 // -----------------------------------------------------------------------------
 
+type TodayTimedPhase = <T,>(phaseName: string, factory: () => Promise<T>) => Promise<T>;
+
 export async function buildTodayReadModel(): Promise<TodayReadModelResult> {
-  const actor = await getRequestActorContext();
+  const timingEnabled = process.env.TODAY_TIMING_DEBUG === "true";
+  const routeStartMs = timingEnabled ? Date.now() : 0;
+  const phaseDurationsMs: Record<string, number> = {};
+
+  const setPhaseValue = (phaseName: string, durationMs: number) => {
+    if (!timingEnabled) return;
+    phaseDurationsMs[phaseName] = durationMs;
+  };
+
+  const timedPhase: TodayTimedPhase = async <T,>(phaseName: string, factory: () => Promise<T>) => {
+    const startMs = timingEnabled ? Date.now() : 0;
+    try {
+      const value = await factory();
+      if (timingEnabled) {
+        setPhaseValue(phaseName, Date.now() - startMs);
+      }
+      return value;
+    } catch (error) {
+      if (timingEnabled) {
+        setPhaseValue(phaseName, Date.now() - startMs);
+      }
+      throw error;
+    }
+  };
+
+  const emitTimingLog = (details: {
+    resultKind: "redirect" | "ok";
+    routeClass: "unauthenticated" | "unauthorized" | "contractor" | "internal";
+    role: InternalRole | null;
+    accountOwnerScoped: boolean;
+    todayJobsCount: number;
+  }) => {
+    if (!timingEnabled) return;
+
+    console.info(
+      "[today-timing]",
+      JSON.stringify({
+        routeLabels: {
+          resultKind: details.resultKind,
+          routeClass: details.routeClass,
+          role: details.role,
+          accountOwnerScoped: details.accountOwnerScoped,
+          todayJobsCount: details.todayJobsCount,
+        },
+        phasesMs: {
+          requestActorContext: phaseDurationsMs.requestActorContext ?? 0,
+          concernReadProductMode: phaseDurationsMs.concernReadProductMode ?? 0,
+          concernReadTenantIdentity: phaseDurationsMs.concernReadTenantIdentity ?? 0,
+          concernReadUnreadNotifications: phaseDurationsMs.concernReadUnreadNotifications ?? 0,
+          concernReadTimeClockSettings: phaseDurationsMs.concernReadTimeClockSettings ?? 0,
+          concernReadTimeClockState: phaseDurationsMs.concernReadTimeClockState ?? 0,
+          todayJobsRead: phaseDurationsMs.todayJobsRead ?? 0,
+          priorityCountsRead: phaseDurationsMs.priorityCountsRead ?? 0,
+          followUpsRead: phaseDurationsMs.followUpsRead ?? 0,
+          teamCoverageRead: phaseDurationsMs.teamCoverageRead ?? 0,
+          recentResumeRead: phaseDurationsMs.recentResumeRead ?? 0,
+          openInvoiceSnapshotRead: phaseDurationsMs.openInvoiceSnapshotRead ?? 0,
+          servicePlansSummaryRead: phaseDurationsMs.servicePlansSummaryRead ?? 0,
+          groupedParallelAwait: phaseDurationsMs.groupedParallelAwait ?? 0,
+          composeReadModel: phaseDurationsMs.composeReadModel ?? 0,
+          totalServerReadModel: Date.now() - routeStartMs,
+        },
+      }),
+    );
+  };
+
+  const actor = await timedPhase("requestActorContext", () => getRequestActorContext());
 
   if (actor.kind === "unauthenticated" || actor.kind === "unauthorized") {
+    emitTimingLog({
+      resultKind: "redirect",
+      routeClass: actor.kind,
+      role: null,
+      accountOwnerScoped: false,
+      todayJobsCount: 0,
+    });
     return { kind: "redirect", to: "/login" };
   }
 
   if (actor.kind === "contractor") {
+    emitTimingLog({
+      resultKind: "redirect",
+      routeClass: actor.kind,
+      role: null,
+      accountOwnerScoped: false,
+      todayJobsCount: 0,
+    });
     return { kind: "redirect", to: "/portal" };
   }
 
   const internalUser = actor.internalUser as InternalUserRow | null;
   if (!internalUser || actor.kind !== "internal") {
+    emitTimingLog({
+      resultKind: "redirect",
+      routeClass: "unauthorized",
+      role: null,
+      accountOwnerScoped: false,
+      todayJobsCount: 0,
+    });
     return { kind: "redirect", to: "/login" };
   }
 
-  return buildTodayReadModelForInternalActor(actor, internalUser);
+  const readModel = await buildTodayReadModelForInternalActor(actor, internalUser, timedPhase);
+  emitTimingLog({
+    resultKind: "ok",
+    routeClass: "internal",
+    role: internalUser.role,
+    accountOwnerScoped: true,
+    todayJobsCount: readModel.todayWork.jobs.length,
+  });
+  return readModel;
 }
 
 async function buildTodayReadModelForInternalActor(
   actor: RequestActorContext,
   internalUser: InternalUserRow,
+  timedPhase?: TodayTimedPhase,
 ): Promise<TodayReadModel> {
+  const localTimedPhase: TodayTimedPhase = timedPhase
+    ? timedPhase
+    : async <T,>(_phaseName: string, factory: () => Promise<T>) => factory();
+
   const supabase = actor.supabase;
   const userId = String(actor.user?.id ?? "");
   const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
@@ -1424,23 +1526,41 @@ async function buildTodayReadModelForInternalActor(
   const canViewBusinessPulse = canViewBusinessPulseForRole(role);
   const showWelcomeModal = !hasDismissedTodayWelcome(actor.user?.user_metadata ?? null);
 
-  const productModePromise = resolveProductModeForAccountOwnerId({
-    supabase,
-    accountOwnerUserId,
-  }).catch<ProductMode>(() => "hybrid");
+  const productModePromise = localTimedPhase("concernReadProductMode", async () => {
+    try {
+      return await resolveProductModeForAccountOwnerId({
+        supabase,
+        accountOwnerUserId,
+      });
+    } catch {
+      return "hybrid" as ProductMode;
+    }
+  });
 
-  const identityPromise = resolveOperationalTenantIdentity({
-    supabase,
-    accountOwnerUserId,
-  }).catch(() => null);
+  const identityPromise = localTimedPhase("concernReadTenantIdentity", async () => {
+    try {
+      return await resolveOperationalTenantIdentity({
+        supabase,
+        accountOwnerUserId,
+      });
+    } catch {
+      return null;
+    }
+  });
 
-  const unreadPromise = getInternalUnreadNotificationBadgeCount({
-    supabase,
-    accountOwnerUserId,
-  }).catch(() => 0);
+  const unreadPromise = localTimedPhase("concernReadUnreadNotifications", async () => {
+    try {
+      return await getInternalUnreadNotificationBadgeCount({
+        supabase,
+        accountOwnerUserId,
+      });
+    } catch {
+      return 0;
+    }
+  });
 
   // Time clock state (per-user) — only meaningful if feature flag is on.
-  const timeClockSettingsPromise = (async () => {
+  const timeClockSettingsPromise = localTimedPhase("concernReadTimeClockSettings", async () => {
     try {
       const { data } = await supabase
         .from("account_settings")
@@ -1451,9 +1571,9 @@ async function buildTodayReadModelForInternalActor(
     } catch {
       return false;
     }
-  })();
+  });
 
-  const clockStatePromise = (async () => {
+  const clockStatePromise = localTimedPhase("concernReadTimeClockState", async () => {
     try {
       const enabled = await timeClockSettingsPromise;
       if (!enabled) return null;
@@ -1466,38 +1586,48 @@ async function buildTodayReadModelForInternalActor(
     } catch {
       return null;
     }
-  })();
-
-  const todayJobsPromise = safeLoadTodayJobsForRole({
-    supabase,
-    accountOwnerUserId,
-    role,
-    userId,
-    today,
   });
 
-  const priorityCountsPromise = safeLoadPriorityCounts({
-    supabase,
-    accountOwnerUserId,
-    today,
-  });
+  const todayJobsPromise = localTimedPhase("todayJobsRead", () =>
+    safeLoadTodayJobsForRole({
+      supabase,
+      accountOwnerUserId,
+      role,
+      userId,
+      today,
+    }),
+  );
 
-  const followUpsPromise = safeLoadFollowUps({ supabase, accountOwnerUserId, today });
+  const priorityCountsPromise = localTimedPhase("priorityCountsRead", () =>
+    safeLoadPriorityCounts({
+      supabase,
+      accountOwnerUserId,
+      today,
+    }),
+  );
 
-  const teamCoveragePromise = safeLoadTeamCoverage({
-    supabase,
-    role,
-    today,
-    maxRows: 5,
-  });
+  const followUpsPromise = localTimedPhase("followUpsRead", () =>
+    safeLoadFollowUps({ supabase, accountOwnerUserId, today }),
+  );
 
-  const recentPromise = safeLoadRecentResume({
-    supabase,
-    accountOwnerUserId,
-    limit: 5,
-  });
+  const teamCoveragePromise = localTimedPhase("teamCoverageRead", () =>
+    safeLoadTeamCoverage({
+      supabase,
+      role,
+      today,
+      maxRows: 5,
+    }),
+  );
 
-  const servicePlansPromise = (async () => {
+  const recentPromise = localTimedPhase("recentResumeRead", () =>
+    safeLoadRecentResume({
+      supabase,
+      accountOwnerUserId,
+      limit: 5,
+    }),
+  );
+
+  const servicePlansPromise = localTimedPhase("servicePlansSummaryRead", async () => {
     if (!isMaintenanceAgreementsEnabled()) return null;
     try {
       return await summarizeMaintenanceAgreementsForAccount({
@@ -1507,11 +1637,13 @@ async function buildTodayReadModelForInternalActor(
     } catch {
       return null;
     }
-  })();
+  });
 
-  const openInvoicePromise = canViewBusinessPulse
-    ? safeLoadOpenInvoiceSnapshot({ supabase, accountOwnerUserId })
-    : Promise.resolve({ count: null, balanceCents: null });
+  const openInvoicePromise = localTimedPhase("openInvoiceSnapshotRead", () =>
+    canViewBusinessPulse
+      ? safeLoadOpenInvoiceSnapshot({ supabase, accountOwnerUserId })
+      : Promise.resolve({ count: null, balanceCents: null }),
+  );
 
   const [
     productMode,
@@ -1526,20 +1658,22 @@ async function buildTodayReadModelForInternalActor(
     recent,
     servicePlans,
     openInvoice,
-  ] = await Promise.all([
-    productModePromise,
-    identityPromise,
-    unreadPromise,
-    timeClockSettingsPromise,
-    clockStatePromise,
-    todayJobsPromise,
-    priorityCountsPromise,
-    followUpsPromise,
-    teamCoveragePromise,
-    recentPromise,
-    servicePlansPromise,
-    openInvoicePromise,
-  ]);
+  ] = await localTimedPhase("groupedParallelAwait", async () =>
+    Promise.all([
+      productModePromise,
+      identityPromise,
+      unreadPromise,
+      timeClockSettingsPromise,
+      clockStatePromise,
+      todayJobsPromise,
+      priorityCountsPromise,
+      followUpsPromise,
+      teamCoveragePromise,
+      recentPromise,
+      servicePlansPromise,
+      openInvoicePromise,
+    ]),
+  );
 
   const servicePlansOverdue = servicePlans?.due_counts?.overdue ?? null;
   const servicePlansDueIn7 = servicePlans?.due_counts?.due_in_next_7_days ?? null;
@@ -1609,7 +1743,7 @@ async function buildTodayReadModelForInternalActor(
   const showFieldActions = role === "tech";
   const todayLabel = role === "tech" ? "My Work" : "Today’s Work";
 
-  return {
+  return localTimedPhase("composeReadModel", async () => ({
     userContext: {
       userId,
       role,
@@ -1634,7 +1768,7 @@ async function buildTodayReadModelForInternalActor(
     resumeRecentWork: recent.items,
     resumeRecentHasMore: recent.hasMore,
     showWelcomeModal,
-  };
+  }));
 }
 
 // Exported for downstream presentation helpers that need the LA today key.
