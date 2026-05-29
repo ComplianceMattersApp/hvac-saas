@@ -718,6 +718,14 @@ function FolderIcon(props: { className?: string }) {
   );
 }
 
+function PaperclipIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M21 11.5 11.8 20.7a5 5 0 0 1-7.1-7.1l9.2-9.2a3.5 3.5 0 1 1 5 5l-9.2 9.2a2 2 0 1 1-2.8-2.8l8.5-8.5" />
+    </MobileLineIcon>
+  );
+}
+
 function NavigateIcon(props: { className?: string }) {
   return (
     <MobileLineIcon className={props.className}>
@@ -740,8 +748,9 @@ function CollapsibleHeader(props: {
   meta?: string;
   metaTone?: "default" | "note-highlight";
   compactOnMobile?: boolean;
+  icon?: ReactNode;
 }) {
-  const { title, subtitle, meta, metaTone = "default", compactOnMobile = false } = props;
+  const { title, subtitle, meta, metaTone = "default", compactOnMobile = false, icon } = props;
   const metaClassName = compactOnMobile
     ? metaTone === "note-highlight"
       ? "mt-0.5 shrink-0 rounded-md border border-amber-200/80 bg-amber-50/85 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-amber-800 shadow-[0_10px_24px_-24px_rgba(217,119,6,0.35)] sm:rounded-lg sm:px-2.5 sm:py-[0.3125rem] sm:text-[10px] sm:tracking-[0.12em]"
@@ -759,7 +768,10 @@ function CollapsibleHeader(props: {
           ▶
         </span>
         <div className={compactOnMobile ? "min-w-0 pt-0" : "min-w-0 pt-0.5"}>
-          <div className={compactOnMobile ? "text-[13px] font-semibold tracking-[-0.015em] text-slate-950 sm:text-[14.5px]" : "text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950"}>{title}</div>
+          <div className={compactOnMobile ? "inline-flex items-center gap-1.5 text-[13px] font-semibold tracking-[-0.015em] text-slate-950 sm:text-[14.5px]" : "inline-flex items-center gap-1.5 text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950"}>
+            {icon ? <span className={compactOnMobile ? "inline-flex h-4 w-4 items-center justify-center text-slate-500" : "inline-flex h-4.5 w-4.5 items-center justify-center text-slate-500"}>{icon}</span> : null}
+            <span>{title}</span>
+          </div>
           {subtitle ? <div className={compactOnMobile ? "mt-0.5 hidden max-w-[42rem] text-[11px] leading-[1.4] text-slate-500 sm:mt-1 sm:block sm:text-[11.5px] sm:leading-[1.45]" : "mt-1 max-w-[42rem] text-[11.5px] leading-[1.45] text-slate-500"}>{subtitle}</div> : null}
         </div>
       </div>
@@ -4442,7 +4454,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
   <div className="mb-3 mt-5 flex flex-wrap items-end justify-between gap-2 border-t border-slate-200/70 pt-5 sm:mt-0 sm:border-t-0 sm:pt-0">
     <div>
-      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Operations Board</div>
+      <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+        <ToolIcon className="h-3.5 w-3.5" />
+        <span>Field Operations Board</span>
+      </div>
     </div>
     <div className="inline-flex rounded-full border border-slate-200 bg-white/86 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-slate-500 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.1em]">
       {equipmentCount} equipment / {assignedTeam.length} assigned
@@ -4456,7 +4471,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {(job.job_type ? String(job.job_type).toUpperCase() : "SERVICE")}
         {serviceCity ? ` • ${serviceCity}` : ""}
       </div>
-      <div className="mt-2 hidden text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:block">Responsible Account</div>
+      <div className="mt-2 hidden items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:inline-flex"><UserIcon className="h-3.5 w-3.5" />Responsible Account</div>
 
       {job.customer_id ? (
         <Link
@@ -4487,7 +4502,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
 
         <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Service Address</div>
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400"><MapPinIcon className="h-3.5 w-3.5" />Service Address</div>
           <div className="mt-1 text-xs text-slate-700">{serviceAddressDisplay}</div>
         </div>
 
@@ -4638,7 +4653,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         attemptCount={attemptCount}
         lastAttemptLabel={lastAttemptLabel}
         action={logCustomerContactAttemptFromForm}
-        buttonClassName={`${compactSecondaryButtonClass} w-full text-xs sm:w-auto`}
+        buttonClassName={`${compactSecondaryButtonClass} inline-flex min-h-9 items-center justify-center w-full text-xs sm:w-auto`}
       />
 
       {roleContactSections.map((section, index) => (
@@ -4692,8 +4707,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/94 p-4`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Visit Reason
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <ClipboardIcon className="h-3.5 w-3.5" />
+              <span>Visit Reason</span>
             </div>
           </div>
           {job.job_type === "service" ? (
@@ -4761,7 +4777,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">Work Needed</div>
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700"><ToolIcon className="h-3.5 w-3.5" />Work Needed</div>
                 {job.job_type === "service" ? (
                   <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:inline-flex">
                     {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
@@ -4884,7 +4900,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <div className={`${workspaceSubtleCardClass} border-slate-200/70 p-4 ${hasPermitDetails ? "bg-white/92" : "bg-slate-50/88"}`}>
           <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Permit</div>
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ClipboardIcon className="h-3.5 w-3.5" />Permit</div>
               <div className="mt-1 text-sm text-slate-600">
                 {hasPermitDetails
                   ? `${permitDetailCount} of 3 fields`
@@ -4922,7 +4938,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
         <div className="mb-3 flex items-start justify-between gap-3">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Equipment</div>
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ToolIcon className="h-3.5 w-3.5" />Equipment</div>
             <div className="mt-1 text-sm text-slate-600">
               {equipmentCount > 0 ? `${equipmentCount} item${equipmentCount === 1 ? "" : "s"} recorded` : "No equipment recorded yet."}
             </div>
@@ -4971,7 +4987,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
     <div className="flex flex-wrap items-center justify-between gap-2">
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Assigned Team</div>
+        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><UserIcon className="h-3.5 w-3.5" />Assigned Team</div>
         <div className="mt-1 text-sm text-slate-600">Field ownership for this visit.</div>
       </div>
       <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
@@ -5051,7 +5067,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     <div className="mt-4 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)] sm:mt-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Next Service Action</div>
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ClockIcon className="h-3.5 w-3.5" />Next Service Action</div>
           <div className="mt-1 text-sm font-semibold text-slate-900">Create a linked follow-up visit.</div>
         </div>
         {serviceCaseVisitCount > 1 ? (
@@ -5112,7 +5128,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     {showCloseoutRow && (
       <div id="closeout-actions" className="mt-3 min-w-0 scroll-mt-24 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)]">
     <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="text-sm font-medium text-gray-700">Closeout</div>
+      <div className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700"><SettingsIcon className="h-4 w-4" />Closeout</div>
 
       <div className="flex flex-wrap items-center gap-2">
         {/* ECC only: Certs */}
@@ -6054,6 +6070,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <CollapsibleHeader
                 title="Edit Job"
                 subtitle="All editable controls for this job."
+                icon={<SettingsIcon className="h-4 w-4" />}
               />
             </summary>
 
@@ -6137,7 +6154,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   <summary className="cursor-pointer list-none">
                     <CollapsibleHeader
                       title="Permit Information"
-                      subtitle="Permit Number, Jurisdiction, and Permit Date."
+                      subtitle="Permit Number, jurisdiction, and permit date."
+                      icon={<ClipboardIcon className="h-4 w-4" />}
                     />
                   </summary>
                   <form action={updateJobScheduleFromForm} className="mt-3 space-y-3">
@@ -6198,7 +6216,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     <summary className="cursor-pointer list-none">
                       <CollapsibleHeader
                         title="Change Contractor"
-                        subtitle="Reassign job ownership to a different contractor."
+                        subtitle="Reassign job ownership."
+                        icon={<UserIcon className="h-4 w-4" />}
                       />
                     </summary>
 
@@ -6242,7 +6261,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     <summary className="cursor-pointer list-none">
                       <CollapsibleHeader
                         title="Service Details"
-                        subtitle="Edit service type and visit classification fields."
+                        subtitle="Edit service type and visit classification."
+                        icon={<ToolIcon className="h-4 w-4" />}
                       />
                     </summary>
 
@@ -6301,7 +6321,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                           required
                         />
                         <p className="text-[11px] leading-5 text-slate-500">
-                          Reason for Visit explains why this visit exists and gives dispatch context.
+                          Why this visit exists.
                         </p>
                       </div>
 
@@ -6338,6 +6358,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   <CollapsibleHeader
                     title="Admin Archive Controls"
                     subtitle="Archive or cancel this job with admin-only actions."
+                    icon={<WarningIcon className="h-4 w-4" />}
                   />
                 </summary>
 
@@ -6372,7 +6393,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   <div id="internal-invoice-panel" className="mt-6 scroll-mt-24 rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-4 shadow-[0_20px_42px_-34px_rgba(15,23,42,0.32)] ring-1 ring-slate-200/70 sm:p-5">
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div>
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Billing</div>
+        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"><ReceiptIcon className="h-3.5 w-3.5" />Billing</div>
         <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
           {internalInvoiceTruth ? formatInternalInvoiceStatus(internalInvoiceTruth.status) : "Invoice required"}
         </div>
@@ -6429,6 +6450,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     <CollapsibleHeader
       title="Job Status"
       subtitle={jobStatusSummaryText}
+      icon={<SettingsIcon className="h-4 w-4" />}
     />
   </summary>
 
@@ -6469,7 +6491,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         String(job.ops_status ?? "")
       ) ? (
         <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-3 text-sm font-medium text-slate-900">
-          Current lifecycle state:{" "}
+          Lifecycle:{" "}
           <span>
             {formatOpsStatusLabel(job.ops_status)}
           </span>
@@ -6570,7 +6592,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           ) : (
             <>
               <p className="mt-1 text-xs leading-5 text-blue-900/90">
-                This is a suggestion only. Use Confirm Next Due Date when you are ready to update the Service Plan next due date. Confirming does not create a job, schedule an appointment, create an invoice, or collect payment.
+                Suggestion only. Confirm updates the Service Plan next due date and does not create a job, schedule, invoice, or payment.
               </p>
               <div className="mt-2 text-sm font-semibold text-blue-900">
                 {suggestedNextDueProjection.manualSchedulingRequired
@@ -6600,9 +6622,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     <section className="rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.99))] p-3.5 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-5">
       <div className="mb-3 flex flex-col gap-1.5 border-b border-slate-200/80 pb-2.5 sm:mb-4 sm:gap-2 sm:pb-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Job Records</div>
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"><FolderIcon className="h-3.5 w-3.5" />Job Records</div>
           <div className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:mt-1 sm:text-lg">Activity, Evidence, and History</div>
-          <div className="mt-1 hidden text-sm text-slate-600 sm:block">Notes, attachments, follow-up, timeline, service chain, and compliance context.</div>
+          <div className="mt-1 hidden text-sm text-slate-600 sm:block">Notes, attachments, follow-up, and history.</div>
         </div>
         <div className="flex flex-wrap gap-1">
           <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{noteCountSummary.timelineNoteEventCount} notes</span>
@@ -6618,6 +6640,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               title={internalNotesTitle}
               subtitle={internalNotesSummaryText}
               meta={internalNotesMeta}
+              icon={<LockIcon className="h-4 w-4" />}
               compactOnMobile
             />
           </summary>
@@ -6657,6 +6680,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title="Attachments"
+              icon={<PaperclipIcon className="h-4 w-4" />}
               compactOnMobile
             />
           </summary>
@@ -6684,6 +6708,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <CollapsibleHeader
               title="Follow Up"
               subtitle={followUpSummaryText}
+              icon={<ClockIcon className="h-4 w-4" />}
               compactOnMobile
             />
           </summary>
@@ -6693,7 +6718,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
             {hasFollowUpReminder ? (
               <div className="mb-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2.5 text-xs leading-5 text-slate-600">
-                Follow Up stays separate from Pending Info. Use this area for reminder ownership, due date, and next-action notes.
+                Use this for reminder ownership, due date, and next steps.
               </div>
             ) : null}
 
@@ -6750,6 +6775,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <CollapsibleHeader
               title="Follow-Up History"
               subtitle={followUpHistorySummaryText}
+              icon={<ClockIcon className="h-4 w-4" />}
               compactOnMobile
             />
           </summary>
@@ -6772,6 +6798,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               title={timelineTitle}
               subtitle={timelineSummaryText}
               meta={timelineNotesMeta}
+              icon={<ClockIcon className="h-4 w-4" />}
               compactOnMobile
             />
           </summary>
@@ -6794,6 +6821,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               title="Service Chain"
               subtitle={serviceChainSummaryText}
               meta={`${serviceCaseVisitCount} visit${serviceCaseVisitCount === 1 ? "" : "s"}`}
+              icon={<ToolIcon className="h-4 w-4" />}
               compactOnMobile
             />
           </summary>
@@ -6829,6 +6857,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 title={sharedNotesTitle}
                 subtitle={sharedNotesSummaryText}
                 meta={sharedNotesMeta}
+                icon={<ChatIcon className="h-4 w-4" />}
                 compactOnMobile
               />
             </summary>
@@ -6881,8 +6910,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <summary className="cursor-pointer list-none">
               <CollapsibleHeader
                 title="ECC Summary"
-                subtitle="Test history, runs, and compliance workspace context."
+                subtitle="Test history and compliance context."
                 meta={`${eccRunCount} run${eccRunCount === 1 ? "" : "s"}`}
+                icon={<ClipboardIcon className="h-4 w-4" />}
                 compactOnMobile
               />
             </summary>
@@ -6890,7 +6920,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <div className={jobRecordsDetailsDividerClass}>
               <div className="rounded-xl border border-slate-200/80 bg-white/96 px-4 py-4 text-sm text-slate-700">
                 <p className="text-sm leading-6 text-slate-700">
-                  Test history, runs, and compliance workspace context.
+                  Test history and compliance context.
                 </p>
                 {eccRunCount > 0 ? (
                   <p className="mt-2 text-xs leading-5 text-slate-600">
@@ -6925,6 +6955,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       title="Failure Resolution"
       subtitle={failureResolutionSummaryText}
       meta={`${failureResolutionPathCount} path${failureResolutionPathCount === 1 ? "" : "s"} available`}
+      icon={<WarningIcon className="h-4 w-4" />}
     />
   </summary>
 

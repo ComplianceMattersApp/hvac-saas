@@ -4,6 +4,36 @@ import type { BillingMode } from "@/lib/business/internal-business-profile";
 import { markServiceComplete, markInvoiceSent } from "@/lib/actions/service-actions";
 import SubmitButton from "@/components/SubmitButton";
 
+function LineIcon(props: { children: React.ReactNode; className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.85"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={props.className ?? "h-4 w-4"}
+      aria-hidden
+    >
+      {props.children}
+    </svg>
+  );
+}
+
+function ToolIcon(props: { className?: string }) {
+  return (
+    <LineIcon className={props.className}>
+      <path d="m14 6 4 4" />
+      <path d="m6 14 4 4" />
+      <path d="m5 19 4-4" />
+      <path d="m15 9 4-4" />
+      <path d="m3 21 6-6" />
+      <path d="m15 3 6 6" />
+    </LineIcon>
+  );
+}
+
 function formatOpsStatusLabel(value?: string | null) {
   const key = String(value ?? "").trim().toLowerCase();
   const labels: Record<string, string> = {
@@ -44,9 +74,9 @@ export default function ServiceStatusActions({
     <section id="service-closeout" className="rounded-xl border bg-white p-4">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h2 className="text-sm font-semibold">Service Closeout</h2>
+          <h2 className="inline-flex items-center gap-1.5 text-sm font-semibold"><ToolIcon className="h-4 w-4 text-neutral-500" />Service Closeout</h2>
           <p className="mt-1 text-xs text-neutral-600">
-            These update <b>ops_status</b> and do not affect the Tests page.
+            Updates <b>ops_status</b> only.
           </p>
           <div className="mt-2 text-xs">
             Current status: <b>{formatOpsStatusLabel(opsStatus)}</b>
@@ -58,7 +88,7 @@ export default function ServiceStatusActions({
         <form action={completeAction}>
           <SubmitButton
             loadingText="Marking complete..."
-            className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50"
+            className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
           >
             Mark Service Complete → Invoice Required
           </SubmitButton>
@@ -68,7 +98,7 @@ export default function ServiceStatusActions({
           <form action={invoiceSentAction}>
             <SubmitButton
               loadingText="Marking..."
-              className="w-full rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
+              className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
             >
               Mark External Billing Complete → Closed
             </SubmitButton>
