@@ -2418,6 +2418,9 @@ const permitDateValue = String((job as any).permit_date ?? "").trim();
 const permitDateLabel = permitDateValue ? formatTimestampDateDisplayLA(permitDateValue) : "";
 const permitDetailCount = Number(Boolean(permitNumber)) + Number(Boolean(permitJurisdiction)) + Number(Boolean(permitDateValue));
 const hasPermitDetails = permitDetailCount > 0;
+const permitSummaryLabel = hasPermitDetails
+  ? `${permitDetailCount} of 3 fields`
+  : "Not recorded";
 
 const serviceCaseVisitCount = serviceCaseVisitCountRaw ?? 0;
 const equipmentItems = Array.isArray(job.job_equipment) ? job.job_equipment : [];
@@ -4072,6 +4075,89 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               </div>
 
               <div className="inline-flex items-center gap-1.5 pt-1 text-sm font-semibold tracking-[0.08em] text-slate-600"><SettingsIcon className="h-4 w-4" />Admin</div>
+
+              <details id="mobile-permit-info" className="group">
+                <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
+                  <span className="inline-flex items-center gap-2"><ClipboardIcon className="h-4.5 w-4.5" />Permit Information</span>
+                </summary>
+                <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
+                  <div className="space-y-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+                      <div className="font-semibold text-slate-600">Permit</div>
+                      <div className="text-base font-semibold text-slate-900">{permitSummaryLabel}</div>
+                    </div>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                        <div className="font-semibold text-slate-600">Number</div>
+                        <div className="text-base font-semibold text-slate-900">{permitNumber || "Not recorded"}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm">
+                        <div className="font-semibold text-slate-600">Jurisdiction</div>
+                        <div className="text-base font-semibold text-slate-900">{permitJurisdiction || "Not recorded"}</div>
+                      </div>
+                      <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm sm:col-span-2">
+                        <div className="font-semibold text-slate-600">Permit Date</div>
+                        <div className="text-base font-semibold text-slate-900">{permitDateLabel || "Not recorded"}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <details id="mobile-permit-edit" className="group mt-3">
+                    <summary className={`${mobileMutedToolLinkClass} cursor-pointer list-none`}>Edit Permit Info</summary>
+                    <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3">
+                      <form action={updateJobScheduleFromForm} className="space-y-3">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-permit-edit`} />
+                        <input type="hidden" name="scheduled_date" value={displayDateLA(job.scheduled_date) ?? ""} />
+                        <input type="hidden" name="window_start" value={timeToTimeInput(job.window_start) ?? ""} />
+                        <input type="hidden" name="window_end" value={timeToTimeInput(job.window_end) ?? ""} />
+
+                        <div className="space-y-1">
+                          <label className="text-sm font-semibold text-slate-700">Permit Number</label>
+                          <input
+                            name="permit_number"
+                            defaultValue={job.permit_number ?? ""}
+                            placeholder="Optional"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-sm font-semibold text-slate-700">Jurisdiction</label>
+                          <input
+                            name="jurisdiction"
+                            defaultValue={(job as any).jurisdiction ?? ""}
+                            placeholder="City or county permit office"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-sm font-semibold text-slate-700">Permit Date</label>
+                          <input
+                            type="date"
+                            name="permit_date"
+                            defaultValue={(job as any).permit_date ?? ""}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2">
+                          <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+                            Save Permit Info
+                          </SubmitButton>
+                          <Link
+                            href={`/jobs/${job.id}?tab=${tab}#mobile-permit-info`}
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800"
+                          >
+                            Cancel
+                          </Link>
+                        </div>
+                      </form>
+                    </div>
+                  </details>
+                </div>
+              </details>
 
               <details className="group">
                 <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
