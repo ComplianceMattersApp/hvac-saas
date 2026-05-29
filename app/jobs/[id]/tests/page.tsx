@@ -12,6 +12,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
+import JobSubpageContextHeader from "../_components/JobSubpageContextHeader";
 
 import {
   completeEccTestRunFromForm,
@@ -97,6 +98,74 @@ function getTestDisplayLabel(testType: string, packageSystem: boolean) {
   }
 
   return baseLabel;
+}
+
+function formatTimeDisplay(time?: string | null) {
+  if (!time) return "";
+  return String(time).slice(0, 5);
+}
+
+function formatAppointmentDate(value?: string | null) {
+  if (!value) return "No appointment scheduled";
+  const parsed = new Date(`${value}T00:00:00`);
+  if (!Number.isFinite(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function formatAppointmentTime(start?: string | null, end?: string | null, hasDate?: boolean) {
+  if (start && end) return `${formatTimeDisplay(start)}-${formatTimeDisplay(end)}`;
+  if (start) return `Starts ${formatTimeDisplay(start)}`;
+  if (end) return `Ends ${formatTimeDisplay(end)}`;
+  return hasDate ? "Time window TBD" : "No time window set";
+}
+
+function formatStatusLabel(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return "Unknown";
+
+  const mapped: Record<string, string> = {
+    open: "Open",
+    on_the_way: "On The Way",
+    in_process: "In Process",
+    completed: "Completed",
+    failed: "Failed",
+    cancelled: "Cancelled",
+  };
+
+  return mapped[normalized] ?? normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatOpsStatusLabel(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return "No ops status";
+
+  const mapped: Record<string, string> = {
+    need_to_schedule: "Need to Schedule",
+    scheduled: "Scheduled",
+    on_the_way: "On The Way",
+    in_process: "In Progress",
+    pending_info: "Pending Info",
+    pending_office_review: "Pending Office Review",
+    on_hold: "On Hold",
+    failed: "Failed",
+    retest_needed: "Retest Needed",
+    paperwork_required: "Paperwork Required",
+    invoice_required: "Invoice Required",
+    closed: "Closed",
+  };
+
+  return mapped[normalized] ?? normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatJobTypeLabel(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return "Service";
+  if (normalized === "ecc") return "ECC";
+  return normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function getRequiredTestStatusForSystem(job: any, systemId: string, testType: EccTestType) {
@@ -613,10 +682,15 @@ export default async function JobTestsPage({
       id,
       title,
       parent_job_id,
+      status,
+      ops_status,
       job_address,
       city,
       job_type,
       project_type,
+      scheduled_date,
+      window_start,
+      window_end,
       permit_number,
       jurisdiction,
       permit_date,
@@ -745,6 +819,24 @@ export default async function JobTestsPage({
   ]
     .filter(Boolean)
     .join(", ");
+
+  const contextCustomerName =
+    [job.customer_first_name, job.customer_last_name]
+      .map((value: unknown) => String(value ?? "").trim())
+      .filter(Boolean)
+      .join(" ") || "Customer not set";
+  const contextAddressLabel =
+    [job.job_address, job.city]
+      .map((value: unknown) => String(value ?? "").trim())
+      .filter(Boolean)
+      .join(", ") || "No service address set";
+  const contextAppointmentLabel = `${formatAppointmentDate(job.scheduled_date)} • ${formatAppointmentTime(
+    job.window_start,
+    job.window_end,
+    !!job.scheduled_date,
+  )}`;
+  const normalizedStatus = String(job.status ?? "").trim().toLowerCase();
+  const normalizedOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
 
   const projectTypeLabel = String(job.project_type ?? "")
     .trim()
@@ -1372,21 +1464,30 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             </div>
           </div>
         )}
+        <JobSubpageContextHeader
+          workspaceLabel="Job Subpage"
+          workspaceTitle="Tests Workspace"
+          customerName={contextCustomerName}
+          jobTitle={normalizeRetestLinkedJobTitle(job.title) || "Job"}
+          addressLabel={contextAddressLabel}
+          appointmentLabel={contextAppointmentLabel}
+          jobTypeLabel={formatJobTypeLabel(job.job_type)}
+          fieldStatusLabel={formatStatusLabel(job.status)}
+          opsStatusLabel={formatOpsStatusLabel(job.ops_status)}
+          fieldStatusKey={normalizedStatus}
+          opsStatusKey={normalizedOpsStatus}
+          backHref={`/jobs/${job.id}`}
+        />
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5 print:hidden">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-3">
-          <div>
-            <div className={eccUtilityLabelClass}>Field Testing Workspace</div>
-            <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-slate-600">
-              <span>{job.city ?? "N/A"}</span>
-              <span className="hidden text-slate-300 sm:inline">|</span>
-              <span>{selectedSystemName}</span>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
+              <span className={eccUtilityLabelClass}>System focus</span>
+              <span className="font-medium text-slate-800">{selectedSystemName}</span>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
                 {selectedCompletionLabel}
               </span>
             </div>
-          </div>
 
           <div className="grid gap-2 sm:grid-cols-4">
             <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
@@ -1432,7 +1533,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
       <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
       <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
-        Completion report is tucked away while you enter field readings.
+        Report stays hidden while entering readings.
         <label htmlFor="completion-report-toggle" className="ml-1 cursor-pointer font-medium text-slate-900 underline">
           Expand report
         </label>
@@ -1854,7 +1955,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div>
           <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">Tests to Run</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Pick a system, start the needed tests, save drafts as you go, then complete only when the readings are verified.
+            Pick a system, enter readings, save drafts, then complete once verified.
           </p>
           </div>
           <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -1989,7 +2090,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               <div>
                 <div className="text-base font-semibold tracking-tight text-slate-950">Ready Queue</div>
                 <div className="mt-1 text-sm leading-6 text-slate-600">
-                  Required tests and selected add-ons for this system. Profile:{" "}
+                  Required tests and selected add-ons. Profile:{" "}
                   <span className="font-medium">
                     {normalizedProfile === "alteration"
                       ? "Alteration"
