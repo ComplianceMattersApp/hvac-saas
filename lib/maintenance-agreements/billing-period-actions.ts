@@ -59,6 +59,8 @@ type AnchorJobRow = {
   customer_id: string | null;
   location_id: string | null;
   service_case_id: string | null;
+  status: string | null;
+  deleted_at: string | null;
 };
 
 type CreateOrUpdateInput = {
@@ -109,6 +111,14 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-
 const INTERNAL_INVOICE_STATUSES = new Set(["draft", "pending_billing"]);
 const EXTERNAL_OFF_PLATFORM_STATUSES = new Set(["draft", "externally_billed"]);
 const MANUAL_STATUSES = new Set(["draft", "pending_billing"]);
+const DISALLOWED_BILLING_ANCHOR_JOB_STATUSES = new Set([
+  "cancelled",
+  "canceled",
+  "closed",
+  "void",
+  "voided",
+  "archived",
+]);
 
 function buildInternalInvoiceNumber() {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, "");
@@ -627,7 +637,7 @@ async function loadInternalInvoice(admin: any, internalInvoiceId: string) {
 async function loadAnchorJob(admin: any, anchorJobId: string) {
   const { data, error } = await admin
     .from("jobs")
-    .select("id, customer_id, location_id, service_case_id")
+    .select("id, customer_id, location_id, service_case_id, status, deleted_at")
     .eq("id", anchorJobId)
     .maybeSingle();
 
@@ -643,8 +653,17 @@ async function loadAnchorJob(admin: any, anchorJobId: string) {
       customer_id: clean(data.customer_id) || null,
       location_id: clean(data.location_id) || null,
       service_case_id: clean(data.service_case_id) || null,
+      status: clean(data.status) || null,
+      deleted_at: clean(data.deleted_at) || null,
     } satisfies AnchorJobRow,
   };
+}
+
+function isUnusableBillingAnchorJob(job: AnchorJobRow) {
+  if (job.deleted_at) return true;
+  const status = clean(job.status).toLowerCase();
+  if (!status) return false;
+  return DISALLOWED_BILLING_ANCHOR_JOB_STATUSES.has(status);
 }
 
 async function isInvoiceClaimedByAnotherBillingPeriod(params: {
@@ -1406,6 +1425,10 @@ async function linkBillingAnchorJobToBillingPeriod(customerPath: string, formDat
 
   const anchorJob = anchorJobResult.job;
   if (anchorJob.customer_id && anchorJob.customer_id !== agreement.customer_id) {
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  if (isUnusableBillingAnchorJob(anchorJob)) {
     rejectBillingAnchorLinkInvalid(customerPath);
   }
 

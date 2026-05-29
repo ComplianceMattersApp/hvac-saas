@@ -113,6 +113,8 @@ function makeJobRow(input: Partial<MockRow> & { id: string }) {
     customer_id: CUSTOMER_ID,
     location_id: null,
     service_case_id: null,
+    status: "open",
+    deleted_at: null,
     ...input,
   };
 }
@@ -1270,6 +1272,28 @@ describe("billing period server actions", () => {
     createAdminClientMock.mockReturnValue(
       makeAdminClient({
         periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice", amount_due_cents: 25000 })],
+        jobs: [makeJobRow({ id: JOB_ONE_ID, customer_id: CUSTOMER_ID, status: "cancelled" })],
+      }),
+    );
+    const cancelledAnchorJob = await expectRedirect(() =>
+      linkBillingAnchorJobFromForm(`/customers/${CUSTOMER_ID}`, buildLinkBillingAnchorFormData())
+    );
+    expect(cancelledAnchorJob).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_anchor_link_invalid`);
+
+    createAdminClientMock.mockReturnValue(
+      makeAdminClient({
+        periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice", amount_due_cents: 25000 })],
+        jobs: [makeJobRow({ id: JOB_ONE_ID, customer_id: CUSTOMER_ID, deleted_at: "2026-05-29T00:00:00Z" })],
+      }),
+    );
+    const deletedAnchorJob = await expectRedirect(() =>
+      linkBillingAnchorJobFromForm(`/customers/${CUSTOMER_ID}`, buildLinkBillingAnchorFormData())
+    );
+    expect(deletedAnchorJob).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_anchor_link_invalid`);
+
+    createAdminClientMock.mockReturnValue(
+      makeAdminClient({
+        periods: [makeBillingPeriodRow({ id: PERIOD_ONE_ID, billing_posture: "internal_invoice", amount_due_cents: 25000 })],
         jobs: [makeJobRow({ id: JOB_ONE_ID, customer_id: CUSTOMER_ID })],
         invoices: [makeInvoiceRow({ id: INVOICE_ONE_ID, job_id: JOB_ONE_ID, status: "draft" })],
       }),
@@ -1278,6 +1302,70 @@ describe("billing period server actions", () => {
       linkBillingAnchorJobFromForm(`/customers/${CUSTOMER_ID}`, buildLinkBillingAnchorFormData())
     );
     expect(activeInvoiceOnAnchor).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_anchor_link_conflict`);
+  });
+
+  it("does not create billing anchor visit link for cancelled or deleted anchor jobs", async () => {
+    const { linkBillingAnchorJobFromForm } = await import(
+      "@/lib/maintenance-agreements/billing-period-actions"
+    );
+
+    const cancelledAdmin = makeAdminClient({
+      periods: [
+        makeBillingPeriodRow({
+          id: PERIOD_ONE_ID,
+          internal_invoice_id: null,
+          billing_period_status: "pending_billing",
+          billing_posture: "internal_invoice",
+          amount_due_cents: 25000,
+        }),
+      ],
+      jobs: [makeJobRow({ id: JOB_ONE_ID, customer_id: CUSTOMER_ID, status: "cancelled" })],
+      invoices: [],
+      visitLinks: [],
+    });
+    createAdminClientMock.mockReturnValue(cancelledAdmin);
+
+    const cancelledTarget = await expectRedirect(() =>
+      linkBillingAnchorJobFromForm(`/customers/${CUSTOMER_ID}`, buildLinkBillingAnchorFormData())
+    );
+
+    expect(cancelledTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_anchor_link_invalid`);
+    expect(cancelledAdmin._visitLinkInsertCalls).toHaveLength(0);
+    expect(cancelledAdmin._invoiceInsertCalls).toHaveLength(0);
+    expect(cancelledAdmin._lineItemInsertCalls).toHaveLength(0);
+    expect(cancelledAdmin._updateCalls).toHaveLength(0);
+    expect(cancelledAdmin._seenTables).not.toContain("internal_invoice_payments");
+    expect(cancelledAdmin._seenTables).not.toContain("internal_invoice_payment_allocations");
+    expect(cancelledAdmin._seenTables).not.toContain("stripe");
+
+    const deletedAdmin = makeAdminClient({
+      periods: [
+        makeBillingPeriodRow({
+          id: PERIOD_ONE_ID,
+          internal_invoice_id: null,
+          billing_period_status: "pending_billing",
+          billing_posture: "internal_invoice",
+          amount_due_cents: 25000,
+        }),
+      ],
+      jobs: [makeJobRow({ id: JOB_ONE_ID, customer_id: CUSTOMER_ID, deleted_at: "2026-05-29T00:00:00Z" })],
+      invoices: [],
+      visitLinks: [],
+    });
+    createAdminClientMock.mockReturnValue(deletedAdmin);
+
+    const deletedTarget = await expectRedirect(() =>
+      linkBillingAnchorJobFromForm(`/customers/${CUSTOMER_ID}`, buildLinkBillingAnchorFormData())
+    );
+
+    expect(deletedTarget).toBe(`/customers/${CUSTOMER_ID}?banner=billing_period_anchor_link_invalid`);
+    expect(deletedAdmin._visitLinkInsertCalls).toHaveLength(0);
+    expect(deletedAdmin._invoiceInsertCalls).toHaveLength(0);
+    expect(deletedAdmin._lineItemInsertCalls).toHaveLength(0);
+    expect(deletedAdmin._updateCalls).toHaveLength(0);
+    expect(deletedAdmin._seenTables).not.toContain("internal_invoice_payments");
+    expect(deletedAdmin._seenTables).not.toContain("internal_invoice_payment_allocations");
+    expect(deletedAdmin._seenTables).not.toContain("stripe");
   });
 
   it("maps race-condition unique conflicts to link_conflict banner", async () => {
