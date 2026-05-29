@@ -726,6 +726,14 @@ function NavigateIcon(props: { className?: string }) {
   );
 }
 
+function ChevronRightIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="m9 6 6 6-6 6" />
+    </MobileLineIcon>
+  );
+}
+
 function CollapsibleHeader(props: {
   title: string;
   subtitle?: string;
@@ -3322,8 +3330,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     mobileOpsStatusLabel !== mobilePrimaryStateLabel
       ? `Scheduling: ${mobileOpsStatusLabel}`
       : null;
+  const mobileCustomerHref = job.customer_id ? `/customers/${job.customer_id}` : null;
   const showMobileEccTestAction = job.job_type === "ecc";
-  const showMobileStartInvoiceAction = job.job_type === "service" && showInternalInvoicePanel;
+  const mobileInvoiceActionRelevant =
+    job.job_type === "service" &&
+    (showInternalInvoicingPlaceholder || Boolean(internalInvoiceTruth) || showExternalDataEntryPrompt || (isCloseoutPending && closeoutNeeds.needsInvoice));
+  const showMobileServiceInvoiceFieldAction =
+    job.job_type === "service" && showInternalInvoicePanel && mobileInvoiceActionRelevant;
+  const showMobileInvoiceOpenAttention =
+    job.job_type === "service" && Boolean(internalInvoiceTruth) && !showInternalInvoicingPlaceholder;
+  const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[92rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
@@ -3332,22 +3348,19 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
-                  <UserIcon className="h-3.5 w-3.5" />
-                  <span>{headerJobTypeLabel || "Job"}</span>
-                </div>
                 <h1 className="mt-1 break-words text-2xl font-semibold leading-tight text-slate-950">
-                  {fieldHeaderTitle}
+                  {mobileCustomerHref ? (
+                    <Link
+                      href={mobileCustomerHref}
+                      className="inline-flex items-center gap-1.5 underline decoration-slate-300/90 underline-offset-4 transition-colors hover:text-blue-700 hover:decoration-blue-300"
+                    >
+                      <span>{fieldHeaderTitle}</span>
+                      <ChevronRightIcon className="h-4 w-4 text-slate-500" />
+                    </Link>
+                  ) : (
+                    fieldHeaderTitle
+                  )}
                 </h1>
-                <div className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-sm font-semibold text-slate-700">
-                  <span className={mobileIconChipClass}>
-                    <ClockIcon className="h-3.5 w-3.5" />
-                  </span>
-                  <span>{mobilePrimaryStateLabel}</span>
-                </div>
-                {mobileSecondaryStateLabel ? (
-                  <div className="mt-1 text-sm font-medium text-slate-600">{mobileSecondaryStateLabel}</div>
-                ) : null}
                 {serviceAddressDisplay !== "No address set" ? (
                   <div className="mt-2 flex items-start gap-1.5 text-sm font-medium text-slate-700">
                     <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
@@ -3358,11 +3371,84 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
 
             <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
-                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
-                  <div className="text-sm font-semibold text-slate-500">When</div>
-                  <div className="mt-1 text-base font-semibold">{appointmentDateLabel}</div>
-                  <div className="text-sm text-slate-600">{appointmentTimeLabel}</div>
-                </div>
+                <details id="mobile-when-panel" className="group rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+                          <ClockIcon className="h-4 w-4" />
+                          <span>When</span>
+                        </div>
+                        <div className="mt-1 text-base font-semibold">{appointmentDateLabel}</div>
+                        <div className="text-sm text-slate-700">{appointmentTimeLabel}</div>
+                      </div>
+                      <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200/70 text-slate-600 transition-transform group-open:rotate-90">
+                        <ChevronRightIcon className="h-3.5 w-3.5" />
+                      </span>
+                    </div>
+                  </summary>
+
+                  <div className="mt-3 border-t border-slate-200 pt-3">
+                    <form action={updateJobScheduleFromForm} className="space-y-3">
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-when-panel`} />
+                      <input type="hidden" name="permit_number" value={job.permit_number ?? ""} />
+                      <input type="hidden" name="jurisdiction" value={(job as any).jurisdiction ?? ""} />
+                      <input type="hidden" name="permit_date" value={(job as any).permit_date ?? ""} />
+
+                      <div className="space-y-1">
+                        <label className="text-sm font-semibold text-slate-700">Scheduled Date</label>
+                        <input
+                          type="date"
+                          name="scheduled_date"
+                          defaultValue={displayDateLA(job.scheduled_date)}
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <label className="text-sm font-semibold text-slate-700">Window Start</label>
+                          <input
+                            type="time"
+                            name="window_start"
+                            defaultValue={timeToTimeInput(job.window_start)}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                          />
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-sm font-semibold text-slate-700">Window End</label>
+                          <input
+                            type="time"
+                            name="window_end"
+                            defaultValue={timeToTimeInput(job.window_end)}
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-2">
+                        <SubmitButton
+                          loadingText="Saving..."
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-blue-700 bg-blue-700 px-4 py-2 text-base font-semibold text-white"
+                        >
+                          Save Scheduling
+                        </SubmitButton>
+
+                        {(job.scheduled_date || job.window_start || job.window_end) ? (
+                          <UnscheduleButton className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800" />
+                        ) : null}
+
+                        <Link
+                          href={`/jobs/${job.id}?tab=${tab}`}
+                          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800"
+                        >
+                          Close
+                        </Link>
+                      </div>
+                    </form>
+                  </div>
+                </details>
                 <div className="rounded-xl bg-slate-50 px-3 py-2.5">
                   <div className="text-sm font-semibold text-slate-500">Work</div>
                   <div className="mt-1 text-base font-semibold">{job.job_type === "service" ? "Service" : "ECC"}</div>
@@ -3410,22 +3496,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <section className="rounded-2xl border border-blue-200 bg-white px-4 py-3.5 shadow-[0_16px_28px_-26px_rgba(29,78,216,0.24)]">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-lg font-semibold">Next Step</div>
-              </div>
-              <div className="flex items-center gap-2 pt-1 text-right text-base font-medium text-slate-600">
-                <span aria-hidden className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-slate-500">
-                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M3 8h8" />
-                    <path d="m8 5 3 3-3 3" />
-                  </svg>
-                </span>
-                <span>
-                  {isFieldComplete
-                    ? "Complete"
-                    : job.status === "completed"
-                    ? "Closeout"
-                    : nextStatusLabel(job.status)}
-                </span>
+                <div className="text-lg font-semibold">Status &amp; Next Step</div>
+                <div className="mt-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Current Status</div>
+                <div className="mt-0.5 text-base font-semibold text-slate-800">{mobileCurrentStatusLabel}</div>
               </div>
             </div>
 
@@ -3524,12 +3597,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     <span>ECC Test</span>
                   </span>
                 </Link>
-              ) : showMobileStartInvoiceAction ? (
+              ) : showMobileServiceInvoiceFieldAction ? (
                 internalInvoiceTruth ? (
                   <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={mobileFieldActionClass}>
                     <span className="inline-flex items-center gap-2">
                       <ReceiptIcon className="h-4.5 w-4.5" />
-                      <span>Start Invoice</span>
+                      <span>View Invoice</span>
                     </span>
                   </Link>
                 ) : (
@@ -3545,6 +3618,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     </SubmitButton>
                   </form>
                 )
+              ) : job.job_type === "service" ? (
+                <a href="#mobile-work-scope" className={mobileFieldActionClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <ToolIcon className="h-4.5 w-4.5" />
+                    <span>Add Work</span>
+                  </span>
+                </a>
               ) : (
                 <span className={mobileDisabledActionClass}>
                   <span className="inline-flex items-center gap-2">
@@ -3601,7 +3681,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </Suspense>
           </section>
 
-          {(showEccNotice || sp?.schedule_required === "1" || activeWaitingState || showExternalDataEntryPrompt || showInternalInvoicingPlaceholder || markVisitCountedLinkId || suggestedNextDueProjection || isCloseoutPending) ? (
+          {(showEccNotice || sp?.schedule_required === "1" || activeWaitingState || showExternalDataEntryPrompt || showInternalInvoicingPlaceholder || showMobileInvoiceOpenAttention || markVisitCountedLinkId || suggestedNextDueProjection || isCloseoutPending) ? (
             <section className="space-y-2">
               {showEccNotice ? (
                 <div className={mobileAttentionStripClass}>
@@ -3675,6 +3755,21 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   </div>
                 ) : null}
 
+                {showMobileInvoiceOpenAttention ? (
+                  <div className="rounded-xl border border-blue-300/70 bg-blue-50/70 px-3 py-2 text-sm leading-5 text-blue-950">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <span className="inline-flex items-center gap-1.5 font-semibold"><ReceiptIcon className="h-4 w-4" />Invoice open</span>
+                        <span className="text-blue-900/90"> · </span>
+                        <span>View invoice</span>
+                      </div>
+                      <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-blue-300 bg-white px-3 py-1.5 text-sm font-semibold text-blue-900 transition-colors hover:bg-blue-100">
+                        View
+                      </Link>
+                    </div>
+                  </div>
+                ) : null}
+
                 {isCloseoutPending ? (
                   <div className={mobileAttentionStripClass}>
                     <span className="inline-flex items-center gap-1.5 font-semibold"><WarningIcon className="h-4 w-4" />Closeout open</span>
@@ -3726,7 +3821,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </section>
           ) : null}
 
-          <section className={mobileSectionClass}>
+          <section id="mobile-work-scope" className={mobileSectionClass}>
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-lg font-semibold">Work Scope</div>
@@ -3909,16 +4004,43 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <div className="space-y-2">
                 <div className="inline-flex items-center gap-1.5 text-sm font-semibold tracking-[0.08em] text-slate-600"><ToolIcon className="h-4 w-4" />Tools</div>
                 <div className="grid gap-3">
-                  {job.customer_id ? (
-                    <Link href={`/customers/${job.customer_id}`} className={mobileToolLinkClass}>Open Customer</Link>
-                  ) : null}
                   {createEstimateFromJobHref ? (
                     <Link href={createEstimateFromJobHref} className={mobileToolLinkClass}>Create Estimate</Link>
+                  ) : null}
+                  {isInternalUser && job.job_type === "service" ? (
+                    <details id="mobile-follow-up-job" className="group">
+                      <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
+                        <span className="inline-flex items-center gap-2"><ToolIcon className="h-4.5 w-4.5" />Create Follow-Up Job</span>
+                      </summary>
+                      <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
+                        <form action={createNextServiceVisitFromForm} className="space-y-3">
+                          <input type="hidden" name="job_id" value={job.id} />
+                          <input type="hidden" name="tab" value={tab} />
+                          <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-follow-up-job`} />
+
+                          <div className="space-y-1">
+                            <label className="text-sm font-semibold text-slate-700">Reason for follow-up</label>
+                            <input
+                              type="text"
+                              name="next_visit_reason"
+                              required
+                              maxLength={220}
+                              placeholder="Example: return to complete repair"
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                            />
+                          </div>
+
+                          <SubmitButton loadingText="Creating..." className={mobileToolLinkClass}>
+                            Create Follow-Up Job
+                          </SubmitButton>
+                        </form>
+                      </div>
+                    </details>
                   ) : null}
                   {job.job_type === "ecc" && !showMobileEccTestAction ? (
                     <Link href={`/jobs/${job.id}/tests`} className={mobileToolLinkClass}>ECC Test</Link>
                   ) : null}
-                  {!showMobileStartInvoiceAction ? showInternalInvoicePanel ? (
+                  {!showMobileServiceInvoiceFieldAction && showInternalInvoicePanel && mobileInvoiceActionRelevant ? (
                     internalInvoiceTruth ? (
                       <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={mobileToolLinkClass}>
                         Open Invoice Workspace
@@ -3933,8 +4055,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                         </SubmitButton>
                       </form>
                     )
-                  ) : (
-                    <span className={mobileMutedToolLinkClass}>Billing: {billingState.statusLabel}</span>
                   ) : null}
                 </div>
               </div>
@@ -3973,14 +4093,31 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 </div>
               </details>
 
-              <TimedServiceStatusActions
-                jobId={job.id}
-                billingMode={billingMode}
-                jobType={job.job_type}
-                opsStatus={job.ops_status}
-                timingEnabled={timingEnabled}
-                onPhaseTiming={recordBlockingPhase}
-              />
+              <details id="mobile-contact-logging" className="group">
+                <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
+                  <span className="inline-flex items-center gap-2"><PhoneIcon className="h-4.5 w-4.5" />Contact Logging</span>
+                </summary>
+                <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
+                  <ContactLoggingQuickActions
+                    jobId={String(job.id)}
+                    attemptCount={attemptCount}
+                    lastAttemptLabel={lastAttemptLabel}
+                    action={logCustomerContactAttemptFromForm}
+                    buttonClassName={`${mobileMutedToolLinkClass} w-full text-sm`}
+                  />
+                </div>
+              </details>
+
+              {job.job_type !== "service" ? (
+                <TimedServiceStatusActions
+                  jobId={job.id}
+                  billingMode={billingMode}
+                  jobType={job.job_type}
+                  opsStatus={job.ops_status}
+                  timingEnabled={timingEnabled}
+                  onPhaseTiming={recordBlockingPhase}
+                />
+              ) : null}
 
               <details className="group">
                 <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
