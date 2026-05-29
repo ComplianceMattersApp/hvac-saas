@@ -7012,15 +7012,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   <p className="mt-2 text-xs leading-5 text-slate-600">No tests recorded yet.</p>
                 )}
               </div>
-
-              <div className="mt-3">
-                <Link
-                  href={`/jobs/${job.id}/tests`}
-                  className={darkButtonClass}
-                >
-                  Open Tests Workspace
-                </Link>
-              </div>
             </div>
           </details>
         ) : null}
