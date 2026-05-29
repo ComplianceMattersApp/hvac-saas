@@ -41,6 +41,30 @@ Date: 2026-05-08
 - Panel surfaces open attention items, category, attempt status, timestamp, recommended operator action, and safe context metadata; no retry action is exposed.
 - This remains visibility-only: no Stripe calls, no payment/allocation/invoice mutations, no visit/next_due mutation, and no customer email/SMS/portal update-card flow launch in this slice.
 - Deferred lanes remain locked: 6H-D manual retry action, 6H-E failed/`requires_action` sandbox smoke, and customer communication/self-service update-card flows.
+
+### Phase 6H-D Closeout (Manual Retry for Failed Scheduled Autopay)
+
+- Phase 6H-D is complete in commit `c3ea465987ac138822b01c914839c6ec62a696fa`.
+- Added manual retry helper/action/UI affordance for retry-eligible failed scheduled-autopay attention through the sanctioned invoice-workspace action path.
+- Retry action behavior is guardrailed: it creates a new retry attempt in `tenant_saved_method_payment_attempts` and does not directly write `internal_invoice_payments`, does not directly write `internal_invoice_payment_allocations`, and does not directly mutate invoice paid/balance state.
+- Source-of-truth lock remains unchanged: `tenant_saved_method_payment_attempts` = attempt/attention truth; `internal_invoice_payments` = payment-event truth; `internal_invoice_payment_allocations` = allocation truth; Stripe = processor/payment-method truth.
+- Operational boundaries remain unchanged: no direct `maintenance_agreement_visits` mutation and no direct `maintenance_agreements.next_due_date` mutation.
+- Successful retry-settlement smoke remains optional/future and should only run when a valid saved-card path can be safely exercised through sanctioned flows.
+
+### Phase 6H-E Closeout (Declined-Path Manual Retry Smoke, Sandbox-Only)
+
+- 6H-E cleanup/stabilization is complete: E2/E3/E4 restored clean fixture baseline and consent/method coherence through sanctioned helpers with no code/docs/schema commits in that cleanup lane.
+- 6H-E5 is complete in commit `d5dd4f918b0178157dbcb54edd5f9203a9b943e3` with sanctioned billing-anchor job path (`linkBillingAnchorJobFromForm`) and no invoice/payment/allocation/Stripe/visit/next_due side effects.
+- 6H-E5B is complete in commit `b12e1cc6e934d2d4c0203104d3e393387890619c`, hard-blocking cancelled/canceled/closed/void/voided/archived/soft-deleted jobs as billing anchors.
+- 6H-E6 declined-path smoke is complete and validated for customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6`, billing period `c89c4c36-a842-40e2-9b20-745dce4b959c`, job `1a52288c-78ae-4e79-9472-d00ed928f32f`, invoice `INV-20260529-DDC200B6` (`3d5edb10-8695-42ab-a133-54bd64e4a2a0`).
+- Scheduled attempt `6d9120a4-d571-41a0-8ad3-b5172ac39275` ended `failed_declined` with failure "Your card was declined."; sanctioned manual retry created attempt `980c90c2-745f-470f-aa86-e2ba5b30fbc0` with `retry_count = 1` and `failed_declined`.
+- Stripe listener captured `charge.failed` and `payment_intent.payment_failed`; webhook POSTs returned HTTP 200.
+- Post-smoke truth was correct and non-silent: one failed `internal_invoice_payments` row (non-collected payment-event truth), one inactive `internal_invoice_payment_allocations` row (non-counting allocation truth), canonical invoice summary unpaid, paid amount `0`, balance `1750`.
+- Invoice paid/balance projection remains derived from recorded collected payment truth only; failed payment rows are non-collected and inactive allocations do not count toward paid balance.
+- Declined retry remained unpaid and visible in attention surfaces; no direct invoice paid mutation and no direct payment/allocation writes from retry action occurred.
+- Customer email/SMS/portal update-card flows remain deferred.
+- Next required visibility lane before production-grade scheduled autopay rollout: Failed Payment Alert + Reconciliation Queue, because failed payments must not occur silently.
+
 ### Phase 6G-E4 Closeout (Fresh Scheduled Autopay Submit Smoke, Docs-Only)
 
 - Phase 6G-E4 passed after the 6G-E3 self-attempt revalidation fix in commit `c7329a8a9b19d392f6dd7196ca7145f86d62e713`.
