@@ -27,6 +27,7 @@ import {
   cancelMaintenanceAgreementBillingPeriodFromForm,
   createMaintenanceAgreementBillingPeriodFromForm,
   generateDraftInvoiceFromBillingPeriodFromForm,
+  linkBillingAnchorJobFromForm,
   linkInternalInvoiceToBillingPeriodFromForm,
   unlinkInternalInvoiceFromBillingPeriodFromForm,
   updateMaintenanceAgreementBillingPeriodFromForm,
@@ -877,6 +878,7 @@ export default async function CustomerDetailPage(props: {
   const updateBillingPeriodAction = updateMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
   const cancelBillingPeriodAction = cancelMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
   const generateDraftInvoiceFromBillingPeriodAction = generateDraftInvoiceFromBillingPeriodFromForm.bind(null, customerPath);
+  const linkBillingAnchorJobAction = linkBillingAnchorJobFromForm.bind(null, customerPath);
   const linkBillingPeriodInvoiceAction = linkInternalInvoiceToBillingPeriodFromForm.bind(null, customerPath);
   const unlinkBillingPeriodInvoiceAction = unlinkInternalInvoiceFromBillingPeriodFromForm.bind(null, customerPath);
   const startSavedPaymentMethodSetupAction = startCustomerSavedPaymentMethodSetupFromForm.bind(null, customerPath);
@@ -914,6 +916,11 @@ export default async function CustomerDetailPage(props: {
             Draft invoice generated from billing period. No invoice was issued, sent, emailed, charged, or linked to payment.
           </div>
         )}
+        {billingPeriodBanner === "billing_period_anchor_linked" && (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Billing anchor job linked to service plan. This does not complete a service visit, create an invoice, send an invoice, or charge a customer.
+          </div>
+        )}
         {billingPeriodBanner === "saved_payment_method_setup_returned" && (
           <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
             Saved card setup returned from Stripe. Final saved-method status is recorded after webhook verification.
@@ -924,11 +931,14 @@ export default async function CustomerDetailPage(props: {
             Saved card setup was cancelled before completion. No charge was created and autopay remains off.
           </div>
         )}
-        {(billingPeriodBanner === "validation_error" || billingPeriodBanner === "duplicate_or_overlap_error" || billingPeriodBanner === "access_denied" || billingPeriodBanner === "billing_period_invoice_link_denied" || billingPeriodBanner === "billing_period_invoice_link_invalid" || billingPeriodBanner === "billing_period_invoice_link_conflict" || billingPeriodBanner === "billing_period_invoice_unlink_reason_required" || billingPeriodBanner === "billing_period_invoice_generate_denied" || billingPeriodBanner === "billing_period_invoice_generate_invalid" || billingPeriodBanner === "billing_period_invoice_generate_anchor_invalid" || billingPeriodBanner === "billing_period_invoice_generate_conflict") && (
+        {(billingPeriodBanner === "validation_error" || billingPeriodBanner === "duplicate_or_overlap_error" || billingPeriodBanner === "access_denied" || billingPeriodBanner === "billing_period_anchor_link_denied" || billingPeriodBanner === "billing_period_anchor_link_invalid" || billingPeriodBanner === "billing_period_anchor_link_conflict" || billingPeriodBanner === "billing_period_invoice_link_denied" || billingPeriodBanner === "billing_period_invoice_link_invalid" || billingPeriodBanner === "billing_period_invoice_link_conflict" || billingPeriodBanner === "billing_period_invoice_unlink_reason_required" || billingPeriodBanner === "billing_period_invoice_generate_denied" || billingPeriodBanner === "billing_period_invoice_generate_invalid" || billingPeriodBanner === "billing_period_invoice_generate_anchor_invalid" || billingPeriodBanner === "billing_period_invoice_generate_conflict") && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
             {billingPeriodBanner === "validation_error" && "Could not save billing period. Verify the required fields and status/posture rules."}
             {billingPeriodBanner === "duplicate_or_overlap_error" && "A billing period with the same or overlapping coverage window already exists for this agreement."}
             {billingPeriodBanner === "access_denied" && "You do not have permission to manage billing periods for this customer."}
+            {billingPeriodBanner === "billing_period_anchor_link_denied" && "You do not have permission to link billing anchor jobs for this customer."}
+            {billingPeriodBanner === "billing_period_anchor_link_invalid" && "Could not link billing anchor job. Verify billing period eligibility, account scope, customer match, and anchor job id."}
+            {billingPeriodBanner === "billing_period_anchor_link_conflict" && "Could not link billing anchor job. Billing period is already invoice-linked or the selected job already has an active invoice."}
             {billingPeriodBanner === "billing_period_invoice_link_denied" && "You do not have permission to link or unlink invoices on billing periods for this customer."}
             {billingPeriodBanner === "billing_period_invoice_link_invalid" && "Could not link invoice. Verify the invoice belongs to this customer and is eligible for linking."}
             {billingPeriodBanner === "billing_period_invoice_link_conflict" && "Could not link invoice. It is already linked to another billing period or conflicts with this billing period."}
@@ -2674,6 +2684,39 @@ export default async function CustomerDetailPage(props: {
                                                 className="inline-flex items-center rounded-lg border border-sky-200 bg-white px-4 py-2 text-sm font-medium text-sky-700 hover:bg-sky-100"
                                               >
                                                 Link Existing Invoice
+                                              </button>
+                                            </div>
+                                          </form>
+                                        </details>
+                                      ) : null}
+
+                                      {canGenerateDraftInvoice ? (
+                                        <details className="rounded-lg border border-violet-200 bg-violet-50 p-3">
+                                          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-violet-700">
+                                            Create Billing Anchor Job Link
+                                          </summary>
+                                          <form action={linkBillingAnchorJobAction} className="mt-3 grid gap-3">
+                                            <input type="hidden" name="billing_period_id" value={billingPeriod.id} />
+                                            <div>
+                                              <label className="mb-1 block text-xs font-medium text-violet-800">Anchor Job ID</label>
+                                              <input
+                                                name="anchor_job_id"
+                                                type="text"
+                                                required
+                                                placeholder="00000000-0000-0000-0000-000000000000"
+                                                className="w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm text-slate-900"
+                                              />
+                                            </div>
+                                            <div className="space-y-1 text-xs text-violet-800">
+                                              <div>Create billing anchor job link.</div>
+                                              <div>Creates a job link for billing-period draft invoice generation only. This does not complete a service visit, create an invoice, send an invoice, or charge a customer.</div>
+                                            </div>
+                                            <div>
+                                              <button
+                                                type="submit"
+                                                className="inline-flex items-center rounded-lg border border-violet-200 bg-white px-4 py-2 text-sm font-medium text-violet-700 hover:bg-violet-100"
+                                              >
+                                                Create billing anchor job
                                               </button>
                                             </div>
                                           </form>

@@ -10,6 +10,10 @@ type Banner =
   | "created"
   | "updated"
   | "cancelled"
+  | "billing_period_anchor_linked"
+  | "billing_period_anchor_link_denied"
+  | "billing_period_anchor_link_invalid"
+  | "billing_period_anchor_link_conflict"
   | "validation_error"
   | "duplicate_or_overlap_error"
   | "access_denied"
@@ -91,6 +95,11 @@ type UnlinkInput = {
 };
 
 type GenerateDraftInvoiceInput = {
+  billingPeriodId: string;
+  anchorJobId: string;
+};
+
+type LinkBillingAnchorInput = {
   billingPeriodId: string;
   anchorJobId: string;
 };
@@ -391,6 +400,22 @@ function parseGenerateDraftInvoiceForm(formData: FormData) {
       billingPeriodId: billingPeriodId.value as string,
       anchorJobId: anchorJobId.value as string,
     } satisfies GenerateDraftInvoiceInput,
+  };
+}
+
+function parseLinkBillingAnchorForm(formData: FormData) {
+  const billingPeriodId = parseUuid(formData.get("billing_period_id"), "Billing period", true);
+  if (!billingPeriodId.ok) return billingPeriodId;
+
+  const anchorJobId = parseUuid(formData.get("anchor_job_id"), "Anchor job", true);
+  if (!anchorJobId.ok) return anchorJobId;
+
+  return {
+    ok: true as const,
+    value: {
+      billingPeriodId: billingPeriodId.value as string,
+      anchorJobId: anchorJobId.value as string,
+    } satisfies LinkBillingAnchorInput,
   };
 }
 
@@ -744,8 +769,16 @@ function rejectInvoiceGenerateDenied(customerPath: string | null | undefined): n
   redirectToCustomerProfile(customerPath, "billing_period_invoice_generate_denied");
 }
 
+function rejectBillingAnchorLinkDenied(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_anchor_link_denied");
+}
+
 function rejectInvoiceGenerateInvalid(customerPath: string | null | undefined): never {
   redirectToCustomerProfile(customerPath, "billing_period_invoice_generate_invalid");
+}
+
+function rejectBillingAnchorLinkInvalid(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_anchor_link_invalid");
 }
 
 function rejectInvoiceGenerateAnchorInvalid(customerPath: string | null | undefined): never {
@@ -754,6 +787,10 @@ function rejectInvoiceGenerateAnchorInvalid(customerPath: string | null | undefi
 
 function rejectInvoiceGenerateConflict(customerPath: string | null | undefined): never {
   redirectToCustomerProfile(customerPath, "billing_period_invoice_generate_conflict");
+}
+
+function rejectBillingAnchorLinkConflict(customerPath: string | null | undefined): never {
+  redirectToCustomerProfile(customerPath, "billing_period_anchor_link_conflict");
 }
 
 function buildCreatePayload(
@@ -1304,6 +1341,118 @@ async function generateDraftInvoiceFromBillingPeriod(customerPath: string, formD
   redirectToCustomerProfile(customerPath, "billing_period_invoice_generated");
 }
 
+async function linkBillingAnchorJobToBillingPeriod(customerPath: string, formData: FormData) {
+  const access = await resolveInternalUserAccess(customerPath, "billing_period_anchor_link_denied");
+  const parsed = parseLinkBillingAnchorForm(formData);
+  if (!parsed.ok) {
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  const admin = createAdminClient();
+  const billingPeriodResult = await loadBillingPeriod(admin, parsed.value.billingPeriodId);
+  if (!billingPeriodResult.ok) {
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  const billingPeriod = billingPeriodResult.billingPeriod;
+  if (billingPeriod.account_owner_user_id !== access.internalUser.account_owner_user_id) {
+    rejectBillingAnchorLinkDenied(customerPath);
+  }
+
+  if (clean(billingPeriod.billing_period_status).toLowerCase() === "cancelled") {
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  if (billingPeriod.internal_invoice_id) {
+    rejectBillingAnchorLinkConflict(customerPath);
+  }
+
+  const agreementResult = await loadAgreement(admin, billingPeriod.maintenance_agreement_id);
+  if (!agreementResult.ok) {
+    if (agreementResult.accessDenied) {
+      rejectBillingAnchorLinkDenied(customerPath);
+    }
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  const agreement = agreementResult.agreement;
+  if (agreement.account_owner_user_id !== access.internalUser.account_owner_user_id) {
+    rejectBillingAnchorLinkDenied(customerPath);
+  }
+
+  const { data: fullBillingPeriod, error: fullBillingPeriodError } = await admin
+    .from("maintenance_agreement_billing_periods")
+    .select("amount_due_cents, billing_posture")
+    .eq("id", billingPeriod.id)
+    .maybeSingle();
+  if (fullBillingPeriodError) throw fullBillingPeriodError;
+  if (!fullBillingPeriod) {
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  const amountDueCents = Number(fullBillingPeriod.amount_due_cents ?? 0);
+  if (!Number.isInteger(amountDueCents) || amountDueCents <= 0) {
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  if (clean(fullBillingPeriod.billing_posture).toLowerCase() !== "internal_invoice") {
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  const anchorJobResult = await loadAnchorJob(admin, parsed.value.anchorJobId);
+  if (!anchorJobResult.ok) {
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  const anchorJob = anchorJobResult.job;
+  if (anchorJob.customer_id && anchorJob.customer_id !== agreement.customer_id) {
+    rejectBillingAnchorLinkInvalid(customerPath);
+  }
+
+  const { data: existingInvoiceForAnchorJob, error: existingInvoiceError } = await admin
+    .from("internal_invoices")
+    .select("id")
+    .eq("account_owner_user_id", agreement.account_owner_user_id)
+    .eq("job_id", anchorJob.id)
+    .neq("status", "void")
+    .maybeSingle();
+  if (existingInvoiceError) throw existingInvoiceError;
+  if (existingInvoiceForAnchorJob?.id) {
+    rejectBillingAnchorLinkConflict(customerPath);
+  }
+
+  const linkedToAgreement = await hasInvoiceJobLinkedToAgreement({
+    admin,
+    accountOwnerUserId: agreement.account_owner_user_id,
+    agreementId: agreement.id,
+    jobId: anchorJob.id,
+  });
+
+  if (!linkedToAgreement) {
+    const { error: linkError } = await admin
+      .from("maintenance_agreement_visits")
+      .insert({
+        account_owner_user_id: agreement.account_owner_user_id,
+        agreement_id: agreement.id,
+        job_id: anchorJob.id,
+        link_source: "manual",
+        count_status: "linked",
+        counts_toward_visit_balance: false,
+        created_by_user_id: access.userId,
+        updated_by_user_id: access.userId,
+      });
+
+    if (linkError) {
+      if (linkError.code === "23505") {
+        rejectBillingAnchorLinkConflict(customerPath);
+      }
+      throw linkError;
+    }
+  }
+
+  redirectToCustomerProfile(customerPath, "billing_period_anchor_linked");
+}
+
 export async function createMaintenanceAgreementBillingPeriodFromForm(
   customerPath: string,
   formData: FormData,
@@ -1344,4 +1493,11 @@ export async function generateDraftInvoiceFromBillingPeriodFromForm(
   formData: FormData,
 ) {
   await generateDraftInvoiceFromBillingPeriod(customerPath, formData);
+}
+
+export async function linkBillingAnchorJobFromForm(
+  customerPath: string,
+  formData: FormData,
+) {
+  await linkBillingAnchorJobToBillingPeriod(customerPath, formData);
 }

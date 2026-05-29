@@ -74,6 +74,7 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Billing period updated.");
     expect(customerPageSource).toContain("Billing period cancelled.");
     expect(customerPageSource).toContain("Generate Draft Invoice");
+    expect(customerPageSource).toContain("Create billing anchor job");
     expect(customerPageSource).toContain("anchor_job_id");
     expect(customerPageSource).toContain("canGenerateDraftInvoice");
     expect(customerPageSource).toContain("You do not have permission to manage billing periods for this customer.");
@@ -102,6 +103,18 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("!billingPeriod.internal_invoice_id");
     expect(customerPageSource).toContain("billingPeriod.billing_posture === \"internal_invoice\"");
     expect(customerPageSource).toContain("Number(billingPeriod.amount_due_cents) > 0");
+  });
+
+  it("wires billing anchor job link control inside eligible billing period blocks", () => {
+    expect(customerPageSource).toContain("linkBillingAnchorJobFromForm");
+    expect(customerPageSource).toContain("linkBillingAnchorJobAction");
+    expect(customerPageSource).toContain("Create Billing Anchor Job Link");
+    expect(customerPageSource).toContain("Create billing anchor job");
+    expect(customerPageSource).toContain(
+      "Creates a job link for billing-period draft invoice generation only. This does not complete a service visit, create an invoice, send an invoice, or charge a customer.",
+    );
+    expect(customerPageSource).toContain("anchor_job_id");
+    expect(customerPageSource).toContain("canGenerateDraftInvoice");
   });
 
   it("wires Link Existing Invoice control inside billing period block", () => {
@@ -135,6 +148,10 @@ describe("customer detail relationship hub wiring", () => {
 
   it("wires new billing-period invoice link banners", () => {
     expect(customerPageSource).toContain("billing_period_invoice_linked");
+    expect(customerPageSource).toContain("billing_period_anchor_linked");
+    expect(customerPageSource).toContain("billing_period_anchor_link_denied");
+    expect(customerPageSource).toContain("billing_period_anchor_link_invalid");
+    expect(customerPageSource).toContain("billing_period_anchor_link_conflict");
     expect(customerPageSource).toContain("billing_period_invoice_unlinked");
     expect(customerPageSource).toContain("billing_period_invoice_link_denied");
     expect(customerPageSource).toContain("billing_period_invoice_link_invalid");
@@ -145,6 +162,9 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("billing_period_invoice_generate_invalid");
     expect(customerPageSource).toContain("billing_period_invoice_generate_anchor_invalid");
     expect(customerPageSource).toContain("billing_period_invoice_generate_conflict");
+    expect(customerPageSource).toContain(
+      "Billing anchor job linked to service plan. This does not complete a service visit, create an invoice, send an invoice, or charge a customer.",
+    );
     expect(customerPageSource).toContain(
       "Billing period linked to existing invoice for visibility. No invoice was generated, sent, or charged.",
     );
