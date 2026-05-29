@@ -9,6 +9,75 @@ import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 import EquipmentEditCard from "../_components/EquipmentEditCard";
 import EquipmentCreateForm from "../_components/EquipmentCreateForm";
+import JobSubpageContextHeader from "../_components/JobSubpageContextHeader";
+
+function formatTimeDisplay(time?: string | null) {
+  if (!time) return "";
+  return String(time).slice(0, 5);
+}
+
+function formatAppointmentDate(value?: string | null) {
+  if (!value) return "No appointment scheduled";
+  const parsed = new Date(`${value}T00:00:00`);
+  if (!Number.isFinite(parsed.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(parsed);
+}
+
+function formatAppointmentTime(start?: string | null, end?: string | null, hasDate?: boolean) {
+  if (start && end) return `${formatTimeDisplay(start)}-${formatTimeDisplay(end)}`;
+  if (start) return `Starts ${formatTimeDisplay(start)}`;
+  if (end) return `Ends ${formatTimeDisplay(end)}`;
+  return hasDate ? "Time window TBD" : "No time window set";
+}
+
+function formatStatusLabel(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return "Unknown";
+
+  const mapped: Record<string, string> = {
+    open: "Open",
+    on_the_way: "On The Way",
+    in_process: "In Process",
+    completed: "Completed",
+    failed: "Failed",
+    cancelled: "Cancelled",
+  };
+
+  return mapped[normalized] ?? normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatOpsStatusLabel(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return "No ops status";
+
+  const mapped: Record<string, string> = {
+    need_to_schedule: "Need to Schedule",
+    scheduled: "Scheduled",
+    on_the_way: "On The Way",
+    in_process: "In Progress",
+    pending_info: "Pending Info",
+    pending_office_review: "Pending Office Review",
+    on_hold: "On Hold",
+    failed: "Failed",
+    retest_needed: "Retest Needed",
+    paperwork_required: "Paperwork Required",
+    invoice_required: "Invoice Required",
+    closed: "Closed",
+  };
+
+  return mapped[normalized] ?? normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function formatJobTypeLabel(value?: string | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (!normalized) return "Service";
+  if (normalized === "ecc") return "ECC";
+  return normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+}
 
 export default async function JobInfoPage({
   params,
@@ -56,8 +125,16 @@ const { data: job, error } = await supabase
     `
     id,
     title,
+    status,
+    ops_status,
     city,
+    job_address,
     job_type,
+    customer_first_name,
+    customer_last_name,
+    scheduled_date,
+    window_start,
+    window_end,
     job_equipment (
       id,
       equipment_role,
@@ -91,20 +168,44 @@ if (!job) return notFound();
 
   if (systemsErr) throw systemsErr;
 
+    const customerName =
+      [job.customer_first_name, job.customer_last_name]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+        .join(" ") || "Customer not set";
+
+    const addressLabel =
+      [job.job_address, job.city]
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean)
+        .join(", ") || "No service address set";
+
+    const appointmentLabel = `${formatAppointmentDate(job.scheduled_date)} • ${formatAppointmentTime(
+      job.window_start,
+      job.window_end,
+      !!job.scheduled_date,
+    )}`;
+
+    const normalizedStatus = String(job.status ?? "").trim().toLowerCase();
+    const normalizedOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+
   return (
     <div className="min-h-screen bg-gray-50/50 p-4 sm:p-6">
       <div className="mx-auto max-w-3xl space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Equipment Capture</div>
-            <h1 className="mt-1 text-2xl font-bold text-gray-950">{normalizeRetestLinkedJobTitle(job.title) || "Job"}</h1>
-            <p className="mt-2 text-sm text-gray-600">{job.city ?? "—"}</p>
-          </div>
-          <Link href={`/jobs/${job.id}`} className="shrink-0 px-3 py-2 text-sm font-medium text-gray-700 rounded-md border border-gray-200 hover:bg-gray-50 transition-colors">
-            ← Back
-          </Link>
-        </div>
+          <JobSubpageContextHeader
+            workspaceLabel="Job Subpage"
+            workspaceTitle="Equipment Capture"
+            customerName={customerName}
+            jobTitle={normalizeRetestLinkedJobTitle(job.title) || "Job"}
+            addressLabel={addressLabel}
+            appointmentLabel={appointmentLabel}
+            jobTypeLabel={formatJobTypeLabel(job.job_type)}
+            fieldStatusLabel={formatStatusLabel(job.status)}
+            opsStatusLabel={formatOpsStatusLabel(job.ops_status)}
+            fieldStatusKey={normalizedStatus}
+            opsStatusKey={normalizedOpsStatus}
+            backHref={`/jobs/${job.id}`}
+          />
 
         {/* Hub */}
         {!focused ? (
@@ -143,7 +244,7 @@ if (!job) return notFound();
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-blue-900">Next step</p>
-                    <p className="mt-1 text-sm text-blue-800">Once equipment is captured, run or complete ECC tests for this job.</p>
+                    <p className="mt-1 text-sm text-blue-800">Equipment captured? Continue to ECC tests.</p>
                   </div>
                   <Link
                     href={`/jobs/${job.id}/tests`}
