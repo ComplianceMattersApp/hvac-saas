@@ -322,7 +322,8 @@ export default function JobAttachmentsInternal({
       </div>
 
       <div className="p-4 space-y-4">
-        <input
+        <div className="space-y-4">
+          <input
           ref={fileRef}
           type="file"
           multiple
@@ -331,57 +332,58 @@ export default function JobAttachmentsInternal({
           onChange={onPickFiles}
           className="hidden"
           disabled={isPending}
-        />
+          />
 
-        {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
-        {ok ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{ok}</div> : null}
+          {error ? <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
+          {ok ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{ok}</div> : null}
 
-        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={openPicker}
+              disabled={isPending}
+              className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-50"
+            >
+              {isImageCaptureMode ? "Take or Choose Photo" : "Choose Files"}
+            </button>
+
+            <div className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
+              {hasFiles
+                ? `Selected: ${files.length} file${files.length === 1 ? "" : "s"}`
+                : "No files selected"}
+            </div>
+          </div>
+
+          <input
+            value={caption}
+            onChange={(e) => setCaption(e.target.value)}
+            placeholder={
+              isImageCaptureMode
+                ? "Optional caption (e.g., Refrigerant charge verification photo)"
+                : "Optional caption (e.g., gauges, nameplate, permit photo)"
+            }
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400"
+            disabled={isPending}
+          />
+
+          <textarea
+            value={note}
+            onChange={(e) => setNote(e.target.value)}
+            placeholder="Optional note for this upload batch..."
+            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400"
+            rows={3}
+            disabled={isPending}
+          />
+
           <button
             type="button"
-            onClick={openPicker}
-            disabled={isPending}
-            className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-50"
-          >
-            {isImageCaptureMode ? "Take or Choose Photo" : "Choose Files"}
-          </button>
-
-          <div className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
-            {hasFiles
-              ? `Selected: ${files.length} file${files.length === 1 ? "" : "s"}`
-              : "No files selected"}
-          </div>
-        </div>
-
-        <input
-          value={caption}
-          onChange={(e) => setCaption(e.target.value)}
-          placeholder={
-            isImageCaptureMode
-              ? "Optional caption (e.g., Refrigerant charge verification photo)"
-              : "Optional caption (e.g., gauges, nameplate, permit photo)"
-          }
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400"
-          disabled={isPending}
-        />
-
-        <textarea
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          placeholder="Optional note for this upload batch..."
-          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-slate-400"
-          rows={3}
-          disabled={isPending}
-        />
-
-          <button
-          type="button"
-          onClick={uploadInternal}
-          disabled={!canAct}
+            onClick={uploadInternal}
+            disabled={!canAct}
             className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-black focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 disabled:opacity-50"
-        >
-          {isPending ? "Uploading…" : "Upload Files"}
-        </button>
+          >
+            {isPending ? "Uploading…" : "Upload Files"}
+          </button>
+        </div>
 
         <div className="border-t border-slate-200 pt-2">
           {!initialItems || initialItems.length === 0 ? (

@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, type ReactNode } from "react";
 import SubmitButton from "@/components/SubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
 import { archiveJobFromForm } from "@/lib/actions/job-actions";
@@ -576,6 +576,154 @@ function nextStatusLabel(status?: string | null) {
     cancelled: "Cancelled",
   };
   return nextMap[s] ?? "—";
+}
+
+function MobileLineIcon(props: { children: ReactNode; className?: string }) {
+  const { children, className } = props;
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.85"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className ?? "h-4 w-4"}
+      aria-hidden
+    >
+      {children}
+    </svg>
+  );
+}
+
+function UserIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M20 21a8 8 0 0 0-16 0" />
+      <circle cx="12" cy="7" r="4" />
+    </MobileLineIcon>
+  );
+}
+
+function MapPinIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M12 22s7-5.6 7-12a7 7 0 1 0-14 0c0 6.4 7 12 7 12Z" />
+      <circle cx="12" cy="10" r="2.5" />
+    </MobileLineIcon>
+  );
+}
+
+function PhoneIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2A19.8 19.8 0 0 1 11.2 19a19.4 19.4 0 0 1-6.1-6.1A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.8 2.6a2 2 0 0 1-.5 2.2L8 9.9a16 16 0 0 0 6.1 6.1l1.4-1.4a2 2 0 0 1 2.2-.5c.8.4 1.7.7 2.6.8A2 2 0 0 1 22 16.9Z" />
+    </MobileLineIcon>
+  );
+}
+
+function MessageIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M21 12a8.5 8.5 0 0 1-8.5 8.5H7l-4 2 1.4-4.2A8.5 8.5 0 1 1 21 12Z" />
+    </MobileLineIcon>
+  );
+}
+
+function ToolIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="m14 6 4 4" />
+      <path d="m6 14 4 4" />
+      <path d="m5 19 4-4" />
+      <path d="m15 9 4-4" />
+      <path d="m3 21 6-6" />
+      <path d="m15 3 6 6" />
+    </MobileLineIcon>
+  );
+}
+
+function ClipboardIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <rect x="6" y="4" width="12" height="18" rx="2" />
+      <path d="M9 4.5h6a1.5 1.5 0 0 0-3-1.5h0A1.5 1.5 0 0 0 9 4.5Z" />
+      <path d="m9 13 2.2 2.2L15 11.4" />
+    </MobileLineIcon>
+  );
+}
+
+function ReceiptIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M6 3h12v18l-2.2-1.5L13 21l-2.8-1.5L7.4 21 6 19.8V3Z" />
+      <path d="M9 8h6" />
+      <path d="M9 12h6" />
+    </MobileLineIcon>
+  );
+}
+
+function WarningIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M12 3 2.5 20h19L12 3Z" />
+      <path d="M12 9v5" />
+      <circle cx="12" cy="17" r="1" />
+    </MobileLineIcon>
+  );
+}
+
+function ClockIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </MobileLineIcon>
+  );
+}
+
+function LockIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <rect x="5" y="11" width="14" height="10" rx="2" />
+      <path d="M8 11V8a4 4 0 1 1 8 0v3" />
+    </MobileLineIcon>
+  );
+}
+
+function ChatIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M21 12a8.5 8.5 0 0 1-8.5 8.5H7l-4 2 1.4-4.2A8.5 8.5 0 1 1 21 12Z" />
+      <path d="M8.5 12h7" />
+      <path d="M8.5 15h4.5" />
+    </MobileLineIcon>
+  );
+}
+
+function SettingsIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M19.4 15a1.8 1.8 0 0 0 .4 2l.1.1a2 2 0 0 1-2.8 2.8l-.1-.1a1.8 1.8 0 0 0-2-.4 1.8 1.8 0 0 0-1 1.6V21a2 2 0 0 1-4 0v-.2a1.8 1.8 0 0 0-1-1.6 1.8 1.8 0 0 0-2 .4l-.1.1a2 2 0 0 1-2.8-2.8l.1-.1a1.8 1.8 0 0 0 .4-2 1.8 1.8 0 0 0-1.6-1H3a2 2 0 0 1 0-4h.2a1.8 1.8 0 0 0 1.6-1 1.8 1.8 0 0 0-.4-2l-.1-.1a2 2 0 0 1 2.8-2.8l.1.1a1.8 1.8 0 0 0 2 .4h0a1.8 1.8 0 0 0 1-1.6V3a2 2 0 0 1 4 0v.2a1.8 1.8 0 0 0 1 1.6h0a1.8 1.8 0 0 0 2-.4l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.8 1.8 0 0 0-.4 2v0a1.8 1.8 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.2a1.8 1.8 0 0 0-1.4.8Z" />
+    </MobileLineIcon>
+  );
+}
+
+function FolderIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="M3 7a2 2 0 0 1 2-2h5l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z" />
+    </MobileLineIcon>
+  );
+}
+
+function NavigateIcon(props: { className?: string }) {
+  return (
+    <MobileLineIcon className={props.className}>
+      <path d="m3 11 18-8-8 18-2.5-7.5L3 11Z" />
+    </MobileLineIcon>
+  );
 }
 
 function CollapsibleHeader(props: {
@@ -3128,8 +3276,794 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     return null;
   };
 
+  const mobileFieldActionClass =
+    "inline-flex min-h-14 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
+  const mobileDisabledActionClass =
+    "inline-flex min-h-14 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-base font-semibold text-slate-400";
+  const mobileSectionClass =
+    "rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]";
+  const mobileToolLinkClass =
+    "inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-900 transition-colors hover:bg-slate-50";
+  const mobileMutedToolLinkClass =
+    "inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-500";
+  const mobileAttentionStripClass =
+    "rounded-xl border-l-4 border-amber-400 bg-amber-50 px-3.5 py-2.5 text-base leading-6 text-amber-950";
+  const mobileAttentionActionClass =
+    "inline-flex min-h-10 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100";
+  const mobileIconChipClass = "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600";
+
+  const mobileLifecycleStatus = String(job.status ?? "").trim().toLowerCase();
+  const mobileOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+  const mobileLifecycleStatusLabelMap: Record<string, string> = {
+    open: "Open",
+    on_the_way: "On The Way",
+    in_process: "In Progress",
+    completed: "Completed",
+    failed: "Failed",
+    cancelled: "Cancelled",
+  };
+  const mobileLifecycleStatusLabel =
+    mobileLifecycleStatusLabelMap[mobileLifecycleStatus] ?? formatStatus(job.status);
+  const mobileOpsStatusLabel = formatOpsStatusLabel(job.ops_status);
+  const mobileFieldLifecycleActive =
+    mobileLifecycleStatus === "on_the_way" ||
+    mobileLifecycleStatus === "in_process" ||
+    (mobileLifecycleStatus === "completed" && !isFieldComplete);
+  const mobilePrimaryStateLabel = mobileFieldLifecycleActive
+    ? mobileLifecycleStatusLabel
+    : mobileLifecycleStatus === "open" && (mobileOpsStatus === "on_the_way" || mobileOpsStatus === "in_process")
+    ? mobileOpsStatus === "in_process"
+      ? "In Progress"
+      : "On The Way"
+    : mobileOpsStatusLabel;
+  const mobileSecondaryStateLabel =
+    !mobileFieldLifecycleActive &&
+    mobileOpsStatusLabel !== "—" &&
+    mobileOpsStatusLabel !== mobilePrimaryStateLabel
+      ? `Scheduling: ${mobileOpsStatusLabel}`
+      : null;
+  const showMobileEccTestAction = job.job_type === "ecc";
+  const showMobileStartInvoiceAction = job.job_type === "service" && showInternalInvoicePanel;
+
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[92rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-4 sm:p-5 lg:p-6">
+    <div className="mx-auto w-full min-w-0 max-w-[92rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
+      <div className="block min-h-screen bg-slate-100 px-3 py-4 text-slate-950 lg:hidden">
+        <div className="mx-auto max-w-lg space-y-4">
+          <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+                  <UserIcon className="h-3.5 w-3.5" />
+                  <span>{headerJobTypeLabel || "Job"}</span>
+                </div>
+                <h1 className="mt-1 break-words text-2xl font-semibold leading-tight text-slate-950">
+                  {fieldHeaderTitle}
+                </h1>
+                <div className="mt-1 inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-sm font-semibold text-slate-700">
+                  <span className={mobileIconChipClass}>
+                    <ClockIcon className="h-3.5 w-3.5" />
+                  </span>
+                  <span>{mobilePrimaryStateLabel}</span>
+                </div>
+                {mobileSecondaryStateLabel ? (
+                  <div className="mt-1 text-sm font-medium text-slate-600">{mobileSecondaryStateLabel}</div>
+                ) : null}
+                {serviceAddressDisplay !== "No address set" ? (
+                  <div className="mt-2 flex items-start gap-1.5 text-sm font-medium text-slate-700">
+                    <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                    <span className="break-words">{serviceAddressDisplay}</span>
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
+                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+                  <div className="text-sm font-semibold text-slate-500">When</div>
+                  <div className="mt-1 text-base font-semibold">{appointmentDateLabel}</div>
+                  <div className="text-sm text-slate-600">{appointmentTimeLabel}</div>
+                </div>
+                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+                  <div className="text-sm font-semibold text-slate-500">Work</div>
+                  <div className="mt-1 text-base font-semibold">{job.job_type === "service" ? "Service" : "ECC"}</div>
+                  <div className="text-sm text-slate-600">{isFieldComplete ? "Field complete" : "Field active"}</div>
+                </div>
+            </div>
+          </section>
+
+          {banner === "note_added" || banner === "follow_up_note_added" ? (
+            <FlashBanner type="success" message="Note added." />
+          ) : null}
+
+          {banner === "field_complete" ? (
+            <FlashBanner type="success" message="Field work marked complete." />
+          ) : null}
+
+          {banner === "status_updated" || banner === "ops_status_saved" || banner === "service_closeout_saved" ? (
+            <FlashBanner type="success" message="Saved." />
+          ) : null}
+
+          {banner === "on_the_way_reverted" ? (
+            <FlashBanner type="success" message="On the Way was reverted." />
+          ) : null}
+
+          {banner === "visit_scope_saved" ? (
+            <FlashBanner type="success" message="Work Items saved." />
+          ) : null}
+
+          {banner === "internal_invoice_draft_created" || banner === "internal_invoice_draft_saved" || banner === "internal_invoice_issued" ? (
+            <FlashBanner type="success" message="Invoice updated." />
+          ) : null}
+
+          {[
+            "note_add_failed",
+            "visit_scope_required",
+            "visit_scope_update_failed",
+            "internal_invoicing_billing_pending",
+            "internal_invoice_issue_blocked",
+            "internal_invoice_issue_incomplete",
+            "on_the_way_revert_unavailable",
+          ].includes(String(banner ?? "")) ? (
+            <FlashBanner type="warning" message="This action needs attention. Review the details below." />
+          ) : null}
+
+          <section className="rounded-2xl border border-blue-200 bg-white px-4 py-3.5 shadow-[0_16px_28px_-26px_rgba(29,78,216,0.24)]">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <div className="text-lg font-semibold">Next Step</div>
+              </div>
+              <div className="flex items-center gap-2 pt-1 text-right text-base font-medium text-slate-600">
+                <span aria-hidden className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                  <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 8h8" />
+                    <path d="m8 5 3 3-3 3" />
+                  </svg>
+                </span>
+                <span>
+                  {isFieldComplete
+                    ? "Complete"
+                    : job.status === "completed"
+                    ? "Closeout"
+                    : nextStatusLabel(job.status)}
+                </span>
+              </div>
+            </div>
+
+            {isFieldComplete || job.status === "completed" ? (
+              <div className="mt-1 text-base text-slate-600">
+                {isFieldComplete ? "Field work is complete." : "Finish field closeout."}
+              </div>
+            ) : null}
+
+            <div className="mt-3.5">
+              {!isFieldComplete && job.status === "completed" ? (
+                <form action={markJobFieldCompleteFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <SubmitButton
+                    loadingText="Completing..."
+                    className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-colors hover:bg-blue-800"
+                  >
+                    Mark Field Complete
+                  </SubmitButton>
+                </form>
+              ) : !isFieldComplete ? (
+                <JobFieldActionButton
+                  jobId={job.id}
+                  currentStatus={job.status}
+                  tab={tab}
+                  hasFullSchedule={hasFullSchedule}
+                  variant="fieldMode"
+                />
+              ) : (
+                <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-700 bg-emerald-700 px-5 py-2.5 text-base font-semibold text-white">
+                  Field Complete
+                </span>
+              )}
+
+              {onTheWayUndoEligibility.eligible ? (
+                <form action={revertOnTheWayFromForm} className="mt-2.5">
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="tab" value={tab} />
+                  <SubmitButton
+                    loadingText="Undoing..."
+                    className="inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-base font-semibold text-amber-900"
+                  >
+                    Undo On the Way
+                  </SubmitButton>
+                </form>
+              ) : null}
+            </div>
+          </section>
+
+          <section className={mobileSectionClass}>
+            <div className="text-lg font-semibold">Field Actions</div>
+            <div className="mt-3 grid grid-cols-2 gap-3">
+              {mobileCallHref ? (
+                <a href={mobileCallHref} className={mobileFieldActionClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <PhoneIcon className="h-4.5 w-4.5" />
+                    <span>Call</span>
+                  </span>
+                </a>
+              ) : (
+                <span className={mobileDisabledActionClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <PhoneIcon className="h-4.5 w-4.5" />
+                    <span>Call</span>
+                  </span>
+                </span>
+              )}
+
+              {mobileTextHref ? (
+                <a href={mobileTextHref} className={mobileFieldActionClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <MessageIcon className="h-4.5 w-4.5" />
+                    <span>Text</span>
+                  </span>
+                </a>
+              ) : (
+                <span className={mobileDisabledActionClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <MessageIcon className="h-4.5 w-4.5" />
+                    <span>Text</span>
+                  </span>
+                </span>
+              )}
+
+              <Link href={`/jobs/${job.id}/info?f=equipment`} className={mobileFieldActionClass}>
+                <span className="inline-flex items-center gap-2">
+                  <ToolIcon className="h-4.5 w-4.5" />
+                  <span>Equipment</span>
+                </span>
+              </Link>
+
+              {showMobileEccTestAction ? (
+                <Link href={`/jobs/${job.id}/tests`} className={mobileFieldActionClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <ClipboardIcon className="h-4.5 w-4.5" />
+                    <span>ECC Test</span>
+                  </span>
+                </Link>
+              ) : showMobileStartInvoiceAction ? (
+                internalInvoiceTruth ? (
+                  <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={mobileFieldActionClass}>
+                    <span className="inline-flex items-center gap-2">
+                      <ReceiptIcon className="h-4.5 w-4.5" />
+                      <span>Start Invoice</span>
+                    </span>
+                  </Link>
+                ) : (
+                  <form action={createInternalInvoiceDraftFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                    <SubmitButton loadingText="Starting..." className={mobileFieldActionClass}>
+                      <span className="inline-flex items-center gap-2">
+                        <ReceiptIcon className="h-4.5 w-4.5" />
+                        <span>Start Invoice</span>
+                      </span>
+                    </SubmitButton>
+                  </form>
+                )
+              ) : (
+                <span className={mobileDisabledActionClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <ReceiptIcon className="h-4.5 w-4.5" />
+                    <span>Start Invoice</span>
+                  </span>
+                </span>
+              )}
+            </div>
+          </section>
+
+          <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
+            <div className="px-4 pb-3 pt-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 text-lg font-semibold">
+                    <MapPinIcon className="h-5 w-5 text-slate-600" />
+                    <span>Service Location</span>
+                  </div>
+                  <div className="mt-1 break-words text-base leading-6 text-slate-700">{serviceAddressDisplay}</div>
+                </div>
+                {mobileNavigateHref ? (
+                  <a href={mobileNavigateHref} target="_blank" rel="noreferrer" className="shrink-0 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
+                    <span className="inline-flex items-center gap-1.5">
+                      <NavigateIcon className="h-4 w-4" />
+                      <span>Navigate</span>
+                    </span>
+                  </a>
+                ) : null}
+              </div>
+            </div>
+            <Suspense
+              fallback={
+                <JobLocationPreviewFallback
+                  addressLine1={serviceAddressLine1}
+                  addressLine2={serviceAddressLine2}
+                  city={serviceCity}
+                  state={serviceState}
+                  zip={serviceZip}
+                  className="px-4 pb-4"
+                />
+              }
+            >
+              <TimedJobLocationPreview
+                addressLine1={serviceAddressLine1}
+                addressLine2={serviceAddressLine2}
+                city={serviceCity}
+                state={serviceState}
+                zip={serviceZip}
+                className="px-4 pb-4 [&_a:first-child]:rounded-xl [&_img]:h-44"
+                timingEnabled={timingEnabled}
+                onPhaseTiming={recordBlockingPhase}
+              />
+            </Suspense>
+          </section>
+
+          {(showEccNotice || sp?.schedule_required === "1" || activeWaitingState || showExternalDataEntryPrompt || showInternalInvoicingPlaceholder || markVisitCountedLinkId || suggestedNextDueProjection || isCloseoutPending) ? (
+            <section className="space-y-2">
+              {showEccNotice ? (
+                <div className={mobileAttentionStripClass}>
+                  <span className="inline-flex items-center gap-1.5 font-semibold"><WarningIcon className="h-4 w-4" />ECC test needed</span>
+                  <span> / complete one test run before Field Complete.</span>
+                  <Link href={`/jobs/${job.id}/tests`} className="ml-2 font-semibold underline underline-offset-2">
+                    Open Tests
+                  </Link>
+                </div>
+              ) : null}
+
+              {sp?.schedule_required === "1" ? (
+                <div className={mobileAttentionStripClass}>
+                  <span className="inline-flex items-center gap-1.5 font-semibold"><ClockIcon className="h-4 w-4" />Schedule missing</span>
+                  <span> / continuing can auto-fill today.</span>
+                </div>
+              ) : null}
+
+                {activeWaitingState ? (
+                  <div className={mobileAttentionStripClass}>
+                    <span className="inline-flex items-center gap-1.5 font-semibold"><ClockIcon className="h-4 w-4" />Waiting</span>
+                    <span> / {activeWaitingState.blockerReason || "progress is paused."}</span>
+                    {canShowWaitingReleaseQuickAction ? (
+                      <form action={releaseAndReevaluateFromForm} className="mt-2">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <SubmitButton loadingText="Updating..." className={mobileAttentionActionClass}>
+                          Ready to Continue
+                        </SubmitButton>
+                      </form>
+                    ) : null}
+                  </div>
+                ) : null}
+
+                {showExternalDataEntryPrompt ? (
+                  <div className={mobileAttentionStripClass}>
+                    <div className="flex items-center justify-between gap-3">
+                      <div><span className="inline-flex items-center gap-1.5 font-semibold"><ReceiptIcon className="h-4 w-4" />Invoice required</span> / confirm external billing.</div>
+                      <form action={completeDataEntryFromForm} className="shrink-0">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <SubmitButton loadingText="Saving..." className={mobileAttentionActionClass}>
+                          Mark Done
+                        </SubmitButton>
+                      </form>
+                    </div>
+                  </div>
+                ) : null}
+
+                {showInternalInvoicingPlaceholder ? (
+                  <div className="rounded-xl border border-amber-300/70 bg-amber-50/70 px-3 py-2 text-sm leading-5 text-amber-950">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <span className="inline-flex items-center gap-1.5 font-semibold"><ReceiptIcon className="h-4 w-4" />Invoice required</span>
+                        <span className="text-amber-900/90"> · </span>
+                        <span>{internalInvoiceTruth ? "Open invoice" : "Start invoice"}</span>
+                      </div>
+                      {internalInvoiceTruth ? (
+                        <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100">
+                          Open invoice
+                        </Link>
+                      ) : (
+                        <form action={createInternalInvoiceDraftFromForm} className="shrink-0">
+                          <input type="hidden" name="job_id" value={job.id} />
+                          <input type="hidden" name="tab" value={tab} />
+                          <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                          <SubmitButton loadingText="Starting..." className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100">
+                            Start invoice
+                          </SubmitButton>
+                        </form>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+
+                {isCloseoutPending ? (
+                  <div className={mobileAttentionStripClass}>
+                    <span className="inline-flex items-center gap-1.5 font-semibold"><WarningIcon className="h-4 w-4" />Closeout open</span>
+                    <span>
+                      {" / "}
+                      {closeoutNeeds.needsInvoice && closeoutNeeds.needsCerts
+                        ? "Invoice and certs are still pending."
+                        : closeoutNeeds.needsCerts
+                        ? "Certs are still pending."
+                        : closeoutNeeds.needsInvoice
+                        ? "Invoice is still pending."
+                        : "Review closeout status."}
+                    </span>
+                  </div>
+                ) : null}
+
+                {markVisitCountedLinkId ? (
+                  <div className={mobileAttentionStripClass}>
+                    <div><span className="inline-flex items-center gap-1.5 font-semibold"><ClockIcon className="h-4 w-4" />Service Plan</span> / visit may count toward {markVisitCountedAgreementName || "the plan"}.</div>
+                    <div className="mt-2">
+                      <MarkVisitCountedActionButton jobId={String(job.id)} linkId={markVisitCountedLinkId} tab={tab} />
+                    </div>
+                  </div>
+                ) : null}
+
+                {suggestedNextDueProjection ? (
+                  <div className={mobileAttentionStripClass}>
+                    <div>
+                      <span className="inline-flex items-center gap-1.5 font-semibold"><ClockIcon className="h-4 w-4" />Suggested next due</span>
+                      <span> / </span>
+                      {suggestedNextDueProjection.manualSchedulingRequired
+                        ? "Manual scheduling required."
+                        : formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || "Manual scheduling required."}
+                    </div>
+                    {!confirmedNextDueContext && !suggestedNextDueProjection.manualSchedulingRequired && suggestedNextDueProjection.suggestedNextDueDate ? (
+                      <div className="mt-2">
+                        <ConfirmNextDueDateActionButton
+                          jobId={String(job.id)}
+                          agreementId={suggestedNextDueProjection.agreementId}
+                          suggestedNextDueDate={suggestedNextDueProjection.suggestedNextDueDate}
+                          baselineNextDueDate={suggestedNextDueProjection.baselineNextDueDate || ""}
+                          displayDate={formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
+                          tab={tab}
+                        />
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+            </section>
+          ) : null}
+
+          <section className={mobileSectionClass}>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-lg font-semibold">Work Scope</div>
+                <div className="mt-1 text-base text-slate-600">
+                  {visitScopeCount} item{visitScopeCount === 1 ? "" : "s"} added
+                </div>
+              </div>
+              <a href="#mobile-tools" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
+                Tools
+              </a>
+            </div>
+
+            <div className="mt-4 space-y-3">
+              <div className="rounded-xl bg-slate-50 px-3 py-3">
+                <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
+                <div className="mt-1 whitespace-pre-wrap break-words text-lg font-semibold leading-7 text-slate-950">
+                  {visitReasonText}
+                </div>
+              </div>
+
+              {primaryVisitScopeItems.length > 0 ? (
+                <div className="space-y-2">
+                  {primaryVisitScopeItems.slice(0, 2).map((item, index) => (
+                    <div key={`mobile-primary-${index}-${item.title}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                      <div className="text-base font-semibold leading-6 text-slate-950">{item.title}</div>
+                      {item.details ? (
+                        <div className="mt-1 whitespace-pre-wrap break-words text-base leading-6 text-slate-700">{item.details}</div>
+                      ) : null}
+                    </div>
+                  ))}
+                  {primaryVisitScopeItems.length > 2 ? (
+                    <div className="text-base font-semibold text-slate-600">
+                      +{primaryVisitScopeItems.length - 2} more work item{primaryVisitScopeItems.length - 2 === 1 ? "" : "s"}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {shouldShowWorkSummary ? (
+                <details className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                  <summary className="cursor-pointer list-none text-base font-semibold text-slate-900">
+                    Work Summary
+                  </summary>
+                  <div className="mt-2 whitespace-pre-wrap break-words border-t border-slate-200 pt-2 text-base leading-6 text-slate-700">
+                    {visitScopeSummary}
+                  </div>
+                </details>
+              ) : null}
+
+              {isInternalUser ? (
+                <details className="group rounded-xl border border-blue-200 bg-blue-50/60 px-3 py-3">
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-base font-semibold text-slate-950">
+                          {hasVisitScopeDefined ? "Adjust Work" : "Add Work"}
+                        </div>
+                        <div className="mt-0.5 text-sm text-slate-600">Quick Add / Pricebook / Custom</div>
+                      </div>
+                      <span className="rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white">
+                        Open
+                      </span>
+                    </div>
+                  </summary>
+                  <div className="mt-3 border-t border-slate-200 pt-3">
+                    <VisitScopeJobDetailForm
+                      jobId={job.id}
+                      jobType={job.job_type === "service" ? "service" : "ecc"}
+                      tab={tab}
+                      initialSummary={visitScopeSummary}
+                      initialItems={visitScopeItems}
+                      pricebookTemplateItems={visitScopePricebookTemplates}
+                      primaryButtonClass={primaryButtonClass}
+                    />
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          </section>
+
+          <section id="mobile-notes-hub" className={mobileSectionClass}>
+            <div className="flex items-center justify-between gap-3">
+              <div className="inline-flex items-center gap-1.5 text-lg font-semibold">
+                <FolderIcon className="h-5 w-5 text-slate-600" />
+                <span>Notes & Attachments</span>
+              </div>
+              <Link
+                href={`/jobs/${job.id}/attachments`}
+                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+              >
+                Attachments
+              </Link>
+            </div>
+            <div className="mt-3 grid gap-3">
+              <details id="mobile-internal-notes" className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3" open={Boolean(internalNoteBannerMessage)}>
+                <summary className="cursor-pointer list-none">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="inline-flex items-center gap-1.5 text-base font-semibold text-slate-950"><LockIcon className="h-4 w-4 text-slate-600" />Internal Notes</div>
+                    <div className="text-sm font-semibold text-slate-500">{internalNotesMeta || "Team only"}</div>
+                  </div>
+                </summary>
+                <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
+                  {internalNoteBannerMessage ? (
+                    <FlashBanner
+                      type={internalNoteBannerType as "success" | "warning" | "error"}
+                      message={internalNoteBannerMessage}
+                    />
+                  ) : null}
+                  <InternalNoteMentionComposer
+                    action={addInternalNoteFromForm}
+                    jobId={String(job.id)}
+                    tab={tab}
+                    candidates={internalTagCandidates}
+                    textareaClassName={`${workspaceTextareaClass} text-base`}
+                    selectClassName={workspaceInputClass}
+                    helperTextClassName="text-sm leading-5 text-slate-500"
+                    buttonClassName={secondaryButtonClass}
+                    returnAnchor="mobile-internal-notes"
+                  />
+                  <Suspense fallback={<NarrativeNotesBodyFallback />}>
+                    <DeferredInternalNotesBody
+                      jobId={String(job.id)}
+                      timelineJobIds={narrativeScopeJobIds}
+                      hasDirectNarrativeChain={hasDirectNarrativeChain}
+                      emptyStateClassName={workspaceEmptyStateClass}
+                    />
+                  </Suspense>
+                </div>
+              </details>
+
+              {showSharedNotesCard ? (
+                <details id="mobile-shared-notes" className="rounded-2xl border border-slate-200 bg-white px-3 py-3" open={Boolean(sharedNoteBannerMessage)}>
+                  <summary className="cursor-pointer list-none">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="inline-flex items-center gap-1.5 text-base font-semibold text-slate-950"><ChatIcon className="h-4 w-4 text-slate-600" />Shared Notes</div>
+                      <div className="text-sm font-semibold text-slate-500">{sharedNotesMeta || "Shared"}</div>
+                    </div>
+                  </summary>
+                  <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
+                    {sharedNoteBannerMessage ? (
+                      <FlashBanner
+                        type={sharedNoteBannerType as "success" | "warning" | "error"}
+                        message={sharedNoteBannerMessage}
+                      />
+                    ) : null}
+                    <form action={addPublicNoteFromForm} className="space-y-3">
+                      <input type="hidden" name="note_scope" value="shared" />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-shared-notes`} />
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="tab" value={tab} />
+                      <textarea
+                        name="note"
+                        rows={3}
+                        placeholder="Add a shared note..."
+                        className={`${workspaceTextareaClass} text-base`}
+                      />
+                      <SubmitButton loadingText="Adding note..." className={secondaryButtonClass}>
+                        Save shared note
+                      </SubmitButton>
+                    </form>
+                    <Suspense fallback={<NarrativeNotesBodyFallback />}>
+                      <DeferredSharedNotesBody
+                        jobId={String(job.id)}
+                        timelineJobIds={narrativeScopeJobIds}
+                        hasDirectNarrativeChain={hasDirectNarrativeChain}
+                        emptyStateClassName={workspaceEmptyStateClass}
+                      />
+                    </Suspense>
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          </section>
+
+          <details id="mobile-tools" className="rounded-2xl border border-slate-300 bg-white px-4 py-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.32)]">
+            <summary className="cursor-pointer list-none text-lg font-semibold text-slate-950">
+              More Details / Tools
+            </summary>
+            <div className="mt-4 space-y-4 border-t border-slate-200 pt-4">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-1.5 text-sm font-semibold tracking-[0.08em] text-slate-600"><ToolIcon className="h-4 w-4" />Tools</div>
+                <div className="grid gap-3">
+                  {job.customer_id ? (
+                    <Link href={`/customers/${job.customer_id}`} className={mobileToolLinkClass}>Open Customer</Link>
+                  ) : null}
+                  {createEstimateFromJobHref ? (
+                    <Link href={createEstimateFromJobHref} className={mobileToolLinkClass}>Create Estimate</Link>
+                  ) : null}
+                  {job.job_type === "ecc" && !showMobileEccTestAction ? (
+                    <Link href={`/jobs/${job.id}/tests`} className={mobileToolLinkClass}>ECC Test</Link>
+                  ) : null}
+                  {!showMobileStartInvoiceAction ? showInternalInvoicePanel ? (
+                    internalInvoiceTruth ? (
+                      <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={mobileToolLinkClass}>
+                        Open Invoice Workspace
+                      </Link>
+                    ) : (
+                      <form action={createInternalInvoiceDraftFromForm}>
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="tab" value={tab} />
+                        <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                        <SubmitButton loadingText="Starting..." className={mobileToolLinkClass}>
+                          Start Invoice
+                        </SubmitButton>
+                      </form>
+                    )
+                  ) : (
+                    <span className={mobileMutedToolLinkClass}>Billing: {billingState.statusLabel}</span>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="inline-flex items-center gap-1.5 pt-1 text-sm font-semibold tracking-[0.08em] text-slate-600"><SettingsIcon className="h-4 w-4" />Admin</div>
+
+              <details className="group">
+                <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
+                  <span className="inline-flex items-center gap-2"><SettingsIcon className="h-4.5 w-4.5" />Job Status Tools</span>
+                </summary>
+                <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
+                  <form action={updateJobOpsFromForm} className="space-y-3">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-tools`} />
+                    <InterruptStateFields
+                      workspaceFieldLabelClass={workspaceFieldLabelClass}
+                      workspaceInputClass={workspaceInputClass}
+                      initialInterruptState={currentInterruptState as "" | "pending_info" | "on_hold" | "waiting"}
+                      initialStatusReason={initialInterruptReason}
+                      initialWaitingReasonType={initialWaitingReasonType}
+                      initialWaitingOtherReason={initialWaitingOtherReason}
+                    />
+                    <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+                      Save Interrupt State
+                    </SubmitButton>
+                  </form>
+                  {canShowReleaseAndReevaluate ? (
+                    <form action={releaseAndReevaluateFromForm} className="mt-3">
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-tools`} />
+                      <SubmitButton loadingText="Updating..." className={secondaryButtonClass}>
+                        {interruptReleaseActionLabel}
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                </div>
+              </details>
+
+              <TimedServiceStatusActions
+                jobId={job.id}
+                billingMode={billingMode}
+                jobType={job.job_type}
+                opsStatus={job.ops_status}
+                timingEnabled={timingEnabled}
+                onPhaseTiming={recordBlockingPhase}
+              />
+
+              <details className="group">
+                <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
+                  <span className="inline-flex items-center gap-2"><UserIcon className="h-4.5 w-4.5" />Assigned Team</span>
+                </summary>
+                <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
+                  {assignedTeam.length > 0 ? (
+                    <div className="space-y-2">
+                      {assignedTeam.map((assignee) => (
+                        <div key={`mobile-${assignee.job_id}-${assignee.user_id}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base font-semibold text-slate-800">
+                          {formatPersonNamePart(assignee.display_name)}
+                          {assignee.is_primary ? <span className="ml-2 text-sm text-slate-500">Primary</span> : null}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className={workspaceEmptyStateClass}>No team assigned yet.</div>
+                  )}
+                  {isInternalUser ? (
+                    <Suspense fallback={<div className="h-12 animate-pulse rounded-xl bg-slate-100" />}>
+                      <DeferredAddAssigneeForm
+                        jobId={String(job.id)}
+                        tab={tab}
+                        assignedUserIds={assignedUserIds}
+                      />
+                    </Suspense>
+                  ) : null}
+                </div>
+              </details>
+
+              <details id="mobile-tools-timeline" className="group">
+                <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
+                  <span className="inline-flex items-center gap-2"><FolderIcon className="h-4.5 w-4.5" />Timeline / History</span>
+                </summary>
+                <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
+                  <Suspense fallback={<NarrativeTimelineBodyFallback />}>
+                    <DeferredTimelineBody
+                      jobId={String(job.id)}
+                      timelineJobIds={narrativeScopeJobIds}
+                      hasDirectNarrativeChain={hasDirectNarrativeChain}
+                      emptyStateClassName={workspaceEmptyStateClass}
+                    />
+                  </Suspense>
+                </div>
+              </details>
+
+              {job.job_type === "ecc" && (showRetestSection || showCorrectionReviewResolution) ? (
+                <details className="group">
+                  <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
+                    <span className="inline-flex items-center gap-2"><WarningIcon className="h-4.5 w-4.5" />Failure Resolution</span>
+                  </summary>
+                  <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3 space-y-3">
+                    {showRetestSection ? (
+                      <form action={createRetestJobFromForm} className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+                        <input type="hidden" name="parent_job_id" value={job.id} />
+                        <label className="flex items-center gap-2 text-base text-slate-700">
+                          <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+                          Copy equipment
+                        </label>
+                        <SubmitButton loadingText="Creating..." className={darkButtonClass}>
+                          Create Retest Job
+                        </SubmitButton>
+                      </form>
+                    ) : null}
+                    {showCorrectionReviewResolution ? (
+                      <form action={resolveFailureByCorrectionReviewFromForm} className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <label className={workspaceFieldLabelClass}>Review Note</label>
+                        <textarea name="review_note" rows={3} className={workspaceTextareaClass} />
+                        <SubmitButton loadingText="Submitting..." className={darkButtonClass}>
+                          Resolve by Correction Review
+                        </SubmitButton>
+                      </form>
+                    ) : null}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div className="hidden space-y-5 lg:block">
 
 <section className={`${workspaceSectionClass} mb-6 overflow-hidden border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] shadow-[0_24px_58px_-38px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70`}>
   <div className="mb-4 border-b border-slate-200/80 pb-4">
@@ -5923,6 +6857,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
   </>
 ) : null}
+
+      </div>
 
 {timingEnabled ? <JobDetailTimingLog /> : null}
 
