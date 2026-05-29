@@ -4466,10 +4466,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     {/* Mobile-only: Workflow + Field chip summary row (hidden on lg+) */}
     <div className="mt-2 flex flex-wrap gap-2 lg:hidden">
       <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/86 px-2.5 py-1 text-xs">
+        <SettingsIcon className="h-3.5 w-3.5 text-slate-400" />
         <span className="font-semibold uppercase tracking-[0.08em] text-slate-400">Workflow</span>
         <span className="font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</span>
       </div>
       <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/86 px-2.5 py-1 text-xs">
+        <ClipboardIcon className="h-3.5 w-3.5 text-slate-400" />
         <span className="font-semibold uppercase tracking-[0.08em] text-slate-400">Field</span>
         <span className={`font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>{formatStatus(job.status)}</span>
       </div>
@@ -4477,7 +4479,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
     {job.job_type === "service" ? (
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
-        <span className="font-semibold uppercase tracking-[0.1em] text-slate-500">Work Needed</span>
+        <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-[0.1em] text-slate-500">
+          <ToolIcon className="h-3.5 w-3.5" />
+          <span>Work Needed</span>
+        </span>
         <span className="font-semibold text-slate-900">{visitScopeBadgeMainText}</span>
         <a
           href="#visit-scope-section"
@@ -4569,12 +4574,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Account Contact</div>
           <div className="mt-1 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:mt-1.5 sm:grid-cols-2">
             {customerPhone !== "—" ? (
-              <div>
+              <div className="inline-flex items-center gap-1.5">
+                <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                 <span className="font-semibold text-slate-500">Phone:</span> {customerPhone}
               </div>
             ) : null}
             {customerEmail !== "—" ? (
-              <div className="break-all">
+              <div className="inline-flex items-center gap-1.5 break-all">
+                <MessageIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
                 <span className="font-semibold text-slate-500">Email:</span> {customerEmail}
               </div>
             ) : null}
