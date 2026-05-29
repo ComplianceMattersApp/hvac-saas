@@ -8,7 +8,7 @@ type JobFieldActionButtonProps = {
   currentStatus: string;
   tab: string;
   hasFullSchedule: boolean;
-  variant?: "default" | "fieldMode";
+  variant?: "default" | "fieldMode" | "commandBar";
 };
 
 function FieldActionSubmitButton({
@@ -18,12 +18,14 @@ function FieldActionSubmitButton({
 }: {
   label: string;
   pendingLabel: string;
-  variant?: "default" | "fieldMode";
+  variant?: "default" | "fieldMode" | "commandBar";
 }) {
   const { pending } = useFormStatus();
   const className =
     variant === "fieldMode"
       ? "inline-flex min-h-14 w-full items-center justify-center whitespace-nowrap rounded-xl border border-blue-700 bg-blue-700 px-5 py-3 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-[background-color,box-shadow,transform] hover:bg-blue-800 hover:shadow-[0_20px_36px_-22px_rgba(29,78,216,0.56)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-60"
+      : variant === "commandBar"
+      ? "inline-flex min-h-10 items-center justify-center whitespace-nowrap rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_16px_28px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_18px_30px_-20px_rgba(37,99,235,0.48)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-60"
       : "inline-flex min-h-10 w-full items-center justify-center whitespace-nowrap rounded-lg border border-blue-600 bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_16px_28px_-20px_rgba(37,99,235,0.42)] transition-[background-color,box-shadow,transform] hover:bg-blue-700 hover:shadow-[0_18px_30px_-20px_rgba(37,99,235,0.48)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto";
 
   return (
@@ -74,7 +76,7 @@ export function JobFieldActionButton({
 
   return (
     <form
-      className={variant === "fieldMode" ? "w-full" : "min-w-[9.5rem] flex-1 sm:w-auto sm:min-w-0 sm:flex-none"}
+      className={variant === "fieldMode" ? "w-full" : variant === "commandBar" ? "w-auto flex-none" : "min-w-[9.5rem] flex-1 sm:w-auto sm:min-w-0 sm:flex-none"}
       action={advanceJobStatusFromForm}
       onSubmit={(e) => {
         const needsScheduleConfirm = currentStatus === "open" && !hasFullSchedule;

@@ -2450,9 +2450,6 @@ const jobStatusSummaryText = activeWaitingState
   : onHoldActive
   ? `On Hold${onHoldReasonText ? ` • ${truncateSummaryText(onHoldReasonText, 72)}` : ""}`
   : `Current lifecycle: ${formatOpsStatusLabel(job.ops_status)}`;
-const currentStateDetailText = jobStatusSummaryText === `Current lifecycle: ${formatOpsStatusLabel(job.ops_status)}`
-  ? "Lifecycle status"
-  : jobStatusSummaryText;
 const followUpSummaryText = hasFollowUpReminder
   ? [
       followUpOwnerLabel ? `For ${followUpOwnerLabel}` : null,
@@ -4304,7 +4301,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
 <section className={`${workspaceSectionClass} mb-6 overflow-hidden border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] shadow-[0_24px_58px_-38px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70`}>
   <div className="mb-4 border-b border-slate-200/80 pb-4">
-    <div className="mt-1 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+    <div className="mt-1 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
       <div className="min-w-0 max-w-3xl">
         <div className="mb-2 hidden sm:inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-800">
           Job Command Center
@@ -4324,78 +4321,53 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       </div>
       <div id="field-status-actions" className="flex w-full flex-col gap-2.5 xl:w-auto xl:min-w-[24rem] xl:items-end">
-        {!isFieldComplete ? (
-          <div className="flex w-full flex-col items-start gap-2 xl:items-end">
-            <div className="flex w-full flex-wrap justify-start gap-2 xl:justify-end">
-              <JobFieldActionButton
-                jobId={job.id}
-                currentStatus={job.status}
-                tab={tab}
-                hasFullSchedule={hasFullSchedule}
-              />
-
-              {onTheWayUndoEligibility.eligible ? (
-                <form action={revertOnTheWayFromForm} className="w-full sm:w-auto">
-                  <input type="hidden" name="job_id" value={job.id} />
-                  <input type="hidden" name="tab" value={tab} />
-                  <SubmitButton
-                    loadingText="Undoing..."
-                    className="w-full rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px] sm:w-auto"
-                  >
-                    Undo On the Way
-                  </SubmitButton>
-                </form>
-              ) : null}
-            </div>
-
-            {onTheWayUndoEligibility.eligible ? (
-              <div className="text-xs text-slate-500 xl:text-right">
-                Available only until any later job activity occurs.
-              </div>
-            ) : null}
+        {!isFieldComplete && job.status !== "completed" ? (
+          <div className="hidden w-full sm:flex xl:justify-end">
+            <JobFieldActionButton
+              jobId={job.id}
+              currentStatus={job.status}
+              tab={tab}
+              hasFullSchedule={hasFullSchedule}
+              variant="commandBar"
+            />
           </div>
-        ) : (
-          <div className="flex w-full justify-start xl:justify-end">
-            <span className="inline-flex min-h-12 w-full items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(37,99,235,0.55)] sm:min-h-10 sm:w-auto">
-              Field Complete
-            </span>
-          </div>
-        )}
+        ) : null}
 
         <div className="hidden w-full flex-wrap gap-2 sm:flex xl:justify-end">
-          <Link
-            href="/ops"
-            className={compactUtilityButtonClass}
-          >
-            Back to Ops
-          </Link>
-
-          {job.customer_id ? (
+          <div className="flex flex-wrap gap-2">
             <Link
-              href={`/customers/${job.customer_id}`}
+              href="/ops"
               className={compactUtilityButtonClass}
             >
-              Open Customer
+              Back to Ops
             </Link>
-          ) : null}
 
-          {createEstimateFromJobHref ? (
-            <Link
-              href={createEstimateFromJobHref}
-              className={compactUtilityButtonClass}
-            >
-              Create Estimate
-            </Link>
-          ) : null}
+            {job.customer_id ? (
+              <Link
+                href={`/customers/${job.customer_id}`}
+                className={compactUtilityButtonClass}
+              >
+                Open Customer
+              </Link>
+            ) : null}
 
-          {job.job_type === "ecc" ? (
-            <Link
-              href={`/jobs/${job.id}/tests`}
-              className={compactWorkspaceActionButtonClass}
-            >
-              Open Tests Workspace
-            </Link>
-          ) : null}
+            {createEstimateFromJobHref ? (
+              <Link
+                href={createEstimateFromJobHref}
+                className={compactUtilityButtonClass}
+              >
+                Create Estimate
+              </Link>
+            ) : null}
+            {job.job_type === "ecc" ? (
+              <Link
+                href={`/jobs/${job.id}/tests`}
+                className={compactWorkspaceActionButtonClass}
+              >
+                Open Tests Workspace
+              </Link>
+            ) : null}
+          </div>
         </div>
 
         <details className="sm:hidden">
@@ -4447,8 +4419,37 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       {/* Workflow — full card on lg+; compressed chip on mobile */}
       <div className="hidden rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5 lg:block">
         <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Workflow</div>
-        <div className="mt-0.5 text-sm font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</div>
-        <div className="mt-0.5 line-clamp-2 text-xs leading-5 text-slate-600">{currentStateDetailText}</div>
+        <div
+          className={`mt-0.5 inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${
+            ["invoice_required", "pending_info"].includes(String(job.ops_status ?? "").toLowerCase())
+              ? "border-amber-300 bg-amber-100 text-amber-800"
+              : String(job.ops_status ?? "").toLowerCase() === "pending_office_review"
+              ? "border-red-200 bg-red-50 text-red-800"
+              : "border-slate-200 bg-slate-50 text-slate-900"
+          }`}
+        >
+          {formatOpsStatusLabel(job.ops_status)}
+        </div>
+        <div className="mt-3 flex w-full flex-col items-start gap-2">
+          {onTheWayUndoEligibility.eligible ? (
+            <div className="flex w-full flex-col items-start gap-2">
+              <form action={revertOnTheWayFromForm} className="w-full sm:w-auto">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="tab" value={tab} />
+                <SubmitButton
+                  loadingText="Undoing..."
+                  className="w-full rounded-lg border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-900 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-200 active:translate-y-[0.5px] sm:w-auto"
+                >
+                  Undo On the Way
+                </SubmitButton>
+              </form>
+
+              <div className="text-xs text-slate-500 xl:text-right">
+                Available only until any later job activity occurs.
+              </div>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       {/* Field — full card on lg+; compressed chip on mobile */}
