@@ -18,6 +18,7 @@ type InternalNoteMentionComposerProps = {
   selectClassName: string;
   helperTextClassName: string;
   buttonClassName: string;
+  returnAnchor?: string;
 };
 
 function normalize(value: string) {
@@ -33,6 +34,7 @@ export default function InternalNoteMentionComposer({
   selectClassName,
   helperTextClassName,
   buttonClassName,
+  returnAnchor = "internal-notes",
 }: InternalNoteMentionComposerProps) {
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const [note, setNote] = useState("");
@@ -96,7 +98,7 @@ export default function InternalNoteMentionComposer({
     <form action={action} className="space-y-3">
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="tab" value={tab} />
-      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#internal-notes`} />
+      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#${returnAnchor}`} />
       <textarea
         ref={textareaRef}
         name="note"
