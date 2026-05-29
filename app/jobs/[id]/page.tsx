@@ -3377,8 +3377,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-2 gap-3 border-t border-slate-200 pt-3">
-                <details id="mobile-when-panel" className="group rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="relative mt-4 grid grid-cols-2 items-start gap-3 overflow-visible border-t border-slate-200 pt-3">
+                <details id="mobile-when-panel" className="group relative self-start rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
                   <summary className="cursor-pointer list-none">
                     <div className="flex items-start justify-between gap-2">
                       <div>
@@ -3395,65 +3395,67 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     </div>
                   </summary>
 
-                  <div className="mt-3 border-t border-slate-200 pt-3">
-                    <form action={updateJobScheduleFromForm} className="space-y-3">
-                      <input type="hidden" name="job_id" value={job.id} />
-                      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-when-panel`} />
-                      <input type="hidden" name="permit_number" value={job.permit_number ?? ""} />
-                      <input type="hidden" name="jurisdiction" value={(job as any).jurisdiction ?? ""} />
-                      <input type="hidden" name="permit_date" value={(job as any).permit_date ?? ""} />
+                  <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[calc(200%+0.75rem)] max-w-[calc(100vw-1.5rem)] group-open:block">
+                    <div className="pointer-events-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70">
+                      <form action={updateJobScheduleFromForm} className="space-y-3">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-when-panel`} />
+                        <input type="hidden" name="permit_number" value={job.permit_number ?? ""} />
+                        <input type="hidden" name="jurisdiction" value={(job as any).jurisdiction ?? ""} />
+                        <input type="hidden" name="permit_date" value={(job as any).permit_date ?? ""} />
 
-                      <div className="space-y-1">
-                        <label className="text-sm font-semibold text-slate-700">Scheduled Date</label>
-                        <input
-                          type="date"
-                          name="scheduled_date"
-                          defaultValue={displayDateLA(job.scheduled_date)}
-                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
-                        />
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2">
                         <div className="space-y-1">
-                          <label className="text-sm font-semibold text-slate-700">Window Start</label>
+                          <label className="text-sm font-semibold text-slate-700">Scheduled Date</label>
                           <input
-                            type="time"
-                            name="window_start"
-                            defaultValue={timeToTimeInput(job.window_start)}
+                            type="date"
+                            name="scheduled_date"
+                            defaultValue={displayDateLA(job.scheduled_date)}
                             className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
                           />
                         </div>
-                        <div className="space-y-1">
-                          <label className="text-sm font-semibold text-slate-700">Window End</label>
-                          <input
-                            type="time"
-                            name="window_end"
-                            defaultValue={timeToTimeInput(job.window_end)}
-                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
-                          />
+
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-sm font-semibold text-slate-700">Window Start</label>
+                            <input
+                              type="time"
+                              name="window_start"
+                              defaultValue={timeToTimeInput(job.window_start)}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-sm font-semibold text-slate-700">Window End</label>
+                            <input
+                              type="time"
+                              name="window_end"
+                              defaultValue={timeToTimeInput(job.window_end)}
+                              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
+                            />
+                          </div>
                         </div>
-                      </div>
 
-                      <div className="grid grid-cols-1 gap-2">
-                        <SubmitButton
-                          loadingText="Saving..."
-                          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-blue-700 bg-blue-700 px-4 py-2 text-base font-semibold text-white"
-                        >
-                          Save Scheduling
-                        </SubmitButton>
+                        <div className="grid grid-cols-1 gap-2">
+                          <SubmitButton
+                            loadingText="Saving..."
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-blue-700 bg-blue-700 px-4 py-2 text-base font-semibold text-white"
+                          >
+                            Save Scheduling
+                          </SubmitButton>
 
-                        {(job.scheduled_date || job.window_start || job.window_end) ? (
-                          <UnscheduleButton className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800" />
-                        ) : null}
+                          {(job.scheduled_date || job.window_start || job.window_end) ? (
+                            <UnscheduleButton className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800" />
+                          ) : null}
 
-                        <Link
-                          href={`/jobs/${job.id}?tab=${tab}`}
-                          className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800"
-                        >
-                          Close
-                        </Link>
-                      </div>
-                    </form>
+                          <Link
+                            href={`/jobs/${job.id}?tab=${tab}`}
+                            className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800"
+                          >
+                            Close
+                          </Link>
+                        </div>
+                      </form>
+                    </div>
                   </div>
                 </details>
                 <div className="rounded-xl bg-slate-50 px-3 py-2.5">
