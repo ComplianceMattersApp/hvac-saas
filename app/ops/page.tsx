@@ -5,6 +5,8 @@ import { Clock3 } from "lucide-react";
 import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
+import { canViewFinancialRegister } from "@/lib/auth/financial-access";
+import { loadFailedPaymentReconciliationItems } from "@/lib/business/failed-payment-reconciliation-read-model";
 
 import {
   formatBusinessDateUS,
@@ -182,6 +184,45 @@ function formatTeamClockElapsedFromClockIn(clockInAt: string | null | undefined)
   if (hours <= 0) return `${minutes}m`;
   return `${hours}h ${minutes}m`;
 }
+
+function formatUsdFromCents(cents: number | null | undefined) {
+  const amount = Number(cents ?? 0) / 100;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(Number.isFinite(amount) ? amount : 0);
+}
+
+function formatFailedPaymentCategoryLabel(category: string | null | undefined) {
+  const normalized = String(category ?? "").trim().toLowerCase();
+  if (normalized === "payment_declined") return "Declined";
+  if (normalized === "authentication_required") return "Requires action";
+  if (normalized === "precondition_blocked") return "Blocked precondition";
+  return "Unknown failure";
+}
+
+function formatFailedPaymentRecommendedActionLabel(action: string | null | undefined) {
+  const normalized = String(action ?? "").trim().toLowerCase();
+  if (normalized === "review_payment_method") return "Review payment method";
+  if (normalized === "request_customer_authentication") return "Request customer authentication";
+  if (normalized === "fix_payment_setup") return "Fix payment setup";
+  if (normalized === "retry_after_review") return "Review before retry";
+  return "No action available";
+}
+
+function formatFailedPaymentOpenedAt(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "-";
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) return "-";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
 function startOfTomorrowLocalISO() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -242,6 +283,24 @@ export default async function OpsPage({
 
   const internalUser = actorContext.internalUser;
   if (opsTimingEnabled) console.log(`[ops:requestActorContext] ${Date.now() - _t_requestActorContext}ms`);
+
+  const canViewFailedPaymentAttention = canViewFinancialRegister({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const failedPaymentReconciliation = canViewFailedPaymentAttention
+    ? await loadFailedPaymentReconciliationItems({
+      admin: supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      limit: 5,
+    })
+    : null;
+
+  const showFailedPaymentAttentionCard =
+    canViewFailedPaymentAttention
+    && (failedPaymentReconciliation?.summary.openCount ?? 0) > 0;
 
   const showTeamClockStatusCardForRole =
     internalUser.role === "admin" || internalUser.role === "office";
@@ -2410,6 +2469,16 @@ const showContractorSignalsSection = visibleSignalCards.length > 0 || Boolean(si
 // Show contractor signals for ECC/Hybrid modes, OR show collaboration signals for HVAC Service mode
 const showOperationalNotificationAwareness = (!isHvacServiceMode && showContractorSignalsSection) || isHvacServiceMode;
 
+const failedPaymentNoSideEffectContractSatisfied = showFailedPaymentAttentionCard
+  ? Boolean(
+    failedPaymentReconciliation?.noStripeCalls
+      && failedPaymentReconciliation?.noPaymentRowWrites
+      && failedPaymentReconciliation?.noAllocationRowWrites
+      && failedPaymentReconciliation?.noInvoiceMutations
+      && failedPaymentReconciliation?.noVisitOrNextDueMutations,
+  )
+  : false;
+
 const activeQueueLabel = OPS_TABS.find((t) => t.key === bucket)?.label ?? bucket;
 const activeSignalLabel =
   signal === "retest_ready"
@@ -3247,6 +3316,95 @@ if (panel !== "full_board") {
         </div>
       </section>
 
+      {showFailedPaymentAttentionCard ? (
+        <section className="rounded-2xl border border-rose-200/90 bg-rose-50/65 p-3.5 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.34)] ring-1 ring-rose-100/80 sm:p-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <div className={`${opsUtilityLabelClass} text-rose-700`}>Financial Attention</div>
+              <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-slate-950">Failed payments need attention</h2>
+              <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
+                Payment failures are not collected payments. Review the invoice workspace before retrying or contacting the customer.
+              </p>
+            </div>
+            <Link href="/reports/payments" className={inlineSectionLinkClass}>
+              Open Payments Register (payment-event truth)
+            </Link>
+          </div>
+
+          <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Open Failed</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.openCount ?? 0}</div>
+            </div>
+            <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Balance At Risk</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{formatUsdFromCents(failedPaymentReconciliation?.summary.totalBalanceDueCents)}</div>
+            </div>
+            <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Declined</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.declinedCount ?? 0}</div>
+            </div>
+            <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Requires Action</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.requiresActionCount ?? 0}</div>
+            </div>
+            <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Blocked Precondition</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.blockedPreconditionCount ?? 0}</div>
+            </div>
+            <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Retry Eligible</div>
+              <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.retryEligibleCount ?? 0}</div>
+            </div>
+          </div>
+
+          <div className="mt-2.5 flex flex-wrap gap-3 text-xs text-slate-700">
+            <div>
+              <span className="font-semibold text-slate-800">Oldest open:</span>{" "}
+              {formatFailedPaymentOpenedAt(failedPaymentReconciliation?.summary.oldestOpenedAt)}
+            </div>
+            <div>
+              <span className="font-semibold text-slate-800">Newest open:</span>{" "}
+              {formatFailedPaymentOpenedAt(failedPaymentReconciliation?.summary.newestOpenedAt)}
+            </div>
+          </div>
+
+          <div className="mt-3 space-y-2">
+            {(failedPaymentReconciliation?.items ?? []).slice(0, 5).map((item) => {
+              const invoiceWorkspaceHref = item.jobId ? `/jobs/${item.jobId}/invoice` : null;
+              return (
+                <div key={item.attemptId} className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2.5">
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-900">
+                        {item.customerDisplayName || "Customer"} · {item.invoiceNumber || item.invoiceId}
+                      </div>
+                      <div className="mt-0.5 text-xs text-slate-600">
+                        Balance due {formatUsdFromCents(item.balanceDueCents)} · {formatFailedPaymentCategoryLabel(item.failureCategory)} · {formatFailedPaymentRecommendedActionLabel(item.recommendedAction)}
+                      </div>
+                      <div className="mt-0.5 text-xs text-slate-500">
+                        {item.failureMessage || item.failureCode || item.attemptStatus}
+                      </div>
+                    </div>
+                    {invoiceWorkspaceHref ? (
+                      <Link href={invoiceWorkspaceHref} className={inlineSectionLinkClass}>Open invoice workspace</Link>
+                    ) : (
+                      <span className="text-xs text-slate-500">Invoice workspace unavailable</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {failedPaymentNoSideEffectContractSatisfied ? (
+            <div className="mt-2.5 rounded-lg border border-rose-200/80 bg-white/90 px-3 py-2 text-xs text-slate-600">
+              Read model verification: no Stripe calls and no payment/allocation/invoice/visit/next_due mutations.
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
       <section id="ops-workspace" className="rounded-3xl border border-slate-300/80 bg-white p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
           <div>
@@ -3548,6 +3706,95 @@ return (
         </div>
       </div>
     </section>
+
+    {showFailedPaymentAttentionCard ? (
+      <section className="rounded-2xl border border-rose-200/90 bg-rose-50/65 p-3.5 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.34)] ring-1 ring-rose-100/80 sm:p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className={`${opsUtilityLabelClass} text-rose-700`}>Financial Attention</div>
+            <h2 className="mt-0.5 text-lg font-semibold tracking-tight text-slate-950">Failed payments need attention</h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-700">
+              Payment failures are not collected payments. Review the invoice workspace before retrying or contacting the customer.
+            </p>
+          </div>
+          <Link href="/reports/payments" className={inlineSectionLinkClass}>
+            Open Payments Register (payment-event truth)
+          </Link>
+        </div>
+
+        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Open Failed</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.openCount ?? 0}</div>
+          </div>
+          <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Balance At Risk</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{formatUsdFromCents(failedPaymentReconciliation?.summary.totalBalanceDueCents)}</div>
+          </div>
+          <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Declined</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.declinedCount ?? 0}</div>
+          </div>
+          <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Requires Action</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.requiresActionCount ?? 0}</div>
+          </div>
+          <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Blocked Precondition</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.blockedPreconditionCount ?? 0}</div>
+          </div>
+          <div className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2">
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Retry Eligible</div>
+            <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{failedPaymentReconciliation?.summary.retryEligibleCount ?? 0}</div>
+          </div>
+        </div>
+
+        <div className="mt-2.5 flex flex-wrap gap-3 text-xs text-slate-700">
+          <div>
+            <span className="font-semibold text-slate-800">Oldest open:</span>{" "}
+            {formatFailedPaymentOpenedAt(failedPaymentReconciliation?.summary.oldestOpenedAt)}
+          </div>
+          <div>
+            <span className="font-semibold text-slate-800">Newest open:</span>{" "}
+            {formatFailedPaymentOpenedAt(failedPaymentReconciliation?.summary.newestOpenedAt)}
+          </div>
+        </div>
+
+        <div className="mt-3 space-y-2">
+          {(failedPaymentReconciliation?.items ?? []).slice(0, 5).map((item) => {
+            const invoiceWorkspaceHref = item.jobId ? `/jobs/${item.jobId}/invoice` : null;
+            return (
+              <div key={item.attemptId} className="rounded-xl border border-rose-200 bg-white/90 px-3 py-2.5">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-900">
+                      {item.customerDisplayName || "Customer"} · {item.invoiceNumber || item.invoiceId}
+                    </div>
+                    <div className="mt-0.5 text-xs text-slate-600">
+                      Balance due {formatUsdFromCents(item.balanceDueCents)} · {formatFailedPaymentCategoryLabel(item.failureCategory)} · {formatFailedPaymentRecommendedActionLabel(item.recommendedAction)}
+                    </div>
+                    <div className="mt-0.5 text-xs text-slate-500">
+                      {item.failureMessage || item.failureCode || item.attemptStatus}
+                    </div>
+                  </div>
+                  {invoiceWorkspaceHref ? (
+                    <Link href={invoiceWorkspaceHref} className={inlineSectionLinkClass}>Open invoice workspace</Link>
+                  ) : (
+                    <span className="text-xs text-slate-500">Invoice workspace unavailable</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {failedPaymentNoSideEffectContractSatisfied ? (
+          <div className="mt-2.5 rounded-lg border border-rose-200/80 bg-white/90 px-3 py-2 text-xs text-slate-600">
+            Read model verification: no Stripe calls and no payment/allocation/invoice/visit/next_due mutations.
+          </div>
+        ) : null}
+      </section>
+    ) : null}
 
     <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.88))] p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(24rem,0.75fr)]">
