@@ -8,6 +8,27 @@ const customerPageSource = readFileSync(
 );
 
 describe("customer detail relationship hub wiring", () => {
+  it("uses Customer Workspace header copy and removes legacy Entity Workspace label", () => {
+    expect(customerPageSource).toContain("Customer Workspace");
+    expect(customerPageSource).not.toContain("Entity Workspace");
+    expect(customerPageSource).toContain("Keep customer details, quick actions, and next steps in one place.");
+    expect(customerPageSource).toContain("{customerDisplayName(customer)}");
+  });
+
+  it("keeps top quick actions and summary badges available", () => {
+    expect(customerPageSource).toContain("Quick Actions");
+    expect(customerPageSource).toContain("Call");
+    expect(customerPageSource).toContain("Email");
+    expect(customerPageSource).toContain("Edit Customer");
+    expect(customerPageSource).toContain("Create Job");
+    expect(customerPageSource).toContain("Create Estimate");
+    expect(customerPageSource).toContain("open job");
+    expect(customerPageSource).toContain("location");
+    expect(customerPageSource).toContain("contact");
+    expect(customerPageSource).toContain("payment attention");
+    expect(customerPageSource).toContain("active service plan");
+  });
+
   it("uses responsible account language in overview", () => {
     expect(customerPageSource).toContain("Responsible Account");
     expect(customerPageSource).toContain("Account Contact");

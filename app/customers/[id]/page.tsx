@@ -702,6 +702,9 @@ export default async function CustomerDetailPage(props: {
   const hasDisplayableRoleContacts = customerRoleContacts.some((recipient) =>
     isDisplayableRole(recipient.recipient_role),
   );
+  const displayableRoleContactCount = customerRoleContacts.filter((recipient) =>
+    isDisplayableRole(recipient.recipient_role),
+  ).length;
   const savedBillingContact = customerRoleContacts.find((recipient) => {
     const role = String(recipient.recipient_role ?? "").trim().toLowerCase();
     const status = String(recipient.status ?? "").trim().toLowerCase();
@@ -873,6 +876,10 @@ export default async function CustomerDetailPage(props: {
       customerSavedPaymentMethods = [];
     }
   }
+  const failedPaymentAttentionCount = customerPaymentHistory.filter((payment) => payment.status === "failed").length;
+  const activeServicePlanCount = customerAgreements.filter(
+    (agreement) => String(agreement.status ?? "").trim().toLowerCase() === "active",
+  ).length;
 
   const createBillingPeriodAction = createMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
   const updateBillingPeriodAction = updateMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
@@ -1008,13 +1015,31 @@ export default async function CustomerDetailPage(props: {
             </Link>
 
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Entity Workspace</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Customer Workspace</div>
               <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-900 md:text-3xl">
                 {customerDisplayName(customer)}
               </h1>
               <p className="mt-1 text-sm text-slate-600">
-                Responsible Account Relationship Hub
+                Keep customer details, quick actions, and next steps in one place.
               </p>
+            </div>
+
+            <div className="space-y-1.5 text-sm text-slate-600">
+              <div>
+                <span className="font-medium text-slate-800">Primary contact:</span>{" "}
+                {customer.phone ? formatPhone(customer.phone) : "No phone on file"}
+                {customer.email ? ` | ${customer.email}` : ""}
+              </div>
+              <div>
+                <span className="font-medium text-slate-800">Primary service location:</span>{" "}
+                {serviceAddressFallback
+                  ? `${serviceAddressFallback.label}: ${serviceAddressFallback.address}`
+                  : "No service address on file"}
+              </div>
+              <div>
+                <span className="font-medium text-slate-800">Billing relationship:</span>{" "}
+                {hasSavedBillingContact ? "Saved billing contact on this account" : "Defaults to responsible account contact"}
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200/80 bg-white/70 p-2 text-xs text-slate-600">
@@ -1022,11 +1047,21 @@ export default async function CustomerDetailPage(props: {
                 {locations.length} location{locations.length === 1 ? "" : "s"}
               </span>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                {jobs.length} job{jobs.length === 1 ? "" : "s"}
+                {activeJobs.length} open job{activeJobs.length === 1 ? "" : "s"}
               </span>
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-                {activeJobs.length} active job{activeJobs.length === 1 ? "" : "s"}
+                {displayableRoleContactCount} contact{displayableRoleContactCount === 1 ? "" : "s"}
               </span>
+              {maintenanceAgreementsEnabled ? (
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                  {activeServicePlanCount} active service plan{activeServicePlanCount === 1 ? "" : "s"}
+                </span>
+              ) : null}
+              {canViewPaymentHistory ? (
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                  {failedPaymentAttentionCount} payment attention
+                </span>
+              ) : null}
               <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
                 Last scheduled:{" "}
                 {formatDate(lastScheduledActiveDate)}
@@ -1035,8 +1070,27 @@ export default async function CustomerDetailPage(props: {
           </div>
 
           <div className="flex flex-col items-stretch gap-3 rounded-xl border border-slate-200 bg-white/85 p-3 md:items-end">
-            {isInternalViewer ? (
+            <div className="space-y-2">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Quick Actions</div>
               <div className="flex flex-wrap gap-2">
+                {callHref ? (
+                  <a
+                    href={callHref}
+                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  >
+                    Call
+                  </a>
+                ) : null}
+                {customer.email ? (
+                  <a
+                    href={`mailto:${customer.email}`}
+                    className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+                  >
+                    Email
+                  </a>
+                ) : null}
+                {isInternalViewer ? (
+                  <>
                 <Link
                   href={`/customers/${customerId}/edit`}
                   className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
@@ -1057,10 +1111,12 @@ export default async function CustomerDetailPage(props: {
                   href={`/jobs/new?customer_id=${customerId}&source=customer`}
                   className="inline-flex items-center rounded-lg bg-black px-4 py-2 text-sm font-medium text-white hover:opacity-90"
                 >
-                  New Job for Customer
+                  Create Job
                 </Link>
+                  </>
+                ) : null}
               </div>
-            ) : null}
+            </div>
           </div>
         </div>
 
