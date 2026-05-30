@@ -39,6 +39,11 @@ type MockAgreement = {
   start_date: string;
   renewal_date: string | null;
   internal_notes: string | null;
+  source_template_id: string | null;
+  source_template_name_snapshot: string | null;
+  source_template_lifecycle_status_snapshot: string | null;
+  source_template_applied_at: string | null;
+  source_template_snapshot: Record<string, unknown> | null;
   created_by_user_id: string;
   updated_by_user_id: string;
   created_at: string;
@@ -94,6 +99,11 @@ function makeAgreement(input: Partial<MockAgreement> & { id: string }): MockAgre
     start_date: "2026-01-01",
     renewal_date: null,
     internal_notes: null,
+    source_template_id: null,
+    source_template_name_snapshot: null,
+    source_template_lifecycle_status_snapshot: null,
+    source_template_applied_at: null,
+    source_template_snapshot: null,
     created_by_user_id: "user-1",
     updated_by_user_id: "user-1",
     created_at: "2026-01-01T00:00:00Z",
@@ -520,6 +530,42 @@ describe("maintenance agreement read model", () => {
     expect(calls).toContainEqual({ op: "from", value: "maintenance_agreements" });
     expect(calls).toContainEqual({ op: "eq", column: "account_owner_user_id", value: ACCOUNT_OWNER });
     expect(calls).toContainEqual({ op: "eq", column: "customer_id", value: CUSTOMER_ID });
+  });
+
+  it("projects template provenance snapshots when present", async () => {
+    const { supabase } = makeSupabaseMock([
+      makeAgreement({
+        id: "a-provenance",
+        source_template_id: "tpl-1",
+        source_template_name_snapshot: "Seasonal Plan Template",
+        source_template_lifecycle_status_snapshot: "active",
+        source_template_applied_at: "2026-05-30T10:00:00Z",
+        source_template_snapshot: {
+          agreement_type: "service_plan",
+          frequency: "annual",
+          default_visit_scope_summary: "Seasonal maintenance walkthrough",
+          default_visit_scope_items: [{ title: "Inspect filters" }],
+          internal_notes_default: "Template note",
+        },
+      }),
+    ]);
+
+    const rows = await listMaintenanceAgreementsForCustomer({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      customerId: CUSTOMER_ID,
+    });
+
+    expect(rows[0]).toMatchObject({
+      source_template_id: "tpl-1",
+      source_template_name_snapshot: "Seasonal Plan Template",
+      source_template_lifecycle_status_snapshot: "active",
+      source_template_applied_at: "2026-05-30T10:00:00Z",
+    });
+    expect(rows[0]?.source_template_snapshot).toMatchObject({
+      agreement_type: "service_plan",
+      frequency: "annual",
+    });
   });
 
   it("lists location agreements with explicit account and location filters", async () => {

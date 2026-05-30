@@ -77,9 +77,11 @@ function makeSupabaseClient() {
 function makeAdminClient(params?: {
   customerFound?: boolean;
   locationFound?: boolean;
+  templateFound?: boolean;
 }) {
   const customerFound = params?.customerFound ?? true;
   const locationFound = params?.locationFound ?? true;
+  const templateFound = params?.templateFound ?? true;
 
   return {
     from: vi.fn((table: string) => {
@@ -102,6 +104,32 @@ function makeAdminClient(params?: {
               eq: vi.fn(() => ({
                 eq: vi.fn(() => ({
                   maybeSingle: vi.fn(async () => ({ data: locationFound ? { id: "loc-1" } : null, error: null })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "maintenance_agreement_templates") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: templateFound
+                    ? {
+                        id: "tpl-1",
+                        template_name: "Seasonal Plan Template",
+                        lifecycle_status: "active",
+                        agreement_type: "service_plan",
+                        frequency: "annual",
+                        default_visit_scope_summary: "Seasonal maintenance walkthrough",
+                        default_visit_scope_items: [{ title: "Inspect filters" }],
+                        internal_notes_default: "Template default note",
+                      }
+                    : null,
+                  error: null,
                 })),
               })),
             })),
@@ -510,6 +538,65 @@ describe("maintenance agreement actions", () => {
         },
       ],
     });
+    expect(supabase._insertCalls[0]).not.toHaveProperty("source_template_id");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("source_template_name_snapshot");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("source_template_lifecycle_status_snapshot");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("source_template_applied_at");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("source_template_snapshot");
+  });
+
+  it("captures provenance snapshot when creating from a selected template", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makeAdminClient({ templateFound: true }));
+
+    const result = await createMaintenanceAgreement({
+      customerId: "cust-1",
+      agreementName: "Plan From Template",
+      agreementType: "service_plan",
+      frequency: "annual",
+      nextDueDate: "2026-10-01",
+      startDate: "2026-05-01",
+      sourceTemplateId: "tpl-1",
+    });
+
+    expect(result).toEqual({ success: true, agreementId: "agr-1" });
+    expect(supabase._insertCalls).toHaveLength(1);
+    expect(supabase._insertCalls[0]).toMatchObject({
+      source_template_id: "tpl-1",
+      source_template_name_snapshot: "Seasonal Plan Template",
+      source_template_lifecycle_status_snapshot: "active",
+      source_template_snapshot: {
+        agreement_type: "service_plan",
+        frequency: "annual",
+        default_visit_scope_summary: "Seasonal maintenance walkthrough",
+        default_visit_scope_items: [{ title: "Inspect filters" }],
+        internal_notes_default: "Template default note",
+      },
+    });
+    expect(typeof (supabase._insertCalls[0] as any).source_template_applied_at).toBe("string");
+  });
+
+  it("fails safely when selected template is unavailable", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makeAdminClient({ templateFound: false }));
+
+    const result = await createMaintenanceAgreement({
+      customerId: "cust-1",
+      agreementName: "Plan From Missing Template",
+      agreementType: "service_plan",
+      frequency: "annual",
+      nextDueDate: "2026-10-01",
+      startDate: "2026-05-01",
+      sourceTemplateId: "tpl-missing",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Selected template is unavailable for this account.",
+    });
+    expect(supabase._insertCalls).toHaveLength(0);
   });
 
   it("rejects invalid default work items safely", async () => {
@@ -586,6 +673,11 @@ describe("maintenance agreement actions", () => {
     });
     expect(supabase._updateCalls[0]).not.toHaveProperty("customer_id");
     expect(supabase._updateCalls[0]).not.toHaveProperty("account_owner_user_id");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_id");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_name_snapshot");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_lifecycle_status_snapshot");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_applied_at");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_snapshot");
   });
 });
 

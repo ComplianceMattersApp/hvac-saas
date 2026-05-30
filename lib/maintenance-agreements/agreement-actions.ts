@@ -27,6 +27,7 @@ type CreateMaintenanceAgreementParams = {
   startDate: string;
   renewalDate?: string | null;
   primaryLocationId?: string | null;
+  sourceTemplateId?: string | null;
   defaultVisitScopeSummary?: string | null;
   defaultVisitScopeItemsJson?: string | null;
   internalNotes?: string | null;
@@ -222,6 +223,56 @@ export async function createMaintenanceAgreement(
     return { success: false, error: locationScopeResult.error };
   }
 
+  const sourceTemplateId = nullableString(params.sourceTemplateId);
+  let sourceTemplateNameSnapshot: string | null = null;
+  let sourceTemplateLifecycleStatusSnapshot: string | null = null;
+  let sourceTemplateAppliedAt: string | null = null;
+  let sourceTemplateSnapshot: Record<string, unknown> | null = null;
+
+  if (sourceTemplateId) {
+    const { data: sourceTemplate, error: sourceTemplateErr } = await scope.admin
+      .from("maintenance_agreement_templates")
+      .select(
+        [
+          "id",
+          "template_name",
+          "lifecycle_status",
+          "agreement_type",
+          "frequency",
+          "default_visit_scope_summary",
+          "default_visit_scope_items",
+          "internal_notes_default",
+        ].join(", "),
+      )
+      .eq("id", sourceTemplateId)
+      .eq("account_owner_user_id", scope.accountOwnerUserId)
+      .maybeSingle();
+
+    if (sourceTemplateErr) throw sourceTemplateErr;
+    const sourceTemplateRow = sourceTemplate as Record<string, unknown> | null;
+    if (!sourceTemplateRow?.id) {
+      return { success: false, error: "Selected template is unavailable for this account." };
+    }
+
+    sourceTemplateNameSnapshot = cleanString(sourceTemplateRow.template_name) || null;
+    sourceTemplateLifecycleStatusSnapshot =
+      cleanString(sourceTemplateRow.lifecycle_status).toLowerCase() || null;
+    sourceTemplateAppliedAt = new Date().toISOString();
+    sourceTemplateSnapshot = {
+      agreement_type: cleanString(sourceTemplateRow.agreement_type).toLowerCase() || null,
+      frequency: cleanString(sourceTemplateRow.frequency).toLowerCase() || null,
+      default_visit_scope_summary: nullableString(
+        sourceTemplateRow.default_visit_scope_summary,
+      ),
+      default_visit_scope_items: sanitizeVisitScopeItems(
+        sourceTemplateRow.default_visit_scope_items,
+      ),
+      internal_notes_default: nullableString(
+        sourceTemplateRow.internal_notes_default,
+      ),
+    };
+  }
+
   const payload = {
     account_owner_user_id: scope.accountOwnerUserId,
     customer_id: scope.customerId,
@@ -232,6 +283,15 @@ export async function createMaintenanceAgreement(
     start_date: startDateResult.value,
     renewal_date: renewalDateResult.value,
     primary_location_id: primaryLocationId,
+    ...(sourceTemplateId
+      ? {
+          source_template_id: sourceTemplateId,
+          source_template_name_snapshot: sourceTemplateNameSnapshot,
+          source_template_lifecycle_status_snapshot: sourceTemplateLifecycleStatusSnapshot,
+          source_template_applied_at: sourceTemplateAppliedAt,
+          source_template_snapshot: sourceTemplateSnapshot,
+        }
+      : {}),
     default_visit_scope_summary: nullableString(params.defaultVisitScopeSummary),
     default_visit_scope_items: defaultVisitScopeItemsResult.value,
     internal_notes: nullableString(params.internalNotes),
@@ -352,6 +412,7 @@ function toCreateParams(formData: FormData): CreateMaintenanceAgreementParams {
     startDate: cleanString(formData.get("start_date")),
     renewalDate: nullableString(formData.get("renewal_date")),
     primaryLocationId: nullableString(formData.get("primary_location_id")),
+    sourceTemplateId: nullableString(formData.get("source_template_id")),
     defaultVisitScopeSummary: nullableString(formData.get("default_visit_scope_summary")),
     defaultVisitScopeItemsJson: nullableString(formData.get("default_visit_scope_items_json")),
     internalNotes: nullableString(formData.get("internal_notes")),

@@ -204,6 +204,19 @@ function formatShortNote(value?: string | null, maxLength = 120) {
   return `${raw.slice(0, maxLength - 3).trimEnd()}...`;
 }
 
+function readTemplateSnapshotString(snapshot: Record<string, unknown> | null, key: string) {
+  if (!snapshot) return null;
+  const raw = snapshot[key];
+  const normalized = String(raw ?? "").trim();
+  return normalized || null;
+}
+
+function readTemplateSnapshotItemsCount(snapshot: Record<string, unknown> | null) {
+  if (!snapshot) return 0;
+  const items = snapshot.default_visit_scope_items;
+  return Array.isArray(items) ? sanitizeVisitScopeItems(items).length : 0;
+}
+
 function formatPhone(phone?: string | null) {
   const digits = String(phone ?? "").replace(/\D/g, "");
   if (digits.length === 10) {
@@ -2401,6 +2414,7 @@ export default async function CustomerDetailPage(props: {
               )}
               <form action={createAgreementAction} className="mt-4 grid gap-3 md:grid-cols-2">
                 <input type="hidden" name="customer_id" value={customerId} />
+                <input type="hidden" name="source_template_id" value={selectedAgreementTemplate?.id ?? ""} />
 
                 <div className="md:col-span-2">
                   <label className="mb-1 block text-xs font-medium text-slate-700">Agreement Name</label>
@@ -2532,6 +2546,21 @@ export default async function CustomerDetailPage(props: {
                 {customerAgreements.map((agr) => {
                   const normalizedAgreementType = String(agr.agreement_type).replace(/_/g, " ");
                   const normalizedFrequency = String(agr.frequency).replace(/_/g, " ");
+                  const templateSnapshot =
+                    agr.source_template_snapshot && typeof agr.source_template_snapshot === "object" && !Array.isArray(agr.source_template_snapshot)
+                      ? (agr.source_template_snapshot as Record<string, unknown>)
+                      : null;
+                  const templateSnapshotAgreementType = readTemplateSnapshotString(templateSnapshot, "agreement_type");
+                  const templateSnapshotFrequency = readTemplateSnapshotString(templateSnapshot, "frequency");
+                  const templateSnapshotVisitScopeSummary = readTemplateSnapshotString(
+                    templateSnapshot,
+                    "default_visit_scope_summary",
+                  );
+                  const templateSnapshotInternalNotes = readTemplateSnapshotString(
+                    templateSnapshot,
+                    "internal_notes_default",
+                  );
+                  const templateSnapshotItemsCount = readTemplateSnapshotItemsCount(templateSnapshot);
                   const visitLinkSummary = agreementVisitSummaryById.get(agr.id);
                   const defaultPlanItems = sanitizeAgreementDefaultVisitScopeItems(
                     agr.default_visit_scope_items,
@@ -2711,6 +2740,37 @@ export default async function CustomerDetailPage(props: {
                             </div>
                           )}
                         </div>
+
+                        {agr.source_template_name_snapshot ? (
+                          <div className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2.5">
+                            <div className="text-xs font-semibold text-blue-900">
+                              Started from template: {agr.source_template_name_snapshot}
+                            </div>
+                            <div className="mt-1 text-xs text-blue-800">
+                              Template changes do not automatically update this customer Service Plan.
+                            </div>
+                            <div className="mt-2 grid gap-x-3 gap-y-1 text-xs text-blue-900 sm:grid-cols-2 lg:grid-cols-3">
+                              <div>
+                                Template status at creation: {String(agr.source_template_lifecycle_status_snapshot ?? "unknown").replace(/_/g, " ")}
+                              </div>
+                              <div>
+                                Applied at: {agr.source_template_applied_at ? formatDate(agr.source_template_applied_at) : "-"}
+                              </div>
+                              <div>
+                                Template default type/frequency: {templateSnapshotAgreementType ? templateSnapshotAgreementType.replace(/_/g, " ") : "-"} / {templateSnapshotFrequency ? templateSnapshotFrequency.replace(/_/g, " ") : "-"}
+                              </div>
+                              <div>
+                                Template default visit summary: {templateSnapshotVisitScopeSummary || "-"}
+                              </div>
+                              <div>
+                                Template default work items: {templateSnapshotItemsCount}
+                              </div>
+                              <div>
+                                Template default internal notes: {templateSnapshotInternalNotes || "-"}
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
 
                       <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3.5 py-3">

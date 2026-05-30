@@ -84,6 +84,9 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Start from template");
     expect(customerPageSource).toContain("Load Template");
     expect(customerPageSource).toContain('name="maTemplate"');
+    expect(customerPageSource).toContain('name="source_template_id"');
+    expect(customerPageSource).toContain("Started from template:");
+    expect(customerPageSource).toContain("Template changes do not automatically update this customer Service Plan.");
     expect(customerPageSource).toContain("Billing Attention");
     expect(customerPageSource).toContain("Scheduling");
     expect(customerPageSource).toContain("Add Billing Period");

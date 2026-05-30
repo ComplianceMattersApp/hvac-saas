@@ -20,6 +20,11 @@ export const MAINTENANCE_AGREEMENT_SELECT = [
   "start_date",
   "renewal_date",
   "internal_notes",
+  "source_template_id",
+  "source_template_name_snapshot",
+  "source_template_lifecycle_status_snapshot",
+  "source_template_applied_at",
+  "source_template_snapshot",
   "created_by_user_id",
   "updated_by_user_id",
   "created_at",
@@ -89,6 +94,11 @@ export type MaintenanceAgreementRow = {
   start_date: string;
   renewal_date: string | null;
   internal_notes: string | null;
+  source_template_id: string | null;
+  source_template_name_snapshot: string | null;
+  source_template_lifecycle_status_snapshot: string | null;
+  source_template_applied_at: string | null;
+  source_template_snapshot: Record<string, unknown> | null;
   created_by_user_id: string;
   updated_by_user_id: string;
   created_at: string;
@@ -541,11 +551,22 @@ export function projectMaintenanceAgreementSuggestedNextDue(input: {
 }
 
 function normalizeAgreementRow(row: MaintenanceAgreementRow): MaintenanceAgreementRow {
+  const sourceTemplateSnapshot =
+    row.source_template_snapshot && typeof row.source_template_snapshot === "object" && !Array.isArray(row.source_template_snapshot)
+      ? row.source_template_snapshot
+      : null;
+
   return {
     ...row,
     default_visit_scope_items: Array.isArray(row.default_visit_scope_items)
       ? row.default_visit_scope_items
       : [],
+    source_template_id: toCleanString(row.source_template_id) || null,
+    source_template_name_snapshot: toCleanString(row.source_template_name_snapshot) || null,
+    source_template_lifecycle_status_snapshot:
+      toCleanString(row.source_template_lifecycle_status_snapshot) || null,
+    source_template_applied_at: toCleanString(row.source_template_applied_at) || null,
+    source_template_snapshot: sourceTemplateSnapshot,
   };
 }
 

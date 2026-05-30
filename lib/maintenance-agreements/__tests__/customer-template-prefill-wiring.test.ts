@@ -15,6 +15,7 @@ describe("customer service-plan template prefill wiring", () => {
     expect(customerPageSource).toContain("listMaintenanceAgreementTemplatesForAccount");
     expect(customerPageSource).toContain("selectedAgreementTemplate");
     expect(customerPageSource).toContain('name="maTemplate"');
+    expect(customerPageSource).toContain('name="source_template_id"');
     expect(customerPageSource).toContain("Load Template");
     expect(customerPageSource).toContain("No template (manual)");
   });
