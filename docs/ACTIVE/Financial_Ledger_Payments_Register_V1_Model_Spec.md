@@ -65,6 +65,67 @@ Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, produc
 - Customer email/SMS/portal update-card flows remain deferred.
 - Next required visibility lane before production-grade scheduled autopay rollout: Failed Payment Alert + Reconciliation Queue, because failed payments must not occur silently.
 
+### Phase 6I-A Closeout (Failed Payment Alert + Reconciliation Queue Model Lock, Docs-Only)
+
+- Scope lock: docs/audit/model only. No code changes, migrations, sandbox/production mutation, Stripe actions, read-model implementation, alert-card implementation, or queue implementation.
+- Preflight lock: branch is clean and synced (`HEAD == origin/main`) at `10aa8983645b59f46f3a5a969f79298b9694b756`; latest commit on branch is `polish(tests): standardize mobile ECC console layout`.
+- History/docs reconciliation: commit grep for `docs(payments): close failed autopay retry smoke` is empty, but failed-autopay retry closeout is clearly reflected in ACTIVE docs (6H-B/6H-C/6H-D/6H-E6 sections).
+
+Failed-payment attention definition (V1 open):
+- `tenant_saved_method_payment_attempts.attempt_kind = scheduled_autopay`.
+- `attempt_status` in `failed_declined`, `failed_requires_action`, or meaningful `blocked_precondition`.
+- not resolved by `resolved_internal_invoice_payment_id`.
+- not terminal closed by `succeeded` or `abandoned`.
+- queue relevance should prefer invoice still issued/non-void with positive balance due.
+
+Visibility rule:
+- Failed payments must not occur silently.
+- Invoice-level attention already exists, but account-level/operator-level failed-payment visibility is required before production-grade autopay rollout.
+
+Source-of-truth lock (unchanged):
+- `tenant_saved_method_payment_attempts` = attempt/attention truth.
+- `internal_invoice_payments` = payment-event truth.
+- `internal_invoice_payment_allocations` = allocation truth.
+- Stripe = processor/payment-method truth.
+- invoice paid/balance = projection from collected payment truth only.
+- visits and `maintenance_agreements.next_due_date` remain operational truth and are not payment-mutated.
+- failed payment rows are non-collected truth.
+- inactive allocations do not count toward paid balance.
+
+Recommended V1 alert surface:
+- Owner/Admin/Billing-only failed-payment attention card on Ops or admin/dashboard surface.
+- show open failed-payment count and category/severity breakout when practical.
+- link to dedicated reconciliation queue.
+- rationale: Ops/admin is daily operational control plane; Payments Register remains payment-event truth but not attempt-attention truth.
+
+Recommended V1 reconciliation queue shape:
+- separate from Payments Register.
+- read-model-backed from attempt truth with invoice/payment enrichment.
+- row fields: customer, invoice number, balance due, failure category, failure reason, last attempt time, retry eligibility, recommended action, invoice workspace link.
+- V1 actions: open invoice workspace, open customer, copy failure context; retry remains invoice-workspace action.
+- `mark acknowledged/reviewed` remains deferred unless explicitly approved later.
+
+Deferred items:
+- failed-payment email notifications.
+- failed-payment SMS notifications.
+- portal update-card flow.
+- customer self-service retry.
+- automated retry scheduling/policies.
+- successful retry-settlement smoke unless safely executable through sanctioned saved-card flows.
+- `payment_intent.payment_failed` routing unless explicitly approved in this phase.
+
+Known risks/blockers:
+- scheduled-autopay close semantics are not fully explicit in current write paths; read model closure expects `resolved_internal_invoice_payment_id` or terminal status.
+- current webhook resolver appears scoped to `manual_saved_method` attempts; scheduled-autopay resolution should be made explicit before queue close/resolution actions.
+- `payment_intent.payment_failed` is not currently routed; failure truth currently relies on `charge.failed`.
+- latest `HEAD` differs from expected failed-autopay docs-closeout commit message; docs/history reconciliation should be explicitly recorded when closing 6I-A.
+
+Proposed implementation sequence:
+- 6I-B: failed-payment reconciliation read model.
+- 6I-C: Owner/Admin/Billing alert card.
+- 6I-D: reconciliation queue UI.
+- 6I-E: sandbox smoke + docs closeout.
+
 ### Phase 6G-E4 Closeout (Fresh Scheduled Autopay Submit Smoke, Docs-Only)
 
 - Phase 6G-E4 passed after the 6G-E3 self-attempt revalidation fix in commit `c7329a8a9b19d392f6dd7196ca7145f86d62e713`.
