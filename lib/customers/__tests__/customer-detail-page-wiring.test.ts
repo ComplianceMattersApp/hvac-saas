@@ -6,6 +6,10 @@ const customerPageSource = readFileSync(
   resolve(__dirname, "../../../app/customers/[id]/page.tsx"),
   "utf8",
 );
+const paymentHistoryCardSource = readFileSync(
+  resolve(__dirname, "../../../app/customers/[id]/_components/PaymentHistoryCard.tsx"),
+  "utf8",
+);
 
 describe("customer detail relationship hub wiring", () => {
   it("uses Customer Workspace header copy and removes legacy Entity Workspace label", () => {
@@ -43,12 +47,32 @@ describe("customer detail relationship hub wiring", () => {
   });
 
   it("keeps money tab controls and saved-card setup wiring", () => {
+    expect(customerPageSource).toContain("Money Overview");
+    expect(customerPageSource).toContain("Invoice Workspace");
+    expect(customerPageSource).toContain("Payment Method");
     expect(customerPageSource).toContain('activeWorkspaceTab === "money" && canViewPaymentHistory');
     expect(customerPageSource).toContain('activeWorkspaceTab === "money" && canManageSavedPaymentMethodSetup');
     expect(customerPageSource).toContain("PaymentHistoryCard");
     expect(customerPageSource).toContain("Saved Card Setup");
+    expect(customerPageSource).toContain("Saved Card Setup");
     expect(customerPageSource).toContain("Set up saved card");
     expect(customerPageSource).toContain("startSavedPaymentMethodSetupAction");
+    expect(customerPageSource).toContain("Payment failed - not collected. Review invoice before retrying.");
+    expect(customerPageSource).toContain("Invoice-specific actions happen in the invoice workspace.");
+    expect(customerPageSource).not.toContain('activeWorkspaceTab === "money" && isInternalViewer && maintenanceAgreementsEnabled');
+    expect(customerPageSource).toContain("generateDraftInvoiceFromBillingPeriodAction");
+    expect(customerPageSource).toContain("linkBillingPeriodInvoiceAction");
+    expect(customerPageSource).toContain("unlinkBillingPeriodInvoiceAction");
+  });
+
+  it("uses readable invoice references and plain-language failed payment guidance", () => {
+    expect(paymentHistoryCardSource).toContain("Invoices & Payment History");
+    expect(paymentHistoryCardSource).toContain("Payment Attention");
+    expect(paymentHistoryCardSource).toContain("Open invoice workspace");
+    expect(paymentHistoryCardSource).toContain("Review invoice before retrying");
+    expect(paymentHistoryCardSource).toContain("formatInvoiceLabel");
+    expect(paymentHistoryCardSource).toContain("Invoice #");
+    expect(paymentHistoryCardSource).not.toContain("Failed Attempts");
   });
 
   it("keeps service-plan and billing-period controls in Service Plans tab", () => {

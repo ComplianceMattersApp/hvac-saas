@@ -13,8 +13,10 @@ export default function PaymentHistoryCard({
   customerId,
   customerName,
 }: PaymentHistoryCardProps) {
+  void customerId;
+
   const recordedPayments = payments.filter((p) => p.status === "recorded");
-  const failedAttempts = payments.filter((p) => p.status === "failed");
+  const failedPayments = payments.filter((p) => p.status === "failed");
   const otherPayments = payments.filter((p) => p.status !== "recorded" && p.status !== "failed");
 
   const hasAnyPayments = payments.length > 0;
@@ -23,28 +25,27 @@ export default function PaymentHistoryCard({
     <section className="rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
       <div className="mb-3 space-y-1">
         <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-          Payment History
+          Invoices & Payment History
         </h2>
         <p className="text-xs text-slate-600">
-          Recorded payments and failed attempts for this customer.
+          Recent customer payments and invoice destinations. Payment history is read-only here.
         </p>
       </div>
 
       {!hasAnyPayments ? (
         <div className="rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-4 text-center">
           <p className="text-xs text-slate-600">
-            No recorded payments or failed attempts for this customer yet.
+            No payment history is available for this customer yet.
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {/* Recorded Payments */}
           {recordedPayments.length > 0 && (
             <div>
               <div className="mb-1.5 flex items-center gap-2">
                 <div className="h-px flex-1 bg-emerald-200" />
                 <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
-                  Recorded ({recordedPayments.length})
+                  Collected ({recordedPayments.length})
                 </div>
                 <div className="h-px flex-1 bg-emerald-200" />
               </div>
@@ -56,25 +57,23 @@ export default function PaymentHistoryCard({
             </div>
           )}
 
-          {/* Failed Attempts */}
-          {failedAttempts.length > 0 && (
+          {failedPayments.length > 0 && (
             <div>
               <div className="mb-1.5 flex items-center gap-2">
                 <div className="h-px flex-1 bg-red-200" />
                 <div className="text-[9px] font-semibold uppercase tracking-[0.08em] text-red-700">
-                  Failed Attempts ({failedAttempts.length})
+                  Payment Attention ({failedPayments.length})
                 </div>
                 <div className="h-px flex-1 bg-red-200" />
               </div>
               <div className="space-y-2">
-                {failedAttempts.map((payment) => (
+                {failedPayments.map((payment) => (
                   <PaymentRow key={payment.paymentId} payment={payment} />
                 ))}
               </div>
             </div>
           )}
 
-          {/* Other Statuses */}
           {otherPayments.length > 0 && (
             <div>
               <div className="mb-1.5 flex items-center gap-2">
@@ -94,7 +93,6 @@ export default function PaymentHistoryCard({
         </div>
       )}
 
-      {/* Footer: Link to full register */}
       {hasAnyPayments && (
         <div className="mt-4 border-t border-slate-200 pt-3">
           <Link
@@ -114,6 +112,8 @@ function PaymentRow({
 }: {
   payment: CustomerPaymentHistoryRow;
 }) {
+  const invoiceLabel = formatInvoiceLabel(payment.invoiceNumber);
+
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50/40 p-2.5">
       <div className="flex items-center justify-between gap-2">
@@ -131,23 +131,42 @@ function PaymentRow({
               </span>
             </div>
           </div>
-          <div className="text-[9px] text-slate-600">
-            <div className="font-medium text-slate-700">
-              {payment.paidAtDisplay} • {payment.invoiceNumber}
-              {payment.jobHref && (
+          <div className="space-y-1 text-[11px] text-slate-600">
+            <div className="font-medium text-slate-700">{payment.paidAtDisplay}</div>
+            <div>
+              <span className="font-medium text-slate-700">{invoiceLabel}</span>
+              {payment.invoiceHref ? (
                 <>
-                  {" "} •{" "}
+                  {" "}•{" "}
                   <Link
-                    href={payment.jobHref}
+                    href={payment.invoiceHref}
                     className="text-blue-600 hover:underline"
                   >
-                    {payment.jobTitle}
+                    Open invoice workspace
                   </Link>
                 </>
+              ) : null}
+            </div>
+            <div>
+              Job:{" "}
+              {payment.jobHref ? (
+                <Link
+                  href={payment.jobHref}
+                  className="text-blue-600 hover:underline"
+                >
+                  {payment.jobTitle}
+                </Link>
+              ) : (
+                payment.jobTitle
               )}
             </div>
+            {payment.status === "failed" ? (
+              <div className="rounded-md border border-red-200 bg-red-50 px-2 py-1 text-red-700">
+                Payment failed - not collected. Review invoice before retrying.
+              </div>
+            ) : null}
             {payment.reference && payment.reference !== "-" && (
-              <div className="text-slate-500">Ref: {payment.reference}</div>
+              <div className="text-slate-500">Reference: {payment.reference}</div>
             )}
             {payment.notes && payment.notes !== "-" && (
               <div className="text-slate-500">{payment.notes}</div>
@@ -157,4 +176,12 @@ function PaymentRow({
       </div>
     </div>
   );
+}
+
+function formatInvoiceLabel(value: string) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized || normalized === "-") return "Invoice -";
+  if (/^invoice\b/i.test(normalized)) return normalized;
+  if (/^\d+$/.test(normalized)) return `Invoice #${normalized}`;
+  return `Invoice ${normalized}`;
 }

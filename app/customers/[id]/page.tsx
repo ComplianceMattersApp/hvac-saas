@@ -880,6 +880,11 @@ export default async function CustomerDetailPage(props: {
     }
   }
   const failedPaymentAttentionCount = customerPaymentHistory.filter((payment) => payment.status === "failed").length;
+  const collectedPaymentCount = customerPaymentHistory.filter((payment) => payment.status === "recorded").length;
+  const mostRecentPayment = customerPaymentHistory[0] ?? null;
+  const mostRecentInvoiceWorkspaceHref = customerPaymentHistory.find((payment) => payment.invoiceHref)?.invoiceHref ?? null;
+  const hasSavedCardOnFile = customerSavedPaymentMethods.length > 0;
+  const primarySavedCard = customerSavedPaymentMethods.find((method) => method.is_default) ?? customerSavedPaymentMethods[0] ?? null;
   const activeServicePlanCount = customerAgreements.filter(
     (agreement) => String(agreement.status ?? "").trim().toLowerCase() === "active",
   ).length;
@@ -1230,6 +1235,85 @@ export default async function CustomerDetailPage(props: {
         </section>
         ) : null}
 
+        {activeWorkspaceTab === "money" ? (
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-sm font-semibold text-slate-900">Money Overview</h2>
+              <p className="mt-1 text-xs text-slate-600">
+                Customer-level payment status and where to go for invoice actions.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Payment Attention</div>
+                <div className="mt-1 text-base font-semibold text-slate-900">
+                  {canViewPaymentHistory
+                    ? `${failedPaymentAttentionCount} failed payment${failedPaymentAttentionCount === 1 ? "" : "s"}`
+                    : "Limited"}
+                </div>
+                <p className="mt-1 text-xs text-slate-600">
+                  {canViewPaymentHistory
+                    ? failedPaymentAttentionCount > 0
+                      ? "Payment failed - not collected. Review invoice before retrying."
+                      : "No failed payments in recent customer history."
+                    : "Payment history access is limited for this viewer."}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Recent Payments</div>
+                <div className="mt-1 text-base font-semibold text-slate-900">
+                  {canViewPaymentHistory
+                    ? `${collectedPaymentCount} collected`
+                    : "Limited"}
+                </div>
+                <p className="mt-1 text-xs text-slate-600">
+                  {canViewPaymentHistory
+                    ? mostRecentPayment
+                      ? `Latest: ${mostRecentPayment.paidAtDisplay} - ${mostRecentPayment.amountDisplay}`
+                      : "No recent payment activity yet."
+                    : "Recent payment details are limited for this viewer."}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Saved Card</div>
+                <div className="mt-1 text-base font-semibold text-slate-900">
+                  {canManageSavedPaymentMethodSetup
+                    ? hasSavedCardOnFile
+                      ? "On file"
+                      : "Not on file"
+                    : "Limited"}
+                </div>
+                <p className="mt-1 text-xs text-slate-600">
+                  {canManageSavedPaymentMethodSetup
+                    ? primarySavedCard
+                      ? formatSavedCardLabel(primarySavedCard)
+                      : "No saved card is on file for this customer yet."
+                    : "Saved card status is limited for this viewer."}
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Invoice Workspace</div>
+                <div className="mt-1 text-base font-semibold text-slate-900">Manage Invoice & Payment</div>
+                <p className="mt-1 text-xs text-slate-600">
+                  Invoice-specific actions happen in the invoice workspace.
+                </p>
+                {mostRecentInvoiceWorkspaceHref ? (
+                  <Link
+                    href={mostRecentInvoiceWorkspaceHref}
+                    className="mt-2 inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-100"
+                  >
+                    Open invoice workspace
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
         {/* Payment History (if authorized) */}
         {activeWorkspaceTab === "money" && canViewPaymentHistory && (
           <PaymentHistoryCard
@@ -1243,7 +1327,8 @@ export default async function CustomerDetailPage(props: {
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
-                <h2 className="text-sm font-semibold text-slate-900">Saved Card Setup</h2>
+                <h2 className="text-sm font-semibold text-slate-900">Payment Method</h2>
+                <p className="text-xs font-medium text-slate-700">Saved Card Setup</p>
                 <p className="text-xs text-slate-600">
                   Card details are entered in Stripe-hosted checkout. Compliance Matters does not store full card number or CVC.
                 </p>
@@ -1291,6 +1376,12 @@ export default async function CustomerDetailPage(props: {
             </div>
           </section>
         )}
+
+        {activeWorkspaceTab === "money" && !canManageSavedPaymentMethodSetup ? (
+          <section className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 shadow-sm">
+            Saved card setup and status are limited for this viewer.
+          </section>
+        ) : null}
 
         {/* Overview + Details */}
         {(activeWorkspaceTab === "overview" || activeWorkspaceTab === "details") ? (
