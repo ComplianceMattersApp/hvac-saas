@@ -14,6 +14,12 @@
 **Authority:** Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md` and `docs/ACTIVE/Compliance_Matters_Payments_Roadmap.md`  
 **Purpose:** Define the future business/commercial layer that expands the current operational platform without regressing the live workflow or conflicting with the active spine.
 
+## Phase 6J-A Note (Platform Fee Foundation Locked)
+
+- Platform fee model foundation is locked at default `25` basis points (`0.25%`) as configurable business-layer policy.
+- Current phase scope is calculation/config only. Stripe Checkout/PaymentIntent mutation, webhook behavior changes, and payment/invoice/allocation truth changes remain deferred.
+- Fee is platform revenue (`application_fee_amount`) for Stripe Connect flows when enabled, not a customer invoice line item or surcharge in this phase.
+
 ## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
 
 - Implementation closeout is complete in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`), pushed and synced.

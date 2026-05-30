@@ -3,6 +3,14 @@
 **Status:** ACTIVE IMPLEMENTATION DIRECTION (platform-subscription V1 live platform smoke complete; tenant customer payments V1 current scope implemented and locally/sandbox validated)
 **Purpose:** Define the locked payment architecture and current-shipped V1 scope, while keeping deferred add-ons explicitly parked.
 
+## Phase 6J-A Closeout (Platform Application Fee Foundation: Config + Calculation Only)
+
+- Platform transaction fee model is now locked at default `25` basis points (`0.25%`) as a small configurable foundation value.
+- This slice is foundation-only: configuration derivation + calculation behavior. No Stripe checkout/session mutation, no saved-card/autopay PaymentIntent mutation, no webhook mutation, and no payment/allocation/invoice truth mutation were introduced.
+- Fee semantics are locked for the next implementation phase: Stripe Connect `application_fee_amount` only when enabled, never customer-facing invoice surcharge, and Compliance Matters invoice paid/balance truth remains gross-payment-based.
+- Guardrails are locked: disabled/comped/test-disabled/connect-not-ready paths skip fee application; zero/negative/unsafe amounts skip; fee must remain strictly less than charge amount; failed payments do not collect application fees.
+- Deferred to next phase: wiring this calculation into Stripe create calls after dedicated implementation and validation review.
+
 ## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
 
 - Phase 6F implementation is closed in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`) and pushed to `origin/main`.

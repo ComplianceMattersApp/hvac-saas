@@ -4,6 +4,12 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Ledger / Payments Register V1
 Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, production, recurring billing, platform fee, or ACH UI work is authorized by this spec.
 
+## Phase 6J-A Note (Platform Application Fee Foundation)
+
+- A foundation helper now locks default platform application fee math to `25` basis points (`0.25%`) with explicit skip guards and rounding behavior.
+- This model note does not authorize payment register mutation, allocation mutation, invoice truth mutation, or Stripe create-call mutation in this phase.
+- Register truth boundaries remain unchanged: collected-money truth is still webhook-confirmed `internal_invoice_payments`; allocation truth remains `internal_invoice_payment_allocations`; failed rows remain non-collected.
+
 ## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
 
 - Closed implementation commit: `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`), pushed with `HEAD == origin/main` and clean tree.
