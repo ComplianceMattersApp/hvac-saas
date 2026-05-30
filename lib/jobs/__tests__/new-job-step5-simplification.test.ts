@@ -102,9 +102,11 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).not.toContain('rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3');
   });
 
-  it("auto-expands details for newly added service scope items", () => {
+  it("keeps service row fields editable inline after add", () => {
     expect(builderSource).toContain("setItemExpanded(expandedItemId, true)");
-    expect(builderSource).toContain("open={expandedItemIds.has(item.id)}");
+    expect(builderSource).toContain("value={item.title}");
+    expect(builderSource).toContain("value={item.expected_unit_price ?? 0}");
+    expect(builderSource).toContain("value={item.details}");
   });
 
   it("preserves matched default prices and falls back to 0.00 when needed", () => {

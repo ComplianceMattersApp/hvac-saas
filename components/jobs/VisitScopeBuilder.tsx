@@ -656,78 +656,67 @@ export default function VisitScopeBuilder({
                             </button>
                           </div>
 
-                          <details
-                            className="mt-3 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2"
-                            open={expandedItemIds.has(item.id)}
-                            onToggle={(event) =>
-                              setItemExpanded(item.id, (event.currentTarget as HTMLDetailsElement).open)
-                            }
-                          >
-                            <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-700">
-                              Details
-                            </summary>
-                            <div className="mt-2.5 space-y-2">
-                              <div className="space-y-1">
-                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                                  Work To Perform
-                                </label>
-                                <input
-                                  type="text"
-                                  value={item.title}
-                                  onChange={(event) => patchItem(item.id, { title: event.target.value })}
-                                  maxLength={160}
-                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                                  placeholder="Diagnose intermittent cooling issue"
-                                />
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                                  Optional price
-                                </label>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.01"
-                                  value={item.expected_unit_price ?? 0}
-                                  onChange={(event) => {
-                                    const raw = event.target.value.trim();
-                                    if (!raw) {
-                                      patchItem(item.id, { expected_unit_price: 0 });
-                                      return;
-                                    }
-
-                                    const parsed = Number.parseFloat(raw);
-                                    if (!Number.isFinite(parsed) || parsed < 0) {
-                                      patchItem(item.id, { expected_unit_price: 0 });
-                                      return;
-                                    }
-
-                                    patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
-                                  }}
-                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                                  placeholder="0.00"
-                                />
-                                <p className="text-xs text-slate-500">
-                                  This helps with upfront context only. It does not create an invoice charge.
-                                </p>
-                              </div>
-
-                              <div className="space-y-1">
-                                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                                  Description
-                                </label>
-                                <textarea
-                                  value={item.details}
-                                  onChange={(event) => patchItem(item.id, { details: event.target.value })}
-                                  rows={2}
-                                  maxLength={500}
-                                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                                  placeholder="What should the tech complete or verify before leaving?"
-                                />
-                              </div>
+                          <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+                            <div className="space-y-1">
+                              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                Work To Perform
+                              </label>
+                              <input
+                                type="text"
+                                value={item.title}
+                                onChange={(event) => patchItem(item.id, { title: event.target.value })}
+                                maxLength={160}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                                placeholder="Diagnose intermittent cooling issue"
+                              />
                             </div>
-                          </details>
+
+                            <div className="space-y-1">
+                              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                Optional price
+                              </label>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={item.expected_unit_price ?? 0}
+                                onChange={(event) => {
+                                  const raw = event.target.value.trim();
+                                  if (!raw) {
+                                    patchItem(item.id, { expected_unit_price: 0 });
+                                    return;
+                                  }
+
+                                  const parsed = Number.parseFloat(raw);
+                                  if (!Number.isFinite(parsed) || parsed < 0) {
+                                    patchItem(item.id, { expected_unit_price: 0 });
+                                    return;
+                                  }
+
+                                  patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
+                                }}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                                placeholder="0.00"
+                              />
+                              <p className="text-xs text-slate-500">
+                                This helps with upfront context only. It does not create an invoice charge.
+                              </p>
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                                Description
+                              </label>
+                              <textarea
+                                value={item.details}
+                                onChange={(event) => patchItem(item.id, { details: event.target.value })}
+                                rows={2}
+                                maxLength={500}
+                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                                placeholder="What should the tech complete or verify before leaving?"
+                              />
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
