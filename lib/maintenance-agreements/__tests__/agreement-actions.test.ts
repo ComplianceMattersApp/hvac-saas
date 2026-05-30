@@ -79,11 +79,15 @@ function makeAdminClient(params?: {
   locationFound?: boolean;
   templateFound?: boolean;
   templateOverrides?: Record<string, unknown>;
+  agreementFound?: boolean;
+  agreementOverrides?: Record<string, unknown>;
 }) {
   const customerFound = params?.customerFound ?? true;
   const locationFound = params?.locationFound ?? true;
   const templateFound = params?.templateFound ?? true;
   const templateOverrides = params?.templateOverrides ?? {};
+  const agreementFound = params?.agreementFound ?? true;
+  const agreementOverrides = params?.agreementOverrides ?? {};
 
   return {
     from: vi.fn((table: string) => {
@@ -106,6 +110,38 @@ function makeAdminClient(params?: {
               eq: vi.fn(() => ({
                 eq: vi.fn(() => ({
                   maybeSingle: vi.fn(async () => ({ data: locationFound ? { id: "loc-1" } : null, error: null })),
+                })),
+              })),
+            })),
+          })),
+        };
+      }
+
+      if (table === "maintenance_agreements") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: agreementFound
+                      ? {
+                          id: "agr-1",
+                          customer_id: "cust-1",
+                          account_owner_user_id: "owner-1",
+                          agreement_name: "Current Service Plan",
+                          agreement_type: "maintenance",
+                          frequency: "quarterly",
+                          default_visit_scope_summary: "Current scope summary",
+                          default_visit_scope_items: [{ title: "Current item" }],
+                          template_locked_field_keys: null,
+                          template_lock_policy_version: null,
+                          template_lock_snapshot_applied_at: null,
+                          ...agreementOverrides,
+                        }
+                      : null,
+                    error: null,
+                  })),
                 })),
               })),
             })),
@@ -704,6 +740,152 @@ describe("maintenance agreement actions", () => {
     expect(supabase._updateCalls[0]).not.toHaveProperty("template_locked_field_keys");
     expect(supabase._updateCalls[0]).not.toHaveProperty("template_lock_policy_version");
     expect(supabase._updateCalls[0]).not.toHaveProperty("template_lock_snapshot_applied_at");
+  });
+
+  it("blocks locked template package field updates without mutating the agreement", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(
+      makeAdminClient({
+        agreementOverrides: {
+          agreement_name: "Locked Current Name",
+          agreement_type: "maintenance",
+          frequency: "quarterly",
+          default_visit_scope_summary: "Locked current summary",
+          default_visit_scope_items: [{ title: "Locked current item" }],
+          template_locked_field_keys: [
+            "agreement_name",
+            "agreement_type",
+            "frequency",
+            "default_visit_scope_summary",
+            "default_visit_scope_items",
+          ],
+          template_lock_policy_version: 1,
+          template_lock_snapshot_applied_at: "2026-05-30T12:00:00.000Z",
+          source_template_id: "tpl-1",
+        },
+      }),
+    );
+
+    const result = await updateMaintenanceAgreement({
+      agreementId: "agr-1",
+      customerId: "cust-1",
+      agreementName: "Edited Locked Name",
+      agreementType: "inspection",
+      frequency: "monthly",
+      nextDueDate: "2026-06-01",
+      startDate: "2026-05-01",
+      defaultVisitScopeSummary: "Edited locked summary",
+      defaultVisitScopeItemsJson: JSON.stringify([{ title: "Edited locked item" }]),
+      primaryLocationId: "loc-1",
+      renewalDate: "2026-07-01",
+      status: "active",
+      internalNotes: "Updated notes",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error:
+        "maintenance_agreement_locked_field_update_blocked: This Service Plan was created from a locked template package. Duplicate or edit the template to change package details.",
+    });
+    expect(supabase._updateCalls).toHaveLength(0);
+  });
+
+  it("allows editable fields to update on locked template-created agreements", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(
+      makeAdminClient({
+        agreementOverrides: {
+          agreement_name: "Locked Current Name",
+          agreement_type: "maintenance",
+          frequency: "quarterly",
+          default_visit_scope_summary: "Locked current summary",
+          default_visit_scope_items: [{ title: "Locked current item" }],
+          template_locked_field_keys: [
+            "agreement_name",
+            "agreement_type",
+            "frequency",
+            "default_visit_scope_summary",
+            "default_visit_scope_items",
+          ],
+          template_lock_policy_version: 1,
+          template_lock_snapshot_applied_at: "2026-05-30T12:00:00.000Z",
+          source_template_id: "tpl-1",
+        },
+      }),
+    );
+
+    const result = await updateMaintenanceAgreement({
+      agreementId: "agr-1",
+      customerId: "cust-1",
+      agreementName: "Locked Current Name",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+      nextDueDate: "2026-06-01",
+      startDate: "2026-05-01",
+      defaultVisitScopeSummary: "Locked current summary",
+      defaultVisitScopeItemsJson: JSON.stringify([{ title: "Locked current item" }]),
+      primaryLocationId: "loc-1",
+      renewalDate: "2026-07-01",
+      status: "paused",
+      internalNotes: "Editable notes",
+    });
+
+    expect(result).toEqual({ success: true, agreementId: "agr-1" });
+    expect(supabase._updateCalls).toHaveLength(1);
+    expect(supabase._updateCalls[0]).toMatchObject({
+      primary_location_id: "loc-1",
+      renewal_date: "2026-07-01",
+      status: "paused",
+      internal_notes: "Editable notes",
+    });
+    expect(supabase._updateCalls[0]).not.toHaveProperty("template_locked_field_keys");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("template_lock_policy_version");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("template_lock_snapshot_applied_at");
+  });
+
+  it("keeps source-template agreements without a lock snapshot backward-compatible", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(
+      makeAdminClient({
+        agreementOverrides: {
+          source_template_id: "tpl-1",
+          template_locked_field_keys: null,
+          template_lock_policy_version: null,
+          template_lock_snapshot_applied_at: null,
+        },
+      }),
+    );
+
+    const result = await updateMaintenanceAgreement({
+      agreementId: "agr-1",
+      customerId: "cust-1",
+      agreementName: "Updated Legacy Source Template Name",
+      agreementType: "inspection",
+      frequency: "monthly",
+      nextDueDate: "2026-06-01",
+      startDate: "2026-05-01",
+      defaultVisitScopeSummary: "Updated legacy summary",
+      defaultVisitScopeItemsJson: JSON.stringify([{ title: "Updated legacy item" }]),
+      primaryLocationId: "loc-1",
+      renewalDate: "2026-07-01",
+      status: "active",
+      internalNotes: "Legacy notes",
+    });
+
+    expect(result).toEqual({ success: true, agreementId: "agr-1" });
+    expect(supabase._updateCalls).toHaveLength(1);
+    expect(supabase._updateCalls[0]).toMatchObject({
+      agreement_name: "Updated Legacy Source Template Name",
+      agreement_type: "inspection",
+      frequency: "monthly",
+      default_visit_scope_summary: "Updated legacy summary",
+      default_visit_scope_items: [{ title: "Updated legacy item" }],
+      primary_location_id: "loc-1",
+      status: "active",
+    });
   });
 
   it("treats persisted template snapshot as immutable agreement-side data during updates", async () => {

@@ -39,6 +39,19 @@ type UpdateMaintenanceAgreementParams = CreateMaintenanceAgreementParams & {
   status: string;
 };
 
+type AgreementTemplateLockSnapshotRow = {
+  agreement_name?: unknown;
+  agreement_type?: unknown;
+  frequency?: unknown;
+  default_visit_scope_summary?: unknown;
+  default_visit_scope_items?: unknown;
+  template_locked_field_keys?: unknown;
+  template_lock_policy_version?: unknown;
+  template_lock_snapshot_applied_at?: unknown;
+};
+
+const TEMPLATE_LOCKED_FIELD_UPDATE_BLOCKED_ERROR = "maintenance_agreement_locked_field_update_blocked";
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 
 function cleanString(value: unknown) {
@@ -113,6 +126,64 @@ function normalizeTemplateLockedFieldKeys(value: unknown) {
 function normalizeTemplateLockPolicyVersion(value: unknown) {
   const parsed = Number(value);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function getActiveTemplateLockedFieldKeys(row: AgreementTemplateLockSnapshotRow) {
+  if (
+    !Array.isArray(row.template_locked_field_keys) ||
+    !Number.isInteger(Number(row.template_lock_policy_version)) ||
+    Number(row.template_lock_policy_version) <= 0 ||
+    !cleanString(row.template_lock_snapshot_applied_at)
+  ) {
+    return [] as string[];
+  }
+
+  const rowLockedFieldKeys = new Set(
+    row.template_locked_field_keys.map((entry) => cleanString(entry)).filter(Boolean),
+  );
+
+  return [...MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS].filter((fieldKey) =>
+    rowLockedFieldKeys.has(fieldKey),
+  );
+}
+
+function normalizeVisitScopeItemsForComparison(value: unknown) {
+  try {
+    return sanitizeVisitScopeItems(value).map(({ id, ...rest }) => rest);
+  } catch {
+    return [] as Array<Record<string, unknown>>;
+  }
+}
+
+function getLockedFieldUpdateDiffs(
+  existingAgreement: AgreementTemplateLockSnapshotRow,
+  proposedAgreement: {
+    agreementName: string;
+    agreementType: string;
+    frequency: string;
+    defaultVisitScopeSummary: string | null;
+    defaultVisitScopeItems: VisitScopeItem[];
+  },
+) {
+  return getActiveTemplateLockedFieldKeys(existingAgreement).filter((fieldKey) => {
+    switch (fieldKey) {
+      case "agreement_name":
+        return cleanString(existingAgreement.agreement_name) !== proposedAgreement.agreementName;
+      case "agreement_type":
+        return cleanString(existingAgreement.agreement_type).toLowerCase() !== proposedAgreement.agreementType;
+      case "frequency":
+        return cleanString(existingAgreement.frequency).toLowerCase() !== proposedAgreement.frequency;
+      case "default_visit_scope_summary":
+        return nullableString(existingAgreement.default_visit_scope_summary) !== proposedAgreement.defaultVisitScopeSummary;
+      case "default_visit_scope_items":
+        return (
+          JSON.stringify(normalizeVisitScopeItemsForComparison(existingAgreement.default_visit_scope_items)) !==
+          JSON.stringify(normalizeVisitScopeItemsForComparison(proposedAgreement.defaultVisitScopeItems))
+        );
+      default:
+        return false;
+    }
+  });
 }
 
 async function resolveMutationScope(customerIdRaw: string) {
@@ -426,6 +497,50 @@ export async function updateMaintenanceAgreement(
   });
   if (!locationScopeResult.success) {
     return { success: false, error: locationScopeResult.error };
+  }
+
+  const { data: existingAgreement, error: existingAgreementError } = await scope.admin
+    .from("maintenance_agreements")
+    .select(
+      [
+        "agreement_name",
+        "agreement_type",
+        "frequency",
+        "default_visit_scope_summary",
+        "default_visit_scope_items",
+        "template_locked_field_keys",
+        "template_lock_policy_version",
+        "template_lock_snapshot_applied_at",
+      ].join(", "),
+    )
+    .eq("id", agreementId)
+    .eq("account_owner_user_id", scope.accountOwnerUserId)
+    .eq("customer_id", scope.customerId)
+    .maybeSingle();
+
+  if (existingAgreementError) {
+    throw existingAgreementError;
+  }
+
+  if (!existingAgreement) {
+    return { success: false, error: "Maintenance agreement is out of scope for this customer." };
+  }
+
+  const existingAgreementRow = existingAgreement as AgreementTemplateLockSnapshotRow;
+
+  const lockedFieldDiffs = getLockedFieldUpdateDiffs(existingAgreementRow, {
+    agreementName,
+    agreementType: agreementTypeResult.value,
+    frequency: frequencyResult.value,
+    defaultVisitScopeSummary: nullableString(params.defaultVisitScopeSummary),
+    defaultVisitScopeItems: defaultVisitScopeItemsResult.value,
+  });
+
+  if (lockedFieldDiffs.length > 0) {
+    return {
+      success: false,
+      error: `${TEMPLATE_LOCKED_FIELD_UPDATE_BLOCKED_ERROR}: This Service Plan was created from a locked template package. Duplicate or edit the template to change package details.`,
+    };
   }
 
   const { data, error } = await scope.supabase
