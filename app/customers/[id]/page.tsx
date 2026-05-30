@@ -898,7 +898,7 @@ export default async function CustomerDetailPage(props: {
     { id: "money", label: "Money" },
     { id: "service-plans", label: "Service Plans" },
     { id: "locations-contacts", label: "Locations & Contacts" },
-    { id: "history", label: "History" },
+    { id: "history", label: "Customer Notes" },
     { id: "details", label: "Details" },
   ] as const;
   type WorkspaceTabId = (typeof workspaceNavigationItems)[number]["id"];
@@ -1578,7 +1578,7 @@ export default async function CustomerDetailPage(props: {
 
         {activeWorkspaceTab === "history" && !isInternalViewer ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
-            Internal customer history notes are not available for this viewer.
+            Customer notes are not available for this viewer.
           </section>
         ) : null}
 

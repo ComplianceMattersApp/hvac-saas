@@ -22,7 +22,7 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Money");
     expect(customerPageSource).toContain("Service Plans");
     expect(customerPageSource).toContain("Locations & Contacts");
-    expect(customerPageSource).toContain("History");
+    expect(customerPageSource).toContain("Customer Notes");
     expect(customerPageSource).toContain("Details");
     expect(customerPageSource).toContain("?tab=${item.id}");
     expect(customerPageSource).toContain("?tab=money");
