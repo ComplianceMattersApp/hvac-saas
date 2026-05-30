@@ -2405,7 +2405,7 @@ export default async function CustomerDetailPage(props: {
               </form>
               {selectedAgreementTemplate ? (
                 <p className="mt-2 text-xs text-slate-600">
-                  Prefilled from template: {selectedAgreementTemplate.template_name}. Review and edit fields before saving.
+                  Template packages standardize agreement details. Using template: {selectedAgreementTemplate.template_name}.
                 </p>
               ) : (
                 <p className="mt-2 text-xs text-slate-500">

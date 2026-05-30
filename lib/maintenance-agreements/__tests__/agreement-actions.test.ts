@@ -78,10 +78,12 @@ function makeAdminClient(params?: {
   customerFound?: boolean;
   locationFound?: boolean;
   templateFound?: boolean;
+  templateOverrides?: Record<string, unknown>;
 }) {
   const customerFound = params?.customerFound ?? true;
   const locationFound = params?.locationFound ?? true;
   const templateFound = params?.templateFound ?? true;
+  const templateOverrides = params?.templateOverrides ?? {};
 
   return {
     from: vi.fn((table: string) => {
@@ -127,6 +129,9 @@ function makeAdminClient(params?: {
                         default_visit_scope_summary: "Seasonal maintenance walkthrough",
                         default_visit_scope_items: [{ title: "Inspect filters" }],
                         internal_notes_default: "Template default note",
+                        locked_field_keys: ["agreement_name", "agreement_type", "frequency", "default_visit_scope_summary", "default_visit_scope_items"],
+                        lock_policy_version: 2,
+                        ...templateOverrides,
                       }
                     : null,
                   error: null,
@@ -471,7 +476,7 @@ describe("maintenance agreement actions", () => {
 
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error).toBe("Agreement name is required.");
+      expect(result.error).toBe("Next due date must be a valid date (YYYY-MM-DD).");
     }
   });
 
@@ -525,6 +530,7 @@ describe("maintenance agreement actions", () => {
     expect(supabase._insertCalls[0]).toMatchObject({
       account_owner_user_id: "owner-1",
       customer_id: "cust-1",
+      agreement_name: "Plan B",
       created_by_user_id: "user-1",
       updated_by_user_id: "user-1",
       agreement_type: "service_plan",
@@ -543,26 +549,36 @@ describe("maintenance agreement actions", () => {
     expect(supabase._insertCalls[0]).not.toHaveProperty("source_template_lifecycle_status_snapshot");
     expect(supabase._insertCalls[0]).not.toHaveProperty("source_template_applied_at");
     expect(supabase._insertCalls[0]).not.toHaveProperty("source_template_snapshot");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("template_locked_field_keys");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("template_lock_policy_version");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("template_lock_snapshot_applied_at");
   });
 
-  it("captures provenance snapshot when creating from a selected template", async () => {
+  it("forces template package fields and persists lock snapshot when creating from a selected template", async () => {
     const supabase = makeSupabaseClient();
     createClientMock.mockResolvedValue(supabase);
     createAdminClientMock.mockReturnValue(makeAdminClient({ templateFound: true }));
 
     const result = await createMaintenanceAgreement({
       customerId: "cust-1",
-      agreementName: "Plan From Template",
-      agreementType: "service_plan",
-      frequency: "annual",
+      agreementName: "Typed Override Should Not Persist",
+      agreementType: "maintenance",
+      frequency: "quarterly",
       nextDueDate: "2026-10-01",
       startDate: "2026-05-01",
       sourceTemplateId: "tpl-1",
+      defaultVisitScopeSummary: "Typed Summary Override",
+      defaultVisitScopeItemsJson: JSON.stringify([{ title: "Typed Override Item" }]),
     });
 
     expect(result).toEqual({ success: true, agreementId: "agr-1" });
     expect(supabase._insertCalls).toHaveLength(1);
     expect(supabase._insertCalls[0]).toMatchObject({
+      agreement_name: "Seasonal Plan Template",
+      agreement_type: "service_plan",
+      frequency: "annual",
+      default_visit_scope_summary: "Seasonal maintenance walkthrough",
+      default_visit_scope_items: [{ title: "Inspect filters" }],
       source_template_id: "tpl-1",
       source_template_name_snapshot: "Seasonal Plan Template",
       source_template_lifecycle_status_snapshot: "active",
@@ -573,8 +589,15 @@ describe("maintenance agreement actions", () => {
         default_visit_scope_items: [{ title: "Inspect filters" }],
         internal_notes_default: "Template default note",
       },
+      template_locked_field_keys: ["agreement_name", "agreement_type", "frequency", "default_visit_scope_summary", "default_visit_scope_items"],
+      template_lock_policy_version: 2,
     });
     expect(typeof (supabase._insertCalls[0] as any).source_template_applied_at).toBe("string");
+    expect(typeof (supabase._insertCalls[0] as any).template_lock_snapshot_applied_at).toBe("string");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("generate_draft_invoice");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("autopay");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("visit_count");
+    expect(supabase._insertCalls[0]).not.toHaveProperty("next_due_mutation");
   });
 
   it("fails safely when selected template is unavailable", async () => {
@@ -677,6 +700,59 @@ describe("maintenance agreement actions", () => {
     expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_name_snapshot");
     expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_lifecycle_status_snapshot");
     expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_applied_at");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_snapshot");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("template_locked_field_keys");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("template_lock_policy_version");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("template_lock_snapshot_applied_at");
+  });
+
+  it("treats persisted template snapshot as immutable agreement-side data during updates", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(
+      makeAdminClient({
+        templateFound: true,
+        templateOverrides: {
+          template_name: "Template Name Edited Later",
+          agreement_type: "maintenance",
+          frequency: "monthly",
+          lock_policy_version: 7,
+          locked_field_keys: ["agreement_name", "frequency"],
+        },
+      }),
+    );
+
+    const created = await createMaintenanceAgreement({
+      customerId: "cust-1",
+      agreementName: "Will Be Ignored",
+      agreementType: "inspection",
+      frequency: "custom",
+      nextDueDate: "2026-10-01",
+      startDate: "2026-05-01",
+      sourceTemplateId: "tpl-1",
+    });
+    expect(created).toEqual({ success: true, agreementId: "agr-1" });
+
+    const updated = await updateMaintenanceAgreement({
+      agreementId: "agr-1",
+      customerId: "cust-1",
+      agreementName: "Operator Edited Name",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+      nextDueDate: "2026-11-01",
+      startDate: "2026-05-01",
+      status: "active",
+    });
+
+    expect(updated).toEqual({ success: true, agreementId: "agr-1" });
+    expect(supabase._insertCalls[0]).toMatchObject({
+      agreement_name: "Template Name Edited Later",
+      template_lock_policy_version: 7,
+      template_locked_field_keys: ["agreement_name", "frequency"],
+    });
+    expect(supabase._updateCalls[0]).not.toHaveProperty("template_lock_policy_version");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("template_locked_field_keys");
+    expect(supabase._updateCalls[0]).not.toHaveProperty("template_lock_snapshot_applied_at");
     expect(supabase._updateCalls[0]).not.toHaveProperty("source_template_snapshot");
   });
 });

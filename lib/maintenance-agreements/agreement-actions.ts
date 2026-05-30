@@ -12,6 +12,7 @@ import {
   MAINTENANCE_AGREEMENT_TYPES,
   projectMaintenanceAgreementVisitCountReview,
 } from "@/lib/maintenance-agreements/read-model";
+import { MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS } from "@/lib/maintenance-agreements/template-read-model";
 import { sanitizeVisitScopeItems, type VisitScopeItem } from "@/lib/jobs/visit-scope";
 
 type MutationResult =
@@ -89,6 +90,29 @@ function parseVisitScopeItemsJson(value: unknown) {
       error: "Default Work Items must be valid visit scope items.",
     };
   }
+}
+
+function normalizeTemplateLockedFieldKeys(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [...MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS];
+  }
+
+  const normalized = Array.from(
+    new Set(
+      value
+        .map((entry) => cleanString(entry))
+        .filter(Boolean),
+    ),
+  );
+
+  return normalized.length > 0
+    ? normalized
+    : [...MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS];
+}
+
+function normalizeTemplateLockPolicyVersion(value: unknown) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
 }
 
 async function resolveMutationScope(customerIdRaw: string) {
@@ -179,25 +203,6 @@ export async function createMaintenanceAgreement(
   const scope = await resolveMutationScope(params.customerId);
   if (!scope.success) return scope;
 
-  const agreementName = cleanString(params.agreementName);
-  if (!agreementName) {
-    return { success: false, error: "Agreement name is required." };
-  }
-
-  const agreementTypeResult = parseEnumValue(
-    params.agreementType,
-    MAINTENANCE_AGREEMENT_TYPES,
-    "Agreement type",
-  );
-  if (!agreementTypeResult.ok) return { success: false, error: agreementTypeResult.error };
-
-  const frequencyResult = parseEnumValue(
-    params.frequency,
-    MAINTENANCE_AGREEMENT_FREQUENCIES,
-    "Frequency",
-  );
-  if (!frequencyResult.ok) return { success: false, error: frequencyResult.error };
-
   const nextDueDateResult = parseRequiredDate(params.nextDueDate, "Next due date");
   if (!nextDueDateResult.ok) return { success: false, error: nextDueDateResult.error };
 
@@ -206,11 +211,6 @@ export async function createMaintenanceAgreement(
 
   const renewalDateResult = parseOptionalDate(params.renewalDate, "Renewal date");
   if (!renewalDateResult.ok) return { success: false, error: renewalDateResult.error };
-
-  const defaultVisitScopeItemsResult = parseVisitScopeItemsJson(params.defaultVisitScopeItemsJson);
-  if (!defaultVisitScopeItemsResult.ok) {
-    return { success: false, error: defaultVisitScopeItemsResult.error };
-  }
 
   const primaryLocationId = nullableString(params.primaryLocationId);
   const locationScopeResult = await validatePrimaryLocationScope({
@@ -228,6 +228,14 @@ export async function createMaintenanceAgreement(
   let sourceTemplateLifecycleStatusSnapshot: string | null = null;
   let sourceTemplateAppliedAt: string | null = null;
   let sourceTemplateSnapshot: Record<string, unknown> | null = null;
+  let templateLockedFieldKeysSnapshot: string[] | null = null;
+  let templateLockPolicyVersionSnapshot: number | null = null;
+  let templateLockSnapshotAppliedAt: string | null = null;
+  let templateAgreementName: string | null = null;
+  let templateAgreementType: string | null = null;
+  let templateFrequency: string | null = null;
+  let templateDefaultVisitScopeSummary: string | null = null;
+  let templateDefaultVisitScopeItems: VisitScopeItem[] = [];
 
   if (sourceTemplateId) {
     const { data: sourceTemplate, error: sourceTemplateErr } = await scope.admin
@@ -242,6 +250,8 @@ export async function createMaintenanceAgreement(
           "default_visit_scope_summary",
           "default_visit_scope_items",
           "internal_notes_default",
+          "locked_field_keys",
+          "lock_policy_version",
         ].join(", "),
       )
       .eq("id", sourceTemplateId)
@@ -258,19 +268,62 @@ export async function createMaintenanceAgreement(
     sourceTemplateLifecycleStatusSnapshot =
       cleanString(sourceTemplateRow.lifecycle_status).toLowerCase() || null;
     sourceTemplateAppliedAt = new Date().toISOString();
+    templateAgreementName = sourceTemplateNameSnapshot;
+    templateAgreementType = cleanString(sourceTemplateRow.agreement_type).toLowerCase() || null;
+    templateFrequency = cleanString(sourceTemplateRow.frequency).toLowerCase() || null;
+    templateDefaultVisitScopeSummary = nullableString(sourceTemplateRow.default_visit_scope_summary);
+    templateDefaultVisitScopeItems = sanitizeVisitScopeItems(
+      sourceTemplateRow.default_visit_scope_items,
+    );
+    templateLockedFieldKeysSnapshot = normalizeTemplateLockedFieldKeys(
+      sourceTemplateRow.locked_field_keys,
+    );
+    templateLockPolicyVersionSnapshot = normalizeTemplateLockPolicyVersion(
+      sourceTemplateRow.lock_policy_version,
+    );
+    templateLockSnapshotAppliedAt = sourceTemplateAppliedAt;
+
+    if (!templateAgreementName) {
+      return { success: false, error: "Selected template must include a template name." };
+    }
+
     sourceTemplateSnapshot = {
-      agreement_type: cleanString(sourceTemplateRow.agreement_type).toLowerCase() || null,
-      frequency: cleanString(sourceTemplateRow.frequency).toLowerCase() || null,
-      default_visit_scope_summary: nullableString(
-        sourceTemplateRow.default_visit_scope_summary,
-      ),
-      default_visit_scope_items: sanitizeVisitScopeItems(
-        sourceTemplateRow.default_visit_scope_items,
-      ),
+      agreement_type: templateAgreementType,
+      frequency: templateFrequency,
+      default_visit_scope_summary: templateDefaultVisitScopeSummary,
+      default_visit_scope_items: templateDefaultVisitScopeItems,
       internal_notes_default: nullableString(
         sourceTemplateRow.internal_notes_default,
       ),
     };
+  }
+
+  const agreementName = sourceTemplateId
+    ? templateAgreementName
+    : cleanString(params.agreementName);
+  if (!agreementName) {
+    return { success: false, error: "Agreement name is required." };
+  }
+
+  const agreementTypeResult = parseEnumValue(
+    sourceTemplateId ? templateAgreementType : params.agreementType,
+    MAINTENANCE_AGREEMENT_TYPES,
+    "Agreement type",
+  );
+  if (!agreementTypeResult.ok) return { success: false, error: agreementTypeResult.error };
+
+  const frequencyResult = parseEnumValue(
+    sourceTemplateId ? templateFrequency : params.frequency,
+    MAINTENANCE_AGREEMENT_FREQUENCIES,
+    "Frequency",
+  );
+  if (!frequencyResult.ok) return { success: false, error: frequencyResult.error };
+
+  const defaultVisitScopeItemsResult = sourceTemplateId
+    ? { ok: true as const, value: templateDefaultVisitScopeItems }
+    : parseVisitScopeItemsJson(params.defaultVisitScopeItemsJson);
+  if (!defaultVisitScopeItemsResult.ok) {
+    return { success: false, error: defaultVisitScopeItemsResult.error };
   }
 
   const payload = {
@@ -290,9 +343,14 @@ export async function createMaintenanceAgreement(
           source_template_lifecycle_status_snapshot: sourceTemplateLifecycleStatusSnapshot,
           source_template_applied_at: sourceTemplateAppliedAt,
           source_template_snapshot: sourceTemplateSnapshot,
+          template_locked_field_keys: templateLockedFieldKeysSnapshot,
+          template_lock_policy_version: templateLockPolicyVersionSnapshot,
+          template_lock_snapshot_applied_at: templateLockSnapshotAppliedAt,
         }
       : {}),
-    default_visit_scope_summary: nullableString(params.defaultVisitScopeSummary),
+    default_visit_scope_summary: sourceTemplateId
+      ? templateDefaultVisitScopeSummary
+      : nullableString(params.defaultVisitScopeSummary),
     default_visit_scope_items: defaultVisitScopeItemsResult.value,
     internal_notes: nullableString(params.internalNotes),
     created_by_user_id: scope.userId,
