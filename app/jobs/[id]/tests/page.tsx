@@ -244,7 +244,7 @@ function getRequiredTestStatusForSystem(job: any, systemId: string, testType: Ec
 }
 
 const eccPageShellClass =
-  "mx-auto w-full min-w-0 max-w-7xl overflow-x-hidden space-y-4 bg-slate-50 px-3 py-4 text-slate-900 sm:px-5 lg:px-6 print:max-w-none print:bg-white print:p-0";
+  "mx-auto flex w-full min-w-0 max-w-7xl flex-col overflow-x-hidden space-y-4 bg-slate-50 px-3 py-4 text-slate-900 sm:px-5 lg:px-6 print:max-w-none print:bg-white print:p-0";
 const eccPanelClass =
   "min-w-0 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.34)] sm:p-5";
 const eccSoftPanelClass =
@@ -991,6 +991,7 @@ export default async function JobTestsPage({
     focusedTypeRaw && !isEccTestApplicableToSystem(focusedTypeRaw, selectedSystemApplicability)
       ? ""
       : focusedTypeRaw;
+  const isDuctLeakageFocused = focusedType === "duct_leakage";
 
   let refrigerantEvidenceAttachments: Array<{
     id: string;
@@ -1516,10 +1517,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         </div>
 
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
-          <label htmlFor="completion-report-toggle" className={eccSecondaryButtonClass}>
-            Completion Report
-          </label>
-          <PrintButton className={eccSecondaryButtonClass} />
+          {!isDuctLeakageFocused ? (
+            <>
+              <label htmlFor="completion-report-toggle" className={eccSecondaryButtonClass}>
+                Completion Report
+              </label>
+              <PrintButton className={eccSecondaryButtonClass} />
+            </>
+          ) : null}
           <Link href={`/jobs/${job.id}/info?f=equipment`} className={eccSecondaryButtonClass}>
             Equipment
           </Link>
@@ -1531,9 +1536,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
       </div>
 
+      <div className={isDuctLeakageFocused ? "order-last print:order-none" : ""}>
       <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
       <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
-        Report stays hidden while entering readings.
+        Report tools are secondary during active field entry.
         <label htmlFor="completion-report-toggle" className="ml-1 cursor-pointer font-medium text-slate-900 underline">
           Expand report
         </label>
@@ -1949,13 +1955,16 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       </section>
 
       </div>
+      </div>
 
       <section className={`${eccPanelClass} space-y-5 print:hidden`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-          <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">Tests to Run</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">{isDuctLeakageFocused ? "Duct Leakage Entry" : "Tests to Run"}</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Pick a system, enter readings, save drafts, then complete once verified.
+            {isDuctLeakageFocused
+              ? "Focused entry mode keeps inputs first. Open the queue when you need the full test board."
+              : "Pick a system, enter readings, save drafts, then complete once verified."}
           </p>
           </div>
           <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
@@ -1964,6 +1973,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         </div>
 
         {/* System selector */}
+        {!isDuctLeakageFocused ? (
         <div className={`${eccSoftPanelClass} space-y-3`}>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -2031,6 +2041,16 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             </div>
           ) : null}
         </div>
+        ) : null}
+
+        {selectedSystemId && isDuctLeakageFocused ? (
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            Queue minimized while entering readings.
+            <Link href={withS(undefined, selectedSystemId)} className="ml-1 font-semibold text-slate-900 underline">
+              Back to Queue
+            </Link>
+          </div>
+        ) : null}
         {false && (
   <div className="rounded-lg border bg-white p-4">
         {/* Test pills */}
@@ -2084,7 +2104,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
 )}
 
-                {selectedSystemId ? (
+                    {selectedSystemId && !isDuctLeakageFocused ? (
           <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.34)] sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -2325,7 +2345,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         ) : null}
 
                 {/* Add Test pill */}
-        {selectedSystemId ? (
+        {selectedSystemId && !isDuctLeakageFocused ? (
           <Link
             href={focusedType === "custom" ? withS(undefined) : withS("custom")}
             className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 shadow-sm transition-colors ${
@@ -2523,6 +2543,23 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         defaultValue={runDL.data?.measured_duct_leakage_cfm ?? ""}
                         placeholder="Required for result"
                       />
+                      <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-700">
+                        <span className="font-semibold text-slate-900">
+                          {runDL.override_pass === true
+                            ? "Pass (override)"
+                            : runDL.override_pass === false
+                            ? "Fail (override)"
+                            : runDL.computed_pass === true
+                            ? "Pass"
+                            : runDL.computed_pass === false
+                            ? "Fail"
+                            : "Pending inputs"}
+                        </span>
+                        <span className="text-slate-500"> • </span>
+                        <span>Measured {runDL.data?.measured_duct_leakage_cfm ?? "—"}</span>
+                        <span className="text-slate-500"> / </span>
+                        <span>Max {runDL.computed?.max_leakage_cfm ?? "—"} CFM</span>
+                      </div>
                     </div>
 
                     <div className="grid gap-1 sm:col-span-2">
@@ -2572,21 +2609,21 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
                 </form>
 
-                <EccLivePreview mode="duct_leakage" formId={ductSaveFormId} projectType={job.project_type} />
-
-                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
-                <div className="text-sm text-muted-foreground rounded-md border border-slate-200 bg-slate-50 px-3 py-2">
-                  <div>
-                    Method: {(savedDuctMethodRaw === "heating" || savedDuctMethodRaw === "cooling" ? savedDuctMethodRaw : defaultDuctAirflowMethod) === "heating" ? "Heating Method" : "Cooling Method"}
+                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
+                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
+                  <div className="mt-2 space-y-1">
+                    <div>
+                      Method: {(savedDuctMethodRaw === "heating" || savedDuctMethodRaw === "cooling" ? savedDuctMethodRaw : defaultDuctAirflowMethod) === "heating" ? "Heating Method" : "Cooling Method"}
+                    </div>
+                    <div>
+                      Target Leakage Limit: {fmtValue(runDL.computed?.leakage_percent_allowed_display, "%")}
+                    </div>
+                    <div>
+                      Max Allowed: {runDL.computed?.max_leakage_cfm ?? "—"} CFM
+                    </div>
+                    <div>Measured: {runDL.data?.measured_duct_leakage_cfm ?? "—"} CFM</div>
                   </div>
-                  <div>
-                    Target Leakage Limit: {fmtValue(runDL.computed?.leakage_percent_allowed_display, "%")}
-                  </div>
-                  <div>
-                    Max Allowed: {runDL.computed?.max_leakage_cfm ?? "—"} CFM
-                  </div>
-                  <div>Measured: {runDL.data?.measured_duct_leakage_cfm ?? "—"} CFM</div>
-                </div>
+                </details>
 
                 <form id={ductDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
