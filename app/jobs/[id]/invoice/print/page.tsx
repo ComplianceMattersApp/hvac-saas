@@ -6,6 +6,7 @@ import { type BillingMode, resolveBillingModeByAccountOwnerId } from "@/lib/busi
 import { resolveInternalInvoiceByJobId } from "@/lib/business/internal-invoice";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
+import { formatInvoiceDisplayReference, normalizeDisplayNumber } from "@/lib/utils/display-references";
 import PrintToolbar from "./PrintToolbar";
 
 function formatCurrencyFromCents(cents?: number | null) {
@@ -144,6 +145,14 @@ export default async function InternalInvoicePrintPage({
   const billingContact = [invoice.billing_email, invoice.billing_phone].filter(Boolean).join(" / ");
   const billingAddress = formatBillingAddress(invoice);
   const hasLogo = String(tenantIdentity.logoUrl ?? "").trim().length > 0;
+  const invoiceReference = formatInvoiceDisplayReference({
+    invoiceDisplayNumber: invoice.invoice_display_number,
+    invoiceNumber: invoice.invoice_number,
+    invoiceId: invoice.id,
+  });
+  const legacyInvoiceReference = normalizeDisplayNumber(invoice.invoice_display_number)
+    ? normalizeDisplayNumber(invoice.invoice_number)
+    : null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 bg-slate-50/40 p-4 text-slate-900 sm:p-6 print:max-w-none print:bg-white print:p-0">
@@ -164,7 +173,10 @@ export default async function InternalInvoicePrintPage({
         </div>
 
         <div className="px-6 py-5 print:px-4 print:py-4">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950 print:text-2xl">Invoice {invoice.invoice_number}</h1>
+          <h1 className="text-3xl font-semibold tracking-tight text-slate-950 print:text-2xl">{invoiceReference}</h1>
+          {legacyInvoiceReference ? (
+            <p className="mt-1 text-xs font-medium tracking-[0.03em] text-slate-500">Legacy ref: {legacyInvoiceReference}</p>
+          ) : null}
           <p className="mt-2 text-sm text-slate-600">{job.title || "Service visit"}</p>
 
           <div className="mt-5 grid gap-4 md:grid-cols-2 print:grid-cols-2 print:gap-x-6">
@@ -172,9 +184,15 @@ export default async function InternalInvoicePrintPage({
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Summary</div>
               <dl className="mt-2 space-y-1.5 text-sm text-slate-700">
                 <div className="flex items-center justify-between gap-4">
-                  <dt>Invoice #</dt>
-                  <dd className="font-semibold text-slate-900">{invoice.invoice_number}</dd>
+                  <dt>Invoice</dt>
+                  <dd className="font-semibold text-slate-900">{invoiceReference}</dd>
                 </div>
+                {legacyInvoiceReference ? (
+                  <div className="flex items-center justify-between gap-4">
+                    <dt>Legacy ref</dt>
+                    <dd className="font-semibold text-slate-700">{legacyInvoiceReference}</dd>
+                  </div>
+                ) : null}
                 <div className="flex items-center justify-between gap-4">
                   <dt>Invoice Date</dt>
                   <dd className="font-semibold text-slate-900">{formatInvoiceDateMMDDYYYY(invoice.invoice_date)}</dd>

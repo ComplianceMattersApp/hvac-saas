@@ -258,6 +258,7 @@ function buildInvoice(overrides: Partial<Record<string, unknown>> = {}) {
     id: 'inv-1',
     account_owner_user_id: 'owner-1',
     job_id: 'job-1',
+    invoice_display_number: '2001',
     invoice_number: 'INV-1',
     status: 'issued',
     total_cents: 9900,
@@ -337,10 +338,15 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     );
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        html: expect.stringContaining('Pay Invoice'),
-        text: expect.stringContaining('Pay Invoice:'),
+        subject: expect.stringContaining('Invoice #2001'),
       }),
     );
+    const firstEmailPayload = sendEmailMock.mock.calls[0]?.[0] as { html?: string; text?: string } | undefined;
+    expect(firstEmailPayload?.html).toContain('Pay Invoice');
+    expect(firstEmailPayload?.html).toContain('Legacy ref: INV-1');
+    expect(firstEmailPayload?.text).toContain('Pay Invoice:');
+    expect(firstEmailPayload?.text).toContain('Invoice: Invoice #2001');
+    expect(firstEmailPayload?.text).toContain('Legacy ref: INV-1');
     expect(
       fixture.writes.some((write) => write.table === 'internal_invoice_payments'),
     ).toBe(false);
@@ -364,10 +370,36 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
 
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
+        subject: expect.stringContaining('Invoice #2001'),
         html: expect.not.stringContaining('Pay Invoice'),
         text: expect.not.stringContaining('Pay Invoice:'),
       }),
     );
+  });
+
+  it('falls back to legacy invoice number reference when display number is missing', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
+      buildInvoice({ invoice_display_number: null, invoice_number: 'INV-LEGACY-77' }),
+    );
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(sendInternalInvoiceEmailFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_email_sent',
+    );
+
+    expect(sendEmailMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        subject: expect.stringContaining('Invoice INV-LEGACY-77'),
+      }),
+    );
+    const fallbackEmailPayload = sendEmailMock.mock.calls[0]?.[0] as { html?: string; text?: string } | undefined;
+    expect(fallbackEmailPayload?.html).toContain('Invoice INV-LEGACY-77');
+    expect(fallbackEmailPayload?.html).not.toContain('Legacy ref:');
+    expect(fallbackEmailPayload?.text).toContain('Invoice: Invoice INV-LEGACY-77');
+    expect(fallbackEmailPayload?.text).not.toContain('Legacy ref:');
   });
 
   it('sends without payment link when connect readiness is not ready', async () => {
