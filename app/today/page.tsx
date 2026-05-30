@@ -139,6 +139,7 @@ function HeaderSection({
           <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[1.75rem]">
             Today
           </h1>
+          <p className="mt-1 text-sm font-medium leading-6 text-slate-800">{header.greetingLine}</p>
           <p className="mt-1 text-sm leading-6 text-slate-600">
             {header.displayDate} · {header.roleLabel}
           </p>

@@ -64,6 +64,7 @@ export type TodayJobSummary = {
 export type TodayHeader = {
   displayDate: string;
   accountDisplayName: string;
+  greetingLine: string;
   roleLabel: string;
   productMode: ProductMode;
   clockState: TimeClockDerivedDisplayState | null;
@@ -258,6 +259,38 @@ function todayBusinessDateLA(now = new Date()): string {
     month: "2-digit",
     day: "2-digit",
   }).format(now);
+}
+
+function firstToken(value: string): string {
+  return String(value ?? "")
+    .trim()
+    .split(/\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean)[0] ?? "";
+}
+
+export function derivePreferredGreetingName(user: any): string | null {
+  const metadata = (user?.user_metadata ?? null) as Record<string, unknown> | null;
+
+  const directFirstName = firstToken(String(metadata?.first_name ?? ""));
+  if (directFirstName) return directFirstName;
+
+  const fullName = firstToken(String(metadata?.full_name ?? ""));
+  if (fullName) return fullName;
+
+  const displayName = firstToken(String(metadata?.display_name ?? ""));
+  if (displayName) return displayName;
+
+  const genericName = firstToken(String(metadata?.name ?? ""));
+  if (genericName) return genericName;
+
+  return null;
+}
+
+export function buildTodayGreetingLine(user: any): string {
+  const name = derivePreferredGreetingName(user);
+  if (!name) return "Welcome back.";
+  return `Welcome back, ${name}.`;
 }
 
 // -----------------------------------------------------------------------------
@@ -1763,6 +1796,7 @@ async function buildTodayReadModelForInternalActor(
     accountDisplayName:
       (identity?.displayName as string | undefined)?.trim() ||
       "Compliance Matters",
+    greetingLine: buildTodayGreetingLine(actor.user),
     roleLabel: roleLabelFor(role, productMode),
     productMode,
     clockState,

@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildTodayGreetingLine,
   buildDailyBriefing,
   buildFollowUpGroups,
   buildPriorityChips,
   buildTeamCoverageSnapshot,
   canViewBusinessPulseForRole,
+  derivePreferredGreetingName,
   followUpReason,
   selectNextBestAction,
   type FollowUpItem,
@@ -64,6 +66,22 @@ describe("canViewBusinessPulseForRole", () => {
   it("denies office and tech", () => {
     expect(canViewBusinessPulseForRole("office")).toBe(false);
     expect(canViewBusinessPulseForRole("tech")).toBe(false);
+  });
+});
+
+describe("today greeting helpers", () => {
+  it("prefers metadata first_name for greeting", () => {
+    expect(
+      derivePreferredGreetingName({ user_metadata: { first_name: "Eddie", full_name: "Someone Else" } }),
+    ).toBe("Eddie");
+    expect(buildTodayGreetingLine({ user_metadata: { first_name: "Eddie" } })).toBe("Welcome back, Eddie.");
+  });
+
+  it("falls back to display/full/name token and then generic greeting", () => {
+    expect(buildTodayGreetingLine({ user_metadata: { display_name: "Rory Williams" } })).toBe("Welcome back, Rory.");
+    expect(buildTodayGreetingLine({ user_metadata: { full_name: "Amy Pond" } })).toBe("Welcome back, Amy.");
+    expect(buildTodayGreetingLine({ user_metadata: { name: "Clara Oswald" } })).toBe("Welcome back, Clara.");
+    expect(buildTodayGreetingLine({ user_metadata: {} })).toBe("Welcome back.");
   });
 });
 
