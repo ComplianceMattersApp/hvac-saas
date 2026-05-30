@@ -18,6 +18,11 @@ describe("isUnauthedPublicRoute", () => {
     expect(isUnauthedPublicRoute("/proposals/some-token")).toBe(true);
   });
 
+  it("allows public checkout confirmation routes without auth", () => {
+    expect(isUnauthedPublicRoute("/payments/checkout-complete")).toBe(true);
+    expect(isUnauthedPublicRoute("/payments/checkout-complete?status=success")).toBe(true);
+  });
+
   it("does not allow protected ops routes", () => {
     expect(isUnauthedPublicRoute("/ops")).toBe(false);
     expect(isUnauthedPublicRoute("/ops/admin")).toBe(false);

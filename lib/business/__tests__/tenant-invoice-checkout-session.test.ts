@@ -118,6 +118,13 @@ describe("createTenantInvoiceCheckoutSession", () => {
     const firstCall = createMock.mock.calls[0] as unknown as Array<Record<string, unknown>>;
     const requestOptions = firstCall[1];
     expect(requestOptions).toEqual(expect.objectContaining({ stripeAccount: "acct_connected_1" }));
+    const payload = firstCall[0] as Record<string, any>;
+    expect(payload.success_url).toBe(
+      "http://localhost:3000/payments/checkout-complete?status=success&job_id=job-1&invoice_id=inv-1",
+    );
+    expect(payload.cancel_url).toBe(
+      "http://localhost:3000/payments/checkout-complete?status=cancelled&job_id=job-1&invoice_id=inv-1",
+    );
   });
 
   it("missing or unready connected account blocks creation", async () => {

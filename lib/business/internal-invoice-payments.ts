@@ -75,6 +75,19 @@ export type TenantInvoiceCheckoutSessionResult = {
   balanceDueCents: number;
 };
 
+function buildPublicTenantInvoiceCheckoutReturnPath(params: {
+  status: "success" | "cancelled";
+  jobId: string;
+  invoiceId: string;
+}) {
+  const search = new URLSearchParams({
+    status: params.status,
+    job_id: params.jobId,
+    invoice_id: params.invoiceId,
+  });
+  return `/payments/checkout-complete?${search.toString()}`;
+}
+
 const INTERNAL_INVOICE_PAYMENT_SELECT = [
   "id",
   "account_owner_user_id",
@@ -468,8 +481,16 @@ export async function createTenantInvoiceCheckoutSession(params: {
           },
         },
       ],
-      success_url: `${appUrl}/jobs/${jobId}/invoice?banner=internal_invoice_payment_checkout_success#invoice-workspace`,
-      cancel_url: `${appUrl}/jobs/${jobId}/invoice?banner=internal_invoice_payment_checkout_cancelled#invoice-workspace`,
+      success_url: `${appUrl}${buildPublicTenantInvoiceCheckoutReturnPath({
+        status: "success",
+        jobId,
+        invoiceId,
+      })}`,
+      cancel_url: `${appUrl}${buildPublicTenantInvoiceCheckoutReturnPath({
+        status: "cancelled",
+        jobId,
+        invoiceId,
+      })}`,
       metadata: checkoutMetadata,
       payment_intent_data: paymentIntentData,
       ...(String(invoice.billing_email ?? "").trim()
