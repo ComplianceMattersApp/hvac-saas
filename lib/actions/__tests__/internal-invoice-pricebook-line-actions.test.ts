@@ -263,7 +263,7 @@ describe('internal invoice line item pricebook plumbing', () => {
       userId: 'internal-user-1',
       internalUser: {
         user_id: 'internal-user-1',
-        role: 'office',
+        role: 'billing',
         is_active: true,
         account_owner_user_id: 'owner-1',
       },
