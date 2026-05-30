@@ -61,6 +61,7 @@ import {
 import RoleContactsCard from "@/components/RoleContactsCard";
 import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/lib/reports/payments-register";
 import { canManageInvoiceLifecycle, canViewFinancialRegister } from "@/lib/auth/financial-access";
+import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 
 
@@ -408,6 +409,7 @@ export default async function CustomerDetailPage(props: {
   params: Promise<{ id: string }>;
   searchParams?: Promise<{
     err?: string;
+    tab?: string;
     maSaved?: string;
     maError?: string;
     maFocus?: string;
@@ -443,6 +445,7 @@ export default async function CustomerDetailPage(props: {
   const roleContactError = String(sp.rcError ?? "").trim() === "1";
   const locationRoleContactSaved = String(sp.rcLocSaved ?? "").trim() === "1";
   const locationRoleContactError = String(sp.rcLocError ?? "").trim() === "1";
+  const workspaceTabParam = String(sp.tab ?? "").trim().toLowerCase();
 
   if (!id || !isUuid(id)) {
     redirect("/customers");
@@ -889,6 +892,19 @@ export default async function CustomerDetailPage(props: {
   const linkBillingPeriodInvoiceAction = linkInternalInvoiceToBillingPeriodFromForm.bind(null, customerPath);
   const unlinkBillingPeriodInvoiceAction = unlinkInternalInvoiceFromBillingPeriodFromForm.bind(null, customerPath);
   const startSavedPaymentMethodSetupAction = startCustomerSavedPaymentMethodSetupFromForm.bind(null, customerPath);
+  const workspaceNavigationItems = [
+    { id: "overview", label: "Overview" },
+    { id: "work", label: "Work" },
+    { id: "money", label: "Money" },
+    { id: "service-plans", label: "Service Plans" },
+    { id: "locations-contacts", label: "Locations & Contacts" },
+    { id: "history", label: "History" },
+    { id: "details", label: "Details" },
+  ] as const;
+  type WorkspaceTabId = (typeof workspaceNavigationItems)[number]["id"];
+  const activeWorkspaceTab: WorkspaceTabId = workspaceNavigationItems.some((item) => item.id === workspaceTabParam)
+    ? (workspaceTabParam as WorkspaceTabId)
+    : "overview";
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -1120,9 +1136,75 @@ export default async function CustomerDetailPage(props: {
           </div>
         </div>
 
+        <nav
+          aria-label="Customer workspace tabs"
+          className="rounded-2xl border border-slate-300 bg-slate-100/95 p-3 shadow-sm ring-1 ring-slate-200 md:p-4"
+        >
+          <div className="mb-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+            Workspace Navigation
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-visible">
+            {workspaceNavigationItems.map((item) => (
+              <Link
+                key={item.id}
+                href={`${customerPath}?tab=${item.id}`}
+                className={[
+                  "inline-flex shrink-0 items-center rounded-xl border px-3.5 py-2 text-sm font-medium transition-colors",
+                  activeWorkspaceTab === item.id
+                    ? "border-slate-900 bg-slate-900 text-white shadow-sm ring-1 ring-slate-900/30"
+                    : "border-slate-300 bg-white text-slate-700 hover:border-slate-500 hover:bg-slate-50",
+                ].join(" ")}
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+
         <div className="space-y-6 md:space-y-7">
 
+        {activeWorkspaceTab === "overview" ? (
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-slate-900">Attention Snapshot</h2>
+          </div>
+
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <div className="font-medium text-slate-900">Money</div>
+              <div className="mt-1">
+                {canViewPaymentHistory
+                  ? `${failedPaymentAttentionCount} payment attention item${failedPaymentAttentionCount === 1 ? "" : "s"}`
+                  : "Payment history access is limited for this viewer."}
+              </div>
+              <Link
+                href={`${customerPath}?tab=money`}
+                className="mt-2 inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-100"
+              >
+                Open Money
+              </Link>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+              <div className="font-medium text-slate-900">Service Plans</div>
+              <div className="mt-1">
+                {maintenanceAgreementsEnabled
+                  ? `${activeServicePlanCount} active service plan${activeServicePlanCount === 1 ? "" : "s"}`
+                  : "Service plans are hidden in this environment or viewer scope."}
+              </div>
+              <Link
+                href={`${customerPath}?tab=service-plans`}
+                className="mt-2 inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-100"
+              >
+                Open Service Plans
+              </Link>
+            </div>
+          </div>
+        </section>
+        ) : null}
+
         {/* Open status summary */}
+        {activeWorkspaceTab === "overview" ? (
         <section className="rounded-xl border border-slate-200/80 bg-white/80 p-3 shadow-sm">
           <div className="mb-2 flex items-center justify-between gap-3">
             <h2 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -1146,9 +1228,10 @@ export default async function CustomerDetailPage(props: {
             ))}
           </div>
         </section>
+        ) : null}
 
         {/* Payment History (if authorized) */}
-        {canViewPaymentHistory && (
+        {activeWorkspaceTab === "money" && canViewPaymentHistory && (
           <PaymentHistoryCard
             payments={customerPaymentHistory}
             customerId={customerId}
@@ -1156,7 +1239,7 @@ export default async function CustomerDetailPage(props: {
           />
         )}
 
-        {canManageSavedPaymentMethodSetup && (
+        {activeWorkspaceTab === "money" && canManageSavedPaymentMethodSetup && (
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
               <div className="space-y-1">
@@ -1209,8 +1292,10 @@ export default async function CustomerDetailPage(props: {
           </section>
         )}
 
-        {/* Overview */}
+        {/* Overview + Details */}
+        {(activeWorkspaceTab === "overview" || activeWorkspaceTab === "details") ? (
         <section className="grid gap-6 xl:grid-cols-[1.25fr_.9fr]">
+          {activeWorkspaceTab === "overview" ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4 flex items-center justify-between">
               <h2 className="text-lg font-semibold text-slate-900">
@@ -1275,7 +1360,9 @@ export default async function CustomerDetailPage(props: {
               </div>
             </div>
           </div>
+          ) : null}
 
+          {activeWorkspaceTab === "details" ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900">Billing / Paperwork Defaults</h2>
 
@@ -1372,9 +1459,11 @@ export default async function CustomerDetailPage(props: {
               </div>
             </div>
           </div>
+          ) : null}
         </section>
+        ) : null}
 
-        {isInternalViewer ? (
+        {activeWorkspaceTab === "locations-contacts" && isInternalViewer ? (
           <section id="role-contacts" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-slate-900">Account Contacts</h2>
@@ -1458,7 +1547,7 @@ export default async function CustomerDetailPage(props: {
           </section>
         ) : null}
 
-        {isInternalViewer ? (
+        {activeWorkspaceTab === "history" && isInternalViewer ? (
           <section id="customer-notes" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-slate-900">Customer Notes</h2>
@@ -1487,7 +1576,14 @@ export default async function CustomerDetailPage(props: {
           </section>
         ) : null}
 
+        {activeWorkspaceTab === "history" && !isInternalViewer ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
+            Internal customer history notes are not available for this viewer.
+          </section>
+        ) : null}
+
         {/* Locations */}
+        {activeWorkspaceTab === "locations-contacts" ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -1660,8 +1756,10 @@ export default async function CustomerDetailPage(props: {
             </div>
           )}
         </section>
+        ) : null}
 
         {/* Job history */}
+        {activeWorkspaceTab === "work" ? (
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex items-center justify-between">
             <div>
@@ -1689,11 +1787,11 @@ export default async function CustomerDetailPage(props: {
                 return (
                   <div
                     key={caseId}
-                    className="space-y-4 rounded-[1.75rem] border border-slate-300/80 bg-gradient-to-br from-slate-100 via-white to-slate-50 p-3 shadow-sm sm:p-4"
+                    className="space-y-3 rounded-2xl border border-slate-300 bg-white p-3 shadow-sm sm:p-4"
                   >
-                    <div className="rounded-2xl border border-slate-300 bg-white/95 p-4 shadow-sm">
-                      <div className="min-w-0 space-y-2">
-                        <div className="flex flex-wrap items-center gap-2">
+                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-1.5">
                           <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Service Case</span>
                           <span className="font-mono text-xs text-slate-500">{String(caseId).slice(0, 8)}</span>
                           <span
@@ -1710,12 +1808,6 @@ export default async function CustomerDetailPage(props: {
                             {caseJobs.length} visit{caseJobs.length === 1 ? "" : "s"}
                           </span>
                         </div>
-                        {serviceCase?.problem_summary ? (
-                          <div className="max-w-3xl text-sm leading-6 text-slate-700">
-                            {String(serviceCase.problem_summary).slice(0, 100)}
-                            {String(serviceCase.problem_summary).length > 100 ? "..." : ""}
-                          </div>
-                        ) : null}
                       </div>
                     </div>
 
@@ -1727,6 +1819,10 @@ export default async function CustomerDetailPage(props: {
                           .map((v) => String(v ?? "").trim())
                           .filter(Boolean)
                           .join(", ");
+                        const jobReference = formatJobDisplayReference({
+                          jobDisplayNumber: null,
+                          jobId: job.id,
+                        });
 
                         return (
                           <div
@@ -1738,55 +1834,42 @@ export default async function CustomerDetailPage(props: {
                                 : "border-slate-200 bg-slate-50",
                             ].join(" ")}
                           >
-                            <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                              <div className="min-w-0 space-y-2">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <Link
-                                    href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
-                                    className="text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
-                                  >
-                                    {normalizeRetestLinkedJobTitle(job.title) || `Job ${job.id.slice(0, 8)}`}
-                                  </Link>
-
+                            <div className="flex flex-col gap-2.5 xl:flex-row xl:items-start xl:justify-between">
+                              <div className="min-w-0 space-y-1.5">
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                                  <span className="font-medium text-slate-800">{formatDate(job.scheduled_date)}</span>
+                                  <span className="text-slate-300">&middot;</span>
+                                  <span className="font-medium text-slate-800">{jobReference}</span>
+                                  <span className="text-slate-300">&middot;</span>
                                   <span
                                     className={[
-                                      "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
                                       opsBadgeClass(job.ops_status),
                                     ].join(" ")}
                                   >
                                     {opsStatusLabel(job.ops_status)}
                                   </span>
-
                                   {isCancelled && !isArchived ? (
-                                    <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                    <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
                                       Cancelled
                                     </span>
                                   ) : null}
-
                                   {isArchived ? (
-                                    <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                    <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
                                       Archived
                                     </span>
                                   ) : null}
                                 </div>
 
-                                <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-                                  <div>
-                                    <span className="font-medium text-slate-700">Job ID:</span>{" "}
-                                    <span className="font-mono text-xs">{job.id.slice(0, 8)}&hellip;</span>
-                                  </div>
-                                  <div>
-                                    <span className="font-medium text-slate-700">Address:</span>{" "}
-                                    {address || "—"}
-                                  </div>
-                                  <div>
-                                    <span className="font-medium text-slate-700">Scheduled:</span>{" "}
-                                    {formatDate(job.scheduled_date)}
-                                  </div>
+                                <div className="text-sm font-semibold text-slate-900">
+                                  {normalizeRetestLinkedJobTitle(job.title) || jobReference}
+                                </div>
+                                <div className="text-sm text-slate-600">
+                                  {address || "Location unavailable"}
                                 </div>
                               </div>
 
-                              <div className="flex flex-wrap gap-2">
+                              <div className="flex flex-wrap gap-2 xl:pt-0.5">
                                 <Link
                                   href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
                                   className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
@@ -1820,6 +1903,10 @@ export default async function CustomerDetailPage(props: {
                         .map((v) => String(v ?? "").trim())
                         .filter(Boolean)
                         .join(", ");
+                      const jobReference = formatJobDisplayReference({
+                        jobDisplayNumber: null,
+                        jobId: job.id,
+                      });
 
                       return (
                         <div
@@ -1831,55 +1918,42 @@ export default async function CustomerDetailPage(props: {
                               : "border-slate-200 bg-slate-50",
                           ].join(" ")}
                         >
-                          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-                            <div className="min-w-0 space-y-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Link
-                                  href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
-                                  className="text-sm font-semibold text-slate-900 underline-offset-2 hover:underline"
-                                >
-                                  {normalizeRetestLinkedJobTitle(job.title) || `Job ${job.id.slice(0, 8)}`}
-                                </Link>
-
+                          <div className="flex flex-col gap-2.5 xl:flex-row xl:items-start xl:justify-between">
+                            <div className="min-w-0 space-y-1.5">
+                              <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                                <span className="font-medium text-slate-800">{formatDate(job.scheduled_date)}</span>
+                                <span className="text-slate-300">&middot;</span>
+                                <span className="font-medium text-slate-800">{jobReference}</span>
+                                <span className="text-slate-300">&middot;</span>
                                 <span
                                   className={[
-                                    "inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-medium",
+                                    "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
                                     opsBadgeClass(job.ops_status),
                                   ].join(" ")}
                                 >
                                   {opsStatusLabel(job.ops_status)}
                                 </span>
-
                                 {isCancelled && !isArchived ? (
-                                  <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                  <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
                                     Cancelled
                                   </span>
                                 ) : null}
-
                                 {isArchived ? (
-                                  <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700">
+                                  <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
                                     Archived
                                   </span>
                                 ) : null}
                               </div>
 
-                              <div className="grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-                                <div>
-                                  <span className="font-medium text-slate-700">Job ID:</span>{" "}
-                                  <span className="font-mono text-xs">{job.id.slice(0, 8)}&hellip;</span>
-                                </div>
-                                <div>
-                                  <span className="font-medium text-slate-700">Address:</span>{" "}
-                                  {address || "—"}
-                                </div>
-                                <div>
-                                  <span className="font-medium text-slate-700">Scheduled:</span>{" "}
-                                  {formatDate(job.scheduled_date)}
-                                </div>
+                              <div className="text-sm font-semibold text-slate-900">
+                                {normalizeRetestLinkedJobTitle(job.title) || jobReference}
+                              </div>
+                              <div className="text-sm text-slate-600">
+                                {address || "Location unavailable"}
                               </div>
                             </div>
 
-                            <div className="flex flex-wrap gap-2">
+                            <div className="flex flex-wrap gap-2 xl:pt-0.5">
                               <Link
                                 href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
                                 className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
@@ -1897,9 +1971,10 @@ export default async function CustomerDetailPage(props: {
             </div>
           )}
         </section>
+        ) : null}
 
         {/* Estimates — internal only, visible when ENABLE_ESTIMATES is on */}
-        {isInternalViewer && estimatesEnabled ? (
+        {activeWorkspaceTab === "work" && isInternalViewer && estimatesEnabled ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-slate-900">Estimates</h2>
@@ -1958,7 +2033,7 @@ export default async function CustomerDetailPage(props: {
         ) : null}
 
         {/* Maintenance Agreements — internal only, visible when ENABLE_MAINTENANCE_AGREEMENTS is on */}
-        {isInternalViewer && maintenanceAgreementsEnabled ? (
+        {activeWorkspaceTab === "service-plans" && isInternalViewer && maintenanceAgreementsEnabled ? (
           <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-4">
               <h2 className="text-lg font-semibold text-slate-900">Maintenance Agreements</h2>
@@ -3016,7 +3091,7 @@ export default async function CustomerDetailPage(props: {
           </section>
         ) : null}
 
-        {isInternalViewer ? (
+        {activeWorkspaceTab === "details" && isInternalViewer ? (
           <section className="rounded-2xl border border-red-200 bg-red-50/40 p-5 shadow-sm">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>

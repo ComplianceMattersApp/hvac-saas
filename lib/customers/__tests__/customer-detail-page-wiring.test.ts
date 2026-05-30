@@ -15,6 +15,70 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("{customerDisplayName(customer)}");
   });
 
+  it("renders segmented workspace tabs with query-param links", () => {
+    expect(customerPageSource).toContain("Workspace Navigation");
+    expect(customerPageSource).toContain("Overview");
+    expect(customerPageSource).toContain("Work");
+    expect(customerPageSource).toContain("Money");
+    expect(customerPageSource).toContain("Service Plans");
+    expect(customerPageSource).toContain("Locations & Contacts");
+    expect(customerPageSource).toContain("History");
+    expect(customerPageSource).toContain("Details");
+    expect(customerPageSource).toContain("?tab=${item.id}");
+    expect(customerPageSource).toContain("?tab=money");
+    expect(customerPageSource).toContain("?tab=service-plans");
+  });
+
+  it("defaults to Overview tab and gates tab panels", () => {
+    expect(customerPageSource).toContain("const workspaceTabParam = String(sp.tab ?? \"\").trim().toLowerCase();");
+    expect(customerPageSource).toContain(': "overview";');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "overview"');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "work"');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "money"');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "service-plans"');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts"');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "history"');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "details"');
+    expect(customerPageSource).not.toContain("#customer-overview");
+  });
+
+  it("keeps money tab controls and saved-card setup wiring", () => {
+    expect(customerPageSource).toContain('activeWorkspaceTab === "money" && canViewPaymentHistory');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "money" && canManageSavedPaymentMethodSetup');
+    expect(customerPageSource).toContain("PaymentHistoryCard");
+    expect(customerPageSource).toContain("Saved Card Setup");
+    expect(customerPageSource).toContain("Set up saved card");
+    expect(customerPageSource).toContain("startSavedPaymentMethodSetupAction");
+  });
+
+  it("keeps service-plan and billing-period controls in Service Plans tab", () => {
+    expect(customerPageSource).toContain('activeWorkspaceTab === "service-plans" && isInternalViewer && maintenanceAgreementsEnabled');
+    expect(customerPageSource).toContain("Maintenance Agreements");
+    expect(customerPageSource).toContain("Add Billing Period");
+    expect(customerPageSource).toContain("Generate Draft Invoice");
+    expect(customerPageSource).toContain("linkBillingPeriodInvoiceAction");
+  });
+
+  it("keeps account contacts and managed locations in Locations & Contacts tab", () => {
+    expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts" && isInternalViewer');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts" ? (');
+    expect(customerPageSource).toContain("Account Contacts");
+    expect(customerPageSource).toContain("Managed Locations");
+    expect(customerPageSource).toContain("Save account contact");
+    expect(customerPageSource).toContain("Save site/access contact");
+  });
+
+  it("keeps danger/archive controls in Details tab and preserves action wiring", () => {
+    expect(customerPageSource).toContain('activeWorkspaceTab === "details" && isInternalViewer');
+    expect(customerPageSource).toContain("Danger Zone");
+    expect(customerPageSource).toContain("Archive Customer");
+    expect(customerPageSource).toContain("action={archiveCustomerFromForm}");
+    expect(customerPageSource).toContain("action={updateCustomerNotesFromForm}");
+    expect(customerPageSource).toContain("action={addCustomerRoleContactFromForm}");
+    expect(customerPageSource).toContain("action={addLocationRoleContactFromForm}");
+    expect(customerPageSource).toContain("action={startSavedPaymentMethodSetupAction}");
+  });
+
   it("keeps top quick actions and summary badges available", () => {
     expect(customerPageSource).toContain("Quick Actions");
     expect(customerPageSource).toContain("Call");
