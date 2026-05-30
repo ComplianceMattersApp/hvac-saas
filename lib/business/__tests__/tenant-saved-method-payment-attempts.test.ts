@@ -284,9 +284,98 @@ describe("tenant saved-method payment attempts", () => {
     expect(result.attemptStatus).toBe("submitted");
     expect(result.stripePaymentIntentId).toBe("pi_123");
     expect(stripe.paymentIntents.create).toHaveBeenCalledTimes(1);
+    const firstCall = stripe.paymentIntents.create.mock.calls[0] as unknown as Array<Record<string, unknown>>;
+    const payload = firstCall[0];
+    const requestOptions = firstCall[1];
+    expect(payload.amount).toBe(2500);
+    expect(payload.application_fee_amount).toBe(6);
+    expect(Number(payload.application_fee_amount)).toBeLessThan(Number(payload.amount));
+    expect(payload.metadata).toEqual(
+      expect.objectContaining({
+        account_owner_user_id: "owner-1",
+        customer_id: "cust-1",
+        invoice_id: "inv-1",
+        attempt_kind: "manual_saved_method",
+      }),
+    );
+    expect(requestOptions).toEqual(
+      expect.objectContaining({
+        stripeAccount: "acct_test_123",
+      }),
+    );
+    expect(String(requestOptions.idempotencyKey ?? "")).toContain("manual_saved_method:owner-1:inv-1:");
     expect(ctx.writes.some((w) => w.table === "tenant_saved_method_payment_attempts" && w.op === "insert")).toBe(true);
     expect(ctx.writes.some((w) => w.table === "internal_invoice_payments")).toBe(false);
     expect(ctx.writes.some((w) => w.table === "internal_invoice_payment_allocations")).toBe(false);
+  });
+
+  it("calculates 4-cent application fee for 17.50 manual saved-card charge", async () => {
+    const ctx = makeAdmin({ balanceDueCents: 1750 });
+    ctx.setupMocks();
+
+    const stripe = {
+      paymentIntents: {
+        create: vi.fn(async () => ({
+          id: "pi_1750",
+          status: "processing",
+          last_payment_error: null,
+        })),
+      },
+    };
+
+    const { startManualSavedMethodPaymentAttempt } = await import(
+      "@/lib/business/tenant-saved-method-payment-attempts"
+    );
+
+    const result = await startManualSavedMethodPaymentAttempt({
+      admin: ctx.admin,
+      stripe: stripe as any,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+      invoiceId: "inv-1",
+      triggeredByUserId: "user-1",
+    });
+
+    expect(result.ok).toBe(true);
+    const firstCall = stripe.paymentIntents.create.mock.calls[0] as unknown as Array<Record<string, unknown>>;
+    const payload = firstCall[0];
+    expect(payload.amount).toBe(1750);
+    expect(payload.application_fee_amount).toBe(4);
+    expect(Number(payload.application_fee_amount)).toBeLessThan(Number(payload.amount));
+  });
+
+  it("omits application_fee_amount when saved-card charge rounds to zero fee", async () => {
+    const ctx = makeAdmin({ balanceDueCents: 1 });
+    ctx.setupMocks();
+
+    const stripe = {
+      paymentIntents: {
+        create: vi.fn(async () => ({
+          id: "pi_1cent",
+          status: "processing",
+          last_payment_error: null,
+        })),
+      },
+    };
+
+    const { startManualSavedMethodPaymentAttempt } = await import(
+      "@/lib/business/tenant-saved-method-payment-attempts"
+    );
+
+    const result = await startManualSavedMethodPaymentAttempt({
+      admin: ctx.admin,
+      stripe: stripe as any,
+      accountOwnerUserId: "owner-1",
+      customerId: "cust-1",
+      invoiceId: "inv-1",
+      triggeredByUserId: "user-1",
+    });
+
+    expect(result.ok).toBe(true);
+    const firstCall = stripe.paymentIntents.create.mock.calls[0] as unknown as Array<Record<string, unknown>>;
+    const payload = firstCall[0];
+    expect(payload.amount).toBe(1);
+    expect(payload.application_fee_amount).toBeUndefined();
   });
 
   it("marks immediate requires_action outcome as failed_requires_action", async () => {

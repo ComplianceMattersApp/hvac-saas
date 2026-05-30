@@ -2,6 +2,10 @@ import type Stripe from "stripe";
 import { getStripeServerClient } from "@/lib/business/platform-billing-stripe";
 import { resolveInvoiceCollectedPaymentSummary } from "@/lib/business/internal-invoice-payments";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+import {
+  calculatePlatformApplicationFeeAmountCents,
+  derivePlatformApplicationFeeConfig,
+} from "@/lib/business/platform-application-fees";
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -93,26 +97,39 @@ export async function submitSavedMethodAttemptThroughStripe(
   const stripeIdempotencyKey = clean(params.stripeIdempotencyKey);
   const billingPeriodId = clean(params.billingPeriodId) || "";
   const maintenanceAgreementId = clean(params.maintenanceAgreementId) || "";
+  const platformFeeConfig = derivePlatformApplicationFeeConfig({
+    stripeConnectReady: Boolean(connectedAccountId),
+    connectedAccountId,
+  });
+  const platformFee = calculatePlatformApplicationFeeAmountCents({
+    amountCents,
+    feeBasisPoints: platformFeeConfig.feeBasisPoints,
+    enabled: platformFeeConfig.enabled,
+  });
+  const paymentIntentPayload: Stripe.PaymentIntentCreateParams = {
+    amount: amountCents,
+    currency: "usd",
+    customer: stripeCustomerId,
+    payment_method: stripePaymentMethodId,
+    confirm: true,
+    off_session: true,
+    metadata: {
+      account_owner_user_id: accountOwnerUserId,
+      customer_id: customerId,
+      invoice_id: invoiceId,
+      attempt_id: attemptId,
+      attempt_kind: attemptKind,
+      billing_period_id: billingPeriodId,
+      maintenance_agreement_id: maintenanceAgreementId,
+    },
+    ...(platformFee.applicationFeeAmountCents > 0
+      ? { application_fee_amount: platformFee.applicationFeeAmountCents }
+      : {}),
+  };
 
   try {
     const paymentIntent = await stripe.paymentIntents.create(
-      {
-        amount: amountCents,
-        currency: "usd",
-        customer: stripeCustomerId,
-        payment_method: stripePaymentMethodId,
-        confirm: true,
-        off_session: true,
-        metadata: {
-          account_owner_user_id: accountOwnerUserId,
-          customer_id: customerId,
-          invoice_id: invoiceId,
-          attempt_id: attemptId,
-          attempt_kind: attemptKind,
-          billing_period_id: billingPeriodId,
-          maintenance_agreement_id: maintenanceAgreementId,
-        },
-      },
+      paymentIntentPayload,
       {
         stripeAccount: connectedAccountId,
         idempotencyKey: stripeIdempotencyKey,

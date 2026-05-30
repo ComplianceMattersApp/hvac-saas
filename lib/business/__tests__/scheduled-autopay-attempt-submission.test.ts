@@ -528,6 +528,141 @@ describe("scheduled autopay attempt submission", () => {
     expect(ctx.touchedTables.includes("maintenance_agreements")).toBe(false);
   });
 
+  it("scheduled autopay submit includes application_fee_amount and preserves metadata/idempotency", async () => {
+    const ctx = makeAdmin();
+    const stripeCreate = vi.fn(async () => ({
+      id: "pi_fee_1",
+      status: "processing",
+      last_payment_error: null,
+    }));
+
+    const stripe = { paymentIntents: { create: stripeCreate } } as any;
+
+    const result = await submitScheduledAutopayAttempts({
+      admin: ctx.admin,
+      accountOwnerUserId: OWNER_ID,
+      attemptId: ATTEMPT_ID,
+      revalidateDryRun: vi.fn(async () => makeEligibleRevalidation()),
+      stripe,
+      submitAttemptThroughStripe: submitSavedMethodAttemptThroughStripe,
+    });
+
+    expect(result.submittedCount).toBe(1);
+    expect(stripeCreate).toHaveBeenCalledTimes(1);
+    const firstCall = stripeCreate.mock.calls[0] as unknown as Array<Record<string, unknown>>;
+    const payload = firstCall[0];
+    const requestOptions = firstCall[1];
+    expect(payload.amount).toBe(5000);
+    expect(payload.application_fee_amount).toBe(13);
+    expect(Number(payload.application_fee_amount)).toBeLessThan(Number(payload.amount));
+    expect(payload.metadata).toEqual(
+      expect.objectContaining({
+        account_owner_user_id: OWNER_ID,
+        invoice_id: INVOICE_ID,
+        attempt_kind: "scheduled_autopay",
+      }),
+    );
+    expect(requestOptions).toEqual(
+      expect.objectContaining({
+        stripeAccount: "acct_ready_1",
+        idempotencyKey: "scheduled_autopay:owner-1:inv-1:2026-05-28:1",
+      }),
+    );
+  });
+
+  it("scheduled autopay amount 17.50 calculates 4-cent application fee", async () => {
+    const ctx = makeAdmin([makeAttemptRow({ amount_cents_snapshot: 1750 })]);
+    const stripeCreate = vi.fn(async () => ({
+      id: "pi_fee_1750",
+      status: "processing",
+      last_payment_error: null,
+    }));
+    const stripe = { paymentIntents: { create: stripeCreate } } as any;
+
+    const revalidate = vi.fn(async () => {
+      const base = makeEligibleRevalidation();
+      return {
+        ...base,
+        invoicesEvaluated: [
+          {
+            ...base.invoicesEvaluated[0],
+            snapshots: {
+              ...base.invoicesEvaluated[0].snapshots,
+              invoice: {
+                ...base.invoicesEvaluated[0].snapshots.invoice,
+                invoiceTotalCents: 1750,
+                balanceDueCents: 1750,
+                proposedAmountCents: 1750,
+              },
+            },
+          },
+        ],
+      } as ScheduledAutopayDryRunResult;
+    });
+
+    const result = await submitScheduledAutopayAttempts({
+      admin: ctx.admin,
+      accountOwnerUserId: OWNER_ID,
+      attemptId: ATTEMPT_ID,
+      revalidateDryRun: revalidate,
+      stripe,
+      submitAttemptThroughStripe: submitSavedMethodAttemptThroughStripe,
+    });
+
+    expect(result.submittedCount).toBe(1);
+    const firstCall = stripeCreate.mock.calls[0] as unknown as Array<Record<string, unknown>>;
+    const payload = firstCall[0];
+    expect(payload.amount).toBe(1750);
+    expect(payload.application_fee_amount).toBe(4);
+    expect(Number(payload.application_fee_amount)).toBeLessThan(1750);
+  });
+
+  it("scheduled autopay omits application_fee_amount when fee rounds to zero", async () => {
+    const ctx = makeAdmin([makeAttemptRow({ amount_cents_snapshot: 1 })]);
+    const stripeCreate = vi.fn(async () => ({
+      id: "pi_fee_1cent",
+      status: "processing",
+      last_payment_error: null,
+    }));
+    const stripe = { paymentIntents: { create: stripeCreate } } as any;
+
+    const revalidate = vi.fn(async () => {
+      const base = makeEligibleRevalidation();
+      return {
+        ...base,
+        invoicesEvaluated: [
+          {
+            ...base.invoicesEvaluated[0],
+            snapshots: {
+              ...base.invoicesEvaluated[0].snapshots,
+              invoice: {
+                ...base.invoicesEvaluated[0].snapshots.invoice,
+                invoiceTotalCents: 1,
+                balanceDueCents: 1,
+                proposedAmountCents: 1,
+              },
+            },
+          },
+        ],
+      } as ScheduledAutopayDryRunResult;
+    });
+
+    const result = await submitScheduledAutopayAttempts({
+      admin: ctx.admin,
+      accountOwnerUserId: OWNER_ID,
+      attemptId: ATTEMPT_ID,
+      revalidateDryRun: revalidate,
+      stripe,
+      submitAttemptThroughStripe: submitSavedMethodAttemptThroughStripe,
+    });
+
+    expect(result.submittedCount).toBe(1);
+    const firstCall = stripeCreate.mock.calls[0] as unknown as Array<Record<string, unknown>>;
+    const payload = firstCall[0];
+    expect(payload.amount).toBe(1);
+    expect(payload.application_fee_amount).toBeUndefined();
+  });
+
   it("repeated submit call is idempotent and does not create another PaymentIntent", async () => {
     const ctx = makeAdmin();
     const stripeCreate = vi.fn(async () => ({
