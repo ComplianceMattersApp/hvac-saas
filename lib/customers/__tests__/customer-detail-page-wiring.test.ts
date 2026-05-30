@@ -10,6 +10,8 @@ const paymentHistoryCardSource = readFileSync(
   resolve(__dirname, "../../../app/customers/[id]/_components/PaymentHistoryCard.tsx"),
   "utf8",
 );
+const locationsContactsTabSource =
+  customerPageSource.match(/activeWorkspaceTab === "locations-contacts"[\s\S]*?\/\* Job history \*\//)?.[0] ?? "";
 
 describe("customer detail relationship hub wiring", () => {
   it("uses Customer Workspace header copy and removes legacy Entity Workspace label", () => {
@@ -98,10 +100,34 @@ describe("customer detail relationship hub wiring", () => {
   it("keeps account contacts and managed locations in Locations & Contacts tab", () => {
     expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts" && isInternalViewer');
     expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts" ? (');
+    expect(customerPageSource).toContain("Contact Overview");
     expect(customerPageSource).toContain("Account Contacts");
     expect(customerPageSource).toContain("Managed Locations");
+    expect(customerPageSource).toContain("Directory totals");
+    expect(customerPageSource).toContain("Actions available");
+    expect(customerPageSource).toContain("Add contacts for billing, scheduling, and site access.");
+    expect(customerPageSource).toContain("Add locations when this customer has more than one service address.");
     expect(customerPageSource).toContain("Save account contact");
     expect(customerPageSource).toContain("Save site/access contact");
+  });
+
+  it("keeps location and customer contact form actions wired in Locations & Contacts", () => {
+    expect(customerPageSource).toContain("action={addCustomerRoleContactFromForm}");
+    expect(customerPageSource).toContain("action={addLocationRoleContactFromForm}");
+    expect(customerPageSource).toContain('name="customer_id" value={customerId}');
+    expect(customerPageSource).toContain('name="location_id" value={locId}');
+    expect(customerPageSource).toContain('href={`/locations/${locId}`}');
+  });
+
+  it("keeps payment and service-plan controls out of Locations & Contacts tab", () => {
+    expect(locationsContactsTabSource).toContain("Contact Overview");
+    expect(locationsContactsTabSource).toContain("Account Contacts");
+    expect(locationsContactsTabSource).toContain("Managed Locations");
+    expect(locationsContactsTabSource).not.toContain("Saved Card Setup");
+    expect(locationsContactsTabSource).not.toContain("Set up saved card");
+    expect(locationsContactsTabSource).not.toContain("Add Billing Period");
+    expect(locationsContactsTabSource).not.toContain("Advanced Billing Period Actions");
+    expect(locationsContactsTabSource).not.toContain("Generate Draft Invoice");
   });
 
   it("keeps danger/archive controls in Details tab and preserves action wiring", () => {

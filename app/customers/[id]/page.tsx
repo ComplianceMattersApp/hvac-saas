@@ -233,6 +233,15 @@ function locationAddressLine(loc: LocationRow) {
   return parts.join(", ");
 }
 
+function locationCityStateZipLine(loc: LocationRow) {
+  const city = String(loc.city ?? "").trim();
+  const state = String(loc.state ?? "").trim();
+  const zip = String(loc.zip ?? loc.postal_code ?? "").trim();
+
+  const cityState = [city, state].filter(Boolean).join(", ");
+  return [cityState, zip].filter(Boolean).join(" ");
+}
+
 function billingAddressLine(customer: CustomerRow) {
   const line1 = String(customer.billing_address_line1 ?? "").trim();
   const line2 = String(customer.billing_address_line2 ?? "").trim();
@@ -730,6 +739,30 @@ export default async function CustomerDetailPage(props: {
   const hasSavedBillingContact = Boolean(
     savedBillingContactName || savedBillingContactPhone || savedBillingContactEmail,
   );
+  const activeDisplayableCustomerRoleContacts = customerRoleContacts.filter((recipient) => {
+    const role = isDisplayableRole(recipient.recipient_role);
+    const status = String(recipient.status ?? "").trim().toLowerCase();
+    return role && status !== "inactive";
+  });
+  const mainContactRolePriority = ["responsible_party", "homeowner", "tenant_or_occupant", "site_access_contact"];
+  const primaryAccountContact =
+    mainContactRolePriority
+      .map((role) =>
+        activeDisplayableCustomerRoleContacts.find(
+          (recipient) => String(recipient.recipient_role ?? "").trim().toLowerCase() === role,
+        ),
+      )
+      .find(Boolean) ?? activeDisplayableCustomerRoleContacts[0] ?? null;
+  const siteAccessContact =
+    activeDisplayableCustomerRoleContacts.find(
+      (recipient) => String(recipient.recipient_role ?? "").trim().toLowerCase() === "site_access_contact",
+    ) ?? locationRoleContacts[0] ?? null;
+  const totalContactCount = new Set(
+    [...customerRoleContacts, ...locationRoleContacts].map((recipient) => String(recipient.id ?? "").trim()).filter(Boolean),
+  ).size;
+  const primaryServiceLocationId = String(
+    firstLocationWithAddress?.id ?? firstLocationWithAddress?.location_id ?? "",
+  ).trim();
 
   // Maintenance Agreements: load only for internal viewers when the flag is on
   // The maintenance_agreements table does not exist in production yet. The flag
@@ -1591,12 +1624,97 @@ export default async function CustomerDetailPage(props: {
         ) : null}
 
         {activeWorkspaceTab === "locations-contacts" && isInternalViewer ? (
+          <section id="contact-overview" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-3">
+              <h2 className="text-lg font-semibold text-slate-900">Contact Overview</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Quickly confirm who to call for scheduling, billing paperwork, and site access.
+              </p>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Primary service location</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">
+                  {serviceAddressFallback?.address || "No service location address saved yet."}
+                </div>
+                {serviceAddressFallback?.label ? (
+                  <div className="mt-1 text-xs text-slate-600">Source: {serviceAddressFallback.label}</div>
+                ) : null}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Main contact</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">
+                  {String(primaryAccountContact?.display_name ?? "").trim() || "No main account contact saved."}
+                </div>
+                {String(primaryAccountContact?.phone_e164 ?? "").trim() ? (
+                  <div className="mt-0.5 text-xs text-slate-600">Phone: {formatPhone(primaryAccountContact?.phone_e164)}</div>
+                ) : null}
+                {String(primaryAccountContact?.email ?? "").trim() ? (
+                  <div className="mt-0.5 break-all text-xs text-slate-600">Email: {String(primaryAccountContact?.email ?? "").trim()}</div>
+                ) : null}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Billing / paperwork</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">
+                  {savedBillingContactName || "No separate billing contact saved."}
+                </div>
+                {savedBillingContactPhone ? (
+                  <div className="mt-0.5 text-xs text-slate-600">Phone: {formatPhone(savedBillingContactPhone)}</div>
+                ) : null}
+                {savedBillingContactEmail ? (
+                  <div className="mt-0.5 break-all text-xs text-slate-600">Email: {savedBillingContactEmail}</div>
+                ) : (
+                  <div className="mt-0.5 text-xs text-slate-600">
+                    Invoices and paperwork default to the responsible account unless overridden on a job or invoice.
+                  </div>
+                )}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Site access contact</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">
+                  {String(siteAccessContact?.display_name ?? "").trim() || "No site access contact saved."}
+                </div>
+                {String(siteAccessContact?.phone_e164 ?? "").trim() ? (
+                  <div className="mt-0.5 text-xs text-slate-600">Phone: {formatPhone(siteAccessContact?.phone_e164)}</div>
+                ) : null}
+                {String(siteAccessContact?.email ?? "").trim() ? (
+                  <div className="mt-0.5 break-all text-xs text-slate-600">Email: {String(siteAccessContact?.email ?? "").trim()}</div>
+                ) : null}
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Directory totals</div>
+                <div className="mt-1 text-sm font-medium text-slate-900">
+                  {totalContactCount} contact{totalContactCount === 1 ? "" : "s"} on file
+                </div>
+                <div className="mt-0.5 text-xs text-slate-600">
+                  {locations.length} managed location{locations.length === 1 ? "" : "s"}
+                </div>
+                <div className="mt-0.5 text-xs text-slate-600">
+                  {locations.length > 1 ? "Multiple managed locations are active for this customer." : "Single managed location on file."}
+                </div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Actions available</div>
+                <div className="mt-1 text-sm text-slate-700">Add account contacts, add site access contacts, and open each location record.</div>
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        {activeWorkspaceTab === "locations-contacts" && isInternalViewer ? (
           <section id="role-contacts" className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-slate-900">Account Contacts</h2>
               <p className="mt-1 text-sm text-slate-500">
-                Role contacts linked to this responsible account, including billing, site/access, tenant/occupant, responsible party, third-party oversight, and homeowner roles.
+                Directory of people tied to this customer account for scheduling, billing, and access needs.
               </p>
+              <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700">Main contact</span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700">Billing / paperwork</span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700">Site access</span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-slate-700">Other</span>
+              </div>
+              <p className="mt-2 text-xs text-slate-600">Add contacts for billing, scheduling, and site access.</p>
             </div>
             {hasDisplayableRoleContacts ? (
               <RoleContactsCard
@@ -1605,7 +1723,7 @@ export default async function CustomerDetailPage(props: {
               />
             ) : (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">
-                No account role contacts are saved yet.
+                No account contacts saved yet. Add who handles scheduling, billing, or access.
               </div>
             )}
 
@@ -1716,22 +1834,24 @@ export default async function CustomerDetailPage(props: {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Managed Locations</h2>
               <p className="text-sm text-slate-500">
-                Service locations managed under this responsible account.
+                Service addresses managed under this customer.
               </p>
             </div>
           </div>
 
           {locations.length === 0 ? (
             <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
-              No locations on file yet.
+              Add locations when this customer has more than one service address.
             </div>
           ) : (
             <div className="grid gap-4 lg:grid-cols-2">
               {locations.map((loc) => {
                 const locId = String(loc.id ?? loc.location_id ?? "");
                 const address = locationAddressLine(loc);
+                const cityStateZip = locationCityStateZipLine(loc);
                 const mapsHref = makeMapsHref(address);
                 const locationContacts = locationRoleContactsByLocationId[locId] ?? [];
+                const isPrimaryServiceLocation = Boolean(primaryServiceLocationId && locId === primaryServiceLocationId);
 
                 return (
                   <div
@@ -1743,52 +1863,60 @@ export default async function CustomerDetailPage(props: {
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold text-slate-900">
-                            {locationDisplayName(loc)}
-                          </div>
-                          <div className="mt-1 text-sm text-slate-600">
                             {address || "No address on file"}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-600">
+                            {cityStateZip || "City/state/zip unavailable"}
+                          </div>
+                          <div className="mt-1 text-xs text-slate-500">
+                            {locationDisplayName(loc)}
                           </div>
                           {isInternalViewer && String(loc.notes ?? "").trim() ? (
                             <div className="mt-1 text-xs text-slate-500">
-                              Access / Notes: {String(loc.notes ?? "").trim()}
+                              Access notes: {String(loc.notes ?? "").trim()}
                             </div>
                           ) : null}
                         </div>
 
-                        <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
-                          {jobsByLocationCount.get(locId) ?? 0} active job
-                          {(jobsByLocationCount.get(locId) ?? 0) === 1 ? "" : "s"}
+                        <div className="flex flex-col items-end gap-1">
+                          {isPrimaryServiceLocation ? (
+                            <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700">
+                              Primary service location
+                            </span>
+                          ) : null}
+                          <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs text-slate-600">
+                            {jobsByLocationCount.get(locId) ?? 0} active job
+                            {(jobsByLocationCount.get(locId) ?? 0) === 1 ? "" : "s"}
+                          </div>
                         </div>
                       </div>
 
                       {isInternalViewer ? (
                         <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">
-                            Site / Access Contact
+                            Linked location contacts
                           </div>
                           {locationContacts.length > 0 ? (
-                            <div className="mt-2 space-y-1.5 text-xs text-slate-700">
+                            <div className="mt-2 space-y-2 text-xs text-slate-700">
                               {locationContacts.map((contact) => {
                                 const label =
                                   formatRoleForInternalDisplay(contact.recipient_role) ?? "Contact";
-                                const contactSummary = [
-                                  String(contact.display_name ?? "").trim(),
-                                  String(contact.phone_e164 ?? "").trim(),
-                                  String(contact.email ?? "").trim(),
-                                ]
-                                  .filter(Boolean)
-                                  .join(" - ");
+                                const contactName = String(contact.display_name ?? "").trim();
+                                const contactPhone = String(contact.phone_e164 ?? "").trim();
+                                const contactEmail = String(contact.email ?? "").trim();
 
                                 return (
-                                  <div key={contact.id}>
-                                    <span className="font-semibold text-slate-800">{label}:</span>{" "}
-                                    {contactSummary || "Contact details unavailable"}
+                                  <div key={contact.id} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+                                    <div className="font-semibold text-slate-800">{label}</div>
+                                    <div className="mt-0.5 text-slate-700">{contactName || "Contact name unavailable"}</div>
+                                    {contactPhone ? <div className="mt-0.5 text-slate-600">Phone: {formatPhone(contactPhone)}</div> : null}
+                                    {contactEmail ? <div className="mt-0.5 break-all text-slate-600">Email: {contactEmail}</div> : null}
                                   </div>
                                 );
                               })}
                             </div>
                           ) : (
-                            <div className="mt-1 text-xs text-slate-600">No separate site/access contact saved.</div>
+                            <div className="mt-1 text-xs text-slate-600">No linked location contacts saved yet.</div>
                           )}
 
                           <details className="mt-2">
