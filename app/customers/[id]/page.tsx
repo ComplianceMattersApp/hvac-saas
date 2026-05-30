@@ -61,7 +61,7 @@ import {
 import RoleContactsCard from "@/components/RoleContactsCard";
 import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/lib/reports/payments-register";
 import { canManageInvoiceLifecycle, canViewFinancialRegister } from "@/lib/auth/financial-access";
-import { formatJobDisplayReference } from "@/lib/utils/display-references";
+import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 
 
@@ -180,6 +180,17 @@ function formatBillingPeriodPaymentDisplayStateLabel(value?: string | null) {
   if (normalized === "invoice_void") return "Invoice void";
   if (normalized === "payment_attention") return "Payment attention";
   return "—";
+}
+
+function formatBillingPeriodInvoiceDisplayLabel(params: {
+  invoiceNumber: string | null | undefined;
+  invoiceId: string | null | undefined;
+}) {
+  return formatInvoiceDisplayReference({
+    invoiceDisplayNumber: null,
+    invoiceNumber: params.invoiceNumber,
+    invoiceId: params.invoiceId,
+  });
 }
 
 function formatShortNote(value?: string | null, maxLength = 120) {
@@ -888,6 +899,31 @@ export default async function CustomerDetailPage(props: {
   const activeServicePlanCount = customerAgreements.filter(
     (agreement) => String(agreement.status ?? "").trim().toLowerCase() === "active",
   ).length;
+  const overdueServicePlanCount = customerAgreements.filter((agreement) => {
+    const dueState = classifyMaintenanceAgreementDueState({
+      status: agreement.status,
+      nextDueDate: agreement.next_due_date,
+    });
+    return dueState === "overdue";
+  }).length;
+  const notScheduledServicePlanCount = customerAgreements.filter((agreement) => {
+    const dueState = classifyMaintenanceAgreementDueState({
+      status: agreement.status,
+      nextDueDate: agreement.next_due_date,
+    });
+    return dueState === "not_scheduled";
+  }).length;
+  const billingPeriodsNeedingAttentionCount = customerBillingPeriods.filter(
+    (billingPeriod) => billingPeriod.payment_display_state === "payment_attention",
+  ).length;
+  const linkedBillingPeriodCount = customerBillingPeriods.filter((billingPeriod) => Boolean(billingPeriod.internal_invoice_id)).length;
+  const paidBillingPeriodCount = customerBillingPeriods.filter(
+    (billingPeriod) => billingPeriod.payment_display_state === "paid",
+  ).length;
+  const nextServicePlanDueDate = customerAgreements
+    .map((agreement) => String(agreement.next_due_date ?? "").trim())
+    .filter((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))
+    .sort()[0] ?? null;
 
   const createBillingPeriodAction = createMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
   const updateBillingPeriodAction = updateMaintenanceAgreementBillingPeriodFromForm.bind(null, customerPath);
@@ -2133,6 +2169,37 @@ export default async function CustomerDetailPage(props: {
               </p>
             </div>
 
+            <div className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+              <div className="mb-3">
+                <h3 className="text-sm font-semibold text-slate-900">Service Plan Overview</h3>
+                <p className="mt-1 text-xs text-slate-600">
+                  Plan status and billing-period health at a glance.
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Active Plans</div>
+                  <div className="mt-1 text-base font-semibold text-slate-900">{activeServicePlanCount}</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Next Due</div>
+                  <div className="mt-1 text-base font-semibold text-slate-900">{nextServicePlanDueDate ? formatDate(nextServicePlanDueDate) : "Not scheduled"}</div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Billing Attention</div>
+                  <div className="mt-1 text-base font-semibold text-slate-900">{billingPeriodsNeedingAttentionCount}</div>
+                  <div className="mt-1 text-xs text-slate-600">
+                    {linkedBillingPeriodCount} linked • {paidBillingPeriodCount} paid
+                  </div>
+                </div>
+                <div className="rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Scheduling</div>
+                  <div className="mt-1 text-base font-semibold text-slate-900">{overdueServicePlanCount} overdue</div>
+                  <div className="mt-1 text-xs text-slate-600">{notScheduledServicePlanCount} not scheduled</div>
+                </div>
+              </div>
+            </div>
+
             <details className="mb-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <summary className="cursor-pointer text-sm font-medium text-slate-900">
                 Add Maintenance Agreement
@@ -2456,11 +2523,15 @@ export default async function CustomerDetailPage(props: {
                             Billing Periods
                           </div>
                           <p className="mt-1 text-xs text-slate-500">
-                            Billing periods are for billing visibility only and do not control service visits.
+                            Read status first, then open advanced controls only when needed.
                           </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            Work orders, visits, next due date, and visit counting continue independently of billing period status.
-                          </p>
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs font-medium text-slate-600">Billing period policy notes</summary>
+                            <div className="mt-1 space-y-1 text-xs text-slate-500">
+                              <div>Billing periods are for billing visibility only and do not control service visits.</div>
+                              <div>Work orders, visits, next due date, and visit counting continue independently of billing period status.</div>
+                            </div>
+                          </details>
                         </div>
 
                         {canManageBillingPeriods ? (
@@ -2628,7 +2699,10 @@ export default async function CustomerDetailPage(props: {
                                   ? "border-amber-200 bg-amber-50 text-amber-800"
                                   : "border-slate-200 bg-slate-50 text-slate-700";
                               const invoiceSummaryLabel = billingPeriod.invoice_summary
-                                ? `${billingPeriod.invoice_summary.invoice_number ?? billingPeriod.invoice_summary.invoice_id} · ${billingPeriod.invoice_summary.invoice_status}`
+                                ? formatBillingPeriodInvoiceDisplayLabel({
+                                  invoiceNumber: billingPeriod.invoice_summary.invoice_number,
+                                  invoiceId: billingPeriod.invoice_summary.invoice_id,
+                                })
                                 : null;
                               const dueDateLabel = billingPeriod.billing_due_date
                                 ? formatDate(billingPeriod.billing_due_date)
@@ -2656,6 +2730,17 @@ export default async function CustomerDetailPage(props: {
                                         <span className="text-slate-300">&middot;</span>
                                         <span>{dueDateLabel}</span>
                                       </div>
+                                      {billingPeriod.invoice_summary ? (
+                                        <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                                          <span className="font-medium text-slate-700">{invoiceSummaryLabel}</span>
+                                          <span className="text-slate-300">&middot;</span>
+                                          <span>{String(billingPeriod.invoice_summary.invoice_status).replace(/_/g, " ")}</span>
+                                          <span className="text-slate-300">&middot;</span>
+                                          <span>Paid {billingPeriod.invoice_summary.amount_paid_cents != null ? `$${(billingPeriod.invoice_summary.amount_paid_cents / 100).toFixed(2)}` : "$0.00"}</span>
+                                          <span className="text-slate-300">&middot;</span>
+                                          <span>Balance {billingPeriod.invoice_summary.balance_due_cents != null ? `$${(billingPeriod.invoice_summary.balance_due_cents / 100).toFixed(2)}` : "$0.00"}</span>
+                                        </div>
+                                      ) : null}
                                     </div>
                                     <div className="flex flex-wrap items-center gap-1.5 text-xs">
                                       <span className={`inline-flex items-center rounded-full border px-2 py-0.5 font-medium ${paymentDisplayTone}`}>
@@ -2673,7 +2758,7 @@ export default async function CustomerDetailPage(props: {
                                     </span>
                                     {invoiceSummaryLabel ? (
                                       <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 font-medium text-slate-700">
-                                        Invoice {invoiceSummaryLabel}
+                                        {invoiceSummaryLabel}
                                       </span>
                                     ) : null}
                                     {billingPeriod.external_reference ? (
@@ -2691,7 +2776,11 @@ export default async function CustomerDetailPage(props: {
                                   ) : null}
 
                                   {canManageBillingPeriods ? (
-                                    <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                                    <details className="mt-3 rounded-lg border border-slate-200 bg-white p-3">
+                                      <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                                        Advanced Billing Period Actions
+                                      </summary>
+                                      <div className="mt-3 space-y-2 border-t border-slate-200 pt-3">
                                       {!billingPeriod.internal_invoice_id ? (
                                         <details className="rounded-lg border border-slate-200 bg-white p-3">
                                           <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
@@ -3009,7 +3098,8 @@ export default async function CustomerDetailPage(props: {
                                           </form>
                                         </details>
                                       ) : null}
-                                    </div>
+                                      </div>
+                                    </details>
                                   ) : null}
                                 </li>
                               );

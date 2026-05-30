@@ -78,9 +78,21 @@ describe("customer detail relationship hub wiring", () => {
   it("keeps service-plan and billing-period controls in Service Plans tab", () => {
     expect(customerPageSource).toContain('activeWorkspaceTab === "service-plans" && isInternalViewer && maintenanceAgreementsEnabled');
     expect(customerPageSource).toContain("Maintenance Agreements");
+    expect(customerPageSource).toContain("Service Plan Overview");
+    expect(customerPageSource).toContain("Billing Attention");
+    expect(customerPageSource).toContain("Scheduling");
     expect(customerPageSource).toContain("Add Billing Period");
+    expect(customerPageSource).toContain("Advanced Billing Period Actions");
+    expect(customerPageSource).toContain("Billing period policy notes");
     expect(customerPageSource).toContain("Generate Draft Invoice");
     expect(customerPageSource).toContain("linkBillingPeriodInvoiceAction");
+    expect(customerPageSource).toContain("cancelBillingPeriodAction");
+    expect(customerPageSource).toContain("updateBillingPeriodAction");
+    expect(customerPageSource).toContain("unlinkBillingPeriodInvoiceAction");
+    expect(customerPageSource).toContain("linkBillingAnchorJobAction");
+    expect(customerPageSource).toContain("formatBillingPeriodInvoiceDisplayLabel");
+    expect(customerPageSource).toContain("formatInvoiceDisplayReference");
+    expect(customerPageSource).not.toContain('activeWorkspaceTab === "service-plans" && canManageSavedPaymentMethodSetup');
   });
 
   it("keeps account contacts and managed locations in Locations & Contacts tab", () => {
