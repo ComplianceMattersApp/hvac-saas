@@ -1301,7 +1301,7 @@ async function generateDraftInvoiceFromBillingPeriod(customerPath: string, formD
       created_by_user_id: access.userId,
       updated_by_user_id: access.userId,
     })
-    .select("id, status")
+    .select("id, status, invoice_display_number")
     .maybeSingle();
 
   if (createInvoiceError) {
@@ -1312,6 +1312,9 @@ async function generateDraftInvoiceFromBillingPeriod(customerPath: string, formD
   }
 
   if (!createdInvoice?.id || clean(createdInvoice.status).toLowerCase() !== "draft") {
+    rejectInvoiceGenerateInvalid(customerPath);
+  }
+  if (!clean((createdInvoice as any).invoice_display_number)) {
     rejectInvoiceGenerateInvalid(customerPath);
   }
 

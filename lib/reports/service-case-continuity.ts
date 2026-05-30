@@ -1,5 +1,6 @@
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { displayDateLA, formatBusinessDateUS, laDateToUtcMidnightIso } from "@/lib/utils/schedule-la";
+import { preferredJobReference } from "@/lib/utils/display-references";
 import {
   accountScopeInList,
   resolveReportAccountCustomerIds,
@@ -112,6 +113,7 @@ type LedgerLocationRow = {
 
 type LinkedJobRow = {
   id: string;
+  job_display_number: string | null;
   service_case_id: string | null;
   title: string | null;
   service_visit_reason: string | null;
@@ -128,7 +130,7 @@ export type ServiceCaseLinkedJobStatus = Pick<LinkedJobRow, "status" | "ops_stat
 const SERVICE_CASE_BASE_SELECT =
   "id, customer_id, location_id, problem_summary, case_kind, status, created_at, resolved_at, resolved_by_job_id";
 const LINKED_JOB_SELECT =
-  "id, service_case_id, title, service_visit_reason, contractor_id, contractors(name), status, ops_status, created_at, scheduled_date";
+  "id, job_display_number, service_case_id, title, service_visit_reason, contractor_id, contractors(name), status, ops_status, created_at, scheduled_date";
 
 function readParam(source: FilterSource, key: string) {
   if (source instanceof URLSearchParams) return source.get(key) ?? undefined;
@@ -534,21 +536,23 @@ export async function listServiceCaseContinuityRows(params: {
     jobIds: linkedJobs.map((job) => String(job.id ?? "")).filter(Boolean),
   });
 
-  const resolvedJobLookup = new Map<string, string>();
+  const resolvedJobLookup = new Map<string, string | null>();
   for (const job of linkedJobs) {
     const id = String(job.id ?? "").trim();
-    if (id) resolvedJobLookup.set(id, id);
+    if (id) resolvedJobLookup.set(id, String(job.job_display_number ?? "").trim() || null);
   }
   if (resolvedJobIds.some((id) => !resolvedJobLookup.has(id))) {
     const { data: resolvedJobs, error: resolvedJobsError } = await params.supabase
       .from("jobs")
-      .select("id")
+      .select("id, job_display_number")
       .in("id", resolvedJobIds.filter((id) => !resolvedJobLookup.has(id)));
 
     if (resolvedJobsError) throw resolvedJobsError;
     for (const row of resolvedJobs ?? []) {
       const id = String((row as any)?.id ?? "").trim();
-      if (id) resolvedJobLookup.set(id, id);
+      if (id) {
+        resolvedJobLookup.set(id, String((row as any)?.job_display_number ?? "").trim() || null);
+      }
     }
   }
 
@@ -606,7 +610,12 @@ export async function listServiceCaseContinuityRows(params: {
       latestContractorDisplay,
       createdDateDisplay: displayDateLA(serviceCase.created_at) || "-",
       resolvedDateDisplay: displayDateLA(serviceCase.resolved_at) || "-",
-      resolvedByJobReference: resolvedByJobId ? resolvedByJobId.slice(0, 8) : "-",
+      resolvedByJobReference: resolvedByJobId
+        ? preferredJobReference({
+            jobDisplayNumber: resolvedJobLookup.get(resolvedByJobId) ?? null,
+            jobId: resolvedByJobId,
+          })
+        : "-",
       resolvedByJobHref: resolvedByJobId ? `/jobs/${resolvedByJobId}?tab=ops` : null,
       visitCount: linked.length,
       latestVisitDateDisplay: getLatestVisitDateDisplay(latestJob),

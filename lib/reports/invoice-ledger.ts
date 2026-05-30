@@ -1,4 +1,5 @@
 import { formatBusinessDateUS, laDateToUtcMidnightIso } from "@/lib/utils/schedule-la";
+import { preferredInvoiceReference, preferredJobReference } from "@/lib/utils/display-references";
 
 export const INVOICE_LEDGER_PAGE_LIMIT = 250;
 export const INVOICE_LEDGER_EXPORT_LIMIT = 5000;
@@ -97,6 +98,7 @@ type InvoiceRow = {
   customer_id: string | null;
   location_id: string | null;
   service_case_id: string | null;
+  invoice_display_number: string | null;
   invoice_number: string;
   status: string;
   invoice_date: string;
@@ -131,6 +133,7 @@ type LocationRow = {
 
 type JobRow = {
   id: string;
+  job_display_number: string | null;
   title: string | null;
   contractor_id: string | null;
   customer_first_name: string | null;
@@ -538,7 +541,7 @@ export async function listInvoiceLedgerRows(params: {
   let query = params.supabase
     .from("internal_invoices")
     .select(
-      "id, job_id, customer_id, location_id, service_case_id, invoice_number, status, invoice_date, issued_at, voided_at, source_type, subtotal_cents, total_cents, billing_name, billing_email, billing_address_line1, billing_city, billing_state, billing_zip, created_at"
+      "id, job_id, customer_id, location_id, service_case_id, invoice_display_number, invoice_number, status, invoice_date, issued_at, voided_at, source_type, subtotal_cents, total_cents, billing_name, billing_email, billing_address_line1, billing_city, billing_state, billing_zip, created_at"
     )
     .eq("account_owner_user_id", params.accountOwnerUserId);
 
@@ -570,7 +573,7 @@ export async function listInvoiceLedgerRows(params: {
   const [jobsResult, customersResult, locationsResult, deliveriesResult, paymentSummaryMap] = await Promise.all([
     params.supabase
       .from("jobs")
-      .select("id, title, contractor_id, customer_first_name, customer_last_name, job_address, city, contractors(name)")
+      .select("id, job_display_number, title, contractor_id, customer_first_name, customer_last_name, job_address, city, contractors(name)")
       .in("id", jobIds.length ? jobIds : ["00000000-0000-0000-0000-000000000000"]),
     params.supabase
       .from("customers")
@@ -672,12 +675,19 @@ export async function listInvoiceLedgerRows(params: {
 
     return {
       invoiceId,
-      invoiceNumber: String(invoice.invoice_number ?? "").trim() || "-",
+      invoiceNumber: preferredInvoiceReference({
+        invoiceDisplayNumber: invoice.invoice_display_number,
+        invoiceNumber: invoice.invoice_number,
+        invoiceId,
+      }),
       invoiceStatusLabel: formatInvoiceStatusLabel(invoice.status),
       sourceTypeLabel: formatSourceTypeLabel(invoice.source_type),
       customerDisplay,
       locationDisplay,
-      jobReference: shortReference(jobId),
+      jobReference: preferredJobReference({
+        jobDisplayNumber: job?.job_display_number,
+        jobId,
+      }),
       jobHref: jobId ? `/jobs/${jobId}` : null,
       serviceCaseReference: shortReference(String(invoice.service_case_id ?? "").trim()),
       contractorDisplay: extractContractorName(job) || "-",

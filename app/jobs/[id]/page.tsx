@@ -1374,6 +1374,7 @@ export default async function JobDetailPage({
         internalInvoiceTruth: null as {
           id: string;
           status: InternalInvoiceStatus;
+          invoice_display_number: string | null;
           invoice_number: string;
           issued_at: string | null;
           total_cents: number;
@@ -1386,7 +1387,7 @@ export default async function JobDetailPage({
 
     const { data: invoiceTruthRow, error: invoiceTruthErr } = await supabase
       .from("internal_invoices")
-      .select("id, status, invoice_number, issued_at, total_cents, billing_name, billing_email")
+      .select("id, status, invoice_display_number, invoice_number, issued_at, total_cents, billing_name, billing_email")
       .eq("job_id", jobId)
       .neq("status", "void")
       .maybeSingle();
@@ -1410,6 +1411,7 @@ export default async function JobDetailPage({
       internalInvoiceTruth: {
         id: String(invoiceTruthRow.id),
         status: normalizeInternalInvoiceStatus(invoiceTruthRow.status),
+        invoice_display_number: String(invoiceTruthRow.invoice_display_number ?? "").trim() || null,
         invoice_number: String(invoiceTruthRow.invoice_number ?? "").trim(),
         issued_at: invoiceTruthRow.issued_at ?? null,
         total_cents: Number(invoiceTruthRow.total_cents ?? 0) || 0,

@@ -6446,7 +6446,7 @@ async function updateJob(input: {
 export async function createJob(
   input: CreateJobInput,
   options?: { serviceCaseWriteClient?: any }
-): Promise<{ id: string; service_case_id: string | null }> {
+): Promise<{ id: string; service_case_id: string | null; job_display_number: string }> {
   const supabase = await createClient();
   const serviceCaseWriteClient = options?.serviceCaseWriteClient ?? supabase;
 
@@ -6540,11 +6540,13 @@ export async function createJob(
   const { data, error } = await supabase
     .from("jobs")
     .insert(payload)
-    .select("id, customer_id, location_id, service_case_id, parent_job_id, title, job_notes")
+    .select("id, customer_id, location_id, service_case_id, parent_job_id, title, job_notes, job_display_number")
     .single();
 
   if (error) throw error;
   if (!data?.id) throw new Error("Job insert failed");
+  const jobDisplayNumber = String(data.job_display_number ?? "").trim();
+  if (!jobDisplayNumber) throw new Error("Job insert failed: missing job_display_number");
 
   let serviceCaseId = data.service_case_id ? String(data.service_case_id) : null;
 
@@ -6575,6 +6577,7 @@ export async function createJob(
   return {
     id: String(data.id),
     service_case_id: serviceCaseId,
+    job_display_number: jobDisplayNumber,
   };
 }
 

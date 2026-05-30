@@ -2585,7 +2585,7 @@ export async function convertApprovedEstimateToJob(params: {
         visit_scope_items: visitScopeItems,
         created_at: createdAtIso,
       })
-      .select("id")
+      .select("id, job_display_number")
       .single();
 
     if (createJobErr) {
@@ -2611,8 +2611,12 @@ export async function convertApprovedEstimateToJob(params: {
     }
 
     jobId = String(insertedJob?.id ?? "").trim();
+    const jobDisplayNumber = String(insertedJob?.job_display_number ?? "").trim();
     if (!jobId) {
       return { success: false, error: "Failed to create job from estimate." };
+    }
+    if (!jobDisplayNumber) {
+      return { success: false, error: "Failed to create job from estimate: missing job display number." };
     }
   } catch (error) {
     if (isEstimateConversionSchemaUnavailableError(error)) {
@@ -2957,7 +2961,7 @@ export async function recordEstimateToInvoiceDraftConversion(params: {
     const { data: insertedInvoice, error: createInvoiceErr } = await supabase
       .from("internal_invoices")
       .insert(invoicePayload)
-      .select("id")
+      .select("id, invoice_display_number")
       .single();
 
     if (createInvoiceErr) {
@@ -2983,8 +2987,12 @@ export async function recordEstimateToInvoiceDraftConversion(params: {
     }
 
     invoiceId = String(insertedInvoice?.id ?? "").trim();
+    const invoiceDisplayNumber = String(insertedInvoice?.invoice_display_number ?? "").trim();
     if (!invoiceId) {
       return { success: false, error: "Failed to create invoice from estimate." };
+    }
+    if (!invoiceDisplayNumber) {
+      return { success: false, error: "Failed to create invoice from estimate: missing invoice display number." };
     }
 
     const formatScaledInt = (value: number, scale: number) => {

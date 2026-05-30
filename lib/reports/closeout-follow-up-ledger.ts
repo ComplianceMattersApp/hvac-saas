@@ -15,6 +15,7 @@ import {
   accountScopeInList,
   resolveReportAccountContractorIds,
 } from "@/lib/reports/report-account-scope";
+import { preferredJobReference } from "@/lib/utils/display-references";
 
 export const CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT = 300;
 export const CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT = 5000;
@@ -127,7 +128,7 @@ const CLOSEOUT_EXCLUDED_STATUSES = '("pending_info","on_hold","closed")';
 const CERT_BLOCKED_STATUSES = '("failed","retest_needed","pending_office_review")';
 
 const JOB_BASE_SELECT =
-  "id, title, visit_scope_summary, job_type, status, ops_status, service_case_id, created_at, scheduled_date, field_complete, field_complete_at, invoice_complete, certs_complete, contractor_id, contractors(name), customer_id, location_id, customer_first_name, customer_last_name, job_address, city, follow_up_date, next_action_note, action_required_by";
+  "id, job_display_number, title, visit_scope_summary, job_type, status, ops_status, service_case_id, created_at, scheduled_date, field_complete, field_complete_at, invoice_complete, certs_complete, contractor_id, contractors(name), customer_id, location_id, customer_first_name, customer_last_name, job_address, city, follow_up_date, next_action_note, action_required_by";
 
 function readParam(source: FilterSource, key: string) {
   if (source instanceof URLSearchParams) {
@@ -534,7 +535,10 @@ export async function listCloseoutFollowUpLedgerRows(params: {
     return {
       jobId,
       jobHref: `/jobs/${jobId}?tab=ops`,
-      jobReference: jobId.slice(0, 8),
+      jobReference: preferredJobReference({
+        jobDisplayNumber: job?.job_display_number,
+        jobId,
+      }),
       displayTitle: normalizedTitle,
       visitReason: visitReason && visitReason !== normalizedTitle ? visitReason : "",
       jobTypeLabel: formatJobTypeLabel(job?.job_type),

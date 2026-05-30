@@ -298,6 +298,7 @@ export default async function InternalInvoiceWorkspacePage({
     .from("jobs")
     .select(`
       id,
+      job_display_number,
       title,
       status,
       field_complete,

@@ -248,7 +248,7 @@ function makeSupabaseScenario(s: Scenario = {}) {
             return {
               select: () => ({
                 single: async () => ({
-                  data: s.jobInsertError ? null : { id: "job-1" },
+                  data: s.jobInsertError ? null : { id: "job-1", job_display_number: "J-1001" },
                   error: s.jobInsertError ?? null,
                 }),
               }),
@@ -604,7 +604,7 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
               return {
                 select: vi.fn().mockReturnThis(),
                 single: vi.fn().mockResolvedValue({
-                  data: { id: "inv-1" },
+                  data: { id: "inv-1", invoice_display_number: "I-2001" },
                   error: null,
                 }),
               };
@@ -798,7 +798,7 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
             maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
             insert: vi.fn().mockReturnValue({
               select: vi.fn().mockReturnThis(),
-              single: vi.fn().mockResolvedValue({ data: { id: "inv-1" }, error: null }),
+              single: vi.fn().mockResolvedValue({ data: { id: "inv-1", invoice_display_number: "I-2001" }, error: null }),
             }),
             update: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnThis(),
@@ -891,7 +891,7 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
             maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
             insert: vi.fn().mockReturnValue({
               select: vi.fn().mockReturnThis(),
-              single: vi.fn().mockResolvedValue({ data: { id: "inv-1" }, error: null }),
+              single: vi.fn().mockResolvedValue({ data: { id: "inv-1", invoice_display_number: "I-2001" }, error: null }),
             }),
             update: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnThis(),
@@ -997,7 +997,7 @@ describe("recordEstimateToInvoiceDraftConversion", () => {
             maybeSingle: vi.fn().mockResolvedValue({ data: null, error: null }),
             insert: vi.fn().mockReturnValue({
               select: vi.fn().mockReturnThis(),
-              single: vi.fn().mockResolvedValue({ data: { id: "inv-1" }, error: null }),
+              single: vi.fn().mockResolvedValue({ data: { id: "inv-1", invoice_display_number: "I-2001" }, error: null }),
             }),
             update: vi.fn().mockReturnValue({
               eq: vi.fn().mockReturnThis(),

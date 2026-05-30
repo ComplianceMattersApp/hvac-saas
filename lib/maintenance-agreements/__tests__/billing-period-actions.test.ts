@@ -237,7 +237,7 @@ function makeAdminClient(params?: {
                 maybeSingle: async () => ({
                   data: params?.invoiceInsertError
                     ? null
-                    : (params?.invoiceInsertReturns ?? { id: INVOICE_ONE_ID, status: "draft" }),
+                    : (params?.invoiceInsertReturns ?? { id: INVOICE_ONE_ID, status: "draft", invoice_display_number: "I-2001" }),
                   error: params?.invoiceInsertError ?? null,
                 }),
               }),

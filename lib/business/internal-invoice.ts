@@ -32,6 +32,7 @@ export type InternalInvoiceRecord = {
   customer_id: string | null;
   location_id: string | null;
   service_case_id: string | null;
+  invoice_display_number: string | null;
   invoice_number: string;
   status: InternalInvoiceStatus;
   invoice_date: string;
@@ -66,6 +67,7 @@ const INTERNAL_INVOICE_SELECT = [
   "customer_id",
   "location_id",
   "service_case_id",
+  "invoice_display_number",
   "invoice_number",
   "status",
   "invoice_date",

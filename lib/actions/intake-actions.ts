@@ -159,10 +159,12 @@ export async function createJobFromIntake(formData: FormData) {
 
       ops_status,
     })
-    .select("id, ops_status")
+    .select("id, ops_status, job_display_number")
     .single();
 
   if (jobErr) throw new Error(`Job insert failed: ${jobErr.message}`);
+  const jobDisplayNumber = String(job?.job_display_number ?? "").trim();
+  if (!jobDisplayNumber) throw new Error("Job insert failed: missing job_display_number");
   const jobId = job.id as string;
 
   // -----------------------------

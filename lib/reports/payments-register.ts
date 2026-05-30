@@ -1,4 +1,5 @@
 import { formatBusinessDateUS, laDateToUtcMidnightIso } from "@/lib/utils/schedule-la";
+import { preferredInvoiceReference, preferredJobReference } from "@/lib/utils/display-references";
 
 export const PAYMENTS_REGISTER_PAGE_LIMIT = 250;
 
@@ -46,12 +47,14 @@ type InternalInvoicePaymentRow = {
 
 type InternalInvoiceRow = {
   id: string;
+  invoice_display_number: string | null;
   invoice_number: string | null;
   customer_id: string | null;
 };
 
 type JobRow = {
   id: string;
+  job_display_number: string | null;
   title: string | null;
 };
 
@@ -399,11 +402,11 @@ export async function listPaymentsRegisterRows(params: {
   const [invoicesResult, jobsResult] = await Promise.all([
     params.supabase
       .from("internal_invoices")
-      .select("id, invoice_number, customer_id")
+      .select("id, invoice_display_number, invoice_number, customer_id")
       .in("id", invoiceIds.length ? invoiceIds : ["00000000-0000-0000-0000-000000000000"]),
     params.supabase
       .from("jobs")
-      .select("id, title")
+      .select("id, job_display_number, title")
       .in("id", jobIds.length ? jobIds : ["00000000-0000-0000-0000-000000000000"]),
   ]);
 
@@ -460,9 +463,16 @@ export async function listPaymentsRegisterRows(params: {
         amountDisplay: formatCurrencyCents(payment.amount_cents),
         customerName: buildCustomerName(customer) || "-",
         customerHref: customerId ? `/customers/${customerId}` : null,
-        invoiceNumber: String(invoice?.invoice_number ?? "").trim() || shortReference(invoiceId),
+        invoiceNumber: preferredInvoiceReference({
+          invoiceDisplayNumber: invoice?.invoice_display_number,
+          invoiceNumber: invoice?.invoice_number,
+          invoiceId,
+        }),
         invoiceHref: jobId ? `/jobs/${jobId}/invoice` : null,
-        jobReference: shortReference(jobId),
+        jobReference: preferredJobReference({
+          jobDisplayNumber: jobById.get(jobId)?.job_display_number,
+          jobId,
+        }),
         jobTitle: String(jobById.get(jobId)?.title ?? "").trim() || "-",
         jobHref: jobId ? `/jobs/${jobId}` : null,
         reference: String(payment.received_reference ?? "").trim() || "-",
@@ -492,7 +502,7 @@ export async function listCustomerPaymentHistory(params: {
   // First, find all invoices for this customer
   const { data: customerInvoices, error: invoiceError } = await params.supabase
     .from("internal_invoices")
-    .select("id, invoice_number, customer_id")
+    .select("id, invoice_display_number, invoice_number, customer_id")
     .eq("customer_id", params.customerId);
 
   if (invoiceError) throw invoiceError;
@@ -527,11 +537,11 @@ export async function listCustomerPaymentHistory(params: {
   const [jobsResult, invoicesResult] = await Promise.all([
     params.supabase
       .from("jobs")
-      .select("id, title")
+      .select("id, job_display_number, title")
       .in("id", jobIds.length ? jobIds : ["00000000-0000-0000-0000-000000000000"]),
     params.supabase
       .from("internal_invoices")
-      .select("id, invoice_number")
+      .select("id, invoice_display_number, invoice_number")
       .in("id", invoicesToFetch.length ? invoicesToFetch : ["00000000-0000-0000-0000-000000000000"]),
   ]);
 
@@ -568,9 +578,16 @@ export async function listCustomerPaymentHistory(params: {
       methodLabel: formatMethodLabel(method),
       amountCents: Number(payment.amount_cents ?? 0) || 0,
       amountDisplay: formatCurrencyCents(payment.amount_cents),
-      invoiceNumber: String(invoice?.invoice_number ?? "").trim() || shortReference(invoiceId),
+      invoiceNumber: preferredInvoiceReference({
+        invoiceDisplayNumber: invoice?.invoice_display_number,
+        invoiceNumber: invoice?.invoice_number,
+        invoiceId,
+      }),
       invoiceHref: jobId ? `/jobs/${jobId}/invoice` : null,
-      jobReference: shortReference(jobId),
+      jobReference: preferredJobReference({
+        jobDisplayNumber: jobById.get(jobId)?.job_display_number,
+        jobId,
+      }),
       jobTitle: String(jobById.get(jobId)?.title ?? "").trim() || "-",
       jobHref: jobId ? `/jobs/${jobId}` : null,
       reference: String(payment.received_reference ?? "").trim() || "-",

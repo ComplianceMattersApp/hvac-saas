@@ -265,6 +265,7 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
             parent_job_id: null,
             title: "Intake Smoke Test Job",
             job_notes: null,
+            job_display_number: "J-1001",
           },
           error: null,
         };

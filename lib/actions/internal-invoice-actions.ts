@@ -1094,7 +1094,7 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
   const { data, error } = await context.supabase
     .from('internal_invoices')
     .insert(draftPayload)
-    .select('id, invoice_number, status, total_cents')
+    .select('id, invoice_number, invoice_display_number, status, total_cents')
     .single();
 
   if (error) {
@@ -1102,6 +1102,11 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
       redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_draft_exists', context.returnTo));
     }
     throw error;
+  }
+
+  const invoiceDisplayNumber = String(data?.invoice_display_number ?? '').trim();
+  if (!invoiceDisplayNumber) {
+    throw new Error('Invoice draft insert failed: missing invoice_display_number');
   }
 
   await logInvoiceEvent({

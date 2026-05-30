@@ -15,6 +15,7 @@ import {
   resolveReportAccountCustomerIds,
   resolveReportAccountContractorIds,
 } from "@/lib/reports/report-account-scope";
+import { preferredJobReference } from "@/lib/utils/display-references";
 
 export const JOB_VISIT_LEDGER_PAGE_LIMIT = 300;
 export const JOB_VISIT_LEDGER_EXPORT_LIMIT = 5000;
@@ -124,7 +125,7 @@ type LedgerLocationRow = {
 };
 
 const JOB_BASE_SELECT =
-  "id, title, visit_scope_summary, job_type, status, ops_status, service_case_id, created_at, scheduled_date, field_complete, field_complete_at, invoice_complete, certs_complete, contractor_id, contractors(name), customer_id, location_id, customer_first_name, customer_last_name, job_address, city";
+  "id, job_display_number, title, visit_scope_summary, job_type, status, ops_status, service_case_id, created_at, scheduled_date, field_complete, field_complete_at, invoice_complete, certs_complete, contractor_id, contractors(name), customer_id, location_id, customer_first_name, customer_last_name, job_address, city";
 
 function readParam(source: FilterSource, key: string) {
   if (source instanceof URLSearchParams) {
@@ -515,7 +516,10 @@ export async function listJobVisitLedgerRows(params: {
     return {
       jobId,
       jobHref: `/jobs/${jobId}?tab=ops`,
-      jobReference: jobId.slice(0, 8),
+      jobReference: preferredJobReference({
+        jobDisplayNumber: job?.job_display_number,
+        jobId,
+      }),
       displayTitle: normalizedTitle,
       visitReason: visitReason && visitReason !== normalizedTitle ? visitReason : "",
       jobTypeLabel: formatJobTypeLabel(job?.job_type),
