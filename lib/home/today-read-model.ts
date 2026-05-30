@@ -17,6 +17,8 @@ import {
   type RequestActorContext,
 } from "@/lib/auth/request-actor-context";
 import type { InternalRole, InternalUserRow } from "@/lib/auth/internal-user";
+import { canViewFinancialRegister } from "@/lib/auth/financial-access";
+import { loadFailedPaymentReconciliationItems } from "@/lib/business/failed-payment-reconciliation-read-model";
 import {
   resolveProductModeForAccountOwnerId,
   type ProductMode,
@@ -137,9 +139,12 @@ export type FollowUpGroup = {
 
 export type BusinessPulse = {
   visible: boolean;
+  failedPaymentsOpenCount: number | null;
+  failedPaymentsBalanceAtRiskCents: number | null;
   servicePlansActive: number | null;
   servicePlansOverdue: number | null;
   servicePlansDueIn7: number | null;
+  servicePlansNotScheduled: number | null;
   openInvoiceCount: number | null;
   openInvoiceBalanceCents: number | null;
   unreadNotificationCount: number;
@@ -1524,6 +1529,11 @@ async function buildTodayReadModelForInternalActor(
   const role = internalUser.role;
   const today = todayBusinessDateLA();
   const canViewBusinessPulse = canViewBusinessPulseForRole(role);
+  const canViewFailedPaymentAttention = canViewFinancialRegister({
+    actorUserId: userId,
+    internalUser,
+    resourceAccountOwnerUserId: accountOwnerUserId,
+  });
   const showWelcomeModal = !hasDismissedTodayWelcome(actor.user?.user_metadata ?? null);
 
   const productModePromise = localTimedPhase("concernReadProductMode", async () => {
@@ -1645,6 +1655,33 @@ async function buildTodayReadModelForInternalActor(
       : Promise.resolve({ count: null, balanceCents: null }),
   );
 
+  const failedPaymentAttentionPromise = localTimedPhase("failedPaymentAttentionRead", async () => {
+    if (!canViewFailedPaymentAttention) {
+      return {
+        openCount: null,
+        totalBalanceDueCents: null,
+      };
+    }
+
+    try {
+      const result = await loadFailedPaymentReconciliationItems({
+        admin: supabase,
+        accountOwnerUserId,
+        limit: 25,
+      });
+
+      return {
+        openCount: result.summary.openCount,
+        totalBalanceDueCents: result.summary.totalBalanceDueCents,
+      };
+    } catch {
+      return {
+        openCount: null,
+        totalBalanceDueCents: null,
+      };
+    }
+  });
+
   const [
     productMode,
     identity,
@@ -1658,6 +1695,7 @@ async function buildTodayReadModelForInternalActor(
     recent,
     servicePlans,
     openInvoice,
+    failedPaymentAttention,
   ] = await localTimedPhase("groupedParallelAwait", async () =>
     Promise.all([
       productModePromise,
@@ -1672,11 +1710,13 @@ async function buildTodayReadModelForInternalActor(
       recentPromise,
       servicePlansPromise,
       openInvoicePromise,
+      failedPaymentAttentionPromise,
     ]),
   );
 
   const servicePlansOverdue = servicePlans?.due_counts?.overdue ?? null;
   const servicePlansDueIn7 = servicePlans?.due_counts?.due_in_next_7_days ?? null;
+  const servicePlansNotScheduled = servicePlans?.due_counts?.not_scheduled_active ?? null;
   const servicePlansActive = servicePlans?.status_counts?.active ?? null;
 
   const followUpGroups = buildFollowUpGroups({
@@ -1732,9 +1772,14 @@ async function buildTodayReadModelForInternalActor(
 
   const businessPulse: BusinessPulse = {
     visible: canViewBusinessPulse,
+    failedPaymentsOpenCount: canViewFailedPaymentAttention ? failedPaymentAttention.openCount : null,
+    failedPaymentsBalanceAtRiskCents: canViewFailedPaymentAttention
+      ? failedPaymentAttention.totalBalanceDueCents
+      : null,
     servicePlansActive: canViewBusinessPulse ? servicePlansActive : null,
     servicePlansOverdue: canViewBusinessPulse ? servicePlansOverdue : null,
     servicePlansDueIn7: canViewBusinessPulse ? servicePlansDueIn7 : null,
+    servicePlansNotScheduled: canViewBusinessPulse ? servicePlansNotScheduled : null,
     openInvoiceCount: canViewBusinessPulse ? openInvoice.count : null,
     openInvoiceBalanceCents: canViewBusinessPulse ? openInvoice.balanceCents : null,
     unreadNotificationCount: typeof unread === "number" ? unread : 0,

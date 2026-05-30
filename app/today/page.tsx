@@ -641,13 +641,21 @@ function BusinessPulseSection({
   pulse: BusinessPulse;
   collapsed?: boolean;
 }) {
+  const showFailedPayments = pulse.failedPaymentsOpenCount !== null;
   const showServicePlans =
     pulse.servicePlansActive !== null ||
     pulse.servicePlansOverdue !== null ||
-    pulse.servicePlansDueIn7 !== null;
+    pulse.servicePlansDueIn7 !== null ||
+    pulse.servicePlansNotScheduled !== null;
   const showInvoices = pulse.openInvoiceCount !== null;
 
-  const hasContent = showServicePlans || showInvoices;
+  const hasContent = showFailedPayments || showServicePlans || showInvoices;
+
+  const failedPaymentsAtRisk =
+    pulse.failedPaymentsBalanceAtRiskCents != null
+      ? formatCurrency(pulse.failedPaymentsBalanceAtRiskCents)
+      : null;
+  const failedPaymentsSub = `${failedPaymentsAtRisk ?? "$0"} at risk`;
 
   return (
     <section
@@ -656,19 +664,28 @@ function BusinessPulseSection({
       }`}
     >
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-        Business Pulse
+        Business Attention
       </div>
       <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-        {collapsed ? "Owner snapshot" : "Snapshot"}
+        {collapsed ? "Money & service plan signals" : "Money & Service Plan Attention"}
       </h2>
 
       {!hasContent ? (
         <EmptyState message="No business pulse data available yet." />
       ) : (
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          {showFailedPayments ? (
+            <PulseTile
+              label="FAILED PAYMENTS"
+              value={String(pulse.failedPaymentsOpenCount ?? 0)}
+              sub={failedPaymentsSub}
+              href="/reports/failed-payments"
+              danger={(pulse.failedPaymentsOpenCount ?? 0) > 0}
+            />
+          ) : null}
           {showInvoices ? (
             <PulseTile
-              label="Open Invoices"
+              label="OPEN INVOICES"
               value={String(pulse.openInvoiceCount ?? 0)}
               sub={
                 pulse.openInvoiceBalanceCents != null
@@ -680,14 +697,14 @@ function BusinessPulseSection({
           ) : null}
           {pulse.servicePlansActive !== null ? (
             <PulseTile
-              label="Active Plans"
+              label="ACTIVE PLANS"
               value={String(pulse.servicePlansActive)}
               href="/service-plans"
             />
           ) : null}
           {pulse.servicePlansOverdue !== null ? (
             <PulseTile
-              label="Plans Overdue"
+              label="PLANS OVERDUE"
               value={String(pulse.servicePlansOverdue)}
               href="/service-plans"
               danger={pulse.servicePlansOverdue > 0}
@@ -695,8 +712,15 @@ function BusinessPulseSection({
           ) : null}
           {pulse.servicePlansDueIn7 !== null ? (
             <PulseTile
-              label="Due in 7 Days"
+              label="DUE IN 7 DAYS"
               value={String(pulse.servicePlansDueIn7)}
+              href="/service-plans"
+            />
+          ) : null}
+          {pulse.servicePlansNotScheduled !== null ? (
+            <PulseTile
+              label="PLANS NOT SCHEDULED"
+              value={String(pulse.servicePlansNotScheduled)}
               href="/service-plans"
             />
           ) : null}
