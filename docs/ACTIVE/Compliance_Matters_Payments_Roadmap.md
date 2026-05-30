@@ -11,6 +11,24 @@
 - Guardrails are locked: disabled/comped/test-disabled/connect-not-ready paths skip fee application; zero/negative/unsafe amounts skip; fee must remain strictly less than charge amount; failed payments do not collect application fees.
 - Deferred to next phase: wiring this calculation into Stripe create calls after dedicated implementation and validation review.
 
+## Phase 6J-E2 Closeout (Platform Application Fee Wiring + Sandbox Smoke, Docs-Only)
+
+- Phase 6J-A and 6J-B foundation scope is complete: platform application fee foundation is locked with default `25` basis points (`0.25%`) and guarded calculation behavior.
+- Phase 6J-C is complete: invoice Checkout path now wires `application_fee_amount` through sanctioned Stripe create-call behavior.
+- Phase 6J-D is complete: saved-card/manual path and scheduled-autopay shared PaymentIntent submit path now wire `application_fee_amount` through the same guarded fee policy.
+- Phase 6J-E/6J-E2 sandbox smoke is complete:
+- Checkout smoke proof: `1750` cents charge produced `application_fee_amount = 4` cents.
+- Saved-card/manual smoke proof: `1750` cents charge produced `application_fee_amount = 4` cents.
+- Financial truth lock remains unchanged: app payment truth is gross customer payment truth; platform application fee remains Stripe/platform revenue only.
+- Invoice/customer-facing billing lock remains unchanged: no customer-facing surcharge line item was introduced.
+- Projection lock remains unchanged: no invoice paid/balance distortion was introduced.
+- Operational lock remains unchanged: no `maintenance_agreement_visits` mutation and no `maintenance_agreements.next_due_date` mutation.
+- Failed-payment truth remains unchanged: failed attempts remain non-collected.
+- Deferred lanes remain unchanged: refunds/disputes deferred, ACH deferred, customer payment success redirect polish deferred.
+- Next roadmap UX lane: invoice page UX cleanup.
+- Follow-on UX lane: customer page IA/UX cleanup after invoice page cleanup.
+- Safety/infra lock for this closeout: no production Stripe action and no schema change.
+
 ## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
 
 - Phase 6F implementation is closed in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`) and pushed to `origin/main`.

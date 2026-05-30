@@ -10,6 +10,22 @@ Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, produc
 - This model note does not authorize payment register mutation, allocation mutation, invoice truth mutation, or Stripe create-call mutation in this phase.
 - Register truth boundaries remain unchanged: collected-money truth is still webhook-confirmed `internal_invoice_payments`; allocation truth remains `internal_invoice_payment_allocations`; failed rows remain non-collected.
 
+## Phase 6J-E2 Note (Platform Application Fee Wiring + Smoke Closeout)
+
+- Phase A/B foundation is complete with default fee policy locked to `25` basis points (`0.25%`).
+- Phase C wiring is complete for invoice Checkout application fee.
+- Phase D wiring is complete for shared saved-card/manual plus scheduled-autopay PaymentIntent submit path.
+- Phase E/E2 sandbox smoke is complete for current intended scope:
+- Checkout path: `1750` cents gross charge with `4` cents application fee.
+- Saved-card/manual path: `1750` cents gross charge with `4` cents application fee.
+- Register model lock remains unchanged: platform application fee is Stripe/platform revenue only and does not create customer-facing surcharge line items.
+- Collected-money projection lock remains unchanged: invoice paid/balance truth remains gross-payment-derived with no paid/balance distortion.
+- Failed-payment lock remains unchanged: failed rows remain non-collected and must not inflate collected totals.
+- Operational lock remains unchanged: no visit mutation and no next-due-date mutation.
+- Deferred lock remains unchanged: refunds/disputes deferred, ACH deferred, customer payment success redirect polish deferred.
+- Current UX sequencing note: invoice page UX cleanup is next lane; customer page IA/UX cleanup follows.
+- Closeout constraints remain satisfied: no production Stripe action and no schema change.
+
 ## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
 
 - Closed implementation commit: `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`), pushed with `HEAD == origin/main` and clean tree.

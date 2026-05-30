@@ -20,6 +20,22 @@
 - Current phase scope is calculation/config only. Stripe Checkout/PaymentIntent mutation, webhook behavior changes, and payment/invoice/allocation truth changes remain deferred.
 - Fee is platform revenue (`application_fee_amount`) for Stripe Connect flows when enabled, not a customer invoice line item or surcharge in this phase.
 
+## Phase 6J-E2 Note (Platform Fee Wiring + Smoke Closeout)
+
+- Phase A/B foundation is complete and remains locked to default `25` basis points (`0.25%`).
+- Phase C is complete: invoice Checkout flow now applies Stripe `application_fee_amount` under the guarded platform-fee policy.
+- Phase D is complete: saved-card/manual and scheduled-autopay shared PaymentIntent submit path now applies the same guarded `application_fee_amount` policy.
+- Phase E/E2 sandbox smoke is complete:
+- Checkout smoke evidence: `1750` cents gross with `4` cents application fee.
+- Saved-card/manual smoke evidence: `1750` cents gross with `4` cents application fee.
+- Business-layer truth lock remains unchanged: platform fee is platform revenue only, not customer-facing surcharge.
+- Invoice/payment truth lock remains unchanged: gross payment truth is preserved with no invoice paid/balance distortion.
+- Failed-payment handling lock remains unchanged: failed attempts remain non-collected.
+- Operational lock remains unchanged: no visit mutation and no next-due-date mutation.
+- Deferred lock remains unchanged: refunds/disputes deferred, ACH deferred, customer payment success redirect polish deferred.
+- Next UX sequencing remains explicit: invoice page UX cleanup next, customer page IA/UX cleanup after invoice page.
+- Closeout constraints remain satisfied: no production Stripe action and no schema change.
+
 ## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
 
 - Implementation closeout is complete in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`), pushed and synced.

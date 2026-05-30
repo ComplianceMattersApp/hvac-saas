@@ -5,6 +5,24 @@ Mode: Documentation/planning only
 Authority: Subordinate to Active Spine and existing ACTIVE runbooks/roadmaps  
 Date: 2026-05-08
 
+## Phase 6J-E2 Closeout (Platform Application Fee Lane, Docs-Only)
+
+- Platform application fee lane is closed for current intended scope.
+- Phase A/B foundation is complete with default fee policy locked to `25` basis points (`0.25%`).
+- Phase C checkout wiring is complete.
+- Phase D shared PaymentIntent wiring is complete for saved-card/manual and scheduled-autopay submit path.
+- Phase E/E2 sandbox smoke is complete:
+- Checkout smoke: `1750` cents gross with `4` cents application fee.
+- Saved-card/manual smoke: `1750` cents gross with `4` cents application fee.
+- Release-scope truth lock remains unchanged: app payment truth remains gross customer payment truth.
+- Platform fee remains Stripe/platform revenue only and is not a customer-facing surcharge line item.
+- No invoice paid/balance distortion was introduced.
+- Failed payments remain non-collected.
+- No visit or next-due-date mutation was introduced.
+- Deferred lanes remain unchanged: refunds/disputes deferred, ACH deferred, customer payment success redirect polish deferred.
+- Next roadmap UX sequencing remains: invoice page UX cleanup next, customer page IA/UX cleanup follows.
+- Safety constraints satisfied for this closeout: no production Stripe action and no schema change.
+
 ## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
 
 - Phase 6F implementation is closed in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`) with push complete and post-push clean tree.
