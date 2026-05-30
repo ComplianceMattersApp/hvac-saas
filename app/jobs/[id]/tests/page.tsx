@@ -1375,6 +1375,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     }))
     .filter((row) => getEffectiveResultState(row.run) === "fail");
 
+  const showInlineAddAnotherTestCard =
+    Boolean(selectedSystemId) &&
+    !isDuctLeakageFocused &&
+    selectedSystemStatusRows.length > 0 &&
+    selectedSystemStatusRows.length % 2 === 1;
+
   function effectiveResult(run: any): "pass" | "fail" | "unknown" {
     if (!run) return "unknown";
     if (run.override_pass === true) return "pass";
@@ -1611,8 +1617,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           >
             Report
           </label>
-          <details className="group col-span-2 rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)]">
-            <summary className="flex min-h-8 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">
+          <details className="group rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)]">
+            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">
               Systems
             </summary>
             <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3">
@@ -2377,6 +2383,27 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     </div>
   );
 })}
+
+                {showInlineAddAnotherTestCard ? (
+                  <Link
+                    href={focusedType === "custom" ? withS(undefined) : withS("custom")}
+                    className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:hidden ${
+                      focusedType === "custom"
+                        ? "border-slate-900 bg-slate-900 text-white"
+                        : "border-slate-300 bg-white text-slate-900 hover:bg-slate-50"
+                    }`}
+                  >
+                    <div>
+                      <div className="text-sm font-semibold">Add another test</div>
+                      <div className={`mt-1 text-xs ${focusedType === "custom" ? "text-slate-200" : "text-slate-600"}`}>
+                        Use when the field scope needs an extra run for this system.
+                      </div>
+                    </div>
+                    <div className={`text-xs font-medium ${focusedType === "custom" ? "text-slate-200" : "text-slate-500"}`}>
+                      {focusedType === "custom" ? "Hide" : "Open"}
+                    </div>
+                  </Link>
+                ) : null}
               </div>
             )}
 
@@ -2496,7 +2523,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         ) : null}
 
                 {/* Add Test pill */}
-        {!isDuctLeakageFocused ? (
+        {!isDuctLeakageFocused && !showInlineAddAnotherTestCard ? (
           selectedSystemId ? (
             <Link
               href={focusedType === "custom" ? withS(undefined) : withS("custom")}
@@ -2940,6 +2967,49 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               <div>Suggested tonnage: {fmtValue(defaultSystemTonnage, "ton")}</div>
             </div>
 
+            {runAF ? (
+              <div
+                className={`rounded-2xl border px-4 py-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:hidden ${
+                  runAF.override_pass === true || runAF.computed_pass === true
+                    ? "border-emerald-200 bg-emerald-50/70"
+                    : runAF.override_pass === false || runAF.computed_pass === false
+                    ? "border-red-200 bg-red-50/70"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className={eccUtilityLabelClass}>Focused Test</div>
+                    <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Airflow</div>
+                    <div className="mt-1 text-sm font-medium text-slate-700">{selectedSystemName}</div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      runAF.override_pass === true || runAF.computed_pass === true
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : runAF.override_pass === false || runAF.computed_pass === false
+                        ? "border-red-200 bg-red-50 text-red-800"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {getEffectiveResultLabel(runAF)}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Measured</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-950">{fmtValue(runAF.data?.measured_total_cfm)}</div>
+                    <div className="text-[10px] font-medium text-slate-500">CFM</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Required</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-950">{fmtValue(runAF.computed?.required_total_cfm)}</div>
+                    <div className="text-[10px] font-medium text-slate-500">CFM</div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {!runAF ? (
               carriedForwardAF ? (
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
@@ -2961,124 +3031,177 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               )
             ) : (
               <>
-              <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
-              <form
-                id={airflowSaveFormId}
-                action={saveAirflowDataFromForm}
-                className="grid gap-3 border-t pt-3"
-              >
-                <input type="hidden" name="system_id" value={selectedSystemId} />
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="test_run_id" value={runAF.id} />
-                <input type="hidden" name="project_type" value={job.project_type} />
+                <form
+                  id={airflowSaveFormId}
+                  action={saveAirflowDataFromForm}
+                  className="grid gap-3 border-t pt-3"
+                >
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="test_run_id" value={runAF.id} />
+                  <input type="hidden" name="project_type" value={job.project_type} />
 
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div className="grid gap-1">
-                    <label className="text-sm font-medium" htmlFor={`af-target-${runAF.id}`}>
-                      Airflow Target (CFM per ton)
-                    </label>
-                    <input
-                      id={`af-target-${runAF.id}`}
-                      name="cfm_per_ton_target"
-                      type="number"
-                      min="1"
-                      step="1"
-                      className="w-full rounded-md border px-3 py-2"
-                      defaultValue={runAF.data?.cfm_per_ton_required ?? (String(job.project_type ?? "").trim().toLowerCase() === "all_new" ? 350 : 300)}
-                    />
-                    <div className="text-xs text-slate-600">Editable per run; defaults from project profile if unchanged.</div>
-                  </div>
-
-                  <div className="grid gap-1">
-                    <label className="text-sm font-medium" htmlFor={`af-ton-${runAF.id}`}>
-                      System Tonnage (auto-filled from equipment if available)
-                    </label>
-                    <input
-                      id={`af-ton-${runAF.id}`}
-                      name="tonnage"
-                      type="number"
-                      step="0.1"
-                      className="w-full rounded-md border px-3 py-2"
-                      defaultValue={runAF.data?.tonnage ?? defaultSystemTonnage}
-                    />
-                  </div>
-
-                  <div className="grid gap-1">
-                    <label className="text-sm font-medium" htmlFor={`af-meas-${runAF.id}`}>
-                      Measured Total Airflow (CFM)
+                  <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Measurement</div>
+                    <label className="flex items-center justify-between gap-2 text-sm font-medium" htmlFor={`af-meas-${runAF.id}`}>
+                      <span>Measured Total Airflow</span>
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">CFM</span>
                     </label>
                     <input
                       id={`af-meas-${runAF.id}`}
                       name="measured_total_cfm"
                       type="number"
                       step="1"
-                      className="w-full rounded-md border px-3 py-2"
+                      className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-base sm:font-normal sm:tracking-normal"
                       defaultValue={runAF.data?.measured_total_cfm ?? ""}
                     />
-                  </div>
-
-                  <div className="grid gap-1 sm:col-span-2">
-                    <label className="text-sm font-medium" htmlFor={`af-notes-${runAF.id}`}>
-                      Notes (optional)
-                    </label>
-                    <input
-                      id={`af-notes-${runAF.id}`}
-                      name="notes"
-                      className="w-full rounded-md border px-3 py-2"
-                      defaultValue={runAF.data?.notes ?? ""}
-                    />
-                  </div>
-
-                  <div className="grid gap-1 sm:col-span-2">
-                    <div className="text-sm font-semibold text-slate-900">Override (Optional)</div>
-                    <div className="text-xs text-slate-600">Use only when manual pass override is required.</div>
-                  </div>
-
-                  <div className="grid gap-1">
-                    <label className="text-sm font-medium" htmlFor={`af-override-${runAF.id}`}>
-                      Airflow Override Pass
-                    </label>
-                    <select
-                      id={`af-override-${runAF.id}`}
-                      name="airflow_override_pass"
-                      className="w-full rounded-md border px-3 py-2"
-                      defaultValue={runAF.override_pass === true ? "true" : "false"}
+                    <div
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${
+                        runAF.override_pass === true || runAF.computed_pass === true
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : runAF.override_pass === false || runAF.computed_pass === false
+                          ? "border-red-200 bg-red-50 text-red-800"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
                     >
-                      <option value="false">No</option>
-                      <option value="true">Yes — Mark as Pass</option>
-                    </select>
+                      {runAF.override_pass === true
+                        ? `Pass override - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
+                        : runAF.override_pass === false
+                        ? `Fail - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
+                        : runAF.computed_pass === true
+                        ? `Pass - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
+                        : runAF.computed_pass === false
+                        ? `Fail - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
+                        : `Needs input - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`}
+                    </div>
                   </div>
 
-                  <div className="grid gap-1 sm:col-span-2">
-                    <label className="text-sm font-medium" htmlFor={`af-override-reason-${runAF.id}`}>
-                      Override Reason
-                    </label>
-                    <textarea
-                      id={`af-override-reason-${runAF.id}`}
-                      name="airflow_override_reason"
-                      rows={3}
-                      className="w-full rounded-md border px-3 py-2"
-                      defaultValue={runAF.override_pass === true ? runAF.override_reason ?? "" : ""}
-                      placeholder="Required only when override pass is used"
-                    />
-                  </div>
-                </div>
+                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
+                          <div className="mt-1 text-sm font-medium text-slate-800">
+                            {fmtValue(runAF.data?.cfm_per_ton_required ?? (String(job.project_type ?? "").trim().toLowerCase() === "all_new" ? 350 : 300), "CFM/ton")} · {fmtValue(runAF.data?.tonnage ?? defaultSystemTonnage, "ton")}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                      </div>
+                    </summary>
 
-              </form>
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`af-target-${runAF.id}`}>
+                          Airflow Target (CFM per ton)
+                        </label>
+                        <input
+                          id={`af-target-${runAF.id}`}
+                          name="cfm_per_ton_target"
+                          type="number"
+                          min="1"
+                          step="1"
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runAF.data?.cfm_per_ton_required ?? (String(job.project_type ?? "").trim().toLowerCase() === "all_new" ? 350 : 300)}
+                        />
+                        <div className="text-xs text-slate-600">Editable per run; defaults from project profile if unchanged.</div>
+                      </div>
+
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`af-ton-${runAF.id}`}>
+                          System Tonnage (auto-filled from equipment if available)
+                        </label>
+                        <input
+                          id={`af-ton-${runAF.id}`}
+                          name="tonnage"
+                          type="number"
+                          step="0.1"
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runAF.data?.tonnage ?? defaultSystemTonnage}
+                        />
+                      </div>
+                    </div>
+                  </details>
+
+                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
+                          <div className="mt-1 text-sm font-medium text-slate-800">
+                            {runAF.override_pass === true
+                              ? String(runAF.override_reason ?? "").trim()
+                                ? "Override active"
+                                : "Override reason required"
+                              : "No override · Notes optional"}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                      </div>
+                    </summary>
+
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <div className="grid gap-1 sm:col-span-2">
+                        <label className="text-sm font-medium" htmlFor={`af-notes-${runAF.id}`}>
+                          Notes (optional)
+                        </label>
+                        <input
+                          id={`af-notes-${runAF.id}`}
+                          name="notes"
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runAF.data?.notes ?? ""}
+                        />
+                      </div>
+
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`af-override-${runAF.id}`}>
+                          Airflow Override Pass
+                        </label>
+                        <select
+                          id={`af-override-${runAF.id}`}
+                          name="airflow_override_pass"
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runAF.override_pass === true ? "true" : "false"}
+                        >
+                          <option value="false">No</option>
+                          <option value="true">Yes - Mark as Pass</option>
+                        </select>
+                      </div>
+
+                      <div className="grid gap-1 sm:col-span-2">
+                        <label className="text-sm font-medium" htmlFor={`af-override-reason-${runAF.id}`}>
+                          Override Reason
+                        </label>
+                        <textarea
+                          id={`af-override-reason-${runAF.id}`}
+                          name="airflow_override_reason"
+                          rows={3}
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runAF.override_pass === true ? runAF.override_reason ?? "" : ""}
+                          placeholder="Required only when override pass is used"
+                        />
+                      </div>
+                    </div>
+                  </details>
+                </form>
 
                 <EccLivePreview mode="airflow" formId={airflowSaveFormId} projectType={job.project_type} />
 
-                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <div>Target Airflow: {fmtValue(runAF.data?.cfm_per_ton_required, "CFM/ton")}</div>
-                  <div>Required Total Airflow: {fmtValue(runAF.computed?.required_total_cfm, "CFM")}</div>
-                  <div>Measured Total Airflow: {fmtValue(runAF.data?.measured_total_cfm, "CFM")}</div>
-                </div>
+                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
+                  <div className="mt-2 space-y-1">
+                    <div>Target Airflow: {fmtValue(runAF.data?.cfm_per_ton_required, "CFM/ton")}</div>
+                    <div>Required Total Airflow: {fmtValue(runAF.computed?.required_total_cfm, "CFM")}</div>
+                    <div>Measured Total Airflow: {fmtValue(runAF.data?.measured_total_cfm, "CFM")}</div>
+                  </div>
+                </details>
 
                 <div className={eccActionRowClass}>
-                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
-                    {runAF.is_completed && "✅ Test completed"}
-                  </span>
+                  <div className="mr-auto text-sm">
+                    <div className="font-semibold text-slate-950">
+                      {runAF.is_completed ? "Test completed" : "Next action"}
+                    </div>
+                    <div className="text-xs text-slate-600">Complete once airflow is verified. Save Draft remains available.</div>
+                  </div>
                   <SubmitButton
                     form={airflowSaveFormId}
                     loadingText="Saving..."
@@ -3094,14 +3217,21 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   >
                     Complete Test
                   </SubmitButton>
-                  <form action={deleteEccTestRunFromForm}>
+                </div>
+
+                <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                  <summary className="cursor-pointer font-medium text-slate-700">Danger zone</summary>
+                  <form action={deleteEccTestRunFromForm} className="mt-2">
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runAF.id} />
-                    <button type="submit" className={eccSecondaryButtonClass}>
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 sm:w-auto"
+                    >
                       Delete
                     </button>
                   </form>
-                </div>
+                </details>
               </>
             )}
           </div>
@@ -3133,6 +3263,49 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               <div>Actual Tested Airflow from MCH-23: {fmtValue(defaultFanActualAirflowCfm, "CFM")}</div>
             </div>
 
+            {runFan ? (
+              <div
+                className={`rounded-2xl border px-4 py-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:hidden ${
+                  runFan.override_pass === true || runFan.computed_pass === true
+                    ? "border-emerald-200 bg-emerald-50/70"
+                    : runFan.override_pass === false || runFan.computed_pass === false
+                    ? "border-red-200 bg-red-50/70"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className={eccUtilityLabelClass}>Focused Test</div>
+                    <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Fan Efficacy / Watt Verification</div>
+                    <div className="mt-1 text-sm font-medium text-slate-700">{selectedSystemName}</div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      runFan.override_pass === true || runFan.computed_pass === true
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : runFan.override_pass === false || runFan.computed_pass === false
+                        ? "border-red-200 bg-red-50 text-red-800"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {getEffectiveResultLabel(runFan)}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Watts</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-950">{fmtValue(runFan.data?.actual_tested_watts)}</div>
+                    <div className="text-[10px] font-medium text-slate-500">W</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Actual</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-950">{formatFanEfficacy(runFan.computed?.actual_fan_efficacy_w_per_cfm ?? null)}</div>
+                    <div className="text-[10px] font-medium text-slate-500">W/CFM</div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {!runFan ? (
               <form action={addEccTestRunFromForm} className="flex items-center gap-2">
                 <input type="hidden" name="job_id" value={job.id} />
@@ -3144,13 +3317,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </form>
             ) : (
               <>
-                <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
                 <form id={fanSaveFormId} action={saveFanWattDrawDataFromForm} className="grid gap-3 border-t pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runFan.id} />
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Measurement</div>
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`fan-watts-${runFan.id}`}>
                         Actual Tested Watts
@@ -3161,100 +3334,155 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         type="number"
                         step="0.01"
                         required
-                        className="w-full rounded-md border px-3 py-2"
+                        className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-base sm:font-normal sm:tracking-normal"
                         defaultValue={runFan.data?.actual_tested_watts ?? ""}
                         placeholder="Required for completion"
                       />
                     </div>
-
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`fan-airflow-${runFan.id}`}>
-                        Actual Tested Airflow from MCH-23 (CFM)
-                      </label>
-                      <input
-                        id={`fan-airflow-${runFan.id}`}
-                        name="actual_tested_airflow_cfm"
-                        type="number"
-                        step="0.01"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runFan.data?.actual_tested_airflow_cfm ?? defaultFanActualAirflowCfm}
-                        placeholder="Required for completion"
-                      />
+                    <div
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${
+                        runFan.override_pass === true || runFan.computed_pass === true
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : runFan.override_pass === false || runFan.computed_pass === false
+                          ? "border-red-200 bg-red-50 text-red-800"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      {runFan.override_pass === true
+                        ? "Pass override active"
+                        : runFan.override_pass === false
+                        ? "Fail override active"
+                        : runFan.computed_pass === true
+                        ? "Pass"
+                        : runFan.computed_pass === false
+                        ? "Fail"
+                        : "Needs input"}
                     </div>
-
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`fan-required-${runFan.id}`}>
-                        Required Fan Efficacy (Watts/CFM)
-                      </label>
-                      <input
-                        id={`fan-required-${runFan.id}`}
-                        name="required_fan_efficacy_w_per_cfm"
-                        type="number"
-                        step="0.01"
-                        required
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runFan.data?.required_fan_efficacy_w_per_cfm ?? 0.45}
-                        placeholder="0.45"
-                      />
-                    </div>
-
-                    <div className="grid gap-1 sm:col-span-2">
-                      <label className="text-sm font-medium" htmlFor={`fan-notes-${runFan.id}`}>
-                        Notes (optional)
-                      </label>
-                      <input
-                        id={`fan-notes-${runFan.id}`}
-                        name="notes"
-                        className="w-full rounded-md border px-3 py-2"
-                        defaultValue={runFan.data?.notes ?? ""}
-                        placeholder="Optional diagnostic notes"
-                      />
-                    </div>
-
-                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                      <input
-                        type="checkbox"
-                        name="registers_fully_open_attested"
-                        defaultChecked={!!runFan.data?.registers_fully_open_attested}
-                      />
-                      All registers fully open during the diagnostic test
-                    </label>
-
-                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                      <input
-                        type="checkbox"
-                        name="fan_max_speed_attested"
-                        defaultChecked={!!runFan.data?.fan_max_speed_attested}
-                      />
-                      System fan set at maximum speed during the diagnostic test
-                    </label>
-
-                    <label className="flex items-center gap-2 text-sm sm:col-span-2">
-                      <input
-                        type="checkbox"
-                        name="photo_taken_attested"
-                        defaultChecked={!!runFan.data?.photo_taken_attested}
-                      />
-                      Photo Taken — attestation only
-                    </label>
                   </div>
+
+                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
+                          <div className="mt-1 text-sm font-medium text-slate-800">
+                            {fmtValue(runFan.data?.required_fan_efficacy_w_per_cfm ?? 0.45)} W/CFM · {fmtValue(runFan.data?.actual_tested_airflow_cfm ?? defaultFanActualAirflowCfm, "CFM")}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                      </div>
+                    </summary>
+
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`fan-airflow-${runFan.id}`}>
+                          Actual Tested Airflow from MCH-23 (CFM)
+                        </label>
+                        <input
+                          id={`fan-airflow-${runFan.id}`}
+                          name="actual_tested_airflow_cfm"
+                          type="number"
+                          step="0.01"
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runFan.data?.actual_tested_airflow_cfm ?? defaultFanActualAirflowCfm}
+                          placeholder="Required for completion"
+                        />
+                      </div>
+
+                      <div className="grid gap-1">
+                        <label className="text-sm font-medium" htmlFor={`fan-required-${runFan.id}`}>
+                          Required Fan Efficacy (Watts/CFM)
+                        </label>
+                        <input
+                          id={`fan-required-${runFan.id}`}
+                          name="required_fan_efficacy_w_per_cfm"
+                          type="number"
+                          step="0.01"
+                          required
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runFan.data?.required_fan_efficacy_w_per_cfm ?? 0.45}
+                          placeholder="0.45"
+                        />
+                      </div>
+
+                      <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                        <input
+                          type="checkbox"
+                          name="registers_fully_open_attested"
+                          defaultChecked={!!runFan.data?.registers_fully_open_attested}
+                        />
+                        All registers fully open during the diagnostic test
+                      </label>
+
+                      <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                        <input
+                          type="checkbox"
+                          name="fan_max_speed_attested"
+                          defaultChecked={!!runFan.data?.fan_max_speed_attested}
+                        />
+                        System fan set at maximum speed during the diagnostic test
+                      </label>
+
+                      <label className="flex items-center gap-2 text-sm sm:col-span-2">
+                        <input
+                          type="checkbox"
+                          name="photo_taken_attested"
+                          defaultChecked={!!runFan.data?.photo_taken_attested}
+                        />
+                        Photo Taken - attestation only
+                      </label>
+                    </div>
+                  </details>
+
+                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
+                          <div className="mt-1 text-sm font-medium text-slate-800">No override flow · Notes optional</div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                      </div>
+                    </summary>
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+
+                      <div className="grid gap-1 sm:col-span-2">
+                        <label className="text-sm font-medium" htmlFor={`fan-notes-${runFan.id}`}>
+                          Notes (optional)
+                        </label>
+                        <input
+                          id={`fan-notes-${runFan.id}`}
+                          name="notes"
+                          className="w-full rounded-md border px-3 py-2"
+                          defaultValue={runFan.data?.notes ?? ""}
+                          placeholder="Optional diagnostic notes"
+                        />
+                      </div>
+                    </div>
+                  </details>
                 </form>
 
                 <EccLivePreview mode="fan_watt_draw" formId={fanSaveFormId} projectType={job.project_type} />
 
-                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <div>Actual Tested Watts: {fmtValue(runFan.data?.actual_tested_watts, "W")}</div>
-                  <div>Actual Tested Airflow from MCH-23: {fmtValue(runFan.data?.actual_tested_airflow_cfm, "CFM")}</div>
-                  <div>Required Fan Efficacy: {formatFanEfficacy(runFan.computed?.required_fan_efficacy_w_per_cfm ?? runFan.data?.required_fan_efficacy_w_per_cfm ?? null)} W/CFM</div>
-                  <div>Actual Fan Efficacy: {formatFanEfficacy(runFan.computed?.actual_fan_efficacy_w_per_cfm ?? null)} W/CFM</div>
-                  <div>Compliance Statement: {fallbackText(runFan.computed?.compliance_statement)}</div>
-                </div>
+                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
+                  <div className="mt-2 space-y-1">
+                    <div>Actual Tested Watts: {fmtValue(runFan.data?.actual_tested_watts, "W")}</div>
+                    <div>Actual Tested Airflow from MCH-23: {fmtValue(runFan.data?.actual_tested_airflow_cfm, "CFM")}</div>
+                    <div>Required Fan Efficacy: {formatFanEfficacy(runFan.computed?.required_fan_efficacy_w_per_cfm ?? runFan.data?.required_fan_efficacy_w_per_cfm ?? null)} W/CFM</div>
+                    <div>Actual Fan Efficacy: {formatFanEfficacy(runFan.computed?.actual_fan_efficacy_w_per_cfm ?? null)} W/CFM</div>
+                    <div>Compliance Statement: {fallbackText(runFan.computed?.compliance_statement)}</div>
+                  </div>
+                </details>
 
                 <div className={eccActionRowClass}>
-                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
-                    {runFan.is_completed && "✅ Test completed"}
-                  </span>
+                  <div className="mr-auto text-sm">
+                    <div className="font-semibold text-slate-950">
+                      {runFan.is_completed ? "Test completed" : "Next action"}
+                    </div>
+                    <div className="text-xs text-slate-600">Complete once watt draw and airflow are verified. Save Draft remains available.</div>
+                  </div>
                   <SubmitButton
                     form={fanSaveFormId}
                     formNoValidate
@@ -3271,14 +3499,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   >
                     Complete Test
                   </SubmitButton>
-                  <button
-                    type="submit"
-                    form={fanDeleteFormId}
-                    className={eccSecondaryButtonClass}
-                  >
-                    Delete
-                  </button>
                 </div>
+
+                <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                  <summary className="cursor-pointer font-medium text-slate-700">Danger zone</summary>
+                  <div className="mt-2">
+                    <button
+                      type="submit"
+                      form={fanDeleteFormId}
+                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 sm:w-auto"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </details>
 
                 <form id={fanDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
@@ -3312,6 +3546,49 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               <div>{selectedSystemName}</div>
             </div>
 
+            {runFilter ? (
+              <div
+                className={`rounded-2xl border px-4 py-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:hidden ${
+                  runFilter.override_pass === true || runFilter.computed_pass === true
+                    ? "border-emerald-200 bg-emerald-50/70"
+                    : runFilter.override_pass === false || runFilter.computed_pass === false
+                    ? "border-red-200 bg-red-50/70"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className={eccUtilityLabelClass}>Focused Test</div>
+                    <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Air Filter Device Verification</div>
+                    <div className="mt-1 text-sm font-medium text-slate-700">{selectedSystemName}</div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      runFilter.override_pass === true || runFilter.computed_pass === true
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : runFilter.override_pass === false || runFilter.computed_pass === false
+                        ? "border-red-200 bg-red-50 text-red-800"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {getEffectiveResultLabel(runFilter)}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Face Area</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-950">{formatAreaSquareInches(runFilter.computed?.calculated_nominal_face_area_sq_in ?? null)}</div>
+                    <div className="text-[10px] font-medium text-slate-500">in²</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Required</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-950">{formatAreaSquareInches(runFilter.computed?.required_minimum_face_area_sq_in ?? null)}</div>
+                    <div className="text-[10px] font-medium text-slate-500">in²</div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {!runFilter ? (
               <form action={addEccTestRunFromForm} className="flex items-center gap-2">
                 <input type="hidden" name="job_id" value={job.id} />
@@ -3323,13 +3600,62 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </form>
             ) : (
               <>
-                <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
                 <form id={filterSaveFormId} action={saveAirFilterDeviceDataFromForm} className="grid gap-3 border-t pt-3">
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runFilter.id} />
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Measurement</div>
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`filter-airflow-${runFilter.id}`}>
+                        Design Airflow CFM
+                      </label>
+                      <input
+                        id={`filter-airflow-${runFilter.id}`}
+                        name="design_airflow_cfm"
+                        type="number"
+                        step="0.01"
+                        className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-base sm:font-normal sm:tracking-normal"
+                        defaultValue={runFilter.data?.design_airflow_cfm ?? ""}
+                        placeholder="Required for completion"
+                      />
+                    </div>
+                    <div
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${
+                        runFilter.override_pass === true || runFilter.computed_pass === true
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : runFilter.override_pass === false || runFilter.computed_pass === false
+                          ? "border-red-200 bg-red-50 text-red-800"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      {runFilter.override_pass === true
+                        ? "Pass override active"
+                        : runFilter.override_pass === false
+                        ? "Fail override active"
+                        : runFilter.computed_pass === true
+                        ? "Pass"
+                        : runFilter.computed_pass === false
+                        ? "Fail"
+                        : "Needs input"}
+                    </div>
+                  </div>
+
+                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
+                          <div className="mt-1 text-sm font-medium text-slate-800">
+                            {fmtValue(runFilter.data?.nominal_depth_inches, "in")} x {fmtValue(runFilter.data?.nominal_width_inches, "in")} x {fmtValue(runFilter.data?.nominal_length_inches, "in")}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                      </div>
+                    </summary>
+
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div className="grid gap-1 sm:col-span-2">
                       <label className="text-sm font-medium" htmlFor={`filter-location-${runFilter.id}`}>
                         Filter Location / Description
@@ -3429,8 +3755,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         defaultValue={runFilter.data?.design_allowable_pressure_drop_iwc ?? ""}
                       />
                     </div>
+                    </div>
+                  </details>
 
-                    <div className="grid gap-1 sm:col-span-2">
+                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
+                          <div className="mt-1 text-sm font-medium text-slate-800">No override flow · Notes optional</div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                      </div>
+                    </summary>
+                    <div className="mt-3 grid gap-1 sm:col-span-2">
                       <label className="text-sm font-medium" htmlFor={`filter-notes-${runFilter.id}`}>
                         Notes (optional)
                       </label>
@@ -3442,27 +3780,32 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         placeholder="Optional diagnostic notes"
                       />
                     </div>
-                  </div>
+                  </details>
                 </form>
 
                 <EccLivePreview mode="air_filter_device" formId={filterSaveFormId} projectType={job.project_type} />
 
-                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <div>Calculated Face Area: {formatAreaSquareInches(runFilter.computed?.calculated_nominal_face_area_sq_in ?? null)} in²</div>
-                  <div>Required Minimum Face Area: {formatAreaSquareInches(runFilter.computed?.required_minimum_face_area_sq_in ?? null)} in²</div>
-                  <div>
-                    Face Area Compliance: {String(runFilter.computed?.face_area_compliance ?? "pending")
-                      .replaceAll("_", " ")
-                      .replace(/\b\w/g, (m) => m.toUpperCase())}
+                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
+                  <div className="mt-2 space-y-1">
+                    <div>Calculated Face Area: {formatAreaSquareInches(runFilter.computed?.calculated_nominal_face_area_sq_in ?? null)} in²</div>
+                    <div>Required Minimum Face Area: {formatAreaSquareInches(runFilter.computed?.required_minimum_face_area_sq_in ?? null)} in²</div>
+                    <div>
+                      Face Area Compliance: {String(runFilter.computed?.face_area_compliance ?? "pending")
+                        .replaceAll("_", " ")
+                        .replace(/\b\w/g, (m) => m.toUpperCase())}
+                    </div>
+                    <div>Compliance Statement: {fallbackText(runFilter.computed?.compliance_statement)}</div>
                   </div>
-                  <div>Compliance Statement: {fallbackText(runFilter.computed?.compliance_statement)}</div>
-                </div>
+                </details>
 
                 <div className={eccActionRowClass}>
-                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
-                    {runFilter.is_completed && "✅ Test completed"}
-                  </span>
+                  <div className="mr-auto text-sm">
+                    <div className="font-semibold text-slate-950">
+                      {runFilter.is_completed ? "Test completed" : "Next action"}
+                    </div>
+                    <div className="text-xs text-slate-600">Complete once filter device inputs are verified. Save Draft remains available.</div>
+                  </div>
                   <SubmitButton
                     form={filterSaveFormId}
                     formNoValidate
@@ -3479,14 +3822,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   >
                     Complete Test
                   </SubmitButton>
-                  <button
-                    type="submit"
-                    form={filterDeleteFormId}
-                    className={eccSecondaryButtonClass}
-                  >
-                    Delete
-                  </button>
                 </div>
+
+                <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                  <summary className="cursor-pointer font-medium text-slate-700">Danger zone</summary>
+                  <div className="mt-2">
+                    <button
+                      type="submit"
+                      form={filterDeleteFormId}
+                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 sm:w-auto"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </details>
 
                 <form id={filterDeleteFormId} action={deleteEccTestRunFromForm}>
                   <input type="hidden" name="job_id" value={job.id} />
@@ -4183,6 +4532,49 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               <div>Refrigerant type on run: {fallbackText(runRC?.data?.refrigerant_type)}</div>
             </div>
 
+            {runRC ? (
+              <div
+                className={`rounded-2xl border px-4 py-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:hidden ${
+                  runRC.override_pass === true || runRC.computed_pass === true
+                    ? "border-emerald-200 bg-emerald-50/70"
+                    : runRC.override_pass === false || runRC.computed_pass === false
+                    ? "border-red-200 bg-red-50/70"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="flex min-w-0 items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className={eccUtilityLabelClass}>Focused Test</div>
+                    <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Refrigerant Charge</div>
+                    <div className="mt-1 text-sm font-medium text-slate-700">{selectedSystemName}</div>
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                      runRC.override_pass === true || runRC.computed_pass === true
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                        : runRC.override_pass === false || runRC.computed_pass === false
+                        ? "border-red-200 bg-red-50 text-red-800"
+                        : "border-slate-200 bg-slate-50 text-slate-700"
+                    }`}
+                  >
+                    {getEffectiveResultLabel(runRC)}
+                  </span>
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
+                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Subcool</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-950">{fmtValue(runRC.computed?.measured_subcool_f)}</div>
+                    <div className="text-[10px] font-medium text-slate-500">deg F</div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Superheat</div>
+                    <div className="mt-1 text-lg font-semibold text-slate-950">{fmtValue(runRC.computed?.measured_superheat_f)}</div>
+                    <div className="text-[10px] font-medium text-slate-500">deg F</div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {!runRC ? (
               carriedForwardRC ? (
                 <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-800">
@@ -4204,7 +4596,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               )
             ) : (
               <>
-                <div className="text-sm font-semibold text-slate-900">Required Inputs</div>
                 <form
                   id={rcSaveFormId}
                   action={saveRefrigerantChargeDataFromForm}
@@ -4215,7 +4606,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runRC.id} />
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Measurement</div>
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`lrdb-${runRC.id}`}>
                         Lowest Return Air Dry Bulb (°F)
@@ -4253,7 +4645,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         name="outdoor_temp_f"
                         type="number"
                         step="0.1"
-                        className="w-full rounded-md border px-3 py-2"
+                        className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-base sm:font-normal sm:tracking-normal"
                         defaultValue={runRC.data?.outdoor_temp_f ?? ""}
                       />
                     </div>
@@ -4304,6 +4696,41 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         defaultValue={runRC.data?.liquid_line_pressure_psig ?? ""}
                       />
                     </div>
+                    <div
+                      className={`sm:col-span-2 rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${
+                        runRC.override_pass === true || runRC.computed_pass === true
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : runRC.override_pass === false || runRC.computed_pass === false
+                          ? "border-red-200 bg-red-50 text-red-800"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      {runRC.override_pass === true
+                        ? "Pass override active"
+                        : runRC.override_pass === false
+                        ? "Fail override active"
+                        : runRC.computed_pass === true
+                        ? "Pass"
+                        : runRC.computed_pass === false
+                        ? "Fail"
+                        : "Needs input"}
+                    </div>
+                  </div>
+
+                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
+                          <div className="mt-1 text-sm font-medium text-slate-800">
+                            {fallbackText(runRC.data?.refrigerant_type)} · Target subcool {fmtValue(runRC.data?.target_subcool_f, "deg F")}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                      </div>
+                    </summary>
+
+                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
 
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`tcsat-${runRC.id}`}>
@@ -4387,66 +4814,127 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         Filter drier installed
                       </label>
                     </div>
-                  </div>
+                    </div>
+                  </details>
+
+                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
+                          <div className="mt-1 text-sm font-medium text-slate-800">
+                            {runRC.data?.verification_method === "photo_taken"
+                              ? "Photo attestation active"
+                              : runRC.data?.charge_exempt_reason
+                              ? "Exemption selected"
+                              : "No override · Notes optional"}
+                          </div>
+                        </div>
+                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                      </div>
+                    </summary>
+
+                    <div className="mt-3 space-y-2">
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="rc_photo_taken"
+                          defaultChecked={runRC.data?.verification_method === "photo_taken"}
+                        />
+                        Photo Taken - user attests gauge photo was captured
+                      </label>
+
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="rc_exempt_package_unit"
+                          defaultChecked={runRC.data?.charge_exempt_reason === "package_unit"}
+                        />
+                        Package unit - charge verification not required
+                      </label>
+
+                      <label className="flex items-center gap-2 text-sm">
+                        <input
+                          type="checkbox"
+                          name="rc_exempt_conditions"
+                          defaultChecked={runRC.data?.charge_exempt_reason === "conditions_not_met"}
+                        />
+                        Conditions not met / weather - override charge verification
+                      </label>
+
+                      <div className="grid gap-1">
+                        <label className="block text-xs font-medium text-slate-700">Notes/details (optional)</label>
+                        <input
+                          name="rc_override_details"
+                          className="w-full rounded-md border px-3 py-2 text-sm"
+                          defaultValue={runRC.data?.charge_exempt_details ?? ""}
+                          placeholder='Example: "Photo shows both gauges stable" or "Outdoor temp 48°F"'
+                        />
+                      </div>
+                    </div>
+                  </details>
 
                 </form>
 
                 <EccLivePreview mode="refrigerant_charge" formId={rcSaveFormId} projectType={job.project_type} />
 
-                <div className="text-sm font-semibold text-slate-900">Calculated / Result</div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <div>Overall Result: {getEffectiveResultLabel(runRC)}</div>
-                  {runRC.data?.verification_method === "photo_taken" ? (
-                    <>
-                      <div className="mt-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                        <div className="font-medium">Photo Taken</div>
-                        <div className="mt-1 text-xs">User confirmed gauge photo was captured. Numeric readings not entered.</div>
-                        {runRC.data?.photo_taken_timestamp && (
-                          <div className="mt-1 text-xs">
-                            Attested: {new Date(runRC.data.photo_taken_timestamp).toLocaleString()}
-                          </div>
-                        )}
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <div>Measured Subcool: {fmtValue(runRC.computed?.measured_subcool_f, "°F")}</div>
-                      <div>Measured Superheat: {fmtValue(runRC.computed?.measured_superheat_f, "°F")}</div>
-                    </>
-                  )}
-                  <div>Status: {fallbackText(runRC.computed?.status)}</div>
-                  {getComputedFailures(runRC).length > 0 ? (
-                    <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                      <div className="font-medium">Why overall result is failing</div>
-                      <ul className="mt-1 list-disc pl-5">
-                        {getComputedFailures(runRC).map((failure) => (
-                          <li key={failure}>{failure}</li>
-                        ))}
-                      </ul>
-                      {hasFilterDrierFailure(runRC) && refrigerantNumericChecksPassing(runRC) ? (
-                        <div className="mt-2">
-                          Subcool and superheat are passing. Overall result still fails until Filter drier installed is confirmed.
+                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
+                  <div className="mt-2 space-y-2">
+                    <div>Overall Result: {getEffectiveResultLabel(runRC)}</div>
+                    {runRC.data?.verification_method === "photo_taken" ? (
+                      <>
+                        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
+                          <div className="font-medium">Photo Taken</div>
+                          <div className="mt-1 text-xs">User confirmed gauge photo was captured. Numeric readings not entered.</div>
+                          {runRC.data?.photo_taken_timestamp && (
+                            <div className="mt-1 text-xs">
+                              Attested: {new Date(runRC.data.photo_taken_timestamp).toLocaleString()}
+                            </div>
+                          )}
                         </div>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-                
-                <div className="text-sm font-semibold text-slate-900">Override (Optional)</div>
-                <div className="rounded-md border p-3 mt-3 sm:col-span-2 space-y-2">
-                  <div className="text-xs text-slate-600">
-                    Select an option, then use Save Draft or Complete Test.
+                      </>
+                    ) : (
+                      <>
+                        <div>Measured Subcool: {fmtValue(runRC.computed?.measured_subcool_f, "°F")}</div>
+                        <div>Measured Superheat: {fmtValue(runRC.computed?.measured_superheat_f, "°F")}</div>
+                      </>
+                    )}
+                    <div>Status: {fallbackText(runRC.computed?.status)}</div>
+                    {getComputedFailures(runRC).length > 0 ? (
+                      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
+                        <div className="font-medium">Why overall result is failing</div>
+                        <ul className="mt-1 list-disc pl-5">
+                          {getComputedFailures(runRC).map((failure) => (
+                            <li key={failure}>{failure}</li>
+                          ))}
+                        </ul>
+                        {hasFilterDrierFailure(runRC) && refrigerantNumericChecksPassing(runRC) ? (
+                          <div className="mt-2">
+                            Subcool and superheat are passing. Overall result still fails until Filter drier installed is confirmed.
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </div>
+                </details>
 
-                  <label className="flex items-center gap-2 text-sm">
-                    <input
-                      form={rcSaveFormId}
-                      type="checkbox"
-                      name="rc_photo_taken"
-                      defaultChecked={runRC.data?.verification_method === "photo_taken"}
-                    />
-                    Photo Taken — user attests gauge photo was captured
-                  </label>
+                <details className="rounded-md border p-3 mt-3 sm:col-span-2 space-y-2">
+                  <summary className="cursor-pointer font-semibold text-slate-900">Evidence / Attachments</summary>
+
+                  <div className="mt-2 rounded-md border border-blue-100 bg-blue-50/80 px-3 py-3 text-xs text-blue-800">
+                    <div className="font-medium text-blue-900">
+                      Photo Taken records the field attestation. Attach the photo to the job for supporting evidence.
+                    </div>
+                    <div className="mt-2">
+                      <Link
+                        href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
+                        className={eccSecondaryButtonClass}
+                      >
+                        Attach refrigerant charge photo
+                      </Link>
+                    </div>
+                  </div>
 
                   <div className="rounded-md border border-blue-100 bg-blue-50/80 px-3 py-3 text-xs text-blue-800">
                     <div className="font-medium text-blue-900">
@@ -4521,42 +5009,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </div>
 
-                  <label className="flex items-center gap-2 text-sm mt-2">
-                    <input
-                      form={rcSaveFormId}
-                      type="checkbox"
-                      name="rc_exempt_package_unit"
-                      defaultChecked={runRC.data?.charge_exempt_reason === "package_unit"}
-                    />
-                    Package unit — charge verification not required
-                  </label>
-
-                  <label className="flex items-center gap-2 text-sm mt-2">
-                    <input
-                      form={rcSaveFormId}
-                      type="checkbox"
-                      name="rc_exempt_conditions"
-                      defaultChecked={runRC.data?.charge_exempt_reason === "conditions_not_met"}
-                    />
-                    Conditions not met / weather — override charge verification
-                  </label>
-
-                  <div className="mt-2">
-                    <label className="block text-xs mb-1">Notes/details (optional)</label>
-                    <input
-                      form={rcSaveFormId}
-                      name="rc_override_details"
-                      className="w-full rounded-md border px-3 py-2 text-sm"
-                      defaultValue={runRC.data?.charge_exempt_details ?? ""}
-                      placeholder='Example: "Photo shows both gauges stable" or "Outdoor temp 48°F"'
-                    />
-                  </div>
-                </div>
+                </details>
 
                 <div className={eccActionRowClass}>
-                  <span className="text-sm font-medium text-emerald-700 flex items-center gap-2">
-                    {runRC.is_completed && "✅ Test completed"}
-                  </span>
+                  <div className="mr-auto text-sm">
+                    <div className="font-semibold text-slate-950">
+                      {runRC.is_completed ? "Test completed" : "Next action"}
+                    </div>
+                    <div className="text-xs text-slate-600">Complete once charge readings are verified. Save Draft remains available.</div>
+                  </div>
                   <SubmitButton
                     form={rcSaveFormId}
                     loadingText="Saving..."
@@ -4572,14 +5033,21 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   >
                     Complete Test
                   </SubmitButton>
-                  <form action={deleteEccTestRunFromForm}>
+                </div>
+
+                <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700">
+                  <summary className="cursor-pointer font-medium text-slate-700">Danger zone</summary>
+                  <form action={deleteEccTestRunFromForm} className="mt-2">
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="test_run_id" value={runRC.id} />
-                    <button type="submit" className={eccSecondaryButtonClass}>
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 sm:w-auto"
+                    >
                       Delete
                     </button>
                   </form>
-                </div>
+                </details>
               </>
             )}
           </div>
