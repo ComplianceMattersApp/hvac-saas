@@ -20,11 +20,21 @@ export const MAINTENANCE_AGREEMENT_TEMPLATE_SELECT = [
   "default_visit_scope_items",
   "internal_notes_default",
   "lifecycle_status",
+  "locked_field_keys",
+  "lock_policy_version",
   "created_by_user_id",
   "updated_by_user_id",
   "created_at",
   "updated_at",
 ].join(", ");
+
+export const MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS = [
+  "agreement_name",
+  "agreement_type",
+  "frequency",
+  "default_visit_scope_summary",
+  "default_visit_scope_items",
+] as const;
 
 export const MAINTENANCE_AGREEMENT_TEMPLATE_LIFECYCLE_STATUSES = ["active", "archived"] as const;
 
@@ -41,6 +51,8 @@ export type MaintenanceAgreementTemplateRow = {
   default_visit_scope_items: VisitScopeItem[];
   internal_notes_default: string | null;
   lifecycle_status: MaintenanceAgreementTemplateLifecycleStatus | string;
+  locked_field_keys: string[];
+  lock_policy_version: number;
   created_by_user_id: string;
   updated_by_user_id: string;
   created_at: string;
@@ -89,6 +101,23 @@ export function normalizeMaintenanceAgreementTemplateLifecycleStatus(
 }
 
 function parseTemplateRow(raw: any): MaintenanceAgreementTemplateRow {
+  const lockPolicyVersionRaw = Number(raw?.lock_policy_version);
+  const lockPolicyVersion = Number.isInteger(lockPolicyVersionRaw) && lockPolicyVersionRaw > 0
+    ? lockPolicyVersionRaw
+    : 1;
+
+  const lockedFieldKeysRaw = Array.isArray(raw?.locked_field_keys)
+    ? raw.locked_field_keys
+    : MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS;
+  const lockedFieldKeySet = new Set<string>();
+  for (const entry of lockedFieldKeysRaw as unknown[]) {
+    const normalized = cleanString(entry);
+    if (normalized) {
+      lockedFieldKeySet.add(normalized);
+    }
+  }
+  const lockedFieldKeys = Array.from(lockedFieldKeySet);
+
   return {
     id: cleanString(raw?.id),
     account_owner_user_id: cleanString(raw?.account_owner_user_id),
@@ -99,6 +128,11 @@ function parseTemplateRow(raw: any): MaintenanceAgreementTemplateRow {
     default_visit_scope_items: sanitizeVisitScopeItems(raw?.default_visit_scope_items),
     internal_notes_default: normalizeMaintenanceAgreementTemplateInternalNotes(raw?.internal_notes_default),
     lifecycle_status: normalizeMaintenanceAgreementTemplateLifecycleStatus(raw?.lifecycle_status),
+    locked_field_keys:
+      lockedFieldKeys.length > 0
+        ? lockedFieldKeys
+        : [...MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS],
+    lock_policy_version: lockPolicyVersion,
     created_by_user_id: cleanString(raw?.created_by_user_id),
     updated_by_user_id: cleanString(raw?.updated_by_user_id),
     created_at: cleanString(raw?.created_at),

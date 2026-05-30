@@ -44,6 +44,9 @@ type MockAgreement = {
   source_template_lifecycle_status_snapshot: string | null;
   source_template_applied_at: string | null;
   source_template_snapshot: Record<string, unknown> | null;
+  template_locked_field_keys: unknown;
+  template_lock_policy_version: unknown;
+  template_lock_snapshot_applied_at: string | null;
   created_by_user_id: string;
   updated_by_user_id: string;
   created_at: string;
@@ -104,6 +107,9 @@ function makeAgreement(input: Partial<MockAgreement> & { id: string }): MockAgre
     source_template_lifecycle_status_snapshot: null,
     source_template_applied_at: null,
     source_template_snapshot: null,
+    template_locked_field_keys: null,
+    template_lock_policy_version: null,
+    template_lock_snapshot_applied_at: null,
     created_by_user_id: "user-1",
     updated_by_user_id: "user-1",
     created_at: "2026-01-01T00:00:00Z",
@@ -565,6 +571,29 @@ describe("maintenance agreement read model", () => {
     expect(rows[0]?.source_template_snapshot).toMatchObject({
       agreement_type: "service_plan",
       frequency: "annual",
+    });
+  });
+
+  it("projects template lock snapshot metadata when present", async () => {
+    const { supabase } = makeSupabaseMock([
+      makeAgreement({
+        id: "a-locks",
+        template_locked_field_keys: ["agreement_name", "frequency", "frequency"],
+        template_lock_policy_version: 2,
+        template_lock_snapshot_applied_at: "2026-05-30T11:00:00Z",
+      }),
+    ]);
+
+    const rows = await listMaintenanceAgreementsForCustomer({
+      supabase,
+      accountOwnerUserId: ACCOUNT_OWNER,
+      customerId: CUSTOMER_ID,
+    });
+
+    expect(rows[0]).toMatchObject({
+      template_locked_field_keys: ["agreement_name", "frequency"],
+      template_lock_policy_version: 2,
+      template_lock_snapshot_applied_at: "2026-05-30T11:00:00Z",
     });
   });
 

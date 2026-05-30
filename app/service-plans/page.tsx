@@ -17,6 +17,7 @@ import {
 import {
   archiveMaintenanceAgreementTemplate,
   createMaintenanceAgreementTemplate,
+  duplicateMaintenanceAgreementTemplate,
   updateMaintenanceAgreementTemplate,
 } from "@/lib/maintenance-agreements/template-actions";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
@@ -283,6 +284,28 @@ export default async function ServicePlansPage({
     redirect(buildServicePlansHref({ filter, banner: "template_archived" }));
   }
 
+  async function duplicateTemplateFromForm(formData: FormData) {
+    "use server";
+
+    const filter = String(formData.get("return_filter") ?? "").trim().toLowerCase();
+    const result = await duplicateMaintenanceAgreementTemplate({
+      templateId: String(formData.get("template_id") ?? ""),
+    });
+
+    if (!result.success) {
+      redirect(
+        buildServicePlansHref({
+          filter,
+          banner: "template_duplicate_failed",
+          message: result.error,
+        }),
+      );
+    }
+
+    revalidatePath("/service-plans");
+    redirect(buildServicePlansHref({ filter, banner: "template_duplicated" }));
+  }
+
   const result = await listMaintenanceAgreementDrilldownForAccount({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
@@ -368,9 +391,14 @@ export default async function ServicePlansPage({
           Template archived.
         </section>
       ) : null}
-      {banner === "template_create_failed" || banner === "template_update_failed" || banner === "template_archive_failed" ? (
+      {banner === "template_duplicated" ? (
+        <section className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          Template duplicated.
+        </section>
+      ) : null}
+      {banner === "template_create_failed" || banner === "template_update_failed" || banner === "template_archive_failed" || banner === "template_duplicate_failed" ? (
         <section className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
-          <div className="font-semibold">Template update failed.</div>
+          <div className="font-semibold">Template action failed.</div>
           <div className="mt-1 text-xs text-rose-800">{bannerMessage || "Please review your input and try again."}</div>
         </section>
       ) : null}
@@ -585,6 +613,17 @@ export default async function ServicePlansPage({
                         Save Template
                       </button>
                     </div>
+                  </form>
+
+                  <form action={duplicateTemplateFromForm} className="mt-3 border-t border-slate-100 pt-3">
+                    <input type="hidden" name="template_id" value={template.id} />
+                    <input type="hidden" name="return_filter" value={selectedFilter} />
+                    <button
+                      type="submit"
+                      className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-[background-color,border-color] hover:border-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                    >
+                      Duplicate Template
+                    </button>
                   </form>
 
                   <form action={archiveTemplateFromForm} className="mt-3 border-t border-slate-100 pt-3">

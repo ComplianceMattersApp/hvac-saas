@@ -16,6 +16,8 @@ type MockTemplate = {
   default_visit_scope_items: unknown;
   internal_notes_default: string | null;
   lifecycle_status: string;
+  locked_field_keys: unknown;
+  lock_policy_version: unknown;
   created_by_user_id: string;
   updated_by_user_id: string;
   created_at: string;
@@ -32,6 +34,14 @@ function makeTemplate(input: Partial<MockTemplate> & { id: string }): MockTempla
     default_visit_scope_items: [],
     internal_notes_default: null,
     lifecycle_status: "active",
+    locked_field_keys: [
+      "agreement_name",
+      "agreement_type",
+      "frequency",
+      "default_visit_scope_summary",
+      "default_visit_scope_items",
+    ],
+    lock_policy_version: 1,
     created_by_user_id: "user-1",
     updated_by_user_id: "user-1",
     created_at: "2026-05-01T00:00:00Z",
@@ -163,5 +173,29 @@ describe("maintenance agreement template read model", () => {
     expect(normalizeMaintenanceAgreementTemplateLifecycleStatus("archived")).toBe("archived");
     expect(normalizeMaintenanceAgreementTemplateLifecycleStatus("ACTIVE")).toBe("active");
     expect(normalizeMaintenanceAgreementTemplateName("  Spring   Plan  ")).toBe("Spring Plan");
+  });
+
+  it("normalizes lock metadata with defaults when source values are invalid", async () => {
+    const { supabase } = makeSupabaseMock([
+      makeTemplate({
+        id: "tpl-1",
+        locked_field_keys: "invalid",
+        lock_policy_version: 0,
+      }),
+    ]);
+
+    const rows = await listMaintenanceAgreementTemplatesForAccount({
+      supabase,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(rows[0]?.locked_field_keys).toEqual([
+      "agreement_name",
+      "agreement_type",
+      "frequency",
+      "default_visit_scope_summary",
+      "default_visit_scope_items",
+    ]);
+    expect(rows[0]?.lock_policy_version).toBe(1);
   });
 });

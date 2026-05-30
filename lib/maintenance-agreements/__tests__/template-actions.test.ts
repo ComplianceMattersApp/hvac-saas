@@ -33,6 +33,20 @@ function makeInternalAccessError(code: "AUTH_REQUIRED" | "INTERNAL_USER_REQUIRED
 function makeSupabaseClient() {
   const insertCalls: unknown[] = [];
   const updateCalls: unknown[] = [];
+  const templateRowsById: Record<string, any> = {
+    "tpl-duplicate-source": {
+      id: "tpl-duplicate-source",
+      template_name: "Spring Plan",
+      agreement_type: "maintenance",
+      frequency: "quarterly",
+      default_visit_scope_summary: "Seasonal tune-up",
+      default_visit_scope_items: [{ title: "Inspect condenser", details: "Clean" }],
+      internal_notes_default: "Source notes",
+      locked_field_keys: ["agreement_name", "frequency"],
+      lock_policy_version: 3,
+    },
+  };
+  const templateNames = ["Spring Plan", "Spring Plan Copy"];
 
   const client = {
     from: vi.fn((table: string) => {
@@ -105,24 +119,43 @@ function makeSupabaseClient() {
 
           return { eq: firstEq };
         }),
-        select: vi.fn(() => ({
-          eq: vi.fn((column: string, value: unknown) => {
-            const id = column === "id" ? String(value ?? "") : "";
+        select: vi.fn((columns?: string) => {
+          if ((columns ?? "").includes("template_name") && !(columns ?? "").includes("id")) {
             return {
-              eq: vi.fn((innerColumn: string, innerValue: unknown) => {
-                const owner = innerColumn === "account_owner_user_id" ? String(innerValue ?? "") : "";
-                return {
-                  maybeSingle: vi.fn(async () => {
-                    if (id === "tpl-already-archived" && owner === "owner-1") {
-                      return { data: { id: "tpl-already-archived" }, error: null };
-                    }
-                    return { data: null, error: null };
-                  }),
-                };
-              }),
+              eq: vi.fn(() => ({
+                limit: vi.fn(async () => ({
+                  data: templateNames.map((template_name) => ({ template_name })),
+                  error: null,
+                })),
+              })),
             };
-          }),
-        })),
+          }
+
+          return {
+            eq: vi.fn((column: string, value: unknown) => {
+              const id = column === "id" ? String(value ?? "") : "";
+              return {
+                eq: vi.fn((innerColumn: string, innerValue: unknown) => {
+                  const owner = innerColumn === "account_owner_user_id" ? String(innerValue ?? "") : "";
+                  return {
+                    maybeSingle: vi.fn(async () => {
+                      if (owner !== "owner-1") {
+                        return { data: null, error: null };
+                      }
+                      if (templateRowsById[id]) {
+                        return { data: templateRowsById[id], error: null };
+                      }
+                      if (id === "tpl-already-archived") {
+                        return { data: { id: "tpl-already-archived" }, error: null };
+                      }
+                      return { data: null, error: null };
+                    }),
+                  };
+                }),
+              };
+            }),
+          };
+        }),
       };
     }),
     _insertCalls: insertCalls,
@@ -136,6 +169,7 @@ const {
   createMaintenanceAgreementTemplate,
   updateMaintenanceAgreementTemplate,
   archiveMaintenanceAgreementTemplate,
+  duplicateMaintenanceAgreementTemplate,
 } = await import("@/lib/maintenance-agreements/template-actions");
 
 describe("maintenance agreement template actions", () => {
@@ -289,6 +323,31 @@ describe("maintenance agreement template actions", () => {
     expect(supabase._updateCalls).toContainEqual({
       lifecycle_status: "archived",
       updated_by_user_id: "user-1",
+    });
+  });
+
+  it("duplicates template with copied lock metadata and collision-safe naming", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+
+    const result = await duplicateMaintenanceAgreementTemplate({
+      templateId: "tpl-duplicate-source",
+    });
+
+    expect(result).toEqual({ success: true, templateId: "tpl-1" });
+    expect(supabase._insertCalls).toHaveLength(1);
+    expect(supabase._insertCalls[0]).toMatchObject({
+      account_owner_user_id: "owner-1",
+      created_by_user_id: "user-1",
+      updated_by_user_id: "user-1",
+      template_name: "Spring Plan Copy 2",
+      agreement_type: "maintenance",
+      frequency: "quarterly",
+      default_visit_scope_summary: "Seasonal tune-up",
+      internal_notes_default: "Source notes",
+      locked_field_keys: ["agreement_name", "frequency"],
+      lock_policy_version: 3,
+      lifecycle_status: "active",
     });
   });
 });

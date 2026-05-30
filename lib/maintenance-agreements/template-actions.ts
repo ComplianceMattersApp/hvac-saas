@@ -9,6 +9,7 @@ import {
   MAINTENANCE_AGREEMENT_TYPES,
 } from "@/lib/maintenance-agreements/read-model";
 import {
+  MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS,
   normalizeMaintenanceAgreementTemplateInternalNotes,
   normalizeMaintenanceAgreementTemplateName,
 } from "@/lib/maintenance-agreements/template-read-model";
@@ -39,6 +40,22 @@ type ArchiveMaintenanceAgreementTemplateParams = {
   templateId: string;
 };
 
+type DuplicateMaintenanceAgreementTemplateParams = {
+  templateId: string;
+};
+
+type DuplicateTemplateSourceRow = {
+  id: string;
+  template_name: string;
+  agreement_type: string;
+  frequency: string;
+  default_visit_scope_summary: string | null;
+  default_visit_scope_items: unknown;
+  internal_notes_default: string | null;
+  locked_field_keys: unknown;
+  lock_policy_version: unknown;
+};
+
 function cleanString(value: unknown) {
   return String(value ?? "").trim();
 }
@@ -66,6 +83,51 @@ function parseVisitScopeItemsJson(value: unknown) {
       error: "Default Work Items must be valid visit scope items.",
     };
   }
+}
+
+function normalizeLockedFieldKeys(value: unknown) {
+  if (!Array.isArray(value)) {
+    return [...MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS];
+  }
+
+  const deduped = Array.from(
+    new Set(
+      value
+        .map((item) => cleanString(item))
+        .filter(Boolean),
+    ),
+  );
+
+  return deduped.length > 0
+    ? deduped
+    : [...MAINTENANCE_AGREEMENT_TEMPLATE_REQUIRED_LOCKED_FIELD_KEYS];
+}
+
+function normalizeLockPolicyVersion(value: unknown) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : 1;
+}
+
+function buildDuplicateTemplateName(baseName: string, existingNames: string[]) {
+  const normalizedBase = normalizeMaintenanceAgreementTemplateName(baseName);
+  const fallbackBase = normalizedBase || "Template";
+  const copyBase = `${fallbackBase} Copy`;
+
+  const lowerTaken = new Set(existingNames.map((name) => normalizeMaintenanceAgreementTemplateName(name).toLowerCase()));
+  if (!lowerTaken.has(copyBase.toLowerCase())) {
+    return copyBase;
+  }
+
+  let suffix = 2;
+  while (suffix < 1000) {
+    const candidate = `${copyBase} ${suffix}`;
+    if (!lowerTaken.has(candidate.toLowerCase())) {
+      return candidate;
+    }
+    suffix += 1;
+  }
+
+  return `${copyBase} ${Date.now()}`;
 }
 
 async function resolveTemplateMutationScope() {
@@ -291,4 +353,104 @@ export async function archiveMaintenanceAgreementTemplate(
   }
 
   return { success: true, templateId: cleanString(data.id) };
+}
+
+export async function duplicateMaintenanceAgreementTemplate(
+  params: DuplicateMaintenanceAgreementTemplateParams,
+): Promise<TemplateMutationResult> {
+  const scope = await resolveTemplateMutationScope();
+  if (!scope.success) return scope;
+
+  const templateId = cleanString(params.templateId);
+  if (!templateId) {
+    return { success: false, error: "Template id is required." };
+  }
+
+  const { data: sourceTemplate, error: sourceTemplateError } = await scope.supabase
+    .from("maintenance_agreement_templates")
+    .select(
+      [
+        "id",
+        "template_name",
+        "agreement_type",
+        "frequency",
+        "default_visit_scope_summary",
+        "default_visit_scope_items",
+        "internal_notes_default",
+        "locked_field_keys",
+        "lock_policy_version",
+      ].join(", "),
+    )
+    .eq("id", templateId)
+    .eq("account_owner_user_id", scope.accountOwnerUserId)
+    .maybeSingle();
+
+  if (sourceTemplateError) {
+    return {
+      success: false,
+      error:
+        sourceTemplateError.message ??
+        "Failed to load maintenance agreement template for duplication.",
+    };
+  }
+
+  const sourceTemplateRow = (sourceTemplate ?? null) as DuplicateTemplateSourceRow | null;
+
+  if (!sourceTemplateRow?.id) {
+    return { success: false, error: "Maintenance agreement template is out of scope." };
+  }
+
+  const sourceTemplateName = normalizeMaintenanceAgreementTemplateName(sourceTemplateRow.template_name);
+  const { data: siblingTemplateRows, error: siblingTemplateRowsError } = await scope.supabase
+    .from("maintenance_agreement_templates")
+    .select("template_name")
+    .eq("account_owner_user_id", scope.accountOwnerUserId)
+    .limit(500);
+
+  if (siblingTemplateRowsError) {
+    return {
+      success: false,
+      error:
+        siblingTemplateRowsError.message ??
+        "Failed to resolve duplicate template naming.",
+    };
+  }
+
+  const duplicateTemplateName = buildDuplicateTemplateName(
+    sourceTemplateName,
+    (Array.isArray(siblingTemplateRows) ? siblingTemplateRows : []).map((row: any) =>
+      String(row?.template_name ?? ""),
+    ),
+  );
+
+  const { data: duplicatedTemplate, error: duplicateError } = await scope.supabase
+    .from("maintenance_agreement_templates")
+    .insert({
+      account_owner_user_id: scope.accountOwnerUserId,
+      template_name: duplicateTemplateName,
+      agreement_type: cleanString(sourceTemplateRow.agreement_type).toLowerCase(),
+      frequency: cleanString(sourceTemplateRow.frequency).toLowerCase(),
+      default_visit_scope_summary: sanitizeVisitScopeSummary(sourceTemplateRow.default_visit_scope_summary),
+      default_visit_scope_items: sanitizeVisitScopeItems(sourceTemplateRow.default_visit_scope_items),
+      internal_notes_default: normalizeMaintenanceAgreementTemplateInternalNotes(
+        sourceTemplateRow.internal_notes_default,
+      ),
+      locked_field_keys: normalizeLockedFieldKeys(sourceTemplateRow.locked_field_keys),
+      lock_policy_version: normalizeLockPolicyVersion(sourceTemplateRow.lock_policy_version),
+      lifecycle_status: "active",
+      created_by_user_id: scope.userId,
+      updated_by_user_id: scope.userId,
+    })
+    .select("id")
+    .single();
+
+  if (duplicateError || !duplicatedTemplate?.id) {
+    return {
+      success: false,
+      error:
+        duplicateError?.message ?? "Failed to duplicate maintenance agreement template.",
+    };
+  }
+
+  return { success: true, templateId: cleanString(duplicatedTemplate.id) };
 }

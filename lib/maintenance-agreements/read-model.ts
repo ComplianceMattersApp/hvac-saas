@@ -25,6 +25,9 @@ export const MAINTENANCE_AGREEMENT_SELECT = [
   "source_template_lifecycle_status_snapshot",
   "source_template_applied_at",
   "source_template_snapshot",
+  "template_locked_field_keys",
+  "template_lock_policy_version",
+  "template_lock_snapshot_applied_at",
   "created_by_user_id",
   "updated_by_user_id",
   "created_at",
@@ -99,6 +102,9 @@ export type MaintenanceAgreementRow = {
   source_template_lifecycle_status_snapshot: string | null;
   source_template_applied_at: string | null;
   source_template_snapshot: Record<string, unknown> | null;
+  template_locked_field_keys: string[] | null;
+  template_lock_policy_version: number | null;
+  template_lock_snapshot_applied_at: string | null;
   created_by_user_id: string;
   updated_by_user_id: string;
   created_at: string;
@@ -555,6 +561,17 @@ function normalizeAgreementRow(row: MaintenanceAgreementRow): MaintenanceAgreeme
     row.source_template_snapshot && typeof row.source_template_snapshot === "object" && !Array.isArray(row.source_template_snapshot)
       ? row.source_template_snapshot
       : null;
+  const templateLockedFieldKeys =
+    Array.isArray(row.template_locked_field_keys)
+      ? row.template_locked_field_keys
+          .map((value) => toCleanString(String(value ?? "")))
+          .filter(Boolean)
+      : null;
+  const templateLockPolicyVersionRaw = Number(row.template_lock_policy_version);
+  const templateLockPolicyVersion =
+    Number.isInteger(templateLockPolicyVersionRaw) && templateLockPolicyVersionRaw > 0
+      ? templateLockPolicyVersionRaw
+      : null;
 
   return {
     ...row,
@@ -567,6 +584,13 @@ function normalizeAgreementRow(row: MaintenanceAgreementRow): MaintenanceAgreeme
       toCleanString(row.source_template_lifecycle_status_snapshot) || null,
     source_template_applied_at: toCleanString(row.source_template_applied_at) || null,
     source_template_snapshot: sourceTemplateSnapshot,
+    template_locked_field_keys:
+      templateLockedFieldKeys && templateLockedFieldKeys.length > 0
+        ? Array.from(new Set(templateLockedFieldKeys))
+        : null,
+    template_lock_policy_version: templateLockPolicyVersion,
+    template_lock_snapshot_applied_at:
+      toCleanString(row.template_lock_snapshot_applied_at) || null,
   };
 }
 

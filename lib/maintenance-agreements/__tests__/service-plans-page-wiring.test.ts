@@ -24,11 +24,16 @@ describe("service plans template management wiring", () => {
     expect(servicePlansPageSource).toContain("createMaintenanceAgreementTemplate");
     expect(servicePlansPageSource).toContain("updateMaintenanceAgreementTemplate");
     expect(servicePlansPageSource).toContain("archiveMaintenanceAgreementTemplate");
+    expect(servicePlansPageSource).toContain("duplicateMaintenanceAgreementTemplate");
     expect(servicePlansPageSource).toContain("isTemplateStoreUnavailableError");
     expect(servicePlansPageSource).toContain("templateStoreUnavailable");
     expect(servicePlansPageSource).toContain("createTemplateFromForm");
     expect(servicePlansPageSource).toContain("updateTemplateFromForm");
     expect(servicePlansPageSource).toContain("archiveTemplateFromForm");
+    expect(servicePlansPageSource).toContain("duplicateTemplateFromForm");
+    expect(servicePlansPageSource).toContain("template_duplicated");
+    expect(servicePlansPageSource).toContain("template_duplicate_failed");
+    expect(servicePlansPageSource).toContain("Duplicate Template");
   });
 
   it("keeps active templates primary and archived templates secondary", () => {
