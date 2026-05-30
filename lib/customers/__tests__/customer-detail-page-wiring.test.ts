@@ -88,6 +88,11 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Template packages standardize agreement details.");
     expect(customerPageSource).toContain("Started from template:");
     expect(customerPageSource).toContain("Template changes do not automatically update this customer Service Plan.");
+    expect(customerPageSource).toContain("Locked by template package");
+    expect(customerPageSource).toContain("Duplicate the template to customize package details.");
+    expect(customerPageSource).toContain("Customer-specific details can still be edited.");
+    expect(customerPageSource).toContain("Template package details - locked");
+    expect(customerPageSource).toContain("Customer-specific details");
     expect(customerPageSource).toContain("Billing Attention");
     expect(customerPageSource).toContain("Scheduling");
     expect(customerPageSource).toContain("Add Billing Period");
