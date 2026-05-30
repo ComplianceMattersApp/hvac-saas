@@ -14,6 +14,7 @@ type JobSubpageContextHeaderProps = {
   opsStatusKey: string;
   backHref: string;
   backLabel?: string;
+  compactMobile?: boolean;
 };
 
 function fieldStatusTone(statusKey: string) {
@@ -58,17 +59,22 @@ export default function JobSubpageContextHeader({
   opsStatusKey,
   backHref,
   backLabel = "Back to Job",
+  compactMobile = false,
 }: JobSubpageContextHeaderProps) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_36px_-30px_rgba(15,23,42,0.28)] sm:p-5">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-2.5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{workspaceLabel}</div>
-          <h1 className="text-2xl font-semibold tracking-tight text-slate-950">{workspaceTitle}</h1>
+    <section
+      className={`rounded-2xl border border-slate-200 bg-white shadow-[0_18px_36px_-30px_rgba(15,23,42,0.28)] ${
+        compactMobile ? "p-3.5 sm:p-5" : "p-4 sm:p-5"
+      }`}
+    >
+      <div className={`flex flex-col sm:flex-row sm:items-start sm:justify-between ${compactMobile ? "gap-3 sm:gap-4" : "gap-4"}`}>
+        <div className={`min-w-0 ${compactMobile ? "space-y-1.5 sm:space-y-2.5" : "space-y-2.5"}`}>
+          <div className={`${compactMobile ? "hidden sm:block" : ""} text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500`}>{workspaceLabel}</div>
+          <h1 className={`${compactMobile ? "text-xl sm:text-2xl" : "text-2xl"} font-semibold tracking-tight text-slate-950`}>{workspaceTitle}</h1>
           <div className="text-sm font-semibold text-slate-800">{customerName}</div>
-          <div className="text-sm text-slate-600">{jobTitle}</div>
+          <div className={`${compactMobile ? "hidden sm:block" : ""} text-sm text-slate-600`}>{jobTitle}</div>
 
-          <div className="flex flex-wrap items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em]">
+          <div className={`flex flex-wrap items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] ${compactMobile ? "pt-1 sm:pt-0" : ""}`}>
             <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-slate-700">
               {jobTypeLabel}
             </span>
@@ -81,7 +87,7 @@ export default function JobSubpageContextHeader({
           </div>
 
           <div className="text-sm text-slate-600">{addressLabel}</div>
-          <div className="text-sm text-slate-600">{appointmentLabel}</div>
+          <div className={`${compactMobile ? "hidden sm:block" : ""} text-sm text-slate-600`}>{appointmentLabel}</div>
         </div>
 
         <Link

@@ -1180,6 +1180,15 @@ export default async function JobTestsPage({
       : null;
 
   const packageSystem = isPackageSystem(selectedSystemEquipment);
+  const mobileNextTestRow =
+    selectedSystemStatusRows.find((row) => !row.complete && !row.carriedForward) ??
+    selectedSystemStatusRows.find((row) => !row.carriedForward) ??
+    selectedSystemStatusRows[0] ??
+    null;
+  const mobileNextTestType = mobileNextTestRow?.testType ? String(mobileNextTestRow.testType) : "";
+  const mobileNextTestLabel = mobileNextTestType
+    ? getTestDisplayLabel(mobileNextTestType, packageSystem)
+    : "Tests";
 
 const primaryEquipment =
   selectedSystemEquipment.find((eq: any) => isPackageEquipment(eq)) ??
@@ -1478,8 +1487,115 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           fieldStatusKey={normalizedStatus}
           opsStatusKey={normalizedOpsStatus}
           backHref={`/jobs/${job.id}`}
+          compactMobile
         />
-      <div className={`${isDuctLeakageFocused ? "hidden sm:block" : ""} rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5 print:hidden`}>
+
+      <section className={`${isDuctLeakageFocused ? "hidden" : "space-y-3"} sm:hidden print:hidden`}>
+        <div className="rounded-2xl border border-blue-200 bg-white px-4 py-3.5 shadow-[0_16px_28px_-26px_rgba(29,78,216,0.24)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-lg font-semibold text-slate-950">Status &amp; Progress</div>
+              <div className="mt-1 text-sm font-semibold text-slate-700">{selectedSystemName}</div>
+            </div>
+            <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              {selectedCompletionLabel}
+            </span>
+          </div>
+
+          <div className="mt-3 grid grid-cols-4 gap-1.5 text-center">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5">
+              <div className="text-base font-semibold text-slate-950">{selectedRequiredRemainingCount}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Left</div>
+            </div>
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1.5">
+              <div className="text-base font-semibold text-emerald-950">{selectedCompletedCount}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-700">Done</div>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5">
+              <div className="text-base font-semibold text-blue-950">{selectedDraftCount}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700">Draft</div>
+            </div>
+            <div className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5">
+              <div className="text-base font-semibold text-sky-950">{selectedNotStartedCount}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-700">New</div>
+            </div>
+          </div>
+
+          {selectedAttentionCount > 0 ? (
+            <div className="mt-2 rounded-xl border-l-4 border-amber-400 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-950">
+              {selectedAttentionCount} test result needs attention before closeout.
+            </div>
+          ) : null}
+
+          <div className="mt-3">
+            {selectedSystemId && mobileNextTestType ? (
+              <Link
+                href={withS(mobileNextTestType, selectedSystemId)}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-colors hover:bg-blue-800"
+              >
+                Continue {mobileNextTestLabel}
+              </Link>
+            ) : (
+              <Link
+                href={`/jobs/${job.id}/info?f=equipment`}
+                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-colors hover:bg-blue-800"
+              >
+                Add / View Equipment
+              </Link>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          <Link
+            href={`/jobs/${job.id}/info?f=equipment`}
+            className="inline-flex min-h-14 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-colors hover:bg-slate-50"
+          >
+            Equipment
+          </Link>
+          <Link
+            href={selectedSystemId ? withS(undefined, selectedSystemId) : `/jobs/${job.id}/tests`}
+            className="inline-flex min-h-14 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-colors hover:bg-slate-50"
+          >
+            Test Queue
+          </Link>
+          <label
+            htmlFor="completion-report-toggle"
+            className="inline-flex min-h-14 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-colors hover:bg-slate-50"
+          >
+            Report
+          </label>
+          <details className="group col-span-2 rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)]">
+            <summary className="flex min-h-8 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">
+              Systems
+            </summary>
+            <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3">
+              {systems.length ? (
+                systems.map((sys: any) => {
+                  const isActive = String(sys.id) === String(selectedSystemId);
+                  return (
+                    <Link
+                      key={sys.id}
+                      href={withS(focusedType || undefined, String(sys.id))}
+                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
+                        isActive
+                          ? "border-slate-900 bg-slate-900 text-white"
+                          : "border-slate-200 bg-slate-50 text-slate-800"
+                      }`}
+                    >
+                      {sys.name}
+                    </Link>
+                  );
+                })
+              ) : (
+                <div className="text-sm text-slate-600">No systems yet.</div>
+              )}
+            </div>
+          </details>
+        </div>
+      </section>
+
+      <div className="hidden rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:block sm:p-5 print:hidden">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
@@ -1528,17 +1644,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <Link href={`/jobs/${job.id}/info?f=equipment`} className={eccSecondaryButtonClass}>
             Equipment
           </Link>
-          {!isDuctLeakageFocused ? (
-            <Link href={`/jobs/${job.id}`} className={eccSecondaryButtonClass}>
-              Back to Job
-            </Link>
-          ) : null}
         </div>
       </div>
 
       </div>
 
-      <div className={isDuctLeakageFocused ? "order-last print:order-none" : ""}>
+      <div className="order-last print:order-none">
       <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
       <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
         Report tools are secondary during active field entry.
@@ -1969,14 +2080,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             </p>
           ) : null}
           </div>
-          <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
+          <div className="hidden rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700 sm:block">
             {selectedCompletionLabel}
           </div>
         </div>
 
         {/* System selector */}
         {!isDuctLeakageFocused ? (
-        <div className={`${eccSoftPanelClass} space-y-3`}>
+        <div className={`${eccSoftPanelClass} hidden space-y-3 sm:block`}>
           <div className="flex items-center justify-between gap-3">
             <div>
               <div className={eccUtilityLabelClass}>System</div>
@@ -2099,11 +2210,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 )}
 
                     {selectedSystemId && !isDuctLeakageFocused ? (
-          <div className="space-y-4 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_38px_-32px_rgba(15,23,42,0.34)] sm:p-5">
+          <div className="space-y-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)] sm:space-y-4 sm:rounded-lg sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="text-base font-semibold tracking-tight text-slate-950">Ready Queue</div>
-                <div className="mt-1 text-sm leading-6 text-slate-600">
+                <div className="text-lg font-semibold tracking-tight text-slate-950 sm:text-base">Current Tests</div>
+                <div className="mt-1 hidden text-sm leading-6 text-slate-600 sm:block">
                   Required tests and selected add-ons. Profile:{" "}
                   <span className="font-medium">
                     {normalizedProfile === "alteration"
@@ -2115,7 +2226,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center sm:min-w-[18rem]">
+              <div className="hidden grid-cols-3 gap-2 text-center sm:grid sm:min-w-[18rem]">
                 <div className="rounded-lg border border-slate-200 bg-slate-50 px-2 py-2">
                   <div className="text-lg font-semibold text-slate-950">{selectedTotalCount}</div>
                   <div className="text-[11px] font-medium text-slate-500">Total</div>
@@ -2151,7 +2262,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </div>
               </div>
             ) : (
-              <div className="grid gap-2">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-1">
                 {selectedSystemStatusRows.map((row) => {
   const { testType, status, carriedForward, isRequired } = row;
   const testHref = `/jobs/${job.id}/tests?s=${selectedSystemId}&t=${testType}`;
@@ -2161,15 +2272,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
   return (
       <div
       key={testType}
-      className={`flex min-w-0 flex-col gap-3 rounded-lg border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:flex-row sm:items-center sm:justify-between sm:px-4 ${isOpen ? "ring-2 ring-slate-300" : ""} ${tone.card}`}
+      className={`flex min-w-0 flex-col justify-between gap-2 rounded-xl border px-3 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)] transition-colors hover:border-slate-300 sm:gap-3 sm:rounded-lg sm:flex-row sm:items-center sm:justify-between sm:px-4 ${isOpen ? "ring-2 ring-slate-300" : ""} ${tone.card}`}
     >
-        <div className="flex min-w-0 gap-3">
+        <div className="flex min-w-0 gap-2 sm:gap-3">
         <span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${carriedForward ? "bg-emerald-500" : tone.dot}`} />
         <div className="min-w-0">
-            <div className="font-semibold text-slate-950">
+            <div className="truncate text-sm font-semibold text-slate-950 sm:text-base">
               {getTestDisplayLabel(testType, packageSystem)}
             </div>
-            <div className={`mt-1 text-xs leading-5 ${carriedForward ? "text-emerald-700" : tone.text}`}>
+            <div className={`mt-1 hidden text-xs leading-5 sm:block ${carriedForward ? "text-emerald-700" : tone.text}`}>
               {getTestStatusHelp(String(status.state), carriedForward)}
             </div>
         </div>
@@ -2178,7 +2289,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-nowrap sm:items-center sm:justify-end">
         <div className="flex flex-wrap items-center gap-2 sm:justify-end">
           <span
-            className={`inline-flex min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium ${
+            className={`hidden min-h-7 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium sm:inline-flex ${
               carriedForward
                 ? "border-emerald-200 bg-white/70 text-emerald-700"
                 : isRequired
@@ -2199,7 +2310,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             No retest needed
           </span>
         ) : status.state === "required" ? (
-          <form action={addEccTestRunFromForm}>
+          <form action={addEccTestRunFromForm} className="w-full sm:w-auto">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="system_id" value={selectedSystemId} />
             <input type="hidden" name="test_type" value={testType} />
@@ -2658,8 +2769,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
         {selectedSystemId && isDuctLeakageFocused ? (
           <details className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            <summary className="cursor-pointer font-semibold text-slate-900">Test queue</summary>
-            <div className="mt-2">
+            <summary className="cursor-pointer font-semibold text-slate-900">Tools</summary>
+            <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap">
+              <Link href={`/jobs/${job.id}/info?f=equipment`} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800">
+                Equipment
+              </Link>
               <Link href={withS(undefined, selectedSystemId)} className="font-semibold text-slate-900 underline">
                 Open full queue
               </Link>
