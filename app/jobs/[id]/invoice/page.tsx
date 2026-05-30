@@ -58,6 +58,7 @@ import {
 } from "@/lib/jobs/visit-scope";
 import { formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
+import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
 import { resolveInvoicePaymentLinkUiState } from "./invoice-payment-link-ui";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -525,6 +526,16 @@ export default async function InternalInvoiceWorkspacePage({
         : Number(paymentSummary?.balanceDueCents ?? 0) > 0
           ? "Create a payment link, charge the saved card once, or record a manual payment."
           : "Invoice is paid. Review payment history or audit details if needed.";
+  const invoiceHeaderReference = invoice
+    ? formatInvoiceDisplayReference({
+        invoiceDisplayNumber: (invoice as { invoice_display_number?: string | null }).invoice_display_number,
+        invoiceNumber: invoice.invoice_number,
+        invoiceId: invoice.id,
+      })
+    : "Start Internal Invoice";
+  const legacyInvoiceReference = invoice
+    ? String(invoice.invoice_number ?? "").trim() || null
+    : null;
 
   return (
     <div id="invoice-workspace" className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6">
@@ -535,8 +546,13 @@ export default async function InternalInvoiceWorkspacePage({
               Invoice Summary
             </div>
             <h1 className="mt-3 text-[clamp(1.45rem,2.2vw,2rem)] font-semibold tracking-[-0.02em] text-slate-950">
-              {invoice ? `Invoice ${invoice.invoice_number}` : "Start Internal Invoice"}
+              {invoiceHeaderReference}
             </h1>
+            {legacyInvoiceReference ? (
+              <div className="mt-1 text-xs font-medium tracking-[0.03em] text-slate-500">
+                Legacy ref: {legacyInvoiceReference}
+              </div>
+            ) : null}
             <div className="mt-1 text-sm leading-6 text-slate-600">
               {job.title || "Job"} / {customerName}{locationLabel ? ` / ${locationLabel}` : ""}
             </div>

@@ -43,6 +43,7 @@ import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-act
 import ServiceStatusActions from "./_components/ServiceStatusActions";
 import { displayDateLA, formatBusinessDateUS, formatDateOnlyDisplay, formatTimestampDateDisplayLA, formatTimestampDateTimeDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
+import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import UnscheduleButton from "./_components/UnscheduleButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
@@ -1280,6 +1281,7 @@ export default async function JobDetailPage({
       certs_complete,
       invoice_complete,
       invoice_number,
+      job_display_number,
       pending_info_reason,
       on_hold_reason,
       follow_up_date,
@@ -2479,6 +2481,10 @@ const fieldHeaderTitle =
     primarySiteAccessName,
     jobTitleText,
   ) ?? "Job Detail";
+const jobHeaderReference = formatJobDisplayReference({
+  jobDisplayNumber: (job as { job_display_number?: string | null }).job_display_number,
+  jobId: job.id,
+});
 const visitReasonText =
   firstNonEmpty(serviceVisitReasonText, jobTitleText, visitScopeLeadText) ??
   "No visit reason saved yet.";
@@ -3367,6 +3373,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     fieldHeaderTitle
                   )}
                 </h1>
+                <div className="mt-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold tracking-[0.06em] text-slate-700">
+                  {jobHeaderReference}
+                </div>
                 {serviceAddressDisplay !== "No address set" ? (
                   <div className="mt-2 flex items-start gap-1.5 text-sm font-medium text-slate-700">
                     <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
@@ -4311,6 +4320,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
           {fieldHeaderTitle}
         </h1>
+        <div className="mt-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold tracking-[0.06em] text-slate-700">
+          {jobHeaderReference}
+        </div>
         <div className="mt-1.5 text-sm font-medium text-slate-600">{headerMetaLine}</div>
         {serviceAddressDisplay !== "No address set" ? (
           <div className="mt-1 hidden max-w-2xl break-words text-sm leading-5 text-slate-500 sm:block">
@@ -4318,7 +4330,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </div>
         ) : null}
         <div className="mt-2 hidden items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:inline-flex">
-          <span className="text-slate-400">Job ID</span>
+          <span className="text-slate-400">Tech ID</span>
           <span className="font-mono normal-case tracking-normal text-slate-600">{job.id}</span>
         </div>
       </div>

@@ -8,6 +8,23 @@ const source = readFileSync(
 );
 
 describe("internal invoice workspace saved-card charge wiring", () => {
+  it("uses shared short invoice reference helper in the primary header", () => {
+    expect(source).toContain('import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";');
+    expect(source).toContain("const invoiceHeaderReference = invoice");
+    expect(source).toContain("formatInvoiceDisplayReference({");
+    expect(source).toContain("invoiceDisplayNumber:");
+    expect(source).toContain("invoiceNumber: invoice.invoice_number");
+    expect(source).toContain("invoiceId: invoice.id");
+    expect(source).toContain("{invoiceHeaderReference}");
+    expect(source).not.toContain("Invoice ${invoice.invoice_number}");
+  });
+
+  it("keeps legacy invoice number as secondary audit text", () => {
+    expect(source).toContain("const legacyInvoiceReference = invoice");
+    expect(source).toContain("Legacy ref:");
+    expect(source).toContain("String(invoice.invoice_number ?? \"\").trim() || null");
+  });
+
   it("wires manual saved-card charge action and one-time copy", () => {
     expect(source).toContain("chargeSavedCardForIssuedInvoiceFromForm");
     expect(source).toContain("Charge saved card");
