@@ -11,14 +11,23 @@ describe("internal invoice workspace saved-card charge wiring", () => {
   it("wires manual saved-card charge action and one-time copy", () => {
     expect(source).toContain("chargeSavedCardForIssuedInvoiceFromForm");
     expect(source).toContain("Charge saved card");
-    expect(source).toContain("One-time saved-card charge");
+    expect(source).toContain("Charge saved card once");
     expect(source).toContain("This is not autopay");
     expect(source).toContain("no subscription is created");
     expect(source).toContain("recorded only after Stripe webhook confirmation");
   });
 
   it("preserves existing payment actions while adding saved-card control", () => {
-    expect(source).toContain("Collect payment now");
-    expect(source).toContain("Record Payment");
+    expect(source).toContain("Create payment link");
+    expect(source).toContain("Record manual payment");
+    expect(source).toContain("collectTenantInvoicePaymentNowFromForm");
+    expect(source).toContain("recordInternalInvoicePaymentFromForm");
+    expect(source).toContain("issueInternalInvoiceFromForm");
+    expect(source).toContain("sendInternalInvoiceEmailFromForm");
+    expect(source).toContain("voidInternalInvoiceFromForm");
+    expect(source).toContain("Payment Options");
+    expect(source).toContain("Payment History");
+    expect(source).toContain("Audit / Technical Details");
+    expect(source).not.toContain("Platform fee");
   });
 });

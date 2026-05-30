@@ -37,7 +37,7 @@ function buildInitialState(
 
   return {
     status: "success",
-    message: "Customer payment link created.",
+    message: "Payment link created.",
     checkoutSessionId,
     checkoutSessionUrl,
   };
@@ -71,7 +71,7 @@ export default function TenantInvoicePaymentLinkPanel({
   return (
     <div className="space-y-4">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-1 pb-4 pt-1">
-        <div className="text-sm font-semibold text-slate-950">Customer payment link</div>
+        <div className="text-sm font-semibold text-slate-950">Payment link</div>
         <div className="mt-1 text-sm text-slate-600">
           Creates a Stripe-hosted payment page for this invoice balance. Payment is recorded after Stripe confirms it.
         </div>
@@ -93,13 +93,13 @@ export default function TenantInvoicePaymentLinkPanel({
           </div>
 
           <SubmitButton loadingText="Creating..." className={`${darkButtonClass} w-full`}>
-            Create Customer Payment Link
+            Create payment link
           </SubmitButton>
         </form>
 
         {state.status === "success" && checkoutSessionUrl ? (
           <div className="space-y-3 rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm leading-6 text-emerald-900">
-            <div className="font-semibold">Customer payment link ready</div>
+            <div className="font-semibold">Payment link ready</div>
             <div>{state.message}</div>
             <div className="space-y-2 rounded-xl border border-emerald-200 bg-white/85 p-3 text-slate-700">
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Checkout URL</div>

@@ -507,6 +507,23 @@ export default async function InternalInvoiceWorkspacePage({
     && failedAutopayAttentionItems.length > 0
     && failedAutopayRetryEligibility?.eligibleInvoicesCount,
   );
+  const recordedInternalInvoicePaymentRows = internalInvoicePaymentRows.filter(
+    (payment) => payment.payment_status === "recorded",
+  );
+  const nonRecordedInternalInvoicePaymentRows = internalInvoicePaymentRows.filter(
+    (payment) => payment.payment_status !== "recorded",
+  );
+  const nextActionSummary = !invoice
+    ? "Create a draft invoice to start billing."
+    : invoice.status === "draft"
+      ? canIssue
+        ? "Issue the invoice when the readiness checks are all ready."
+        : "Review the readiness checks before issuing the invoice."
+      : failedAutopayAttentionItems.length > 0
+        ? "Payment failed - invoice is still unpaid. Review before retrying."
+        : Number(paymentSummary?.balanceDueCents ?? 0) > 0
+          ? "Create a payment link, charge the saved card once, or record a manual payment."
+          : "Invoice is paid. Review payment history or audit details if needed.";
 
   return (
     <div id="invoice-workspace" className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6">
@@ -514,7 +531,7 @@ export default async function InternalInvoiceWorkspacePage({
         <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div className="min-w-0">
             <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-800">
-              Invoice Workspace
+              Invoice Summary
             </div>
             <h1 className="mt-3 text-[clamp(1.45rem,2.2vw,2rem)] font-semibold tracking-[-0.02em] text-slate-950">
               {invoice ? `Invoice ${invoice.invoice_number}` : "Start Internal Invoice"}
@@ -522,6 +539,7 @@ export default async function InternalInvoiceWorkspacePage({
             <div className="mt-1 text-sm leading-6 text-slate-600">
               {job.title || "Job"} / {customerName}{locationLabel ? ` / ${locationLabel}` : ""}
             </div>
+            <p className="mt-3 text-sm leading-6 text-slate-700">{nextActionSummary}</p>
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span className={chipClass}>{invoice ? formatInternalInvoiceStatus(invoice.status) : "No draft"}</span>
               <span className={chipClass}>{lineItemCount} charge{lineItemCount === 1 ? "" : "s"}</span>
@@ -546,7 +564,7 @@ export default async function InternalInvoiceWorkspacePage({
             ) : null}
             {invoice ? (
               <Link href="#invoice-charges" className={darkButtonClass}>
-                Review Charges
+                Open Invoice Lines
               </Link>
             ) : null}
           </div>
@@ -585,12 +603,12 @@ export default async function InternalInvoiceWorkspacePage({
         </section>
       ) : (
         <div className="grid gap-5 xl:grid-cols-[minmax(0,1.32fr)_minmax(22rem,0.68fr)]">
-          <main className="space-y-5">
-            <section id="invoice-charges" className={`${panelClass} p-4 sm:p-5`}>
+          <main className="flex flex-col gap-5">
+            <section id="invoice-charges" className={`${panelClass} order-40 p-4 sm:p-5`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Build Charges</div>
-                  <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Invoice Charges Review</h2>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Invoice Lines</div>
+                  <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Charges</h2>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
                     Invoice Charges are billed commercial scope. Work Items are operational scope and can be imported as draft charges.
                   </p>
@@ -621,7 +639,7 @@ export default async function InternalInvoiceWorkspacePage({
               ) : (
                 <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/75">
                   {invoice.line_items.length === 0 ? (
-                    <div className="px-4 py-4 text-sm text-slate-600">No frozen invoice charges were recorded on this invoice.</div>
+                    <div className="px-4 py-4 text-sm text-slate-600">No invoice lines were recorded on this invoice.</div>
                   ) : (
                     <div className="divide-y divide-slate-200/80">
                       {invoice.line_items.map((lineItem, index) => (
@@ -647,9 +665,9 @@ export default async function InternalInvoiceWorkspacePage({
             </section>
 
             {invoicePaymentLinkUiState.showPanel ? (
-              <section className={`${panelClass} p-4 sm:p-5`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Customer Payment Link</div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Create a Stripe-hosted checkout page</h2>
+              <section className={`${panelClass} order-30 p-4 sm:p-5`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Link</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Create a customer payment link</h2>
 
                 {invoicePaymentLinkUiState.showCreateButton ? (
                   <TenantInvoicePaymentLinkPanel
@@ -680,16 +698,16 @@ export default async function InternalInvoiceWorkspacePage({
             ) : null}
 
             {invoice.status === "issued" ? (
-              <section className={`${panelClass} p-4 sm:p-5`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Failed Scheduled Autopay Attention</div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Read-only attention projection</h2>
+              <section className={`${panelClass} order-20 p-4 sm:p-5`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Attention</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Review payment failures</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  This panel is projection-only. No retry, no write actions, and no customer messages are triggered from this workspace.
+                  Payment failed - invoice is still unpaid. Review before retrying. Failed payments are not counted as paid.
                 </p>
 
                 {failedAutopayAttentionItems.length === 0 ? (
                   <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-600">
-                    No open failed scheduled-autopay attention items for this invoice.
+                    No open payment failures for this invoice.
                   </div>
                 ) : (
                   <>
@@ -775,11 +793,11 @@ export default async function InternalInvoiceWorkspacePage({
             ) : null}
 
             {invoice.status === "issued" ? (
-              <section className={`${panelClass} p-4 sm:p-5`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Tracking</div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Manual and webhook payment records</h2>
+              <section className={`${panelClass} order-10 p-4 sm:p-5`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Options</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Choose how to collect payment</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Manual entries can be recorded here. Online card payments are recorded after Stripe webhook confirmation.
+                  Pick one available option below. Online card payments are recorded only after Stripe confirms them.
                 </p>
 
                 {canShowManualSavedCardCharge ? (
@@ -796,7 +814,7 @@ export default async function InternalInvoiceWorkspacePage({
                       name="tenant_customer_payment_method_id"
                       value={String(defaultSavedCardMethod?.id ?? "")}
                     />
-                    <div className="text-sm font-semibold text-emerald-950">One-time saved-card charge</div>
+                    <div className="text-sm font-semibold text-emerald-950">Charge saved card once</div>
                     <div className="text-sm leading-6 text-slate-700">
                       Uses the active saved card on file for this customer.
                       This is not autopay, no subscription is created, and invoice payment is recorded only after Stripe webhook confirmation.
@@ -820,7 +838,7 @@ export default async function InternalInvoiceWorkspacePage({
                       Opens secure Stripe Checkout so the customer can pay this invoice now.
                     </div>
                     <SubmitButton loadingText="Opening checkout..." className={darkButtonClass}>
-                      Collect payment now
+                      Create payment link
                     </SubmitButton>
                   </form>
                 ) : null}
@@ -877,13 +895,70 @@ export default async function InternalInvoiceWorkspacePage({
                     className={darkButtonClass}
                     disabled={!paymentSummary || paymentSummary.balanceDueCents <= 0}
                   >
-                    Record Payment
+                    Record manual payment
                   </SubmitButton>
                 </form>
 
-                {internalInvoicePaymentRows.length > 0 ? (
+              </section>
+            ) : null}
+
+            {invoice.status === "issued" ? (
+              <section className={`${panelClass} order-50 p-4 sm:p-5`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment History</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collected and not-collected activity</h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Collected payments appear first. Failed or reversed attempts are listed as not collected.
+                </p>
+
+                {recordedInternalInvoicePaymentRows.length > 0 ? (
                   <div className="mt-4 space-y-2">
-                    {internalInvoicePaymentRows.slice(0, 6).map((payment) => (
+                    <div className="text-xs font-semibold uppercase tracking-[0.1em] text-emerald-800">Collected</div>
+                    {recordedInternalInvoicePaymentRows.slice(0, 6).map((payment) => (
+                      <div key={payment.id} className="rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm text-slate-700">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-semibold text-slate-900">{formatCurrencyFromCents(payment.amount_cents)}</span>
+                          <span className="text-xs text-slate-500">{formatTimestampDateDisplayLA(payment.paid_at)}</span>
+                        </div>
+                        <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                          <span>{formatPaymentMethodLabel(payment.payment_method)}</span>
+                          <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-800">
+                            Recorded
+                          </span>
+                        </div>
+                        {isStripeSourcedPayment(payment) ? (
+                          <div className="mt-2 text-xs text-amber-800">
+                            Online Stripe payment. This screen cannot reverse or refund Stripe charges.
+                          </div>
+                        ) : (
+                          <form action={reverseInternalInvoicePaymentFromForm} className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50/70 p-2.5">
+                            <input type="hidden" name="job_id" value={jobId} />
+                            <input type="hidden" name="payment_id" value={payment.id} />
+                            <input type="hidden" name="tab" value="info" />
+                            <input type="hidden" name="return_to" value={returnTo} />
+                            <label className={labelClass}>Reversal Reason</label>
+                            <input
+                              name="reversal_reason"
+                              className={inputClass}
+                              placeholder="Required correction reason"
+                              required
+                            />
+                            <div className="text-xs text-amber-900">
+                              This does not refund Stripe. It only corrects Compliance Matters records.
+                            </div>
+                            <SubmitButton loadingText="Reversing..." className={secondaryButtonClass}>
+                              Reverse Recorded Payment
+                            </SubmitButton>
+                          </form>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                {nonRecordedInternalInvoicePaymentRows.length > 0 ? (
+                  <div className="mt-4 space-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-[0.1em] text-rose-800">Not collected</div>
+                    {nonRecordedInternalInvoicePaymentRows.slice(0, 6).map((payment) => (
                       <div key={payment.id} className="rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm text-slate-700">
                         <div className="flex flex-wrap items-center justify-between gap-2">
                           <span className="font-semibold text-slate-900">{formatCurrencyFromCents(payment.amount_cents)}</span>
@@ -893,13 +968,9 @@ export default async function InternalInvoiceWorkspacePage({
                           <span>{formatPaymentMethodLabel(payment.payment_method)}</span>
                           <span
                             className={`inline-flex rounded-full border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${
-                              payment.payment_status === "recorded"
-                                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                                : payment.payment_status === "reversed"
+                              payment.payment_status === "reversed"
                                 ? "border-amber-200 bg-amber-50 text-amber-800"
-                                : payment.payment_status === "failed"
-                                ? "border-rose-200 bg-rose-50 text-rose-800"
-                                : "border-slate-200 bg-slate-50 text-slate-700"
+                                : "border-rose-200 bg-rose-50 text-rose-800"
                             }`}
                           >
                             {formatPaymentStatusLabel(payment.payment_status)}
@@ -911,33 +982,6 @@ export default async function InternalInvoiceWorkspacePage({
                             {payment.reversed_at ? ` (${formatTimestampDateDisplayLA(payment.reversed_at)})` : ""}
                           </div>
                         ) : null}
-                        {payment.payment_status === "recorded" ? (
-                          isStripeSourcedPayment(payment) ? (
-                            <div className="mt-2 text-xs text-amber-800">
-                              Online Stripe payment. This screen cannot reverse or refund Stripe charges.
-                            </div>
-                          ) : (
-                            <form action={reverseInternalInvoicePaymentFromForm} className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50/70 p-2.5">
-                              <input type="hidden" name="job_id" value={jobId} />
-                              <input type="hidden" name="payment_id" value={payment.id} />
-                              <input type="hidden" name="tab" value="info" />
-                              <input type="hidden" name="return_to" value={returnTo} />
-                              <label className={labelClass}>Reversal Reason</label>
-                              <input
-                                name="reversal_reason"
-                                className={inputClass}
-                                placeholder="Required correction reason"
-                                required
-                              />
-                              <div className="text-xs text-amber-900">
-                                This does not refund Stripe. It only corrects Compliance Matters records.
-                              </div>
-                              <SubmitButton loadingText="Reversing..." className={secondaryButtonClass}>
-                                Reverse Recorded Payment
-                              </SubmitButton>
-                            </form>
-                          )
-                        ) : null}
                       </div>
                     ))}
                   </div>
@@ -948,7 +992,7 @@ export default async function InternalInvoiceWorkspacePage({
 
           <aside className="space-y-5">
             <section className={`${panelClass} p-4 sm:p-5`}>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Ready to Issue</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Issue Readiness</div>
               <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">{canIssue ? "Ready to issue" : "Needs review"}</h2>
               <div className="mt-3 space-y-2">
                 {readinessRow("Billing recipient", recipientReady, recipientReady ? String(invoice.billing_name) : "Add a billing name.")}
@@ -1032,7 +1076,7 @@ export default async function InternalInvoiceWorkspacePage({
 
             {invoice.status === "issued" ? (
               <section className={`${panelClass} p-4 sm:p-5`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Send / Resend</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Send Invoice</div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   Invoice issue and invoice send are separate steps. Sending is communication-only and does not create a second invoice or change charge lines.
                 </p>
@@ -1085,7 +1129,33 @@ export default async function InternalInvoiceWorkspacePage({
 
             <section className={`${panelClass} p-4 sm:p-5`}>
               <details>
-                <summary className="cursor-pointer text-sm font-semibold text-slate-800">More actions</summary>
+                <summary className="cursor-pointer text-sm font-semibold text-slate-800">Audit / Technical Details</summary>
+                <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-700">
+                  <div className="font-semibold text-slate-900">Source-of-truth audit details remain available below.</div>
+                  {internalInvoicePaymentRows.slice(0, 5).map((payment) => (
+                    <div key={payment.id} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+                      <div>Payment ID: {payment.id}</div>
+                      {payment.stripe_checkout_session_id ? <div>Checkout Session: {payment.stripe_checkout_session_id}</div> : null}
+                      {payment.stripe_payment_intent_id ? <div>Payment Intent: {payment.stripe_payment_intent_id}</div> : null}
+                      {payment.stripe_event_id ? <div>Stripe Event: {payment.stripe_event_id}</div> : null}
+                    </div>
+                  ))}
+                  {failedAutopayAttentionItems.slice(0, 5).map((item) => (
+                    <div key={item.attemptId} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
+                      <div>Failed Attempt: {item.attemptId}</div>
+                      {item.failureCode ? <div>Failure Code: {item.failureCode}</div> : null}
+                      {item.blockedReasonCode ? <div>Blocked Reason: {item.blockedReasonCode}</div> : null}
+                      {item.requiresActionType ? <div>Action Type: {item.requiresActionType}</div> : null}
+                    </div>
+                  ))}
+                  <div>Payment totals and paid status are derived from allocation-compatible payment truth.</div>
+                </div>
+              </details>
+            </section>
+
+            <section className={`${panelClass} p-4 sm:p-5`}>
+              <details>
+                <summary className="cursor-pointer text-sm font-semibold text-slate-800">Danger Zone</summary>
                 <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50/70 p-3">
                   <div className="text-sm font-semibold text-rose-900">Danger zone</div>
                   <p className="mt-1 text-xs leading-5 text-rose-900/90">
