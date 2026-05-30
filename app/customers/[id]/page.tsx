@@ -973,7 +973,7 @@ export default async function CustomerDetailPage(props: {
     { id: "service-plans", label: "Service Plans" },
     { id: "locations-contacts", label: "Locations & Contacts" },
     { id: "history", label: "Customer Notes" },
-    { id: "details", label: "Details" },
+    { id: "settings", label: "Settings" },
   ] as const;
   type WorkspaceTabId = (typeof workspaceNavigationItems)[number]["id"];
   const activeWorkspaceTab: WorkspaceTabId = workspaceNavigationItems.some((item) => item.id === workspaceTabParam)
@@ -1452,8 +1452,8 @@ export default async function CustomerDetailPage(props: {
           </section>
         ) : null}
 
-        {/* Overview + Details */}
-        {(activeWorkspaceTab === "overview" || activeWorkspaceTab === "details") ? (
+        {/* Overview + Settings */}
+        {(activeWorkspaceTab === "overview" || activeWorkspaceTab === "settings") ? (
         <section className="grid gap-6 xl:grid-cols-[1.25fr_.9fr]">
           {activeWorkspaceTab === "overview" ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -1522,7 +1522,7 @@ export default async function CustomerDetailPage(props: {
           </div>
           ) : null}
 
-          {activeWorkspaceTab === "details" ? (
+          {activeWorkspaceTab === "settings" ? (
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-slate-900">Billing / Paperwork Defaults</h2>
 
@@ -3400,7 +3400,7 @@ export default async function CustomerDetailPage(props: {
           </section>
         ) : null}
 
-        {activeWorkspaceTab === "details" && isInternalViewer ? (
+        {activeWorkspaceTab === "settings" && isInternalViewer ? (
           <section className="rounded-2xl border border-red-200 bg-red-50/40 p-5 shadow-sm">
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-red-900">Danger Zone</h2>

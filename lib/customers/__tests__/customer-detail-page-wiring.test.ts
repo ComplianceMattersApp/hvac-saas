@@ -29,7 +29,7 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Service Plans");
     expect(customerPageSource).toContain("Locations & Contacts");
     expect(customerPageSource).toContain("Customer Notes");
-    expect(customerPageSource).toContain("Details");
+    expect(customerPageSource).toContain("Settings");
     expect(customerPageSource).toContain("?tab=${item.id}");
     expect(customerPageSource).toContain("?tab=money");
     expect(customerPageSource).toContain("?tab=service-plans");
@@ -44,7 +44,7 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain('activeWorkspaceTab === "service-plans"');
     expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts"');
     expect(customerPageSource).toContain('activeWorkspaceTab === "history"');
-    expect(customerPageSource).toContain('activeWorkspaceTab === "details"');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "settings"');
     expect(customerPageSource).not.toContain("#customer-overview");
   });
 
@@ -130,8 +130,8 @@ describe("customer detail relationship hub wiring", () => {
     expect(locationsContactsTabSource).not.toContain("Generate Draft Invoice");
   });
 
-  it("keeps danger/archive controls in Details tab and preserves action wiring", () => {
-    expect(customerPageSource).toContain('activeWorkspaceTab === "details" && isInternalViewer');
+  it("keeps danger/archive controls in Settings tab and preserves action wiring", () => {
+    expect(customerPageSource).toContain('activeWorkspaceTab === "settings" && isInternalViewer');
     expect(customerPageSource).toContain("Danger Zone");
     expect(customerPageSource).toContain("Archive Customer");
     expect(customerPageSource).toContain("action={archiveCustomerFromForm}");
