@@ -32,7 +32,9 @@ describe("/ops failed payment alert card wiring", () => {
     expect(opsPageSource).toContain("Retry Eligible");
   });
 
-  it("links attention rows to invoice workspace without adding queue routes", () => {
+  it("links alert card to queue route and keeps invoice workspace row links", () => {
+    expect(opsPageSource).toContain('/reports/failed-payments');
+    expect(opsPageSource).toContain('Open failed-payment queue');
     expect(opsPageSource).toContain("Open invoice workspace");
     expect(opsPageSource).toContain("/jobs/${item.jobId}/invoice");
     expect(opsPageSource).not.toContain("/ops/payments-reconciliation");

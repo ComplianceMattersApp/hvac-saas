@@ -3326,8 +3326,8 @@ if (panel !== "full_board") {
                 Payment failures are not collected payments. Review the invoice workspace before retrying or contacting the customer.
               </p>
             </div>
-            <Link href="/reports/payments" className={inlineSectionLinkClass}>
-              Open Payments Register (payment-event truth)
+            <Link href="/reports/failed-payments" className={inlineSectionLinkClass}>
+              Open failed-payment queue
             </Link>
           </div>
 
@@ -3717,8 +3717,8 @@ return (
               Payment failures are not collected payments. Review the invoice workspace before retrying or contacting the customer.
             </p>
           </div>
-          <Link href="/reports/payments" className={inlineSectionLinkClass}>
-            Open Payments Register (payment-event truth)
+          <Link href="/reports/failed-payments" className={inlineSectionLinkClass}>
+            Open failed-payment queue
           </Link>
         </div>
 
