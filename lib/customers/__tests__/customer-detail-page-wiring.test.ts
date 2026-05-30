@@ -81,6 +81,9 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain('activeWorkspaceTab === "service-plans" && isInternalViewer && maintenanceAgreementsEnabled');
     expect(customerPageSource).toContain("Maintenance Agreements");
     expect(customerPageSource).toContain("Service Plan Overview");
+    expect(customerPageSource).toContain("Start from template");
+    expect(customerPageSource).toContain("Load Template");
+    expect(customerPageSource).toContain('name="maTemplate"');
     expect(customerPageSource).toContain("Billing Attention");
     expect(customerPageSource).toContain("Scheduling");
     expect(customerPageSource).toContain("Add Billing Period");

@@ -43,6 +43,10 @@ import {
   type MaintenanceAgreementRow,
 } from "@/lib/maintenance-agreements/read-model";
 import {
+  listMaintenanceAgreementTemplatesForAccount,
+  type MaintenanceAgreementTemplateRow,
+} from "@/lib/maintenance-agreements/template-read-model";
+import {
   listMaintenanceAgreementBillingPeriodsForCustomer,
   type MaintenanceAgreementBillingPeriodReadModelRow,
 } from "@/lib/maintenance-agreements/billing-period-read-model";
@@ -433,6 +437,7 @@ export default async function CustomerDetailPage(props: {
     maSaved?: string;
     maError?: string;
     maFocus?: string;
+    maTemplate?: string;
     banner?: string;
     rcSaved?: string;
     rcError?: string;
@@ -460,6 +465,7 @@ export default async function CustomerDetailPage(props: {
   const maintenanceAgreementSaved = String(sp.maSaved ?? "").trim().toLowerCase();
   const maintenanceAgreementError = String(sp.maError ?? "").trim();
   const maintenanceAgreementFocusId = String(sp.maFocus ?? "").trim();
+  const maintenanceAgreementTemplateId = String(sp.maTemplate ?? "").trim();
   const billingPeriodBanner = String(sp.banner ?? "").trim().toLowerCase();
   const roleContactSaved = String(sp.rcSaved ?? "").trim() === "1";
   const roleContactError = String(sp.rcError ?? "").trim() === "1";
@@ -781,6 +787,34 @@ export default async function CustomerDetailPage(props: {
       customerAgreements = [];
     }
   }
+
+  let agreementTemplates: MaintenanceAgreementTemplateRow[] = [];
+  if (maintenanceAgreementsEnabled) {
+    try {
+      agreementTemplates = await listMaintenanceAgreementTemplatesForAccount({
+        supabase,
+        accountOwnerUserId: visibilityScope.accountOwnerUserId,
+        limit: 200,
+      });
+    } catch {
+      agreementTemplates = [];
+    }
+  }
+  const selectedAgreementTemplate =
+    agreementTemplates.find((template) => template.id === maintenanceAgreementTemplateId) ?? null;
+  const createAgreementTypeDefault =
+    selectedAgreementTemplate
+    && MAINTENANCE_AGREEMENT_TYPES.includes(selectedAgreementTemplate.agreement_type as any)
+      ? selectedAgreementTemplate.agreement_type
+      : "maintenance";
+  const createAgreementFrequencyDefault =
+    selectedAgreementTemplate
+    && MAINTENANCE_AGREEMENT_FREQUENCIES.includes(selectedAgreementTemplate.frequency as any)
+      ? selectedAgreementTemplate.frequency
+      : "quarterly";
+  const createAgreementVisitScopeSummaryDefault = selectedAgreementTemplate?.default_visit_scope_summary ?? "";
+  const createAgreementVisitScopeItemsDefault = selectedAgreementTemplate?.default_visit_scope_items ?? [];
+  const createAgreementInternalNotesDefault = selectedAgreementTemplate?.internal_notes_default ?? "";
 
   let customerBillingPeriods: MaintenanceAgreementBillingPeriodReadModelRow[] = [];
   const billingPeriodsByAgreementId = new Map<string, MaintenanceAgreementBillingPeriodReadModelRow[]>();
@@ -2332,6 +2366,39 @@ export default async function CustomerDetailPage(props: {
               <summary className="cursor-pointer text-sm font-medium text-slate-900">
                 Add Maintenance Agreement
               </summary>
+              <form method="get" action={customerPath} className="mt-4 grid gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
+                <input type="hidden" name="tab" value="service-plans" />
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">Start from template</label>
+                  <select
+                    name="maTemplate"
+                    defaultValue={selectedAgreementTemplate?.id ?? ""}
+                    className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  >
+                    <option value="">No template (manual)</option>
+                    {agreementTemplates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.template_name} ({String(template.agreement_type).replace(/_/g, " ")} • {String(template.frequency).replace(/_/g, " ")})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  type="submit"
+                  className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
+                >
+                  Load Template
+                </button>
+              </form>
+              {selectedAgreementTemplate ? (
+                <p className="mt-2 text-xs text-slate-600">
+                  Prefilled from template: {selectedAgreementTemplate.template_name}. Review and edit fields before saving.
+                </p>
+              ) : (
+                <p className="mt-2 text-xs text-slate-500">
+                  Manual mode stays available. Selecting a template only prefills fields and does not create records until you save.
+                </p>
+              )}
               <form action={createAgreementAction} className="mt-4 grid gap-3 md:grid-cols-2">
                 <input type="hidden" name="customer_id" value={customerId} />
 
@@ -2348,7 +2415,7 @@ export default async function CustomerDetailPage(props: {
                   <label className="mb-1 block text-xs font-medium text-slate-700">Agreement Type</label>
                   <select
                     name="agreement_type"
-                    defaultValue="maintenance"
+                    defaultValue={createAgreementTypeDefault}
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                   >
                     {MAINTENANCE_AGREEMENT_TYPES.map((value) => (
@@ -2363,7 +2430,7 @@ export default async function CustomerDetailPage(props: {
                   <label className="mb-1 block text-xs font-medium text-slate-700">Frequency</label>
                   <select
                     name="frequency"
-                    defaultValue="quarterly"
+                    defaultValue={createAgreementFrequencyDefault}
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                   >
                     {MAINTENANCE_AGREEMENT_FREQUENCIES.map((value) => (
@@ -2429,8 +2496,8 @@ export default async function CustomerDetailPage(props: {
                     jobType="service"
                     summaryName="default_visit_scope_summary"
                     itemsName="default_visit_scope_items_json"
-                    initialSummary=""
-                    initialItems={[]}
+                    initialSummary={createAgreementVisitScopeSummaryDefault}
+                    initialItems={createAgreementVisitScopeItemsDefault}
                   />
                 </div>
 
@@ -2439,6 +2506,7 @@ export default async function CustomerDetailPage(props: {
                   <textarea
                     name="internal_notes"
                     rows={3}
+                    defaultValue={createAgreementInternalNotesDefault}
                     className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
                   />
                 </div>
