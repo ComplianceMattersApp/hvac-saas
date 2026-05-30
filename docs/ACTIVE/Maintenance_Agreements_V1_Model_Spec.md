@@ -125,6 +125,21 @@ Proposed implementation sequence:
 - 6I-D: reconciliation queue UI.
 - 6I-E: sandbox smoke + docs closeout.
 
+### Phase 6I-E Closeout (Failed Payment Reconciliation Visibility, Docs-Only)
+
+- 6I-B is complete: account-level failed-payment reconciliation read model is implemented and validated as read-only projection.
+- 6I-C is complete: Ops failed-payment alert card is implemented for financial-authority visibility (Owner/Admin/Billing).
+- 6I-D is complete: dedicated Failed Payment Reconciliation Queue route `/reports/failed-payments` is implemented and linked from Ops alert surface.
+- 6I-E smoke is complete after correcting account context to the fixture owner account (Service Account).
+- Proven visibility chain: failed-payment item appears in account-level read model -> Ops failed-payment alert is visible -> alert links to `/reports/failed-payments` -> queue displays failed-payment items -> queue links to invoice workspace -> invoice workspace shows detailed failed scheduled-autopay attention.
+- Smoke evidence on fixture account: queue rendered open failed payments `2`, balance at risk `$35.00`, and two declined rows for invoice `INV-20260529-DDC200B6`; queue drill-in opened `/jobs/1a52288c-78ae-4e79-9472-d00ed928f32f/invoice` and showed issued/unpaid state plus Failed Scheduled Autopay Attention items.
+- Read-only boundaries remain locked for alert and queue: no retry action on alert/queue, no acknowledge/review/resolve queue actions, no customer email/SMS, no portal update-card flow, and no customer self-service retry in this slice.
+- Retry remains invoice-workspace-only behavior.
+- Source-of-truth remains unchanged: `tenant_saved_method_payment_attempts` = attempt/attention truth; `internal_invoice_payments` = payment-event truth; `internal_invoice_payment_allocations` = allocation truth; Stripe = processor/payment-method truth; Payments Register remains payment-event history/reporting truth; Failed Payment Reconciliation Queue is unresolved attempt/attention visibility.
+- Invoice paid/balance remains collected-payment projection only; failed payment rows are non-collected truth; inactive allocations do not count toward paid balance.
+- Operational truth boundaries remain unchanged: visits and `maintenance_agreements.next_due_date` are not payment-mutated.
+- No schema changes, no Stripe behavior changes, no production enablement change, and no payment/allocation truth mutation outside existing webhook behavior.
+
 ### Phase 6G-E4 Closeout (Fresh Scheduled Autopay Submit Smoke, Docs-Only)
 
 - Phase 6G-E4 passed after the 6G-E3 self-attempt revalidation fix in commit `c7329a8a9b19d392f6dd7196ca7145f86d62e713`.
