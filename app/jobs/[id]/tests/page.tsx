@@ -1479,7 +1479,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           opsStatusKey={normalizedOpsStatus}
           backHref={`/jobs/${job.id}`}
         />
-      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5 print:hidden">
+      <div className={`${isDuctLeakageFocused ? "hidden sm:block" : ""} rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:p-5 print:hidden`}>
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
@@ -1528,9 +1528,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <Link href={`/jobs/${job.id}/info?f=equipment`} className={eccSecondaryButtonClass}>
             Equipment
           </Link>
-          <Link href={`/jobs/${job.id}`} className={eccSecondaryButtonClass}>
-            Back to Job
-          </Link>
+          {!isDuctLeakageFocused ? (
+            <Link href={`/jobs/${job.id}`} className={eccSecondaryButtonClass}>
+              Back to Job
+            </Link>
+          ) : null}
         </div>
       </div>
 
@@ -1957,15 +1959,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       </div>
       </div>
 
-      <section className={`${eccPanelClass} space-y-5 print:hidden`}>
+      <section className={`${eccPanelClass} ${isDuctLeakageFocused ? "space-y-3" : "space-y-5"} print:hidden`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
           <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">{isDuctLeakageFocused ? "Duct Leakage Entry" : "Tests to Run"}</h2>
-          <p className="text-sm leading-6 text-slate-600">
-            {isDuctLeakageFocused
-              ? "Focused entry mode keeps inputs first. Open the queue when you need the full test board."
-              : "Pick a system, enter readings, save drafts, then complete once verified."}
-          </p>
+          {!isDuctLeakageFocused ? (
+            <p className="text-sm leading-6 text-slate-600">
+              Pick a system, enter readings, save drafts, then complete once verified.
+            </p>
+          ) : null}
           </div>
           <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
             {selectedCompletionLabel}
@@ -2043,14 +2045,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         </div>
         ) : null}
 
-        {selectedSystemId && isDuctLeakageFocused ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            Queue minimized while entering readings.
-            <Link href={withS(undefined, selectedSystemId)} className="ml-1 font-semibold text-slate-900 underline">
-              Back to Queue
-            </Link>
-          </div>
-        ) : null}
         {false && (
   <div className="rounded-lg border bg-white p-4">
         {/* Test pills */}
@@ -2345,28 +2339,30 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         ) : null}
 
                 {/* Add Test pill */}
-        {selectedSystemId && !isDuctLeakageFocused ? (
-          <Link
-            href={focusedType === "custom" ? withS(undefined) : withS("custom")}
-            className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 shadow-sm transition-colors ${
-              focusedType === "custom"
-                ? "border-slate-900 bg-slate-900 text-white"
-                : "border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50"
-            }`}
-          >
-            <div>
-              <div className="font-semibold">Add another test</div>
-              <div className={`mt-0.5 text-xs ${focusedType === "custom" ? "text-slate-200" : "text-slate-500"}`}>
-                Use when the field scope needs an extra run for this system.
+        {!isDuctLeakageFocused ? (
+          selectedSystemId ? (
+            <Link
+              href={focusedType === "custom" ? withS(undefined) : withS("custom")}
+              className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 shadow-sm transition-colors ${
+                focusedType === "custom"
+                  ? "border-slate-900 bg-slate-900 text-white"
+                  : "border-slate-300 bg-white text-slate-900 hover:border-slate-400 hover:bg-slate-50"
+              }`}
+            >
+              <div>
+                <div className="font-semibold">Add another test</div>
+                <div className={`mt-0.5 text-xs ${focusedType === "custom" ? "text-slate-200" : "text-slate-500"}`}>
+                  Use when the field scope needs an extra run for this system.
+                </div>
               </div>
+              <span className="text-xs">{focusedType === "custom" ? "Hide" : "Open"}</span>
+            </Link>
+          ) : (
+            <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
+              Select a system first to add tests.
             </div>
-            <span className="text-xs">{focusedType === "custom" ? "Hide" : "Open"}</span>
-          </Link>
-        ) : (
-          <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
-            Select a system first to add tests.
-          </div>
-        )}
+          )
+        ) : null}
 
         {focusedCustomTestType ? (
           <div className={eccWorkspaceCardClass}>
@@ -2435,7 +2431,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="font-medium">Duct Leakage</div>
+                <div className={eccUtilityLabelClass}>Focused Test</div>
+                <div className="mt-1 text-base font-semibold text-slate-950">Duct Leakage</div>
                 <div className="mt-1 text-sm">
                   <span className="font-medium">Result:</span>{" "}
                   {runDL
@@ -2450,14 +2447,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
             </div>
 
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-              <div className="font-semibold text-slate-800">System Reference</div>
-              <div>{selectedSystemName}</div>
-              {isHeatOnlySystem ? (
-                <div>Suggested heating input: {fmtValue(defaultHeatingCapacityKbtu, "KBTU/h")}</div>
-              ) : (
-                <div>Suggested tonnage: {fmtValue(defaultSystemTonnage, "ton")}</div>
-              )}
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+              <span className="font-semibold text-slate-900">{selectedSystemName}</span>
+              <span className="text-slate-400">/</span>
+              <span>
+                {isHeatOnlySystem
+                  ? `Heating input ${fmtValue(defaultHeatingCapacityKbtu, "KBTU/h")}`
+                  : `Tonnage ${fmtValue(defaultSystemTonnage, "ton")}`}
+              </span>
             </div>
 
             {!runDL ? (
@@ -2482,22 +2479,50 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               )
             ) : (
               <>
-                <div className="text-sm font-semibold text-slate-900">Inputs</div>
                 <form
                   id={ductSaveFormId}
                   action={saveDuctLeakageDataFromForm}
-                  className="grid gap-3 border-t pt-3"
+                  className="grid gap-3 border-t pt-3 sm:gap-4"
                 >
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runDL.id} />
                   <input type="hidden" name="project_type" value={job.project_type} />
 
-                  <div className="rounded-md border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] text-slate-500">
-                    Pick the method, enter measured leakage, then save draft or complete.
-                  </div>
-
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid gap-1">
+                      <label className="text-sm font-medium" htmlFor={`dl-meas-${runDL.id}`}>
+                        Measured Duct Leakage (CFM)
+                      </label>
+                      <input
+                        id={`dl-meas-${runDL.id}`}
+                        name="measured_duct_leakage_cfm"
+                        type="number"
+                        step="1"
+                        required
+                        className="w-full rounded-md border px-3 py-2 placeholder:text-slate-400"
+                        defaultValue={runDL.data?.measured_duct_leakage_cfm ?? ""}
+                        placeholder="Required for result"
+                      />
+                      <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-700">
+                        <span className="font-semibold text-slate-900">
+                          {runDL.override_pass === true
+                            ? "Pass (override)"
+                            : runDL.override_pass === false
+                            ? "Fail (override)"
+                            : runDL.computed_pass === true
+                            ? "Pass"
+                            : runDL.computed_pass === false
+                            ? "Fail"
+                            : "Pending inputs"}
+                        </span>
+                        <span className="text-slate-500"> / </span>
+                        <span>Measured {runDL.data?.measured_duct_leakage_cfm ?? "-"}</span>
+                        <span className="text-slate-500"> / </span>
+                        <span>Max {runDL.computed?.max_leakage_cfm ?? "-"} CFM</span>
+                      </div>
+                    </div>
+
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`dl-target-${runDL.id}`}>
                         Duct Leakage Target (%)
@@ -2528,39 +2553,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       defaultHeatingEfficiencyPercent={runDL.data?.heating_efficiency_percent ?? defaultHeatingEfficiencyFromEquipment}
                       defaultTonnage={runDL.data?.tonnage ?? defaultSystemTonnage}
                     />
-
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`dl-meas-${runDL.id}`}>
-                        Measured Duct Leakage (CFM)
-                      </label>
-                      <input
-                        id={`dl-meas-${runDL.id}`}
-                        name="measured_duct_leakage_cfm"
-                        type="number"
-                        step="1"
-                        required
-                        className="w-full rounded-md border px-3 py-2 placeholder:text-slate-400"
-                        defaultValue={runDL.data?.measured_duct_leakage_cfm ?? ""}
-                        placeholder="Required for result"
-                      />
-                      <div className="mt-1 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-700">
-                        <span className="font-semibold text-slate-900">
-                          {runDL.override_pass === true
-                            ? "Pass (override)"
-                            : runDL.override_pass === false
-                            ? "Fail (override)"
-                            : runDL.computed_pass === true
-                            ? "Pass"
-                            : runDL.computed_pass === false
-                            ? "Fail"
-                            : "Pending inputs"}
-                        </span>
-                        <span className="text-slate-500"> • </span>
-                        <span>Measured {runDL.data?.measured_duct_leakage_cfm ?? "—"}</span>
-                        <span className="text-slate-500"> / </span>
-                        <span>Max {runDL.computed?.max_leakage_cfm ?? "—"} CFM</span>
-                      </div>
-                    </div>
 
                     <div className="grid gap-1 sm:col-span-2">
                       <label className="text-sm font-medium" htmlFor={`dl-notes-${runDL.id}`}>
@@ -2662,6 +2654,17 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </>
             )}
           </div>
+        ) : null}
+
+        {selectedSystemId && isDuctLeakageFocused ? (
+          <details className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+            <summary className="cursor-pointer font-semibold text-slate-900">Test queue</summary>
+            <div className="mt-2">
+              <Link href={withS(undefined, selectedSystemId)} className="font-semibold text-slate-900 underline">
+                Open full queue
+              </Link>
+            </div>
+          </details>
         ) : null}
 
         {/* =========================
