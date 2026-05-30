@@ -3796,13 +3796,57 @@ return (
       </section>
     ) : null}
 
+    {maintenanceAgreementsEnabled && servicePlanSummary ? (
+      <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5">
+        <div className="mb-2.5 flex items-end justify-between gap-2 border-b border-slate-200/80 pb-2.5">
+          <div>
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Service Plans</div>
+            <div className="text-[15px] font-semibold tracking-tight text-slate-950">Service Plans</div>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="text-[11px] text-slate-500">As of {servicePlanSummary.as_of_date}</div>
+            <Link href="/service-plans" className={sectionActionLinkClass}>
+              View Service Plans
+            </Link>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-slate-500`}>Active Plans</div>
+            <div className="mt-1 text-base font-semibold text-slate-900 tabular-nums">{servicePlanSummary.status_counts.active}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-rose-700`}>Overdue</div>
+            <div className="mt-1 text-base font-semibold text-rose-700 tabular-nums">{servicePlanSummary.due_counts.overdue}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-amber-700`}>Due Today</div>
+            <div className="mt-1 text-base font-semibold text-amber-700 tabular-nums">{servicePlanSummary.due_counts.due_today}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-blue-700`}>Due in 1-7 Days</div>
+            <div className="mt-1 text-base font-semibold text-blue-700 tabular-nums">{servicePlanSummary.due_counts.due_in_next_7_days}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-cyan-700`}>Due in 8-30 Days</div>
+            <div className="mt-1 text-base font-semibold text-cyan-700 tabular-nums">{dueIn8To30Days}</div>
+          </div>
+          <div className={servicePlanSummaryCountClass}>
+            <div className={`${opsUtilityLabelClass} text-slate-600`}>Not Scheduled</div>
+            <div className="mt-1 text-base font-semibold text-slate-700 tabular-nums">{servicePlanSummary.due_counts.not_scheduled_active}</div>
+          </div>
+        </div>
+      </section>
+    ) : null}
+
     <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.88))] p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(24rem,0.75fr)]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-end justify-between gap-2">
             <div>
-              <div className={`${opsUtilityLabelClass} text-slate-500`}>Priority Queues</div>
-              <div className="text-lg font-semibold tracking-tight text-slate-950">Work Flow</div>
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>Workflow Health</div>
+              <div className="text-lg font-semibold tracking-tight text-slate-950">Workflow Health</div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
               {operationalFlowTotal} jobs in flow
@@ -4087,7 +4131,15 @@ return (
       )}
     </section>
 
-    <section className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
+    <section className="rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(248,250,252,0.88))] p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
+      <div className="mb-3 flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className={`${opsUtilityLabelClass} text-slate-500`}>Queue Shortcuts</div>
+          <div className="text-lg font-semibold tracking-tight text-slate-950">Queue Shortcuts</div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)]">
       <div id="field-work" className={`rounded-2xl border ${prioritizedFieldWorkJobs.length === 0 ? "border-emerald-200/80 bg-emerald-50/50 p-3" : "border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70"}`}>
         <div className="mb-2 flex items-center justify-between gap-2">
           <div>
@@ -4200,55 +4252,8 @@ return (
           </div>
         )}
       </div>
+      </div>
     </section>
-
-    {maintenanceAgreementsEnabled && servicePlanSummary ? (
-      <section className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70 sm:p-3.5">
-        <div className="mb-2.5 flex items-end justify-between gap-2 border-b border-slate-200/80 pb-2.5">
-          <div>
-            <div className={`${opsUtilityLabelClass} text-slate-500`}>Planning</div>
-            <div className="text-[15px] font-semibold tracking-tight text-slate-950">Service Plans</div>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="text-[11px] text-slate-500">As of {servicePlanSummary.as_of_date}</div>
-            <Link href="/service-plans" className={sectionActionLinkClass}>
-              View Service Plans
-            </Link>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
-          <div className={servicePlanSummaryCountClass}>
-            <div className={`${opsUtilityLabelClass} text-slate-500`}>Active Plans</div>
-            <div className="mt-1 text-base font-semibold text-slate-900 tabular-nums">{servicePlanSummary.status_counts.active}</div>
-          </div>
-          <div className={servicePlanSummaryCountClass}>
-            <div className={`${opsUtilityLabelClass} text-rose-700`}>Overdue</div>
-            <div className="mt-1 text-base font-semibold text-rose-700 tabular-nums">{servicePlanSummary.due_counts.overdue}</div>
-          </div>
-          <div className={servicePlanSummaryCountClass}>
-            <div className={`${opsUtilityLabelClass} text-amber-700`}>Due Today</div>
-            <div className="mt-1 text-base font-semibold text-amber-700 tabular-nums">{servicePlanSummary.due_counts.due_today}</div>
-          </div>
-          <div className={servicePlanSummaryCountClass}>
-            <div className={`${opsUtilityLabelClass} text-blue-700`}>Due in 1-7 Days</div>
-            <div className="mt-1 text-base font-semibold text-blue-700 tabular-nums">{servicePlanSummary.due_counts.due_in_next_7_days}</div>
-          </div>
-          <div className={servicePlanSummaryCountClass}>
-            <div className={`${opsUtilityLabelClass} text-cyan-700`}>Due in 8-30 Days</div>
-            <div className="mt-1 text-base font-semibold text-cyan-700 tabular-nums">{dueIn8To30Days}</div>
-          </div>
-          <div className={servicePlanSummaryCountClass}>
-            <div className={`${opsUtilityLabelClass} text-slate-600`}>Not Scheduled</div>
-            <div className="mt-1 text-base font-semibold text-slate-700 tabular-nums">{servicePlanSummary.due_counts.not_scheduled_active}</div>
-          </div>
-        </div>
-
-        <div className="mt-2.5 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[12.5px] leading-5 text-slate-600 sm:text-[12px] sm:leading-4">
-          Service plan counts are planning visibility only. Work orders are created separately.
-        </div>
-      </section>
-    ) : null}
 
     {showOperationalNotificationAwareness ? (
       <section id="system-alerts" className={`rounded-2xl border p-3 shadow-[0_14px_32px_-28px_rgba(15,23,42,0.35)] sm:p-3.5 ${hasActiveSystemAlerts || signal ? "border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.98))]" : "border-slate-300/75 bg-slate-50/75"}`}>
@@ -4322,8 +4327,8 @@ return (
     <section id="ops-queues" className="rounded-2xl border border-slate-300/80 bg-slate-100/70 p-3 shadow-[0_18px_42px_-32px_rgba(15,23,42,0.38)] sm:p-4">
       <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className={`${opsUtilityLabelClass} text-slate-500`}>Workflow</div>
-          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Ops Queues</div>
+          <div className={`${opsUtilityLabelClass} text-slate-500`}>Queue Shortcuts</div>
+          <div className="text-[15px] font-semibold tracking-tight text-slate-950">Focused Queue Preview</div>
         </div>
       </div>
 
@@ -4386,7 +4391,7 @@ return (
           quietSectionEmptyState("No jobs in this queue with current filters.")
         ) : (
           <div className="space-y-2">
-            {sortedBucketJobs.slice(0, 20).map((j: any) => {
+            {sortedBucketJobs.slice(0, 12).map((j: any) => {
               const isRetestReady = hasSignalEventForJob(
                 latestRetestReadyByJob,
                 String(j.id ?? "")
