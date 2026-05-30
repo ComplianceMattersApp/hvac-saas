@@ -8,6 +8,10 @@ import {
   deriveCompatibilityInvoiceAllocations,
   sumActiveInvoiceAllocationCents,
 } from "@/lib/business/payment-allocations";
+import {
+  calculatePlatformApplicationFeeAmountCents,
+  derivePlatformApplicationFeeConfig,
+} from "@/lib/business/platform-application-fees";
 
 export const INTERNAL_INVOICE_PAYMENT_STATUSES = [
   "recorded",
@@ -433,6 +437,21 @@ export async function createTenantInvoiceCheckoutSession(params: {
     job_id: jobId,
     invoice_number: String(invoice.invoice_number ?? "").trim() || invoiceId,
   };
+  const platformFeeConfig = derivePlatformApplicationFeeConfig({
+    stripeConnectReady: readiness.isReady,
+    connectedAccountId: readiness.connectedAccountId,
+  });
+  const platformFee = calculatePlatformApplicationFeeAmountCents({
+    amountCents: balanceDueCents,
+    feeBasisPoints: platformFeeConfig.feeBasisPoints,
+    enabled: platformFeeConfig.enabled,
+  });
+  const paymentIntentData = {
+    metadata: checkoutMetadata,
+    ...(platformFee.applicationFeeAmountCents > 0
+      ? { application_fee_amount: platformFee.applicationFeeAmountCents }
+      : {}),
+  };
 
   const session = await stripe.checkout.sessions.create(
     {
@@ -452,9 +471,7 @@ export async function createTenantInvoiceCheckoutSession(params: {
       success_url: `${appUrl}/jobs/${jobId}/invoice?banner=internal_invoice_payment_checkout_success#invoice-workspace`,
       cancel_url: `${appUrl}/jobs/${jobId}/invoice?banner=internal_invoice_payment_checkout_cancelled#invoice-workspace`,
       metadata: checkoutMetadata,
-      payment_intent_data: {
-        metadata: checkoutMetadata,
-      },
+      payment_intent_data: paymentIntentData,
       ...(String(invoice.billing_email ?? "").trim()
         ? { customer_email: String(invoice.billing_email).trim() }
         : {}),

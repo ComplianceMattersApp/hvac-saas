@@ -268,6 +268,10 @@ describe("createTenantInvoiceCheckoutSession", () => {
     const payload = firstCall[0];
 
     expect(payload.line_items[0].price_data.unit_amount).toBe(7500);
+    expect(payload.payment_intent_data?.application_fee_amount).toBe(19);
+    expect(payload.payment_intent_data?.application_fee_amount).toBeLessThan(
+      payload.line_items[0].price_data.unit_amount,
+    );
     expect(payload.metadata).toEqual(
       expect.objectContaining({
         account_owner_user_id: "owner-1",
@@ -284,6 +288,59 @@ describe("createTenantInvoiceCheckoutSession", () => {
         invoice_number: "INV-1001",
       }),
     );
+  });
+
+  it("calculates 4-cent application fee for 17.50 checkout amount", async () => {
+    const fixture = buildSupabaseFixture({
+      invoiceTotalCents: 1750,
+      paymentRows: [],
+    });
+    const createMock = vi.fn(async () => ({
+      id: "cs_test_1750",
+      url: "https://checkout.stripe.com/c/pay/cs_test_1750",
+    }));
+
+    await createTenantInvoiceCheckoutSession({
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      invoiceId: "inv-1",
+      supabase: fixture.supabase,
+      stripe: { checkout: { sessions: { create: createMock } } } as any,
+      appUrl: "http://localhost:3000",
+    });
+
+    const firstCall = createMock.mock.calls[0] as unknown as Array<Record<string, any>>;
+    const payload = firstCall[0];
+
+    expect(payload.line_items[0].price_data.unit_amount).toBe(1750);
+    expect(payload.payment_intent_data?.application_fee_amount).toBe(4);
+    expect(payload.payment_intent_data?.application_fee_amount).toBeLessThan(1750);
+  });
+
+  it("omits application_fee_amount when fee calculation resolves to zero", async () => {
+    const fixture = buildSupabaseFixture({
+      invoiceTotalCents: 1,
+      paymentRows: [],
+    });
+    const createMock = vi.fn(async () => ({
+      id: "cs_test_1cent",
+      url: "https://checkout.stripe.com/c/pay/cs_test_1cent",
+    }));
+
+    await createTenantInvoiceCheckoutSession({
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      invoiceId: "inv-1",
+      supabase: fixture.supabase,
+      stripe: { checkout: { sessions: { create: createMock } } } as any,
+      appUrl: "http://localhost:3000",
+    });
+
+    const firstCall = createMock.mock.calls[0] as unknown as Array<Record<string, any>>;
+    const payload = firstCall[0];
+
+    expect(payload.line_items[0].price_data.unit_amount).toBe(1);
+    expect(payload.payment_intent_data?.application_fee_amount).toBeUndefined();
   });
 
   it("does not insert local payment rows during checkout session creation", async () => {
