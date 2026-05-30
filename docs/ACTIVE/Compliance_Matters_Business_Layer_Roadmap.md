@@ -866,6 +866,10 @@ Maintenance agreements closeout note (May 2026):
 - Service Plans / Maintenance Agreements status is now closed for this pass after 9A-14A, 9A-14B, and 9A-14C; reopen only for real workflow bugs or strongly validated user feedback.
 - Planning guardrail for next pass: do not add additional Service Plan capability unless explicitly reopened.
 
+- 9A-15A Service Plan Templates / Locked Package Model is complete in commit `a8ca9b0`.
+- 9A-15A closes the template-workflow lane with template management, create-from-template prefill, provenance snapshot, duplicate-template flow, template package lock metadata, strict create-time package values, server-side locked-field enforcement, and read-only locked-package rendering on customer profile.
+- 9A-15A preserves the same operating boundaries: no automatic jobs, no recurrence engine, no invoice/payment/autopay changes, no visit-count mutation, no next-due mutation, no portal/SMS/QBO changes, and manual Service Plan creation stays intact.
+
 SMS Slice E2 closeout note (May 2026):
 - Slice E2 Message Intent + Provider Delivery Audit Foundation is complete in commit `b90c9ea` with migration `supabase/migrations/20260515130000_sms_message_intent_provider_delivery_foundation.sql`.
 - E2 created `sms_message_intents` and `sms_provider_deliveries` as neutral tenant/account-scoped communication audit infrastructure.

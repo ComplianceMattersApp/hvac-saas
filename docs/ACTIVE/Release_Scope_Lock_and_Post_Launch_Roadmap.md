@@ -822,6 +822,10 @@ Maintenance agreements read-only projection closeout note (May 2026):
 - Service Plans / Maintenance Agreements status: closed for now after 9A-14A, 9A-14B, and 9A-14C; reopen only for real-world workflow bugs or strongly validated user feedback.
 - Scope guardrail for next pass: do not add more Service Plan capability unless explicitly reopened.
 
+- 9A-15A Service Plan Templates / Locked Package Model is complete in commit `a8ca9b0`.
+- 9A-15A records template management, create-from-template prefill, provenance snapshot, duplicate-template flow, template package lock metadata, strict create-time package values, server-side locked-field update enforcement, and read-only locked-package rendering.
+- 9A-15A boundaries remain closed: no automatic jobs, no recurrence engine, no invoice/payment/autopay changes, no visit-count mutation, no next-due mutation, no portal/SMS/QBO changes, and manual Service Plan creation remains preserved.
+
 Execution companion note: for practical first-customer support posture and expansion-lane classification guardrails, see `docs/ACTIVE/Owner_Led_Go_Live_Readiness_Addendum.md`.
 
 ---

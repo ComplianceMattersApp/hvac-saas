@@ -1948,6 +1948,32 @@ Service Plans / Maintenance Agreements status:
 - Reopen only for real-world workflow bugs or strongly validated user feedback.
 - Do not add more Service Plan capability in the next pass.
 
+## Group 9A-15A Closeout Snapshot (Service Plan Templates / Locked Package Model)
+
+Group 9A-15A is complete and pushed in commit `a8ca9b0` (`feat(service-plans): render locked template packages read-only`).
+
+Recorded completion:
+
+- Service Plan Templates foundation is complete.
+- Template management on `/service-plans` is complete.
+- Customer profile create-from-template prefill is complete.
+- Template provenance snapshot is complete.
+- Duplicate Template flow is complete.
+- Template package lock metadata is complete.
+- Strict template-create package values are enforced.
+- Server-side locked-field update enforcement is complete.
+- Customer UI read-only locked package rendering is complete.
+
+Boundaries preserved:
+
+- no automatic jobs
+- no recurrence engine
+- no invoice/payment/autopay changes
+- no visit-count mutation
+- no next-due mutation
+- no portal/SMS/QBO changes
+- manual Service Plan creation preserved
+
 ## Group 9A-8B Closeout Snapshot (service plans read-only drilldown page + ops link implemented in repo)
 
 Group 9A-8B (Service Plans Read-Only Drilldown Page + Ops Link) is implemented and pushed.

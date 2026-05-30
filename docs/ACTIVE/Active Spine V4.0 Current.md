@@ -854,6 +854,10 @@ Current Program Status Note (May 2026)
   - reopen only for real-world workflow bugs or strongly validated user feedback
   - do not add more Service Plan capability in the next pass unless explicitly reopened
 
+- Group 9A-15A Service Plan Templates / Locked Package Model is complete in commit `a8ca9b0`.
+- 9A-15A records template management, create-from-template prefill, provenance snapshot, duplicate-template flow, template package lock metadata, strict create-time package values, server-side locked-field update enforcement, and read-only locked-package rendering on customer profile.
+- 9A-15A boundaries stay closed: no automatic jobs, no recurrence engine, no invoice/payment/autopay changes, no visit-count mutation, no next-due mutation, no portal/SMS/QBO changes, and manual Service Plan creation remains available.
+
 - Group 9A-13B-C Safe Confirm Write (agreement + link metadata idempotency truth) is complete and pushed in commit `3e8c769` with 9A-13B-C1 browser smoke closeout:
   - confirm now writes both surfaces on success: `maintenance_agreements.next_due_date` and `maintenance_agreement_visits` confirmation metadata (`baseline_next_due_date`, `confirmed_next_due_date`, `next_due_confirmed_at`, `next_due_confirmed_by_user_id`)
   - link metadata is the idempotency truth: counted link can confirm once; repeat confirm from same counted link is blocked with `confirm_next_due_already_confirmed`
