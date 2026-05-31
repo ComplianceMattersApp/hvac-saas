@@ -6,6 +6,11 @@ import {
   saveInternalBusinessProfileFromForm,
   startTenantStripeConnectOnboardingFromForm,
 } from "@/lib/actions/internal-business-profile-actions";
+import {
+  archiveAuthorizedEccRaterFromForm,
+  createAuthorizedEccRaterFromForm,
+  setAuthorizedEccRaterDefaultFromForm,
+} from "@/lib/actions/authorized-handoff-recipient-actions";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import {
   DEFAULT_BILLING_MODE,
@@ -24,6 +29,10 @@ import {
 } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+import {
+  resolveActiveAuthorizedHandoffRecipientSelection,
+  type AuthorizedHandoffRecipientRow,
+} from "@/lib/workflows/authorized-handoff-recipients-read";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -59,6 +68,34 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   stripe_connect_status_refresh_failed_unready: {
     tone: "warn",
     message: "We couldn't refresh the latest Stripe status just now. The last saved setup state is shown below.",
+  },
+  authorized_ecc_rater_saved: {
+    tone: "success",
+    message: "Authorized ECC rater saved.",
+  },
+  authorized_ecc_rater_display_name_required: {
+    tone: "error",
+    message: "Display name is required for an authorized ECC rater.",
+  },
+  authorized_ecc_rater_save_failed: {
+    tone: "error",
+    message: "Could not save authorized ECC rater. Please try again.",
+  },
+  authorized_ecc_rater_default_saved: {
+    tone: "success",
+    message: "Default authorized ECC rater updated.",
+  },
+  authorized_ecc_rater_default_failed: {
+    tone: "error",
+    message: "Could not set default authorized ECC rater.",
+  },
+  authorized_ecc_rater_archived: {
+    tone: "success",
+    message: "Authorized ECC rater archived.",
+  },
+  authorized_ecc_rater_archive_failed: {
+    tone: "error",
+    message: "Could not archive authorized ECC rater.",
   },
 };
 
@@ -105,7 +142,7 @@ export default async function AdminCompanyProfilePage({
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
-  const [profile, entitlement, seatAuditPreview] = await Promise.all([
+  const [profile, entitlement, seatAuditPreview, authorizedEccSelection] = await Promise.all([
     getInternalBusinessProfileByAccountOwnerId({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
@@ -114,6 +151,11 @@ export default async function AdminCompanyProfilePage({
     resolvePlatformSeatAuditPreviewCounts({
       accountOwnerUserId: internalUser.account_owner_user_id,
       supabase,
+    }),
+    resolveActiveAuthorizedHandoffRecipientSelection({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      handoffKind: "ecc",
     }),
   ]);
 
@@ -132,6 +174,7 @@ export default async function AdminCompanyProfilePage({
   const billingMode = profile?.billing_mode ?? DEFAULT_BILLING_MODE;
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
   const platformBillingAvailability = getPlatformBillingAvailability();
+  const authorizedEccRecipients = authorizedEccSelection.recipients;
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -401,9 +444,210 @@ export default async function AdminCompanyProfilePage({
         </form>
       </div>
 
+      <div id="authorized-ecc-raters" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Authorized ECC Raters</h2>
+          <p className="text-sm leading-6 text-slate-600">
+            Set up who can receive ECC handoffs from workflow guidance. If one active rater exists, future workflow handoff can default to that rater. If multiple exist, the user will choose from a dropdown.
+          </p>
+        </div>
+
+        <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
+          {authorizedEccSelection.mode === "none" ? (
+            <span>Workflow handoff will show setup required.</span>
+          ) : authorizedEccSelection.mode === "single" ? (
+            <span>Workflow handoff will default to this rater.</span>
+          ) : (
+            <span>Workflow handoff will ask the user to choose a rater.</span>
+          )}
+        </div>
+
+        <div className="mt-5 space-y-3">
+          {authorizedEccRecipients.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
+              No authorized ECC raters are set up yet.
+            </div>
+          ) : (
+            authorizedEccRecipients.map((recipient) => {
+              const details = [
+                recipient.external_company_name,
+                recipient.external_contact_name,
+                recipient.external_email,
+                recipient.external_phone,
+              ].filter(Boolean);
+
+              return (
+                <div key={recipient.id} className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-900">{recipient.display_name}</div>
+                      <div className="mt-1 text-xs text-slate-600">{formatAuthorizedRecipientTypeLabel(recipient)}</div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      {recipient.is_default ? (
+                        <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                          Default
+                        </span>
+                      ) : null}
+                      <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                        {recipient.handoff_kind.toUpperCase()}
+                      </span>
+                    </div>
+                  </div>
+
+                  {details.length > 0 ? (
+                    <div className="mt-2 text-sm text-slate-700">{details.join(" • ")}</div>
+                  ) : null}
+
+                  {recipient.notes ? (
+                    <div className="mt-2 text-sm text-slate-600">Notes: {recipient.notes}</div>
+                  ) : null}
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    {!recipient.is_default ? (
+                      <form action={setAuthorizedEccRaterDefaultFromForm}>
+                        <input type="hidden" name="recipient_id" value={recipient.id} />
+                        <button
+                          type="submit"
+                          className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+                        >
+                          Set as default
+                        </button>
+                      </form>
+                    ) : null}
+
+                    <form action={archiveAuthorizedEccRaterFromForm}>
+                      <input type="hidden" name="recipient_id" value={recipient.id} />
+                      <button
+                        type="submit"
+                        className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+                      >
+                        Archive
+                      </button>
+                    </form>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <form action={createAuthorizedEccRaterFromForm} className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="text-sm font-semibold text-slate-900">Add authorized rater</div>
+          <input type="hidden" name="handoff_kind" value="ecc" />
+          <input type="hidden" name="recipient_type" value="external_manual" />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <label htmlFor="authorized-rater-display-name" className="text-sm font-medium text-slate-700">
+                Display name
+              </label>
+              <input
+                id="authorized-rater-display-name"
+                name="display_name"
+                required
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="Central Valley HERS Rater"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="authorized-rater-company" className="text-sm font-medium text-slate-700">
+                Company (optional)
+              </label>
+              <input
+                id="authorized-rater-company"
+                name="external_company_name"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="External Rating Co"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="authorized-rater-contact" className="text-sm font-medium text-slate-700">
+                Contact name (optional)
+              </label>
+              <input
+                id="authorized-rater-contact"
+                name="external_contact_name"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="Jane Rater"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="authorized-rater-email" className="text-sm font-medium text-slate-700">
+                Email (optional)
+              </label>
+              <input
+                id="authorized-rater-email"
+                name="external_email"
+                type="email"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="rater@example.com"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label htmlFor="authorized-rater-phone" className="text-sm font-medium text-slate-700">
+                Phone (optional)
+              </label>
+              <input
+                id="authorized-rater-phone"
+                name="external_phone"
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="(209) 555-0202"
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <label htmlFor="authorized-rater-notes" className="text-sm font-medium text-slate-700">
+                Notes (optional)
+              </label>
+              <textarea
+                id="authorized-rater-notes"
+                name="notes"
+                rows={2}
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="Use for workflow ECC handoff and completion coordination"
+              />
+            </div>
+          </div>
+
+          <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+            <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
+            Set as default ECC rater
+          </label>
+
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
+            V1 setup supports external/manual raters. Internal-user and connected-account raters are reserved for future slices.
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-slate-800"
+            >
+              Add authorized rater
+            </button>
+          </div>
+        </form>
+      </div>
+
       <TenantStripePaymentsSection readiness={tenantStripeReadiness} />
     </div>
   );
+}
+
+function formatAuthorizedRecipientTypeLabel(recipient: AuthorizedHandoffRecipientRow) {
+  const normalizedType = String(recipient.recipient_type ?? "").trim().toLowerCase();
+  if (normalizedType === "internal_user") {
+    return "Internal user";
+  }
+  if (normalizedType === "connected_account_future") {
+    return "Connected account future";
+  }
+  return "External/manual rater";
 }
 
 // ---------------------------------------------------------------------------
