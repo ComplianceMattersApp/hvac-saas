@@ -19,9 +19,9 @@ const jobActionsSource = readFileSync(
 
 describe("visit scope inline composer slice 1", () => {
   it("keeps manual add path in the same search/type composer flow", () => {
-    expect(builderSource).toContain("Search Pricebook Or Add Scope");
+    expect(builderSource).toContain("Search Pricebook or type custom work...");
     expect(builderSource).toContain("addManualItemFromQuickEntry");
-    expect(builderSource).toContain('Add "${searchQuery');
+    expect(builderSource).toContain("disabled={!searchQuery}");
   });
 
   it("keeps pricebook add path and provenance mapping", () => {
@@ -31,7 +31,7 @@ describe("visit scope inline composer slice 1", () => {
   });
 
   it("keeps inline edit controls visible on added service rows", () => {
-    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-4 py-3");
+    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-3 py-3");
     expect(builderSource).toContain("value={item.title}");
     expect(builderSource).toContain("onChange={(event) => patchItem(item.id, { title: event.target.value })}");
     expect(builderSource).toContain("value={item.expected_unit_price ?? 0}");

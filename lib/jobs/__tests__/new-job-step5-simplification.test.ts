@@ -28,13 +28,13 @@ describe("New job Step 5 simplification wiring", () => {
     expect(formSource).toContain("Select the responsible account, choose the work, then create the job.");
   });
 
-  it("prioritizes current job scope above add controls", () => {
-    expect(builderSource).toContain("Current Job Scope");
-    expect(builderSource.indexOf("Current Job Scope")).toBeLessThan(
-      builderSource.indexOf("Browse saved work items"),
+  it("keeps a compact add-work composer ahead of saved defaults", () => {
+    expect(builderSource).toContain("Add Work");
+    expect(builderSource.indexOf("Add Work")).toBeLessThan(
+      builderSource.indexOf("Saved work items"),
     );
-    expect(builderSource).toContain("No work added yet.");
-    expect(builderSource).toContain("Selected work appears here first so the active scope is always clear.");
+    expect(builderSource).toContain("Search Pricebook or type custom work...");
+    expect(builderSource).toContain("disabled={!searchQuery}");
   });
 
   it("keeps details field-first, keeps optional price, and hides metadata controls", () => {
@@ -47,8 +47,8 @@ describe("New job Step 5 simplification wiring", () => {
   });
 
   it("uses softened Pricebook wording", () => {
-    expect(builderSource).toContain("Use Pricebook defaults");
-    expect(builderSource).toContain("Default from Pricebook");
+    expect(builderSource).toContain("Saved work item");
+    expect(builderSource).toContain("Saved work items");
   });
 
   it("retains quick choices internally for non-service scope paths and excludes generic maintenance", () => {
@@ -59,8 +59,8 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).not.toContain('label: "Maintenance"');
   });
 
-  it("keeps structured quick-choice candidate support for non-service paths", () => {
-    expect(builderSource).toContain('jobType !== "service" ? (');
+  it("keeps structured quick-choice candidate support across scope paths", () => {
+    expect(builderSource).toContain("quickChoices.map");
     expect(builderSource).toContain("addScopeCandidate(choice.candidate)");
     expect(builderSource).toContain("title: choice.label");
     expect(builderSource).toContain("source_pricebook_item_id");
@@ -76,16 +76,15 @@ describe("New job Step 5 simplification wiring", () => {
   it("hides saved/default rows until search or browse", () => {
     expect(builderSource).toContain("showSavedDefaults");
     expect(builderSource).toContain("searchQuery.length > 0");
-    expect(builderSource).toContain("Browse saved work items");
-    expect(builderSource).toContain("shouldShowSavedDefaults");
+    expect(builderSource).toContain("Saved work items");
+    expect(builderSource).toContain("onToggle={(event) => setShowSavedDefaults");
   });
 
   it("supports typed custom scope adds", () => {
-    expect(builderSource).toContain("Search Pricebook Or Add Scope");
-    expect(builderSource).toContain("Add another item");
+    expect(builderSource).toContain("Search Pricebook or type custom work...");
     expect(builderSource).toContain("addManualItemFromQuickEntry");
     expect(builderSource).toContain("applyFieldIntakeScopeDefaults");
-    expect(builderSource).toContain('Add "${searchQuery');
+    expect(builderSource).toContain("disabled={!searchQuery}");
   });
 
   it("renders service scope items as selected cards with source and details affordances", () => {
@@ -94,7 +93,7 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("Custom work");
     expect(builderSource).toContain('completedItems.length === 1 ? "item" : "items"');
     expect(builderSource).toContain("Optional price: $");
-    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-4 py-3");
+    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-3 py-3");
   });
 
   it("flattens the service scope shell instead of nesting extra framed cards", () => {

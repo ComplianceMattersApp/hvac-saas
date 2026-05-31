@@ -18,11 +18,11 @@ describe("Visit scope visit-type suggestion UX", () => {
     expect(resolveVisitTypeScopeSuggestion("callback")).toBeNull();
   });
 
-  it("renders a visit-type suggestion block near Current Job Scope", () => {
-    expect(builderSource).toContain("Suggested from Visit Type");
+  it("keeps visit-type suggestion available in compact add-work controls", () => {
+    expect(builderSource).toContain("visitTypeSuggestionCandidate");
+    expect(builderSource).toContain("Add {visitTypeSuggestionCandidate.title}");
     expect(builderSource).toContain("From visit type");
-    expect(builderSource).toContain("Add to job scope");
-    expect(builderSource).toContain("Already added");
+    expect(builderSource).toContain("isVisitTypeSuggestionAdded");
   });
 
   it("prevents duplicate adds from suggestion path", () => {
@@ -30,19 +30,18 @@ describe("Visit scope visit-type suggestion UX", () => {
     expect(builderSource).toContain("findExistingScopeItem(items, visitTypeSuggestionCandidate)");
   });
 
-  it("keeps quick add behind Add more work instead of first visible state", () => {
-    expect(builderSource).toContain("Add more work");
-    expect(builderSource).toContain("Add another item");
-    expect(builderSource).toContain("Search Pricebook items or type custom scope");
-    expect(builderSource).toContain('open={jobType !== "service" || !hasCompletedItems}');
-    expect(builderSource).toContain('jobType !== "service" ? (');
-    expect((builderSource.match(/Quick Add/g) || []).length).toBe(1);
+  it("uses a compact search-first composer instead of nested add-more details", () => {
+    expect(builderSource).toContain("Add Work");
+    expect(builderSource).toContain("Search Pricebook or type custom work...");
+    expect(builderSource).toContain("disabled={!searchQuery}");
+    expect(builderSource).not.toContain("Add more work");
+    expect(builderSource).not.toContain("Add another item");
   });
 
-  it("renders added service scope as the primary current-scope card", () => {
-    expect(builderSource).toContain("Selected work appears here first so the active scope is always clear.");
+  it("renders added service scope as selected editable rows", () => {
+    expect(builderSource).toContain("Selected Work Items");
     expect(builderSource).toContain("From saved work item");
     expect(builderSource).toContain("Custom work");
-    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-4 py-3");
+    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-3 py-3");
   });
 });

@@ -186,7 +186,7 @@ export default function VisitScopeBuilder({
   const [items, setItems] = useState<VisitScopeDraftItem[]>(() => toDraftItems(initialItems, jobType));
   const [quickEntryValue, setQuickEntryValue] = useState("");
   const [scopeFeedback, setScopeFeedback] = useState<ScopeFeedback | null>(null);
-  const [expandedItemIds, setExpandedItemIds] = useState<Set<string>>(new Set());
+  const [, setExpandedItemIds] = useState<Set<string>>(new Set());
   const [showSavedDefaults, setShowSavedDefaults] = useState(false);
   const [showEccOptionalScope, setShowEccOptionalScope] = useState(() => {
     const seededItems = toDraftItems(initialItems, jobType);
@@ -235,9 +235,6 @@ export default function VisitScopeBuilder({
     () => items.filter((item) => item.title.trim().length > 0 || item.details.trim().length > 0),
     [items],
   );
-
-  const shouldShowSavedDefaults =
-    availablePricebookTemplates.length > 0 && (showSavedDefaults || searchQuery.length > 0);
 
   const quickChoices = useMemo(
     () =>
@@ -496,14 +493,14 @@ export default function VisitScopeBuilder({
   return (
     <div className="space-y-4">
       {jobType === "ecc" && !showEccOptionalScope ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3.5 py-3">
-          <p className="text-sm text-slate-700">
-            Optional: add companion service work or extra visit notes if this ECC visit also includes service work.
+        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5">
+          <p className="text-xs text-slate-700">
+            Optional for ECC. Add only if this trip includes extra service work.
           </p>
           <button
             type="button"
             onClick={() => setShowEccOptionalScope(true)}
-            className="mt-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+            className="mt-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
           >
             Add Optional Scope
           </button>
@@ -512,49 +509,62 @@ export default function VisitScopeBuilder({
 
       {jobType === "service" || showEccOptionalScope ? (
       <>
-      <div className="space-y-1">
-        <label className="block text-sm font-medium text-slate-900">
-          {jobType === "service" ? "Reason for Visit / Visit Title" : "Known trip context"}
-        </label>
-        <textarea
-          name={summaryName}
-          value={summary}
-          onChange={(event) => setSummary(event.target.value)}
-          rows={2}
-          maxLength={600}
-          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-          placeholder={jobType === "service" ? "Why this visit exists and key dispatch context (e.g., 'No cooling upstairs - intermittent after 3pm')" : "Optional: add any known context for this ECC trip."}
-        />
-        <p className="text-xs text-slate-500">
-          {jobType === "service"
-            ? "Reason for Visit sets the created visit title and gives dispatch context."
-            : "Optional. Use this for helpful field context, not to replace the inspection or test type."}
-        </p>
-        {shouldShowFallbackPreview && fallbackPreviewTitle ? (
-          <p className="mt-1.5 rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-900 border border-emerald-200">
-            <span className="font-medium">Title will use:</span> {fallbackPreviewTitle}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="space-y-3 border-t border-slate-200/80 pt-3">
+      {jobType === "service" ? (
         <div className="space-y-1">
-          <div className="text-sm font-medium text-slate-900">
-            {jobType === "service" ? "Work to perform" : "Optional job scope notes"}
-          </div>
-          <div className="text-xs text-slate-500">
-            {jobType === "service"
-              ? "Job scope items define what belongs to this visit. They stay operational and do not create invoice charges."
-              : "Use when you know companion work, field expectations, or a note worth carrying into dispatch."}
-          </div>
-          {availablePricebookTemplates.length > 0 ? (
-            <div className="text-xs text-slate-500">
-              Pricebook is optional. Use Pricebook defaults as a quick starter for job scope.
-            </div>
+          <label className="block text-sm font-medium text-slate-900">
+            Reason for Visit / Visit Title
+          </label>
+          <textarea
+            name={summaryName}
+            value={summary}
+            onChange={(event) => setSummary(event.target.value)}
+            rows={2}
+            maxLength={600}
+            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+            placeholder="Why this visit exists and key dispatch context"
+          />
+          {shouldShowFallbackPreview && fallbackPreviewTitle ? (
+            <p className="mt-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+              <span className="font-medium">Title will use:</span> {fallbackPreviewTitle}
+            </p>
           ) : null}
         </div>
+      ) : (
+        <details className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+          <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+            More options
+          </summary>
+          <div className="mt-2 space-y-1.5">
+            <label className="block text-xs font-medium text-slate-800">Trip context (optional)</label>
+            <textarea
+              name={summaryName}
+              value={summary}
+              onChange={(event) => setSummary(event.target.value)}
+              rows={2}
+              maxLength={600}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+              placeholder="Optional trip context"
+            />
+          </div>
+        </details>
+      )}
 
-        <div className="space-y-3">
+      <div className="space-y-3 border-t border-slate-200/80 pt-3">
+        <div className="space-y-3 rounded-xl border border-slate-200/85 bg-slate-50/35 px-3 py-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-900">Add Work</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {jobType === "service"
+                    ? "Search, tap, and edit selected work inline."
+                    : "Optional for ECC. Add only if this trip includes extra service work."}
+                </p>
+              </div>
+              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
+                {completedItems.length} {completedItems.length === 1 ? "item" : "items"}
+              </span>
+            </div>
+
             {scopeFeedback && (jobType !== "service" || scopeFeedback.tone !== "added") ? (
               <p
                 className={[
@@ -569,323 +579,280 @@ export default function VisitScopeBuilder({
               </p>
             ) : null}
 
-            <div className="space-y-3 rounded-xl border border-slate-200/85 bg-slate-50/45 px-3 py-3">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Current Job Scope</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {completedItems.length > 0
-                      ? "Selected work appears here first so the active scope is always clear."
-                      : jobType === "service"
-                        ? "No work added yet. Search saved work items or type custom work to add the first item."
-                        : "Optional for ECC. Add scope only when useful."}
-                  </p>
-                </div>
-                <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
-                  {completedItems.length} {completedItems.length === 1 ? "item" : "items"} added
-                </span>
+            <div className="flex flex-wrap gap-2">
+              {quickChoices.map((choice) => (
+                <button
+                  key={choice.label}
+                  type="button"
+                  onClick={() => addScopeCandidate(choice.candidate)}
+                  disabled={choice.isAdded}
+                  aria-pressed={choice.isAdded}
+                  className={[
+                    "min-h-9 rounded-full border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors",
+                    choice.isAdded
+                      ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                      : "border-slate-300 bg-white text-slate-700 hover:bg-slate-100",
+                  ].join(" ")}
+                >
+                  {choice.label}
+                </button>
+              ))}
+              {jobType === "service" && visitTypeSuggestionCandidate && !isVisitTypeSuggestionAdded ? (
+                <button
+                  type="button"
+                  onClick={() => addScopeCandidate(visitTypeSuggestionCandidate)}
+                  className="min-h-9 rounded-full border border-blue-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-50"
+                >
+                  Add {visitTypeSuggestionCandidate.title}
+                </button>
+              ) : null}
+            </div>
+
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={quickEntryValue}
+                  onChange={(event) => {
+                    setQuickEntryValue(event.target.value);
+                    if (scopeFeedback?.tone !== "added") setScopeFeedback(null);
+                  }}
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                  placeholder="Search Pricebook or type custom work..."
+                />
+                <button
+                  type="button"
+                  onClick={addManualItemFromQuickEntry}
+                  disabled={!searchQuery}
+                  className="min-h-9 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-55"
+                >
+                  Add
+                </button>
               </div>
 
-              {jobType === "service" && visitTypeSuggestionCandidate ? (
-                <div className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-2.5">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-700">
-                    Suggested from Visit Type
-                  </div>
-                  <div className="mt-1 flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <div className="text-sm font-semibold text-blue-900">
-                        {visitTypeSuggestionCandidate.title}
-                      </div>
-                      <div className="text-xs text-blue-800">From visit type</div>
-                    </div>
-                    {isVisitTypeSuggestionAdded ? (
-                      <span className="rounded-full bg-blue-100 px-2 py-1 text-xs font-semibold text-blue-800">
-                        Already added
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => addScopeCandidate(visitTypeSuggestionCandidate)}
-                        className="min-h-9 rounded-full border border-blue-300 bg-white px-3 py-2 text-xs font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-100"
-                      >
-                        Add to job scope
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ) : null}
-
-              {jobType === "service" ? (
-                hasCompletedItems ? (
-                  <div className="space-y-3">
-                    {completedItems.map((item) => {
-                      const sourceLabel = getScopeSourceLabel(item, visitTypeSuggestionCandidate);
-                      const priceLabel = formatOptionalPrice(item.expected_unit_price);
+              {searchQuery.length > 0 ? (
+                filteredPricebookTemplates.length > 0 ? (
+                  <div className="space-y-1.5">
+                    {filteredPricebookTemplates.map((item) => {
+                      const candidate: ScopeCandidate = {
+                        title: item.item_name,
+                        details: item.default_description ?? "",
+                        source_pricebook_item_id: item.id,
+                        expected_unit_price: item.default_unit_price,
+                        unit_label: item.unit_label,
+                        item_type: item.item_type,
+                        category: item.category,
+                      };
+                      const isAdded = Boolean(findExistingScopeItem(items, candidate));
 
                       return (
-                        <div
+                        <button
                           key={item.id}
-                          className="rounded-xl border border-emerald-200 bg-white px-4 py-3"
+                          type="button"
+                          onClick={() => applyPricebookTemplate(item)}
+                          disabled={isAdded}
+                          className={[
+                            "w-full rounded-xl border px-3 py-2 text-left text-sm shadow-sm transition-colors",
+                            isAdded
+                              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+                              : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
+                          ].join(" ")}
                         >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex items-start gap-3">
-                              <span className="inline-flex h-7 w-7 flex-none items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
-                                ✓
-                              </span>
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <div className="text-sm font-semibold text-slate-900">
-                                    {item.title.trim() || "Untitled scope item"}
-                                  </div>
-                                  <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-semibold text-emerald-800 ring-1 ring-emerald-200">
-                                    Added
-                                  </span>
-                                </div>
-                                <div className="mt-1 text-xs text-slate-600">{sourceLabel}</div>
-                                {priceLabel ? (
-                                  <div className="mt-1 text-xs font-medium text-slate-700">Optional price: ${priceLabel}</div>
-                                ) : null}
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <div className="font-medium">{item.item_name}</div>
+                              <div className="text-xs text-slate-500">
+                                {[item.item_type, item.category].filter(Boolean).join(" / ") || "Saved work item"}
                               </div>
                             </div>
-                            <button
-                              type="button"
-                              onClick={() => removeItem(item.id)}
-                              className="text-xs font-semibold text-rose-700 transition-colors hover:text-rose-800"
-                            >
-                              Remove
-                            </button>
+                            {isAdded ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
+                                Added
+                              </span>
+                            ) : null}
                           </div>
-
-                          <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
-                            <div className="space-y-1">
-                              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                                Work To Perform
-                              </label>
-                              <input
-                                type="text"
-                                value={item.title}
-                                onChange={(event) => patchItem(item.id, { title: event.target.value })}
-                                maxLength={160}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                                placeholder="Diagnose intermittent cooling issue"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                                Optional price
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                step="0.01"
-                                value={item.expected_unit_price ?? 0}
-                                onChange={(event) => {
-                                  const raw = event.target.value.trim();
-                                  if (!raw) {
-                                    patchItem(item.id, { expected_unit_price: 0 });
-                                    return;
-                                  }
-
-                                  const parsed = Number.parseFloat(raw);
-                                  if (!Number.isFinite(parsed) || parsed < 0) {
-                                    patchItem(item.id, { expected_unit_price: 0 });
-                                    return;
-                                  }
-
-                                  patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
-                                }}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                                placeholder="0.00"
-                              />
-                              <p className="text-xs text-slate-500">
-                                This helps with upfront context only. It does not create an invoice charge.
-                              </p>
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                                Description
-                              </label>
-                              <textarea
-                                value={item.details}
-                                onChange={(event) => patchItem(item.id, { details: event.target.value })}
-                                rows={2}
-                                maxLength={500}
-                                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                                placeholder="What should the tech complete or verify before leaving?"
-                              />
-                            </div>
-                          </div>
-                        </div>
+                        </button>
                       );
                     })}
                   </div>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                    <p className="font-medium text-slate-700">No work added yet.</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Search saved work items or type custom work to add the first item.
-                    </p>
+                  <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2.5 text-xs text-slate-500">
+                    No saved work items match. Add the typed custom work.
                   </div>
                 )
-              ) : completedItems.length > 0 ? (
-                <div className="mt-1.5 flex flex-wrap gap-1.5">
-                  {completedItems.slice(0, 6).map((item) => (
-                    <span
-                      key={item.id}
-                      className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700"
-                    >
-                      {item.title.trim() || "Untitled scope item"}
-                    </span>
-                  ))}
-                  {completedItems.length > 6 ? (
-                    <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
-                      +{completedItems.length - 6} more
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
+              ) : availablePricebookTemplates.length > 0 ? (
+                <details
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2"
+                  open={showSavedDefaults}
+                  onToggle={(event) => setShowSavedDefaults((event.currentTarget as HTMLDetailsElement).open)}
+                >
+                  <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
+                    Saved work items
+                  </summary>
+                  <div className="mt-2 space-y-1.5">
+                    {availablePricebookTemplates.slice(0, 6).map((item) => {
+                      const candidate: ScopeCandidate = {
+                        title: item.item_name,
+                        details: item.default_description ?? "",
+                        source_pricebook_item_id: item.id,
+                        expected_unit_price: item.default_unit_price,
+                        unit_label: item.unit_label,
+                        item_type: item.item_type,
+                        category: item.category,
+                      };
+                      const isAdded = Boolean(findExistingScopeItem(items, candidate));
 
-            <details
-              className="rounded-xl border border-slate-200/85 bg-slate-50/45 px-3 py-3"
-              open={jobType !== "service" || !hasCompletedItems}
-            >
-              <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                {jobType === "service" && hasCompletedItems ? "Add another item" : "Add more work"}
-              </summary>
-              <div className="mt-2.5 space-y-3">
-                {jobType !== "service" ? (
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      Quick Add
-                    </div>
-                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                      {quickChoices.map((choice) => (
+                      return (
                         <button
-                          key={choice.label}
+                          key={item.id}
                           type="button"
-                          onClick={() => addScopeCandidate(choice.candidate)}
-                          disabled={choice.isAdded}
-                          aria-pressed={choice.isAdded}
+                          onClick={() => applyPricebookTemplate(item)}
+                          disabled={isAdded}
                           className={[
-                            "min-h-14 rounded-xl border px-3 py-2 text-left text-sm shadow-sm transition-colors",
-                            choice.isAdded
+                            "w-full rounded-xl border px-3 py-2 text-left text-sm shadow-sm transition-colors",
+                            isAdded
                               ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                              : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
+                              : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
                           ].join(" ")}
                         >
-                          <span className="flex items-center justify-between gap-2">
-                            <span className="font-semibold">{choice.label}</span>
-                            {choice.isAdded ? (
-                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-800">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">{item.item_name}</span>
+                            {isAdded ? (
+                              <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
                                 Added
                               </span>
                             ) : null}
-                          </span>
-                          <span className={choice.isAdded ? "mt-0.5 block text-xs text-emerald-800" : "mt-0.5 block text-xs text-slate-500"}>
-                            {choice.helper}
-                          </span>
+                          </div>
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                ) : null}
+                </details>
+              ) : null}
+            </div>
+        </div>
 
-                <div className="space-y-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                    Search Pricebook Or Add Scope
-                  </div>
-                  <input
-                    type="text"
-                    value={quickEntryValue}
-                    onChange={(event) => {
-                      setQuickEntryValue(event.target.value);
-                      if (scopeFeedback?.tone !== "added") setScopeFeedback(null);
-                    }}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                    placeholder={availablePricebookTemplates.length > 0 ? "Search Pricebook items or type custom scope" : "Type custom scope to add"}
-                  />
-                  <div className="flex flex-wrap items-center justify-between gap-2">
+        {jobType === "service" && hasCompletedItems ? (
+          <div className="space-y-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+              Selected Work Items
+            </p>
+            {completedItems.map((item) => {
+              const sourceLabel = getScopeSourceLabel(item, visitTypeSuggestionCandidate);
+              const priceLabel = formatOptionalPrice(item.expected_unit_price);
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-emerald-200 bg-white px-3 py-3"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <span className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
+                        ✓
+                      </span>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-900">
+                          {item.title.trim() || "Untitled scope item"}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-600">{sourceLabel}</div>
+                        {priceLabel ? (
+                          <div className="mt-1 text-xs font-medium text-slate-700">Optional price: ${priceLabel}</div>
+                        ) : null}
+                      </div>
+                    </div>
                     <button
                       type="button"
-                      onClick={addManualItemFromQuickEntry}
-                      disabled={!searchQuery}
-                      className="min-h-9 rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-55 sm:ml-auto"
+                      onClick={() => removeItem(item.id)}
+                      className="text-xs font-semibold text-rose-700 transition-colors hover:text-rose-800"
                     >
-                      {searchQuery ? `Add "${searchQuery.slice(0, 36)}${searchQuery.length > 36 ? "..." : ""}"` : "Add scope item"}
+                      Remove
                     </button>
                   </div>
-                </div>
 
-            {availablePricebookTemplates.length > 0 ? (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setShowSavedDefaults((value) => !value)}
-                  className="rounded-full border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-                  aria-expanded={showSavedDefaults}
-                >
-                  {showSavedDefaults ? "Hide saved work items" : "Browse saved work items"}
-                </button>
-
-                {shouldShowSavedDefaults && filteredPricebookTemplates.length > 0 ? (
-                <div className="space-y-2 pt-1">
-                {filteredPricebookTemplates.map((item) => {
-                  const candidate: ScopeCandidate = {
-                    title: item.item_name,
-                    details: item.default_description ?? "",
-                    source_pricebook_item_id: item.id,
-                    expected_unit_price: item.default_unit_price,
-                    unit_label: item.unit_label,
-                    item_type: item.item_type,
-                    category: item.category,
-                  };
-                  const isAdded = Boolean(findExistingScopeItem(items, candidate));
-
-                  return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    onClick={() => applyPricebookTemplate(item)}
-                    disabled={isAdded}
-                    className={[
-                      "w-full rounded-xl border px-3 py-3 text-left shadow-sm transition-colors",
-                      isAdded
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-900"
-                        : "border-slate-200 bg-white text-slate-900 hover:border-slate-300 hover:bg-slate-50",
-                    ].join(" ")}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <div className="text-sm font-medium">{item.item_name}</div>
-                        <div className={isAdded ? "mt-0.5 text-xs text-emerald-800" : "mt-0.5 text-xs text-slate-500"}>
-                          {[item.item_type, item.category, item.unit_label].filter(Boolean).join(" / ") || "Default from Pricebook"}
-                        </div>
-                      </div>
-                      {isAdded ? (
-                        <span className="rounded-full bg-emerald-100 px-2 py-1 text-xs font-semibold text-emerald-800">
-                          Added
-                        </span>
-                      ) : null}
+                  <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                        Work To Perform
+                      </label>
+                      <input
+                        type="text"
+                        value={item.title}
+                        onChange={(event) => patchItem(item.id, { title: event.target.value })}
+                        maxLength={160}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                        placeholder="Diagnose intermittent cooling issue"
+                      />
                     </div>
-                    {item.default_description ? (
-                      <div className={isAdded ? "mt-2 text-xs leading-5 text-emerald-800" : "mt-2 text-xs leading-5 text-slate-600"}>{item.default_description}</div>
-                    ) : null}
-                  </button>
-                  );
-                })}
-              </div>
-            ) : shouldShowSavedDefaults ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-3 text-sm text-slate-500">
-                No saved work items match this search. Add the typed custom work instead.
-              </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                        Optional price
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={item.expected_unit_price ?? 0}
+                        onChange={(event) => {
+                          const raw = event.target.value.trim();
+                          if (!raw) {
+                            patchItem(item.id, { expected_unit_price: 0 });
+                            return;
+                          }
+
+                          const parsed = Number.parseFloat(raw);
+                          if (!Number.isFinite(parsed) || parsed < 0) {
+                            patchItem(item.id, { expected_unit_price: 0 });
+                            return;
+                          }
+
+                          patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
+                        }}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                        placeholder="0.00"
+                      />
+                      <p className="text-xs text-slate-500">
+                        This helps with upfront context only. It does not create an invoice charge.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                        Description
+                      </label>
+                      <textarea
+                        value={item.details}
+                        onChange={(event) => patchItem(item.id, { details: event.target.value })}
+                        rows={2}
+                        maxLength={500}
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                        placeholder="What should the tech complete or verify before leaving?"
+                      />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : completedItems.length > 0 ? (
+          <div className="mt-1.5 flex flex-wrap gap-1.5">
+            {completedItems.slice(0, 6).map((item) => (
+              <span
+                key={item.id}
+                className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700"
+              >
+                {item.title.trim() || "Untitled scope item"}
+              </span>
+            ))}
+            {completedItems.length > 6 ? (
+              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
+                +{completedItems.length - 6} more
+              </span>
             ) : null}
-              </div>
-            ) : null}
-              </div>
-            </details>
+          </div>
+        ) : null}
+
         </div>
 
         {jobType !== "service" ? items.map((item, index) => (
@@ -998,7 +965,6 @@ export default function VisitScopeBuilder({
             </div>
           </div>
         )) : null}
-      </div>
 
       <input type="hidden" name={itemsName} value={serializedItems} />
       </>
