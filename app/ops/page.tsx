@@ -3577,6 +3577,9 @@ if (panel !== "full_board") {
               <div className="text-[15px] font-semibold tracking-tight text-slate-950">Notifications and collaboration</div>
             </div>
             <div className="flex items-center gap-3">
+              <Link href="/ops/connected-handoffs" className={inlineSectionLinkClass}>
+                Connected Handoffs
+              </Link>
               <Link href="/ops/handoffs" className={inlineSectionLinkClass}>
                 Handoff Requests
               </Link>
