@@ -3576,9 +3576,14 @@ if (panel !== "full_board") {
               <div className={`${opsUtilityLabelClass} text-slate-500`}>Signals</div>
               <div className="text-[15px] font-semibold tracking-tight text-slate-950">Notifications and collaboration</div>
             </div>
-            <Link href="/ops/notifications?state=unread" className={inlineSectionLinkClass}>
-              Open notifications
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href="/ops/handoffs" className={inlineSectionLinkClass}>
+                Handoff Requests
+              </Link>
+              <Link href="/ops/notifications?state=unread" className={inlineSectionLinkClass}>
+                Open notifications
+              </Link>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">

@@ -2039,6 +2039,39 @@ export async function respondToWorkflowHandoffRequest(
   };
 }
 
+export async function respondToWorkflowHandoffRequestFromForm(formData: FormData) {
+  const handoffRequestId = cleanString(formData.get("handoff_request_id"));
+  const responseStatus = cleanString(formData.get("response_status"));
+  const responseNote = cleanNullableString(formData.get("response_note"));
+  const evidenceReference = cleanNullableString(formData.get("evidence_reference"));
+  const sourceJobId = cleanString(formData.get("source_job_id"));
+  const returnTo = cleanString(formData.get("return_to")) || "/ops/handoffs";
+
+  const result = await respondToWorkflowHandoffRequest({
+    handoffRequestId,
+    responseStatus,
+    responseNote,
+    evidenceReference,
+  });
+
+  if (!result.success) {
+    redirect(withBanner(returnTo, "handoff_response_failed"));
+  }
+
+  revalidatePath("/ops/handoffs");
+  if (sourceJobId) {
+    revalidatePath(`/jobs/${sourceJobId}`);
+  }
+
+  const successBanner = result.handoffStatus === "accepted"
+    ? "handoff_response_accepted"
+    : result.handoffStatus === "completed"
+    ? "handoff_response_completed"
+    : "handoff_response_rejected";
+
+  redirect(withBanner(returnTo, successBanner));
+}
+
 export async function updateWorkflowMilestoneStatusFromForm(formData: FormData) {
   const workflowInstanceId = cleanString(formData.get("workflow_instance_id"));
   const milestoneId = cleanString(formData.get("milestone_id"));
