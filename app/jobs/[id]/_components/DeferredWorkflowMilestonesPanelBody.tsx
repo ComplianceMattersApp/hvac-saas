@@ -14,6 +14,10 @@ import {
   type AuthorizedHandoffRecipientSelectionState,
 } from "@/lib/workflows/authorized-handoff-recipients-read";
 import {
+  getLatestWorkflowHandoffRequestForMilestone,
+  type WorkflowHandoffRequestRow,
+} from "@/lib/workflows/workflow-handoff-requests-read";
+import {
   assignInstallWithPermitWorkflowForJobFromForm,
   confirmLinkedInternalEccCompletionForWorkflowMilestoneFromForm,
   linkInternalEccJobToWorkflowMilestoneFromForm,
@@ -113,6 +117,72 @@ function isWorkflowSchemaMissingError(error: unknown) {
   );
 }
 
+function formatCompactDateTime(value: unknown) {
+  const normalized = cleanString(value);
+  if (!normalized) {
+    return null;
+  }
+
+  const parsed = new Date(normalized);
+  if (Number.isNaN(parsed.getTime())) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "numeric",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(parsed);
+}
+
+function getHandoffRequestTone(status: string) {
+  switch (status) {
+    case "completed":
+      return "border-emerald-200 bg-emerald-50/70 text-emerald-900";
+    case "rejected":
+      return "border-rose-200 bg-rose-50/70 text-rose-900";
+    case "cancelled":
+      return "border-slate-200 bg-slate-100/80 text-slate-700";
+    default:
+      return "border-sky-200 bg-sky-50/70 text-sky-900";
+  }
+}
+
+function getHandoffRequestHeading(request: WorkflowHandoffRequestRow) {
+  const recipientName = cleanString(request.recipient_display_name_snapshot) || "authorized rater";
+  switch (request.handoff_status) {
+    case "accepted":
+      return `Accepted by ${recipientName}`;
+    case "completed":
+      return "Rater marked ECC complete";
+    case "rejected":
+      return "Rater rejected handoff";
+    case "cancelled":
+      return "Handoff cancelled";
+    case "sent":
+    default:
+      return `Sent to ${recipientName}`;
+  }
+}
+
+function getHandoffRequestSubheading(request: WorkflowHandoffRequestRow) {
+  switch (request.handoff_status) {
+    case "accepted":
+      return "Waiting for ECC completion";
+    case "completed":
+      return "Rater completed ECC — review and complete ECC milestone.";
+    case "rejected":
+      return "Review the rejection details before sending again.";
+    case "cancelled":
+      return "This handoff is closed.";
+    case "sent":
+    default:
+      return "Waiting for rater response";
+  }
+}
+
 function MilestoneStatusUpdateForm({
   workflowInstanceId,
   milestoneId,
@@ -209,6 +279,7 @@ export default async function DeferredWorkflowMilestonesPanelBody({
     instance: (typeof instances)[number];
     milestones: Awaited<ReturnType<typeof listWorkflowInstanceMilestones>>;
     linkedJobs: Awaited<ReturnType<typeof listLinkedJobsForWorkflow>>;
+    latestHandoffRequests: Record<string, WorkflowHandoffRequestRow | null>;
   }> = [];
   let eligibleEccJobs: Array<{
     id: string;
@@ -237,10 +308,30 @@ export default async function DeferredWorkflowMilestonesPanelBody({
           workflowInstanceId: instance.id,
         });
 
+        const latestHandoffRequests = Object.fromEntries(
+          await Promise.all(
+            milestones
+              .filter((milestone) => isEccHandoffCompletionMilestone(milestone))
+              .map(async (milestone) => {
+                const milestoneId = cleanString(milestone.id);
+                const latestRequest = milestoneId
+                  ? await getLatestWorkflowHandoffRequestForMilestone(supabase, {
+                      installerAccountOwnerUserId: accountOwnerUserId,
+                      workflowInstanceId: instance.id,
+                      workflowInstanceMilestoneId: milestoneId,
+                    })
+                  : null;
+
+                return [milestoneId, latestRequest] as const;
+              }),
+          ),
+        );
+
         return {
           instance,
           milestones,
           linkedJobs,
+          latestHandoffRequests,
         };
       }),
     );
@@ -279,7 +370,7 @@ export default async function DeferredWorkflowMilestonesPanelBody({
 
   return (
     <div className="space-y-2">
-      {workflows.map(({ instance, milestones, linkedJobs }) => {
+      {workflows.map(({ instance, milestones, linkedJobs, latestHandoffRequests }) => {
         const totalMilestones = milestones.length;
         const completedMilestones = milestones.filter(
           (row) => toWorkflowMilestoneStatus(row.milestone_status) === "completed",
@@ -336,18 +427,28 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                   const sendableAuthorizedRecipients = authorizedEccRaterSelection.recipients.filter(
                     (recipient) => cleanString(recipient.recipient_type).toLowerCase() !== "connected_account_future",
                   );
+                  const latestHandoffRequest = isEccMilestone
+                    ? latestHandoffRequests[cleanString(milestone.id)] ?? null
+                    : null;
+                  const latestHandoffStatus = cleanString(latestHandoffRequest?.handoff_status).toLowerCase();
+                  const hasOpenHandoffRequest = latestHandoffStatus === "sent" || latestHandoffStatus === "accepted";
+                  const shouldHidePrimarySendForCompletedRequest = latestHandoffStatus === "completed";
                   const unavailableConnectedRecipientCount =
                     authorizedEccRaterSelection.recipients.length - sendableAuthorizedRecipients.length;
                   const canShowSendToRaterPrimary =
                     isEccMilestone
                     && !isCompletedMilestone
-                    && normalizedStatus !== "waiting";
+                    && !hasOpenHandoffRequest
+                    && !shouldHidePrimarySendForCompletedRequest
+                    && (normalizedStatus !== "waiting" || latestHandoffStatus === "rejected" || latestHandoffStatus === "cancelled");
                   const showSetupRequiredSendState =
                     canShowSendToRaterPrimary && sendableAuthorizedRecipients.length === 0;
                   const showSingleRecipientSendState =
                     canShowSendToRaterPrimary && sendableAuthorizedRecipients.length === 1;
                   const showMultipleRecipientSendState =
                     canShowSendToRaterPrimary && sendableAuthorizedRecipients.length > 1;
+                  const handoffSentAt = formatCompactDateTime(latestHandoffRequest?.sent_at);
+                  const handoffRespondedAt = formatCompactDateTime(latestHandoffRequest?.responded_at);
                   const hasAnySecondaryAction = true;
 
                   return (
@@ -381,6 +482,23 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                           {cleanString(linkedEccJob.job.title) ? (
                             <span className="text-sky-800"> {cleanString(linkedEccJob.job.title)}</span>
                           ) : null}
+                        </div>
+                      ) : null}
+
+                      {latestHandoffRequest ? (
+                        <div className={`mt-2 rounded-md border px-2.5 py-2 text-[11px] ${getHandoffRequestTone(latestHandoffStatus)}`}>
+                          <div className="font-semibold">{getHandoffRequestHeading(latestHandoffRequest)}</div>
+                          <div className="mt-0.5">{getHandoffRequestSubheading(latestHandoffRequest)}</div>
+                          <div className="mt-1 space-y-0.5 text-[10px] opacity-90">
+                            {handoffSentAt ? <div>Sent {handoffSentAt}</div> : null}
+                            {handoffRespondedAt ? <div>Updated {handoffRespondedAt}</div> : null}
+                            {cleanString(latestHandoffRequest.response_note) ? (
+                              <div>Response note: {cleanString(latestHandoffRequest.response_note)}</div>
+                            ) : null}
+                            {cleanString(latestHandoffRequest.evidence_reference) ? (
+                              <div>Evidence: {cleanString(latestHandoffRequest.evidence_reference)}</div>
+                            ) : null}
+                          </div>
                         </div>
                       ) : null}
 
@@ -455,7 +573,7 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                         </form>
                       ) : null}
 
-                      {isEccMilestone && normalizedStatus === "waiting" && statusReason.toLowerCase().startsWith("sent to authorized rater:") ? (
+                      {isEccMilestone && !latestHandoffRequest && normalizedStatus === "waiting" && statusReason.toLowerCase().startsWith("sent to authorized rater:") ? (
                         <div className="mt-2 rounded-md border border-sky-200 bg-sky-50/70 px-2.5 py-2 text-[11px] text-sky-900">
                           Sent to rater. Use linked-job review or external completion when the result is ready.
                         </div>

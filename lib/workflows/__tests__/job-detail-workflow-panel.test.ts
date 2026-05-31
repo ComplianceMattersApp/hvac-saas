@@ -7,6 +7,7 @@ const listActiveWorkflowInstancesByServiceCaseMock = vi.fn();
 const listLinkedJobsForWorkflowMock = vi.fn();
 const listWorkflowInstanceMilestonesMock = vi.fn();
 const resolveActiveAuthorizedHandoffRecipientSelectionMock = vi.fn();
+const getLatestWorkflowHandoffRequestForMilestoneMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -40,6 +41,11 @@ vi.mock("@/lib/workflows/read-model", () => ({
 vi.mock("@/lib/workflows/authorized-handoff-recipients-read", () => ({
   resolveActiveAuthorizedHandoffRecipientSelection: (...args: unknown[]) =>
     resolveActiveAuthorizedHandoffRecipientSelectionMock(...args),
+}));
+
+vi.mock("@/lib/workflows/workflow-handoff-requests-read", () => ({
+  getLatestWorkflowHandoffRequestForMilestone: (...args: unknown[]) =>
+    getLatestWorkflowHandoffRequestForMilestoneMock(...args),
 }));
 
 vi.mock("@/lib/workflows/actions", () => ({
@@ -79,6 +85,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     });
     loadScopedInternalJobDetailReadBoundaryMock.mockResolvedValue({ id: "job-1" });
     listLinkedJobsForWorkflowMock.mockResolvedValue([]);
+    getLatestWorkflowHandoffRequestForMilestoneMock.mockResolvedValue(null);
     resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
       mode: "none",
       recipients: [],
@@ -288,6 +295,393 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).toContain("Send to Acme Ratings");
     expect(html).toContain("name=\"authorized_recipient_id\"");
     expect(html).toContain("Record external ECC completion");
+    expect(html).not.toContain("Waiting for rater response");
+  });
+
+  it("shows durable sent handoff state and hides primary send action while request is open", async () => {
+    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
+      mode: "single",
+      recipients: [
+        {
+          id: "ahr-1",
+          recipient_type: "external_manual",
+          display_name: "Smoke Rater A",
+          is_default: true,
+          is_active: true,
+        },
+      ],
+      defaultRecipientId: "ahr-1",
+      preselectedRecipientId: "ahr-1",
+    });
+    getLatestWorkflowHandoffRequestForMilestoneMock.mockResolvedValue({
+      id: "whr-1",
+      installer_account_owner_user_id: "owner-1",
+      workflow_instance_id: "wf-1",
+      workflow_instance_milestone_id: "ms-ecc",
+      service_case_id: "case-1",
+      source_job_id: "job-1",
+      authorized_handoff_recipient_id: "ahr-1",
+      recipient_type_snapshot: "external_manual",
+      recipient_display_name_snapshot: "Smoke Rater A",
+      handoff_kind: "ecc",
+      handoff_status: "sent",
+      sent_by_user_id: "user-1",
+      sent_at: "2026-05-31T17:51:10.463Z",
+      responded_by_user_id: null,
+      responded_at: null,
+      response_note: null,
+      evidence_reference: null,
+      created_at: "2026-05-31T17:51:10.463Z",
+      updated_at: "2026-05-31T17:51:10.463Z",
+    });
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "waiting",
+        status_reason: "Sent to authorized rater: Smoke Rater A",
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Sent to Smoke Rater A");
+    expect(html).toContain("Waiting for rater response");
+    expect(html).toContain("Record external ECC completion");
+    expect(html).not.toContain("Send to Smoke Rater A");
+  });
+
+  it("shows accepted durable handoff state", async () => {
+    getLatestWorkflowHandoffRequestForMilestoneMock.mockResolvedValue({
+      id: "whr-1",
+      installer_account_owner_user_id: "owner-1",
+      workflow_instance_id: "wf-1",
+      workflow_instance_milestone_id: "ms-ecc",
+      service_case_id: "case-1",
+      source_job_id: "job-1",
+      authorized_handoff_recipient_id: "ahr-1",
+      recipient_type_snapshot: "external_manual",
+      recipient_display_name_snapshot: "Smoke Rater A",
+      handoff_kind: "ecc",
+      handoff_status: "accepted",
+      sent_by_user_id: "user-1",
+      sent_at: "2026-05-31T17:51:10.463Z",
+      responded_by_user_id: "user-2",
+      responded_at: "2026-05-31T17:55:10.463Z",
+      response_note: null,
+      evidence_reference: null,
+      created_at: "2026-05-31T17:51:10.463Z",
+      updated_at: "2026-05-31T17:55:10.463Z",
+    });
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "waiting",
+        status_reason: "Sent to authorized rater: Smoke Rater A",
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Accepted by Smoke Rater A");
+    expect(html).toContain("Waiting for ECC completion");
+    expect(html).not.toContain("Send to rater");
+  });
+
+  it("shows completed durable handoff state with review helper", async () => {
+    getLatestWorkflowHandoffRequestForMilestoneMock.mockResolvedValue({
+      id: "whr-1",
+      installer_account_owner_user_id: "owner-1",
+      workflow_instance_id: "wf-1",
+      workflow_instance_milestone_id: "ms-ecc",
+      service_case_id: "case-1",
+      source_job_id: "job-1",
+      authorized_handoff_recipient_id: "ahr-1",
+      recipient_type_snapshot: "external_manual",
+      recipient_display_name_snapshot: "Smoke Rater A",
+      handoff_kind: "ecc",
+      handoff_status: "completed",
+      sent_by_user_id: "user-1",
+      sent_at: "2026-05-31T17:51:10.463Z",
+      responded_by_user_id: "user-2",
+      responded_at: "2026-05-31T18:10:10.463Z",
+      response_note: "Certificate delivered.",
+      evidence_reference: "CERT-2042",
+      created_at: "2026-05-31T17:51:10.463Z",
+      updated_at: "2026-05-31T18:10:10.463Z",
+    });
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "waiting",
+        status_reason: "Sent to authorized rater: Smoke Rater A",
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Rater marked ECC complete");
+    expect(html).toContain("Rater completed ECC — review and complete ECC milestone.");
+    expect(html).toContain("Response note: Certificate delivered.");
+    expect(html).toContain("Evidence: CERT-2042");
+    expect(html).toContain("Record external ECC completion");
+    expect(html).not.toContain("Send to rater");
+  });
+
+  it("shows rejected durable handoff state and allows resend path", async () => {
+    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
+      mode: "single",
+      recipients: [
+        {
+          id: "ahr-1",
+          recipient_type: "external_manual",
+          display_name: "Smoke Rater A",
+          is_default: true,
+          is_active: true,
+        },
+      ],
+      defaultRecipientId: "ahr-1",
+      preselectedRecipientId: "ahr-1",
+    });
+    getLatestWorkflowHandoffRequestForMilestoneMock.mockResolvedValue({
+      id: "whr-1",
+      installer_account_owner_user_id: "owner-1",
+      workflow_instance_id: "wf-1",
+      workflow_instance_milestone_id: "ms-ecc",
+      service_case_id: "case-1",
+      source_job_id: "job-1",
+      authorized_handoff_recipient_id: "ahr-1",
+      recipient_type_snapshot: "external_manual",
+      recipient_display_name_snapshot: "Smoke Rater A",
+      handoff_kind: "ecc",
+      handoff_status: "rejected",
+      sent_by_user_id: "user-1",
+      sent_at: "2026-05-31T17:51:10.463Z",
+      responded_by_user_id: "user-2",
+      responded_at: "2026-05-31T17:56:10.463Z",
+      response_note: "Missing permit packet.",
+      evidence_reference: null,
+      created_at: "2026-05-31T17:51:10.463Z",
+      updated_at: "2026-05-31T17:56:10.463Z",
+    });
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "waiting",
+        status_reason: "Sent to authorized rater: Smoke Rater A",
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Rater rejected handoff");
+    expect(html).toContain("Response note: Missing permit packet.");
+    expect(html).toContain("Send to Smoke Rater A");
+  });
+
+  it("shows cancelled durable handoff state", async () => {
+    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
+      mode: "single",
+      recipients: [
+        {
+          id: "ahr-1",
+          recipient_type: "external_manual",
+          display_name: "Smoke Rater A",
+          is_default: true,
+          is_active: true,
+        },
+      ],
+      defaultRecipientId: "ahr-1",
+      preselectedRecipientId: "ahr-1",
+    });
+    getLatestWorkflowHandoffRequestForMilestoneMock.mockResolvedValue({
+      id: "whr-1",
+      installer_account_owner_user_id: "owner-1",
+      workflow_instance_id: "wf-1",
+      workflow_instance_milestone_id: "ms-ecc",
+      service_case_id: "case-1",
+      source_job_id: "job-1",
+      authorized_handoff_recipient_id: "ahr-1",
+      recipient_type_snapshot: "external_manual",
+      recipient_display_name_snapshot: "Smoke Rater A",
+      handoff_kind: "ecc",
+      handoff_status: "cancelled",
+      sent_by_user_id: "user-1",
+      sent_at: "2026-05-31T17:51:10.463Z",
+      responded_by_user_id: null,
+      responded_at: null,
+      response_note: null,
+      evidence_reference: null,
+      created_at: "2026-05-31T17:51:10.463Z",
+      updated_at: "2026-05-31T17:56:10.463Z",
+    });
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "waiting",
+        status_reason: "Sent to authorized rater: Smoke Rater A",
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Handoff cancelled");
+    expect(html).toContain("This handoff is closed.");
+    expect(html).toContain("Send to Smoke Rater A");
   });
 
   it("shows recipient selector when multiple active authorized ECC raters exist", async () => {
@@ -768,19 +1162,26 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
   });
 
   it("keeps external/manual and linked-job controls visible while waiting after send", async () => {
-    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
-      mode: "single",
-      recipients: [
-        {
-          id: "ahr-1",
-          recipient_type: "external_manual",
-          display_name: "Acme Ratings",
-          is_default: true,
-          is_active: true,
-        },
-      ],
-      defaultRecipientId: "ahr-1",
-      preselectedRecipientId: "ahr-1",
+    getLatestWorkflowHandoffRequestForMilestoneMock.mockResolvedValue({
+      id: "whr-1",
+      installer_account_owner_user_id: "owner-1",
+      workflow_instance_id: "wf-1",
+      workflow_instance_milestone_id: "ms-ecc",
+      service_case_id: "case-1",
+      source_job_id: "job-1",
+      authorized_handoff_recipient_id: "ahr-1",
+      recipient_type_snapshot: "external_manual",
+      recipient_display_name_snapshot: "Acme Ratings",
+      handoff_kind: "ecc",
+      handoff_status: "sent",
+      sent_by_user_id: "user-1",
+      sent_at: "2026-05-31T17:51:10.463Z",
+      responded_by_user_id: null,
+      responded_at: null,
+      response_note: null,
+      evidence_reference: null,
+      created_at: "2026-05-31T17:51:10.463Z",
+      updated_at: "2026-05-31T17:51:10.463Z",
     });
 
     listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
@@ -849,7 +1250,8 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
 
     const html = renderToStaticMarkup(jsx);
     expect(html).toContain("Reason: Sent to authorized rater: Acme Ratings");
-    expect(html).toContain("Sent to rater. Use linked-job review or external completion when the result is ready.");
+    expect(html).toContain("Sent to Acme Ratings");
+    expect(html).toContain("Waiting for rater response");
     expect(html).toContain("Record external ECC completion");
     expect(html).toContain("Linked ECC job appears complete. Review and complete ECC milestone.");
     expect(html).not.toContain("Send to Acme Ratings");
