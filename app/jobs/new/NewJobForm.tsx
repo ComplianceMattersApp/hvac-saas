@@ -546,6 +546,10 @@ const [billingRecipient, setBillingRecipient] = useState<
     String(maintenanceAgreementPrefill?.default_visit_scope_summary ?? "").trim(),
   );
   const [visitScopeItems, setVisitScopeItems] = useState<VisitScopeDraftItem[]>(maintenancePrefillItems);
+  const isServicePlanPrefillFlow = Boolean(isInternalMode && maintenanceAgreementPrefill);
+  const isServicePlanQuickScheduleMode = Boolean(isServicePlanPrefillFlow && jobType === "service");
+  const [showServicePlanWorkItems, setShowServicePlanWorkItems] = useState(false);
+  const [showServicePlanAdvancedDetails, setShowServicePlanAdvancedDetails] = useState(false);
   const [visitScopeResetKey, setVisitScopeResetKey] = useState(0);
   const [visitScopeError, setVisitScopeError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -758,6 +762,18 @@ const [billingRecipient, setBillingRecipient] = useState<
     if (jobType === modeSafeJobType) return;
     setJobType(modeSafeJobType);
   }, [jobType, modeSafeJobType]);
+
+  useEffect(() => {
+    if (!isServicePlanPrefillFlow) {
+      setShowServicePlanWorkItems(false);
+    }
+  }, [isServicePlanPrefillFlow]);
+
+  useEffect(() => {
+    if (!isServicePlanQuickScheduleMode) {
+      setShowServicePlanAdvancedDetails(false);
+    }
+  }, [isServicePlanQuickScheduleMode]);
 
   useEffect(() => {
     if (!isHvacServiceInternalMode) return;
@@ -1367,7 +1383,9 @@ const [billingRecipient, setBillingRecipient] = useState<
   const createSectionTone = isSubmitReady ? "complete" : canAdvancePastResolution ? "active" : "pending";
   const workOrderSectionSummary = completedVisitScopeItemCount > 0
     ? `${visitScopeSummary.trim() || visitScopeItems.find((item) => item.title.trim())?.title.trim() || "Scope added"} • ${completedVisitScopeItemCount} item${completedVisitScopeItemCount === 1 ? "" : "s"}`
-    : "Choose visit details and add the work scope.";
+    : isServicePlanQuickScheduleMode
+      ? "Included work stays collapsed unless you choose to review it."
+      : "Choose visit details and add the work scope.";
   const scheduleSectionSummary = scheduledDate
     ? `${scheduledDate}${windowStart && windowEnd ? ` • ${windowStart}-${windowEnd}` : ""}`
     : "Leave unscheduled if timing is not set yet.";
@@ -1751,7 +1769,7 @@ const [billingRecipient, setBillingRecipient] = useState<
           <input type="hidden" name="contractor_id" value="" />
         )}
 
-        <div className="space-y-8">
+        <div className="flex flex-col gap-8">
         {!isInternalMode ? (
         <section className="space-y-3">
           <h2 className="border-b border-slate-100 pb-2 text-base font-semibold text-slate-900">Job Type</h2>
@@ -2756,13 +2774,17 @@ const [billingRecipient, setBillingRecipient] = useState<
 
         {canAdvancePastResolution ? (
           <>
-            <section className="space-y-3">
+            <section className={`space-y-3 ${isServicePlanQuickScheduleMode ? "order-2" : "order-1"}`}>
               {isInternalMode ? (
                 <div className={guidedSectionShellClass} ref={visitScopeSectionRef}>
                   {renderGuidedSectionIntro({
                     icon: <ClipboardList className="h-4 w-4" aria-hidden="true" />,
                     title: isHvacServiceMode ? "Work Order Details" : "Work To Perform & Job Scope",
-                    description: isHvacServiceMode
+                    description: isServicePlanQuickScheduleMode
+                      ? "Service Plan visit defaults to quick scheduling. Review included work only when needed."
+                      : isServicePlanPrefillFlow && jobType === "service"
+                      ? "Service Plan work is included by default. Schedule first, then review work items only when needed."
+                      : isHvacServiceMode
                       ? "What kind of visit is this, and what work needs to be done?"
                       : jobType === "service"
                         ? "Start with Reason for Visit, then add the structured job scope for this trip."
@@ -2777,15 +2799,17 @@ const [billingRecipient, setBillingRecipient] = useState<
                     </p>
                   ) : null}
                   <div className={`space-y-3 ${visitScopeError ? "rounded-2xl border border-red-300 bg-red-50/40 p-4 ring-2 ring-red-100" : ""}`}>
-                    <div>
-                      <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; Job Scope</h3>
-                      <p className="mt-1 text-sm text-slate-500">
-                        {jobType === "service"
-                          ? "Reason for Visit sets the visit title, then add at least one scope item for the field work."
-                          : "ECC jobs don't require job scope. Add companion scope only if this visit includes service work."}
-                      </p>
-                    </div>
-                    {isHvacServiceMode && jobType === "service" ? (
+                    {!isServicePlanQuickScheduleMode ? (
+                      <div>
+                        <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; Job Scope</h3>
+                        <p className="mt-1 text-sm text-slate-500">
+                          {jobType === "service"
+                            ? "Reason for Visit sets the visit title, then add at least one scope item for the field work."
+                            : "ECC jobs don't require job scope. Add companion scope only if this visit includes service work."}
+                        </p>
+                      </div>
+                    ) : null}
+                    {isHvacServiceMode && jobType === "service" && !isServicePlanQuickScheduleMode ? (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
                           <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
@@ -2833,16 +2857,59 @@ const [billingRecipient, setBillingRecipient] = useState<
                         </div>
                       </div>
                     ) : null}
-                    <VisitScopeBuilder
-                      initialSummary={visitScopeSummary}
-                      initialItems={visitScopeItems}
-                      jobType={jobType}
-                      serviceVisitType={serviceVisitType}
-                      pricebookTemplateItems={pricebookTemplateItems}
-                      resetKey={visitScopeResetKey}
-                      onSummaryChange={setVisitScopeSummary}
-                      onItemsChange={setVisitScopeItems}
-                    />
+                    {isServicePlanQuickScheduleMode ? (
+                      <>
+                        <input type="hidden" name="service_case_kind" value={serviceCaseKind} />
+                        <input type="hidden" name="service_visit_type" value={serviceVisitType} />
+                      </>
+                    ) : null}
+                    {isServicePlanPrefillFlow && jobType === "service" ? (
+                      <div className="rounded-2xl border border-blue-200 bg-blue-50/60 p-3.5">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <p className="text-xs font-semibold uppercase tracking-wide text-blue-700">Service Plan Visit</p>
+                            <p className="mt-1 text-sm text-blue-950">
+                              <span className="font-semibold">{maintenanceAgreementPrefill?.agreement_name}</span>
+                              {" work is already included."}
+                            </p>
+                            <p className="mt-1 text-xs text-blue-800">
+                              {completedVisitScopeItemCount} prefilled {completedVisitScopeItemCount === 1 ? "item" : "items"} will submit with this work order.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            className={secondaryCompactButtonClass}
+                            onClick={() => setShowServicePlanWorkItems((value) => !value)}
+                            aria-expanded={showServicePlanWorkItems}
+                          >
+                            {showServicePlanWorkItems ? "Hide Included Work" : "Review Included Work"}
+                          </button>
+                        </div>
+                        <div className={showServicePlanWorkItems ? "mt-4 border-t border-blue-200 pt-4" : "hidden"}>
+                          <VisitScopeBuilder
+                            initialSummary={visitScopeSummary}
+                            initialItems={visitScopeItems}
+                            jobType={jobType}
+                            serviceVisitType={serviceVisitType}
+                            pricebookTemplateItems={pricebookTemplateItems}
+                            resetKey={visitScopeResetKey}
+                            onSummaryChange={setVisitScopeSummary}
+                            onItemsChange={setVisitScopeItems}
+                          />
+                        </div>
+                      </div>
+                    ) : (
+                      <VisitScopeBuilder
+                        initialSummary={visitScopeSummary}
+                        initialItems={visitScopeItems}
+                        jobType={jobType}
+                        serviceVisitType={serviceVisitType}
+                        pricebookTemplateItems={pricebookTemplateItems}
+                        resetKey={visitScopeResetKey}
+                        onSummaryChange={setVisitScopeSummary}
+                        onItemsChange={setVisitScopeItems}
+                      />
+                    )}
                   </div>
                   </div>
                 </div>
@@ -2890,11 +2957,13 @@ const [billingRecipient, setBillingRecipient] = useState<
 
             {/* Scheduling - internal/staff only; hidden for contractor and customer intake */}
             {!isContractorMode && (
-              <section className={isInternalMode ? guidedSectionShellClass : "space-y-3"}>
+              <section className={`${isServicePlanQuickScheduleMode ? "order-1" : "order-2"} ${isInternalMode ? guidedSectionShellClass : "space-y-3"}`}>
                 {isInternalMode ? renderGuidedSectionIntro({
                   icon: <CalendarClock className="h-4 w-4" aria-hidden="true" />,
                   title: "Schedule",
-                  description: "Schedule the visit if needed, then confirm who gets billed later.",
+                  description: isServicePlanQuickScheduleMode
+                    ? "Pick a date and window first. Included Service Plan work stays in the background."
+                    : "Schedule the visit if needed, then confirm who gets billed later.",
                   summary: scheduleSectionSummary,
                   tone: scheduleSectionTone,
                 }) : (
@@ -2952,6 +3021,22 @@ const [billingRecipient, setBillingRecipient] = useState<
                       <option value="14:00-16:00">14:00-16:00</option>
                     </select>
                   </div>
+
+                  {isServicePlanQuickScheduleMode ? (
+                    <div className="space-y-2 rounded-xl border border-slate-200 bg-white p-3">
+                      <label className="block text-xs font-medium text-slate-700">Visit Note (optional)</label>
+                      <textarea
+                        rows={2}
+                        value={visitScopeSummary}
+                        onChange={(e) => setVisitScopeSummary(e.target.value)}
+                        placeholder="Add a quick dispatch note (optional)."
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
+                      />
+                      <p className="text-[11px] text-slate-500">
+                        This note saves with the included Service Plan work without opening the work builder.
+                      </p>
+                    </div>
+                  ) : null}
                 </div>
 
                 {isInternalMode ? (
@@ -3310,6 +3395,24 @@ const [billingRecipient, setBillingRecipient] = useState<
                 tone: additionalDetailsTone,
               })}
               <div className={guidedSectionBodyClass}>
+              {isServicePlanQuickScheduleMode ? (
+                <div className={`${guidedSectionInsetClass} flex flex-wrap items-center justify-between gap-3`}>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Advanced Job Details</p>
+                    <p className="mt-1 text-sm text-slate-600">Permit, equipment, photos, and extra comments.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className={secondaryCompactButtonClass}
+                    onClick={() => setShowServicePlanAdvancedDetails((value) => !value)}
+                    aria-expanded={showServicePlanAdvancedDetails}
+                  >
+                    {showServicePlanAdvancedDetails ? "Hide Advanced Details" : "Review Advanced Details"}
+                  </button>
+                </div>
+              ) : null}
+              {!isServicePlanQuickScheduleMode || showServicePlanAdvancedDetails ? (
+                <>
               {isHvacServiceMode ? (
                 <details className={`${guidedSectionInsetClass} group`}>
                   <summary className="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
@@ -3568,6 +3671,8 @@ const [billingRecipient, setBillingRecipient] = useState<
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                 />
               </div>
+                </>
+              ) : null}
               </div>
             </section>
             ) : null}

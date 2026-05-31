@@ -31,9 +31,14 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
       "What kind of visit is this, and what work needs to be done?",
     );
     expect(formSource).toContain('<option value="install">Install Visit</option>');
-    expect(formSource).toMatch(
-      /isHvacServiceMode && jobType === "service" \? \([\s\S]*name="service_case_kind"[\s\S]*name="service_visit_type"[\s\S]*\) : null\}\s*<VisitScopeBuilder/,
-    );
+    expect(formSource).toContain('isHvacServiceMode && jobType === "service" && !isServicePlanQuickScheduleMode ? (');
+    expect(formSource).toContain('name="service_case_kind"');
+    expect(formSource).toContain('name="service_visit_type"');
+    expect(formSource).toContain('isServicePlanPrefillFlow && jobType === "service" ? (');
+    expect(formSource).toContain("Review Included Work");
+    expect(formSource).toContain("Service Plan Visit");
+    expect(formSource).toContain("work is already included.");
+    expect(formSource).toContain("<VisitScopeBuilder");
   });
 
   it("renames Step 7 Optional details to Additional details", () => {
