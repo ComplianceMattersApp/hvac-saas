@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
+import { canManageMaintenanceAgreementPolicy } from "@/lib/maintenance-agreements/role-policy";
 import {
   MAINTENANCE_AGREEMENT_FREQUENCIES,
   MAINTENANCE_AGREEMENT_TYPES,
@@ -165,6 +166,18 @@ async function resolveTemplateMutationScope() {
     return {
       success: false as const,
       error: "Maintenance agreement updates are unavailable for this account.",
+    };
+  }
+
+  if (
+    !canManageMaintenanceAgreementPolicy({
+      actorUserId: userId,
+      internalUser: authz.internalUser,
+    })
+  ) {
+    return {
+      success: false as const,
+      error: "Owner/admin internal role required for Service Plan template management.",
     };
   }
 

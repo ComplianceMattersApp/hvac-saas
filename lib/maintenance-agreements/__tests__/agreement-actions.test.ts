@@ -682,6 +682,8 @@ describe("maintenance agreement actions", () => {
     requireInternalUserMock.mockResolvedValue({
       internalUser: {
         user_id: "user-1",
+        role: "admin",
+        is_active: true,
         account_owner_user_id: "owner-1",
       },
     });
@@ -725,6 +727,66 @@ describe("maintenance agreement actions", () => {
     if (!result.success) {
       expect(result.error).toBe("Next due date must be a valid date (YYYY-MM-DD).");
     }
+  });
+
+  it("denies service plan create for non-admin non-owner internal roles", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makeAdminClient());
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: {
+        user_id: "office-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const result = await createMaintenanceAgreement({
+      customerId: "cust-1",
+      agreementName: "Plan A",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+      nextDueDate: "2026-06-01",
+      startDate: "2026-05-01",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Owner/admin internal role required for Service Plan management.",
+    });
+    expect(supabase._insertCalls).toHaveLength(0);
+  });
+
+  it("denies service plan update for non-admin non-owner internal roles", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    createAdminClientMock.mockReturnValue(makeAdminClient());
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: {
+        user_id: "office-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const result = await updateMaintenanceAgreement({
+      agreementId: "agr-1",
+      customerId: "cust-1",
+      agreementName: "Plan C",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+      nextDueDate: "2026-06-01",
+      startDate: "2026-05-01",
+      status: "active",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Owner/admin internal role required for Service Plan management.",
+    });
+    expect(supabase._updateCalls).toHaveLength(0);
   });
 
   it("rejects out-of-scope primary location", async () => {
@@ -1235,6 +1297,30 @@ describe("createMaintenanceAgreementVisitLinkFromJobCreation", () => {
       job_id: "job-1",
     });
   });
+
+  it("keeps service-plan work-order link creation operational for technician-created jobs", async () => {
+    const { createMaintenanceAgreementVisitLinkFromJobCreation } = await import("@/lib/maintenance-agreements/agreement-actions");
+
+    isMaintenanceAgreementsEnabledMock.mockReturnValue(true);
+    const admin = makeLinkAdminClient();
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await createMaintenanceAgreementVisitLinkFromJobCreation({
+      agreementId: "agr-1",
+      jobId: "job-1",
+      createdByUserId: "tech-1",
+    });
+
+    expect(result).toBe(true);
+    expect(admin._insertCalls).toHaveLength(1);
+    expect(admin._insertCalls[0]).toMatchObject({
+      account_owner_user_id: "owner-1",
+      agreement_id: "agr-1",
+      job_id: "job-1",
+      created_by_user_id: "tech-1",
+      updated_by_user_id: "tech-1",
+    });
+  });
 });
 
 describe("markMaintenanceAgreementVisitCountedFromForm", () => {
@@ -1275,6 +1361,36 @@ describe("markMaintenanceAgreementVisitCountedFromForm", () => {
     });
     expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1");
     expect(revalidatePathMock).toHaveBeenCalledWith("/service-plans");
+  });
+
+  it("allows technicians to progress counted-visit completion flow when already authorized by job permissions", async () => {
+    const { markMaintenanceAgreementVisitCountedFromForm } = await import("@/lib/maintenance-agreements/agreement-actions");
+    const admin = makeMarkVisitCountedAdminClient();
+    createAdminClientMock.mockReturnValue(admin);
+    requireInternalUserMock.mockResolvedValue({
+      userId: "tech-1",
+      internalUser: {
+        user_id: "tech-1",
+        role: "tech",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("maintenance_agreement_visit_link_id", "link-1");
+
+    const target = await expectRedirectError(() =>
+      markMaintenanceAgreementVisitCountedFromForm(formData),
+    );
+
+    expect(target).toContain("banner=maintenance_visit_count_saved");
+    expect(admin._updateCalls).toHaveLength(1);
+    expect(admin._updateCalls[0]).toMatchObject({
+      counted_by_user_id: "tech-1",
+      updated_by_user_id: "tech-1",
+    });
   });
 
   it("fails closed when feature flag is disabled", async () => {

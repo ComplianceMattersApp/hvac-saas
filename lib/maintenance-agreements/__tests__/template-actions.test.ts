@@ -181,6 +181,8 @@ describe("maintenance agreement template actions", () => {
       userId: "user-1",
       internalUser: {
         user_id: "user-1",
+        role: "admin",
+        is_active: true,
         account_owner_user_id: "owner-1",
       },
     });
@@ -218,6 +220,131 @@ describe("maintenance agreement template actions", () => {
       success: false,
       error: "Active internal user required.",
     });
+  });
+
+  it("denies template create for non-admin non-owner internal roles", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValue({
+      userId: "office-1",
+      internalUser: {
+        user_id: "office-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const result = await createMaintenanceAgreementTemplate({
+      templateName: "Spring Plan",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Owner/admin internal role required for Service Plan template management.",
+    });
+    expect(supabase._insertCalls).toHaveLength(0);
+  });
+
+  it("denies template update for non-admin non-owner internal roles", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValue({
+      userId: "office-1",
+      internalUser: {
+        user_id: "office-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const result = await updateMaintenanceAgreementTemplate({
+      templateId: "tpl-1",
+      templateName: "Updated Name",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+      defaultVisitScopeItemsJson: JSON.stringify([]),
+      defaultVisitScopeSummary: "",
+      internalNotesDefault: "",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Owner/admin internal role required for Service Plan template management.",
+    });
+    expect(supabase._updateCalls).toHaveLength(0);
+  });
+
+  it("denies template duplicate for non-admin non-owner internal roles", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValue({
+      userId: "office-1",
+      internalUser: {
+        user_id: "office-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const result = await duplicateMaintenanceAgreementTemplate({
+      templateId: "tpl-duplicate-source",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Owner/admin internal role required for Service Plan template management.",
+    });
+    expect(supabase._insertCalls).toHaveLength(0);
+  });
+
+  it("denies template archive for non-admin non-owner internal roles", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValue({
+      userId: "office-1",
+      internalUser: {
+        user_id: "office-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const result = await archiveMaintenanceAgreementTemplate({ templateId: "tpl-archive" });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Owner/admin internal role required for Service Plan template management.",
+    });
+    expect(supabase._updateCalls).toHaveLength(0);
+  });
+
+  it("allows structural owner template management even when role is not admin", async () => {
+    const supabase = makeSupabaseClient();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValue({
+      userId: "owner-1",
+      internalUser: {
+        user_id: "owner-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const result = await createMaintenanceAgreementTemplate({
+      templateName: "Owner Plan",
+      agreementType: "maintenance",
+      frequency: "quarterly",
+    });
+
+    expect(result).toEqual({ success: true, templateId: "tpl-1" });
+    expect(supabase._insertCalls).toHaveLength(1);
   });
 
   it("creates template with account-scoped owner and actor ids", async () => {
