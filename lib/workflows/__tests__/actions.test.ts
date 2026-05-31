@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
+const listActiveRecipientConnectionsForAccountMock = vi.fn();
+const createWorkflowHandoffRequestGrantMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -15,6 +17,16 @@ vi.mock("@/lib/auth/internal-user", () => ({
     Boolean(error)
       && typeof error === "object"
       && (error as any).name === "InternalAccessError",
+}));
+
+vi.mock("@/lib/workflows/account-handoff-connections-read", () => ({
+  listActiveRecipientConnectionsForAccount: (...args: unknown[]) =>
+    listActiveRecipientConnectionsForAccountMock(...args),
+}));
+
+vi.mock("@/lib/workflows/workflow-handoff-request-grants-actions", () => ({
+  createWorkflowHandoffRequestGrant: (...args: unknown[]) =>
+    createWorkflowHandoffRequestGrantMock(...args),
 }));
 
 type MockServiceCase = {
@@ -969,6 +981,15 @@ describe("assignWorkflowPresetToServiceCase", () => {
     vi.clearAllMocks();
 
     createClientMock.mockResolvedValue({});
+    listActiveRecipientConnectionsForAccountMock.mockReset();
+    createWorkflowHandoffRequestGrantMock.mockReset();
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValue([]);
+    createWorkflowHandoffRequestGrantMock.mockResolvedValue({
+      success: true,
+      grantId: "grant-1",
+      grantStatus: "active",
+      created: true,
+    });
     requireInternalUserMock.mockResolvedValue({
       userId: "user-1",
       internalUser: {
@@ -2573,7 +2594,7 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
     expect(mismatchAdmin._workflowMilestoneUpdateCalls).toHaveLength(0);
   });
 
-  it("rejects connected_account_future recipients for this workflow-scoped v1", async () => {
+  it("rejects connected_account_future recipients when connected account scope is missing", async () => {
     const admin = buildFixture({
       authorizedHandoffRecipients: [
         {
@@ -2582,6 +2603,7 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
           recipient_type: "connected_account_future",
           handoff_kind: "ecc",
           display_name: "Future Connected Recipient",
+          connected_account_owner_user_id: null,
           is_default: true,
           is_active: true,
           archived_at: null,
@@ -2596,9 +2618,235 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
 
     expect(result).toEqual({
       success: false,
-      error: "Connected-account ECC handoff is not available yet.",
+      error: "Connected-account ECC recipient is missing connected account scope.",
     });
     expect(admin._workflowHandoffRequestInsertCalls).toHaveLength(0);
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("creates durable handoff request and request grant for connected-account recipients", async () => {
+    const admin = buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "connected_account_future",
+          handoff_kind: "ecc",
+          display_name: "Connected account 22222222",
+          connected_account_owner_user_id: "owner-2",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValue([
+      {
+        id: "connection-1",
+        requesting_account_owner_user_id: "owner-1",
+        recipient_account_owner_user_id: "owner-2",
+        connection_status: "active",
+        handoff_kind: "ecc",
+      },
+    ]);
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+      jobId: "job-1",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      status: "waiting",
+      statusReason: "Sent to authorized rater: Connected account 22222222",
+      authorizedRecipientId: "ahr-1",
+      recipientDisplayName: "Connected account 22222222",
+      handoffRequestId: "whr-1",
+      handoffRequestCreated: true,
+      handoffRequestGrantId: "grant-1",
+      handoffRequestGrantCreated: true,
+    });
+    expect(admin._workflowHandoffRequestInsertCalls).toHaveLength(1);
+    expect(createWorkflowHandoffRequestGrantMock).toHaveBeenCalledWith({
+      workflowHandoffRequestId: "whr-1",
+      accountHandoffConnectionId: "connection-1",
+      recipientAccountOwnerUserId: "owner-2",
+      authorizedHandoffRecipientId: "ahr-1",
+    });
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(1);
+  });
+
+  it("is idempotent for repeated connected-account sends with reused request and grant", async () => {
+    const admin = buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "connected_account_future",
+          handoff_kind: "ecc",
+          display_name: "Connected account 22222222",
+          connected_account_owner_user_id: "owner-2",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValue([
+      {
+        id: "connection-1",
+        requesting_account_owner_user_id: "owner-1",
+        recipient_account_owner_user_id: "owner-2",
+        connection_status: "active",
+        handoff_kind: "ecc",
+      },
+    ]);
+    createWorkflowHandoffRequestGrantMock
+      .mockResolvedValueOnce({ success: true, grantId: "grant-1", grantStatus: "active", created: true })
+      .mockResolvedValueOnce({ success: true, grantId: "grant-1", grantStatus: "active", created: false });
+
+    const first = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+      jobId: "job-1",
+    });
+    const second = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+      jobId: "job-1",
+    });
+
+    expect(first.success).toBe(true);
+    expect(second).toMatchObject({
+      success: true,
+      handoffRequestId: "whr-1",
+      handoffRequestCreated: false,
+      handoffRequestGrantId: "grant-1",
+      handoffRequestGrantCreated: false,
+    });
+    expect(admin._workflowHandoffRequestInsertCalls).toHaveLength(1);
+    expect(createWorkflowHandoffRequestGrantMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects connected-account sends when no active connection exists", async () => {
+    const admin = buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "connected_account_future",
+          handoff_kind: "ecc",
+          display_name: "Connected account 22222222",
+          connected_account_owner_user_id: "owner-2",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValueOnce([]);
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Connected-account ECC recipient requires an active account handoff connection.",
+    });
+    expect(admin._workflowHandoffRequestInsertCalls).toHaveLength(0);
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("rejects connected-account sends when active connection recipient account mismatches", async () => {
+    const admin = buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "connected_account_future",
+          handoff_kind: "ecc",
+          display_name: "Connected account 22222222",
+          connected_account_owner_user_id: "owner-2",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValue([
+      {
+        id: "connection-1",
+        requesting_account_owner_user_id: "owner-1",
+        recipient_account_owner_user_id: "owner-3",
+        connection_status: "active",
+        handoff_kind: "ecc",
+      },
+    ]);
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Connected-account ECC recipient requires an active account handoff connection.",
+    });
+    expect(admin._workflowHandoffRequestInsertCalls).toHaveLength(0);
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("returns a safe error when request grant creation fails and does not update milestone", async () => {
+    const admin = buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "connected_account_future",
+          handoff_kind: "ecc",
+          display_name: "Connected account 22222222",
+          connected_account_owner_user_id: "owner-2",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValue([
+      {
+        id: "connection-1",
+        requesting_account_owner_user_id: "owner-1",
+        recipient_account_owner_user_id: "owner-2",
+        connection_status: "active",
+        handoff_kind: "ecc",
+      },
+    ]);
+    createWorkflowHandoffRequestGrantMock.mockResolvedValue({
+      success: false,
+      error: "Failed to create workflow handoff request grant.",
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Failed to create workflow handoff request grant.",
+    });
+    expect(admin._workflowHandoffRequestInsertCalls).toHaveLength(1);
     expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
   });
 

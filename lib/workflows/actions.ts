@@ -7,6 +7,8 @@ import { WORKFLOW_MILESTONE_STATUSES, type WorkflowMilestoneStatus } from "@/lib
 import {
   resolveActiveAuthorizedHandoffRecipientSelection,
 } from "@/lib/workflows/authorized-handoff-recipients-read";
+import { listActiveRecipientConnectionsForAccount } from "@/lib/workflows/account-handoff-connections-read";
+import { createWorkflowHandoffRequestGrant } from "@/lib/workflows/workflow-handoff-request-grants-actions";
 import {
   isInternalAccessError,
   requireInternalUser,
@@ -160,6 +162,8 @@ type SendWorkflowEccMilestoneToAuthorizedRaterResult =
       recipientDisplayName: string;
       handoffRequestId: string;
       handoffRequestCreated: boolean;
+      handoffRequestGrantId?: string;
+      handoffRequestGrantCreated?: boolean;
     }
   | {
       success: false;
@@ -1818,11 +1822,38 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
     };
   }
 
-  if (cleanString(recipient.recipient_type).toLowerCase() === "connected_account_future") {
-    return {
-      success: false,
-      error: "Connected-account ECC handoff is not available yet.",
-    };
+  const recipientType = cleanString(recipient.recipient_type).toLowerCase();
+  const connectedRecipientAccountOwnerUserId = cleanNullableString(
+    (recipient as { connected_account_owner_user_id?: string | null }).connected_account_owner_user_id,
+  );
+  const isConnectedAccountRecipient = recipientType === "connected_account_future";
+
+  let activeConnectedRecipientConnectionId: string | null = null;
+  if (isConnectedAccountRecipient) {
+    if (!connectedRecipientAccountOwnerUserId) {
+      return {
+        success: false,
+        error: "Connected-account ECC recipient is missing connected account scope.",
+      };
+    }
+
+    const activeRecipientConnections = await listActiveRecipientConnectionsForAccount(
+      admin,
+      accountOwnerUserId,
+      "ecc",
+    );
+    const activeConnectedRecipientConnection = activeRecipientConnections.find((entry) =>
+      cleanString(entry.recipient_account_owner_user_id) === connectedRecipientAccountOwnerUserId,
+    ) ?? null;
+
+    if (!activeConnectedRecipientConnection?.id) {
+      return {
+        success: false,
+        error: "Connected-account ECC recipient requires an active account handoff connection.",
+      };
+    }
+
+    activeConnectedRecipientConnectionId = cleanString(activeConnectedRecipientConnection.id);
   }
 
   let sourceJobId: string | null = null;
@@ -1875,6 +1906,8 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
 
   let handoffRequestId = cleanString((existingOpenRequest as { id?: string | null } | null)?.id);
   let handoffRequestCreated = false;
+  let handoffRequestGrantId: string | undefined;
+  let handoffRequestGrantCreated: boolean | undefined;
 
   if (!handoffRequestId) {
     const { data: insertedRequest, error: insertRequestError } = await admin
@@ -1943,6 +1976,25 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
     }
   }
 
+  if (isConnectedAccountRecipient) {
+    const grantResult = await createWorkflowHandoffRequestGrant({
+      workflowHandoffRequestId: handoffRequestId,
+      accountHandoffConnectionId: cleanString(activeConnectedRecipientConnectionId),
+      recipientAccountOwnerUserId: cleanString(connectedRecipientAccountOwnerUserId),
+      authorizedHandoffRecipientId: recipient.id,
+    });
+
+    if (!grantResult.success) {
+      return {
+        success: false,
+        error: grantResult.error,
+      };
+    }
+
+    handoffRequestGrantId = grantResult.grantId;
+    handoffRequestGrantCreated = grantResult.created;
+  }
+
   const statusReason = `Sent to authorized rater: ${cleanString(recipient.display_name)}`;
 
   const { data: updatedMilestone, error: updateError } = await admin
@@ -1976,6 +2028,12 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
     recipientDisplayName: cleanString(recipient.display_name),
     handoffRequestId,
     handoffRequestCreated,
+    ...(handoffRequestGrantId
+      ? {
+          handoffRequestGrantId,
+          handoffRequestGrantCreated: Boolean(handoffRequestGrantCreated),
+        }
+      : {}),
   };
 }
 export async function respondToWorkflowHandoffRequest(

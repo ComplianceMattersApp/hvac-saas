@@ -763,7 +763,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).toContain("Golden State Rater");
   });
 
-  it("shows unsupported helper and keeps send disabled when only connected-account recipient exists", async () => {
+  it("shows connected-account send CTA with request-scoped access helper when only connected recipient exists", async () => {
     resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
       mode: "single",
       recipients: [
@@ -821,16 +821,15 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     });
 
     const html = renderToStaticMarkup(jsx);
-    expect(html).toContain("Connected account rater is configured, but connected handoff sending is not available yet.");
-    expect(html).toContain("Use manual/external completion for now, or add an internal/manual rater.");
-    expect(html).toContain("Connected account — not available yet: Connected account 22222222");
-    expect(html).not.toContain("Send to rater");
-    expect(html).not.toContain("Send to Connected account 22222222");
+    expect(html).toContain("Send to Connected account 22222222");
+    expect(html).toContain("Connected-account send creates request-scoped access");
+    expect(html).toContain("Connected-account handoff will create request-scoped access, but recipient-side response UI is not available yet.");
+    expect(html).toContain("Connected account 22222222");
     expect(html).toContain("Record external ECC completion");
     expect(html).toContain("More actions");
   });
 
-  it("shows supported send option plus connected-account unavailable messaging in mixed recipient state", async () => {
+  it("shows mixed recipient selector plus connected-account request-scoped access messaging", async () => {
     resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
       mode: "multiple",
       recipients: [
@@ -895,11 +894,12 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     });
 
     const html = renderToStaticMarkup(jsx);
-    expect(html).toContain("Send to Acme Ratings");
+    expect(html).toContain("Choose authorized rater");
+    expect(html).toContain("Send to rater");
     expect(html).toContain("Acme Ratings");
-    expect(html).toContain("Connected account — not available yet");
+    expect(html).toContain("Connected-account send creates request-scoped access");
+    expect(html).toContain("Connected-account handoff will create request-scoped access, but recipient-side response UI is not available yet.");
     expect(html).toContain("Connected account 22222222");
-    expect(html).not.toContain("Send to Connected account 22222222");
   });
 
   it("shows Link internal ECC job when eligible ECC jobs exist for the service case", async () => {

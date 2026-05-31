@@ -425,15 +425,13 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                     && !isCompletedMilestone
                     && Boolean(linkedEccJob)
                     && !linkedEccJobIsComplete;
-                  const sendableAuthorizedRecipients = authorizedEccRaterSelection.recipients.filter(
-                    (recipient) => cleanString(recipient.recipient_type).toLowerCase() !== "connected_account_future",
-                  );
-                  const unavailableConnectedRecipients = authorizedEccRaterSelection.recipients.filter(
+                  const connectedAccountRecipients = authorizedEccRaterSelection.recipients.filter(
                     (recipient) => cleanString(recipient.recipient_type).toLowerCase() === "connected_account_future",
                   );
-                  const unavailableConnectedRecipientNames = unavailableConnectedRecipients
+                  const connectedAccountRecipientNames = connectedAccountRecipients
                     .map((recipient) => cleanString(recipient.display_name))
                     .filter(Boolean);
+                  const sendableAuthorizedRecipients = authorizedEccRaterSelection.recipients;
                   const latestHandoffRequest = isEccMilestone
                     ? latestHandoffRequests[cleanString(milestone.id)] ?? null
                     : null;
@@ -441,8 +439,6 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                   const hasOpenHandoffRequest = latestHandoffStatus === "sent" || latestHandoffStatus === "accepted";
                   const shouldHidePrimarySendForCompletedRequest = latestHandoffStatus === "completed";
                   const canReviewCompleteCompletedHandoffRequest = isEccMilestone && !isCompletedMilestone && latestHandoffStatus === "completed";
-                  const unavailableConnectedRecipientCount =
-                    authorizedEccRaterSelection.recipients.length - sendableAuthorizedRecipients.length;
                   const canShowSendToRaterPrimary =
                     isEccMilestone
                     && !isCompletedMilestone
@@ -450,11 +446,6 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                     && !shouldHidePrimarySendForCompletedRequest
                     && (normalizedStatus !== "waiting" || latestHandoffStatus === "rejected" || latestHandoffStatus === "cancelled");
                   const hasAnyAuthorizedRecipients = authorizedEccRaterSelection.recipients.length > 0;
-                  const hasOnlyUnavailableConnectedRecipients =
-                    canShowSendToRaterPrimary
-                    && hasAnyAuthorizedRecipients
-                    && sendableAuthorizedRecipients.length === 0
-                    && unavailableConnectedRecipients.length > 0;
                   const showSetupRequiredSendState =
                     canShowSendToRaterPrimary
                     && !hasAnyAuthorizedRecipients;
@@ -548,29 +539,6 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                           >
                             Set up authorized raters
                           </Link>
-                          {unavailableConnectedRecipientCount > 0 ? (
-                            <div className="mt-1 text-[10px] text-amber-800">
-                              Connected-account raters are configured but cannot receive workflow sends yet.
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : null}
-
-                      {hasOnlyUnavailableConnectedRecipients ? (
-                        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900">
-                          <div className="font-semibold">Connected account rater is configured, but connected handoff sending is not available yet.</div>
-                          <div className="mt-1">Use manual/external completion for now, or add an internal/manual rater.</div>
-                          {unavailableConnectedRecipientNames.length > 0 ? (
-                            <div className="mt-1 text-[10px] text-amber-800">
-                              Connected account — not available yet: {unavailableConnectedRecipientNames.join(", ")}
-                            </div>
-                          ) : null}
-                          <Link
-                            href="/ops/admin/company-profile#authorized-ecc-raters"
-                            className="mt-1 inline-flex text-[11px] font-semibold underline decoration-amber-300 underline-offset-4"
-                          >
-                            Manage authorized raters
-                          </Link>
                         </div>
                       ) : null}
 
@@ -589,13 +557,16 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                         </form>
                       ) : null}
 
-                      {canShowSendToRaterPrimary && sendableAuthorizedRecipients.length > 0 && unavailableConnectedRecipients.length > 0 ? (
+                      {canShowSendToRaterPrimary && connectedAccountRecipients.length > 0 ? (
                         <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/70 px-2.5 py-2 text-[11px] text-amber-900">
-                          <div className="font-semibold">Connected account — not available yet</div>
+                          <div className="font-semibold">Connected-account send creates request-scoped access</div>
                           <div className="mt-0.5">
-                            {unavailableConnectedRecipientNames.length > 0
-                              ? unavailableConnectedRecipientNames.join(", ")
-                              : `${unavailableConnectedRecipients.length} connected account recipient(s)`}
+                            Connected-account handoff will create request-scoped access, but recipient-side response UI is not available yet.
+                          </div>
+                          <div className="mt-0.5">
+                            {connectedAccountRecipientNames.length > 0
+                              ? connectedAccountRecipientNames.join(", ")
+                              : `${connectedAccountRecipients.length} connected account recipient(s)`}
                           </div>
                         </div>
                       ) : null}
