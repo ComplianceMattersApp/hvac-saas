@@ -8,6 +8,7 @@ const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const setOpsStatusIfNotManualMock = vi.fn();
 const reconcileServiceCaseStatusAfterJobChangeMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -54,6 +55,11 @@ vi.mock("@/lib/actions/job-event-meta", () => ({
 vi.mock("@/lib/actions/service-case-reconciliation", () => ({
   reconcileServiceCaseStatusAfterJobChange: (...args: unknown[]) =>
     reconcileServiceCaseStatusAfterJobChangeMock(...args),
+}));
+
+vi.mock("@/lib/maintenance-agreements/agreement-actions", () => ({
+  autoCountMaintenanceAgreementVisitsForCompletedServiceJob: (...args: unknown[]) =>
+    autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock(...args),
 }));
 
 type FixtureConfig = {
@@ -132,6 +138,50 @@ describe("markInvoiceSent - canonical external billing completion contract", () 
 
     reconcileServiceCaseStatusAfterJobChangeMock.mockResolvedValue(undefined);
     resolveBillingModeByAccountOwnerIdMock.mockResolvedValue("external_billing");
+    autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock.mockResolvedValue({
+      evaluatedLinks: 1,
+      eligibleLinks: 1,
+      countedLinks: 1,
+      alreadyCountedLinks: 0,
+      skippedLinks: 0,
+    });
+  });
+
+  it("triggers maintenance visit auto-count after successful service completion", async () => {
+    const fixture = makeServiceCloseoutSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({
+      id: "job-1",
+      job_type: "service",
+      ops_status: "scheduled",
+      status: "in_process",
+      field_complete: false,
+      service_case_id: "case-1",
+      service_visit_outcome: null,
+    });
+
+    const { markServiceComplete } = await import("@/lib/actions/service-actions");
+
+    await expect(markServiceComplete("job-1")).rejects.toThrow("banner=service_closeout_saved");
+
+    expect(fixture.jobUpdates).toHaveLength(1);
+    expect(fixture.jobUpdates[0]).toEqual(
+      expect.objectContaining({
+        status: "completed",
+        field_complete: true,
+        ops_status: "invoice_required",
+      }),
+    );
+    expect(fixture.jobUpdates[0]).not.toHaveProperty("invoice_complete");
+
+    expect(autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        admin: fixture.supabase,
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        actingUserId: "internal-user-1",
+      }),
+    );
   });
 
   it("marks external billing complete, keeps closeout projection flow, and logs canonical event copy", async () => {

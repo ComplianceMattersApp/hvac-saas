@@ -13,7 +13,10 @@ import { forceSetOpsStatus } from "@/lib/actions/ops-status";
 import { releasePendingInfoAndRecompute } from "@/lib/actions/job-ops-actions";
 import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import { buildMovementEventMeta, buildStaffingSnapshotMeta } from "@/lib/actions/job-event-meta";
-import { createMaintenanceAgreementVisitLinkFromJobCreation } from "@/lib/maintenance-agreements/agreement-actions";
+import {
+  autoCountMaintenanceAgreementVisitsForCompletedServiceJob,
+  createMaintenanceAgreementVisitLinkFromJobCreation,
+} from "@/lib/maintenance-agreements/agreement-actions";
 import {
   createContractorIntakeProposalAwarenessNotification,
   insertInternalNotificationForEvent,
@@ -8936,6 +8939,23 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       revalidatePath(`/portal`);
       revalidatePath(`/portal/jobs/${id}`);
       redirect(buildJobRedirect({ banner: "status_already_updated" }));
+    }
+
+    if (next === "completed" && completedJobType === "service") {
+      // Best-effort: lifecycle completion should not fail if auto-count side effect fails.
+      try {
+        await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+          admin: supabase,
+          accountOwnerUserId: String(internalUser.account_owner_user_id ?? "").trim(),
+          jobId: id,
+          actingUserId,
+        });
+      } catch (error) {
+        console.error("[ADVANCE_STATUS_AUTO_COUNT_BEST_EFFORT_FAILED]", {
+          jobId: id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     // Diagnostic re-read: confirm DB write persisted before post-update work.

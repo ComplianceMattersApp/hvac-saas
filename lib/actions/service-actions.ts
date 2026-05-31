@@ -9,6 +9,7 @@ import { setOpsStatusIfNotManual } from "@/lib/actions/ops-status";
 import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
 import { applyExternalBillingCompletionMutation } from "@/lib/actions/external-billing-completion";
 import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
+import { autoCountMaintenanceAgreementVisitsForCompletedServiceJob } from "@/lib/maintenance-agreements/agreement-actions";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { revalidatePath } from "next/cache";
@@ -172,6 +173,21 @@ export async function markServiceComplete(jobIdOrFormData: string | FormData, re
     .eq("id", jobId);
 
   if (updateErr) throw new Error(updateErr.message);
+
+  // Best-effort: completion remains source-of-truth even if auto-count side effect fails.
+  try {
+    await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin: supabase,
+      accountOwnerUserId: String(internalUser.account_owner_user_id ?? "").trim(),
+      jobId,
+      actingUserId,
+    });
+  } catch (error) {
+    console.error("[SERVICE_AUTO_COUNT_BEST_EFFORT_FAILED]", {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   await reconcileServiceCaseStatusAfterJobChange({
     supabase,

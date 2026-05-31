@@ -452,6 +452,217 @@ function makeMarkVisitCountedAdminClient(params?: {
   };
 }
 
+type AutoCountVisitLinkFixture = {
+  id: string;
+  account_owner_user_id: string;
+  agreement_id: string;
+  job_id: string;
+  count_status: string;
+  counts_toward_visit_balance: boolean;
+  reversed_at: string | null;
+  counted_at: string | null;
+  counted_by_user_id: string | null;
+  updated_by_user_id: string | null;
+};
+
+function makeAutoCountAdminClient(params?: {
+  job?: Record<string, unknown>;
+  links?: AutoCountVisitLinkFixture[];
+  agreementStatusById?: Record<string, string>;
+  agreementCustomerIdById?: Record<string, string>;
+}) {
+  const job = {
+    id: "job-1",
+    customer_id: "cust-1",
+    job_type: "service",
+    status: "completed",
+    ops_status: "invoice_required",
+    field_complete: true,
+    service_visit_type: "maintenance",
+    service_visit_outcome: null,
+    ...(params?.job ?? {}),
+  };
+
+  const visitLinks: AutoCountVisitLinkFixture[] =
+    params?.links ??
+    [
+      {
+        id: "link-1",
+        account_owner_user_id: "owner-1",
+        agreement_id: "agr-1",
+        job_id: "job-1",
+        count_status: "linked",
+        counts_toward_visit_balance: false,
+        reversed_at: null,
+        counted_at: null,
+        counted_by_user_id: null,
+        updated_by_user_id: null,
+      },
+    ];
+
+  const agreementStatusById: Record<string, string> = {
+    "agr-1": "active",
+    ...(params?.agreementStatusById ?? {}),
+  };
+  const agreementCustomerIdById: Record<string, string> = {
+    "agr-1": "cust-1",
+    ...(params?.agreementCustomerIdById ?? {}),
+  };
+
+  const updateCalls: unknown[] = [];
+
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "jobs") {
+        const builder: any = {
+          eq: vi.fn((_column: string, value: unknown) => {
+            builder._jobId = String(value ?? "");
+            return builder;
+          }),
+          maybeSingle: vi.fn(async () => ({
+            data: builder._jobId === String(job.id ?? "") ? { ...job } : null,
+            error: null,
+          })),
+        };
+
+        return {
+          select: vi.fn(() => builder),
+        };
+      }
+
+      if (table === "maintenance_agreements") {
+        const builder: any = {
+          _agreementId: "",
+          _ownerId: "",
+          eq: vi.fn((column: string, value: unknown) => {
+            if (column === "id") builder._agreementId = String(value ?? "");
+            if (column === "account_owner_user_id") builder._ownerId = String(value ?? "");
+            return builder;
+          }),
+          maybeSingle: vi.fn(async () => {
+            const agreementId = String(builder._agreementId ?? "");
+            if (!agreementId) return { data: null, error: null };
+
+            return {
+              data: {
+                id: agreementId,
+                account_owner_user_id: String(builder._ownerId ?? "owner-1"),
+                customer_id: agreementCustomerIdById[agreementId] ?? "cust-1",
+                status: agreementStatusById[agreementId] ?? "active",
+              },
+              error: null,
+            };
+          }),
+        };
+
+        return {
+          select: vi.fn(() => builder),
+        };
+      }
+
+      if (table === "maintenance_agreement_visits") {
+        return {
+          select: vi.fn(() => {
+            const builder: any = {
+              _jobId: "",
+              _ownerId: "",
+              _linkId: "",
+              eq: vi.fn((column: string, value: unknown) => {
+                if (column === "job_id") builder._jobId = String(value ?? "");
+                if (column === "account_owner_user_id") builder._ownerId = String(value ?? "");
+                if (column === "id") builder._linkId = String(value ?? "");
+                return builder;
+              }),
+              maybeSingle: vi.fn(async () => {
+                const link = visitLinks.find((row) => row.id === builder._linkId) ?? null;
+                return { data: link ? { ...link } : null, error: null };
+              }),
+              then: (onFulfilled: (value: { data: unknown; error: null }) => unknown, onRejected?: (reason: unknown) => unknown) => {
+                const filtered = visitLinks.filter((row) => {
+                  const matchesJob = builder._jobId ? row.job_id === builder._jobId : true;
+                  const matchesOwner = builder._ownerId
+                    ? row.account_owner_user_id === builder._ownerId
+                    : true;
+                  return matchesJob && matchesOwner;
+                });
+
+                return Promise.resolve({ data: filtered.map((row) => ({ ...row })), error: null }).then(
+                  onFulfilled,
+                  onRejected,
+                );
+              },
+            };
+
+            return builder;
+          }),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            updateCalls.push(payload);
+
+            const builder: any = {
+              _linkId: "",
+              _ownerId: "",
+              _jobId: "",
+              _agreementId: "",
+              _allowedStatuses: [] as string[],
+              _countsTowardVisitBalance: false,
+              eq: vi.fn((column: string, value: unknown) => {
+                if (column === "id") builder._linkId = String(value ?? "");
+                if (column === "account_owner_user_id") builder._ownerId = String(value ?? "");
+                if (column === "job_id") builder._jobId = String(value ?? "");
+                if (column === "agreement_id") builder._agreementId = String(value ?? "");
+                if (column === "counts_toward_visit_balance") {
+                  builder._countsTowardVisitBalance = Boolean(value);
+                }
+                return builder;
+              }),
+              in: vi.fn((column: string, values: unknown[]) => {
+                if (column === "count_status") {
+                  builder._allowedStatuses = values.map((value) => String(value ?? "").toLowerCase());
+                }
+                return builder;
+              }),
+              select: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => {
+                  const link = visitLinks.find((row) => row.id === builder._linkId) ?? null;
+                  if (!link) return { data: null, error: null };
+
+                  const status = String(link.count_status ?? "").toLowerCase();
+                  const canUpdate =
+                    link.account_owner_user_id === builder._ownerId &&
+                    link.job_id === builder._jobId &&
+                    link.agreement_id === builder._agreementId &&
+                    builder._allowedStatuses.includes(status) &&
+                    link.counts_toward_visit_balance === builder._countsTowardVisitBalance;
+
+                  if (!canUpdate) {
+                    return { data: null, error: null };
+                  }
+
+                  link.count_status = String(payload.count_status ?? link.count_status);
+                  link.counts_toward_visit_balance = Boolean(
+                    payload.counts_toward_visit_balance ?? link.counts_toward_visit_balance,
+                  );
+                  link.counted_at = String(payload.counted_at ?? "") || null;
+                  link.counted_by_user_id = String(payload.counted_by_user_id ?? "") || null;
+                  link.updated_by_user_id = String(payload.updated_by_user_id ?? "") || null;
+
+                  return { data: { id: link.id }, error: null };
+                }),
+              })),
+            };
+
+            return builder;
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected admin table ${table}`);
+    }),
+    _visitLinks: visitLinks,
+    _updateCalls: updateCalls,
+  };
+}
+
 async function expectRedirectError(work: () => Promise<unknown>) {
   await expect(work()).rejects.toThrow(/REDIRECT:/);
   const calls = redirectMock.mock.calls;
@@ -1192,5 +1403,238 @@ describe("markMaintenanceAgreementVisitCountedFromForm", () => {
     );
 
     expect(target).toContain("banner=maintenance_visit_count_not_eligible");
+  });
+});
+
+describe("autoCountMaintenanceAgreementVisitsForCompletedServiceJob", () => {
+  it("counts a linked eligible service-plan visit once", async () => {
+    const { autoCountMaintenanceAgreementVisitsForCompletedServiceJob } = await import("@/lib/maintenance-agreements/agreement-actions");
+    const admin = makeAutoCountAdminClient();
+
+    const result = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+
+    expect(result.countedLinks).toBe(1);
+    expect(admin._updateCalls).toHaveLength(1);
+    expect(admin._visitLinks[0]).toMatchObject({
+      count_status: "counted",
+      counts_toward_visit_balance: true,
+      counted_by_user_id: "user-1",
+    });
+  });
+
+  it("does not double-count on repeated helper calls", async () => {
+    const { autoCountMaintenanceAgreementVisitsForCompletedServiceJob } = await import("@/lib/maintenance-agreements/agreement-actions");
+    const admin = makeAutoCountAdminClient();
+
+    const first = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+    const second = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+
+    expect(first.countedLinks).toBe(1);
+    expect(second.countedLinks).toBe(0);
+    expect(admin._updateCalls).toHaveLength(1);
+  });
+
+  it("skips already counted links", async () => {
+    const { autoCountMaintenanceAgreementVisitsForCompletedServiceJob } = await import("@/lib/maintenance-agreements/agreement-actions");
+    const admin = makeAutoCountAdminClient({
+      links: [
+        {
+          id: "link-1",
+          account_owner_user_id: "owner-1",
+          agreement_id: "agr-1",
+          job_id: "job-1",
+          count_status: "counted",
+          counts_toward_visit_balance: true,
+          reversed_at: null,
+          counted_at: "2026-05-01T00:00:00.000Z",
+          counted_by_user_id: "user-0",
+          updated_by_user_id: "user-0",
+        },
+      ],
+    });
+
+    const result = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+
+    expect(result.countedLinks).toBe(0);
+    expect(result.alreadyCountedLinks).toBe(1);
+    expect(admin._updateCalls).toHaveLength(0);
+  });
+
+  it("skips excluded and reversed links", async () => {
+    const { autoCountMaintenanceAgreementVisitsForCompletedServiceJob } = await import("@/lib/maintenance-agreements/agreement-actions");
+    const admin = makeAutoCountAdminClient({
+      links: [
+        {
+          id: "link-excluded",
+          account_owner_user_id: "owner-1",
+          agreement_id: "agr-1",
+          job_id: "job-1",
+          count_status: "excluded",
+          counts_toward_visit_balance: false,
+          reversed_at: null,
+          counted_at: null,
+          counted_by_user_id: null,
+          updated_by_user_id: null,
+        },
+        {
+          id: "link-reversed",
+          account_owner_user_id: "owner-1",
+          agreement_id: "agr-1",
+          job_id: "job-1",
+          count_status: "linked",
+          counts_toward_visit_balance: false,
+          reversed_at: "2026-05-02T00:00:00.000Z",
+          counted_at: null,
+          counted_by_user_id: null,
+          updated_by_user_id: null,
+        },
+      ],
+    });
+
+    const result = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+
+    expect(result.countedLinks).toBe(0);
+    expect(admin._updateCalls).toHaveLength(0);
+  });
+
+  it("skips non-service and non-maintenance visit types", async () => {
+    const { autoCountMaintenanceAgreementVisitsForCompletedServiceJob } = await import("@/lib/maintenance-agreements/agreement-actions");
+
+    const nonServiceAdmin = makeAutoCountAdminClient({
+      job: {
+        job_type: "ecc",
+      },
+    });
+    const nonMaintenanceAdmin = makeAutoCountAdminClient({
+      job: {
+        service_visit_type: "repair",
+      },
+    });
+
+    const nonServiceResult = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin: nonServiceAdmin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+    const nonMaintenanceResult = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin: nonMaintenanceAdmin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+
+    expect(nonServiceResult.countedLinks).toBe(0);
+    expect(nonMaintenanceResult.countedLinks).toBe(0);
+    expect(nonServiceAdmin._updateCalls).toHaveLength(0);
+    expect(nonMaintenanceAdmin._updateCalls).toHaveLength(0);
+  });
+
+  it("skips disqualifying canceled/no-show outcomes", async () => {
+    const { autoCountMaintenanceAgreementVisitsForCompletedServiceJob } = await import("@/lib/maintenance-agreements/agreement-actions");
+    const canceledAdmin = makeAutoCountAdminClient({
+      job: {
+        status: "cancelled",
+      },
+    });
+    const noShowAdmin = makeAutoCountAdminClient({
+      job: {
+        service_visit_outcome: "no_show",
+      },
+    });
+
+    const canceledResult = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin: canceledAdmin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+    const noShowResult = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin: noShowAdmin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+
+    expect(canceledResult.countedLinks).toBe(0);
+    expect(noShowResult.countedLinks).toBe(0);
+    expect(canceledAdmin._updateCalls).toHaveLength(0);
+    expect(noShowAdmin._updateCalls).toHaveLength(0);
+  });
+
+  it("counts all eligible links when multiple links are eligible", async () => {
+    const { autoCountMaintenanceAgreementVisitsForCompletedServiceJob } = await import("@/lib/maintenance-agreements/agreement-actions");
+    const admin = makeAutoCountAdminClient({
+      links: [
+        {
+          id: "link-1",
+          account_owner_user_id: "owner-1",
+          agreement_id: "agr-1",
+          job_id: "job-1",
+          count_status: "linked",
+          counts_toward_visit_balance: false,
+          reversed_at: null,
+          counted_at: null,
+          counted_by_user_id: null,
+          updated_by_user_id: null,
+        },
+        {
+          id: "link-2",
+          account_owner_user_id: "owner-1",
+          agreement_id: "agr-2",
+          job_id: "job-1",
+          count_status: "eligible",
+          counts_toward_visit_balance: false,
+          reversed_at: null,
+          counted_at: null,
+          counted_by_user_id: null,
+          updated_by_user_id: null,
+        },
+      ],
+      agreementStatusById: {
+        "agr-1": "active",
+        "agr-2": "active",
+      },
+      agreementCustomerIdById: {
+        "agr-1": "cust-1",
+        "agr-2": "cust-1",
+      },
+    });
+
+    const result = await autoCountMaintenanceAgreementVisitsForCompletedServiceJob({
+      admin,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      actingUserId: "user-1",
+    });
+
+    expect(result.countedLinks).toBe(2);
+    expect(admin._updateCalls).toHaveLength(2);
+    expect(admin._visitLinks.every((row) => row.count_status === "counted")).toBe(true);
   });
 });

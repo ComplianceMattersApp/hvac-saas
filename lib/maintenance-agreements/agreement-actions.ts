@@ -743,6 +743,247 @@ export async function createMaintenanceAgreementVisitLinkFromJobCreation(params:
   }
 }
 
+export type AutoCountMaintenanceAgreementVisitsResult = {
+  evaluatedLinks: number;
+  eligibleLinks: number;
+  countedLinks: number;
+  alreadyCountedLinks: number;
+  skippedLinks: number;
+};
+
+/**
+ * Auto-count eligible maintenance agreement visit links for a completed Service job.
+ *
+ * Scope boundary:
+ * - This helper only performs forward count transitions into `counted`.
+ * - It intentionally does NOT auto-reverse counted links for later cancel/fail changes.
+ */
+export async function autoCountMaintenanceAgreementVisitsForCompletedServiceJob(params: {
+  admin: any;
+  accountOwnerUserId: string;
+  jobId: string;
+  actingUserId: string;
+}): Promise<AutoCountMaintenanceAgreementVisitsResult> {
+  const result: AutoCountMaintenanceAgreementVisitsResult = {
+    evaluatedLinks: 0,
+    eligibleLinks: 0,
+    countedLinks: 0,
+    alreadyCountedLinks: 0,
+    skippedLinks: 0,
+  };
+
+  if (!isMaintenanceAgreementsEnabled()) {
+    return result;
+  }
+
+  const accountOwnerUserId = cleanString(params.accountOwnerUserId);
+  const jobId = cleanString(params.jobId);
+  const actingUserId = cleanString(params.actingUserId);
+
+  if (!accountOwnerUserId || !jobId || !actingUserId) {
+    return result;
+  }
+
+  const admin = params.admin;
+
+  const { data: jobRow, error: jobError } = await admin
+    .from("jobs")
+    .select(
+      [
+        "id",
+        "customer_id",
+        "job_type",
+        "status",
+        "ops_status",
+        "field_complete",
+        "service_visit_type",
+        "service_visit_outcome",
+      ].join(", "),
+    )
+    .eq("id", jobId)
+    .maybeSingle();
+
+  const job = (jobRow ?? null) as {
+    id?: string | null;
+    customer_id?: string | null;
+    job_type?: string | null;
+    status?: string | null;
+    ops_status?: string | null;
+    field_complete?: boolean | null;
+    service_visit_type?: string | null;
+    service_visit_outcome?: string | null;
+  } | null;
+
+  if (jobError || !job?.id) {
+    return result;
+  }
+
+  const jobCustomerId = cleanString(job.customer_id);
+  if (!jobCustomerId) {
+    return result;
+  }
+
+  const { data: linkRows, error: linkError } = await admin
+    .from("maintenance_agreement_visits")
+    .select(
+      [
+        "id",
+        "account_owner_user_id",
+        "agreement_id",
+        "job_id",
+        "count_status",
+        "counts_toward_visit_balance",
+        "reversed_at",
+      ].join(", "),
+    )
+    .eq("job_id", jobId)
+    .eq("account_owner_user_id", accountOwnerUserId);
+
+  const links = Array.isArray(linkRows)
+    ? (linkRows as Array<{
+        id?: string | null;
+        account_owner_user_id?: string | null;
+        agreement_id?: string | null;
+        job_id?: string | null;
+        count_status?: string | null;
+        counts_toward_visit_balance?: boolean | null;
+        reversed_at?: string | null;
+      }>)
+    : [];
+
+  if (linkError || links.length === 0) {
+    return result;
+  }
+
+  const nowIso = new Date().toISOString();
+
+  for (const link of links) {
+    result.evaluatedLinks += 1;
+
+    const linkId = cleanString(link.id);
+    const linkAgreementId = cleanString(link.agreement_id);
+    const linkStatus = cleanString(link.count_status).toLowerCase();
+    const linkCountsToward = Boolean(link.counts_toward_visit_balance);
+    const linkReversedAt = cleanString(link.reversed_at);
+
+    if (!linkId || !linkAgreementId) {
+      result.skippedLinks += 1;
+      continue;
+    }
+
+    if (linkStatus === "counted" && linkCountsToward) {
+      result.alreadyCountedLinks += 1;
+      continue;
+    }
+
+    if (linkStatus === "excluded" || linkStatus === "reversed") {
+      result.skippedLinks += 1;
+      continue;
+    }
+
+    if ((linkStatus !== "linked" && linkStatus !== "eligible") || linkCountsToward || linkReversedAt) {
+      result.skippedLinks += 1;
+      continue;
+    }
+
+    const { data: agreementRow, error: agreementError } = await admin
+      .from("maintenance_agreements")
+      .select("id, account_owner_user_id, customer_id, status")
+      .eq("id", linkAgreementId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .maybeSingle();
+
+    const agreement = (agreementRow ?? null) as {
+      id?: string | null;
+      customer_id?: string | null;
+      status?: string | null;
+    } | null;
+
+    if (agreementError || !agreement?.id) {
+      result.skippedLinks += 1;
+      continue;
+    }
+
+    const agreementCustomerId = cleanString(agreement.customer_id);
+    const agreementStatus = cleanString(agreement.status).toLowerCase();
+
+    if (!agreementCustomerId || agreementCustomerId !== jobCustomerId || agreementStatus !== "active") {
+      result.skippedLinks += 1;
+      continue;
+    }
+
+    const projectedLabel = projectMaintenanceAgreementVisitCountReview({
+      link: {
+        count_status: linkStatus,
+        counts_toward_visit_balance: linkCountsToward,
+      },
+      job: {
+        id: job.id,
+        status: job.status,
+        ops_status: job.ops_status,
+        job_type: job.job_type,
+        field_complete: job.field_complete,
+        service_visit_type: job.service_visit_type,
+        service_visit_outcome: job.service_visit_outcome,
+      },
+    });
+
+    if (projectedLabel !== "eligible_for_count_review") {
+      result.skippedLinks += 1;
+      continue;
+    }
+
+    result.eligibleLinks += 1;
+
+    const { data: updatedLink, error: updateError } = await admin
+      .from("maintenance_agreement_visits")
+      .update({
+        count_status: "counted",
+        counts_toward_visit_balance: true,
+        counted_at: nowIso,
+        counted_by_user_id: actingUserId,
+        updated_by_user_id: actingUserId,
+      })
+      .eq("id", linkId)
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("job_id", jobId)
+      .eq("agreement_id", linkAgreementId)
+      .in("count_status", ["linked", "eligible"])
+      .eq("counts_toward_visit_balance", false)
+      .select("id")
+      .maybeSingle();
+
+    if (updateError) {
+      result.skippedLinks += 1;
+      continue;
+    }
+
+    if (updatedLink?.id) {
+      result.countedLinks += 1;
+      continue;
+    }
+
+    const { data: recheckRow, error: recheckError } = await admin
+      .from("maintenance_agreement_visits")
+      .select("count_status, counts_toward_visit_balance")
+      .eq("id", linkId)
+      .maybeSingle();
+
+    if (!recheckError) {
+      const recheckStatus = cleanString((recheckRow as any)?.count_status).toLowerCase();
+      const recheckCountsToward = Boolean((recheckRow as any)?.counts_toward_visit_balance);
+      if (recheckStatus === "counted" && recheckCountsToward) {
+        result.alreadyCountedLinks += 1;
+        continue;
+      }
+    }
+
+    result.skippedLinks += 1;
+  }
+
+  return result;
+}
+
 function jobBannerPath(jobIdRaw: string, banner: string, returnToRaw?: string | null) {
   const jobId = cleanString(jobIdRaw);
   const returnTo = cleanString(returnToRaw);

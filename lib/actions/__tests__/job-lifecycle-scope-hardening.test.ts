@@ -8,6 +8,7 @@ const refreshMock = vi.fn();
 const sendEmailMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const resolveNotificationAccountOwnerUserIdMock = vi.fn();
+const autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -76,6 +77,12 @@ vi.mock("@/lib/email/sendEmail", () => ({
 vi.mock("@/lib/notifications/account-owner", () => ({
   resolveNotificationAccountOwnerUserId: (...args: unknown[]) =>
     resolveNotificationAccountOwnerUserIdMock(...args),
+}));
+
+vi.mock("@/lib/maintenance-agreements/agreement-actions", () => ({
+  createMaintenanceAgreementVisitLinkFromJobCreation: vi.fn(async () => false),
+  autoCountMaintenanceAgreementVisitsForCompletedServiceJob: (...args: unknown[]) =>
+    autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock(...args),
 }));
 
 function makeDenySupabaseFixture() {
@@ -214,6 +221,105 @@ function makeSchedulePreservationFixture(beforeOverrides: Record<string, unknown
               })),
             })),
           })),
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    },
+  };
+
+  return { supabase, jobsUpdates, jobEvents };
+}
+
+function makeAdvanceToCompletedServiceFixture() {
+  const jobEvents: Record<string, unknown>[] = [];
+  const jobsUpdates: Record<string, unknown>[] = [];
+
+  const jobRecord: Record<string, unknown> = {
+    id: "job-1",
+    status: "in_process",
+    on_the_way_at: null,
+    parent_job_id: null,
+    job_type: "service",
+    ops_status: "scheduled",
+    field_complete: false,
+    field_complete_at: null,
+    certs_complete: false,
+    invoice_complete: false,
+    scheduled_date: "2026-04-24",
+    window_start: "09:00",
+    window_end: "11:00",
+  };
+
+  const supabase = {
+    from(table: string) {
+      if (table === "jobs") {
+        return {
+          select: vi.fn((_columns: string) => {
+            const builder: any = {
+              _id: "",
+              eq: vi.fn((column: string, value: unknown) => {
+                if (column === "id") {
+                  builder._id = String(value ?? "");
+                }
+                return builder;
+              }),
+              single: vi.fn(async () => ({
+                data: builder._id === "job-1" ? { ...jobRecord } : null,
+                error: null,
+              })),
+              maybeSingle: vi.fn(async () => ({
+                data: builder._id === "job-1" ? { ...jobRecord } : null,
+                error: null,
+              })),
+            };
+
+            return builder;
+          }),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            jobsUpdates.push(payload);
+            Object.assign(jobRecord, payload);
+
+            const chain: any = {
+              eq: vi.fn(() => chain),
+              select: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({ data: { id: "job-1" }, error: null })),
+              })),
+              is: vi.fn(() => chain),
+              not: vi.fn(() => chain),
+            };
+
+            return chain;
+          }),
+        };
+      }
+
+      if (table === "job_assignments") {
+        return {
+          select: vi.fn(() => {
+            const builder: any = {
+              eq: vi.fn(() => builder),
+              maybeSingle: vi.fn(async () => ({ data: { id: "assign-1" }, error: null })),
+            };
+            return builder;
+          }),
+        };
+      }
+
+      if (table === "job_events") {
+        return {
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            jobEvents.push(payload);
+            const response = { data: { id: `evt-${jobEvents.length}` }, error: null };
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => response),
+              })),
+              single: vi.fn(async () => response),
+              then: (onFulfilled: (value: typeof response) => unknown, onRejected?: (reason: unknown) => unknown) =>
+                Promise.resolve(response).then(onFulfilled, onRejected),
+            };
+          }),
         };
       }
 
@@ -453,6 +559,13 @@ describe("internal same-account lifecycle scheduling hardening", () => {
       authorized: true,
       reason: "allowed_active",
     });
+    autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock.mockResolvedValue({
+      evaluatedLinks: 1,
+      eligibleLinks: 1,
+      countedLinks: 1,
+      alreadyCountedLinks: 0,
+      skippedLinks: 0,
+    });
   });
 
   it("denies cross-account internal advanceJobStatusFromForm before writes", async () => {
@@ -511,6 +624,34 @@ describe("internal same-account lifecycle scheduling hardening", () => {
     );
     expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: "owner-1" }),
+    );
+  });
+
+  it("triggers maintenance visit auto-count for non-ECC service completion", async () => {
+    const { supabase, jobsUpdates } = makeAdvanceToCompletedServiceFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { advanceJobStatusFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(advanceJobStatusFromForm(buildJobOnlyFormData())).rejects.toThrow(
+      "banner=status_updated",
+    );
+
+    expect(jobsUpdates).toContainEqual(
+      expect.objectContaining({
+        status: "completed",
+        field_complete: true,
+        ops_status: "invoice_required",
+      }),
+    );
+    expect(autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        admin: supabase,
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        actingUserId: "internal-user-1",
+      }),
     );
   });
 

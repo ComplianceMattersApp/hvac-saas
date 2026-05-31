@@ -12,6 +12,7 @@ const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const insertTargetedInternalNotificationMock = vi.fn();
 const assertAssignableInternalUserMock = vi.fn();
 const resolveUserDisplayMapMock = vi.fn();
+const autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
@@ -90,6 +91,12 @@ vi.mock("@/lib/actions/job-event-meta", () => ({
 
 vi.mock("@/lib/email/sendEmail", () => ({
   sendEmail: vi.fn(async () => undefined),
+}));
+
+vi.mock("@/lib/maintenance-agreements/agreement-actions", () => ({
+  createMaintenanceAgreementVisitLinkFromJobCreation: vi.fn(async () => false),
+  autoCountMaintenanceAgreementVisitsForCompletedServiceJob: (...args: unknown[]) =>
+    autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock(...args),
 }));
 
 type JobRecord = {
@@ -311,6 +318,13 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
       "internal-user-1": "Alex Rivera",
       "internal-user-2": "Eddie",
       "internal-user-3": "Riley",
+    });
+    autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock.mockResolvedValue({
+      evaluatedLinks: 0,
+      eligibleLinks: 0,
+      countedLinks: 0,
+      alreadyCountedLinks: 0,
+      skippedLinks: 0,
     });
   });
 
@@ -568,6 +582,7 @@ describe("internal job-detail customer/notes/data-entry same-account hardening",
     expect(forceSetOpsStatusMock).toHaveBeenCalledWith("job-1", "closed");
     expect(evaluateJobOpsStatusMock).not.toHaveBeenCalled();
     expect(healStalePaperworkOpsStatusMock).not.toHaveBeenCalled();
+    expect(autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock).not.toHaveBeenCalled();
   });
 
   it("allows valid trial internal completeDataEntryFromForm past entitlement preflight", async () => {
