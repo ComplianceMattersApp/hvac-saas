@@ -48,6 +48,8 @@ type MockWorkflowMilestone = {
   id: string;
   account_owner_user_id: string;
   workflow_instance_id: string;
+  milestone_key?: string | null;
+  milestone_title?: string | null;
   milestone_status?: string;
   status_reason?: string | null;
   updated_by_user_id?: string | null;
@@ -388,6 +390,8 @@ function makeAdminFixture(input?: {
               id: `ms-${workflowMilestones.length + 1}`,
               account_owner_user_id: String(row.account_owner_user_id ?? "").trim(),
               workflow_instance_id: String(row.workflow_instance_id ?? "").trim(),
+              milestone_key: String(row.milestone_key ?? "").trim() || null,
+              milestone_title: String(row.milestone_title ?? "").trim() || null,
               milestone_status: String(row.milestone_status ?? "planned").trim() || "planned",
               status_reason: (row.status_reason as string | null | undefined) ?? null,
               updated_by_user_id: String(row.updated_by_user_id ?? "").trim() || null,
@@ -559,6 +563,7 @@ const {
   assignInstallWithPermitWorkflowToJob,
   assignWorkflowPresetToServiceCase,
   ensureInstallWithPermitWorkflowPreset,
+  recordExternalEccCompletionForWorkflowMilestone,
   updateWorkflowMilestoneStatus,
 } = await import("@/lib/workflows/actions");
 
@@ -1152,6 +1157,251 @@ describe("assignInstallWithPermitWorkflowToJob", () => {
     expect(result.success).toBe(true);
 
     const forbiddenTables = [
+      "job_events",
+      "internal_invoices",
+      "internal_invoice_payments",
+      "internal_invoice_payment_allocations",
+      "customer_saved_payment_methods",
+      "stripe_webhook_events",
+      "outbound_sms_messages",
+      "qbo_sync_events",
+      "portal_notifications",
+    ];
+
+    for (const table of forbiddenTables) {
+      expect(admin._tableCalls).not.toContain(table);
+    }
+  });
+});
+
+describe("recordExternalEccCompletionForWorkflowMilestone", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        role: "admin",
+        is_active: true,
+      },
+    });
+  });
+
+  it("succeeds for ECC handoff/completion milestone and writes completion reason", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "in_progress",
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await recordExternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      completionNote: "External ECC completion smoke test",
+      evidenceReference: "CF3R #12345",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      status: "completed",
+      statusReason: "External ECC completion smoke test | Evidence: CF3R #12345",
+    });
+
+    expect(admin._workflowMilestones[0]).toMatchObject({
+      milestone_status: "completed",
+      status_reason: "External ECC completion smoke test | Evidence: CF3R #12345",
+      updated_by_user_id: "user-1",
+    });
+  });
+
+  it("rejects non-ECC milestone", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-install",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "install_work",
+          milestone_title: "Install work",
+          milestone_status: "ready",
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await recordExternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-install",
+      completionNote: "External ECC completion smoke test",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "milestone_id is not ECC handoff/completion milestone.",
+    });
+    expect(admin._workflowMilestones[0]).toMatchObject({
+      milestone_status: "ready",
+    });
+  });
+
+  it("rejects missing required completion note", async () => {
+    const admin = makeAdminFixture();
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await recordExternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      completionNote: "   ",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "completion_note is required.",
+    });
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("rejects cross-account workflow/milestone", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-2",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-2",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "in_progress",
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await recordExternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      completionNote: "External ECC completion smoke test",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "workflow_instance_id not found in this account.",
+    });
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("rejects milestone/workflow mismatch", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-2",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "in_progress",
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await recordExternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      completionNote: "External ECC completion smoke test",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "milestone_id does not belong to workflow_instance_id.",
+    });
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("updates only workflow_instance_milestones and does not touch job/service_case/job_events or billing/sms/qbo/portal tables", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "in_progress",
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await recordExternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      completionNote: "External ECC completion smoke test",
+      evidenceReference: "Third-party rater ACME",
+    });
+
+    expect(result.success).toBe(true);
+
+    const forbiddenTables = [
+      "jobs",
+      "service_cases",
       "job_events",
       "internal_invoices",
       "internal_invoice_payments",

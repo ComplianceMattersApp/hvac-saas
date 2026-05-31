@@ -36,6 +36,7 @@ vi.mock("@/lib/workflows/read-model", () => ({
 vi.mock("@/lib/workflows/actions", () => ({
   updateWorkflowMilestoneStatusFromForm: vi.fn(async () => undefined),
   assignInstallWithPermitWorkflowForJobFromForm: vi.fn(async () => undefined),
+  recordExternalEccCompletionForWorkflowMilestoneFromForm: vi.fn(async () => undefined),
 }));
 
 const DeferredWorkflowMilestonesPanelBody = (
@@ -127,6 +128,148 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).toContain("Permit");
     expect(html).toContain("Install");
     expect(html).toContain("Save");
+  });
+
+  it("shows ECC external completion action for incomplete ECC milestone", async () => {
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "in_progress",
+        status_reason: null,
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Record external ECC completion");
+    expect(html).toContain("name=\"completion_note\"");
+    expect(html).toContain("required");
+    expect(html).toContain("name=\"evidence_reference\"");
+  });
+
+  it("does not show ECC external completion action for non-ECC milestones", async () => {
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-install",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "install_work",
+        milestone_title: "Install work",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "ready",
+        status_reason: null,
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).not.toContain("Record external ECC completion");
+  });
+
+  it("hides ECC external completion action once ECC milestone is completed", async () => {
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "completed",
+        status_reason: "External ECC completion smoke test",
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Reason: External ECC completion smoke test");
+    expect(html).not.toContain("Record external ECC completion");
   });
 
   it("shows empty state when no active workflow is attached", async () => {

@@ -8,6 +8,7 @@ import {
 } from "@/lib/workflows/read-model";
 import {
   assignInstallWithPermitWorkflowForJobFromForm,
+  recordExternalEccCompletionForWorkflowMilestoneFromForm,
   updateWorkflowMilestoneStatusFromForm,
 } from "@/lib/workflows/actions";
 
@@ -62,6 +63,22 @@ function formatStatusLabel(status: WorkflowMilestoneStatus) {
 
 function formatStatusBadgeClass(status: WorkflowMilestoneStatus) {
   return statusBadgeClassMap[status] ?? statusBadgeClassMap.planned;
+}
+
+function normalizeMilestoneTitle(value: unknown) {
+  return cleanString(value).toLowerCase().replace(/\s+/g, " ");
+}
+
+function isEccHandoffCompletionMilestone(milestone: {
+  milestone_key?: unknown;
+  milestone_title?: unknown;
+}) {
+  const milestoneKey = cleanString(milestone.milestone_key).toLowerCase();
+  if (milestoneKey) {
+    return milestoneKey === "ecc_handoff_completion";
+  }
+
+  return normalizeMilestoneTitle(milestone.milestone_title) === "ecc handoff/completion";
 }
 
 function isWorkflowSchemaMissingError(error: unknown) {
@@ -190,6 +207,9 @@ export default async function DeferredWorkflowMilestonesPanelBody({
               <div className="mt-2 space-y-2">
                 {milestones.map((milestone) => {
                   const normalizedStatus = toWorkflowMilestoneStatus(milestone.milestone_status);
+                  const isEccMilestone = isEccHandoffCompletionMilestone(milestone);
+                  const canRecordExternalEccCompletion = isEccMilestone && normalizedStatus !== "completed";
+                  const statusReason = cleanString(milestone.status_reason);
 
                   return (
                     <div
@@ -204,6 +224,9 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                           <div className={`mt-1 inline-flex rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] ${formatStatusBadgeClass(normalizedStatus)}`}>
                             {formatStatusLabel(normalizedStatus)}
                           </div>
+                          {statusReason ? (
+                            <div className="mt-1 text-[11px] text-slate-600">Reason: {statusReason}</div>
+                          ) : null}
                         </div>
 
                         <form action={updateWorkflowMilestoneStatusFromForm} className="flex items-center gap-1.5">
@@ -229,6 +252,53 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                           </button>
                         </form>
                       </div>
+
+                      {canRecordExternalEccCompletion ? (
+                        <details className="mt-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2">
+                          <summary className="cursor-pointer text-[11px] font-semibold text-emerald-800">
+                            Record external ECC completion
+                          </summary>
+                          <form action={recordExternalEccCompletionForWorkflowMilestoneFromForm} className="mt-2 space-y-1.5">
+                            <input type="hidden" name="workflow_instance_id" value={instance.id} />
+                            <input type="hidden" name="milestone_id" value={milestone.id} />
+                            <div>
+                              <label className="mb-0.5 block text-[11px] font-semibold text-slate-700" htmlFor={`external-ecc-note-${milestone.id}`}>
+                                Completion note
+                              </label>
+                              <input
+                                id={`external-ecc-note-${milestone.id}`}
+                                type="text"
+                                name="completion_note"
+                                required
+                                maxLength={240}
+                                placeholder="External ECC completion smoke test"
+                                className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-800"
+                              />
+                            </div>
+                            <div>
+                              <label className="mb-0.5 block text-[11px] font-semibold text-slate-700" htmlFor={`external-ecc-evidence-${milestone.id}`}>
+                                Evidence reference (optional)
+                              </label>
+                              <input
+                                id={`external-ecc-evidence-${milestone.id}`}
+                                type="text"
+                                name="evidence_reference"
+                                maxLength={240}
+                                placeholder="Certificate #, rater, email, or file reference"
+                                className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-800"
+                              />
+                            </div>
+                            <div className="flex justify-end">
+                              <button
+                                type="submit"
+                                className="h-7 rounded-md border border-emerald-300 bg-white px-2 text-[11px] font-semibold text-emerald-800 transition-colors hover:border-emerald-400 hover:bg-emerald-50"
+                              >
+                                Save external completion
+                              </button>
+                            </div>
+                          </form>
+                        </details>
+                      ) : null}
                     </div>
                   );
                 })}

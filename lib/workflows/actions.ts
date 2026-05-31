@@ -39,12 +39,32 @@ type UpdateWorkflowMilestoneStatusParams = {
   statusReason?: string | null;
 };
 
+type RecordExternalEccCompletionForWorkflowMilestoneParams = {
+  workflowInstanceId: string;
+  milestoneId: string;
+  completionNote: string;
+  evidenceReference?: string | null;
+};
+
 type WorkflowMilestoneStatusUpdateResult =
   | {
       success: true;
       workflowInstanceId: string;
       milestoneId: string;
       status: WorkflowMilestoneStatus;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+type ExternalEccWorkflowMilestoneUpdateResult =
+  | {
+      success: true;
+      workflowInstanceId: string;
+      milestoneId: string;
+      status: "completed";
+      statusReason: string;
     }
   | {
       success: false;
@@ -90,6 +110,8 @@ type NormalizedMilestoneDefinition = {
 };
 
 const INSTALL_WITH_PERMIT_TEMPLATE_NAME = "Install with Permit";
+const ECC_HANDOFF_COMPLETION_MILESTONE_KEY = "ecc_handoff_completion";
+const ECC_HANDOFF_COMPLETION_MILESTONE_TITLE = "ecc handoff/completion";
 
 const INSTALL_WITH_PERMIT_MILESTONE_DEFINITIONS = [
   {
@@ -226,6 +248,23 @@ function isAllowedMilestoneStatus(value: string): value is WorkflowMilestoneStat
 function canManageWorkflowPresetLifecycle(role: string) {
   const normalized = cleanString(role).toLowerCase();
   return normalized === "owner" || normalized === "admin";
+}
+
+function normalizeMilestoneTitleForComparison(value: unknown) {
+  return cleanString(value).toLowerCase().replace(/\s+/g, " ");
+}
+
+function isEccHandoffCompletionMilestone(milestone: {
+  milestone_key?: unknown;
+  milestone_title?: unknown;
+}) {
+  const milestoneKey = cleanString(milestone.milestone_key).toLowerCase();
+  if (milestoneKey) {
+    return milestoneKey === ECC_HANDOFF_COMPLETION_MILESTONE_KEY;
+  }
+
+  const milestoneTitle = normalizeMilestoneTitleForComparison(milestone.milestone_title);
+  return milestoneTitle === ECC_HANDOFF_COMPLETION_MILESTONE_TITLE;
 }
 
 function withBanner(returnTo: string, banner: string) {
@@ -835,6 +874,139 @@ export async function updateWorkflowMilestoneStatus(
   };
 }
 
+export async function recordExternalEccCompletionForWorkflowMilestone(
+  params: RecordExternalEccCompletionForWorkflowMilestoneParams,
+): Promise<ExternalEccWorkflowMilestoneUpdateResult> {
+  const workflowInstanceId = cleanString(params.workflowInstanceId);
+  const milestoneId = cleanString(params.milestoneId);
+  const completionNote = cleanString(params.completionNote);
+  const evidenceReference = cleanNullableString(params.evidenceReference);
+
+  if (!workflowInstanceId) {
+    return { success: false, error: "workflow_instance_id is required." };
+  }
+
+  if (!milestoneId) {
+    return { success: false, error: "milestone_id is required." };
+  }
+
+  if (!completionNote) {
+    return { success: false, error: "completion_note is required." };
+  }
+
+  const supabase = await createClient();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        return { success: false, error: "Authentication required." };
+      }
+      return { success: false, error: "Active internal user required." };
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const actingUserId = cleanString(authz.userId);
+  if (!accountOwnerUserId || !actingUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: workflowInstance, error: workflowInstanceError } = await admin
+    .from("workflow_instances")
+    .select("id, account_owner_user_id")
+    .eq("id", workflowInstanceId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (workflowInstanceError) {
+    return {
+      success: false,
+      error: workflowInstanceError.message ?? "Failed to load workflow instance.",
+    };
+  }
+
+  if (!workflowInstance?.id) {
+    return {
+      success: false,
+      error: "workflow_instance_id not found in this account.",
+    };
+  }
+
+  const { data: milestoneRow, error: milestoneReadError } = await admin
+    .from("workflow_instance_milestones")
+    .select("id, account_owner_user_id, workflow_instance_id, milestone_key, milestone_title")
+    .eq("id", milestoneId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (milestoneReadError) {
+    return {
+      success: false,
+      error: milestoneReadError.message ?? "Failed to load workflow milestone.",
+    };
+  }
+
+  if (!milestoneRow?.id) {
+    return {
+      success: false,
+      error: "milestone_id not found in this account.",
+    };
+  }
+
+  const milestoneWorkflowInstanceId = cleanString(milestoneRow.workflow_instance_id);
+  if (milestoneWorkflowInstanceId !== workflowInstanceId) {
+    return {
+      success: false,
+      error: "milestone_id does not belong to workflow_instance_id.",
+    };
+  }
+
+  if (!isEccHandoffCompletionMilestone(milestoneRow)) {
+    return {
+      success: false,
+      error: "milestone_id is not ECC handoff/completion milestone.",
+    };
+  }
+
+  const statusReason = evidenceReference
+    ? `${completionNote} | Evidence: ${evidenceReference}`
+    : completionNote;
+
+  const { data: updatedMilestone, error: milestoneUpdateError } = await admin
+    .from("workflow_instance_milestones")
+    .update({
+      milestone_status: "completed",
+      status_reason: statusReason,
+      updated_by_user_id: actingUserId,
+    })
+    .eq("id", milestoneId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("workflow_instance_id", workflowInstanceId)
+    .select("id, milestone_status")
+    .maybeSingle();
+
+  if (milestoneUpdateError || !updatedMilestone?.id) {
+    return {
+      success: false,
+      error: milestoneUpdateError?.message ?? "Failed to record external ECC completion.",
+    };
+  }
+
+  return {
+    success: true,
+    workflowInstanceId,
+    milestoneId: cleanString(updatedMilestone.id),
+    status: "completed",
+    statusReason,
+  };
+}
+
 export async function updateWorkflowMilestoneStatusFromForm(formData: FormData) {
   const workflowInstanceId = cleanString(formData.get("workflow_instance_id"));
   const milestoneId = cleanString(formData.get("milestone_id"));
@@ -846,6 +1018,24 @@ export async function updateWorkflowMilestoneStatusFromForm(formData: FormData) 
     milestoneId,
     status,
     statusReason,
+  });
+
+  if (!result.success) {
+    throw new Error(result.error);
+  }
+}
+
+export async function recordExternalEccCompletionForWorkflowMilestoneFromForm(formData: FormData) {
+  const workflowInstanceId = cleanString(formData.get("workflow_instance_id"));
+  const milestoneId = cleanString(formData.get("milestone_id"));
+  const completionNote = cleanString(formData.get("completion_note"));
+  const evidenceReference = cleanNullableString(formData.get("evidence_reference"));
+
+  const result = await recordExternalEccCompletionForWorkflowMilestone({
+    workflowInstanceId,
+    milestoneId,
+    completionNote,
+    evidenceReference,
   });
 
   if (!result.success) {
