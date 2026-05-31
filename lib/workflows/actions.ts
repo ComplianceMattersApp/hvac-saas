@@ -67,6 +67,12 @@ type SendWorkflowEccMilestoneToAuthorizedRaterParams = {
   authorizedRecipientId?: string | null;
   jobId?: string | null;
 };
+type RespondToWorkflowHandoffRequestParams = {
+  handoffRequestId: string;
+  responseStatus: string;
+  responseNote?: string | null;
+  evidenceReference?: string | null;
+};
 
 type WorkflowMilestoneStatusUpdateResult =
   | {
@@ -137,6 +143,33 @@ type SendWorkflowEccMilestoneToAuthorizedRaterResult =
       success: false;
       error: string;
     };
+type WorkflowHandoffResponseResult =
+  | {
+      success: true;
+      handoffRequestId: string;
+      handoffStatus: "accepted" | "completed" | "rejected";
+      responseNote: string | null;
+      evidenceReference: string | null;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+function isSupportedWorkflowHandoffResponseStatus(value: string): value is "accepted" | "completed" | "rejected" {
+  return value === "accepted" || value === "completed" || value === "rejected";
+}
+
+function isAllowedWorkflowHandoffStatusTransition(currentStatus: string, nextStatus: "accepted" | "completed" | "rejected") {
+  if (currentStatus === "sent") {
+    return nextStatus === "accepted" || nextStatus === "completed" || nextStatus === "rejected";
+  }
+
+  if (currentStatus === "accepted") {
+    return nextStatus === "completed" || nextStatus === "rejected";
+  }
+
+  return false;
+}
 
 type EnsureInstallWithPermitWorkflowPresetResult =
   | {
@@ -1887,6 +1920,122 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
     recipientDisplayName: cleanString(recipient.display_name),
     handoffRequestId,
     handoffRequestCreated,
+  };
+}
+export async function respondToWorkflowHandoffRequest(
+  params: RespondToWorkflowHandoffRequestParams,
+): Promise<WorkflowHandoffResponseResult> {
+  const handoffRequestId = cleanString(params.handoffRequestId);
+  const responseStatus = cleanString(params.responseStatus).toLowerCase();
+  const requestedResponseNote = cleanNullableString(params.responseNote);
+  const evidenceReference = cleanNullableString(params.evidenceReference);
+
+  if (!handoffRequestId) {
+    return { success: false, error: "handoff_request_id is required." };
+  }
+
+  if (!isSupportedWorkflowHandoffResponseStatus(responseStatus)) {
+    return { success: false, error: "response_status must be accepted, completed, or rejected." };
+  }
+
+  if (responseStatus === "rejected" && !requestedResponseNote) {
+    return { success: false, error: "response_note is required when rejecting a handoff request." };
+  }
+
+  const supabase = await createClient();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        return { success: false, error: "Authentication required." };
+      }
+      return { success: false, error: "Active internal user required." };
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const actingUserId = cleanString(authz.userId);
+
+  if (!accountOwnerUserId || !actingUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: handoffRequest, error: handoffRequestError } = await admin
+    .from("workflow_handoff_requests")
+    .select("id, installer_account_owner_user_id, workflow_instance_id, workflow_instance_milestone_id, handoff_kind, handoff_status")
+    .eq("id", handoffRequestId)
+    .eq("installer_account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (handoffRequestError) {
+    return {
+      success: false,
+      error: handoffRequestError.message ?? "Failed to load workflow handoff request.",
+    };
+  }
+
+  if (!handoffRequest?.id) {
+    return {
+      success: false,
+      error: "handoff_request_id not found in this account.",
+    };
+  }
+
+  const handoffKind = cleanString((handoffRequest as { handoff_kind?: string | null }).handoff_kind).toLowerCase();
+  if (handoffKind !== "ecc") {
+    return {
+      success: false,
+      error: "handoff_request_id is not an ECC handoff request.",
+    };
+  }
+
+  const currentStatus = cleanString((handoffRequest as { handoff_status?: string | null }).handoff_status).toLowerCase();
+  if (!isAllowedWorkflowHandoffStatusTransition(currentStatus, responseStatus)) {
+    return {
+      success: false,
+      error: `handoff request cannot transition from ${currentStatus || "unknown"} to ${responseStatus}.`,
+    };
+  }
+
+  const respondedAt = new Date().toISOString();
+  const responseNote = responseStatus === "completed"
+    ? requestedResponseNote ?? "ECC completed by authorized rater."
+    : requestedResponseNote;
+
+  const { data: updatedRequest, error: updateError } = await admin
+    .from("workflow_handoff_requests")
+    .update({
+      handoff_status: responseStatus,
+      responded_by_user_id: actingUserId,
+      responded_at: respondedAt,
+      response_note: responseNote,
+      evidence_reference: evidenceReference,
+      updated_at: respondedAt,
+    })
+    .eq("id", handoffRequestId)
+    .eq("installer_account_owner_user_id", accountOwnerUserId)
+    .select("id, handoff_status, response_note, evidence_reference")
+    .maybeSingle();
+
+  if (updateError || !updatedRequest?.id) {
+    return {
+      success: false,
+      error: updateError?.message ?? "Failed to update workflow handoff request.",
+    };
+  }
+
+  return {
+    success: true,
+    handoffRequestId,
+    handoffStatus: cleanString((updatedRequest as { handoff_status?: string | null }).handoff_status).toLowerCase() as "accepted" | "completed" | "rejected",
+    responseNote: cleanNullableString((updatedRequest as { response_note?: string | null }).response_note),
+    evidenceReference: cleanNullableString((updatedRequest as { evidence_reference?: string | null }).evidence_reference),
   };
 }
 

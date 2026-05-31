@@ -113,6 +113,11 @@ type MockWorkflowHandoffRequest = {
   sent_by_user_id: string;
   sent_at?: string;
   created_at?: string;
+  responded_by_user_id?: string | null;
+  responded_at?: string | null;
+  response_note?: string | null;
+  evidence_reference?: string | null;
+  updated_at?: string | null;
 };
 
 function makeThenable<T>(
@@ -154,6 +159,7 @@ function makeAdminFixture(input?: {
   const workflowMilestoneUpdateCalls: Array<Record<string, unknown>> = [];
   const workflowJobLinkInsertCalls: Array<Array<Record<string, unknown>>> = [];
   const workflowHandoffRequestInsertCalls: Array<Record<string, unknown>> = [];
+  const workflowHandoffRequestUpdateCalls: Array<Record<string, unknown>> = [];
 
   const admin = {
     from: vi.fn((table: string) => {
@@ -763,7 +769,12 @@ function makeAdminFixture(input?: {
                   ...row,
                   source_job_id: row.source_job_id ?? null,
                   sent_at: row.sent_at ?? "2026-05-31T00:00:00.000Z",
+                  responded_by_user_id: row.responded_by_user_id ?? null,
+                  responded_at: row.responded_at ?? null,
+                  response_note: row.response_note ?? null,
+                  evidence_reference: row.evidence_reference ?? null,
                   created_at: row.created_at ?? row.sent_at ?? "2026-05-31T00:00:00.000Z",
+                  updated_at: row.updated_at ?? row.created_at ?? row.sent_at ?? "2026-05-31T00:00:00.000Z",
                 }));
 
               return { data: scoped, error: null };
@@ -814,7 +825,12 @@ function makeAdminFixture(input?: {
                     ...row,
                     source_job_id: row.source_job_id ?? null,
                     sent_at: row.sent_at ?? "2026-05-31T00:00:00.000Z",
+                    responded_by_user_id: row.responded_by_user_id ?? null,
+                    responded_at: row.responded_at ?? null,
+                    response_note: row.response_note ?? null,
+                    evidence_reference: row.evidence_reference ?? null,
                     created_at: row.created_at ?? row.sent_at ?? "2026-05-31T00:00:00.000Z",
+                    updated_at: row.updated_at ?? row.created_at ?? row.sent_at ?? "2026-05-31T00:00:00.000Z",
                   },
                   error: null,
                 };
@@ -844,6 +860,11 @@ function makeAdminFixture(input?: {
             sent_by_user_id: String(payload.sent_by_user_id ?? "").trim(),
             sent_at: String(payload.sent_at ?? "").trim() || "2026-05-31T00:00:00.000Z",
             created_at: String(payload.sent_at ?? "").trim() || "2026-05-31T00:00:00.000Z",
+            responded_by_user_id: null,
+            responded_at: null,
+            response_note: null,
+            evidence_reference: null,
+            updated_at: String(payload.sent_at ?? "").trim() || "2026-05-31T00:00:00.000Z",
           });
 
           return {
@@ -859,6 +880,55 @@ function makeAdminFixture(input?: {
         return {
           select,
           insert,
+          update: vi.fn((payload: Record<string, unknown>) => {
+            workflowHandoffRequestUpdateCalls.push(payload);
+
+            let requestId = "";
+            let installerAccountOwnerUserId = "";
+
+            const query: any = {
+              eq: (column: unknown, value: unknown) => {
+                if (column === "id") {
+                  requestId = String(value ?? "").trim();
+                }
+                if (column === "installer_account_owner_user_id") {
+                  installerAccountOwnerUserId = String(value ?? "").trim();
+                }
+                return query;
+              },
+              select: () => query,
+              maybeSingle: async () => {
+                const row = workflowHandoffRequests.find((entry) => {
+                  if (requestId && entry.id !== requestId) return false;
+                  if (installerAccountOwnerUserId && entry.installer_account_owner_user_id !== installerAccountOwnerUserId) return false;
+                  return true;
+                });
+
+                if (!row) {
+                  return { data: null, error: null };
+                }
+
+                row.handoff_status = String(payload.handoff_status ?? row.handoff_status).trim() || row.handoff_status;
+                row.responded_by_user_id = String(payload.responded_by_user_id ?? row.responded_by_user_id ?? "").trim() || null;
+                row.responded_at = String(payload.responded_at ?? row.responded_at ?? "").trim() || null;
+                row.response_note = String(payload.response_note ?? row.response_note ?? "").trim() || null;
+                row.evidence_reference = String(payload.evidence_reference ?? row.evidence_reference ?? "").trim() || null;
+                row.updated_at = String(payload.updated_at ?? row.updated_at ?? "").trim() || null;
+
+                return {
+                  data: {
+                    id: row.id,
+                    handoff_status: row.handoff_status,
+                    response_note: row.response_note ?? null,
+                    evidence_reference: row.evidence_reference ?? null,
+                  },
+                  error: null,
+                };
+              },
+            };
+
+            return query;
+          }),
         };
       }
 
@@ -871,6 +941,7 @@ function makeAdminFixture(input?: {
     _workflowMilestoneUpdateCalls: workflowMilestoneUpdateCalls,
     _workflowJobLinkInsertCalls: workflowJobLinkInsertCalls,
     _workflowHandoffRequestInsertCalls: workflowHandoffRequestInsertCalls,
+    _workflowHandoffRequestUpdateCalls: workflowHandoffRequestUpdateCalls,
     _workflowHandoffRequests: workflowHandoffRequests,
     _workflowInstances: workflowInstances,
     _workflowMilestones: workflowMilestones,
@@ -887,6 +958,7 @@ const {
   ensureInstallWithPermitWorkflowPreset,
   linkInternalEccJobToWorkflowMilestone,
   recordExternalEccCompletionForWorkflowMilestone,
+  respondToWorkflowHandoffRequest,
   sendWorkflowEccMilestoneToAuthorizedRater,
   updateWorkflowMilestoneStatus,
 } = await import("@/lib/workflows/actions");
@@ -2551,6 +2623,383 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
     expect(result.success).toBe(true);
 
     const forbiddenTables = [
+      "jobs",
+      "service_cases",
+      "job_events",
+      "internal_invoices",
+      "internal_invoice_payments",
+      "internal_invoice_payment_allocations",
+      "customer_saved_payment_methods",
+      "stripe_webhook_events",
+      "outbound_sms_messages",
+      "qbo_sync_events",
+      "portal_notifications",
+      "maintenance_agreements",
+      "maintenance_agreement_memberships",
+      "maintenance_agreement_billing_periods",
+    ];
+
+    for (const table of forbiddenTables) {
+      expect(admin._tableCalls).not.toContain(table);
+    }
+  });
+});
+
+describe("respondToWorkflowHandoffRequest", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        role: "admin",
+        is_active: true,
+      },
+    });
+  });
+
+  function buildResponseFixture(overrides?: {
+    workflowHandoffRequests?: MockWorkflowHandoffRequest[];
+  }) {
+    const admin = makeAdminFixture({
+      workflowHandoffRequests: overrides?.workflowHandoffRequests ?? [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          source_job_id: "job-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "ecc",
+          handoff_status: "sent",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+          created_at: "2026-05-31T17:51:10.463Z",
+        },
+      ],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+    return admin;
+  }
+
+  it("allows sent to accepted", async () => {
+    const admin = buildResponseFixture();
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "accepted",
+      responseNote: "Accepted for review.",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      handoffRequestId: "whr-1",
+      handoffStatus: "accepted",
+      responseNote: "Accepted for review.",
+      evidenceReference: null,
+    });
+
+    expect(admin._workflowHandoffRequests[0]).toMatchObject({
+      handoff_status: "accepted",
+      responded_by_user_id: "user-1",
+      response_note: "Accepted for review.",
+    });
+  });
+
+  it("allows sent to completed and stores evidence", async () => {
+    const admin = buildResponseFixture();
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "completed",
+      responseNote: "ECC completed smoke response",
+      evidenceReference: "CF3R smoke response",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      handoffRequestId: "whr-1",
+      handoffStatus: "completed",
+      responseNote: "ECC completed smoke response",
+      evidenceReference: "CF3R smoke response",
+    });
+    expect(admin._workflowHandoffRequests[0]).toMatchObject({
+      handoff_status: "completed",
+      responded_by_user_id: "user-1",
+      response_note: "ECC completed smoke response",
+      evidence_reference: "CF3R smoke response",
+    });
+  });
+
+  it("uses generated note when completing without a note", async () => {
+    buildResponseFixture();
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "completed",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      handoffRequestId: "whr-1",
+      handoffStatus: "completed",
+      responseNote: "ECC completed by authorized rater.",
+      evidenceReference: null,
+    });
+  });
+
+  it("allows accepted to completed", async () => {
+    buildResponseFixture({
+      workflowHandoffRequests: [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "ecc",
+          handoff_status: "accepted",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+          responded_by_user_id: "user-3",
+          responded_at: "2026-05-31T17:55:10.463Z",
+          response_note: "Accepted",
+        },
+      ],
+    });
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "completed",
+      responseNote: "Done.",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      handoffStatus: "completed",
+      responseNote: "Done.",
+    });
+  });
+
+  it("allows sent to rejected", async () => {
+    buildResponseFixture();
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "rejected",
+      responseNote: "Insufficient packet.",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      handoffRequestId: "whr-1",
+      handoffStatus: "rejected",
+      responseNote: "Insufficient packet.",
+      evidenceReference: null,
+    });
+  });
+
+  it("allows accepted to rejected", async () => {
+    buildResponseFixture({
+      workflowHandoffRequests: [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "ecc",
+          handoff_status: "accepted",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+        },
+      ],
+    });
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "rejected",
+      responseNote: "Rater cannot proceed.",
+    });
+
+    expect(result).toMatchObject({
+      success: true,
+      handoffStatus: "rejected",
+      responseNote: "Rater cannot proceed.",
+    });
+  });
+
+  it("requires response note for rejected", async () => {
+    buildResponseFixture();
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "rejected",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "response_note is required when rejecting a handoff request.",
+    });
+  });
+
+  it("rejects invalid transitions", async () => {
+    buildResponseFixture({
+      workflowHandoffRequests: [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "ecc",
+          handoff_status: "accepted",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+        },
+      ],
+    });
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "accepted",
+      responseNote: "Still accepted",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "handoff request cannot transition from accepted to accepted.",
+    });
+  });
+
+  it("rejects terminal completed rejected and cancelled states", async () => {
+    for (const terminalStatus of ["completed", "rejected", "cancelled"]) {
+      buildResponseFixture({
+        workflowHandoffRequests: [
+          {
+            id: "whr-1",
+            installer_account_owner_user_id: "owner-1",
+            workflow_instance_id: "wf-1",
+            workflow_instance_milestone_id: "ms-ecc",
+            service_case_id: "case-1",
+            authorized_handoff_recipient_id: "ahr-1",
+            recipient_type_snapshot: "external_manual",
+            recipient_display_name_snapshot: "Smoke Rater A",
+            handoff_kind: "ecc",
+            handoff_status: terminalStatus,
+            sent_by_user_id: "user-2",
+            sent_at: "2026-05-31T17:51:10.463Z",
+          },
+        ],
+      });
+
+      const result = await respondToWorkflowHandoffRequest({
+        handoffRequestId: "whr-1",
+        responseStatus: "completed",
+        responseNote: "Retry",
+      });
+
+      expect(result).toEqual({
+        success: false,
+        error: `handoff request cannot transition from ${terminalStatus} to completed.`,
+      });
+    }
+  });
+
+  it("rejects non-ECC handoff kinds", async () => {
+    buildResponseFixture({
+      workflowHandoffRequests: [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "general_future",
+          handoff_status: "sent",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+        },
+      ],
+    });
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "accepted",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "handoff_request_id is not an ECC handoff request.",
+    });
+  });
+
+  it("rejects cross-account requests", async () => {
+    buildResponseFixture({
+      workflowHandoffRequests: [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-2",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "ecc",
+          handoff_status: "sent",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+        },
+      ],
+    });
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "accepted",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "handoff_request_id not found in this account.",
+    });
+  });
+
+  it("updates only workflow_handoff_requests and avoids milestone job service-case event and billing writes", async () => {
+    const admin = buildResponseFixture();
+
+    const result = await respondToWorkflowHandoffRequest({
+      handoffRequestId: "whr-1",
+      responseStatus: "completed",
+      responseNote: "ECC completed smoke response",
+      evidenceReference: "CF3R smoke response",
+    });
+
+    expect(result.success).toBe(true);
+    expect(admin._workflowHandoffRequestUpdateCalls).toHaveLength(1);
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+
+    const forbiddenTables = [
+      "workflow_instance_milestones",
       "jobs",
       "service_cases",
       "job_events",
