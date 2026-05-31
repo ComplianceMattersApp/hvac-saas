@@ -763,6 +763,145 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).toContain("Golden State Rater");
   });
 
+  it("shows unsupported helper and keeps send disabled when only connected-account recipient exists", async () => {
+    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
+      mode: "single",
+      recipients: [
+        {
+          id: "ahr-connected-1",
+          recipient_type: "connected_account_future",
+          display_name: "Connected account 22222222",
+          is_default: true,
+          is_active: true,
+        },
+      ],
+      defaultRecipientId: "ahr-connected-1",
+      preselectedRecipientId: "ahr-connected-1",
+    });
+
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "ready",
+        status_reason: null,
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Connected account rater is configured, but connected handoff sending is not available yet.");
+    expect(html).toContain("Use manual/external completion for now, or add an internal/manual rater.");
+    expect(html).toContain("Connected account — not available yet: Connected account 22222222");
+    expect(html).not.toContain("Send to rater");
+    expect(html).not.toContain("Send to Connected account 22222222");
+    expect(html).toContain("Record external ECC completion");
+    expect(html).toContain("More actions");
+  });
+
+  it("shows supported send option plus connected-account unavailable messaging in mixed recipient state", async () => {
+    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
+      mode: "multiple",
+      recipients: [
+        {
+          id: "ahr-1",
+          recipient_type: "external_manual",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+        },
+        {
+          id: "ahr-connected-1",
+          recipient_type: "connected_account_future",
+          display_name: "Connected account 22222222",
+          is_default: false,
+          is_active: true,
+        },
+      ],
+      defaultRecipientId: "ahr-1",
+      preselectedRecipientId: "ahr-1",
+    });
+
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "ready",
+        status_reason: null,
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Send to Acme Ratings");
+    expect(html).toContain("Acme Ratings");
+    expect(html).toContain("Connected account — not available yet");
+    expect(html).toContain("Connected account 22222222");
+    expect(html).not.toContain("Send to Connected account 22222222");
+  });
+
   it("shows Link internal ECC job when eligible ECC jobs exist for the service case", async () => {
     createClientMock.mockResolvedValue({
       from: vi.fn((table: string) => {

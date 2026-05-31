@@ -2574,7 +2574,7 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
   });
 
   it("rejects connected_account_future recipients for this workflow-scoped v1", async () => {
-    buildFixture({
+    const admin = buildFixture({
       authorizedHandoffRecipients: [
         {
           id: "ahr-1",
@@ -2598,6 +2598,8 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
       success: false,
       error: "Connected-account ECC handoff is not available yet.",
     });
+    expect(admin._workflowHandoffRequestInsertCalls).toHaveLength(0);
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
   });
 
   it("updates only workflow_instance_milestones and avoids job/service_case/job_events and billing/sms/qbo/portal writes", async () => {
