@@ -6,12 +6,17 @@ import {
   listWorkflowInstanceMilestones,
   type WorkflowMilestoneStatus,
 } from "@/lib/workflows/read-model";
-import { updateWorkflowMilestoneStatusFromForm } from "@/lib/workflows/actions";
+import {
+  assignInstallWithPermitWorkflowForJobFromForm,
+  updateWorkflowMilestoneStatusFromForm,
+} from "@/lib/workflows/actions";
 
 type DeferredWorkflowMilestonesPanelBodyProps = {
   accountOwnerUserId: string;
   currentJobId: string;
   serviceCaseId: string;
+  canManageWorkflowGuidance: boolean;
+  returnToPath: string;
   emptyStateClassName: string;
 };
 
@@ -73,6 +78,8 @@ export default async function DeferredWorkflowMilestonesPanelBody({
   accountOwnerUserId,
   currentJobId,
   serviceCaseId,
+  canManageWorkflowGuidance,
+  returnToPath,
   emptyStateClassName,
 }: DeferredWorkflowMilestonesPanelBodyProps) {
   const supabase = await createClient();
@@ -103,7 +110,23 @@ export default async function DeferredWorkflowMilestonesPanelBody({
   }
 
   if (instances.length === 0) {
-    return <div className={emptyStateClassName}>No active workflow guidance is attached yet.</div>;
+    return (
+      <div className="space-y-2">
+        <div className={emptyStateClassName}>No active workflow guidance is attached yet.</div>
+        {canManageWorkflowGuidance ? (
+          <form action={assignInstallWithPermitWorkflowForJobFromForm} className="flex items-center gap-2">
+            <input type="hidden" name="job_id" value={currentJobId} />
+            <input type="hidden" name="return_to" value={returnToPath} />
+            <button
+              type="submit"
+              className="rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
+            >
+              Add Install with Permit workflow
+            </button>
+          </form>
+        ) : null}
+      </div>
+    );
   }
 
   let workflows: Array<{

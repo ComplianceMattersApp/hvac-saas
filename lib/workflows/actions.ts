@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { WORKFLOW_MILESTONE_STATUSES, type WorkflowMilestoneStatus } from "@/lib/workflows/read-model";
 import {
@@ -49,6 +51,36 @@ type WorkflowMilestoneStatusUpdateResult =
       error: string;
     };
 
+type EnsureInstallWithPermitWorkflowPresetResult =
+  | {
+      success: true;
+      workflowPresetTemplateId: string;
+      created: boolean;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+type AssignInstallWithPermitWorkflowToJobParams = {
+  jobId: string;
+};
+
+type AssignInstallWithPermitWorkflowToJobResult =
+  | {
+      success: true;
+      workflowInstanceId: string;
+      workflowPresetTemplateId: string;
+      presetCreated: boolean;
+      created: boolean;
+      milestoneCount: number;
+      linkedJobCount: number;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
 type NormalizedMilestoneDefinition = {
   milestoneKey: string | null;
   displayName: string;
@@ -56,6 +88,39 @@ type NormalizedMilestoneDefinition = {
   sortOrder: number;
   metadataJson: Record<string, unknown> | null;
 };
+
+const INSTALL_WITH_PERMIT_TEMPLATE_NAME = "Install with Permit";
+
+const INSTALL_WITH_PERMIT_MILESTONE_DEFINITIONS = [
+  {
+    milestone_key: "install_work",
+    display_name: "Install work",
+    milestone_description: null,
+    sort_order: 0,
+    metadata_json: null,
+  },
+  {
+    milestone_key: "ecc_handoff_completion",
+    display_name: "ECC handoff/completion",
+    milestone_description: null,
+    sort_order: 1,
+    metadata_json: null,
+  },
+  {
+    milestone_key: "final_inspection",
+    display_name: "Final inspection",
+    milestone_description: null,
+    sort_order: 2,
+    metadata_json: null,
+  },
+  {
+    milestone_key: "closeout",
+    display_name: "Closeout",
+    milestone_description: null,
+    sort_order: 3,
+    metadata_json: null,
+  },
+];
 
 function cleanString(value: unknown) {
   return String(value ?? "").trim();
@@ -156,6 +221,216 @@ function normalizeExplicitJobIds(value: unknown) {
 
 function isAllowedMilestoneStatus(value: string): value is WorkflowMilestoneStatus {
   return (WORKFLOW_MILESTONE_STATUSES as readonly string[]).includes(value);
+}
+
+function canManageWorkflowPresetLifecycle(role: string) {
+  const normalized = cleanString(role).toLowerCase();
+  return normalized === "owner" || normalized === "admin";
+}
+
+function withBanner(returnTo: string, banner: string) {
+  const safeReturnTo = returnTo.startsWith("/") ? returnTo : "/jobs";
+  const [pathWithoutHash, hash = ""] = safeReturnTo.split("#", 2);
+  const separator = pathWithoutHash.includes("?") ? "&" : "?";
+  return `${pathWithoutHash}${separator}banner=${encodeURIComponent(banner)}${hash ? `#${hash}` : ""}`;
+}
+
+export async function ensureInstallWithPermitWorkflowPreset(): Promise<EnsureInstallWithPermitWorkflowPresetResult> {
+  const supabase = await createClient();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        return { success: false, error: "Authentication required." };
+      }
+      return { success: false, error: "Active internal user required." };
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const actingUserId = cleanString(authz.userId);
+  const role = cleanString(authz.internalUser.role).toLowerCase();
+
+  if (!accountOwnerUserId || !actingUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: existingRows, error: existingError } = await admin
+    .from("workflow_preset_templates")
+    .select("id")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("template_name", INSTALL_WITH_PERMIT_TEMPLATE_NAME)
+    .eq("lifecycle_status", "active")
+    .order("updated_at", { ascending: false })
+    .limit(1);
+
+  if (existingError) {
+    return {
+      success: false,
+      error: existingError.message ?? "Failed to check workflow preset template.",
+    };
+  }
+
+  const existingRowsList = Array.isArray(existingRows) ? existingRows : [];
+  const existingId = cleanString((existingRowsList[0] as any)?.id);
+  if (existingId) {
+    return {
+      success: true,
+      workflowPresetTemplateId: existingId,
+      created: false,
+    };
+  }
+
+  if (!canManageWorkflowPresetLifecycle(role)) {
+    return {
+      success: false,
+      error: "Owner/admin role required to create workflow guidance preset.",
+    };
+  }
+
+  const { data: insertedPreset, error: insertError } = await admin
+    .from("workflow_preset_templates")
+    .insert({
+      account_owner_user_id: accountOwnerUserId,
+      template_name: INSTALL_WITH_PERMIT_TEMPLATE_NAME,
+      template_description: "Default workflow guidance for permit-bound installation jobs.",
+      lifecycle_status: "active",
+      milestone_definition_json: INSTALL_WITH_PERMIT_MILESTONE_DEFINITIONS,
+      created_by_user_id: actingUserId,
+      updated_by_user_id: actingUserId,
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !insertedPreset?.id) {
+    const { data: fallbackRows, error: fallbackError } = await admin
+      .from("workflow_preset_templates")
+      .select("id")
+      .eq("account_owner_user_id", accountOwnerUserId)
+      .eq("template_name", INSTALL_WITH_PERMIT_TEMPLATE_NAME)
+      .eq("lifecycle_status", "active")
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    if (fallbackError) {
+      return {
+        success: false,
+        error: insertError?.message ?? fallbackError.message ?? "Failed to create workflow preset template.",
+      };
+    }
+
+    const fallbackRowsList = Array.isArray(fallbackRows) ? fallbackRows : [];
+    const fallbackId = cleanString((fallbackRowsList[0] as any)?.id);
+    if (fallbackId) {
+      return {
+        success: true,
+        workflowPresetTemplateId: fallbackId,
+        created: false,
+      };
+    }
+
+    return {
+      success: false,
+      error: insertError?.message ?? "Failed to create workflow preset template.",
+    };
+  }
+
+  return {
+    success: true,
+    workflowPresetTemplateId: cleanString(insertedPreset.id),
+    created: true,
+  };
+}
+
+export async function assignInstallWithPermitWorkflowToJob(
+  params: AssignInstallWithPermitWorkflowToJobParams,
+): Promise<AssignInstallWithPermitWorkflowToJobResult> {
+  const jobId = cleanString(params.jobId);
+  if (!jobId) {
+    return { success: false, error: "job_id is required." };
+  }
+
+  const supabase = await createClient();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        return { success: false, error: "Authentication required." };
+      }
+      return { success: false, error: "Active internal user required." };
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const actorRole = cleanString(authz.internalUser.role).toLowerCase();
+  if (!accountOwnerUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  if (!canManageWorkflowPresetLifecycle(actorRole)) {
+    return {
+      success: false,
+      error: "Owner/admin role required to attach workflow guidance.",
+    };
+  }
+
+  const admin = createAdminClient();
+
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId,
+    jobId,
+    select: "id, service_case_id",
+    admin,
+  });
+
+  if (!scopedJob?.id) {
+    return {
+      success: false,
+      error: "job_id not found in this account.",
+    };
+  }
+
+  const serviceCaseId = cleanString((scopedJob as any).service_case_id);
+  if (!serviceCaseId) {
+    return {
+      success: false,
+      error: "job_id is not attached to a service_case_id.",
+    };
+  }
+
+  const ensuredPreset = await ensureInstallWithPermitWorkflowPreset();
+  if (!ensuredPreset.success) {
+    return ensuredPreset;
+  }
+
+  const assignment = await assignWorkflowPresetToServiceCase({
+    serviceCaseId,
+    workflowPresetTemplateId: ensuredPreset.workflowPresetTemplateId,
+  });
+
+  if (!assignment.success) {
+    return assignment;
+  }
+
+  return {
+    success: true,
+    workflowInstanceId: assignment.workflowInstanceId,
+    workflowPresetTemplateId: ensuredPreset.workflowPresetTemplateId,
+    presetCreated: ensuredPreset.created,
+    created: assignment.created,
+    milestoneCount: assignment.milestoneCount,
+    linkedJobCount: assignment.linkedJobCount,
+  };
 }
 
 export async function assignWorkflowPresetToServiceCase(
@@ -576,4 +851,27 @@ export async function updateWorkflowMilestoneStatusFromForm(formData: FormData) 
   if (!result.success) {
     throw new Error(result.error);
   }
+}
+
+export async function assignInstallWithPermitWorkflowForJobFromForm(formData: FormData) {
+  const jobId = cleanString(formData.get("job_id"));
+  const returnTo = cleanString(formData.get("return_to")) || `/jobs/${jobId}#service-chain`;
+
+  const result = await assignInstallWithPermitWorkflowToJob({ jobId });
+  if (!result.success) {
+    const banner =
+      result.error === "job_id is not attached to a service_case_id."
+        ? "workflow_guidance_service_case_required"
+        : result.error === "Owner/admin role required to attach workflow guidance."
+        ? "workflow_guidance_permission_required"
+        : "workflow_guidance_add_failed";
+
+    redirect(withBanner(returnTo, banner));
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  const successBanner = result.created
+    ? "workflow_guidance_added"
+    : "workflow_guidance_already_attached";
+  redirect(withBanner(returnTo, successBanner));
 }

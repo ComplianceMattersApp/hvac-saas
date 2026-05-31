@@ -35,6 +35,7 @@ vi.mock("@/lib/workflows/read-model", () => ({
 
 vi.mock("@/lib/workflows/actions", () => ({
   updateWorkflowMilestoneStatusFromForm: vi.fn(async () => undefined),
+  assignInstallWithPermitWorkflowForJobFromForm: vi.fn(async () => undefined),
 }));
 
 const DeferredWorkflowMilestonesPanelBody = (
@@ -99,6 +100,8 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
       accountOwnerUserId: "owner-1",
       currentJobId: "job-1",
       serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
       emptyStateClassName: "empty-state",
     });
 
@@ -134,11 +137,32 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
       accountOwnerUserId: "owner-1",
       currentJobId: "job-1",
       serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
       emptyStateClassName: "empty-state",
     });
 
     const html = renderToStaticMarkup(jsx);
     expect(html).toContain("No active workflow guidance is attached yet.");
+    expect(html).toContain("Add Install with Permit workflow");
+  });
+
+  it("hides assignment action for non-owner/admin viewers", async () => {
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([]);
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: false,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("No active workflow guidance is attached yet.");
+    expect(html).not.toContain("Add Install with Permit workflow");
   });
 
   it("fails open when workflow tables are not yet available in schema cache", async () => {
@@ -153,6 +177,8 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
       accountOwnerUserId: "owner-1",
       currentJobId: "job-1",
       serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
       emptyStateClassName: "empty-state",
     });
 

@@ -160,20 +160,77 @@ function makeAdminFixture(input?: {
       }
 
       if (table === "workflow_preset_templates") {
-        let whereId = "";
+        const select = vi.fn(() => {
+          let whereId = "";
+          let ownerId = "";
+          let templateName = "";
+          let lifecycleStatus = "";
+          let limit = 100;
+
+          const query: any = {
+            eq: (column: string, value: unknown) => {
+              if (column === "id") whereId = String(value ?? "").trim();
+              if (column === "account_owner_user_id") ownerId = String(value ?? "").trim();
+              if (column === "template_name") templateName = String(value ?? "").trim();
+              if (column === "lifecycle_status") lifecycleStatus = String(value ?? "").trim();
+              return query;
+            },
+            order: () => query,
+            limit: (value: unknown) => {
+              limit = Number(value ?? 100);
+              return query;
+            },
+            maybeSingle: async () => {
+              const row = presets.find((entry) => {
+                if (whereId && entry.id !== whereId) return false;
+                if (ownerId && entry.account_owner_user_id !== ownerId) return false;
+                if (templateName && entry.template_name !== templateName) return false;
+                if (lifecycleStatus && entry.lifecycle_status !== lifecycleStatus) return false;
+                return true;
+              });
+
+              return {
+                data: row ?? null,
+                error: null,
+              };
+            },
+            then: (resolve: (value: { data: Array<{ id: string }>; error: null }) => unknown, reject?: (reason: unknown) => unknown) => {
+              const rows = presets
+                .filter((entry) => (whereId ? entry.id === whereId : true))
+                .filter((entry) => (ownerId ? entry.account_owner_user_id === ownerId : true))
+                .filter((entry) => (templateName ? entry.template_name === templateName : true))
+                .filter((entry) => (lifecycleStatus ? entry.lifecycle_status === lifecycleStatus : true))
+                .slice(0, limit)
+                .map((entry) => ({ id: entry.id }));
+
+              return Promise.resolve({ data: rows, error: null }).then(resolve, reject);
+            },
+          };
+
+          return query;
+        });
+
+        const insert = vi.fn((payload: Record<string, unknown>) => {
+          const id = `tpl-${presets.length + 1}`;
+          presets.push({
+            id,
+            account_owner_user_id: String(payload.account_owner_user_id ?? "").trim(),
+            template_name: String(payload.template_name ?? "").trim(),
+            lifecycle_status: String(payload.lifecycle_status ?? "active").trim(),
+            milestone_definition_json: payload.milestone_definition_json ?? [],
+            updated_at: null,
+          });
+
+          return {
+            select: vi.fn(() => ({
+              single: vi.fn(async () => ({ data: { id }, error: null })),
+            })),
+          };
+        });
 
         return {
-          select: vi.fn(() => ({
-            eq: vi.fn((column: string, value: unknown) => {
-              if (column === "id") whereId = String(value ?? "").trim();
-              return {
-                maybeSingle: vi.fn(async () => ({
-                  data: presets.find((row) => row.id === whereId) ?? null,
-                  error: null,
-                })),
-              };
-            }),
-          })),
+          select,
+          insert,
         };
       }
 
@@ -498,7 +555,12 @@ function makeAdminFixture(input?: {
   return admin;
 }
 
-const { assignWorkflowPresetToServiceCase, updateWorkflowMilestoneStatus } = await import("@/lib/workflows/actions");
+const {
+  assignInstallWithPermitWorkflowToJob,
+  assignWorkflowPresetToServiceCase,
+  ensureInstallWithPermitWorkflowPreset,
+  updateWorkflowMilestoneStatus,
+} = await import("@/lib/workflows/actions");
 
 describe("assignWorkflowPresetToServiceCase", () => {
   beforeEach(() => {
@@ -881,6 +943,212 @@ describe("assignWorkflowPresetToServiceCase", () => {
       workflowPresetTemplateId: "tpl-1",
     });
 
+    expect(result.success).toBe(true);
+
+    const forbiddenTables = [
+      "job_events",
+      "internal_invoices",
+      "internal_invoice_payments",
+      "internal_invoice_payment_allocations",
+      "customer_saved_payment_methods",
+      "stripe_webhook_events",
+      "outbound_sms_messages",
+      "qbo_sync_events",
+      "portal_notifications",
+    ];
+
+    for (const table of forbiddenTables) {
+      expect(admin._tableCalls).not.toContain(table);
+    }
+  });
+});
+
+describe("ensureInstallWithPermitWorkflowPreset", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        role: "admin",
+        is_active: true,
+      },
+    });
+  });
+
+  it("returns existing active tenant preset when present", async () => {
+    const admin = makeAdminFixture({
+      presets: [
+        {
+          id: "tpl-existing",
+          account_owner_user_id: "owner-1",
+          template_name: "Install with Permit",
+          lifecycle_status: "active",
+          milestone_definition_json: [],
+        },
+      ],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await ensureInstallWithPermitWorkflowPreset();
+
+    expect(result).toEqual({
+      success: true,
+      workflowPresetTemplateId: "tpl-existing",
+      created: false,
+    });
+  });
+
+  it("creates a tenant preset when missing and remains idempotent", async () => {
+    const admin = makeAdminFixture();
+    createAdminClientMock.mockReturnValue(admin);
+
+    const first = await ensureInstallWithPermitWorkflowPreset();
+    const second = await ensureInstallWithPermitWorkflowPreset();
+
+    expect(first.success).toBe(true);
+    expect(second.success).toBe(true);
+
+    if (first.success && second.success) {
+      expect(first.workflowPresetTemplateId).toBeTruthy();
+      expect(second.workflowPresetTemplateId).toBe(first.workflowPresetTemplateId);
+      expect(first.created).toBe(true);
+      expect(second.created).toBe(false);
+    }
+
+    expect(admin._presets).toHaveLength(1);
+    expect(admin._presets[0]).toMatchObject({
+      account_owner_user_id: "owner-1",
+      template_name: "Install with Permit",
+      lifecycle_status: "active",
+    });
+  });
+
+  it("requires owner/admin authority to create the default preset", async () => {
+    const admin = makeAdminFixture();
+    createAdminClientMock.mockReturnValue(admin);
+
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-2",
+      internalUser: {
+        user_id: "user-2",
+        account_owner_user_id: "owner-1",
+        role: "dispatcher",
+        is_active: true,
+      },
+    });
+
+    const result = await ensureInstallWithPermitWorkflowPreset();
+
+    expect(result).toEqual({
+      success: false,
+      error: "Owner/admin role required to create workflow guidance preset.",
+    });
+    expect(admin._presets).toHaveLength(0);
+  });
+});
+
+describe("assignInstallWithPermitWorkflowToJob", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        role: "admin",
+        is_active: true,
+      },
+    });
+  });
+
+  it("assigns Install with Permit to the scoped job service_case_id", async () => {
+    const admin = makeAdminFixture({
+      serviceCases: [{ id: "case-1", customer_id: "cust-1" }],
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      jobs: [{ id: "job-1", customer_id: "cust-1", service_case_id: "case-1", deleted_at: null }],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await assignInstallWithPermitWorkflowToJob({ jobId: "job-1" });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.workflowPresetTemplateId).toBeTruthy();
+      expect(result.workflowInstanceId).toBeTruthy();
+      expect(result.milestoneCount).toBe(4);
+    }
+
+    expect(admin._presets).toHaveLength(1);
+    expect(admin._workflowInstances).toHaveLength(1);
+    expect(admin._workflowMilestones).toHaveLength(4);
+  });
+
+  it("rejects job without service_case_id", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      jobs: [{ id: "job-1", customer_id: "cust-1", service_case_id: null, deleted_at: null }],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await assignInstallWithPermitWorkflowToJob({ jobId: "job-1" });
+
+    expect(result).toEqual({
+      success: false,
+      error: "job_id is not attached to a service_case_id.",
+    });
+    expect(admin._workflowInstances).toHaveLength(0);
+  });
+
+  it("rejects cross-account job scope", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-2" }],
+      jobs: [{ id: "job-1", customer_id: "cust-1", service_case_id: "case-1", deleted_at: null }],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await assignInstallWithPermitWorkflowToJob({ jobId: "job-1" });
+
+    expect(result).toEqual({
+      success: false,
+      error: "job_id not found in this account.",
+    });
+    expect(admin._workflowInstances).toHaveLength(0);
+  });
+
+  it("is idempotent on duplicate submit and does not duplicate workflow instances/milestones", async () => {
+    const admin = makeAdminFixture({
+      serviceCases: [{ id: "case-1", customer_id: "cust-1" }],
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      jobs: [{ id: "job-1", customer_id: "cust-1", service_case_id: "case-1", deleted_at: null }],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const first = await assignInstallWithPermitWorkflowToJob({ jobId: "job-1" });
+    const second = await assignInstallWithPermitWorkflowToJob({ jobId: "job-1" });
+
+    expect(first.success).toBe(true);
+    expect(second.success).toBe(true);
+
+    expect(admin._workflowInstances).toHaveLength(1);
+    expect(admin._workflowMilestones).toHaveLength(4);
+  });
+
+  it("does not write jobs/service_cases/job_events or billing/sms/qbo/portal tables", async () => {
+    const admin = makeAdminFixture({
+      serviceCases: [{ id: "case-1", customer_id: "cust-1" }],
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      jobs: [{ id: "job-1", customer_id: "cust-1", service_case_id: "case-1", deleted_at: null }],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await assignInstallWithPermitWorkflowToJob({ jobId: "job-1" });
     expect(result.success).toBe(true);
 
     const forbiddenTables = [

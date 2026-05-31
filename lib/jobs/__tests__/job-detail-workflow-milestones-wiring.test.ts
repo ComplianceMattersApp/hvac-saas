@@ -23,5 +23,12 @@ describe("job detail workflow milestone guidance wiring", () => {
     );
     expect(jobDetailSource).toContain("currentJobId={String(jobId)}");
     expect(jobDetailSource).toContain("serviceCaseId={String(serviceCaseId)}");
+    expect(jobDetailSource).toContain("canManageWorkflowGuidance={canManageWorkflowGuidance}");
+    expect(jobDetailSource).toContain('returnToPath={`/jobs/${job.id}?tab=${tab}#service-chain`}');
+  });
+
+  it("computes workflow guidance management visibility for owner/admin only", () => {
+    expect(jobDetailSource).toContain("const internalRole = String(internalUser.role ?? \"\").trim().toLowerCase();");
+    expect(jobDetailSource).toContain("const canManageWorkflowGuidance = internalRole === \"owner\" || internalRole === \"admin\";");
   });
 });

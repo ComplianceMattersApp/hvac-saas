@@ -1105,6 +1105,24 @@ export default async function JobDetailPage({
       ? "Could not add shared note."
       : "";
   const sharedNoteBannerType = banner === "note_add_failed" ? "error" : "success";
+  const workflowGuidanceBannerMessage =
+    banner === "workflow_guidance_added"
+      ? "Workflow guidance attached to this service case."
+      : banner === "workflow_guidance_already_attached"
+      ? "Workflow guidance is already attached to this service case."
+      : banner === "workflow_guidance_service_case_required"
+      ? "Workflow guidance requires a job attached to a service case."
+      : banner === "workflow_guidance_permission_required"
+      ? "Only owner/admin can attach workflow guidance."
+      : banner === "workflow_guidance_add_failed"
+      ? "Could not attach workflow guidance."
+      : "";
+  const workflowGuidanceBannerType =
+    banner === "workflow_guidance_add_failed"
+      ? "error"
+      : banner === "workflow_guidance_permission_required" || banner === "workflow_guidance_service_case_required"
+      ? "warning"
+      : "success";
 
   const timingEnabled = process.env.JOB_DETAIL_TIMING_DEBUG === "true";
   const renderStartMs = Date.now();
@@ -1220,6 +1238,8 @@ export default async function JobDetailPage({
   }
 
   const internalUser = actorResolution.internalUser;
+  const internalRole = String(internalUser.role ?? "").trim().toLowerCase();
+  const canManageWorkflowGuidance = internalRole === "owner" || internalRole === "admin";
   const contractors = await timedPhase("contractorsRead", () =>
     getContractors(internalUser.account_owner_user_id),
   );
@@ -6974,11 +6994,21 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                     Workflow Guidance
                   </div>
+                  {workflowGuidanceBannerMessage ? (
+                    <div className="mb-2">
+                      <FlashBanner
+                        type={workflowGuidanceBannerType as "success" | "warning" | "error"}
+                        message={workflowGuidanceBannerMessage}
+                      />
+                    </div>
+                  ) : null}
                   <Suspense fallback={<WorkflowMilestonesPanelBodyFallback />}>
                     <DeferredWorkflowMilestonesPanelBody
                       accountOwnerUserId={String(internalUser.account_owner_user_id)}
                       currentJobId={String(jobId)}
                       serviceCaseId={String(serviceCaseId)}
+                      canManageWorkflowGuidance={canManageWorkflowGuidance}
+                      returnToPath={`/jobs/${job.id}?tab=${tab}#service-chain`}
                       emptyStateClassName={workspaceEmptyStateClass}
                     />
                   </Suspense>
