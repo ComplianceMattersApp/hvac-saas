@@ -103,6 +103,7 @@ import {
 import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachmentsInternal";
 import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
 import DeferredServiceChainPanelBody from "./_components/DeferredServiceChainPanelBody";
+import DeferredWorkflowMilestonesPanelBody from "./_components/DeferredWorkflowMilestonesPanelBody";
 import DeferredAddAssigneeForm from "./_components/DeferredAddAssigneeForm";
 import ContactLoggingQuickActions from "./_components/ContactLoggingQuickActions";
 import DeferredTimelineBody from "./_components/DeferredTimelineBody";
@@ -342,6 +343,19 @@ function ServiceChainPanelBodyFallback() {
         <div
           key={index}
           className="h-24 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
+        />
+      ))}
+    </div>
+  );
+}
+
+function WorkflowMilestonesPanelBodyFallback() {
+  return (
+    <div className="space-y-2" aria-busy="true" aria-live="polite">
+      {Array.from({ length: 2 }).map((_, index) => (
+        <div
+          key={index}
+          className="h-20 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
         />
       ))}
     </div>
@@ -1500,8 +1514,13 @@ export default async function JobDetailPage({
           .eq("event_type", "internal_note"),
       ]);
 
-      if (sharedCountRes.error) throw new Error(sharedCountRes.error.message);
-      if (internalCountRes.error) throw new Error(internalCountRes.error.message);
+      if (sharedCountRes.error || internalCountRes.error) {
+        return {
+          sharedCount: 0,
+          internalCount: 0,
+          timelineNoteEventCount: 0,
+        };
+      }
 
       const sharedCount = Number(sharedCountRes.count ?? 0) || 0;
       const internalCount = Number(internalCountRes.count ?? 0) || 0;
@@ -6941,14 +6960,30 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 This job is not attached to a service case yet.
               </div>
             ) : (
-              <Suspense fallback={<ServiceChainPanelBodyFallback />}>
-                <DeferredServiceChainPanelBody
-                  accountOwnerUserId={String(internalUser.account_owner_user_id)}
-                  currentJobId={String(jobId)}
-                  serviceCaseId={String(serviceCaseId)}
-                  emptyStateClassName={workspaceEmptyStateClass}
-                />
-              </Suspense>
+              <div className="space-y-3">
+                <Suspense fallback={<ServiceChainPanelBodyFallback />}>
+                  <DeferredServiceChainPanelBody
+                    accountOwnerUserId={String(internalUser.account_owner_user_id)}
+                    currentJobId={String(jobId)}
+                    serviceCaseId={String(serviceCaseId)}
+                    emptyStateClassName={workspaceEmptyStateClass}
+                  />
+                </Suspense>
+
+                <div className="rounded-xl border border-slate-200/80 bg-white/96 p-3">
+                  <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Workflow Guidance
+                  </div>
+                  <Suspense fallback={<WorkflowMilestonesPanelBodyFallback />}>
+                    <DeferredWorkflowMilestonesPanelBody
+                      accountOwnerUserId={String(internalUser.account_owner_user_id)}
+                      currentJobId={String(jobId)}
+                      serviceCaseId={String(serviceCaseId)}
+                      emptyStateClassName={workspaceEmptyStateClass}
+                    />
+                  </Suspense>
+                </div>
+              </div>
             )}
           </div>
         </details>

@@ -1,6 +1,7 @@
 "use server";
 
 import { createAdminClient, createClient } from "@/lib/supabase/server";
+import { WORKFLOW_MILESTONE_STATUSES, type WorkflowMilestoneStatus } from "@/lib/workflows/read-model";
 import {
   isInternalAccessError,
   requireInternalUser,
@@ -28,6 +29,25 @@ type AssignWorkflowPresetToServiceCaseParams = {
   workflowPresetTemplateId: string;
   explicitJobIds?: string[] | null;
 };
+
+type UpdateWorkflowMilestoneStatusParams = {
+  workflowInstanceId: string;
+  milestoneId: string;
+  status: string;
+  statusReason?: string | null;
+};
+
+type WorkflowMilestoneStatusUpdateResult =
+  | {
+      success: true;
+      workflowInstanceId: string;
+      milestoneId: string;
+      status: WorkflowMilestoneStatus;
+    }
+  | {
+      success: false;
+      error: string;
+    };
 
 type NormalizedMilestoneDefinition = {
   milestoneKey: string | null;
@@ -132,6 +152,10 @@ function normalizeExplicitJobIds(value: unknown) {
   }
 
   return rows;
+}
+
+function isAllowedMilestoneStatus(value: string): value is WorkflowMilestoneStatus {
+  return (WORKFLOW_MILESTONE_STATUSES as readonly string[]).includes(value);
 }
 
 export async function assignWorkflowPresetToServiceCase(
@@ -405,4 +429,151 @@ export async function assignWorkflowPresetToServiceCase(
     milestoneCount: milestoneDefinitions.length,
     linkedJobCount: explicitJobIds.length,
   };
+}
+
+export async function updateWorkflowMilestoneStatus(
+  params: UpdateWorkflowMilestoneStatusParams,
+): Promise<WorkflowMilestoneStatusUpdateResult> {
+  const workflowInstanceId = cleanString(params.workflowInstanceId);
+  const milestoneId = cleanString(params.milestoneId);
+  const status = cleanString(params.status).toLowerCase();
+  const statusReason = cleanNullableString(params.statusReason);
+
+  if (!workflowInstanceId) {
+    return { success: false, error: "workflow_instance_id is required." };
+  }
+
+  if (!milestoneId) {
+    return { success: false, error: "milestone_id is required." };
+  }
+
+  if (!status) {
+    return { success: false, error: "status is required." };
+  }
+
+  if (!isAllowedMilestoneStatus(status)) {
+    return {
+      success: false,
+      error: "Invalid milestone status.",
+    };
+  }
+
+  const supabase = await createClient();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        return { success: false, error: "Authentication required." };
+      }
+      return { success: false, error: "Active internal user required." };
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const actingUserId = cleanString(authz.userId);
+
+  if (!accountOwnerUserId || !actingUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: workflowInstance, error: workflowInstanceError } = await admin
+    .from("workflow_instances")
+    .select("id, account_owner_user_id")
+    .eq("id", workflowInstanceId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (workflowInstanceError) {
+    return {
+      success: false,
+      error: workflowInstanceError.message ?? "Failed to load workflow instance.",
+    };
+  }
+
+  if (!workflowInstance?.id) {
+    return {
+      success: false,
+      error: "workflow_instance_id not found in this account.",
+    };
+  }
+
+  const { data: milestoneRow, error: milestoneReadError } = await admin
+    .from("workflow_instance_milestones")
+    .select("id, account_owner_user_id, workflow_instance_id")
+    .eq("id", milestoneId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (milestoneReadError) {
+    return {
+      success: false,
+      error: milestoneReadError.message ?? "Failed to load workflow milestone.",
+    };
+  }
+
+  if (!milestoneRow?.id) {
+    return {
+      success: false,
+      error: "milestone_id not found in this account.",
+    };
+  }
+
+  const milestoneWorkflowInstanceId = cleanString(milestoneRow.workflow_instance_id);
+  if (milestoneWorkflowInstanceId !== workflowInstanceId) {
+    return {
+      success: false,
+      error: "milestone_id does not belong to workflow_instance_id.",
+    };
+  }
+
+  const { data: updatedMilestone, error: milestoneUpdateError } = await admin
+    .from("workflow_instance_milestones")
+    .update({
+      milestone_status: status,
+      status_reason: statusReason,
+      updated_by_user_id: actingUserId,
+    })
+    .eq("id", milestoneId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("workflow_instance_id", workflowInstanceId)
+    .select("id, milestone_status")
+    .maybeSingle();
+
+  if (milestoneUpdateError || !updatedMilestone?.id) {
+    return {
+      success: false,
+      error: milestoneUpdateError?.message ?? "Failed to update workflow milestone status.",
+    };
+  }
+
+  return {
+    success: true,
+    workflowInstanceId,
+    milestoneId: cleanString(updatedMilestone.id),
+    status,
+  };
+}
+
+export async function updateWorkflowMilestoneStatusFromForm(formData: FormData) {
+  const workflowInstanceId = cleanString(formData.get("workflow_instance_id"));
+  const milestoneId = cleanString(formData.get("milestone_id"));
+  const status = cleanString(formData.get("status"));
+  const statusReason = cleanNullableString(formData.get("status_reason"));
+
+  const result = await updateWorkflowMilestoneStatus({
+    workflowInstanceId,
+    milestoneId,
+    status,
+    statusReason,
+  });
+
+  if (!result.success) {
+    throw new Error(result.error);
+  }
 }

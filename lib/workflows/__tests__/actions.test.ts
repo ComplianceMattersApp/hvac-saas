@@ -48,6 +48,9 @@ type MockWorkflowMilestone = {
   id: string;
   account_owner_user_id: string;
   workflow_instance_id: string;
+  milestone_status?: string;
+  status_reason?: string | null;
+  updated_by_user_id?: string | null;
 };
 
 type MockWorkflowJobLink = {
@@ -95,6 +98,7 @@ function makeAdminFixture(input?: {
   const tableCalls: string[] = [];
   const workflowInstanceInsertCalls: Array<Record<string, unknown>> = [];
   const workflowMilestoneInsertCalls: Array<Array<Record<string, unknown>>> = [];
+  const workflowMilestoneUpdateCalls: Array<Record<string, unknown>> = [];
   const workflowJobLinkInsertCalls: Array<Array<Record<string, unknown>>> = [];
 
   const admin = {
@@ -175,6 +179,7 @@ function makeAdminFixture(input?: {
 
       if (table === "workflow_instances") {
         const select = vi.fn(() => {
+          let id = "";
           let ownerId = "";
           let serviceCaseId = "";
           let templateId = "";
@@ -183,6 +188,9 @@ function makeAdminFixture(input?: {
 
           const query: any = {
             eq: (column: unknown, value: unknown) => {
+              if (column === "id") {
+                id = String(value ?? "").trim();
+              }
               if (column === "account_owner_user_id") {
                 ownerId = String(value ?? "").trim();
               }
@@ -205,8 +213,24 @@ function makeAdminFixture(input?: {
               limit = Number(value ?? 100);
               return query;
             },
+            maybeSingle: async () => {
+              const row = workflowInstances.find((entry) => {
+                if (id && entry.id !== id) return false;
+                if (ownerId && entry.account_owner_user_id !== ownerId) return false;
+                if (serviceCaseId && entry.service_case_id !== serviceCaseId) return false;
+                if (templateId && entry.workflow_preset_template_id !== templateId) return false;
+                if (statuses.length > 0 && !statuses.includes(entry.workflow_status)) return false;
+                return true;
+              });
+
+              return {
+                data: row ?? null,
+                error: null,
+              };
+            },
             then: (resolve: (value: { data: Array<{ id: string }>; error: null }) => unknown, reject?: (reason: unknown) => unknown) => {
               const rows = workflowInstances
+                .filter((row) => (id ? row.id === id : true))
                 .filter((row) => (ownerId ? row.account_owner_user_id === ownerId : true))
                 .filter((row) => (serviceCaseId ? row.service_case_id === serviceCaseId : true))
                 .filter((row) => (templateId ? row.workflow_preset_template_id === templateId : true))
@@ -248,6 +272,7 @@ function makeAdminFixture(input?: {
 
       if (table === "workflow_instance_milestones") {
         const select = vi.fn((_columns: string, options?: { count?: string; head?: boolean }) => {
+          let milestoneId = "";
           let ownerId = "";
           let workflowInstanceId = "";
 
@@ -255,6 +280,8 @@ function makeAdminFixture(input?: {
             () => {
               const scoped = workflowMilestones.filter(
                 (row) =>
+                  (!milestoneId || row.id === milestoneId)
+                  &&
                   (!ownerId || row.account_owner_user_id === ownerId)
                   && (!workflowInstanceId || row.workflow_instance_id === workflowInstanceId),
               );
@@ -267,6 +294,9 @@ function makeAdminFixture(input?: {
             },
             {
               eq: (column: unknown, value: unknown) => {
+                if (column === "id") {
+                  milestoneId = String(value ?? "").trim();
+                }
                 if (column === "account_owner_user_id") {
                   ownerId = String(value ?? "").trim();
                 }
@@ -274,6 +304,19 @@ function makeAdminFixture(input?: {
                   workflowInstanceId = String(value ?? "").trim();
                 }
                 return query;
+              },
+              maybeSingle: async () => {
+                const row = workflowMilestones.find(
+                  (entry) =>
+                    (!milestoneId || entry.id === milestoneId)
+                    && (!ownerId || entry.account_owner_user_id === ownerId)
+                    && (!workflowInstanceId || entry.workflow_instance_id === workflowInstanceId),
+                );
+
+                return {
+                  data: row ?? null,
+                  error: null,
+                };
               },
             },
           );
@@ -288,15 +331,65 @@ function makeAdminFixture(input?: {
               id: `ms-${workflowMilestones.length + 1}`,
               account_owner_user_id: String(row.account_owner_user_id ?? "").trim(),
               workflow_instance_id: String(row.workflow_instance_id ?? "").trim(),
+              milestone_status: String(row.milestone_status ?? "planned").trim() || "planned",
+              status_reason: (row.status_reason as string | null | undefined) ?? null,
+              updated_by_user_id: String(row.updated_by_user_id ?? "").trim() || null,
             });
           }
 
           return Promise.resolve({ error: null });
         });
 
+        const update = vi.fn((payload: Record<string, unknown>) => {
+          workflowMilestoneUpdateCalls.push(payload);
+
+          let milestoneId = "";
+          let ownerId = "";
+          let workflowInstanceId = "";
+
+          const query: any = {
+            eq: (column: unknown, value: unknown) => {
+              if (column === "id") milestoneId = String(value ?? "").trim();
+              if (column === "account_owner_user_id") ownerId = String(value ?? "").trim();
+              if (column === "workflow_instance_id") {
+                workflowInstanceId = String(value ?? "").trim();
+              }
+              return query;
+            },
+            select: () => query,
+            maybeSingle: async () => {
+              const row = workflowMilestones.find(
+                (entry) =>
+                  (!milestoneId || entry.id === milestoneId)
+                  && (!ownerId || entry.account_owner_user_id === ownerId)
+                  && (!workflowInstanceId || entry.workflow_instance_id === workflowInstanceId),
+              );
+
+              if (!row) {
+                return { data: null, error: null };
+              }
+
+              row.milestone_status = String(payload.milestone_status ?? row.milestone_status ?? "planned").trim() || "planned";
+              row.status_reason = (payload.status_reason as string | null | undefined) ?? null;
+              row.updated_by_user_id = String(payload.updated_by_user_id ?? row.updated_by_user_id ?? "").trim() || null;
+
+              return {
+                data: {
+                  id: row.id,
+                  milestone_status: row.milestone_status,
+                },
+                error: null,
+              };
+            },
+          };
+
+          return query;
+        });
+
         return {
           select,
           insert,
+          update,
         };
       }
 
@@ -395,15 +488,17 @@ function makeAdminFixture(input?: {
     _tableCalls: tableCalls,
     _workflowInstanceInsertCalls: workflowInstanceInsertCalls,
     _workflowMilestoneInsertCalls: workflowMilestoneInsertCalls,
+    _workflowMilestoneUpdateCalls: workflowMilestoneUpdateCalls,
     _workflowJobLinkInsertCalls: workflowJobLinkInsertCalls,
     _workflowInstances: workflowInstances,
+    _workflowMilestones: workflowMilestones,
     _presets: presets,
   };
 
   return admin;
 }
 
-const { assignWorkflowPresetToServiceCase } = await import("@/lib/workflows/actions");
+const { assignWorkflowPresetToServiceCase, updateWorkflowMilestoneStatus } = await import("@/lib/workflows/actions");
 
 describe("assignWorkflowPresetToServiceCase", () => {
   beforeEach(() => {
@@ -789,6 +884,227 @@ describe("assignWorkflowPresetToServiceCase", () => {
     expect(result.success).toBe(true);
 
     const forbiddenTables = [
+      "job_events",
+      "internal_invoices",
+      "internal_invoice_payments",
+      "internal_invoice_payment_allocations",
+      "customer_saved_payment_methods",
+      "stripe_webhook_events",
+      "outbound_sms_messages",
+      "qbo_sync_events",
+      "portal_notifications",
+    ];
+
+    for (const table of forbiddenTables) {
+      expect(admin._tableCalls).not.toContain(table);
+    }
+  });
+});
+
+describe("updateWorkflowMilestoneStatus", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        role: "admin",
+        is_active: true,
+      },
+    });
+  });
+
+  it("updates milestone status when workflow and milestone are in account scope", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-1",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_status: "ready",
+        },
+      ],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await updateWorkflowMilestoneStatus({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-1",
+      status: "completed",
+      statusReason: "Operator confirmed completion",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-1",
+      status: "completed",
+    });
+
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(1);
+    expect(admin._workflowMilestones[0]).toMatchObject({
+      id: "ms-1",
+      milestone_status: "completed",
+      status_reason: "Operator confirmed completion",
+      updated_by_user_id: "user-1",
+    });
+  });
+
+  it("rejects invalid status values", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-1",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_status: "ready",
+        },
+      ],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await updateWorkflowMilestoneStatus({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-1",
+      status: "not_a_real_status",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Invalid milestone status.",
+    });
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("rejects workflow instance outside account scope", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-2",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-1",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_status: "ready",
+        },
+      ],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await updateWorkflowMilestoneStatus({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-1",
+      status: "completed",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "workflow_instance_id not found in this account.",
+    });
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("rejects milestone/workflow mismatch", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-1",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-2",
+          milestone_status: "ready",
+        },
+      ],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await updateWorkflowMilestoneStatus({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-1",
+      status: "completed",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "milestone_id does not belong to workflow_instance_id.",
+    });
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("does not mutate job/service_case/job_events or billing/sms/qbo/portal tables", async () => {
+    const admin = makeAdminFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-1",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_status: "ready",
+        },
+      ],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await updateWorkflowMilestoneStatus({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-1",
+      status: "completed",
+    });
+
+    expect(result.success).toBe(true);
+
+    const forbiddenTables = [
+      "jobs",
+      "service_cases",
       "job_events",
       "internal_invoices",
       "internal_invoice_payments",
