@@ -59,13 +59,19 @@ type MockWorkflowJobLink = {
   id: string;
   account_owner_user_id: string;
   workflow_instance_id: string;
+  workflow_instance_milestone_id?: string | null;
+  job_id?: string | null;
+  link_role?: string | null;
+  is_primary?: boolean;
 };
 
 type MockJob = {
   id: string;
   customer_id: string;
   service_case_id: string | null;
+  job_type?: string | null;
   deleted_at?: string | null;
+  job_display_number?: string | null;
 };
 
 function makeThenable<T>(
@@ -458,13 +464,17 @@ function makeAdminFixture(input?: {
         const select = vi.fn((_columns: string, options?: { count?: string; head?: boolean }) => {
           let ownerId = "";
           let workflowInstanceId = "";
+          let milestoneId = "";
+          let jobId = "";
 
           const query = makeThenable(
             () => {
               const scoped = workflowJobLinks.filter(
                 (row) =>
                   (!ownerId || row.account_owner_user_id === ownerId)
-                  && (!workflowInstanceId || row.workflow_instance_id === workflowInstanceId),
+                  && (!workflowInstanceId || row.workflow_instance_id === workflowInstanceId)
+                  && (!milestoneId || row.workflow_instance_milestone_id === milestoneId)
+                  && (!jobId || row.job_id === jobId),
               );
 
               if (options?.head) {
@@ -481,7 +491,27 @@ function makeAdminFixture(input?: {
                 if (column === "workflow_instance_id") {
                   workflowInstanceId = String(value ?? "").trim();
                 }
+                if (column === "workflow_instance_milestone_id") {
+                  milestoneId = String(value ?? "").trim();
+                }
+                if (column === "job_id") {
+                  jobId = String(value ?? "").trim();
+                }
                 return query;
+              },
+              maybeSingle: async () => {
+                const row = workflowJobLinks.find(
+                  (entry) =>
+                    (!ownerId || entry.account_owner_user_id === ownerId)
+                    && (!workflowInstanceId || entry.workflow_instance_id === workflowInstanceId)
+                    && (!milestoneId || entry.workflow_instance_milestone_id === milestoneId)
+                    && (!jobId || entry.job_id === jobId),
+                );
+
+                return {
+                  data: row ?? null,
+                  error: null,
+                };
               },
             },
           );
@@ -489,17 +519,36 @@ function makeAdminFixture(input?: {
           return query;
         });
 
-        const insert = vi.fn((payload: Array<Record<string, unknown>>) => {
-          workflowJobLinkInsertCalls.push(payload);
-          for (const row of payload) {
+        const insert = vi.fn((payload: Array<Record<string, unknown>> | Record<string, unknown>) => {
+          const rows = Array.isArray(payload) ? payload : [payload];
+          workflowJobLinkInsertCalls.push(rows);
+
+          const insertedIds: string[] = [];
+          for (const row of rows) {
+            const insertedId = `lnk-${workflowJobLinks.length + 1}`;
+            insertedIds.push(insertedId);
             workflowJobLinks.push({
-              id: `lnk-${workflowJobLinks.length + 1}`,
+              id: insertedId,
               account_owner_user_id: String(row.account_owner_user_id ?? "").trim(),
               workflow_instance_id: String(row.workflow_instance_id ?? "").trim(),
+              workflow_instance_milestone_id:
+                String(row.workflow_instance_milestone_id ?? "").trim() || null,
+              job_id: String(row.job_id ?? "").trim() || null,
+              link_role: String(row.link_role ?? "supporting").trim() || "supporting",
+              is_primary: Boolean(row.is_primary),
             });
           }
 
-          return Promise.resolve({ error: null });
+          return {
+            select: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { id: insertedIds[0] ?? "" },
+                error: null,
+              })),
+            })),
+            then: (resolve: (value: { error: null }) => unknown, reject?: (reason: unknown) => unknown) =>
+              Promise.resolve({ error: null }).then(resolve, reject),
+          };
         });
 
         return {
@@ -510,36 +559,35 @@ function makeAdminFixture(input?: {
 
       if (table === "jobs") {
         let jobId = "";
-        let includeDeleted = false;
+        let includeDeleted = true;
+        const query: any = {
+          eq: (column: string, value: unknown) => {
+            if (column === "id") {
+              jobId = String(value ?? "").trim();
+            }
+
+            return query;
+          },
+          is: (isColumn: string, isValue: unknown) => {
+            if (isColumn === "deleted_at" && isValue === null) {
+              includeDeleted = false;
+            }
+
+            return query;
+          },
+          maybeSingle: async () => {
+            const row = jobs.find((candidate) => {
+              if (candidate.id !== jobId) return false;
+              if (!includeDeleted && candidate.deleted_at != null) return false;
+              return true;
+            });
+
+            return { data: row ?? null, error: null };
+          },
+        };
 
         return {
-          select: vi.fn(() => ({
-            eq: vi.fn((column: string, value: unknown) => {
-              if (column === "id") {
-                jobId = String(value ?? "").trim();
-              }
-
-              return {
-                is: vi.fn((isColumn: string, isValue: unknown) => {
-                  if (isColumn === "deleted_at" && isValue === null) {
-                    includeDeleted = false;
-                  }
-
-                  return {
-                    maybeSingle: vi.fn(async () => {
-                      const row = jobs.find((candidate) => {
-                        if (candidate.id !== jobId) return false;
-                        if (!includeDeleted && candidate.deleted_at != null) return false;
-                        return true;
-                      });
-
-                      return { data: row ?? null, error: null };
-                    }),
-                  };
-                }),
-              };
-            }),
-          })),
+          select: vi.fn(() => query),
         };
       }
 
@@ -563,6 +611,7 @@ const {
   assignInstallWithPermitWorkflowToJob,
   assignWorkflowPresetToServiceCase,
   ensureInstallWithPermitWorkflowPreset,
+  linkInternalEccJobToWorkflowMilestone,
   recordExternalEccCompletionForWorkflowMilestone,
   updateWorkflowMilestoneStatus,
 } = await import("@/lib/workflows/actions");
@@ -1416,6 +1465,440 @@ describe("recordExternalEccCompletionForWorkflowMilestone", () => {
     for (const table of forbiddenTables) {
       expect(admin._tableCalls).not.toContain(table);
     }
+  });
+});
+
+describe("linkInternalEccJobToWorkflowMilestone", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        role: "admin",
+        is_active: true,
+      },
+    });
+  });
+
+  it("links valid same-account same-service-case ECC job to ECC milestone", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "in_progress",
+        },
+      ],
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "ecc",
+          deleted_at: null,
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await linkInternalEccJobToWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      jobId: "job-ecc-1",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      jobId: "job-ecc-1",
+      workflowInstanceJobLinkId: "lnk-1",
+      created: true,
+    });
+
+    expect(admin._workflowJobLinkInsertCalls).toHaveLength(1);
+    expect(admin._workflowJobLinkInsertCalls[0][0]).toMatchObject({
+      workflow_instance_id: "wf-1",
+      workflow_instance_milestone_id: "ms-ecc",
+      job_id: "job-ecc-1",
+      link_role: "supporting",
+      is_primary: false,
+    });
+  });
+
+  it("rejects non-ECC milestone", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-install",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "install_work",
+          milestone_title: "Install work",
+          milestone_status: "ready",
+        },
+      ],
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "ecc",
+          deleted_at: null,
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await linkInternalEccJobToWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-install",
+      jobId: "job-ecc-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "milestone_id is not ECC handoff/completion milestone.",
+    });
+    expect(admin._workflowJobLinkInsertCalls).toHaveLength(0);
+  });
+
+  it("rejects cross-account job", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-2" }],
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+        },
+      ],
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "ecc",
+          deleted_at: null,
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await linkInternalEccJobToWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      jobId: "job-ecc-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "job_id not found in this account.",
+    });
+    expect(admin._workflowJobLinkInsertCalls).toHaveLength(0);
+  });
+
+  it("rejects job from different service_case_id", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+        },
+      ],
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-2",
+          job_type: "ecc",
+          deleted_at: null,
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await linkInternalEccJobToWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      jobId: "job-ecc-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "job_id must belong to the same service_case_id as workflow_instance_id.",
+    });
+    expect(admin._workflowJobLinkInsertCalls).toHaveLength(0);
+  });
+
+  it("rejects deleted job", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+        },
+      ],
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "ecc",
+          deleted_at: "2026-05-30T00:00:00.000Z",
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await linkInternalEccJobToWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      jobId: "job-ecc-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "job_id is deleted and cannot be linked.",
+    });
+    expect(admin._workflowJobLinkInsertCalls).toHaveLength(0);
+  });
+
+  it("rejects non-ECC job type", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+        },
+      ],
+      jobs: [
+        {
+          id: "job-service-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "service",
+          deleted_at: null,
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await linkInternalEccJobToWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      jobId: "job-service-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "job_id must be an ECC job.",
+    });
+    expect(admin._workflowJobLinkInsertCalls).toHaveLength(0);
+  });
+
+  it("treats duplicate link as idempotent", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+        },
+      ],
+      workflowJobLinks: [
+        {
+          id: "lnk-existing",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          job_id: "job-ecc-1",
+          link_role: "supporting",
+          is_primary: false,
+        },
+      ],
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "ecc",
+          deleted_at: null,
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await linkInternalEccJobToWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      jobId: "job-ecc-1",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      jobId: "job-ecc-1",
+      workflowInstanceJobLinkId: "lnk-existing",
+      created: false,
+    });
+    expect(admin._workflowJobLinkInsertCalls).toHaveLength(0);
+  });
+
+  it("does not mutate jobs/service_cases/job_events or billing/sms/qbo/portal tables", async () => {
+    const admin = makeAdminFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-1" }],
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+        },
+      ],
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "ecc",
+          deleted_at: null,
+        },
+      ],
+    });
+    createAdminClientMock.mockReturnValue(admin);
+
+    const result = await linkInternalEccJobToWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      jobId: "job-ecc-1",
+    });
+
+    expect(result.success).toBe(true);
+
+    const forbiddenTables = [
+      "service_cases",
+      "job_events",
+      "internal_invoices",
+      "internal_invoice_payments",
+      "internal_invoice_payment_allocations",
+      "customer_saved_payment_methods",
+      "stripe_webhook_events",
+      "outbound_sms_messages",
+      "qbo_sync_events",
+      "portal_notifications",
+    ];
+
+    for (const table of forbiddenTables) {
+      expect(admin._tableCalls).not.toContain(table);
+    }
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(0);
   });
 });
 

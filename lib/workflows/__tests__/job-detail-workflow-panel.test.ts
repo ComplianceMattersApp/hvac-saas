@@ -4,6 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 const createClientMock = vi.fn();
 const loadScopedInternalJobDetailReadBoundaryMock = vi.fn();
 const listActiveWorkflowInstancesByServiceCaseMock = vi.fn();
+const listLinkedJobsForWorkflowMock = vi.fn();
 const listWorkflowInstanceMilestonesMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -29,6 +30,8 @@ vi.mock("@/lib/workflows/read-model", () => ({
   ],
   listActiveWorkflowInstancesByServiceCase: (...args: unknown[]) =>
     listActiveWorkflowInstancesByServiceCaseMock(...args),
+  listLinkedJobsForWorkflow: (...args: unknown[]) =>
+    listLinkedJobsForWorkflowMock(...args),
   listWorkflowInstanceMilestones: (...args: unknown[]) =>
     listWorkflowInstanceMilestonesMock(...args),
 }));
@@ -36,6 +39,7 @@ vi.mock("@/lib/workflows/read-model", () => ({
 vi.mock("@/lib/workflows/actions", () => ({
   updateWorkflowMilestoneStatusFromForm: vi.fn(async () => undefined),
   assignInstallWithPermitWorkflowForJobFromForm: vi.fn(async () => undefined),
+  linkInternalEccJobToWorkflowMilestoneFromForm: vi.fn(async () => undefined),
   recordExternalEccCompletionForWorkflowMilestoneFromForm: vi.fn(async () => undefined),
 }));
 
@@ -46,8 +50,27 @@ const DeferredWorkflowMilestonesPanelBody = (
 describe("DeferredWorkflowMilestonesPanelBody", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    createClientMock.mockResolvedValue({ from: vi.fn() });
+    createClientMock.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table !== "jobs") {
+          throw new Error(`Unexpected table ${table}`);
+        }
+
+        const query: any = {
+          select: () => query,
+          eq: () => query,
+          is: () => query,
+          order: () => query,
+          limit: () => query,
+          then: (resolve: (value: { data: Array<Record<string, unknown>>; error: null }) => unknown, reject?: (reason: unknown) => unknown) =>
+            Promise.resolve({ data: [], error: null }).then(resolve, reject),
+        };
+
+        return query;
+      }),
+    });
     loadScopedInternalJobDetailReadBoundaryMock.mockResolvedValue({ id: "job-1" });
+    listLinkedJobsForWorkflowMock.mockResolvedValue([]);
   });
 
   it("reads active workflow milestones for the job service_case_id and renders compact progress", async () => {
@@ -123,6 +146,13 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
       }),
     );
 
+    expect(listLinkedJobsForWorkflowMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: "owner-1",
+        workflowInstanceId: "wf-1",
+      }),
+    );
+
     expect(html).toContain("Install Workflow");
     expect(html).toContain("1 of 2 complete");
     expect(html).toContain("Permit");
@@ -177,6 +207,198 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).toContain("name=\"completion_note\"");
     expect(html).toContain("required");
     expect(html).toContain("name=\"evidence_reference\"");
+  });
+
+  it("shows Link internal ECC job when eligible ECC jobs exist for the service case", async () => {
+    createClientMock.mockResolvedValue({
+      from: vi.fn((table: string) => {
+        if (table !== "jobs") throw new Error(`Unexpected table ${table}`);
+
+        const query: any = {
+          select: () => query,
+          eq: () => query,
+          is: () => query,
+          order: () => query,
+          limit: () => query,
+          then: (resolve: (value: { data: Array<Record<string, unknown>>; error: null }) => unknown, reject?: (reason: unknown) => unknown) =>
+            Promise.resolve({
+              data: [
+                {
+                  id: "job-ecc-1",
+                  job_display_number: "2042",
+                  title: "ECC Alteration Test",
+                  ops_status: "need_to_schedule",
+                },
+              ],
+              error: null,
+            }).then(resolve, reject),
+        };
+
+        return query;
+      }),
+    });
+
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 1,
+        milestone_status: "ready",
+        status_reason: null,
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Link internal ECC job");
+    expect(html).toContain("Select ECC job");
+    expect(html).toContain("Job #2042");
+  });
+
+  it("renders linked ECC job reference after link exists", async () => {
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 1,
+        milestone_status: "ready",
+        status_reason: null,
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listLinkedJobsForWorkflowMock.mockResolvedValue([
+      {
+        id: "lnk-1",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        workflow_instance_milestone_id: "ms-ecc",
+        job_id: "job-ecc-1",
+        link_role: "supporting",
+        is_primary: false,
+        notes: null,
+        created_at: "",
+        job: {
+          id: "job-ecc-1",
+          job_display_number: "2042",
+          service_case_id: "case-1",
+          title: "ECC Alteration Test",
+          status: "open",
+          ops_status: "need_to_schedule",
+          scheduled_date: null,
+          created_at: "",
+        },
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Linked ECC job:");
+    expect(html).toContain("Job #2042");
+    expect(html).toContain("ECC Alteration Test");
+    expect(html).not.toContain("No internal ECC job found in this service case yet.");
+  });
+
+  it("renders no-eligible-ECC-job helper when none exist", async () => {
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 1,
+        milestone_status: "ready",
+        status_reason: null,
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("No internal ECC job found in this service case yet. Create the ECC job through the normal job flow, then link it here.");
   });
 
   it("does not show ECC external completion action for non-ECC milestones", async () => {

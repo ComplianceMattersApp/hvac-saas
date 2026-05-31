@@ -1,13 +1,17 @@
+import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
 import { loadScopedInternalJobDetailReadBoundary } from "@/lib/actions/internal-job-detail-read-boundary";
 import {
   WORKFLOW_MILESTONE_STATUSES,
   listActiveWorkflowInstancesByServiceCase,
+  listLinkedJobsForWorkflow,
   listWorkflowInstanceMilestones,
   type WorkflowMilestoneStatus,
 } from "@/lib/workflows/read-model";
 import {
   assignInstallWithPermitWorkflowForJobFromForm,
+  linkInternalEccJobToWorkflowMilestoneFromForm,
   recordExternalEccCompletionForWorkflowMilestoneFromForm,
   updateWorkflowMilestoneStatusFromForm,
 } from "@/lib/workflows/actions";
@@ -47,6 +51,11 @@ const statusBadgeClassMap: Record<WorkflowMilestoneStatus, string> = {
 
 function cleanString(value: unknown) {
   return String(value ?? "").trim();
+}
+
+function cleanNullableString(value: unknown) {
+  const normalized = cleanString(value);
+  return normalized ? normalized : null;
 }
 
 function toWorkflowMilestoneStatus(value: unknown): WorkflowMilestoneStatus {
@@ -149,6 +158,13 @@ export default async function DeferredWorkflowMilestonesPanelBody({
   let workflows: Array<{
     instance: (typeof instances)[number];
     milestones: Awaited<ReturnType<typeof listWorkflowInstanceMilestones>>;
+    linkedJobs: Awaited<ReturnType<typeof listLinkedJobsForWorkflow>>;
+  }> = [];
+  let eligibleEccJobs: Array<{
+    id: string;
+    job_display_number: string | null;
+    title: string | null;
+    ops_status: string | null;
   }> = [];
   try {
     workflows = await Promise.all(
@@ -159,12 +175,39 @@ export default async function DeferredWorkflowMilestonesPanelBody({
           workflowInstanceId: instance.id,
         });
 
+        const linkedJobs = await listLinkedJobsForWorkflow({
+          supabase,
+          accountOwnerUserId,
+          workflowInstanceId: instance.id,
+        });
+
         return {
           instance,
           milestones,
+          linkedJobs,
         };
       }),
     );
+
+    const { data: eligibleEccJobRows, error: eligibleEccJobRowsError } = await supabase
+      .from("jobs")
+      .select("id, job_display_number, title, ops_status")
+      .eq("service_case_id", serviceCaseId)
+      .eq("job_type", "ecc")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false })
+      .limit(25);
+
+    if (eligibleEccJobRowsError) {
+      throw eligibleEccJobRowsError;
+    }
+
+    eligibleEccJobs = (Array.isArray(eligibleEccJobRows) ? eligibleEccJobRows : []).map((row: any) => ({
+      id: cleanString(row?.id),
+      job_display_number: cleanNullableString(row?.job_display_number),
+      title: cleanNullableString(row?.title),
+      ops_status: cleanNullableString(row?.ops_status),
+    })).filter((row) => row.id);
   } catch (error) {
     if (isWorkflowSchemaMissingError(error)) {
       return <div className={emptyStateClassName}>Workflow guidance is not available yet for this environment.</div>;
@@ -174,7 +217,7 @@ export default async function DeferredWorkflowMilestonesPanelBody({
 
   return (
     <div className="space-y-2">
-      {workflows.map(({ instance, milestones }) => {
+      {workflows.map(({ instance, milestones, linkedJobs }) => {
         const totalMilestones = milestones.length;
         const completedMilestones = milestones.filter(
           (row) => toWorkflowMilestoneStatus(row.milestone_status) === "completed",
@@ -210,6 +253,11 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                   const isEccMilestone = isEccHandoffCompletionMilestone(milestone);
                   const canRecordExternalEccCompletion = isEccMilestone && normalizedStatus !== "completed";
                   const statusReason = cleanString(milestone.status_reason);
+                  const milestoneLinkedJobs = linkedJobs.filter(
+                    (row) => cleanString(row.workflow_instance_milestone_id) === cleanString(milestone.id),
+                  );
+                  const linkedEccJob = milestoneLinkedJobs[0] ?? null;
+                  const canLinkInternalEccJob = isEccMilestone && !linkedEccJob;
 
                   return (
                     <div
@@ -298,6 +346,63 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                             </div>
                           </form>
                         </details>
+                      ) : null}
+
+                      {linkedEccJob ? (
+                        <div className="mt-2 rounded-md border border-sky-200 bg-sky-50/70 px-2.5 py-2 text-[11px] text-sky-900">
+                          <span className="font-semibold">Linked ECC job:</span>{" "}
+                          <Link
+                            href={`/jobs/${linkedEccJob.job.id}?tab=tests`}
+                            className="font-semibold underline decoration-sky-300 underline-offset-4"
+                          >
+                            {linkedEccJob.job.job_display_number ? `Job #${linkedEccJob.job.job_display_number}` : cleanString(linkedEccJob.job.title) || "Open job"}
+                          </Link>
+                          {cleanString(linkedEccJob.job.title) ? (
+                            <span className="text-sky-800"> {cleanString(linkedEccJob.job.title)}</span>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {canLinkInternalEccJob ? (
+                        eligibleEccJobs.length > 0 ? (
+                          <form action={linkInternalEccJobToWorkflowMilestoneFromForm} className="mt-2 flex flex-col gap-1.5 rounded-md border border-slate-200 bg-white/80 p-2 sm:flex-row sm:items-end">
+                            <input type="hidden" name="workflow_instance_id" value={instance.id} />
+                            <input type="hidden" name="milestone_id" value={milestone.id} />
+                            <div className="min-w-0 flex-1">
+                              <label className="mb-0.5 block text-[11px] font-semibold text-slate-700" htmlFor={`internal-ecc-job-${milestone.id}`}>
+                                Link internal ECC job
+                              </label>
+                              <select
+                                id={`internal-ecc-job-${milestone.id}`}
+                                name="job_id"
+                                required
+                                defaultValue=""
+                                className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-800"
+                                aria-label={`Link internal ECC job for ${cleanString(milestone.milestone_title) || "milestone"}`}
+                              >
+                                <option value="" disabled>
+                                  Select ECC job
+                                </option>
+                                {eligibleEccJobs.map((job) => (
+                                  <option key={job.id} value={job.id}>
+                                    {(job.job_display_number ? `Job #${job.job_display_number}` : job.id.slice(0, 8))}
+                                    {job.title ? ` • ${job.title}` : ""}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                            <button
+                              type="submit"
+                              className="h-8 rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
+                            >
+                              Link internal ECC job
+                            </button>
+                          </form>
+                        ) : (
+                          <div className="mt-2 rounded-md border border-dashed border-slate-300 bg-slate-50/80 px-2.5 py-2 text-[11px] text-slate-600">
+                            No internal ECC job found in this service case yet. Create the ECC job through the normal job flow, then link it here.
+                          </div>
+                        )
                       ) : null}
                     </div>
                   );

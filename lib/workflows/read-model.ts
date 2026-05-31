@@ -52,6 +52,7 @@ export type WorkflowLinkedJobRow = {
   created_at: string;
   job: {
     id: string;
+    job_display_number: string | null;
     service_case_id: string | null;
     title: string | null;
     status: string | null;
@@ -132,7 +133,7 @@ const WORKFLOW_LINKED_JOB_SELECT = [
   "is_primary",
   "notes",
   "created_at",
-  "jobs(id, service_case_id, title, status, ops_status, scheduled_date, created_at)",
+  "jobs(id, job_display_number, service_case_id, title, status, ops_status, scheduled_date, created_at)",
 ].join(", ");
 
 function cleanString(value: unknown) {
@@ -218,6 +219,7 @@ function parseWorkflowLinkedJobRow(raw: any): WorkflowLinkedJobRow {
     created_at: cleanString(raw?.created_at),
     job: {
       id: cleanString(jobRaw?.id),
+      job_display_number: cleanNullableString(jobRaw?.job_display_number),
       service_case_id: cleanNullableString(jobRaw?.service_case_id),
       title: cleanNullableString(jobRaw?.title),
       status: cleanNullableString(jobRaw?.status),

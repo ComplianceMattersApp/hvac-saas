@@ -46,6 +46,12 @@ type RecordExternalEccCompletionForWorkflowMilestoneParams = {
   evidenceReference?: string | null;
 };
 
+type LinkInternalEccJobToWorkflowMilestoneParams = {
+  workflowInstanceId: string;
+  milestoneId: string;
+  jobId: string;
+};
+
 type WorkflowMilestoneStatusUpdateResult =
   | {
       success: true;
@@ -65,6 +71,20 @@ type ExternalEccWorkflowMilestoneUpdateResult =
       milestoneId: string;
       status: "completed";
       statusReason: string;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+type LinkInternalEccJobToWorkflowMilestoneResult =
+  | {
+      success: true;
+      workflowInstanceId: string;
+      milestoneId: string;
+      jobId: string;
+      workflowInstanceJobLinkId: string;
+      created: boolean;
     }
   | {
       success: false;
@@ -1007,6 +1027,255 @@ export async function recordExternalEccCompletionForWorkflowMilestone(
   };
 }
 
+export async function linkInternalEccJobToWorkflowMilestone(
+  params: LinkInternalEccJobToWorkflowMilestoneParams,
+): Promise<LinkInternalEccJobToWorkflowMilestoneResult> {
+  const workflowInstanceId = cleanString(params.workflowInstanceId);
+  const milestoneId = cleanString(params.milestoneId);
+  const jobId = cleanString(params.jobId);
+
+  if (!workflowInstanceId) {
+    return { success: false, error: "workflow_instance_id is required." };
+  }
+
+  if (!milestoneId) {
+    return { success: false, error: "milestone_id is required." };
+  }
+
+  if (!jobId) {
+    return { success: false, error: "job_id is required." };
+  }
+
+  const supabase = await createClient();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        return { success: false, error: "Authentication required." };
+      }
+      return { success: false, error: "Active internal user required." };
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const actingUserId = cleanString(authz.userId);
+  if (!accountOwnerUserId || !actingUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: workflowInstance, error: workflowInstanceError } = await admin
+    .from("workflow_instances")
+    .select("id, account_owner_user_id, service_case_id")
+    .eq("id", workflowInstanceId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (workflowInstanceError) {
+    return {
+      success: false,
+      error: workflowInstanceError.message ?? "Failed to load workflow instance.",
+    };
+  }
+
+  if (!workflowInstance?.id) {
+    return {
+      success: false,
+      error: "workflow_instance_id not found in this account.",
+    };
+  }
+
+  const workflowServiceCaseId = cleanString(workflowInstance.service_case_id);
+  if (!workflowServiceCaseId) {
+    return {
+      success: false,
+      error: "workflow_instance_id is not attached to a service_case_id.",
+    };
+  }
+
+  const { data: milestoneRow, error: milestoneReadError } = await admin
+    .from("workflow_instance_milestones")
+    .select("id, account_owner_user_id, workflow_instance_id, milestone_key, milestone_title")
+    .eq("id", milestoneId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (milestoneReadError) {
+    return {
+      success: false,
+      error: milestoneReadError.message ?? "Failed to load workflow milestone.",
+    };
+  }
+
+  if (!milestoneRow?.id) {
+    return {
+      success: false,
+      error: "milestone_id not found in this account.",
+    };
+  }
+
+  const milestoneWorkflowInstanceId = cleanString(milestoneRow.workflow_instance_id);
+  if (milestoneWorkflowInstanceId !== workflowInstanceId) {
+    return {
+      success: false,
+      error: "milestone_id does not belong to workflow_instance_id.",
+    };
+  }
+
+  if (!isEccHandoffCompletionMilestone(milestoneRow)) {
+    return {
+      success: false,
+      error: "milestone_id is not ECC handoff/completion milestone.",
+    };
+  }
+
+  const { data: targetJob, error: targetJobError } = await admin
+    .from("jobs")
+    .select("id, customer_id, service_case_id, job_type, deleted_at")
+    .eq("id", jobId)
+    .maybeSingle();
+
+  if (targetJobError) {
+    return {
+      success: false,
+      error: targetJobError.message ?? "Failed to load target job.",
+    };
+  }
+
+  if (!targetJob?.id) {
+    return {
+      success: false,
+      error: "job_id not found in this account.",
+    };
+  }
+
+  if (targetJob.deleted_at != null) {
+    return {
+      success: false,
+      error: "job_id is deleted and cannot be linked.",
+    };
+  }
+
+  const targetJobCustomerId = cleanString(targetJob.customer_id);
+  const targetJobServiceCaseId = cleanString(targetJob.service_case_id);
+  const targetJobType = cleanString(targetJob.job_type).toLowerCase();
+
+  if (!targetJobCustomerId) {
+    return {
+      success: false,
+      error: "job_id not found in this account.",
+    };
+  }
+
+  const { data: targetJobCustomer, error: targetJobCustomerError } = await admin
+    .from("customers")
+    .select("id")
+    .eq("id", targetJobCustomerId)
+    .eq("owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (targetJobCustomerError) {
+    return {
+      success: false,
+      error: targetJobCustomerError.message ?? "Failed to scope target job.",
+    };
+  }
+
+  if (!targetJobCustomer?.id) {
+    return {
+      success: false,
+      error: "job_id not found in this account.",
+    };
+  }
+
+  if (!targetJobServiceCaseId || targetJobServiceCaseId !== workflowServiceCaseId) {
+    return {
+      success: false,
+      error: "job_id must belong to the same service_case_id as workflow_instance_id.",
+    };
+  }
+
+  if (targetJobType !== "ecc") {
+    return {
+      success: false,
+      error: "job_id must be an ECC job.",
+    };
+  }
+
+  const { data: existingLinks, error: existingLinksError } = await admin
+    .from("workflow_instance_job_links")
+    .select("id, job_id")
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("workflow_instance_id", workflowInstanceId)
+    .eq("workflow_instance_milestone_id", milestoneId);
+
+  if (existingLinksError) {
+    return {
+      success: false,
+      error: existingLinksError.message ?? "Failed to load existing milestone job links.",
+    };
+  }
+
+  const existingLinkRows = Array.isArray(existingLinks) ? existingLinks : [];
+  const matchingExistingLink = existingLinkRows.find(
+    (row) => cleanString((row as any)?.job_id) === jobId,
+  );
+
+  if (matchingExistingLink) {
+    return {
+      success: true,
+      workflowInstanceId,
+      milestoneId,
+      jobId,
+      workflowInstanceJobLinkId: cleanString((matchingExistingLink as any)?.id),
+      created: false,
+    };
+  }
+
+  if (existingLinkRows.length > 0) {
+    return {
+      success: false,
+      error: "ECC milestone already has a linked internal ECC job.",
+    };
+  }
+
+  const { data: insertedLink, error: insertLinkError } = await admin
+    .from("workflow_instance_job_links")
+    .insert({
+      account_owner_user_id: accountOwnerUserId,
+      workflow_instance_id: workflowInstanceId,
+      workflow_instance_milestone_id: milestoneId,
+      job_id: jobId,
+      link_role: "supporting",
+      is_primary: false,
+      linked_by_user_id: actingUserId,
+      updated_by_user_id: actingUserId,
+    })
+    .select("id")
+    .maybeSingle();
+
+  if (insertLinkError || !insertedLink?.id) {
+    return {
+      success: false,
+      error: insertLinkError?.message ?? "Failed to link internal ECC job.",
+    };
+  }
+
+  return {
+    success: true,
+    workflowInstanceId,
+    milestoneId,
+    jobId,
+    workflowInstanceJobLinkId: cleanString(insertedLink.id),
+    created: true,
+  };
+}
+
 export async function updateWorkflowMilestoneStatusFromForm(formData: FormData) {
   const workflowInstanceId = cleanString(formData.get("workflow_instance_id"));
   const milestoneId = cleanString(formData.get("milestone_id"));
@@ -1036,6 +1305,22 @@ export async function recordExternalEccCompletionForWorkflowMilestoneFromForm(fo
     milestoneId,
     completionNote,
     evidenceReference,
+  });
+
+  if (!result.success) {
+    throw new Error(result.error);
+  }
+}
+
+export async function linkInternalEccJobToWorkflowMilestoneFromForm(formData: FormData) {
+  const workflowInstanceId = cleanString(formData.get("workflow_instance_id"));
+  const milestoneId = cleanString(formData.get("milestone_id"));
+  const jobId = cleanString(formData.get("job_id"));
+
+  const result = await linkInternalEccJobToWorkflowMilestone({
+    workflowInstanceId,
+    milestoneId,
+    jobId,
   });
 
   if (!result.success) {
