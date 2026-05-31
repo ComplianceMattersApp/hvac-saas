@@ -158,6 +158,8 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).toContain("1 of 2 complete");
     expect(html).toContain("Permit");
     expect(html).toContain("Install");
+    expect(html).toContain("More actions");
+    expect(html).toContain("Update milestone status");
     expect(html).toContain("Save");
   });
 

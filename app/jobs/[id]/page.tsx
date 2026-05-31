@@ -6981,15 +6981,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               </div>
             ) : (
               <div className="space-y-3">
-                <Suspense fallback={<ServiceChainPanelBodyFallback />}>
-                  <DeferredServiceChainPanelBody
-                    accountOwnerUserId={String(internalUser.account_owner_user_id)}
-                    currentJobId={String(jobId)}
-                    serviceCaseId={String(serviceCaseId)}
-                    emptyStateClassName={workspaceEmptyStateClass}
-                  />
-                </Suspense>
-
                 <div className="rounded-xl border border-slate-200/80 bg-white/96 p-3">
                   <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                     Workflow Guidance
@@ -7013,6 +7004,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     />
                   </Suspense>
                 </div>
+
+                <Suspense fallback={<ServiceChainPanelBodyFallback />}>
+                  <DeferredServiceChainPanelBody
+                    accountOwnerUserId={String(internalUser.account_owner_user_id)}
+                    currentJobId={String(jobId)}
+                    serviceCaseId={String(serviceCaseId)}
+                    emptyStateClassName={workspaceEmptyStateClass}
+                  />
+                </Suspense>
               </div>
             )}
           </div>
