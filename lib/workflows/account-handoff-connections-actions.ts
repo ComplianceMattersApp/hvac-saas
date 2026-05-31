@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   isInternalAccessError,
@@ -45,6 +47,8 @@ type AccountHandoffConnectionActionResult =
 const HANDOFF_KIND_ECC: AccountHandoffConnectionHandoffKind = "ecc";
 const LIVE_CONNECTION_STATUSES: AccountHandoffConnectionStatus[] = ["pending", "active"];
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const COMPANY_PROFILE_PATH = "/ops/admin/company-profile";
+const COMPANY_PROFILE_CONNECTIONS_ANCHOR = "#account-handoff-connections";
 
 function cleanString(value: unknown) {
   return String(value ?? "").trim();
@@ -53,6 +57,10 @@ function cleanString(value: unknown) {
 function cleanNullableString(value: unknown) {
   const normalized = cleanString(value);
   return normalized ? normalized : null;
+}
+
+function withCompanyProfileNotice(notice: string) {
+  return `${COMPANY_PROFILE_PATH}?notice=${encodeURIComponent(notice)}${COMPANY_PROFILE_CONNECTIONS_ANCHOR}`;
 }
 
 function isUuid(value: string) {
@@ -491,4 +499,61 @@ export async function revokeAccountHandoffConnection(input: {
     connectionId: updated.id,
     connectionStatus: updated.connection_status,
   };
+}
+
+export async function requestAccountHandoffConnectionFromForm(formData: FormData): Promise<void> {
+  const result = await requestAccountHandoffConnection({
+    recipientAccountOwnerUserId: cleanString(formData.get("recipient_account_owner_user_id")),
+    handoffKind: cleanString(formData.get("handoff_kind")) || HANDOFF_KIND_ECC,
+    connectionNote: cleanNullableString(formData.get("connection_note")),
+  });
+
+  if (!result.success) {
+    redirect(withCompanyProfileNotice("connection_error"));
+  }
+
+  revalidatePath(COMPANY_PROFILE_PATH);
+  redirect(withCompanyProfileNotice("connection_requested"));
+}
+
+export async function approveAccountHandoffConnectionFromForm(formData: FormData): Promise<void> {
+  const result = await approveAccountHandoffConnection({
+    connectionId: cleanString(formData.get("connection_id")),
+    connectionNote: cleanNullableString(formData.get("connection_note")),
+  });
+
+  if (!result.success) {
+    redirect(withCompanyProfileNotice("connection_error"));
+  }
+
+  revalidatePath(COMPANY_PROFILE_PATH);
+  redirect(withCompanyProfileNotice("connection_approved"));
+}
+
+export async function declineAccountHandoffConnectionFromForm(formData: FormData): Promise<void> {
+  const result = await declineAccountHandoffConnection({
+    connectionId: cleanString(formData.get("connection_id")),
+    connectionNote: cleanNullableString(formData.get("connection_note")),
+  });
+
+  if (!result.success) {
+    redirect(withCompanyProfileNotice("connection_error"));
+  }
+
+  revalidatePath(COMPANY_PROFILE_PATH);
+  redirect(withCompanyProfileNotice("connection_declined"));
+}
+
+export async function revokeAccountHandoffConnectionFromForm(formData: FormData): Promise<void> {
+  const result = await revokeAccountHandoffConnection({
+    connectionId: cleanString(formData.get("connection_id")),
+    connectionNote: cleanNullableString(formData.get("connection_note")),
+  });
+
+  if (!result.success) {
+    redirect(withCompanyProfileNotice("connection_error"));
+  }
+
+  revalidatePath(COMPANY_PROFILE_PATH);
+  redirect(withCompanyProfileNotice("connection_revoked"));
 }

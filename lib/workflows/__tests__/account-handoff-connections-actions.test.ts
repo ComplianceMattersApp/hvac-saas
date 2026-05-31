@@ -3,6 +3,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
+const revalidatePathMock = vi.fn();
+
+vi.mock("next/navigation", () => ({
+  redirect: (url: string) => {
+    throw new Error(`REDIRECT:${url}`);
+  },
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
+}));
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -19,9 +30,13 @@ vi.mock("@/lib/auth/internal-user", () => ({
 
 import {
   approveAccountHandoffConnection,
+  approveAccountHandoffConnectionFromForm,
   declineAccountHandoffConnection,
+  declineAccountHandoffConnectionFromForm,
   requestAccountHandoffConnection,
+  requestAccountHandoffConnectionFromForm,
   revokeAccountHandoffConnection,
+  revokeAccountHandoffConnectionFromForm,
 } from "../account-handoff-connections-actions";
 
 type MockConnection = {
@@ -237,6 +252,7 @@ describe("account handoff connections actions", () => {
     createClientMock.mockReset();
     createAdminClientMock.mockReset();
     requireInternalUserMock.mockReset();
+    revalidatePathMock.mockReset();
   });
 
   it("requester admin can create pending connection", async () => {
@@ -583,5 +599,86 @@ describe("account handoff connections actions", () => {
     expect(touched).not.toContain("sms");
     expect(touched).not.toContain("qbo");
     expect(touched).not.toContain("service_plans");
+  });
+
+  it("request wrapper redirects to company profile anchor on success", async () => {
+    const fixture = makeAdminFixture();
+    createAdminClientMock.mockReturnValue(fixture.admin);
+    setActor({
+      userId: "00000000-0000-4000-8000-0000000000a1",
+      accountOwnerUserId: "00000000-0000-4000-8000-0000000000a1",
+      role: "admin",
+    });
+
+    const formData = new FormData();
+    formData.set("recipient_account_owner_user_id", "00000000-0000-4000-8000-0000000000b1");
+    formData.set("connection_note", "Request via form");
+
+    await expect(requestAccountHandoffConnectionFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=connection_requested#account-handoff-connections",
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith("/ops/admin/company-profile");
+  });
+
+  it("approve wrapper redirects to error notice on validation failure", async () => {
+    const fixture = makeAdminFixture();
+    createAdminClientMock.mockReturnValue(fixture.admin);
+    setActor({
+      userId: "00000000-0000-4000-8000-0000000000a1",
+      accountOwnerUserId: "00000000-0000-4000-8000-0000000000a1",
+      role: "admin",
+    });
+
+    const formData = new FormData();
+    formData.set("connection_id", "");
+
+    await expect(approveAccountHandoffConnectionFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=connection_error#account-handoff-connections",
+    );
+  });
+
+  it("decline wrapper redirects safely when non-admin is blocked by underlying action", async () => {
+    const fixture = makeAdminFixture({
+      connections: [makeConnection({ id: "00000000-0000-4000-8000-000000000041" })],
+    });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+    setActor({
+      userId: "00000000-0000-4000-8000-0000000000a9",
+      accountOwnerUserId: "00000000-0000-4000-8000-0000000000a1",
+      role: "office",
+    });
+
+    const formData = new FormData();
+    formData.set("connection_id", "00000000-0000-4000-8000-000000000041");
+
+    await expect(declineAccountHandoffConnectionFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=connection_error#account-handoff-connections",
+    );
+  });
+
+  it("revoke wrapper redirects to revoked notice on success", async () => {
+    const fixture = makeAdminFixture({
+      connections: [
+        makeConnection({
+          id: "00000000-0000-4000-8000-000000000042",
+          connection_status: "active",
+          approved_by_user_id: "00000000-0000-4000-8000-0000000000b2",
+          approved_at: "2026-05-31T10:00:00.000Z",
+        }),
+      ],
+    });
+    createAdminClientMock.mockReturnValue(fixture.admin);
+    setActor({
+      userId: "00000000-0000-4000-8000-0000000000b2",
+      accountOwnerUserId: "00000000-0000-4000-8000-0000000000b1",
+      role: "admin",
+    });
+
+    const formData = new FormData();
+    formData.set("connection_id", "00000000-0000-4000-8000-000000000042");
+
+    await expect(revokeAccountHandoffConnectionFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=connection_revoked#account-handoff-connections",
+    );
   });
 });

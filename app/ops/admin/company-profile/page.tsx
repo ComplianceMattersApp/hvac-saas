@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import type { ReactNode } from "react";
 import {
   refreshTenantStripeConnectReadinessFromForm,
   saveInvoiceModeFromForm,
@@ -11,6 +12,12 @@ import {
   createAuthorizedEccRaterFromForm,
   setAuthorizedEccRaterDefaultFromForm,
 } from "@/lib/actions/authorized-handoff-recipient-actions";
+import {
+  approveAccountHandoffConnectionFromForm,
+  declineAccountHandoffConnectionFromForm,
+  requestAccountHandoffConnectionFromForm,
+  revokeAccountHandoffConnectionFromForm,
+} from "@/lib/workflows/account-handoff-connections-actions";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import {
   DEFAULT_BILLING_MODE,
@@ -33,6 +40,10 @@ import {
   resolveActiveAuthorizedHandoffRecipientSelection,
   type AuthorizedHandoffRecipientRow,
 } from "@/lib/workflows/authorized-handoff-recipients-read";
+import {
+  listAccountHandoffConnectionsForAccount,
+  type AccountHandoffConnectionRow,
+} from "@/lib/workflows/account-handoff-connections-read";
 
 type SearchParams = Promise<{ notice?: string }>;
 
@@ -97,6 +108,26 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
     tone: "error",
     message: "Could not archive authorized ECC rater.",
   },
+  connection_requested: {
+    tone: "success",
+    message: "Connected handoff account request submitted.",
+  },
+  connection_approved: {
+    tone: "success",
+    message: "Connected handoff account request approved.",
+  },
+  connection_declined: {
+    tone: "warn",
+    message: "Connected handoff account request declined.",
+  },
+  connection_revoked: {
+    tone: "warn",
+    message: "Connected handoff account connection revoked.",
+  },
+  connection_error: {
+    tone: "error",
+    message: "Could not update connected handoff account settings. Please try again.",
+  },
 };
 
 function bannerClass(tone: "success" | "warn" | "error") {
@@ -142,7 +173,7 @@ export default async function AdminCompanyProfilePage({
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
-  const [profile, entitlement, seatAuditPreview, authorizedEccSelection] = await Promise.all([
+  const [profile, entitlement, seatAuditPreview, authorizedEccSelection, accountHandoffConnections] = await Promise.all([
     getInternalBusinessProfileByAccountOwnerId({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
@@ -157,6 +188,14 @@ export default async function AdminCompanyProfilePage({
       accountOwnerUserId: internalUser.account_owner_user_id,
       handoffKind: "ecc",
     }),
+    listAccountHandoffConnectionsForAccount(
+      supabase,
+      internalUser.account_owner_user_id,
+      {
+        handoffKind: "ecc",
+        limit: 200,
+      },
+    ),
   ]);
 
   const tenantStripeReadiness = await resolveTenantStripeConnectReadiness(
@@ -175,6 +214,20 @@ export default async function AdminCompanyProfilePage({
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
   const platformBillingAvailability = getPlatformBillingAvailability();
   const authorizedEccRecipients = authorizedEccSelection.recipients;
+  const pendingOutgoingConnections = accountHandoffConnections.filter((connection) =>
+    connection.connection_status === "pending"
+    && connection.requesting_account_owner_user_id === internalUser.account_owner_user_id,
+  );
+  const pendingIncomingConnections = accountHandoffConnections.filter((connection) =>
+    connection.connection_status === "pending"
+    && connection.recipient_account_owner_user_id === internalUser.account_owner_user_id,
+  );
+  const activeConnections = accountHandoffConnections.filter((connection) =>
+    connection.connection_status === "active",
+  );
+  const historicalConnections = accountHandoffConnections.filter((connection) =>
+    connection.connection_status === "declined" || connection.connection_status === "revoked",
+  );
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -634,7 +687,238 @@ export default async function AdminCompanyProfilePage({
         </form>
       </div>
 
+      <div id="account-handoff-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
+        <div className="space-y-1">
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Connected Handoff Accounts</h2>
+          <p className="text-sm leading-6 text-slate-600">
+            Set up trusted company-to-company handoff connections. This only controls whether another account can be approved for future workflow handoffs. It does not share jobs, customers, service cases, or payment data.
+          </p>
+        </div>
+
+        <form action={requestAccountHandoffConnectionFromForm} className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="text-sm font-semibold text-slate-900">Request connection</div>
+          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
+            Enter the account owner user id for the company you want to connect with. Company lookup/search can come later.
+          </div>
+          <input type="hidden" name="handoff_kind" value="ecc" />
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <label htmlFor="connection-recipient-account-owner-id" className="text-sm font-medium text-slate-700">
+                Recipient account owner user id
+              </label>
+              <input
+                id="connection-recipient-account-owner-id"
+                name="recipient_account_owner_user_id"
+                required
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="00000000-0000-4000-8000-000000000000"
+              />
+            </div>
+
+            <div className="space-y-1.5 sm:col-span-2">
+              <label htmlFor="connection-request-note" className="text-sm font-medium text-slate-700">
+                Note (optional)
+              </label>
+              <textarea
+                id="connection-request-note"
+                name="connection_note"
+                rows={2}
+                className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                placeholder="Requesting trusted handoff connection for ECC workflows"
+              />
+            </div>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              type="submit"
+              className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-slate-800"
+            >
+              Request connection
+            </button>
+          </div>
+        </form>
+
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <ConnectionListSection
+            title="Pending outgoing"
+            emptyMessage="No pending outgoing connection requests."
+            rows={pendingOutgoingConnections}
+            currentAccountOwnerUserId={internalUser.account_owner_user_id}
+          />
+
+          <ConnectionListSection
+            title="Pending incoming"
+            emptyMessage="No pending incoming connection requests."
+            rows={pendingIncomingConnections}
+            currentAccountOwnerUserId={internalUser.account_owner_user_id}
+            actionSlot={(connection) => (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <form action={approveAccountHandoffConnectionFromForm} className="flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="connection_id" value={connection.id} />
+                  <input
+                    name="connection_note"
+                    className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900"
+                    placeholder="Optional note"
+                  />
+                  <button
+                    type="submit"
+                    className="inline-flex min-h-9 items-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-700 transition-colors hover:bg-emerald-50"
+                  >
+                    Approve
+                  </button>
+                </form>
+
+                <form action={declineAccountHandoffConnectionFromForm} className="flex flex-wrap items-center gap-2">
+                  <input type="hidden" name="connection_id" value={connection.id} />
+                  <input
+                    name="connection_note"
+                    className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900"
+                    placeholder="Optional note"
+                  />
+                  <button
+                    type="submit"
+                    className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+                  >
+                    Decline
+                  </button>
+                </form>
+              </div>
+            )}
+          />
+
+          <ConnectionListSection
+            title="Active"
+            emptyMessage="No active connected handoff accounts."
+            rows={activeConnections}
+            currentAccountOwnerUserId={internalUser.account_owner_user_id}
+            actionSlot={(connection) => (
+              <form action={revokeAccountHandoffConnectionFromForm} className="mt-3 flex flex-wrap items-center gap-2">
+                <input type="hidden" name="connection_id" value={connection.id} />
+                <input
+                  name="connection_note"
+                  className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900"
+                  placeholder="Optional note"
+                />
+                <button
+                  type="submit"
+                  className="inline-flex min-h-9 items-center rounded-lg border border-rose-300 bg-white px-3 py-1.5 text-xs font-semibold text-rose-700 transition-colors hover:bg-rose-50"
+                >
+                  Revoke
+                </button>
+              </form>
+            )}
+          />
+
+          <ConnectionListSection
+            title="Declined / Revoked"
+            emptyMessage="No declined or revoked connections."
+            rows={historicalConnections}
+            currentAccountOwnerUserId={internalUser.account_owner_user_id}
+          />
+        </div>
+      </div>
+
       <TenantStripePaymentsSection readiness={tenantStripeReadiness} />
+    </div>
+  );
+}
+
+function formatConnectionTimestamp(value: string | null) {
+  if (!value) return null;
+
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) {
+    return null;
+  }
+
+  return date.toLocaleString();
+}
+
+function resolveOtherAccountOwnerUserId(connection: AccountHandoffConnectionRow, currentAccountOwnerUserId: string) {
+  if (connection.requesting_account_owner_user_id === currentAccountOwnerUserId) {
+    return connection.recipient_account_owner_user_id;
+  }
+
+  return connection.requesting_account_owner_user_id;
+}
+
+function formatConnectionStatus(value: AccountHandoffConnectionRow["connection_status"]) {
+  if (value === "pending") return "Pending";
+  if (value === "active") return "Active";
+  if (value === "declined") return "Declined";
+  return "Revoked";
+}
+
+function connectionStatusBadgeClass(value: AccountHandoffConnectionRow["connection_status"]) {
+  if (value === "active") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  }
+
+  if (value === "pending") {
+    return "border-amber-200 bg-amber-50 text-amber-800";
+  }
+
+  return "border-slate-300 bg-slate-100 text-slate-700";
+}
+
+function ConnectionListSection(props: {
+  title: string;
+  emptyMessage: string;
+  rows: AccountHandoffConnectionRow[];
+  currentAccountOwnerUserId: string;
+  actionSlot?: (connection: AccountHandoffConnectionRow) => ReactNode;
+}) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+      <div className="text-sm font-semibold text-slate-900">{props.title}</div>
+      <div className="mt-3 space-y-3">
+        {props.rows.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600">
+            {props.emptyMessage}
+          </div>
+        ) : (
+          props.rows.map((connection) => {
+            const requestedAt = formatConnectionTimestamp(connection.requested_at);
+            const approvedAt = formatConnectionTimestamp(connection.approved_at);
+            const declinedAt = formatConnectionTimestamp(connection.declined_at);
+            const revokedAt = formatConnectionTimestamp(connection.revoked_at);
+
+            return (
+              <div key={connection.id} className="rounded-xl border border-slate-200 bg-white px-3 py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold text-slate-900">{resolveOtherAccountOwnerUserId(connection, props.currentAccountOwnerUserId)}</div>
+                    <div className="mt-1 text-xs text-slate-600">Other account owner user id</div>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${connectionStatusBadgeClass(connection.connection_status)}`}>
+                      {formatConnectionStatus(connection.connection_status)}
+                    </span>
+                    <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-700">
+                      {connection.handoff_kind.toUpperCase()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="mt-2 space-y-1 text-xs text-slate-600">
+                  {requestedAt ? <div>Requested: {requestedAt}</div> : null}
+                  {approvedAt ? <div>Approved: {approvedAt}</div> : null}
+                  {declinedAt ? <div>Declined: {declinedAt}</div> : null}
+                  {revokedAt ? <div>Revoked: {revokedAt}</div> : null}
+                </div>
+
+                {connection.connection_note ? (
+                  <div className="mt-2 text-sm text-slate-700">Note: {connection.connection_note}</div>
+                ) : null}
+
+                {props.actionSlot ? props.actionSlot(connection) : null}
+              </div>
+            );
+          })
+        )}
+      </div>
     </div>
   );
 }
