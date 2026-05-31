@@ -65,6 +65,7 @@ type SendWorkflowEccMilestoneToAuthorizedRaterParams = {
   workflowInstanceId: string;
   milestoneId: string;
   authorizedRecipientId?: string | null;
+  jobId?: string | null;
 };
 
 type WorkflowMilestoneStatusUpdateResult =
@@ -129,6 +130,8 @@ type SendWorkflowEccMilestoneToAuthorizedRaterResult =
       statusReason: string;
       authorizedRecipientId: string;
       recipientDisplayName: string;
+      handoffRequestId: string;
+      handoffRequestCreated: boolean;
     }
   | {
       success: false;
@@ -1581,6 +1584,7 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
   const workflowInstanceId = cleanString(params.workflowInstanceId);
   const milestoneId = cleanString(params.milestoneId);
   const requestedRecipientId = cleanNullableString(params.authorizedRecipientId);
+  const sourceJobIdInput = cleanNullableString(params.jobId);
 
   if (!workflowInstanceId) {
     return { success: false, error: "workflow_instance_id is required." };
@@ -1616,7 +1620,7 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
 
   const { data: workflowInstance, error: workflowInstanceError } = await admin
     .from("workflow_instances")
-    .select("id, account_owner_user_id")
+    .select("id, account_owner_user_id, service_case_id")
     .eq("id", workflowInstanceId)
     .eq("account_owner_user_id", accountOwnerUserId)
     .maybeSingle();
@@ -1632,6 +1636,14 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
     return {
       success: false,
       error: "workflow_instance_id not found in this account.",
+    };
+  }
+
+  const workflowServiceCaseId = cleanString((workflowInstance as { service_case_id?: string | null }).service_case_id);
+  if (!workflowServiceCaseId) {
+    return {
+      success: false,
+      error: "workflow_instance_id is not attached to a service_case_id.",
     };
   }
 
@@ -1724,6 +1736,124 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
     };
   }
 
+  let sourceJobId: string | null = null;
+  if (sourceJobIdInput) {
+    const scopedJob = await loadScopedInternalJobForMutation({
+      accountOwnerUserId,
+      jobId: sourceJobIdInput,
+      admin,
+      select: "service_case_id",
+    });
+
+    if (!scopedJob?.id) {
+      return {
+        success: false,
+        error: "job_id not found in this account.",
+      };
+    }
+
+    const scopedJobServiceCaseId = cleanString((scopedJob as { service_case_id?: string | null }).service_case_id);
+    if (!scopedJobServiceCaseId || scopedJobServiceCaseId !== workflowServiceCaseId) {
+      return {
+        success: false,
+        error: "job_id must belong to the same service_case_id as workflow_instance_id.",
+      };
+    }
+
+    sourceJobId = cleanString(scopedJob.id);
+  }
+
+  const handoffSentAt = new Date().toISOString();
+
+  const { data: existingOpenRequest, error: existingOpenRequestError } = await admin
+    .from("workflow_handoff_requests")
+    .select("id")
+    .eq("installer_account_owner_user_id", accountOwnerUserId)
+    .eq("workflow_instance_id", workflowInstanceId)
+    .eq("workflow_instance_milestone_id", milestoneId)
+    .eq("authorized_handoff_recipient_id", recipient.id)
+    .in("handoff_status", ["sent", "accepted"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (existingOpenRequestError) {
+    return {
+      success: false,
+      error: existingOpenRequestError.message ?? "Failed to load existing workflow handoff request.",
+    };
+  }
+
+  let handoffRequestId = cleanString((existingOpenRequest as { id?: string | null } | null)?.id);
+  let handoffRequestCreated = false;
+
+  if (!handoffRequestId) {
+    const { data: insertedRequest, error: insertRequestError } = await admin
+      .from("workflow_handoff_requests")
+      .insert({
+        installer_account_owner_user_id: accountOwnerUserId,
+        workflow_instance_id: workflowInstanceId,
+        workflow_instance_milestone_id: milestoneId,
+        service_case_id: workflowServiceCaseId,
+        source_job_id: sourceJobId,
+        authorized_handoff_recipient_id: recipient.id,
+        recipient_type_snapshot: cleanString(recipient.recipient_type),
+        recipient_display_name_snapshot: cleanString(recipient.display_name),
+        handoff_kind: "ecc",
+        handoff_status: "sent",
+        sent_by_user_id: actingUserId,
+        sent_at: handoffSentAt,
+      })
+      .select("id")
+      .maybeSingle();
+
+    if (insertRequestError) {
+      const uniqueViolation = cleanString((insertRequestError as { code?: string | null }).code) === "23505";
+      if (!uniqueViolation) {
+        return {
+          success: false,
+          error: insertRequestError.message ?? "Failed to create workflow handoff request.",
+        };
+      }
+
+      const { data: racedExistingRequest, error: racedExistingRequestError } = await admin
+        .from("workflow_handoff_requests")
+        .select("id")
+        .eq("installer_account_owner_user_id", accountOwnerUserId)
+        .eq("workflow_instance_id", workflowInstanceId)
+        .eq("workflow_instance_milestone_id", milestoneId)
+        .eq("authorized_handoff_recipient_id", recipient.id)
+        .in("handoff_status", ["sent", "accepted"])
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (racedExistingRequestError) {
+        return {
+          success: false,
+          error: racedExistingRequestError.message ?? "Failed to resolve workflow handoff request after duplicate send.",
+        };
+      }
+
+      handoffRequestId = cleanString((racedExistingRequest as { id?: string | null } | null)?.id);
+      if (!handoffRequestId) {
+        return {
+          success: false,
+          error: "Failed to resolve workflow handoff request after duplicate send.",
+        };
+      }
+    } else {
+      handoffRequestId = cleanString((insertedRequest as { id?: string | null } | null)?.id);
+      if (!handoffRequestId) {
+        return {
+          success: false,
+          error: "Failed to create workflow handoff request.",
+        };
+      }
+      handoffRequestCreated = true;
+    }
+  }
+
   const statusReason = `Sent to authorized rater: ${cleanString(recipient.display_name)}`;
 
   const { data: updatedMilestone, error: updateError } = await admin
@@ -1732,7 +1862,7 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
       milestone_status: "waiting",
       status_reason: statusReason,
       updated_by_user_id: actingUserId,
-      updated_at: new Date().toISOString(),
+      updated_at: handoffSentAt,
     })
     .eq("id", milestoneId)
     .eq("account_owner_user_id", accountOwnerUserId)
@@ -1755,6 +1885,8 @@ export async function sendWorkflowEccMilestoneToAuthorizedRater(
     statusReason,
     authorizedRecipientId: recipient.id,
     recipientDisplayName: cleanString(recipient.display_name),
+    handoffRequestId,
+    handoffRequestCreated,
   };
 }
 
@@ -1836,6 +1968,7 @@ export async function sendWorkflowEccMilestoneToAuthorizedRaterFromForm(formData
     workflowInstanceId,
     milestoneId,
     authorizedRecipientId,
+    jobId,
   });
 
   if (!result.success) {

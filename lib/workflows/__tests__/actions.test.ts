@@ -98,6 +98,23 @@ type MockAuthorizedHandoffRecipient = {
   archived_at?: string | null;
 };
 
+type MockWorkflowHandoffRequest = {
+  id: string;
+  installer_account_owner_user_id: string;
+  workflow_instance_id: string;
+  workflow_instance_milestone_id: string;
+  service_case_id: string;
+  source_job_id?: string | null;
+  authorized_handoff_recipient_id: string;
+  recipient_type_snapshot: string;
+  recipient_display_name_snapshot: string;
+  handoff_kind: string;
+  handoff_status: string;
+  sent_by_user_id: string;
+  sent_at?: string;
+  created_at?: string;
+};
+
 function makeThenable<T>(
   resolver: () => T,
   chainMethods: Record<string, (...args: unknown[]) => any>,
@@ -119,6 +136,7 @@ function makeAdminFixture(input?: {
   workflowJobLinks?: MockWorkflowJobLink[];
   jobs?: MockJob[];
   authorizedHandoffRecipients?: MockAuthorizedHandoffRecipient[];
+  workflowHandoffRequests?: MockWorkflowHandoffRequest[];
 }) {
   const serviceCases = [...(input?.serviceCases ?? [])];
   const customers = [...(input?.customers ?? [])];
@@ -128,12 +146,14 @@ function makeAdminFixture(input?: {
   const workflowJobLinks = [...(input?.workflowJobLinks ?? [])];
   const jobs = [...(input?.jobs ?? [])];
   const authorizedHandoffRecipients = [...(input?.authorizedHandoffRecipients ?? [])];
+  const workflowHandoffRequests = [...(input?.workflowHandoffRequests ?? [])];
 
   const tableCalls: string[] = [];
   const workflowInstanceInsertCalls: Array<Record<string, unknown>> = [];
   const workflowMilestoneInsertCalls: Array<Array<Record<string, unknown>>> = [];
   const workflowMilestoneUpdateCalls: Array<Record<string, unknown>> = [];
   const workflowJobLinkInsertCalls: Array<Array<Record<string, unknown>>> = [];
+  const workflowHandoffRequestInsertCalls: Array<Record<string, unknown>> = [];
 
   const admin = {
     from: vi.fn((table: string) => {
@@ -719,6 +739,129 @@ function makeAdminFixture(input?: {
         };
       }
 
+      if (table === "workflow_handoff_requests") {
+        const select = vi.fn(() => {
+          let installerAccountOwnerUserId = "";
+          let workflowInstanceId = "";
+          let milestoneId = "";
+          let recipientId = "";
+          let statuses: string[] = [];
+          let limit = 100;
+
+          const query: any = makeThenable(
+            () => {
+              const scoped = workflowHandoffRequests
+                .filter((row) => (
+                  !installerAccountOwnerUserId || row.installer_account_owner_user_id === installerAccountOwnerUserId
+                ))
+                .filter((row) => (!workflowInstanceId || row.workflow_instance_id === workflowInstanceId))
+                .filter((row) => (!milestoneId || row.workflow_instance_milestone_id === milestoneId))
+                .filter((row) => (!recipientId || row.authorized_handoff_recipient_id === recipientId))
+                .filter((row) => (statuses.length > 0 ? statuses.includes(row.handoff_status) : true))
+                .slice(0, limit)
+                .map((row) => ({
+                  ...row,
+                  source_job_id: row.source_job_id ?? null,
+                  sent_at: row.sent_at ?? "2026-05-31T00:00:00.000Z",
+                  created_at: row.created_at ?? row.sent_at ?? "2026-05-31T00:00:00.000Z",
+                }));
+
+              return { data: scoped, error: null };
+            },
+            {
+              eq: (column: unknown, value: unknown) => {
+                if (column === "installer_account_owner_user_id") {
+                  installerAccountOwnerUserId = String(value ?? "").trim();
+                }
+                if (column === "workflow_instance_id") {
+                  workflowInstanceId = String(value ?? "").trim();
+                }
+                if (column === "workflow_instance_milestone_id") {
+                  milestoneId = String(value ?? "").trim();
+                }
+                if (column === "authorized_handoff_recipient_id") {
+                  recipientId = String(value ?? "").trim();
+                }
+                return query;
+              },
+              in: (column: unknown, value: unknown) => {
+                if (column === "handoff_status" && Array.isArray(value)) {
+                  statuses = value.map((entry) => String(entry ?? "").trim());
+                }
+                return query;
+              },
+              order: () => query,
+              limit: (value: unknown) => {
+                limit = Number(value ?? 100);
+                return query;
+              },
+              maybeSingle: async () => {
+                const row = workflowHandoffRequests.find((entry) => {
+                  if (installerAccountOwnerUserId && entry.installer_account_owner_user_id !== installerAccountOwnerUserId) return false;
+                  if (workflowInstanceId && entry.workflow_instance_id !== workflowInstanceId) return false;
+                  if (milestoneId && entry.workflow_instance_milestone_id !== milestoneId) return false;
+                  if (recipientId && entry.authorized_handoff_recipient_id !== recipientId) return false;
+                  if (statuses.length > 0 && !statuses.includes(entry.handoff_status)) return false;
+                  return true;
+                });
+
+                if (!row) {
+                  return { data: null, error: null };
+                }
+
+                return {
+                  data: {
+                    ...row,
+                    source_job_id: row.source_job_id ?? null,
+                    sent_at: row.sent_at ?? "2026-05-31T00:00:00.000Z",
+                    created_at: row.created_at ?? row.sent_at ?? "2026-05-31T00:00:00.000Z",
+                  },
+                  error: null,
+                };
+              },
+            },
+          );
+
+          return query;
+        });
+
+        const insert = vi.fn((payload: Record<string, unknown>) => {
+          workflowHandoffRequestInsertCalls.push(payload);
+
+          const id = `whr-${workflowHandoffRequests.length + 1}`;
+          workflowHandoffRequests.push({
+            id,
+            installer_account_owner_user_id: String(payload.installer_account_owner_user_id ?? "").trim(),
+            workflow_instance_id: String(payload.workflow_instance_id ?? "").trim(),
+            workflow_instance_milestone_id: String(payload.workflow_instance_milestone_id ?? "").trim(),
+            service_case_id: String(payload.service_case_id ?? "").trim(),
+            source_job_id: String(payload.source_job_id ?? "").trim() || null,
+            authorized_handoff_recipient_id: String(payload.authorized_handoff_recipient_id ?? "").trim(),
+            recipient_type_snapshot: String(payload.recipient_type_snapshot ?? "").trim(),
+            recipient_display_name_snapshot: String(payload.recipient_display_name_snapshot ?? "").trim(),
+            handoff_kind: String(payload.handoff_kind ?? "").trim(),
+            handoff_status: String(payload.handoff_status ?? "").trim(),
+            sent_by_user_id: String(payload.sent_by_user_id ?? "").trim(),
+            sent_at: String(payload.sent_at ?? "").trim() || "2026-05-31T00:00:00.000Z",
+            created_at: String(payload.sent_at ?? "").trim() || "2026-05-31T00:00:00.000Z",
+          });
+
+          return {
+            select: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({
+                data: { id },
+                error: null,
+              })),
+            })),
+          };
+        });
+
+        return {
+          select,
+          insert,
+        };
+      }
+
       throw new Error(`Unexpected table ${table}`);
     }),
 
@@ -727,6 +870,8 @@ function makeAdminFixture(input?: {
     _workflowMilestoneInsertCalls: workflowMilestoneInsertCalls,
     _workflowMilestoneUpdateCalls: workflowMilestoneUpdateCalls,
     _workflowJobLinkInsertCalls: workflowJobLinkInsertCalls,
+    _workflowHandoffRequestInsertCalls: workflowHandoffRequestInsertCalls,
+    _workflowHandoffRequests: workflowHandoffRequests,
     _workflowInstances: workflowInstances,
     _workflowMilestones: workflowMilestones,
     _presets: presets,
@@ -1942,11 +2087,16 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
   });
 
   function buildFixture(overrides?: {
+    customers?: MockCustomer[];
+    jobs?: MockJob[];
     workflowInstances?: MockWorkflowInstance[];
     workflowMilestones?: MockWorkflowMilestone[];
     authorizedHandoffRecipients?: MockAuthorizedHandoffRecipient[];
+    workflowHandoffRequests?: MockWorkflowHandoffRequest[];
   }) {
     const admin = makeAdminFixture({
+      customers: overrides?.customers ?? [{ id: "cust-1", owner_user_id: "owner-1" }],
+      jobs: overrides?.jobs ?? [{ id: "job-1", customer_id: "cust-1", service_case_id: "case-1", deleted_at: null }],
       workflowInstances: overrides?.workflowInstances ?? [
         {
           id: "wf-1",
@@ -1968,6 +2118,7 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
         },
       ],
       authorizedHandoffRecipients: overrides?.authorizedHandoffRecipients ?? [],
+      workflowHandoffRequests: overrides?.workflowHandoffRequests ?? [],
     });
 
     createAdminClientMock.mockReturnValue(admin);
@@ -1988,7 +2139,7 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
     });
   });
 
-  it("sends to the only active ECC recipient when one recipient exists", async () => {
+  it("creates durable handoff request and updates milestone when one active recipient exists", async () => {
     const admin = buildFixture({
       authorizedHandoffRecipients: [
         {
@@ -2007,6 +2158,7 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
     const result = await sendWorkflowEccMilestoneToAuthorizedRater({
       workflowInstanceId: "wf-1",
       milestoneId: "ms-ecc",
+      jobId: "job-1",
     });
 
     expect(result).toEqual({
@@ -2017,12 +2169,101 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
       statusReason: "Sent to authorized rater: Acme Ratings",
       authorizedRecipientId: "ahr-1",
       recipientDisplayName: "Acme Ratings",
+      handoffRequestId: "whr-1",
+      handoffRequestCreated: true,
+    });
+
+    expect(admin._workflowHandoffRequestInsertCalls).toHaveLength(1);
+    expect(admin._workflowHandoffRequestInsertCalls[0]).toMatchObject({
+      installer_account_owner_user_id: "owner-1",
+      workflow_instance_id: "wf-1",
+      workflow_instance_milestone_id: "ms-ecc",
+      service_case_id: "case-1",
+      source_job_id: "job-1",
+      authorized_handoff_recipient_id: "ahr-1",
+      recipient_type_snapshot: "external_manual",
+      recipient_display_name_snapshot: "Acme Ratings",
+      handoff_kind: "ecc",
+      handoff_status: "sent",
+      sent_by_user_id: "user-1",
     });
 
     expect(admin._workflowMilestones[0]).toMatchObject({
       milestone_status: "waiting",
       status_reason: "Sent to authorized rater: Acme Ratings",
       updated_by_user_id: "user-1",
+    });
+  });
+
+  it("is idempotent for repeated sends to the same milestone and recipient", async () => {
+    const admin = buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const first = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+      jobId: "job-1",
+    });
+    const second = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+      jobId: "job-1",
+    });
+
+    expect(first.success).toBe(true);
+    expect(second).toMatchObject({
+      success: true,
+      handoffRequestId: "whr-1",
+      handoffRequestCreated: false,
+      status: "waiting",
+    });
+
+    expect(admin._workflowHandoffRequestInsertCalls).toHaveLength(1);
+    expect(admin._workflowHandoffRequests).toHaveLength(1);
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(2);
+  });
+
+  it("rejects source job ids that are out of service-case scope", async () => {
+    buildFixture({
+      jobs: [{ id: "job-foreign", customer_id: "cust-1", service_case_id: "case-2", deleted_at: null }],
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+      jobId: "job-foreign",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "job_id must belong to the same service_case_id as workflow_instance_id.",
     });
   });
 
@@ -2321,6 +2562,9 @@ describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
       "outbound_sms_messages",
       "qbo_sync_events",
       "portal_notifications",
+      "maintenance_agreements",
+      "maintenance_agreement_memberships",
+      "maintenance_agreement_billing_periods",
     ];
 
     for (const table of forbiddenTables) {
