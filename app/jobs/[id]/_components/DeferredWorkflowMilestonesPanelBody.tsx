@@ -19,6 +19,7 @@ import {
 } from "@/lib/workflows/workflow-handoff-requests-read";
 import {
   assignInstallWithPermitWorkflowForJobFromForm,
+  completeWorkflowMilestoneFromCompletedHandoffRequestFromForm,
   confirmLinkedInternalEccCompletionForWorkflowMilestoneFromForm,
   linkInternalEccJobToWorkflowMilestoneFromForm,
   recordExternalEccCompletionForWorkflowMilestoneFromForm,
@@ -433,6 +434,7 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                   const latestHandoffStatus = cleanString(latestHandoffRequest?.handoff_status).toLowerCase();
                   const hasOpenHandoffRequest = latestHandoffStatus === "sent" || latestHandoffStatus === "accepted";
                   const shouldHidePrimarySendForCompletedRequest = latestHandoffStatus === "completed";
+                  const canReviewCompleteCompletedHandoffRequest = isEccMilestone && !isCompletedMilestone && latestHandoffStatus === "completed";
                   const unavailableConnectedRecipientCount =
                     authorizedEccRaterSelection.recipients.length - sendableAuthorizedRecipients.length;
                   const canShowSendToRaterPrimary =
@@ -488,6 +490,9 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                       {latestHandoffRequest ? (
                         <div className={`mt-2 rounded-md border px-2.5 py-2 text-[11px] ${getHandoffRequestTone(latestHandoffStatus)}`}>
                           <div className="font-semibold">{getHandoffRequestHeading(latestHandoffRequest)}</div>
+                          <div className="mt-0.5 text-[10px] opacity-90">
+                            Recipient: {cleanString(latestHandoffRequest.recipient_display_name_snapshot) || "authorized rater"}
+                          </div>
                           <div className="mt-0.5">{getHandoffRequestSubheading(latestHandoffRequest)}</div>
                           <div className="mt-1 space-y-0.5 text-[10px] opacity-90">
                             {handoffSentAt ? <div>Sent {handoffSentAt}</div> : null}
@@ -500,6 +505,25 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                             ) : null}
                           </div>
                         </div>
+                      ) : null}
+
+                      {canReviewCompleteCompletedHandoffRequest ? (
+                        <form action={completeWorkflowMilestoneFromCompletedHandoffRequestFromForm} className="mt-2 rounded-md border border-emerald-200 bg-emerald-50/70 p-2">
+                          <input type="hidden" name="handoff_request_id" value={cleanString(latestHandoffRequest?.id)} />
+                          <input type="hidden" name="source_job_id" value={cleanString(latestHandoffRequest?.source_job_id) || currentJobId} />
+                          <input type="hidden" name="return_to" value={returnToPath} />
+                          <div className="text-[11px] font-semibold text-emerald-900">
+                            Completed rater handoff is ready for installer review.
+                          </div>
+                          <div className="mt-1 flex justify-end">
+                            <button
+                              type="submit"
+                              className="inline-flex h-8 items-center justify-center rounded-md border border-emerald-600 bg-emerald-600 px-2.5 text-[11px] font-semibold text-white transition-colors hover:border-emerald-700 hover:bg-emerald-700 active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-1"
+                            >
+                              Review complete — mark ECC milestone complete
+                            </button>
+                          </div>
+                        </form>
                       ) : null}
 
                       {showSetupRequiredSendState ? (

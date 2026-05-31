@@ -958,6 +958,7 @@ const {
   ensureInstallWithPermitWorkflowPreset,
   linkInternalEccJobToWorkflowMilestone,
   recordExternalEccCompletionForWorkflowMilestone,
+  completeWorkflowMilestoneFromCompletedHandoffRequest,
   respondToWorkflowHandoffRequest,
   sendWorkflowEccMilestoneToAuthorizedRater,
   updateWorkflowMilestoneStatus,
@@ -3019,6 +3020,312 @@ describe("respondToWorkflowHandoffRequest", () => {
     for (const table of forbiddenTables) {
       expect(admin._tableCalls).not.toContain(table);
     }
+  });
+});
+
+describe("completeWorkflowMilestoneFromCompletedHandoffRequest", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        role: "admin",
+        is_active: true,
+      },
+    });
+  });
+
+  function buildCompletedHandoffFixture(overrides?: {
+    workflowInstances?: MockWorkflowInstance[];
+    workflowMilestones?: MockWorkflowMilestone[];
+    workflowHandoffRequests?: MockWorkflowHandoffRequest[];
+  }) {
+    const admin = makeAdminFixture({
+      workflowInstances: overrides?.workflowInstances ?? [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: overrides?.workflowMilestones ?? [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "waiting",
+          status_reason: "Rater marked ECC complete",
+        },
+      ],
+      workflowHandoffRequests: overrides?.workflowHandoffRequests ?? [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          source_job_id: "job-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "ecc",
+          handoff_status: "completed",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+          responded_by_user_id: "user-3",
+          responded_at: "2026-05-31T18:10:10.463Z",
+          response_note: "Certificate delivered.",
+          evidence_reference: "CERT-2042",
+          created_at: "2026-05-31T17:51:10.463Z",
+          updated_at: "2026-05-31T18:10:10.463Z",
+        },
+      ],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+    return admin;
+  }
+
+  it("succeeds when a completed ECC handoff request exists", async () => {
+    const admin = buildCompletedHandoffFixture();
+
+    const result = await completeWorkflowMilestoneFromCompletedHandoffRequest({
+      handoffRequestId: "whr-1",
+      reviewNote: "Installer reviewed completed handoff.",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      status: "completed",
+      statusReason:
+        "Rater Smoke Rater A marked ECC complete | Response note: Certificate delivered. | Evidence: CERT-2042 | Installer review note: Installer reviewed completed handoff.",
+    });
+
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(1);
+    expect(admin._workflowMilestoneUpdateCalls[0]).toMatchObject({
+      milestone_status: "completed",
+      status_reason:
+        "Rater Smoke Rater A marked ECC complete | Response note: Certificate delivered. | Evidence: CERT-2042 | Installer review note: Installer reviewed completed handoff.",
+      updated_by_user_id: "user-1",
+    });
+    expect(admin._workflowHandoffRequestUpdateCalls).toHaveLength(0);
+
+    const forbiddenTables = [
+      "jobs",
+      "service_cases",
+      "job_events",
+      "internal_invoices",
+      "internal_invoice_payments",
+      "internal_invoice_payment_allocations",
+      "customer_saved_payment_methods",
+      "stripe_webhook_events",
+      "outbound_sms_messages",
+      "qbo_sync_events",
+      "portal_notifications",
+      "maintenance_agreements",
+      "maintenance_agreement_memberships",
+      "maintenance_agreement_billing_periods",
+    ];
+
+    for (const table of forbiddenTables) {
+      expect(admin._tableCalls).not.toContain(table);
+    }
+  });
+
+  it("uses default installer review note when review_note is omitted", async () => {
+    const admin = buildCompletedHandoffFixture();
+
+    const result = await completeWorkflowMilestoneFromCompletedHandoffRequest({
+      handoffRequestId: "whr-1",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      status: "completed",
+      statusReason:
+        "Rater Smoke Rater A marked ECC complete | Response note: Certificate delivered. | Evidence: CERT-2042 | Installer review note: Installer reviewed completed rater handoff.",
+    });
+
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(1);
+    expect(admin._workflowMilestoneUpdateCalls[0]).toMatchObject({
+      milestone_status: "completed",
+      status_reason:
+        "Rater Smoke Rater A marked ECC complete | Response note: Certificate delivered. | Evidence: CERT-2042 | Installer review note: Installer reviewed completed rater handoff.",
+      updated_by_user_id: "user-1",
+    });
+    expect(admin._workflowHandoffRequestUpdateCalls).toHaveLength(0);
+  });
+
+  it.each(["sent", "accepted", "rejected", "cancelled"] as const)("rejects %s handoff requests", async (handoffStatus) => {
+    buildCompletedHandoffFixture({
+      workflowHandoffRequests: [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          source_job_id: "job-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "ecc",
+          handoff_status: handoffStatus,
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+          responded_by_user_id: handoffStatus === "sent" ? null : "user-3",
+          responded_at: handoffStatus === "sent" ? null : "2026-05-31T18:10:10.463Z",
+          response_note: handoffStatus === "rejected" ? "Rejected for review." : handoffStatus === "accepted" ? "Accepted for review." : null,
+          evidence_reference: null,
+          created_at: "2026-05-31T17:51:10.463Z",
+          updated_at: "2026-05-31T18:10:10.463Z",
+        },
+      ],
+    });
+
+    const result = await completeWorkflowMilestoneFromCompletedHandoffRequest({
+      handoffRequestId: "whr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "handoff_request_id must be completed before installer review can complete the ECC milestone.",
+    });
+  });
+
+  it("rejects non-ECC handoffs", async () => {
+    buildCompletedHandoffFixture({
+      workflowHandoffRequests: [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          source_job_id: "job-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "general_future",
+          handoff_status: "completed",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+        },
+      ],
+    });
+
+    const result = await completeWorkflowMilestoneFromCompletedHandoffRequest({
+      handoffRequestId: "whr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "handoff_request_id is not an ECC handoff request.",
+    });
+  });
+
+  it("rejects cross-account requests", async () => {
+    buildCompletedHandoffFixture({
+      workflowHandoffRequests: [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-2",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          source_job_id: "job-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "ecc",
+          handoff_status: "completed",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+        },
+      ],
+    });
+
+    const result = await completeWorkflowMilestoneFromCompletedHandoffRequest({
+      handoffRequestId: "whr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "handoff_request_id not found in this account.",
+    });
+  });
+
+  it("rejects milestone and workflow mismatches", async () => {
+    buildCompletedHandoffFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+        {
+          id: "wf-2",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-2",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "waiting",
+        },
+      ],
+      workflowHandoffRequests: [
+        {
+          id: "whr-1",
+          installer_account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          service_case_id: "case-1",
+          source_job_id: "job-1",
+          authorized_handoff_recipient_id: "ahr-1",
+          recipient_type_snapshot: "external_manual",
+          recipient_display_name_snapshot: "Smoke Rater A",
+          handoff_kind: "ecc",
+          handoff_status: "completed",
+          sent_by_user_id: "user-2",
+          sent_at: "2026-05-31T17:51:10.463Z",
+          responded_by_user_id: "user-3",
+          responded_at: "2026-05-31T18:10:10.463Z",
+          response_note: "Certificate delivered.",
+          evidence_reference: "CERT-2042",
+        },
+      ],
+    });
+
+    const result = await completeWorkflowMilestoneFromCompletedHandoffRequest({
+      handoffRequestId: "whr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "milestone_id does not belong to workflow_instance_id.",
+    });
   });
 });
 

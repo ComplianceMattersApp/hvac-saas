@@ -15,6 +15,10 @@ import {
   loadScopedInternalJobForMutation,
   loadScopedInternalServiceCaseForMutation,
 } from "@/lib/auth/internal-job-scope";
+import {
+  completeWorkflowMilestoneFromCompletedHandoffRequest as completeWorkflowMilestoneFromCompletedHandoffRequestImpl,
+  completeWorkflowMilestoneFromCompletedHandoffRequestFromForm as completeWorkflowMilestoneFromCompletedHandoffRequestFromFormImpl,
+} from "./completed-handoff-review";
 
 type WorkflowAssignmentResult =
   | {
@@ -58,6 +62,11 @@ type LinkInternalEccJobToWorkflowMilestoneParams = {
 type ConfirmLinkedInternalEccCompletionForWorkflowMilestoneParams = {
   workflowInstanceId: string;
   milestoneId: string;
+  reviewNote?: string | null;
+};
+
+type CompleteWorkflowMilestoneFromCompletedHandoffRequestParams = {
+  handoffRequestId: string;
   reviewNote?: string | null;
 };
 
@@ -121,6 +130,19 @@ type ConfirmLinkedInternalEccCompletionForWorkflowMilestoneResult =
       status: "completed";
       statusReason: string;
       jobId: string;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+type CompleteWorkflowMilestoneFromCompletedHandoffRequestResult =
+  | {
+      success: true;
+      workflowInstanceId: string;
+      milestoneId: string;
+      status: "completed";
+      statusReason: string;
     }
   | {
       success: false;
@@ -382,6 +404,39 @@ function formatLinkedInternalEccCompletionReason(input: {
   const jobDisplayNumber = cleanString(input.jobDisplayNumber);
   const jobReference = jobDisplayNumber ? `Job #${jobDisplayNumber}` : `Job ${input.jobId.slice(0, 8)}`;
   return `${jobReference}: ${input.reviewNote}`;
+}
+
+function formatInstallerReviewCompletionReason(input: {
+  recipientDisplayName?: unknown;
+  responseNote?: unknown;
+  evidenceReference?: unknown;
+  reviewNote?: unknown;
+}) {
+  const reasonParts: string[] = [];
+  const recipientDisplayName = cleanString(input.recipientDisplayName);
+
+  reasonParts.push(
+    recipientDisplayName
+      ? `Rater ${recipientDisplayName} marked ECC complete`
+      : "Rater marked ECC complete",
+  );
+
+  const responseNote = cleanNullableString(input.responseNote);
+  if (responseNote) {
+    reasonParts.push(`Response note: ${responseNote}`);
+  }
+
+  const evidenceReference = cleanNullableString(input.evidenceReference);
+  if (evidenceReference) {
+    reasonParts.push(`Evidence: ${evidenceReference}`);
+  }
+
+  const reviewNote = cleanNullableString(input.reviewNote);
+  if (reviewNote) {
+    reasonParts.push(`Installer review note: ${reviewNote}`);
+  }
+
+  return reasonParts.join(" | ");
 }
 
 function withBanner(returnTo: string, banner: string) {
@@ -1405,6 +1460,7 @@ export async function confirmLinkedInternalEccCompletionForWorkflowMilestone(
       }
       return { success: false, error: "Active internal user required." };
     }
+
     throw error;
   }
 
@@ -2070,6 +2126,16 @@ export async function respondToWorkflowHandoffRequestFromForm(formData: FormData
     : "handoff_response_rejected";
 
   redirect(withBanner(returnTo, successBanner));
+}
+
+export async function completeWorkflowMilestoneFromCompletedHandoffRequest(
+  params: CompleteWorkflowMilestoneFromCompletedHandoffRequestParams,
+): Promise<CompleteWorkflowMilestoneFromCompletedHandoffRequestResult> {
+  return completeWorkflowMilestoneFromCompletedHandoffRequestImpl(params);
+}
+
+export async function completeWorkflowMilestoneFromCompletedHandoffRequestFromForm(formData: FormData) {
+  return completeWorkflowMilestoneFromCompletedHandoffRequestFromFormImpl(formData);
 }
 
 export async function updateWorkflowMilestoneStatusFromForm(formData: FormData) {

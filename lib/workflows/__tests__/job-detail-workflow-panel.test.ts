@@ -52,6 +52,7 @@ vi.mock("@/lib/workflows/actions", () => ({
   updateWorkflowMilestoneStatusFromForm: vi.fn(async () => undefined),
   assignInstallWithPermitWorkflowForJobFromForm: vi.fn(async () => undefined),
   linkInternalEccJobToWorkflowMilestoneFromForm: vi.fn(async () => undefined),
+  completeWorkflowMilestoneFromCompletedHandoffRequestFromForm: vi.fn(async () => undefined),
   confirmLinkedInternalEccCompletionForWorkflowMilestoneFromForm: vi.fn(async () => undefined),
   recordExternalEccCompletionForWorkflowMilestoneFromForm: vi.fn(async () => undefined),
   sendWorkflowEccMilestoneToAuthorizedRaterFromForm: vi.fn(async () => undefined),
@@ -378,6 +379,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).toContain("Sent to Smoke Rater A");
     expect(html).toContain("Waiting for rater response");
     expect(html).toContain("Record external ECC completion");
+    expect(html).not.toContain("Review complete — mark ECC milestone complete");
     expect(html).not.toContain("Send to Smoke Rater A");
   });
 
@@ -446,6 +448,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     const html = renderToStaticMarkup(jsx);
     expect(html).toContain("Accepted by Smoke Rater A");
     expect(html).toContain("Waiting for ECC completion");
+    expect(html).not.toContain("Review complete — mark ECC milestone complete");
     expect(html).not.toContain("Send to rater");
   });
 
@@ -514,8 +517,11 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     const html = renderToStaticMarkup(jsx);
     expect(html).toContain("Rater marked ECC complete");
     expect(html).toContain("Rater completed ECC — review and complete ECC milestone.");
+    expect(html).toContain("Recipient: Smoke Rater A");
     expect(html).toContain("Response note: Certificate delivered.");
     expect(html).toContain("Evidence: CERT-2042");
+    expect(html).toContain("Review complete — mark ECC milestone complete");
+    expect(html).toContain("More actions");
     expect(html).toContain("Record external ECC completion");
     expect(html).not.toContain("Send to rater");
   });
@@ -599,6 +605,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     const html = renderToStaticMarkup(jsx);
     expect(html).toContain("Rater rejected handoff");
     expect(html).toContain("Response note: Missing permit packet.");
+    expect(html).not.toContain("Review complete — mark ECC milestone complete");
     expect(html).toContain("Send to Smoke Rater A");
   });
 
@@ -681,6 +688,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     const html = renderToStaticMarkup(jsx);
     expect(html).toContain("Handoff cancelled");
     expect(html).toContain("This handoff is closed.");
+    expect(html).not.toContain("Review complete — mark ECC milestone complete");
     expect(html).toContain("Send to Smoke Rater A");
   });
 
@@ -1091,6 +1099,27 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
   });
 
   it("hides review helper when ECC milestone is already completed", async () => {
+    getLatestWorkflowHandoffRequestForMilestoneMock.mockResolvedValue({
+      id: "whr-1",
+      installer_account_owner_user_id: "owner-1",
+      workflow_instance_id: "wf-1",
+      workflow_instance_milestone_id: "ms-ecc",
+      service_case_id: "case-1",
+      source_job_id: "job-1",
+      authorized_handoff_recipient_id: "ahr-1",
+      recipient_type_snapshot: "external_manual",
+      recipient_display_name_snapshot: "Smoke Rater A",
+      handoff_kind: "ecc",
+      handoff_status: "completed",
+      sent_by_user_id: "user-1",
+      sent_at: "2026-05-31T17:51:10.463Z",
+      responded_by_user_id: "user-2",
+      responded_at: "2026-05-31T18:10:10.463Z",
+      response_note: "Certificate delivered.",
+      evidence_reference: "CERT-2042",
+      created_at: "2026-05-31T17:51:10.463Z",
+      updated_at: "2026-05-31T18:10:10.463Z",
+    });
     listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
       {
         id: "wf-1",
@@ -1158,6 +1187,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     const html = renderToStaticMarkup(jsx);
     expect(html).not.toContain("Linked ECC job is not complete yet.");
     expect(html).not.toContain("Review and complete ECC milestone");
+    expect(html).not.toContain("Review complete — mark ECC milestone complete");
     expect(html).toContain("Reason: Job #2042: Linked internal ECC job reviewed and completed.");
   });
 
@@ -1254,6 +1284,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).toContain("Waiting for rater response");
     expect(html).toContain("Record external ECC completion");
     expect(html).toContain("Linked ECC job appears complete. Review and complete ECC milestone.");
+    expect(html).not.toContain("Review complete — mark ECC milestone complete");
     expect(html).not.toContain("Send to Acme Ratings");
   });
 
