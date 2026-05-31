@@ -6,6 +6,7 @@ const loadScopedInternalJobDetailReadBoundaryMock = vi.fn();
 const listActiveWorkflowInstancesByServiceCaseMock = vi.fn();
 const listLinkedJobsForWorkflowMock = vi.fn();
 const listWorkflowInstanceMilestonesMock = vi.fn();
+const resolveActiveAuthorizedHandoffRecipientSelectionMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -36,12 +37,18 @@ vi.mock("@/lib/workflows/read-model", () => ({
     listWorkflowInstanceMilestonesMock(...args),
 }));
 
+vi.mock("@/lib/workflows/authorized-handoff-recipients-read", () => ({
+  resolveActiveAuthorizedHandoffRecipientSelection: (...args: unknown[]) =>
+    resolveActiveAuthorizedHandoffRecipientSelectionMock(...args),
+}));
+
 vi.mock("@/lib/workflows/actions", () => ({
   updateWorkflowMilestoneStatusFromForm: vi.fn(async () => undefined),
   assignInstallWithPermitWorkflowForJobFromForm: vi.fn(async () => undefined),
   linkInternalEccJobToWorkflowMilestoneFromForm: vi.fn(async () => undefined),
   confirmLinkedInternalEccCompletionForWorkflowMilestoneFromForm: vi.fn(async () => undefined),
   recordExternalEccCompletionForWorkflowMilestoneFromForm: vi.fn(async () => undefined),
+  sendWorkflowEccMilestoneToAuthorizedRaterFromForm: vi.fn(async () => undefined),
 }));
 
 const DeferredWorkflowMilestonesPanelBody = (
@@ -72,6 +79,12 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     });
     loadScopedInternalJobDetailReadBoundaryMock.mockResolvedValue({ id: "job-1" });
     listLinkedJobsForWorkflowMock.mockResolvedValue([]);
+    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
+      mode: "none",
+      recipients: [],
+      defaultRecipientId: null,
+      preselectedRecipientId: null,
+    });
   });
 
   it("reads active workflow milestones for the job service_case_id and renders compact progress", async () => {
@@ -206,10 +219,146 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     });
 
     const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("No authorized ECC rater is set up yet.");
+    expect(html).toContain("Set up authorized raters");
     expect(html).toContain("Record external ECC completion");
     expect(html).toContain("name=\"completion_note\"");
     expect(html).toContain("required");
     expect(html).toContain("name=\"evidence_reference\"");
+  });
+
+  it("shows one-click send action when exactly one active authorized ECC rater exists", async () => {
+    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
+      mode: "single",
+      recipients: [
+        {
+          id: "ahr-1",
+          recipient_type: "external_manual",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+        },
+      ],
+      defaultRecipientId: "ahr-1",
+      preselectedRecipientId: "ahr-1",
+    });
+
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "ready",
+        status_reason: null,
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Send to Acme Ratings");
+    expect(html).toContain("name=\"authorized_recipient_id\"");
+    expect(html).toContain("Record external ECC completion");
+  });
+
+  it("shows recipient selector when multiple active authorized ECC raters exist", async () => {
+    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
+      mode: "multiple",
+      recipients: [
+        {
+          id: "ahr-1",
+          recipient_type: "external_manual",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+        },
+        {
+          id: "ahr-2",
+          recipient_type: "external_manual",
+          display_name: "Golden State Rater",
+          is_default: false,
+          is_active: true,
+        },
+      ],
+      defaultRecipientId: "ahr-1",
+      preselectedRecipientId: "ahr-1",
+    });
+
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 0,
+        milestone_status: "ready",
+        status_reason: null,
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Choose authorized rater");
+    expect(html).toContain("Send to rater");
+    expect(html).toContain("Acme Ratings");
+    expect(html).toContain("Golden State Rater");
   });
 
   it("shows Link internal ECC job when eligible ECC jobs exist for the service case", async () => {
@@ -616,6 +765,94 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).not.toContain("Linked ECC job is not complete yet.");
     expect(html).not.toContain("Review and complete ECC milestone");
     expect(html).toContain("Reason: Job #2042: Linked internal ECC job reviewed and completed.");
+  });
+
+  it("keeps external/manual and linked-job controls visible while waiting after send", async () => {
+    resolveActiveAuthorizedHandoffRecipientSelectionMock.mockResolvedValue({
+      mode: "single",
+      recipients: [
+        {
+          id: "ahr-1",
+          recipient_type: "external_manual",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+        },
+      ],
+      defaultRecipientId: "ahr-1",
+      preselectedRecipientId: "ahr-1",
+    });
+
+    listActiveWorkflowInstancesByServiceCaseMock.mockResolvedValue([
+      {
+        id: "wf-1",
+        account_owner_user_id: "owner-1",
+        service_case_id: "case-1",
+        workflow_preset_template_id: "tpl-1",
+        workflow_name_snapshot: "Install Workflow",
+        workflow_status: "active",
+        progress_percent: 0,
+        template_snapshot_json: {},
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listWorkflowInstanceMilestonesMock.mockResolvedValue([
+      {
+        id: "ms-ecc",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        milestone_key: "ecc_handoff_completion",
+        milestone_title: "ECC handoff/completion",
+        milestone_description: null,
+        sort_order: 1,
+        milestone_status: "waiting",
+        status_reason: "Sent to authorized rater: Acme Ratings",
+        metadata_json: null,
+        created_at: "",
+        updated_at: "",
+      },
+    ]);
+    listLinkedJobsForWorkflowMock.mockResolvedValue([
+      {
+        id: "lnk-1",
+        account_owner_user_id: "owner-1",
+        workflow_instance_id: "wf-1",
+        workflow_instance_milestone_id: "ms-ecc",
+        job_id: "job-ecc-1",
+        link_role: "supporting",
+        is_primary: false,
+        notes: null,
+        created_at: "",
+        job: {
+          id: "job-ecc-1",
+          job_display_number: "2042",
+          service_case_id: "case-1",
+          title: "ECC Alteration Test",
+          status: "completed",
+          ops_status: "invoice_required",
+          field_complete: true,
+          scheduled_date: null,
+          created_at: "",
+        },
+      },
+    ]);
+
+    const jsx = await DeferredWorkflowMilestonesPanelBody({
+      accountOwnerUserId: "owner-1",
+      currentJobId: "job-1",
+      serviceCaseId: "case-1",
+      canManageWorkflowGuidance: true,
+      returnToPath: "/jobs/job-1?tab=info#service-chain",
+      emptyStateClassName: "empty-state",
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Reason: Sent to authorized rater: Acme Ratings");
+    expect(html).toContain("Sent to rater. Use linked-job review or external completion when the result is ready.");
+    expect(html).toContain("Record external ECC completion");
+    expect(html).toContain("Linked ECC job appears complete. Review and complete ECC milestone.");
+    expect(html).not.toContain("Send to Acme Ratings");
   });
 
   it("does not show ECC external completion action for non-ECC milestones", async () => {

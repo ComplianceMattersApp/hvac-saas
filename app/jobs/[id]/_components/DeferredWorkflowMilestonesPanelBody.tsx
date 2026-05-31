@@ -10,10 +10,15 @@ import {
   type WorkflowMilestoneStatus,
 } from "@/lib/workflows/read-model";
 import {
+  resolveActiveAuthorizedHandoffRecipientSelection,
+  type AuthorizedHandoffRecipientSelectionState,
+} from "@/lib/workflows/authorized-handoff-recipients-read";
+import {
   assignInstallWithPermitWorkflowForJobFromForm,
   confirmLinkedInternalEccCompletionForWorkflowMilestoneFromForm,
   linkInternalEccJobToWorkflowMilestoneFromForm,
   recordExternalEccCompletionForWorkflowMilestoneFromForm,
+  sendWorkflowEccMilestoneToAuthorizedRaterFromForm,
   updateWorkflowMilestoneStatusFromForm,
 } from "@/lib/workflows/actions";
 
@@ -211,6 +216,12 @@ export default async function DeferredWorkflowMilestonesPanelBody({
     title: string | null;
     ops_status: string | null;
   }> = [];
+  let authorizedEccRaterSelection: AuthorizedHandoffRecipientSelectionState = {
+    mode: "none",
+    recipients: [],
+    defaultRecipientId: null,
+    preselectedRecipientId: null,
+  };
   try {
     workflows = await Promise.all(
       instances.map(async (instance) => {
@@ -253,6 +264,12 @@ export default async function DeferredWorkflowMilestonesPanelBody({
       title: cleanNullableString(row?.title),
       ops_status: cleanNullableString(row?.ops_status),
     })).filter((row) => row.id);
+
+    authorizedEccRaterSelection = await resolveActiveAuthorizedHandoffRecipientSelection({
+      supabase,
+      accountOwnerUserId,
+      handoffKind: "ecc",
+    });
   } catch (error) {
     if (isWorkflowSchemaMissingError(error)) {
       return <div className={emptyStateClassName}>Workflow guidance is not available yet for this environment.</div>;
@@ -316,6 +333,21 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                     && !isCompletedMilestone
                     && Boolean(linkedEccJob)
                     && !linkedEccJobIsComplete;
+                  const sendableAuthorizedRecipients = authorizedEccRaterSelection.recipients.filter(
+                    (recipient) => cleanString(recipient.recipient_type).toLowerCase() !== "connected_account_future",
+                  );
+                  const unavailableConnectedRecipientCount =
+                    authorizedEccRaterSelection.recipients.length - sendableAuthorizedRecipients.length;
+                  const canShowSendToRaterPrimary =
+                    isEccMilestone
+                    && !isCompletedMilestone
+                    && normalizedStatus !== "waiting";
+                  const showSetupRequiredSendState =
+                    canShowSendToRaterPrimary && sendableAuthorizedRecipients.length === 0;
+                  const showSingleRecipientSendState =
+                    canShowSendToRaterPrimary && sendableAuthorizedRecipients.length === 1;
+                  const showMultipleRecipientSendState =
+                    canShowSendToRaterPrimary && sendableAuthorizedRecipients.length > 1;
                   const hasAnySecondaryAction = true;
 
                   return (
@@ -349,6 +381,83 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                           {cleanString(linkedEccJob.job.title) ? (
                             <span className="text-sky-800"> {cleanString(linkedEccJob.job.title)}</span>
                           ) : null}
+                        </div>
+                      ) : null}
+
+                      {showSetupRequiredSendState ? (
+                        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900">
+                          <div className="font-semibold">No authorized ECC rater is set up yet.</div>
+                          <Link
+                            href="/ops/admin/company-profile#authorized-ecc-raters"
+                            className="mt-1 inline-flex text-[11px] font-semibold underline decoration-amber-300 underline-offset-4"
+                          >
+                            Set up authorized raters
+                          </Link>
+                          {unavailableConnectedRecipientCount > 0 ? (
+                            <div className="mt-1 text-[10px] text-amber-800">
+                              Connected-account raters are configured but cannot receive workflow sends yet.
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {showSingleRecipientSendState ? (
+                        <form action={sendWorkflowEccMilestoneToAuthorizedRaterFromForm} className="mt-2">
+                          <input type="hidden" name="workflow_instance_id" value={instance.id} />
+                          <input type="hidden" name="milestone_id" value={milestone.id} />
+                          <input type="hidden" name="job_id" value={currentJobId} />
+                          <input type="hidden" name="authorized_recipient_id" value={sendableAuthorizedRecipients[0]?.id ?? ""} />
+                          <button
+                            type="submit"
+                            className="h-8 rounded-md border border-sky-300 bg-sky-50 px-2.5 text-[11px] font-semibold text-sky-800 transition-colors hover:border-sky-400 hover:bg-sky-100"
+                          >
+                            Send to {cleanString(sendableAuthorizedRecipients[0]?.display_name) || "authorized rater"}
+                          </button>
+                        </form>
+                      ) : null}
+
+                      {showMultipleRecipientSendState ? (
+                        <form action={sendWorkflowEccMilestoneToAuthorizedRaterFromForm} className="mt-2 flex flex-col gap-1.5 rounded-md border border-slate-200 bg-white/80 p-2 sm:flex-row sm:items-end">
+                          <input type="hidden" name="workflow_instance_id" value={instance.id} />
+                          <input type="hidden" name="milestone_id" value={milestone.id} />
+                          <input type="hidden" name="job_id" value={currentJobId} />
+                          <div className="min-w-0 flex-1">
+                            <label className="mb-0.5 block text-[11px] font-semibold text-slate-700" htmlFor={`authorized-recipient-${milestone.id}`}>
+                              Choose authorized rater
+                            </label>
+                            <select
+                              id={`authorized-recipient-${milestone.id}`}
+                              name="authorized_recipient_id"
+                              required
+                              defaultValue={
+                                sendableAuthorizedRecipients.find(
+                                  (recipient) => recipient.id === authorizedEccRaterSelection.preselectedRecipientId,
+                                )?.id
+                                ?? sendableAuthorizedRecipients[0]?.id
+                                ?? ""
+                              }
+                              className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-800"
+                              aria-label={`Choose authorized rater for ${milestoneTitle}`}
+                            >
+                              {sendableAuthorizedRecipients.map((recipient) => (
+                                <option key={recipient.id} value={recipient.id}>
+                                  {cleanString(recipient.display_name)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <button
+                            type="submit"
+                            className="h-8 rounded-md border border-sky-300 bg-sky-50 px-2.5 text-[11px] font-semibold text-sky-800 transition-colors hover:border-sky-400 hover:bg-sky-100"
+                          >
+                            Send to rater
+                          </button>
+                        </form>
+                      ) : null}
+
+                      {isEccMilestone && normalizedStatus === "waiting" && statusReason.toLowerCase().startsWith("sent to authorized rater:") ? (
+                        <div className="mt-2 rounded-md border border-sky-200 bg-sky-50/70 px-2.5 py-2 text-[11px] text-sky-900">
+                          Sent to rater. Use linked-job review or external completion when the result is ready.
                         </div>
                       ) : null}
 

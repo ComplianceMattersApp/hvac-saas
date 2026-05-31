@@ -5,6 +5,9 @@ import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { WORKFLOW_MILESTONE_STATUSES, type WorkflowMilestoneStatus } from "@/lib/workflows/read-model";
 import {
+  resolveActiveAuthorizedHandoffRecipientSelection,
+} from "@/lib/workflows/authorized-handoff-recipients-read";
+import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
@@ -58,6 +61,12 @@ type ConfirmLinkedInternalEccCompletionForWorkflowMilestoneParams = {
   reviewNote?: string | null;
 };
 
+type SendWorkflowEccMilestoneToAuthorizedRaterParams = {
+  workflowInstanceId: string;
+  milestoneId: string;
+  authorizedRecipientId?: string | null;
+};
+
 type WorkflowMilestoneStatusUpdateResult =
   | {
       success: true;
@@ -105,6 +114,21 @@ type ConfirmLinkedInternalEccCompletionForWorkflowMilestoneResult =
       status: "completed";
       statusReason: string;
       jobId: string;
+    }
+  | {
+      success: false;
+      error: string;
+    };
+
+type SendWorkflowEccMilestoneToAuthorizedRaterResult =
+  | {
+      success: true;
+      workflowInstanceId: string;
+      milestoneId: string;
+      status: "waiting";
+      statusReason: string;
+      authorizedRecipientId: string;
+      recipientDisplayName: string;
     }
   | {
       success: false;
@@ -1551,6 +1575,189 @@ export async function confirmLinkedInternalEccCompletionForWorkflowMilestone(
   };
 }
 
+export async function sendWorkflowEccMilestoneToAuthorizedRater(
+  params: SendWorkflowEccMilestoneToAuthorizedRaterParams,
+): Promise<SendWorkflowEccMilestoneToAuthorizedRaterResult> {
+  const workflowInstanceId = cleanString(params.workflowInstanceId);
+  const milestoneId = cleanString(params.milestoneId);
+  const requestedRecipientId = cleanNullableString(params.authorizedRecipientId);
+
+  if (!workflowInstanceId) {
+    return { success: false, error: "workflow_instance_id is required." };
+  }
+
+  if (!milestoneId) {
+    return { success: false, error: "milestone_id is required." };
+  }
+
+  const supabase = await createClient();
+
+  let authz: Awaited<ReturnType<typeof requireInternalUser>>;
+  try {
+    authz = await requireInternalUser({ supabase });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      if (error.code === "AUTH_REQUIRED") {
+        return { success: false, error: "Authentication required." };
+      }
+      return { success: false, error: "Active internal user required." };
+    }
+    throw error;
+  }
+
+  const accountOwnerUserId = cleanString(authz.internalUser.account_owner_user_id);
+  const actingUserId = cleanString(authz.userId);
+
+  if (!accountOwnerUserId || !actingUserId) {
+    return { success: false, error: "Internal account scope is required." };
+  }
+
+  const admin = createAdminClient();
+
+  const { data: workflowInstance, error: workflowInstanceError } = await admin
+    .from("workflow_instances")
+    .select("id, account_owner_user_id")
+    .eq("id", workflowInstanceId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (workflowInstanceError) {
+    return {
+      success: false,
+      error: workflowInstanceError.message ?? "Failed to load workflow instance.",
+    };
+  }
+
+  if (!workflowInstance?.id) {
+    return {
+      success: false,
+      error: "workflow_instance_id not found in this account.",
+    };
+  }
+
+  const { data: milestoneRow, error: milestoneReadError } = await admin
+    .from("workflow_instance_milestones")
+    .select("id, account_owner_user_id, workflow_instance_id, milestone_key, milestone_title")
+    .eq("id", milestoneId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (milestoneReadError) {
+    return {
+      success: false,
+      error: milestoneReadError.message ?? "Failed to load workflow milestone.",
+    };
+  }
+
+  if (!milestoneRow?.id) {
+    return {
+      success: false,
+      error: "milestone_id not found in this account.",
+    };
+  }
+
+  if (cleanString(milestoneRow.workflow_instance_id) !== workflowInstanceId) {
+    return {
+      success: false,
+      error: "milestone_id does not belong to workflow_instance_id.",
+    };
+  }
+
+  if (!isEccHandoffCompletionMilestone(milestoneRow)) {
+    return {
+      success: false,
+      error: "milestone_id is not ECC handoff/completion milestone.",
+    };
+  }
+
+  const selection = await resolveActiveAuthorizedHandoffRecipientSelection({
+    supabase: admin,
+    accountOwnerUserId,
+    handoffKind: "ecc",
+  });
+
+  if (selection.mode === "none") {
+    return {
+      success: false,
+      error: "No active authorized ECC rater is set up yet.",
+    };
+  }
+
+  if (selection.mode === "multiple" && !requestedRecipientId) {
+    return {
+      success: false,
+      error: "authorized_recipient_id is required when multiple recipients are active.",
+    };
+  }
+
+  if (selection.mode === "single" && requestedRecipientId && requestedRecipientId !== selection.recipients[0]?.id) {
+    return {
+      success: false,
+      error: "authorized_recipient_id is not an active ECC recipient in this account.",
+    };
+  }
+
+  const resolvedRecipientId =
+    selection.mode === "single"
+      ? selection.recipients[0]?.id ?? null
+      : requestedRecipientId;
+
+  if (!resolvedRecipientId) {
+    return {
+      success: false,
+      error: "authorized_recipient_id is required.",
+    };
+  }
+
+  const recipient = selection.recipients.find((row) => row.id === resolvedRecipientId) ?? null;
+  if (!recipient) {
+    return {
+      success: false,
+      error: "authorized_recipient_id is not an active ECC recipient in this account.",
+    };
+  }
+
+  if (cleanString(recipient.recipient_type).toLowerCase() === "connected_account_future") {
+    return {
+      success: false,
+      error: "Connected-account ECC handoff is not available yet.",
+    };
+  }
+
+  const statusReason = `Sent to authorized rater: ${cleanString(recipient.display_name)}`;
+
+  const { data: updatedMilestone, error: updateError } = await admin
+    .from("workflow_instance_milestones")
+    .update({
+      milestone_status: "waiting",
+      status_reason: statusReason,
+      updated_by_user_id: actingUserId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", milestoneId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("workflow_instance_id", workflowInstanceId)
+    .select("id")
+    .maybeSingle();
+
+  if (updateError || !updatedMilestone?.id) {
+    return {
+      success: false,
+      error: updateError?.message ?? "Failed to send ECC milestone to authorized rater.",
+    };
+  }
+
+  return {
+    success: true,
+    workflowInstanceId,
+    milestoneId,
+    status: "waiting",
+    statusReason,
+    authorizedRecipientId: recipient.id,
+    recipientDisplayName: cleanString(recipient.display_name),
+  };
+}
+
 export async function updateWorkflowMilestoneStatusFromForm(formData: FormData) {
   const workflowInstanceId = cleanString(formData.get("workflow_instance_id"));
   const milestoneId = cleanString(formData.get("milestone_id"));
@@ -1616,6 +1823,27 @@ export async function confirmLinkedInternalEccCompletionForWorkflowMilestoneFrom
 
   if (!result.success) {
     throw new Error(result.error);
+  }
+}
+
+export async function sendWorkflowEccMilestoneToAuthorizedRaterFromForm(formData: FormData) {
+  const workflowInstanceId = cleanString(formData.get("workflow_instance_id"));
+  const milestoneId = cleanString(formData.get("milestone_id"));
+  const authorizedRecipientId = cleanNullableString(formData.get("authorized_recipient_id"));
+  const jobId = cleanString(formData.get("job_id"));
+
+  const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+    workflowInstanceId,
+    milestoneId,
+    authorizedRecipientId,
+  });
+
+  if (!result.success) {
+    throw new Error(result.error);
+  }
+
+  if (jobId) {
+    revalidatePath(`/jobs/${jobId}`);
   }
 }
 

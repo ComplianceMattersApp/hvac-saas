@@ -76,6 +76,28 @@ type MockJob = {
   field_complete?: boolean;
 };
 
+type MockAuthorizedHandoffRecipient = {
+  id: string;
+  account_owner_user_id: string;
+  recipient_type: string;
+  handoff_kind: string;
+  display_name: string;
+  internal_user_id?: string | null;
+  external_company_name?: string | null;
+  external_contact_name?: string | null;
+  external_email?: string | null;
+  external_phone?: string | null;
+  connected_account_owner_user_id?: string | null;
+  is_default?: boolean;
+  is_active?: boolean;
+  notes?: string | null;
+  created_by_user_id?: string | null;
+  updated_by_user_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  archived_at?: string | null;
+};
+
 function makeThenable<T>(
   resolver: () => T,
   chainMethods: Record<string, (...args: unknown[]) => any>,
@@ -96,6 +118,7 @@ function makeAdminFixture(input?: {
   workflowMilestones?: MockWorkflowMilestone[];
   workflowJobLinks?: MockWorkflowJobLink[];
   jobs?: MockJob[];
+  authorizedHandoffRecipients?: MockAuthorizedHandoffRecipient[];
 }) {
   const serviceCases = [...(input?.serviceCases ?? [])];
   const customers = [...(input?.customers ?? [])];
@@ -104,6 +127,7 @@ function makeAdminFixture(input?: {
   const workflowMilestones = [...(input?.workflowMilestones ?? [])];
   const workflowJobLinks = [...(input?.workflowJobLinks ?? [])];
   const jobs = [...(input?.jobs ?? [])];
+  const authorizedHandoffRecipients = [...(input?.authorizedHandoffRecipients ?? [])];
 
   const tableCalls: string[] = [];
   const workflowInstanceInsertCalls: Array<Record<string, unknown>> = [];
@@ -343,7 +367,7 @@ function makeAdminFixture(input?: {
           let ownerId = "";
           let workflowInstanceId = "";
 
-          const query = makeThenable(
+          const query: any = makeThenable(
             () => {
               const scoped = workflowMilestones.filter(
                 (row) =>
@@ -470,7 +494,7 @@ function makeAdminFixture(input?: {
           let milestoneId = "";
           let jobId = "";
 
-          const query = makeThenable(
+          const query: any = makeThenable(
             () => {
               const scoped = workflowJobLinks.filter(
                 (row) =>
@@ -594,6 +618,107 @@ function makeAdminFixture(input?: {
         };
       }
 
+      if (table === "authorized_handoff_recipients") {
+        const select = vi.fn(() => {
+          let whereId = "";
+          let ownerId = "";
+          let handoffKind = "";
+          let isActive: boolean | null = null;
+          let archivedAtIsNull = false;
+          let limit = 100;
+
+          const query: any = makeThenable(
+            () => {
+              const scoped = authorizedHandoffRecipients
+                .filter((row) => (whereId ? row.id === whereId : true))
+                .filter((row) => (ownerId ? row.account_owner_user_id === ownerId : true))
+                .filter((row) => (handoffKind ? row.handoff_kind === handoffKind : true))
+                .filter((row) => (isActive == null ? true : Boolean(row.is_active) === isActive))
+                .filter((row) => (archivedAtIsNull ? row.archived_at == null : true))
+                .slice(0, limit)
+                .map((row) => ({
+                  ...row,
+                  internal_user_id: row.internal_user_id ?? null,
+                  external_company_name: row.external_company_name ?? null,
+                  external_contact_name: row.external_contact_name ?? null,
+                  external_email: row.external_email ?? null,
+                  external_phone: row.external_phone ?? null,
+                  connected_account_owner_user_id: row.connected_account_owner_user_id ?? null,
+                  is_default: Boolean(row.is_default),
+                  is_active: row.is_active == null ? true : Boolean(row.is_active),
+                  notes: row.notes ?? null,
+                  created_by_user_id: row.created_by_user_id ?? null,
+                  updated_by_user_id: row.updated_by_user_id ?? null,
+                  created_at: row.created_at ?? "2026-05-31T00:00:00.000Z",
+                  updated_at: row.updated_at ?? "2026-05-31T00:00:00.000Z",
+                  archived_at: row.archived_at ?? null,
+                }));
+
+              return { data: scoped, error: null };
+            },
+            {
+              eq: (column: unknown, value: unknown) => {
+                if (column === "id") whereId = String(value ?? "").trim();
+                if (column === "account_owner_user_id") ownerId = String(value ?? "").trim();
+                if (column === "handoff_kind") handoffKind = String(value ?? "").trim();
+                if (column === "is_active") isActive = Boolean(value);
+                return query;
+              },
+              is: (column: unknown, value: unknown) => {
+                if (column === "archived_at" && value === null) archivedAtIsNull = true;
+                return query;
+              },
+              order: () => query,
+              limit: (value: unknown) => {
+                limit = Number(value ?? 100);
+                return query;
+              },
+              maybeSingle: async () => {
+                const row = authorizedHandoffRecipients.find((entry) => {
+                  if (whereId && entry.id !== whereId) return false;
+                  if (ownerId && entry.account_owner_user_id !== ownerId) return false;
+                  if (handoffKind && entry.handoff_kind !== handoffKind) return false;
+                  if (isActive != null && Boolean(entry.is_active) !== isActive) return false;
+                  if (archivedAtIsNull && entry.archived_at != null) return false;
+                  return true;
+                });
+
+                if (!row) {
+                  return { data: null, error: null };
+                }
+
+                return {
+                  data: {
+                    ...row,
+                    internal_user_id: row.internal_user_id ?? null,
+                    external_company_name: row.external_company_name ?? null,
+                    external_contact_name: row.external_contact_name ?? null,
+                    external_email: row.external_email ?? null,
+                    external_phone: row.external_phone ?? null,
+                    connected_account_owner_user_id: row.connected_account_owner_user_id ?? null,
+                    is_default: Boolean(row.is_default),
+                    is_active: row.is_active == null ? true : Boolean(row.is_active),
+                    notes: row.notes ?? null,
+                    created_by_user_id: row.created_by_user_id ?? null,
+                    updated_by_user_id: row.updated_by_user_id ?? null,
+                    created_at: row.created_at ?? "2026-05-31T00:00:00.000Z",
+                    updated_at: row.updated_at ?? "2026-05-31T00:00:00.000Z",
+                    archived_at: row.archived_at ?? null,
+                  },
+                  error: null,
+                };
+              },
+            },
+          );
+
+          return query;
+        });
+
+        return {
+          select,
+        };
+      }
+
       throw new Error(`Unexpected table ${table}`);
     }),
 
@@ -617,6 +742,7 @@ const {
   ensureInstallWithPermitWorkflowPreset,
   linkInternalEccJobToWorkflowMilestone,
   recordExternalEccCompletionForWorkflowMilestone,
+  sendWorkflowEccMilestoneToAuthorizedRater,
   updateWorkflowMilestoneStatus,
 } = await import("@/lib/workflows/actions");
 
@@ -1796,6 +1922,410 @@ describe("confirmLinkedInternalEccCompletionForWorkflowMilestone", () => {
     expect(admin._tableCalls).not.toContain("qbo_sync_events");
     expect(admin._tableCalls).not.toContain("portal_notifications");
     expect(admin._workflowJobLinkInsertCalls).toHaveLength(0);
+  });
+});
+
+describe("sendWorkflowEccMilestoneToAuthorizedRater", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        role: "admin",
+        is_active: true,
+      },
+    });
+  });
+
+  function buildFixture(overrides?: {
+    workflowInstances?: MockWorkflowInstance[];
+    workflowMilestones?: MockWorkflowMilestone[];
+    authorizedHandoffRecipients?: MockAuthorizedHandoffRecipient[];
+  }) {
+    const admin = makeAdminFixture({
+      workflowInstances: overrides?.workflowInstances ?? [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: overrides?.workflowMilestones ?? [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+          status_reason: null,
+        },
+      ],
+      authorizedHandoffRecipients: overrides?.authorizedHandoffRecipients ?? [],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+    return admin;
+  }
+
+  it("rejects when no active ECC recipient is configured", async () => {
+    buildFixture();
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "No active authorized ECC rater is set up yet.",
+    });
+  });
+
+  it("sends to the only active ECC recipient when one recipient exists", async () => {
+    const admin = buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      status: "waiting",
+      statusReason: "Sent to authorized rater: Acme Ratings",
+      authorizedRecipientId: "ahr-1",
+      recipientDisplayName: "Acme Ratings",
+    });
+
+    expect(admin._workflowMilestones[0]).toMatchObject({
+      milestone_status: "waiting",
+      status_reason: "Sent to authorized rater: Acme Ratings",
+      updated_by_user_id: "user-1",
+    });
+  });
+
+  it("requires explicit recipient selection when multiple recipients are active", async () => {
+    buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+        {
+          id: "ahr-2",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Golden State Rater",
+          is_default: false,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "authorized_recipient_id is required when multiple recipients are active.",
+    });
+  });
+
+  it("rejects recipient ids that are out of account scope", async () => {
+    buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-foreign",
+          account_owner_user_id: "owner-2",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Foreign Recipient",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-foreign",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "No active authorized ECC rater is set up yet.",
+    });
+  });
+
+  it("rejects inactive recipients", async () => {
+    buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Inactive Rater",
+          is_default: true,
+          is_active: false,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "No active authorized ECC rater is set up yet.",
+    });
+  });
+
+  it("rejects non-ECC recipient kinds", async () => {
+    buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "general_future",
+          display_name: "General Recipient",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "No active authorized ECC rater is set up yet.",
+    });
+  });
+
+  it("rejects non-ECC milestones", async () => {
+    buildFixture({
+      workflowMilestones: [
+        {
+          id: "ms-install",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "install_work",
+          milestone_title: "Install work",
+          milestone_status: "ready",
+        },
+      ],
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-install",
+      authorizedRecipientId: "ahr-1",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "milestone_id is not ECC handoff/completion milestone.",
+    });
+  });
+
+  it("rejects cross-account workflow/milestone scope and mismatch", async () => {
+    buildFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-2",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const crossAccountResult = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+    });
+
+    expect(crossAccountResult).toEqual({
+      success: false,
+      error: "workflow_instance_id not found in this account.",
+    });
+
+    const mismatchAdmin = buildFixture({
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-2",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+        },
+      ],
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const mismatchResult = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      authorizedRecipientId: "ahr-1",
+    });
+
+    expect(mismatchResult).toEqual({
+      success: false,
+      error: "milestone_id does not belong to workflow_instance_id.",
+    });
+    expect(mismatchAdmin._workflowMilestoneUpdateCalls).toHaveLength(0);
+  });
+
+  it("rejects connected_account_future recipients for this workflow-scoped v1", async () => {
+    buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "connected_account_future",
+          handoff_kind: "ecc",
+          display_name: "Future Connected Recipient",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "Connected-account ECC handoff is not available yet.",
+    });
+  });
+
+  it("updates only workflow_instance_milestones and avoids job/service_case/job_events and billing/sms/qbo/portal writes", async () => {
+    const admin = buildFixture({
+      authorizedHandoffRecipients: [
+        {
+          id: "ahr-1",
+          account_owner_user_id: "owner-1",
+          recipient_type: "external_manual",
+          handoff_kind: "ecc",
+          display_name: "Acme Ratings",
+          is_default: true,
+          is_active: true,
+          archived_at: null,
+        },
+      ],
+    });
+
+    const result = await sendWorkflowEccMilestoneToAuthorizedRater({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result.success).toBe(true);
+
+    const forbiddenTables = [
+      "jobs",
+      "service_cases",
+      "job_events",
+      "internal_invoices",
+      "internal_invoice_payments",
+      "internal_invoice_payment_allocations",
+      "customer_saved_payment_methods",
+      "stripe_webhook_events",
+      "outbound_sms_messages",
+      "qbo_sync_events",
+      "portal_notifications",
+    ];
+
+    for (const table of forbiddenTables) {
+      expect(admin._tableCalls).not.toContain(table);
+    }
   });
 });
 
