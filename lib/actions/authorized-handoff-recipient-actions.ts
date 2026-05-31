@@ -6,12 +6,13 @@ import {
   isInternalAccessError,
   requireInternalRole,
 } from "@/lib/auth/internal-user";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   archiveAuthorizedHandoffRecipient,
   createAuthorizedHandoffRecipient,
   updateAuthorizedHandoffRecipient,
 } from "@/lib/workflows/authorized-handoff-recipients-actions";
+import { listActiveRecipientConnectionsForAccount } from "@/lib/workflows/account-handoff-connections-read";
 
 const COMPANY_PROFILE_PATH = "/ops/admin/company-profile";
 const SECTION_ANCHOR = "#authorized-ecc-raters";
@@ -38,7 +39,12 @@ async function requireAdminOrRedirectForbidden() {
   const supabase = await createClient();
 
   try {
-    await requireInternalRole("admin", { supabase });
+    const authz = await requireInternalRole("admin", { supabase });
+    return {
+      supabase,
+      userId: cleanString(authz.userId),
+      accountOwnerUserId: cleanString(authz.internalUser.account_owner_user_id),
+    };
   } catch (error) {
     if (isInternalAccessError(error)) {
       redirect("/forbidden");
@@ -113,4 +119,72 @@ export async function archiveAuthorizedEccRaterFromForm(formData: FormData): Pro
 
   revalidatePath(COMPANY_PROFILE_PATH);
   redirect(withNotice("authorized_ecc_rater_archived"));
+}
+
+function connectedAccountRaterDisplayName(accountOwnerUserId: string) {
+  const shortId = cleanString(accountOwnerUserId).slice(0, 8);
+  return shortId ? `Connected account ${shortId}` : "Connected account rater";
+}
+
+export async function createConnectedAccountAuthorizedEccRaterFromForm(formData: FormData): Promise<void> {
+  const authz = await requireAdminOrRedirectForbidden();
+
+  const connectionId = cleanString(formData.get("connection_id"));
+  if (!connectionId) {
+    redirect(withNotice("connected_rater_error"));
+  }
+
+  const activeConnections = await listActiveRecipientConnectionsForAccount(
+    authz.supabase,
+    authz.accountOwnerUserId,
+    "ecc",
+  );
+
+  const connection = activeConnections.find((entry) => entry.id === connectionId) ?? null;
+  if (!connection) {
+    redirect(withNotice("connected_rater_error"));
+  }
+
+  const connectedAccountOwnerUserId = cleanString(connection.recipient_account_owner_user_id);
+  if (!connectedAccountOwnerUserId) {
+    redirect(withNotice("connected_rater_error"));
+  }
+
+  const admin = createAdminClient();
+  const { data: existingRow, error: existingError } = await admin
+    .from("authorized_handoff_recipients")
+    .select("id")
+    .eq("account_owner_user_id", authz.accountOwnerUserId)
+    .eq("handoff_kind", "ecc")
+    .eq("recipient_type", "connected_account_future")
+    .eq("connected_account_owner_user_id", connectedAccountOwnerUserId)
+    .eq("is_active", true)
+    .is("archived_at", null)
+    .maybeSingle();
+
+  if (existingError) {
+    redirect(withNotice("connected_rater_error"));
+  }
+
+  if (existingRow?.id) {
+    revalidatePath(COMPANY_PROFILE_PATH);
+    redirect(withNotice("connected_rater_exists"));
+  }
+
+  const result = await createAuthorizedHandoffRecipient({
+    recipientType: "connected_account_future",
+    handoffKind: "ecc",
+    connectedAccountOwnerUserId,
+    displayName: connectedAccountRaterDisplayName(connectedAccountOwnerUserId),
+    notes: cleanNullableString(formData.get("notes")),
+    isDefault: normalizeChecked(formData.get("is_default")),
+    isActive: true,
+  });
+
+  if (!result.success) {
+    redirect(withNotice("connected_rater_error"));
+  }
+
+  revalidatePath(COMPANY_PROFILE_PATH);
+  redirect(withNotice("connected_rater_added"));
 }

@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createClientMock = vi.fn();
+const createAdminClientMock = vi.fn();
 const requireInternalRoleMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const listActiveRecipientConnectionsForAccountMock = vi.fn();
 
 const createAuthorizedHandoffRecipientMock = vi.fn();
 const updateAuthorizedHandoffRecipientMock = vi.fn();
@@ -20,6 +22,7 @@ vi.mock("next/cache", () => ({
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
+  createAdminClient: (...args: unknown[]) => createAdminClientMock(...args),
 }));
 
 vi.mock("@/lib/auth/internal-user", () => ({
@@ -37,6 +40,11 @@ vi.mock("@/lib/workflows/authorized-handoff-recipients-actions", () => ({
     updateAuthorizedHandoffRecipientMock(...args),
   archiveAuthorizedHandoffRecipient: (...args: unknown[]) =>
     archiveAuthorizedHandoffRecipientMock(...args),
+}));
+
+vi.mock("@/lib/workflows/account-handoff-connections-read", () => ({
+  listActiveRecipientConnectionsForAccount: (...args: unknown[]) =>
+    listActiveRecipientConnectionsForAccountMock(...args),
 }));
 
 describe("authorized handoff recipient admin form actions", () => {
@@ -63,6 +71,26 @@ describe("authorized handoff recipient admin form actions", () => {
     archiveAuthorizedHandoffRecipientMock.mockResolvedValue({
       success: true,
       recipient: { id: "recipient-1" },
+    });
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValue([]);
+    createAdminClientMock.mockReturnValue({
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    is: vi.fn(() => ({
+                      maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          })),
+        })),
+      })),
     });
   });
 
@@ -161,5 +189,154 @@ describe("authorized handoff recipient admin form actions", () => {
     formData.set("display_name", "Blocked");
 
     await expect(createAuthorizedEccRaterFromForm(formData)).rejects.toThrow("REDIRECT:/forbidden");
+  });
+
+  it("adds connected account rater when active requester-side connection exists", async () => {
+    const { createConnectedAccountAuthorizedEccRaterFromForm } = await import(
+      "@/lib/actions/authorized-handoff-recipient-actions"
+    );
+
+    const adminFromMock = vi.fn(() => ({
+      select: vi.fn(() => ({
+        eq: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  is: vi.fn(() => ({
+                    maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                  })),
+                })),
+              })),
+            })),
+          })),
+        })),
+      })),
+    }));
+    createAdminClientMock.mockReturnValue({ from: adminFromMock });
+
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValue([
+      {
+        id: "connection-1",
+        requesting_account_owner_user_id: "owner-1",
+        recipient_account_owner_user_id: "22222222-2222-4222-8222-222222222222",
+        connection_status: "active",
+        handoff_kind: "ecc",
+      },
+    ]);
+
+    const formData = new FormData();
+    formData.set("connection_id", "connection-1");
+    formData.set("is_default", "1");
+
+    await expect(createConnectedAccountAuthorizedEccRaterFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=connected_rater_added#authorized-ecc-raters",
+    );
+
+    expect(listActiveRecipientConnectionsForAccountMock).toHaveBeenCalledWith(
+      expect.anything(),
+      "owner-1",
+      "ecc",
+    );
+    expect(createAuthorizedHandoffRecipientMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        recipientType: "connected_account_future",
+        handoffKind: "ecc",
+        connectedAccountOwnerUserId: "22222222-2222-4222-8222-222222222222",
+        isDefault: true,
+        isActive: true,
+      }),
+    );
+    expect(adminFromMock).toHaveBeenCalledWith("authorized_handoff_recipients");
+  });
+
+  it("rejects when selected connection is not active requester-side connection", async () => {
+    const { createConnectedAccountAuthorizedEccRaterFromForm } = await import(
+      "@/lib/actions/authorized-handoff-recipient-actions"
+    );
+
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValue([
+      {
+        id: "different-connection",
+        requesting_account_owner_user_id: "owner-1",
+        recipient_account_owner_user_id: "22222222-2222-4222-8222-222222222222",
+        connection_status: "active",
+        handoff_kind: "ecc",
+      },
+    ]);
+
+    const formData = new FormData();
+    formData.set("connection_id", "missing-connection");
+
+    await expect(createConnectedAccountAuthorizedEccRaterFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=connected_rater_error#authorized-ecc-raters",
+    );
+    expect(createAuthorizedHandoffRecipientMock).not.toHaveBeenCalled();
+  });
+
+  it("returns already configured notice when duplicate active connected recipient exists", async () => {
+    const { createConnectedAccountAuthorizedEccRaterFromForm } = await import(
+      "@/lib/actions/authorized-handoff-recipient-actions"
+    );
+
+    listActiveRecipientConnectionsForAccountMock.mockResolvedValue([
+      {
+        id: "connection-1",
+        requesting_account_owner_user_id: "owner-1",
+        recipient_account_owner_user_id: "22222222-2222-4222-8222-222222222222",
+        connection_status: "active",
+        handoff_kind: "ecc",
+      },
+    ]);
+
+    createAdminClientMock.mockReturnValue({
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    is: vi.fn(() => ({
+                      maybeSingle: vi.fn(async () => ({
+                        data: { id: "recipient-existing" },
+                        error: null,
+                      })),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          })),
+        })),
+      })),
+    });
+
+    const formData = new FormData();
+    formData.set("connection_id", "connection-1");
+
+    await expect(createConnectedAccountAuthorizedEccRaterFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/admin/company-profile?notice=connected_rater_exists#authorized-ecc-raters",
+    );
+    expect(createAuthorizedHandoffRecipientMock).not.toHaveBeenCalled();
+  });
+
+  it("redirects forbidden for connected rater add when non-admin", async () => {
+    requireInternalRoleMock.mockRejectedValue({
+      name: "InternalAccessError",
+      code: "INTERNAL_ROLE_REQUIRED",
+      message: "Required internal role: admin",
+    });
+
+    const { createConnectedAccountAuthorizedEccRaterFromForm } = await import(
+      "@/lib/actions/authorized-handoff-recipient-actions"
+    );
+
+    const formData = new FormData();
+    formData.set("connection_id", "connection-1");
+
+    await expect(createConnectedAccountAuthorizedEccRaterFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/forbidden",
+    );
   });
 });

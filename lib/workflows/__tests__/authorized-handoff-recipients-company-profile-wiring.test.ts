@@ -48,4 +48,20 @@ describe("authorized ECC raters company profile wiring", () => {
     expect(pageSource).toContain('name="handoff_kind" value="ecc"');
     expect(pageSource).toContain('name="recipient_type" value="external_manual"');
   });
+
+  it("shows connected account rater option wired to active connections", () => {
+    const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
+
+    expect(pageSource).toContain("Connected account raters");
+    expect(pageSource).toContain("listActiveRecipientConnectionsForAccount");
+    expect(pageSource).toContain("createConnectedAccountAuthorizedEccRaterFromForm");
+    expect(pageSource).toContain("Active connected accounts can be added as authorized ECC rater routing options.");
+    expect(pageSource).toContain("No active connected handoff accounts yet.");
+    expect(pageSource).toContain("#account-handoff-connections");
+  });
+
+  it("labels connected recipient rows clearly", () => {
+    const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
+    expect(pageSource).toContain("Connected account");
+  });
 });

@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions/internal-business-profile-actions";
 import {
   archiveAuthorizedEccRaterFromForm,
+  createConnectedAccountAuthorizedEccRaterFromForm,
   createAuthorizedEccRaterFromForm,
   setAuthorizedEccRaterDefaultFromForm,
 } from "@/lib/actions/authorized-handoff-recipient-actions";
@@ -41,6 +42,7 @@ import {
   type AuthorizedHandoffRecipientRow,
 } from "@/lib/workflows/authorized-handoff-recipients-read";
 import {
+  listActiveRecipientConnectionsForAccount,
   listAccountHandoffConnectionsForAccount,
   type AccountHandoffConnectionRow,
 } from "@/lib/workflows/account-handoff-connections-read";
@@ -108,6 +110,18 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
     tone: "error",
     message: "Could not archive authorized ECC rater.",
   },
+  connected_rater_added: {
+    tone: "success",
+    message: "Connected account rater added.",
+  },
+  connected_rater_exists: {
+    tone: "warn",
+    message: "Connected account rater is already configured.",
+  },
+  connected_rater_error: {
+    tone: "error",
+    message: "Could not add connected account rater.",
+  },
   connection_requested: {
     tone: "success",
     message: "Connected handoff account request submitted.",
@@ -173,7 +187,14 @@ export default async function AdminCompanyProfilePage({
   const notice = NOTICE_TEXT[String(sp.notice ?? "").trim().toLowerCase()];
 
   const { supabase, internalUser } = await requireAdminOrRedirect();
-  const [profile, entitlement, seatAuditPreview, authorizedEccSelection, accountHandoffConnections] = await Promise.all([
+  const [
+    profile,
+    entitlement,
+    seatAuditPreview,
+    authorizedEccSelection,
+    accountHandoffConnections,
+    activeConnectedRecipientConnections,
+  ] = await Promise.all([
     getInternalBusinessProfileByAccountOwnerId({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
@@ -195,6 +216,11 @@ export default async function AdminCompanyProfilePage({
         handoffKind: "ecc",
         limit: 200,
       },
+    ),
+    listActiveRecipientConnectionsForAccount(
+      supabase,
+      internalUser.account_owner_user_id,
+      "ecc",
     ),
   ]);
 
@@ -685,6 +711,66 @@ export default async function AdminCompanyProfilePage({
             </button>
           </div>
         </form>
+
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="text-sm font-semibold text-slate-900">Connected account raters</div>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            Active connected accounts can be added as authorized ECC rater routing options. This still does not share jobs, customers, service cases, or payment data.
+          </p>
+
+          {activeConnectedRecipientConnections.length === 0 ? (
+            <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-3 py-2 text-sm text-slate-600">
+              No active connected handoff accounts yet. <a href="#account-handoff-connections" className="font-semibold text-slate-900 underline-offset-2 hover:underline">Open Connected Handoff Accounts setup</a>.
+            </div>
+          ) : activeConnectedRecipientConnections.length === 1 ? (
+            <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
+              <input type="hidden" name="connection_id" value={activeConnectedRecipientConnections[0].id} />
+              <div className="text-sm text-slate-700">
+                Add connected account {activeConnectedRecipientConnections[0].recipient_account_owner_user_id.slice(0, 8)} as an authorized ECC rater.
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
+                Set as default ECC rater
+              </label>
+              <button
+                type="submit"
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+              >
+                Add connected account rater
+              </button>
+            </form>
+          ) : (
+            <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
+              <div className="space-y-1.5">
+                <label htmlFor="connected-rater-connection-id" className="text-sm font-medium text-slate-700">
+                  Select active connected account
+                </label>
+                <select
+                  id="connected-rater-connection-id"
+                  name="connection_id"
+                  required
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                >
+                  {activeConnectedRecipientConnections.map((connection) => (
+                    <option key={connection.id} value={connection.id}>
+                      {connection.recipient_account_owner_user_id}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
+                Set as default ECC rater
+              </label>
+              <button
+                type="submit"
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+              >
+                Add connected account rater
+              </button>
+            </form>
+          )}
+        </div>
       </div>
 
       <div id="account-handoff-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
@@ -929,7 +1015,7 @@ function formatAuthorizedRecipientTypeLabel(recipient: AuthorizedHandoffRecipien
     return "Internal user";
   }
   if (normalizedType === "connected_account_future") {
-    return "Connected account future";
+    return "Connected account";
   }
   return "External/manual rater";
 }
