@@ -11,6 +11,7 @@ import {
 } from "@/lib/workflows/read-model";
 import {
   assignInstallWithPermitWorkflowForJobFromForm,
+  confirmLinkedInternalEccCompletionForWorkflowMilestoneFromForm,
   linkInternalEccJobToWorkflowMilestoneFromForm,
   recordExternalEccCompletionForWorkflowMilestoneFromForm,
   updateWorkflowMilestoneStatusFromForm,
@@ -88,6 +89,13 @@ function isEccHandoffCompletionMilestone(milestone: {
   }
 
   return normalizeMilestoneTitle(milestone.milestone_title) === "ecc handoff/completion";
+}
+
+function isLinkedEccJobComplete(job: {
+  status?: unknown;
+  field_complete?: unknown;
+}) {
+  return Boolean(job.field_complete) || cleanString(job.status).toLowerCase() === "completed";
 }
 
 function isWorkflowSchemaMissingError(error: unknown) {
@@ -257,7 +265,18 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                     (row) => cleanString(row.workflow_instance_milestone_id) === cleanString(milestone.id),
                   );
                   const linkedEccJob = milestoneLinkedJobs[0] ?? null;
+                  const linkedEccJobIsComplete = linkedEccJob ? isLinkedEccJobComplete(linkedEccJob.job) : false;
                   const canLinkInternalEccJob = isEccMilestone && !linkedEccJob;
+                  const canReviewCompleteLinkedEccJob =
+                    isEccMilestone
+                    && normalizedStatus !== "completed"
+                    && Boolean(linkedEccJob)
+                    && linkedEccJobIsComplete;
+                  const shouldShowIncompleteLinkedEccHelper =
+                    isEccMilestone
+                    && normalizedStatus !== "completed"
+                    && Boolean(linkedEccJob)
+                    && !linkedEccJobIsComplete;
 
                   return (
                     <div
@@ -361,6 +380,45 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                             <span className="text-sky-800"> {cleanString(linkedEccJob.job.title)}</span>
                           ) : null}
                         </div>
+                      ) : null}
+
+                      {shouldShowIncompleteLinkedEccHelper ? (
+                        <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/80 px-2.5 py-2 text-[11px] text-amber-900">
+                          Linked ECC job is not complete yet.
+                        </div>
+                      ) : null}
+
+                      {canReviewCompleteLinkedEccJob ? (
+                        <details className="mt-2 rounded-md border border-emerald-200 bg-emerald-50/60 p-2">
+                          <summary className="cursor-pointer text-[11px] font-semibold text-emerald-800">
+                            Linked ECC job appears complete. Review and complete ECC milestone.
+                          </summary>
+                          <form action={confirmLinkedInternalEccCompletionForWorkflowMilestoneFromForm} className="mt-2 space-y-1.5">
+                            <input type="hidden" name="workflow_instance_id" value={instance.id} />
+                            <input type="hidden" name="milestone_id" value={milestone.id} />
+                            <div>
+                              <label className="mb-0.5 block text-[11px] font-semibold text-slate-700" htmlFor={`linked-ecc-review-note-${milestone.id}`}>
+                                Review note
+                              </label>
+                              <input
+                                id={`linked-ecc-review-note-${milestone.id}`}
+                                type="text"
+                                name="review_note"
+                                defaultValue="Linked internal ECC job reviewed and completed."
+                                maxLength={240}
+                                className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[11px] text-slate-800"
+                              />
+                            </div>
+                            <div className="flex justify-end">
+                              <button
+                                type="submit"
+                                className="h-7 rounded-md border border-emerald-300 bg-white px-2 text-[11px] font-semibold text-emerald-800 transition-colors hover:border-emerald-400 hover:bg-emerald-50"
+                              >
+                                Review and complete ECC milestone
+                              </button>
+                            </div>
+                          </form>
+                        </details>
                       ) : null}
 
                       {canLinkInternalEccJob ? (

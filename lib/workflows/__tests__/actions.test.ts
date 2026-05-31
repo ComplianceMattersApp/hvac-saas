@@ -72,6 +72,8 @@ type MockJob = {
   job_type?: string | null;
   deleted_at?: string | null;
   job_display_number?: string | null;
+  status?: string | null;
+  field_complete?: boolean;
 };
 
 function makeThenable<T>(
@@ -439,6 +441,7 @@ function makeAdminFixture(input?: {
               row.milestone_status = String(payload.milestone_status ?? row.milestone_status ?? "planned").trim() || "planned";
               row.status_reason = (payload.status_reason as string | null | undefined) ?? null;
               row.updated_by_user_id = String(payload.updated_by_user_id ?? row.updated_by_user_id ?? "").trim() || null;
+              (row as any).updated_at = String((payload as any).updated_at ?? (row as any).updated_at ?? "").trim() || null;
 
               return {
                 data: {
@@ -610,6 +613,7 @@ function makeAdminFixture(input?: {
 const {
   assignInstallWithPermitWorkflowToJob,
   assignWorkflowPresetToServiceCase,
+  confirmLinkedInternalEccCompletionForWorkflowMilestone,
   ensureInstallWithPermitWorkflowPreset,
   linkInternalEccJobToWorkflowMilestone,
   recordExternalEccCompletionForWorkflowMilestone,
@@ -1465,6 +1469,333 @@ describe("recordExternalEccCompletionForWorkflowMilestone", () => {
     for (const table of forbiddenTables) {
       expect(admin._tableCalls).not.toContain(table);
     }
+  });
+});
+
+describe("confirmLinkedInternalEccCompletionForWorkflowMilestone", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-1",
+      internalUser: {
+        user_id: "user-1",
+        account_owner_user_id: "owner-1",
+        role: "admin",
+        is_active: true,
+      },
+    });
+  });
+
+  function buildFixture(overrides?: {
+    workflowInstances?: MockWorkflowInstance[];
+    workflowMilestones?: MockWorkflowMilestone[];
+    workflowJobLinks?: MockWorkflowJobLink[];
+    jobs?: MockJob[];
+    customers?: MockCustomer[];
+  }) {
+    const admin = makeAdminFixture({
+      workflowInstances: overrides?.workflowInstances ?? [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-1",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+      workflowMilestones: overrides?.workflowMilestones ?? [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+          status_reason: null,
+        },
+      ],
+      workflowJobLinks: overrides?.workflowJobLinks ?? [
+        {
+          id: "lnk-1",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-ecc",
+          job_id: "job-ecc-1",
+          link_role: "supporting",
+          is_primary: false,
+        },
+      ],
+      jobs: overrides?.jobs ?? [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "ecc",
+          deleted_at: null,
+          job_display_number: "2042",
+          status: "completed",
+          field_complete: true,
+        },
+      ],
+      customers: overrides?.customers ?? [{ id: "cust-1", owner_user_id: "owner-1" }],
+    });
+
+    createAdminClientMock.mockReturnValue(admin);
+    return admin;
+  }
+
+  it("succeeds when ECC milestone has a linked completed ECC job", async () => {
+    const admin = buildFixture();
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      reviewNote: "Reviewed in workflow helper.",
+    });
+
+    expect(result).toEqual({
+      success: true,
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+      status: "completed",
+      statusReason: "Job #2042: Reviewed in workflow helper.",
+      jobId: "job-ecc-1",
+    });
+
+    expect(admin._workflowMilestoneUpdateCalls).toHaveLength(1);
+    expect(admin._workflowMilestoneUpdateCalls[0]).toMatchObject({
+      milestone_status: "completed",
+      status_reason: "Job #2042: Reviewed in workflow helper.",
+      updated_by_user_id: "user-1",
+    });
+  });
+
+  it("uses default review note when none is provided", async () => {
+    buildFixture();
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({
+        success: true,
+        statusReason: "Job #2042: Linked internal ECC job reviewed and completed.",
+      }),
+    );
+  });
+
+  it("rejects when no linked ECC job exists", async () => {
+    buildFixture({ workflowJobLinks: [] });
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "ECC milestone does not have a linked internal ECC job.",
+    });
+  });
+
+  it("rejects when linked job is not ECC", async () => {
+    buildFixture({
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "service",
+          status: "completed",
+          field_complete: true,
+        },
+      ],
+    });
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "linked job must be an ECC job.",
+    });
+  });
+
+  it("rejects when linked job belongs to different service_case", async () => {
+    buildFixture({
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-2",
+          job_type: "ecc",
+          status: "completed",
+          field_complete: true,
+        },
+      ],
+    });
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "linked job must belong to the same service_case_id as workflow_instance_id.",
+    });
+  });
+
+  it("rejects when linked job is out of account scope", async () => {
+    buildFixture({
+      customers: [{ id: "cust-1", owner_user_id: "owner-2" }],
+    });
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "linked job is out of account scope.",
+    });
+  });
+
+  it("rejects when linked ECC job is not complete", async () => {
+    buildFixture({
+      jobs: [
+        {
+          id: "job-ecc-1",
+          customer_id: "cust-1",
+          service_case_id: "case-1",
+          job_type: "ecc",
+          status: "open",
+          field_complete: false,
+        },
+      ],
+    });
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "linked ECC job is not complete yet.",
+    });
+  });
+
+  it("rejects non-ECC milestone", async () => {
+    buildFixture({
+      workflowMilestones: [
+        {
+          id: "ms-install",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          milestone_key: "install_work",
+          milestone_title: "Install work",
+          milestone_status: "ready",
+        },
+      ],
+      workflowJobLinks: [
+        {
+          id: "lnk-1",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-1",
+          workflow_instance_milestone_id: "ms-install",
+          job_id: "job-ecc-1",
+          link_role: "supporting",
+          is_primary: false,
+        },
+      ],
+    });
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-install",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "milestone_id is not ECC handoff/completion milestone.",
+    });
+  });
+
+  it("rejects cross-account workflow scope", async () => {
+    buildFixture({
+      workflowInstances: [
+        {
+          id: "wf-1",
+          account_owner_user_id: "owner-2",
+          service_case_id: "case-1",
+          workflow_preset_template_id: "tpl-1",
+          workflow_status: "active",
+        },
+      ],
+    });
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "workflow_instance_id not found in this account.",
+    });
+  });
+
+  it("rejects milestone/workflow mismatch", async () => {
+    buildFixture({
+      workflowMilestones: [
+        {
+          id: "ms-ecc",
+          account_owner_user_id: "owner-1",
+          workflow_instance_id: "wf-2",
+          milestone_key: "ecc_handoff_completion",
+          milestone_title: "ECC handoff/completion",
+          milestone_status: "ready",
+        },
+      ],
+    });
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result).toEqual({
+      success: false,
+      error: "milestone_id does not belong to workflow_instance_id.",
+    });
+  });
+
+  it("updates only workflow_instance_milestones and avoids jobs/service_cases/job_events/invoice/sms/qbo/portal writes", async () => {
+    const admin = buildFixture();
+
+    const result = await confirmLinkedInternalEccCompletionForWorkflowMilestone({
+      workflowInstanceId: "wf-1",
+      milestoneId: "ms-ecc",
+    });
+
+    expect(result.success).toBe(true);
+    expect(admin._tableCalls).not.toContain("service_cases");
+    expect(admin._tableCalls).not.toContain("job_events");
+    expect(admin._tableCalls).not.toContain("internal_invoices");
+    expect(admin._tableCalls).not.toContain("internal_invoice_payments");
+    expect(admin._tableCalls).not.toContain("notifications");
+    expect(admin._tableCalls).not.toContain("outbound_sms_messages");
+    expect(admin._tableCalls).not.toContain("qbo_sync_events");
+    expect(admin._tableCalls).not.toContain("portal_notifications");
+    expect(admin._workflowJobLinkInsertCalls).toHaveLength(0);
   });
 });
 
