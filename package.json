@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:smoke:visit-scope-inline-price-mobile": "node scripts/__tests__/visit-scope-inline-price-mobile.smoke.js"
   },
   "dependencies": {
     "@supabase/ssr": "^0.8.0",

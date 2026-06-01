@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import {
   VISIT_SCOPE_ITEM_LIMIT,
   createVisitScopeItemId,
+  formatVisitScopeItemKindLabel,
   sanitizeVisitScopeItemId,
   type VisitScopeItem,
 } from "@/lib/jobs/visit-scope";
@@ -83,6 +84,14 @@ function normalizeExpectedUnitPrice(value: unknown, fallback = 0) {
   return Math.max(0, Number(parsed.toFixed(2)));
 }
 
+function parseOptionalPriceInput(value: string) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return 0;
+  const parsed = Number.parseFloat(raw);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0;
+  return Number(parsed.toFixed(2));
+}
+
 function normalizeScopeComparable(value: unknown) {
   return String(value ?? "")
     .trim()
@@ -94,11 +103,11 @@ function isBlankScopeItem(item: VisitScopeDraftItem) {
   return item.title.trim().length === 0 && item.details.trim().length === 0;
 }
 
-function formatOptionalPrice(value: number | null | undefined) {
-  if (value === null || value === undefined) return null;
-  const normalized = normalizeExpectedUnitPrice(value, 0);
-  if (normalized <= 0) return null;
-  return normalized.toFixed(2);
+function formatScopeDetailsPreview(value: string, maxLength = 110) {
+  const normalized = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (!normalized) return "";
+  if (normalized.length <= maxLength) return normalized;
+  return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
 function getScopeSourceLabel(
@@ -186,13 +195,8 @@ export default function VisitScopeBuilder({
   const [items, setItems] = useState<VisitScopeDraftItem[]>(() => toDraftItems(initialItems, jobType));
   const [quickEntryValue, setQuickEntryValue] = useState("");
   const [scopeFeedback, setScopeFeedback] = useState<ScopeFeedback | null>(null);
-  const [, setExpandedItemIds] = useState<Set<string>>(new Set());
+  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
   const [showSavedDefaults, setShowSavedDefaults] = useState(false);
-  const [showEccOptionalScope, setShowEccOptionalScope] = useState(() => {
-    const seededItems = toDraftItems(initialItems, jobType);
-    const hasSummary = String(initialSummary ?? "").trim().length > 0;
-    return jobType === "service" || hasSummary || seededItems.length > 0;
-  });
 
   const availablePricebookTemplates = useMemo(
     () =>
@@ -298,27 +302,13 @@ export default function VisitScopeBuilder({
 
   useEffect(() => {
     const seededItems = toDraftItems(initialItems, jobType);
-    const hasSummary = String(initialSummary ?? "").trim().length > 0;
     setSummary(String(initialSummary ?? ""));
     setItems(seededItems);
     setQuickEntryValue("");
     setScopeFeedback(null);
-    setExpandedItemIds(new Set());
+    setExpandedItemId(null);
     setShowSavedDefaults(false);
-    setShowEccOptionalScope(jobType === "service" || hasSummary || seededItems.length > 0);
   }, [jobType, resetKey]);
-
-  function setItemExpanded(itemId: string, expanded: boolean) {
-    setExpandedItemIds((prev) => {
-      const next = new Set(prev);
-      if (expanded) {
-        next.add(itemId);
-      } else {
-        next.delete(itemId);
-      }
-      return next;
-    });
-  }
 
   useEffect(() => {
     onSummaryChange?.(summary);
@@ -407,7 +397,8 @@ export default function VisitScopeBuilder({
     };
 
     const blankDraftTargetId = items.find(isBlankScopeItem)?.id ?? null;
-    const expandedItemId = blankDraftTargetId || nextItem.id;
+    const nextItemId = blankDraftTargetId || nextItem.id;
+    const shouldAutoExpandNewItem = !sanitizeVisitScopeItemId(candidate.source_pricebook_item_id);
 
     setItems((prev) => {
       if (findExistingScopeItem(prev, candidate)) return prev;
@@ -422,7 +413,9 @@ export default function VisitScopeBuilder({
       if (prev.length >= VISIT_SCOPE_ITEM_LIMIT) return prev;
       return [...prev, nextItem];
     });
-    setItemExpanded(expandedItemId, true);
+    if (shouldAutoExpandNewItem) {
+      setExpandedItemId(nextItemId);
+    }
 
     if (jobType !== "service") {
       setScopeFeedback({
@@ -458,7 +451,9 @@ export default function VisitScopeBuilder({
   }
 
   function removeItem(itemId: string) {
-    setItemExpanded(itemId, false);
+    if (expandedItemId === itemId) {
+      setExpandedItemId(null);
+    }
     setItems((prev) => {
       if (prev.length <= 1) {
         if (jobType === "ecc") {
@@ -492,22 +487,6 @@ export default function VisitScopeBuilder({
 
   return (
     <div className="space-y-4">
-      {jobType === "ecc" && !showEccOptionalScope ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5">
-          <p className="text-xs text-slate-700">
-            Optional for ECC. Add only if this trip includes extra service work.
-          </p>
-          <button
-            type="button"
-            onClick={() => setShowEccOptionalScope(true)}
-            className="mt-2 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
-          >
-            Add Optional Scope
-          </button>
-        </div>
-      ) : null}
-
-      {jobType === "service" || showEccOptionalScope ? (
       <>
       {jobType === "service" ? (
         <div className="space-y-1">
@@ -557,7 +536,7 @@ export default function VisitScopeBuilder({
                 <p className="mt-1 text-xs text-slate-500">
                   {jobType === "service"
                     ? "Search, tap, and edit selected work inline."
-                    : "Optional for ECC. Add only if this trip includes extra service work."}
+                    : "ECC test work is tracked separately. Add work items only if this visit includes additional service work."}
                 </p>
               </div>
               <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-700">
@@ -732,247 +711,167 @@ export default function VisitScopeBuilder({
             </div>
         </div>
 
-        {jobType === "service" && hasCompletedItems ? (
-          <div className="space-y-3">
+        {hasCompletedItems ? (
+          <div className="space-y-2.5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
               Selected Work Items
             </p>
             {completedItems.map((item) => {
               const sourceLabel = getScopeSourceLabel(item, visitTypeSuggestionCandidate);
-              const priceLabel = formatOptionalPrice(item.expected_unit_price);
+              const detailsPreview = formatScopeDetailsPreview(item.details);
+              const kindLabel =
+                jobType === "ecc" ? formatVisitScopeItemKindLabel(item.kind) : "Primary Visit Scope";
+              const itemTypeLabel = String(item.item_type ?? "").trim() || null;
+              const categoryLabel = String(item.category ?? "").trim() || null;
+              const isExpanded = expandedItemId === item.id;
 
               return (
-                <div
-                  key={item.id}
-                  className="rounded-xl border border-emerald-200 bg-white px-3 py-3"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2.5">
-                      <span className="inline-flex h-6 w-6 flex-none items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
-                        ✓
-                      </span>
-                      <div>
-                        <div className="text-sm font-semibold text-slate-900">
-                          {item.title.trim() || "Untitled scope item"}
-                        </div>
-                        <div className="mt-1 text-xs text-slate-600">{sourceLabel}</div>
-                        {priceLabel ? (
-                          <div className="mt-1 text-xs font-medium text-slate-700">Optional price: ${priceLabel}</div>
+                <div key={item.id} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                  <div className="flex flex-col gap-2.5 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 space-y-1">
+                      <div className="text-sm font-semibold text-slate-900">
+                        {item.title.trim() || "Untitled scope item"}
+                      </div>
+                      <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
+                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
+                          {kindLabel}
+                        </span>
+                        {itemTypeLabel ? (
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
+                            {itemTypeLabel}
+                          </span>
+                        ) : null}
+                        {categoryLabel ? (
+                          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">
+                            {categoryLabel}
+                          </span>
                         ) : null}
                       </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.id)}
-                      className="text-xs font-semibold text-rose-700 transition-colors hover:text-rose-800"
-                    >
-                      Remove
-                    </button>
-                  </div>
-
-                  <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5">
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Work To Perform
-                      </label>
-                      <input
-                        type="text"
-                        value={item.title}
-                        onChange={(event) => patchItem(item.id, { title: event.target.value })}
-                        maxLength={160}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                        placeholder="Diagnose intermittent cooling issue"
-                      />
+                      <div className="text-xs text-slate-500">{sourceLabel}</div>
+                      {!isExpanded && detailsPreview ? (
+                        <div className="text-xs text-slate-600">{detailsPreview}</div>
+                      ) : null}
                     </div>
 
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Optional price
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.expected_unit_price ?? 0}
-                        onChange={(event) => {
-                          const raw = event.target.value.trim();
-                          if (!raw) {
-                            patchItem(item.id, { expected_unit_price: 0 });
-                            return;
-                          }
+                    <div className="w-full space-y-2 lg:w-auto lg:min-w-[12rem] lg:max-w-[12rem]">
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 lg:text-right">
+                          Optional price
+                        </label>
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">
+                            $
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={item.expected_unit_price ?? 0}
+                            onChange={(event) =>
+                              patchItem(item.id, {
+                                expected_unit_price: parseOptionalPriceInput(event.target.value),
+                              })
+                            }
+                            className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-7 pr-3 text-right text-sm text-slate-900 shadow-sm"
+                            placeholder="0.00"
+                            aria-label={`Optional price for ${item.title.trim() || "scope item"}`}
+                          />
+                        </div>
+                        <p className="text-xs text-slate-500 lg:text-right">
+                          This helps with upfront context only. It does not create an invoice charge.
+                        </p>
+                      </div>
 
-                          const parsed = Number.parseFloat(raw);
-                          if (!Number.isFinite(parsed) || parsed < 0) {
-                            patchItem(item.id, { expected_unit_price: 0 });
-                            return;
-                          }
-
-                          patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
-                        }}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                        placeholder="0.00"
-                      />
-                      <p className="text-xs text-slate-500">
-                        This helps with upfront context only. It does not create an invoice charge.
-                      </p>
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                        Description
-                      </label>
-                      <textarea
-                        value={item.details}
-                        onChange={(event) => patchItem(item.id, { details: event.target.value })}
-                        rows={2}
-                        maxLength={500}
-                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                        placeholder="What should the tech complete or verify before leaving?"
-                      />
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setExpandedItemId((prev) => (prev === item.id ? null : item.id))}
+                          className="text-xs font-semibold text-slate-700 transition-colors hover:text-slate-900"
+                        >
+                          {isExpanded ? "Done" : "Edit"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="text-xs font-semibold text-rose-700 transition-colors hover:text-rose-800"
+                        >
+                          Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
+
+                  {isExpanded ? (
+                    <div className="mt-2.5 space-y-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+                      <div className={jobType === "ecc" ? "grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_13rem] lg:items-start" : "space-y-2.5"}>
+                        <div className="space-y-1">
+                          <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                            Work To Perform
+                          </label>
+                          <input
+                            type="text"
+                            value={item.title}
+                            onChange={(event) => patchItem(item.id, { title: event.target.value })}
+                            maxLength={160}
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                            placeholder={
+                              jobType === "ecc"
+                                ? "Optional: note companion work or field context"
+                                : "Diagnose intermittent cooling issue"
+                            }
+                          />
+                        </div>
+
+                        {jobType === "ecc" ? (
+                          <div className="space-y-1">
+                            <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                              Type
+                            </label>
+                            <select
+                              value={item.kind}
+                              onChange={(event) =>
+                                patchItem(item.id, {
+                                  kind: event.target.value === "companion_service" ? "companion_service" : "primary",
+                                })
+                              }
+                              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                            >
+                              <option value="primary">Primary</option>
+                              <option value="companion_service">Companion Service</option>
+                            </select>
+                          </div>
+                        ) : null}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
+                          Description
+                        </label>
+                        <textarea
+                          value={item.details}
+                          onChange={(event) => patchItem(item.id, { details: event.target.value })}
+                          rows={2}
+                          maxLength={500}
+                          className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
+                          placeholder={
+                            jobType === "ecc"
+                              ? "Optional field note for the ECC trip"
+                              : "What should the tech complete or verify before leaving?"
+                          }
+                        />
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               );
             })}
-          </div>
-        ) : completedItems.length > 0 ? (
-          <div className="mt-1.5 flex flex-wrap gap-1.5">
-            {completedItems.slice(0, 6).map((item) => (
-              <span
-                key={item.id}
-                className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700"
-              >
-                {item.title.trim() || "Untitled scope item"}
-              </span>
-            ))}
-            {completedItems.length > 6 ? (
-              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
-                +{completedItems.length - 6} more
-              </span>
-            ) : null}
           </div>
         ) : null}
 
         </div>
 
-        {jobType !== "service" ? items.map((item, index) => (
-          <div key={item.id} className="rounded-xl border border-slate-200 bg-white p-3 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.35)]">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Scope Item {index + 1}</div>
-                <div className="text-sm font-semibold text-slate-900">
-                  {item.title.trim() || "Untitled scope item"}
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => removeItem(item.id)}
-                className="text-xs font-semibold text-rose-700 transition-colors hover:text-rose-800"
-              >
-                Remove
-              </button>
-            </div>
-
-            <div className={jobType === "ecc" ? "grid gap-2.5 lg:grid-cols-[minmax(0,1fr)_13rem] lg:items-start" : "space-y-2.5"}>
-              <div className="space-y-1">
-                <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                  Work To Perform
-                </label>
-                <input
-                  type="text"
-                  value={item.title}
-                  onChange={(event) => patchItem(item.id, { title: event.target.value })}
-                  maxLength={160}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                  placeholder="Optional: note companion work or field context"
-                />
-              </div>
-
-              {jobType === "ecc" ? (
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">
-                    Type
-                  </label>
-                  <select
-                    value={item.kind}
-                    onChange={(event) =>
-                      patchItem(item.id, {
-                        kind: event.target.value === "companion_service" ? "companion_service" : "primary",
-                      })
-                    }
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                  >
-                    <option value="primary">Primary</option>
-                    <option value="companion_service">Companion Service</option>
-                  </select>
-                </div>
-              ) : null}
-            </div>
-
-            <details className="mt-2.5 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2">
-              <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                Details
-              </summary>
-              <div className="mt-2.5 space-y-2">
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Optional price</label>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={item.expected_unit_price ?? 0}
-                    onChange={(event) => {
-                      const raw = event.target.value.trim();
-                      if (!raw) {
-                        patchItem(item.id, { expected_unit_price: 0 });
-                        return;
-                      }
-
-                      const parsed = Number.parseFloat(raw);
-                      if (!Number.isFinite(parsed) || parsed < 0) {
-                        patchItem(item.id, { expected_unit_price: 0 });
-                        return;
-                      }
-
-                      patchItem(item.id, { expected_unit_price: Number(parsed.toFixed(2)) });
-                    }}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                    placeholder="0.00"
-                  />
-                  <p className="text-xs text-slate-500">This helps with upfront context only. It does not create an invoice charge.</p>
-                </div>
-
-                <div className="space-y-1">
-                  <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500">Description</label>
-                  <textarea
-                    value={item.details}
-                    onChange={(event) => patchItem(item.id, { details: event.target.value })}
-                    rows={2}
-                    maxLength={500}
-                    className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm"
-                    placeholder="Optional field note for the ECC trip"
-                  />
-                </div>
-              </div>
-            </details>
-
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <div className="text-xs text-slate-500">
-                {jobType === "ecc" && item.kind === "companion_service"
-                  ? "Same-trip service item under ECC."
-                  : "Optional trip note."}
-              </div>
-            </div>
-          </div>
-        )) : null}
-
       <input type="hidden" name={itemsName} value={serializedItems} />
       </>
-      ) : null}
-
-      {jobType === "ecc" && !showEccOptionalScope ? (
-        <input type="hidden" name={itemsName} value={serializedItems} />
-      ) : null}
     </div>
   );
 }

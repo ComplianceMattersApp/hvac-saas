@@ -31,6 +31,10 @@ export default function VisitScopeJobDetailForm({
   pricebookTemplateItems = [],
   primaryButtonClass,
 }: Props) {
+  const hadInitialContent = hasVisitScopeContent(
+    String(initialSummary ?? "").trim() || null,
+    initialItems,
+  );
   const [summary, setSummary] = useState(String(initialSummary ?? ""));
   const [items, setItems] = useState<VisitScopeDraftItem[]>(
     initialItems.map((item, index) => ({
@@ -49,9 +53,10 @@ export default function VisitScopeJobDetailForm({
     })),
   );
   const [error, setError] = useState<string | null>(null);
+  const nonEmptyItems = items.filter((item) => item.title.trim() || item.details.trim());
+  const hasDraftContent = hasVisitScopeContent(summary.trim() || null, nonEmptyItems);
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    const nonEmptyItems = items.filter((item) => item.title.trim() || item.details.trim());
     if (jobType === "service" && !hasVisitScopeContent(summary.trim() || null, nonEmptyItems)) {
       event.preventDefault();
       setError("Add a Reason for Visit or at least one Work Item before saving.");
@@ -82,11 +87,16 @@ export default function VisitScopeJobDetailForm({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
-          Save Work Items
-        </SubmitButton>
-      </div>
+      {hasDraftContent || hadInitialContent ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+          <p className="text-xs font-medium text-slate-600">Confirm selected work items.</p>
+          <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+            Save Work Items
+          </SubmitButton>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">Add a work item to enable save.</p>
+      )}
     </form>
   );
 }

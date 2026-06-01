@@ -4927,7 +4927,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               </div>
             </div>
 
-            <details className="group w-full sm:w-auto">
+            <details className="group w-full">
               <summary className="inline-flex min-h-11 w-full cursor-pointer list-none items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:min-h-9 sm:w-auto sm:py-1.5 sm:text-xs">
                 {hasVisitScopeDefined ? "Edit Work Items" : "Add Work Items"}
               </summary>
@@ -4947,6 +4947,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
           </div>
 
+          {hasVisitScopeDefined ? (
           <div className="rounded-2xl border border-slate-200/80 bg-white/94 px-4 py-3.5 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)]">
             <div className="space-y-3.5">
               {primaryVisitScopeItems.length > 0 ? (
@@ -5030,6 +5031,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               ) : null}
             </div>
           </div>
+          ) : (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
+              No work items added yet.
+            </div>
+          )}
 
         </div>
       </div>

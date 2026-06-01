@@ -87,13 +87,13 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("disabled={!searchQuery}");
   });
 
-  it("renders service scope items as selected cards with source and details affordances", () => {
+  it("renders service scope items as compact rows with source and details affordances", () => {
     expect(builderSource).toContain("From saved work item");
     expect(builderSource).toContain("From visit type");
     expect(builderSource).toContain("Custom work");
     expect(builderSource).toContain('completedItems.length === 1 ? "item" : "items"');
-    expect(builderSource).toContain("Optional price: $");
-    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-3 py-3");
+    expect(builderSource).toContain("Selected Work Items");
+    expect(builderSource).toContain("rounded-xl border border-slate-200 bg-white px-3 py-2.5");
   });
 
   it("flattens the service scope shell instead of nesting extra framed cards", () => {
@@ -101,8 +101,12 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).not.toContain('rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-3');
   });
 
-  it("keeps service row fields editable inline after add", () => {
-    expect(builderSource).toContain("setItemExpanded(expandedItemId, true)");
+  it("keeps compact row editing with one-row expansion behavior", () => {
+    expect(builderSource).toContain("setExpandedItemId(nextItemId)");
+    expect(builderSource).toContain("setExpandedItemId((prev) => (prev === item.id ? null : item.id))");
+    expect(builderSource).toContain("lg:min-w-[12rem]");
+    expect(builderSource).toContain("lg:text-right");
+    expect(builderSource).toContain('aria-label={`Optional price for ${item.title.trim() || "scope item"}`}');
     expect(builderSource).toContain("value={item.title}");
     expect(builderSource).toContain("value={item.expected_unit_price ?? 0}");
     expect(builderSource).toContain("value={item.details}");

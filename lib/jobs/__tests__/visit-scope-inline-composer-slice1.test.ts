@@ -30,8 +30,12 @@ describe("visit scope inline composer slice 1", () => {
     expect(builderSource).toContain("source_pricebook_item_id: null");
   });
 
-  it("keeps inline edit controls visible on added service rows", () => {
-    expect(builderSource).toContain("rounded-xl border border-emerald-200 bg-white px-3 py-3");
+  it("keeps compact rows with inline edit expansion controls", () => {
+    expect(builderSource).toContain("rounded-xl border border-slate-200 bg-white px-3 py-2.5");
+    expect(builderSource).toContain("Optional price");
+    expect(builderSource).toContain('aria-label={`Optional price for ${item.title.trim() || "scope item"}`}');
+    expect(builderSource).toContain('{isExpanded ? "Done" : "Edit"}');
+    expect(builderSource).toContain("setExpandedItemId((prev) => (prev === item.id ? null : item.id))");
     expect(builderSource).toContain("value={item.title}");
     expect(builderSource).toContain("onChange={(event) => patchItem(item.id, { title: event.target.value })}");
     expect(builderSource).toContain("value={item.expected_unit_price ?? 0}");
