@@ -761,6 +761,13 @@ function subtractBusinessDays(date: Date, days: number) {
     }
 
     const operationalTenantIdentity = await operationalTenantIdentityPromise;
+    const focusedQueueHref = `/ops${buildQueryString({
+      bucket,
+      contractor: contractorScopeFilter ?? "",
+      q: q ?? "",
+      sort,
+      signal,
+    })}#ops-workspace`;
 
     return (
       <div className="mx-auto max-w-[92rem] space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6">
@@ -781,25 +788,15 @@ function subtractBusinessDays(date: Date, days: number) {
                 Operations Workspace
               </h1>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                Work operational queues, triage blockers, and move jobs forward.
+                Start with the queue that needs attention now. Then work down through field progress, exceptions, and closeout.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Link href="/today" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
                 Go to Today
               </Link>
-              <Link
-                href={`/ops${buildQueryString({
-                  bucket,
-                  contractor: contractorScopeFilter ?? "",
-                  q: q ?? "",
-                  sort,
-                  signal,
-                  panel: "full_board",
-                })}#ops-queues`}
-                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]"
-              >
-                Full operations board
+              <Link href={focusedQueueHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
+                Open focused queue
               </Link>
             </div>
           </div>
@@ -3292,25 +3289,15 @@ if (panel !== "full_board") {
               Operations Workspace
             </h1>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Work operational queues, triage blockers, and move jobs forward.
+              Start with the queue that needs attention now. Then work down through field progress, exceptions, and closeout.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Link href="/today" className={sectionActionLinkClass}>
               Go to Today
             </Link>
-            <Link
-              href={`/ops${buildQueryString({
-                bucket,
-                contractor: contractorScopeFilter ?? "",
-                q: q ?? "",
-                sort,
-                signal,
-                panel: "full_board",
-              })}#ops-queues`}
-              className={sectionActionLinkClass}
-            >
-              Full operations board
+            <Link href={selectedWorkspaceQueue.fullHref} className={sectionActionLinkClass}>
+              Open focused queue
             </Link>
           </div>
         </div>

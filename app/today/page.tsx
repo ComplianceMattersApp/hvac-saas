@@ -219,6 +219,9 @@ function NextBestActionCard({
       <div className={`mt-1.5 ${mobile ? "text-xl" : "text-2xl"} font-semibold tracking-tight text-slate-950`}>
         {action.headline}
       </div>
+      <p className="mt-1.5 text-sm leading-6 text-slate-600">
+        Start with this. One clear move first, then work the queues below.
+      </p>
       {action.detail ? (
         <p className="mt-1.5 text-sm leading-6 text-slate-600">{action.detail}</p>
       ) : null}

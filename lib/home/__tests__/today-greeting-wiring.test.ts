@@ -52,6 +52,12 @@ describe("today greeting polish", () => {
     expect(todayPageSource).toContain("{header.displayDate} · {header.roleLabel}");
   });
 
+  it("compresses first-step guidance into the Next Best Action card", () => {
+    expect(todayPageSource).toContain("Next Best Action");
+    expect(todayPageSource).toContain("Start with this. One clear move first, then work the queues below.");
+    expect(todayPageSource).toContain("action.detail");
+  });
+
   it("keeps business attention and link surfaces unchanged", () => {
     expect(todayPageSource).toContain("/reports/failed-payments");
     expect(todayPageSource).toContain("/reports/payments");

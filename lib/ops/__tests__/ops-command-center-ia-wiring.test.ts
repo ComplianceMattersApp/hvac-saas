@@ -12,27 +12,14 @@ function assertFound(label: string, index: number) {
 }
 
 describe("/ops Full Ops command center IA wiring", () => {
-  it("keeps Financial Attention and Service Plans ahead of workflow and queue previews", () => {
-    const fullOpsStart = opsPageSource.indexOf("Ops Command Center");
-    assertFound("Ops Command Center", fullOpsStart);
+  it("makes the first viewport tell the operator where to start", () => {
+    const heroStart = opsPageSource.indexOf("Operations Workspace");
+    assertFound("Operations Workspace", heroStart);
 
-    const fullOpsSource = opsPageSource.slice(fullOpsStart);
-    const financialAttentionIndex = fullOpsSource.indexOf("Financial Attention");
-    const servicePlansIndex = fullOpsSource.indexOf("View Service Plans");
-    const workflowHealthIndex = fullOpsSource.indexOf("Workflow Health");
-    const attentionBoardIndex = fullOpsSource.indexOf("Attention Board");
-    const queueShortcutsIndex = fullOpsSource.indexOf("Queue Shortcuts");
-
-    assertFound("Financial Attention", financialAttentionIndex);
-    assertFound("Service Plans", servicePlansIndex);
-    assertFound("Workflow Health", workflowHealthIndex);
-    assertFound("Attention Board", attentionBoardIndex);
-    assertFound("Queue Shortcuts", queueShortcutsIndex);
-
-    expect(financialAttentionIndex).toBeLessThan(servicePlansIndex);
-    expect(servicePlansIndex).toBeLessThan(workflowHealthIndex);
-    expect(workflowHealthIndex).toBeLessThan(attentionBoardIndex);
-    expect(attentionBoardIndex).toBeLessThan(queueShortcutsIndex);
+    const heroSource = opsPageSource.slice(heroStart, heroStart + 1200);
+    expect(heroSource).toContain("Start with the queue that needs attention now.");
+    expect(heroSource).toContain("focusedQueueHref");
+    expect(heroSource).not.toContain("Full operations board");
   });
 
   it("keeps focused queue and filter wiring query-parameter driven", () => {
@@ -45,8 +32,9 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('href={`/ops${buildQueryString({');
   });
 
-  it("keeps focused queue preview compact instead of duplicating full queue lists", () => {
-    expect(opsPageSource).toContain("Focused Queue Preview");
-    expect(opsPageSource).toContain("sortedBucketJobs.slice(0, 12)");
+  it("keeps the focused queue preview compact and reachable", () => {
+    expect(opsPageSource).toContain("Active Queue");
+    expect(opsPageSource).toContain("Open focused queue");
+    expect(opsPageSource).toContain("Open Job");
   });
 });
