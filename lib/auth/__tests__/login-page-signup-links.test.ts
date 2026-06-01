@@ -26,4 +26,17 @@ describe("login page signup entry options", () => {
     expect(loginPageSource).toContain("resolveSafeAuthReturnPath({");
     expect(loginPageSource).toContain("candidateNext: nextPath");
   });
+
+  it("waits for session commit before protected redirect and always clears pending state", () => {
+    expect(loginPageSource).toContain("async function waitForSessionCommit");
+    expect(loginPageSource).toContain("await waitForSessionCommit(supabase);");
+    expect(loginPageSource).toContain("finally {");
+    expect(loginPageSource).toContain("setLoading(false);");
+  });
+
+  it("persists session explicitly and uses hard navigation to ensure server-visible cookies", () => {
+    expect(loginPageSource).toContain("supabase.auth.setSession(");
+    expect(loginPageSource).toContain("window.location.href = resumePath");
+    expect(loginPageSource).not.toContain("router.push(");
+  });
 });

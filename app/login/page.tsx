@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createClient } from "../../lib/supabase/client";
 import { resolveSafeAuthReturnPath } from "@/lib/auth/auth-return-path";
@@ -71,8 +71,20 @@ function createPasswordRecoveryClient() {
   );
 }
 
+async function waitForSessionCommit(supabase: ReturnType<typeof createClient>) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (session) return true;
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+
+  return false;
+}
+
 export default function LoginPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const supabase = createClient();
@@ -97,55 +109,73 @@ export default function LoginPage() {
     setErrorMsg(null);
     setSuccessMsg(null);
 
-    const { data: signInData, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      const { data: signInData, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-    setLoading(false);
-
-    if (error) {
-      setErrorMsg(error.message);
-      return;
-    }
-
-    let user = signInData?.user ?? null;
-
-    if (!user) {
-      const {
-        data: userData,
-        error: userError,
-      } = await supabase.auth.getUser();
-
-      if (userError) {
-        setErrorMsg(userError.message || "Session could not be confirmed.");
+      if (error) {
+        setErrorMsg(error.message);
         return;
       }
 
-      user = userData?.user ?? null;
+      const signedInSession = signInData?.session ?? null;
+      if (signedInSession?.access_token && signedInSession?.refresh_token) {
+        const { error: setSessionError } = await supabase.auth.setSession({
+          access_token: signedInSession.access_token,
+          refresh_token: signedInSession.refresh_token,
+        });
+
+        if (setSessionError) {
+          setErrorMsg(setSessionError.message || "Session could not be persisted.");
+          return;
+        }
+      }
+
+      await waitForSessionCommit(supabase);
+
+      let user = signInData?.user ?? null;
+
+      if (!user) {
+        const {
+          data: userData,
+          error: userError,
+        } = await supabase.auth.getUser();
+
+        if (userError) {
+          setErrorMsg(userError.message || "Session could not be confirmed.");
+          return;
+        }
+
+        user = userData?.user ?? null;
+      }
+
+      if (!user) {
+        setErrorMsg("Session could not be confirmed.");
+        return;
+      }
+
+      const destination = await resolveLoginDestination(supabase, user.id);
+
+      if (!destination) {
+        setErrorMsg("This account is not configured for portal or internal access.");
+        return;
+      }
+
+      const actorKind = destination === "/portal" ? "contractor" : "internal";
+      const resumePath = resolveSafeAuthReturnPath({
+        actorKind,
+        candidateNext: nextPath,
+        fallbackPath: destination,
+      });
+
+      window.location.href = resumePath;
+    } catch (error) {
+      setErrorMsg(error instanceof Error ? error.message : "We could not complete sign-in.");
+    } finally {
+      setLoading(false);
     }
-
-    if (!user) {
-      setErrorMsg("Session could not be confirmed.");
-      return;
-    }
-
-    const destination = await resolveLoginDestination(supabase, user.id);
-
-    if (!destination) {
-      setErrorMsg("This account is not configured for portal or internal access.");
-      return;
-    }
-
-    const actorKind = destination === "/portal" ? "contractor" : "internal";
-    const resumePath = resolveSafeAuthReturnPath({
-      actorKind,
-      candidateNext: nextPath,
-      fallbackPath: destination,
-    });
-
-    router.push(resumePath);
-    router.refresh();
   }
 
   async function onForgotPassword() {
