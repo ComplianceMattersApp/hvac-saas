@@ -1,3 +1,15 @@
+self.addEventListener("message", (event) => {
+  if (!event.data || typeof event.data !== "object") return;
+
+  if (event.data.type === "SKIP_WAITING") {
+    event.waitUntil(self.skipWaiting());
+  }
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 self.addEventListener("push", (event) => {
   if (!event.data) return;
 

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { registerBrowserPushSubscriptionAction } from "@/lib/actions/push-subscription-actions";
 import { reconcileBrowserPushSubscription } from "@/lib/notifications/browser-push-auto-reconcile";
+import { getOrRegisterServiceWorkerRegistration } from "@/lib/pwa/service-worker";
 
 type BrowserPushSubscriptionAutoReconcilerProps = {
   userId: string;
@@ -21,11 +22,7 @@ function supportsBrowserPush(): boolean {
 async function resolveExistingPushRegistration() {
   if (!supportsBrowserPush()) return null;
 
-  const registration =
-    (await navigator.serviceWorker.getRegistration("/sw.js")) ??
-    (await navigator.serviceWorker.register("/sw.js", { scope: "/" }));
-
-  return registration;
+  return getOrRegisterServiceWorkerRegistration();
 }
 
 export default function BrowserPushSubscriptionAutoReconciler({

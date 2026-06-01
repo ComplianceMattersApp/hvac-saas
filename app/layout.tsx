@@ -5,6 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileShellMenu from "@/components/layout/MobileShellMenu";
 import BrowserPushSubscriptionAutoReconciler from "@/components/layout/BrowserPushSubscriptionAutoReconciler";
+import PwaUpdateNotice from "@/components/layout/PwaUpdateNotice";
 import ShellCreateMenu, { type ShellCreateItem } from "@/components/layout/ShellCreateMenu";
 import ShellNavLink from "@/components/layout/ShellNavLink";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
@@ -251,6 +252,8 @@ export default async function RootLayout({
               </header>
             </>
           ) : null}
+
+          <PwaUpdateNotice />
 
           {/* Main Content */}
           <main className="flex-1 p-6 pt-16 sm:pt-20 print:p-0">
