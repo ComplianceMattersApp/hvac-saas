@@ -3,6 +3,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 
+import DeferredNarrativeSectionFailure from "./DeferredNarrativeSectionFailure";
+
 type DeferredTimelineBodyProps = {
   jobId: string;
   timelineJobIds: string[];
@@ -377,67 +379,77 @@ export default async function DeferredTimelineBody({
   hasDirectNarrativeChain,
   emptyStateClassName,
 }: DeferredTimelineBodyProps) {
-  const supabase = await createClient();
+  try {
+    const supabase = await createClient();
 
-  const narrativeScopeJobIds = timelineJobIds.length ? timelineJobIds : [jobId];
+    const narrativeScopeJobIds = timelineJobIds.length ? timelineJobIds : [jobId];
 
-  const { data: timelineEvents, error: timelineErr } = await supabase
-    .from("job_events")
-    .select("id, job_id, created_at, event_type, message, meta, user_id")
-    .in("job_id", narrativeScopeJobIds)
-    .order("created_at", { ascending: false })
-    .limit(200);
+    const { data: timelineEvents, error: timelineErr } = await supabase
+      .from("job_events")
+      .select("id, job_id, created_at, event_type, message, meta, user_id")
+      .in("job_id", narrativeScopeJobIds)
+      .order("created_at", { ascending: false })
+      .limit(200);
 
-  if (timelineErr) throw new Error(timelineErr.message);
+    if (timelineErr) {
+      throw new Error(timelineErr.message);
+    }
 
-  const timelineItems = timelineEvents ?? [];
-  const timelinePreviewItems = timelineItems.slice(0, 3);
-  const timelineOverflowItems = timelineItems.slice(3);
+    const timelineItems = timelineEvents ?? [];
+    const timelinePreviewItems = timelineItems.slice(0, 3);
+    const timelineOverflowItems = timelineItems.slice(3);
 
-  if (!timelineItems.length) {
+    if (!timelineItems.length) {
+      return (
+        <div className={emptyStateClassName}>
+          {hasDirectNarrativeChain
+            ? "No timeline events in this direct retest chain yet."
+            : "No timeline events yet."}
+        </div>
+      );
+    }
+
+    const timelineActorIds = Array.from(
+      new Set(
+        timelineItems
+          .flatMap((e: any) => {
+            const meta =
+              e?.meta && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
+            return [String(e?.user_id ?? "").trim(), String(meta?.actor_user_id ?? "").trim()];
+          })
+          .filter(Boolean),
+      ),
+    );
+
+    const actorDisplayMap = await resolveUserDisplayMap({
+      supabase,
+      userIds: timelineActorIds,
+    });
+
     return (
-      <div className={emptyStateClassName}>
-        {hasDirectNarrativeChain
-          ? "No timeline events in this direct retest chain yet."
-          : "No timeline events yet."}
-      </div>
+      <>
+        {timelinePreviewItems.map((e: any, idx: number) =>
+          renderTimelineItem(e, `timeline-preview-${idx}`, actorDisplayMap),
+        )}
+
+        {timelineOverflowItems.length > 0 ? (
+          <details className="pt-1">
+            <summary className="cursor-pointer text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4">
+              Show all timeline entries ({timelineItems.length})
+            </summary>
+            <div className="mt-2 space-y-2">
+              {timelineOverflowItems.map((e: any, idx: number) =>
+                renderTimelineItem(e, `timeline-overflow-${idx}`, actorDisplayMap),
+              )}
+            </div>
+          </details>
+        ) : null}
+      </>
+    );
+  } catch (error) {
+    console.error("DeferredTimelineBody failed", error);
+    return (
+      <DeferredNarrativeSectionFailure message="Timeline is temporarily unavailable. Core job details remain available. Refresh to try again." />
     );
   }
-
-  const timelineActorIds = Array.from(
-    new Set(
-      timelineItems
-        .flatMap((e: any) => {
-          const meta = e?.meta && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
-          return [String(e?.user_id ?? "").trim(), String(meta?.actor_user_id ?? "").trim()];
-        })
-        .filter(Boolean),
-    ),
-  );
-
-  const actorDisplayMap = await resolveUserDisplayMap({
-    supabase,
-    userIds: timelineActorIds,
-  });
-
-  return (
-    <>
-      {timelinePreviewItems.map((e: any, idx: number) =>
-        renderTimelineItem(e, `timeline-preview-${idx}`, actorDisplayMap),
-      )}
-
-      {timelineOverflowItems.length > 0 ? (
-        <details className="pt-1">
-          <summary className="cursor-pointer text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4">
-            Show all timeline entries ({timelineItems.length})
-          </summary>
-          <div className="mt-2 space-y-2">
-            {timelineOverflowItems.map((e: any, idx: number) =>
-              renderTimelineItem(e, `timeline-overflow-${idx}`, actorDisplayMap),
-            )}
-          </div>
-        </details>
-      ) : null}
-    </>
-  );
 }
