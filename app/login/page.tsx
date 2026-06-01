@@ -225,6 +225,8 @@ export default function LoginPage() {
           <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Email</label>
           <input
             className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 transition-all"
+            type="email"
+            name="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             autoComplete="email"
@@ -247,6 +249,7 @@ export default function LoginPage() {
           <input
             className="w-full rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2.5 text-sm text-gray-900 dark:text-gray-100 shadow-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 transition-all"
             type={showPassword ? "text" : "password"}
+            name="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
