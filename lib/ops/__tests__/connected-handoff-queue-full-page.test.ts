@@ -20,13 +20,18 @@ describe("/ops connected handoff queue - Full Page link", () => {
 });
 
 describe("/ops/connected-handoffs page", () => {
-  it("is read-only and uses the connected recipient projection helper", () => {
+  it("uses projection helper and connected recipient response wrapper without broad data exposure", () => {
     expect(connectedHandoffsPageSource).toContain("listActiveConnectedRecipientHandoffProjectionsForAccount");
+    expect(connectedHandoffsPageSource).toContain("respondToConnectedRecipientHandoffRequestFromForm");
     expect(connectedHandoffsPageSource).not.toContain("respondToWorkflowHandoffRequestFromForm");
     expect(connectedHandoffsPageSource).not.toContain("/jobs/");
+    expect(connectedHandoffsPageSource).not.toContain("/customers/");
     expect(connectedHandoffsPageSource).not.toContain("service_case");
-    expect(connectedHandoffsPageSource).not.toContain("customer");
+    expect(connectedHandoffsPageSource).not.toContain("workflow_instances");
+    expect(connectedHandoffsPageSource).not.toContain("workflow_instance_milestones");
+    expect(connectedHandoffsPageSource).not.toContain("job_events");
+    expect(connectedHandoffsPageSource).not.toContain("internal_invoices");
     expect(connectedHandoffsPageSource).toContain("Connected Handoff Requests");
-    expect(connectedHandoffsPageSource).toContain("This view is read-only");
+    expect(connectedHandoffsPageSource).toContain("updates request status only");
   });
 });

@@ -1,5 +1,7 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { createAdminClient, createClient } from "@/lib/supabase/server";
 import {
   isInternalAccessError,
@@ -10,6 +12,7 @@ import type { WorkflowHandoffStatus } from "@/lib/workflows/workflow-handoff-req
 const HANDOFF_KIND_ECC = "ecc" as const;
 const SHARED_SCOPE_HANDOFF_REQUEST_ONLY = "handoff_request_only" as const;
 const COMPLETED_DEFAULT_NOTE = "ECC completed by connected recipient.";
+const CONNECTED_HANDOFFS_PATH = "/ops/connected-handoffs";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type ConnectedRecipientResponseStatus = "accepted" | "completed" | "rejected";
@@ -141,6 +144,13 @@ function isAllowedHandoffStatusTransition(currentStatus: WorkflowHandoffStatus, 
   }
 
   return false;
+}
+
+function withBanner(returnTo: string, banner: string) {
+  const safeReturnTo = returnTo.startsWith("/") ? returnTo : CONNECTED_HANDOFFS_PATH;
+  const [pathWithoutHash, hash = ""] = safeReturnTo.split("#", 2);
+  const separator = pathWithoutHash.includes("?") ? "&" : "?";
+  return `${pathWithoutHash}${separator}banner=${encodeURIComponent(banner)}${hash ? `#${hash}` : ""}`;
 }
 
 async function resolveRecipientInternalUserContext() {
@@ -299,4 +309,32 @@ export async function respondToConnectedRecipientHandoffRequest(
     responseNote: updatedRequest.response_note,
     evidenceReference: updatedRequest.evidence_reference,
   };
+}
+
+export async function respondToConnectedRecipientHandoffRequestFromForm(formData: FormData) {
+  const grantId = cleanString(formData.get("grant_id"));
+  const responseStatus = cleanString(formData.get("response_status"));
+  const responseNote = cleanNullableString(formData.get("response_note"));
+  const evidenceReference = cleanNullableString(formData.get("evidence_reference"));
+
+  const result = await respondToConnectedRecipientHandoffRequest({
+    grantId,
+    responseStatus,
+    responseNote,
+    evidenceReference,
+  });
+
+  if (!result.success) {
+    redirect(withBanner(CONNECTED_HANDOFFS_PATH, "connected_handoff_response_error"));
+  }
+
+  revalidatePath(CONNECTED_HANDOFFS_PATH);
+
+  const successBanner = result.handoffStatus === "accepted"
+    ? "connected_handoff_accepted"
+    : result.handoffStatus === "completed"
+      ? "connected_handoff_completed"
+      : "connected_handoff_rejected";
+
+  redirect(withBanner(CONNECTED_HANDOFFS_PATH, successBanner));
 }

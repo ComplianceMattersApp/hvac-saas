@@ -3,10 +3,15 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const createClientMock = vi.fn();
 const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
+const revalidatePathMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
   createAdminClient: (...args: unknown[]) => createAdminClientMock(...args),
+}));
+
+vi.mock("next/cache", () => ({
+  revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
 }));
 
 vi.mock("@/lib/auth/internal-user", () => ({
@@ -17,7 +22,16 @@ vi.mock("@/lib/auth/internal-user", () => ({
     && (error as any).name === "InternalAccessError",
 }));
 
-import { respondToConnectedRecipientHandoffRequest } from "../connected-recipient-handoff-response-actions";
+vi.mock("next/navigation", () => ({
+  redirect: (url: string) => {
+    throw new Error(`REDIRECT:${url}`);
+  },
+}));
+
+import {
+  respondToConnectedRecipientHandoffRequest,
+  respondToConnectedRecipientHandoffRequestFromForm,
+} from "../connected-recipient-handoff-response-actions";
 
 type GrantRow = {
   id: string;
@@ -193,6 +207,7 @@ describe("connected recipient handoff response actions", () => {
     createClientMock.mockReset();
     createAdminClientMock.mockReset();
     requireInternalUserMock.mockReset();
+    revalidatePathMock.mockReset();
   });
 
   it("recipient account can accept a sent request", async () => {
@@ -592,5 +607,48 @@ describe("connected recipient handoff response actions", () => {
       expect(fixture.tableCalls).not.toContain(table);
       expect(fixture.updateTableCalls).not.toContain(table);
     }
+  });
+
+  it("form wrapper delegates and redirects with success banner", async () => {
+    const fixture = makeAdminFixture({
+      grants: [makeGrant()],
+      requests: [makeRequest()],
+    });
+
+    createAdminClientMock.mockReturnValue(fixture.admin);
+    setActor();
+
+    const formData = new FormData();
+    formData.set("grant_id", "00000000-0000-4000-8000-0000000000a1");
+    formData.set("response_status", "completed");
+    formData.set("response_note", "Completed from wrapper");
+    formData.set("evidence_reference", "drive://evidence/wrapper.pdf");
+
+    await expect(respondToConnectedRecipientHandoffRequestFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/connected-handoffs?banner=connected_handoff_completed",
+    );
+
+    expect(revalidatePathMock).toHaveBeenCalledWith("/ops/connected-handoffs");
+    expect(fixture.getRequests()[0]?.handoff_status).toBe("completed");
+    expect(fixture.getRequests()[0]?.response_note).toBe("Completed from wrapper");
+    expect(fixture.getRequests()[0]?.evidence_reference).toBe("drive://evidence/wrapper.pdf");
+  });
+
+  it("form wrapper redirects with safe error banner when core action fails", async () => {
+    createClientMock.mockResolvedValue({});
+    requireInternalUserMock.mockRejectedValue({
+      name: "InternalAccessError",
+      code: "AUTH_REQUIRED",
+    });
+
+    const formData = new FormData();
+    formData.set("grant_id", "00000000-0000-4000-8000-0000000000a1");
+    formData.set("response_status", "accepted");
+
+    await expect(respondToConnectedRecipientHandoffRequestFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/ops/connected-handoffs?banner=connected_handoff_response_error",
+    );
+
+    expect(revalidatePathMock).not.toHaveBeenCalled();
   });
 });
