@@ -894,7 +894,7 @@ The following remain intentionally deferred/parked (not blockers for owner-relea
 1. Estimates production enablement expansion beyond internal-only baseline (runbook-gated; internal-only production enablement is now completed).
 2. Support Console production enablement (runbook-gated; full `ENABLE_SUPPORT_CONSOLE` console with impersonation-lite, support grants, and support access sessions is still disabled and runbook-gated). Note: Support Case / Call Log V1 owner/support-internal record layer is now implemented and production-smoke-passed separately — see completion matrix above.
 3. First-owner provisioning apply/invites outside controlled runbook operation.
-4. Tenant customer payment execution (online checkout/payment rail at tenant invoice layer; later Stripe-first invoice acceptance, separate from platform subscription billing).
+4. Payments V2 add-ons (refunds/disputes, saved cards/autopay expansion, partial payments, receipt messaging, public payment portal, platform fees follow-up, ACH, QBO sync).
 5. QBO integration (last-last, optional downstream accounting sync/export only).
 6. Recurring services / maintenance agreements (customer-owned agreement V1; Group 9A-2 backend foundation committed in `b126ff6`; Group 9A-3 read-only customer profile section committed in `09edc9f`; Group 9A-4 customer profile create/edit V1 committed in `9f81d6f`; Group 9A-5B due/overdue summary read model committed with `summarizeMaintenanceAgreementsForAccount` in `lib/maintenance-agreements/read-model.ts`; Group 9A-6 feature-gated read-only ops Service Plans card committed in `1776042` (`app/ops/page.tsx`), fail-safe and non-blocking on read error; Group 9A-7B manual Create Work Order from Service Plan prefill V1 committed in `3c186e5` with compact customer-card entry point, lightweight params only (`customer_id`, `maintenance_agreement_id`), server-side scoped prefill resolver on `/jobs/new`, editable service-maintenance defaults, and non-blocking invalid/unavailable fallback; Group 9A-8B read-only Service Plans drilldown route plus ops link implemented and pushed with internal/account-scoped `/service-plans`, feature-gated visibility, account-scoped capped drilldown helper, and no heavier `/ops` drilldown query; Group 9A-9A docs/model decisions now record preferred future linkage via `maintenance_agreement_visits`, completed-valid-work counting gate, derived V1 visit-balance projection, manual `next_due_date` posture, and V2-ledger parking; Group 9A-9B link-table foundation implemented and pushed in commit `6bf7329` with new `maintenance_agreement_visits` table in migration `20260513110000_maintenance_agreement_visits_link_foundation.sql`, durable link structure with `(agreement_id, job_id)` uniqueness, link_source enum (service_plan_prefill/manual/system_future), count_status lifecycle (linked/eligible/counted/excluded/reversed), READ helpers (`listMaintenanceAgreementVisitsForAgreement`, `listMaintenanceAgreementLinksForJob`, `summarizeMaintenanceAgreementVisitLinksForAgreement`), account-scoped RLS policies (SELECT/INSERT/UPDATE only; no DELETE), and 4 new vitest-passed link-helper tests; feature gated by `ENABLE_MAINTENANCE_AGREEMENTS` (default `false`); no automatic job generation; no persisted job/agreement linkage wired; no automatic counting; no due-date or balance-deduction logic; production remains inactive until migration apply and flag enablement are intentionally approved; Group 9A-9C link-row creation when job is created from service plan implemented and pushed in commit `071915a` with automatic link creation after job succeeds (`createMaintenanceAgreementVisitLinkFromJobCreation` action in `lib/maintenance-agreements/agreement-actions.ts`), link_source='service_plan_prefill', count_status='linked', counts_toward_visit_balance=false, non-blocking failure on invalid scopes, strict account/agreement/job scope validation, and 2 new vitest-passed link creation tests; Group 9A-9E service-plan Work Items prefill + runtime link-order fix implemented and pushed in commit `c4a08d9` with agreement default Work Items persistence, `/jobs/new` Step 5 Work Item prefill, service/maintenance job persistence for service-plan-origin jobs, and link creation moved before `postCreate(...)` redirect so link rows are no longer unreachable at runtime; Group 9A-10B count eligibility read-only projection implemented and pushed in commit `0588a26`; Group 9A-10C manual `Mark Visit Counted` on eligible linked job detail implemented and pushed in commit `1b69336` with always-visible placement fix in `2ae1a4b`; manual action updates only link row count fields, does not mutate agreement, does not advance `next_due_date`, and adds no invoice/payment behavior; Service Plan counts and due/overdue summary logic are implemented in the repo/read model and exposed on `/ops` as a read-only card, internal read-only drilldown is available on `/service-plans`, manual work-order prefill from customer agreements is implemented on `/jobs/new`, automatic link creation from job creation is active, and link-table foundation with read helpers plus controlled manual counting is ready for future reversal wiring; see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md)).
 7. Customer portal (requires separate customer/location-scoped external visibility design).
@@ -1120,7 +1120,6 @@ Category key:
 | Support V1 read-only Support Console | 2 | Console remains controlled and dormant by default to minimize operational/security risk during early adoption. | Runbook-approved enablement window and gate checks pass. |
 | Support V2 in-app Report Issue intake | 4 | Planned intake expansion is intentionally later so V0/V1 are proven first. | Post-launch prioritization after validated support workflow need. |
 | Estimates full customer-facing flow (public/customer conversion/payment-facing expansion) | 2 | Internal baseline exists, but external/customer-facing expansion remains incomplete and intentionally gated behind runbook/design decisions. Future Good / Better / Best proposals must follow `docs/ACTIVE/Estimate_Multi_Option_Proposal_Model_Spec.md`. | Explicit expansion decision plus runbook/design approval beyond internal-only scope. |
-| Tenant customer payment execution (invoice payment acceptance) | 5 | Payment-ready foundation is present, but live tenant customer payment execution is intentionally deferred. | Explicit approval to pull forward tenant execution phase with processor-backed controls. |
 | SMS/Twilio provider-powered messaging | 5 | Current posture is explicitly non-sending; provider-powered SMS remains deferred behind compliance/provider readiness gates. | Consent/suppression/readiness gates complete, provider/legal review complete, explicit activation decision made. |
 | Product mode/tier/add-on/per-seat expansion (admin mutation, tier enforcement, full mode-aware surfaces) | 4 | Baseline product-mode foundation exists; broader packaging/enforcement and full mode-aware behavior are intentionally future slices. | Future Product Mode and packaging roadmap slices explicitly approved. |
 | Customer portal | 4 | Out of current release scope; requires a separate customer/location visibility and authority model. | Explicit reopen decision with dedicated portal design and scope approval. |
@@ -1182,7 +1181,7 @@ The following are explicitly runbook-gated and must remain controlled:
    - Dry-run first, guarded apply, environment verification gates
 4. Platform subscription billing/Stripe where applicable
    - Platform account subscription slice is live-smoke confirmed
-   - Tenant customer payment execution remains deferred and separately gated
+   - Tenant customer payment execution V1 is implemented for current scope; only Payments V2 add-ons remain deferred
 5. Any production flag enablement
    - Must remain evidence-backed, gate-approved, and rollback-ready
 
@@ -1254,7 +1253,7 @@ Recommended order after owner-release:
 3. Read-only Support Console V1 only if/when support load justifies it.
 4. Estimates production enablement (internal-only runbook execution).
 5. Recurring services / maintenance agreements (customer-owned agreement V1; manual prep only; no automatic job generation).
-6. Tenant customer payment execution.
+6. Payments V2 add-ons triage (refunds/disputes, ACH, customer portal payments, advanced saved-card/autopay behaviors).
 7. QBO integration last-last (optional downstream accounting sync/export only).
 8. Product-mode configuration layer (settings/visibility/presets).
 9. Customer portal only if explicitly reopened.
@@ -1265,6 +1264,28 @@ Ordering rationale:
 - controlled adoption second,
 - operational/commercial expansion next,
 - accounting sync and broader packaging last.
+
+### 7.1 Roadmap to Completion (Realigned June 2026)
+
+This is the current execution roadmap after evidence-based alignment with implemented behavior.
+
+1. Close active lane: True App Package / Device-App Experience.
+   - Confirm installability and mobile runtime acceptance criteria.
+   - Keep this as the only active closeout lane until sign-off is complete.
+2. Stabilize production operations and docs truth.
+   - Keep Section 4.1 as the single open-lane register.
+   - Keep completed lanes out of deferred lists.
+3. Execute controlled pre-launch hardening.
+   - Run pre-launch hardening checklist in a scheduled window.
+   - Track only measured regressions; avoid broad speculative rewrites.
+4. Continue controlled onboarding.
+   - First-owner provisioning remains disciplined dry-run/apply operation.
+   - Expand tester/operator usage gradually with support-response monitoring.
+5. Pull next lane by operational signal, not by assumption.
+   - Priority candidates: Support V1 read-only console, estimates customer-facing expansion, Service Plans V2 improvements.
+   - Payment execution is already in place for current V1 scope; future payment work is Payments V2 add-ons only.
+6. Keep long-tail items parked unless explicitly reopened.
+   - Customer portal broad scope, QBO last-last, product-mode expansion, and SMS provider sending remain future decisions.
 
 ---
 

@@ -2531,10 +2531,10 @@ External contractor onboarding / invite acceptance remains outside internal oper
 
 Rollout boundary confirmations:
 
-- no Stripe tenant customer payment execution was introduced
+- no new tenant payment behavior expansion was introduced in this rollout batch
 - no QBO behavior was introduced
 - no schema migration or Supabase data change was part of this rollout
-- tenant customer / work payment execution remains deferred
+- tenant customer/work payment execution V1 is complete; deferred work is limited to Payments V2 add-ons
 - two additional test-only mock repairs were committed during main validation (`job-ops-waiting-state.test.ts`, `service-case-reconciliation-wiring.test.ts`); no product behavior change was introduced by those repairs
 
 17. What Is Deferred (Intentional, Not Missing)
@@ -2553,7 +2553,7 @@ Field-ready installable/PWA access readiness V1B-1 (Proxy Verification + Portal 
 
 Note:
 Payment P1 foundation is closed at the current baseline.
-Tenant customer invoice payment execution and live Pay Now/Charge Card flows remain deferred.
+Tenant customer invoice payment execution for the current V1 scope is implemented; deferred work is limited to Payments V2 add-ons.
 Stripe Platform Subscription V1 is implemented and live-smoke confirmed for platform account onboarding.
 Operational entitlement mutation gating for active internal operational mutation paths is complete and production-promoted on `main` (commit `bf38eca`). Dormant legacy intake cleanup remains a later candidate.
 See Section 19 for current payment-ready status.
