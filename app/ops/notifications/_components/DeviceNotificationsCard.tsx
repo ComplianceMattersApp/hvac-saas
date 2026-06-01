@@ -8,6 +8,7 @@ import type {
   RegisterBrowserPushSubscriptionResult,
 } from "@/lib/actions/push-subscription-actions";
 import { DeviceNotificationsDeviceList } from "./DeviceNotificationsDeviceList";
+import { DeviceInstallHelper } from "./DeviceInstallHelper";
 
 type DeviceNotificationsCardProps = {
   initialSubscriptions: PushSubscriptionSafeRow[];
@@ -176,15 +177,15 @@ export function DeviceNotificationsCard({
     switch (state) {
       case "unsupported":
       case "missing_config":
-        return "Device Notifications Not Available";
+        return "Notifications not available";
       case "denied":
-        return "Notifications Blocked";
+        return "Notifications blocked";
       case "enabled":
-        return "Device Notifications Enabled";
+        return "Notifications active";
       case "saving":
-        return "Saving...";
+        return "Saving notifications...";
       default:
-        return "Turn on job alerts for this device";
+        return "Notifications";
     }
   }, [state]);
 
@@ -288,82 +289,86 @@ export function DeviceNotificationsCard({
     }
   }
 
-  // Show helpful guidance for unsupported/denied states
   const isUnsupported = state === "unsupported" || state === "missing_config";
   const isDenied = state === "denied";
 
-  if (isUnsupported || isDenied) {
-    return (
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
-        <div className="flex gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-600">
-            <Smartphone className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-slate-900">{promptTitle}</h2>
-            <p className="mt-1 text-sm text-slate-600">{statusText}</p>
-            {isDenied && (
-              <p className="mt-2 text-xs text-slate-600">
-                To enable notifications, go to your browser settings and allow notifications for Compliance Matters, then reload this page.
-              </p>
-            )}
-          </div>
-        </div>
-      </section>
-    );
-  }
-
   return (
     <section className="space-y-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div className="flex min-w-0 gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700">
-            <Smartphone className="h-5 w-5" aria-hidden="true" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-sm font-semibold text-slate-950">{promptTitle}</h2>
-              {state === "enabled" && (
-                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                  Active
-                </span>
-              )}
-              {state !== "enabled" && activeCount > 0 && (
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-                  {activeCount} other {activeCount === 1 ? "device" : "devices"} active
-                </span>
-              )}
-            </div>
-            <p className="mt-1 text-sm leading-6 text-slate-600">{statusText}</p>
-          </div>
+      <div className="flex min-w-0 gap-3">
+        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700">
+          <Smartphone className="h-5 w-5" aria-hidden="true" />
         </div>
-
-        <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
-          {canDisable ? (
-            <button
-              type="button"
-              onClick={() => void handleDisable()}
-              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <BellOff className="h-4 w-4" aria-hidden="true" />
-              Not now
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void handleEnable()}
-              className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-blue-700 bg-blue-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
-              disabled={!canEnable}
-            >
-              <Bell className="h-4 w-4" aria-hidden="true" />
-              {enableButtonLabel}
-            </button>
-          )}
+        <div className="min-w-0">
+          <h2 className="text-base font-semibold text-slate-950">Device setup</h2>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            Set up this device for faster access and job alerts.
+          </p>
         </div>
       </div>
 
-      {/* Device list toggle */}
-      {activeCount > 0 && (
+      <div className="grid gap-3 lg:grid-cols-2">
+        <DeviceInstallHelper />
+
+        <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4">
+          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div className="flex min-w-0 gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700">
+                <Bell className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-sm font-semibold text-slate-950">{promptTitle}</h3>
+                  {state === "enabled" && (
+                    <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                      Active
+                    </span>
+                  )}
+                  {state !== "enabled" && activeCount > 0 && (
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
+                      {activeCount} other {activeCount === 1 ? "device" : "devices"} active
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Turn on job alerts and updates for this device.
+                </p>
+                <p className="mt-1 text-sm leading-6 text-slate-600">{statusText}</p>
+                {isDenied ? (
+                  <p className="mt-2 text-xs text-slate-600">
+                    To enable notifications, allow notifications for Compliance Matters in this browser, then reload this page.
+                  </p>
+                ) : null}
+                {isUnsupported ? null : null}
+              </div>
+            </div>
+
+            <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
+              {canDisable ? (
+                <button
+                  type="button"
+                  onClick={() => void handleDisable()}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <BellOff className="h-4 w-4" aria-hidden="true" />
+                  Not now
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void handleEnable()}
+                  className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-blue-700 bg-blue-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  disabled={!canEnable}
+                >
+                  <Bell className="h-4 w-4" aria-hidden="true" />
+                  {enableButtonLabel}
+                </button>
+              )}
+            </div>
+          </div>
+      </div>
+      </div>
+
+      {activeCount > 0 ? (
         <div className="border-t border-slate-100 pt-3">
           <button
             type="button"
@@ -376,19 +381,16 @@ export function DeviceNotificationsCard({
             </span>
           </button>
 
-          {showDeviceList && (
+          {showDeviceList ? (
             <div className="mt-3">
               <DeviceNotificationsDeviceList
                 subscriptions={initialSubscriptions}
                 currentEndpoint={currentEndpoint}
               />
             </div>
-          )}
+          ) : null}
         </div>
-      )}
-
-      {/* Guidance text */}
-      {state === "not_enabled" && activeCount === 0 && (
+      ) : (
         <div className="border-t border-slate-100 pt-3">
           <p className="text-xs text-slate-500">
             Device alerts are per browser/device. Enable alerts separately on your phone, tablet, and desktop. Turning this off only affects this browser/device.
