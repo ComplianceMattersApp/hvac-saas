@@ -522,22 +522,33 @@ If any item here conflicts with the active spine, the spine wins.
   1. Performance/responsiveness batch closeout and documentation (closed for the current pass)
   2. Support Console production-readiness planning (controlled, read-only, audited, careful flag-enable planning, no impersonation, no tenant mutation unless explicitly approved later)
   3. Estimates production-readiness planning (internal production-enablement decision only; migration/feature-flag/smoke/rollback plan required) â€” readiness audit complete, production readiness hardening guard committed, internal-only enablement runbook drafted; production enablement requires explicit gate approval per `docs/ACTIVE/Estimates_Production_Enablement_Runbook.md`
-  4. Field-ready installable/PWA plus True App Package / Device-App Experience closeout lane (current active closeout lane)
+  4. Field-ready installable/PWA plus True App Package / Device-App Experience closeout lane (completed for controlled rollout)
   5. Final launch confirmation sweep (intake, internal job creation, scheduling, field lifecycle, invoice-tracking honesty, reports, flags, disabled/deferred features, production smoke)
   6. First-owner/operator handoff dry-run (owner setup, operator checklist, account readiness, support readiness, launch operations)
   7. Controlled tester onboarding only after the above are acceptably complete
 - Tester remains in the wings intentionally and is not to be treated as a public launch trigger.
 - Support Console and Estimates production enablement remain parked behind their runbooks; tenant customer payments V1 is complete for current intended scope; the Payments V2 deferred register is parked; QBO remains optional downstream/last-last.
 - Resume broader launch-readiness sequencing after this docs closeout without treating tester pressure as a launch trigger.
+- Next recommended product lane is Owner Visibility / Business Pulse V1, followed by Customer Communication Polish V1.
+- Controlled rollout support/feedback remains direct-to-owner for now; do not reopen the formal support-system lane in this pass.
 
-### 2.3.7 Field-ready installable/PWA access readiness V1 (Slice 1 baseline hardening)
-- Completed scope for this slice is web/PWA metadata/installability baseline hardening only (`app/manifest.ts`, `app/layout.tsx`), with no auth/routing/data/server-action/source-of-truth behavior changes.
-- Current posture remains web-first app-like install readiness.
-- True App Package / Device-App Experience is the current closeout lane.
+### 2.3.7 Field-ready installable/PWA access readiness V1 (controlled rollout complete)
+- Completed scope now includes web/PWA metadata/installability baseline hardening, login continuity hardening, update-safe refresh notice, service-worker update-failure handling, and shared Device setup guidance plus per-device notifications.
+- Current posture remains web-first app-like install readiness for controlled rollout use.
+- Device setup now confirms:
+  - Chromium install prompt path when the browser exposes install prompt support
+  - iPhone/Safari manual Add to Home Screen guidance
+  - already-installed detection
+  - per-device notifications preserved in the same setup surface
+- Confirmed adjacent launch-readiness items closed in this pass:
+  - Today/Ops first-action guidance and clarity
+  - revenue workflow rail clarity
+  - calendar mobile control compression
+  - admin Day 1 essentials
+  - mobile `/jobs/[id]` field-mode protection remained intact during device-setup rollout
 - Native app-store distribution expansion beyond this lane remains intentionally deferred unless explicitly reopened.
-- Service worker/offline caching remains intentionally deferred to a separate planned slice.
-- Chromium install prompt readiness may still require a future service-worker slice and is not implemented here.
-- iOS install flow remains manual Add to Home Screen guidance (no automatic browser install prompt path).
+- Deeper offline mode/service-worker caching remains intentionally deferred to a separate planned slice.
+- SMS/provider messaging, QBO, customer portal, full support system, and deeper Payments V2 remain deferred.
 
 ### 2.3.7.1 Field-ready installable/PWA access readiness V1B-1 — Proxy Verification + Portal Loading Polish (completed)
 - Confirmed: `proxy.ts` is the active and correct routing convention for this project under Next.js 16.
@@ -783,7 +794,7 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 Summary of locked posture:
 - Notifications, calendar, contractor portal, reports, admin/setup, job workspace, ops, product mode matrix, and customer continuity V1 are closed for the current owner-release pass.
 - Deferred/parked items (customer portal, QBO, tenant payment execution, estimates/support-console production enablement, mode-switch UI) are not release blockers unless the owner explicitly reopens them.
-- True App Package / Device-App Experience is current active closeout work, not a deferred blocker.
+- True App Package / Device-App Experience is complete for controlled rollout use and is not an open blocker.
 - Runbook-gated items (estimates enablement, support console enablement, first-owner provisioning) remain parked behind their runbooks.
 - No codebase split. ECC/HERS-first with HVAC Service-ready shared foundation.
 

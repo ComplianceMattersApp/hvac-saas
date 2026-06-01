@@ -22,6 +22,8 @@ Support V0 clarification:
 - Practical onboarding setup still requires live contact details, support hours, after-hours S1 path, issue log location, and owner/first responder identity.
 - Controlled onboarding can proceed once those practical details are filled.
 - Support V0 does not close operationally until a formal ticketing/support system or equivalent support process is enabled later.
+- Controlled rollout support and feedback remain direct-to-owner during the current true-app rollout posture.
+- Full support-system expansion remains deferred unless owner evidence explicitly reopens it.
 - Group 8A practical setup and issue-log template references:
    - `docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md` (§2 and §3A)
    - `docs/ACTIVE/Support_V0_Issue_Log_Template.md`
@@ -234,17 +236,18 @@ Likely future measurement surfaces:
 
 ## 11. Immediate Next Decision
 
-After this addendum, next work should be selected from expansion/planning lanes:
+After this addendum, next work should be selected from controlled rollout follow-up lanes:
 
-1. Estimates / Quoting V1
-2. Recurring Services / Maintenance Agreements
-3. SMS/Text Messaging
-4. Tenant Stripe Customer Payments
-5. Targeted performance improvements only if daily use exposes a specific issue
+1. Owner Visibility / Business Pulse V1
+2. Customer Communication Polish V1
+3. Targeted performance improvements only if daily use exposes a specific issue
+4. Estimates / Quoting V1 only if owner evidence reorders priorities
+5. Recurring Services / Maintenance Agreements only if owner evidence reorders priorities
 
 Selection rule:
 - Choose one primary lane at a time.
 - Maintain deferred/runbook-gated boundaries unless explicitly reopened by owner decision.
+- Keep support routing owner-direct for the controlled rollout period rather than converting this pass into a formal support-system buildout.
 
 ---
 

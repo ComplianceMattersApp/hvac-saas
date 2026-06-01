@@ -102,7 +102,7 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 - Support V0/V1/V2 model
 - Post-launch roadmap order
 
-Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No codebase split. No customer portal in current scope. Current intended release is complete at the current quality bar. The active closeout lane is True App Package / Device-App Experience. Deferred and runbook-gated items remain parked unless explicitly reopened.
+Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No codebase split. No customer portal in current scope. Current intended release is complete at the current quality bar. True App / PWA V1 is complete for controlled tester use. Device setup now combines install or add-to-phone guidance with per-device notifications in the same setup surface. Login continuity, update-safe refresh notice, service-worker update failure handling, Today/Ops first-action clarity, revenue workflow rail clarity, calendar mobile control compression, and admin Day 1 essentials are complete. Deferred and runbook-gated items remain parked unless explicitly reopened, including native app-store wrapper work, deeper offline mode, SMS/provider messaging, QBO, customer portal, full support-system buildout, and deeper Payments V2 work.
 Canonical note: detailed deferred/remaining register authority stays in [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) Section 4.1; this spine mirrors that register instead of expanding duplicate long lists.
 
 **Estimate Multi-Option Proposal Model Lock:**
@@ -1400,6 +1400,8 @@ Current Program Status Note (May 2026)
   - no queue rewrite
   - no payment/Stripe tenant execution/QBO/Estimates/Support/onboarding behavior changes
 - Planned pre-launch spine order is now resumed after this docs closeout; Support Console and Estimates production enablement remain parked behind their runbooks, tenant customer payments V1 is complete for current intended scope, deferred payment add-ons remain parked, QBO remains optional downstream/last-last, and controlled tester onboarding remains intentionally held until readiness work is acceptably complete and supportable.
+- Next recommended product lane is Owner Visibility / Business Pulse V1, followed by Customer Communication Polish V1.
+- Controlled rollout feedback and support remain direct-to-owner for now; full support-system expansion stays deferred.
 - Contractor Report current-scope delivery is complete and accepted for current launch scope quality:
   - failed ECC contractor reports aggregate all failed completed ECC runs for the job
   - enriched contractor-actionable failure details are included (baseline, measured value, variance), including corrected duct-leakage percentage logic
@@ -2547,9 +2549,9 @@ additional dispatch UX micro-polish beyond the current unified drag/drop baselin
 deeper notification prioritization/escalation layers
 broader role model refinement
 future branding/settings/business-profile formalization
-True App Package / Device-App Experience is the current closeout lane for current intended release.
-Field-ready installable/PWA access readiness V1 Slice 1 remains the metadata/installability baseline hardening layer (manifest/layout metadata coherence and home-screen launch QA checklist).
-Field-ready installable/PWA access readiness V1B-1 (Proxy Verification + Portal Loading Polish) is complete: `proxy.ts` is confirmed active under Next.js 16 (the correct convention; `middleware.ts` is deprecated and must not be added), protected unauthenticated deep links preserve `?next=` for tested routes, and `app/portal/loading.tsx` provides a mobile-friendly contractor portal loading skeleton. Future native-store distribution and expanded offline packaging beyond this closeout lane remain deferred unless explicitly reopened in the canonical register.
+True App Package / Device-App Experience closeout is complete for controlled tester use in current intended release.
+Field-ready installable/PWA access readiness V1 now includes metadata/installability baseline hardening, login continuity, update-safe refresh notice, service-worker update-failure handling, and shared Device setup install/add-to-phone guidance plus per-device notifications.
+Field-ready installable/PWA access readiness V1B-1 (Proxy Verification + Portal Loading Polish) remains complete: `proxy.ts` is confirmed active under Next.js 16 (the correct convention; `middleware.ts` is deprecated and must not be added), protected unauthenticated deep links preserve `?next=` for tested routes, and `app/portal/loading.tsx` provides a mobile-friendly contractor portal loading skeleton. Native-store distribution, deeper offline mode, and broader packaging expansion remain deferred unless explicitly reopened in the canonical register.
 
 Note:
 Payment P1 foundation is closed at the current baseline.

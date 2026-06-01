@@ -256,6 +256,8 @@ Current release posture is confirmed as:
 
 Completion quality across the owner-release stack is high and coherent. Recent notification sanity returned pass with no must-fix blockers. Remaining deferred items are intentional and runbook-gated where applicable.
 
+True App / PWA V1 is now complete for controlled rollout use. Device setup combines install or add-to-phone guidance with per-device notifications in one setup surface, while login continuity, update-safe refresh, service-worker update-failure handling, Today/Ops first-action clarity, revenue workflow rail clarity, calendar mobile control compression, and admin Day 1 essentials are complete. Controlled rollout support/feedback remains direct-to-owner for now, and deferred lanes remain parked.
+
 This packet therefore recommends:
 - lock current owner-release scope as complete for current quality bar,
 - keep deferred work deferred,
@@ -850,7 +852,7 @@ Execution companion note: for practical first-customer support posture and expan
 | Support Case / Call Log V1 | Complete / production-smoke-passed | Support Case V1 implemented and production-smoke-passed (May 2026). Owner/support-internal only. Mutates only `support_cases` and `support_case_notes`. No impersonation. No tenant mutation. See `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md`. |
 | Product-mode matrix documentation | Complete | Matrix documented as shared-engine, presentation/configuration direction without pre-release switching requirement. |
 | Mobile/PWA baseline | Complete baseline | Installability baseline and route/access smoke documented. |
-| True App Package / Device-App Experience | Active closeout lane | Current intended release is complete at the current quality bar; active closeout work is focused on true app package/device-app experience hardening. Deferred/future items remain parked in Section 4.1 unless explicitly reopened. |
+| True App Package / Device-App Experience | Complete for controlled rollout | Current intended release is complete at the current quality bar; true app/device-app acceptance is complete for controlled tester use, and deferred/future items remain parked in Section 4.1 unless explicitly reopened. |
 | First-owner/operator readiness runbook | Complete as controlled runbook | First-owner provisioning runbook is active with strict guardrails, dry-run/apply gates, and verification checklist. |
 
 ### 2.2 Completion interpretation
@@ -1124,7 +1126,7 @@ Category key:
 | Product mode/tier/add-on/per-seat expansion (admin mutation, tier enforcement, full mode-aware surfaces) | 4 | Baseline product-mode foundation exists; broader packaging/enforcement and full mode-aware behavior are intentionally future slices. | Future Product Mode and packaging roadmap slices explicitly approved. |
 | Customer portal | 4 | Out of current release scope; requires a separate customer/location visibility and authority model. | Explicit reopen decision with dedicated portal design and scope approval. |
 | QBO integration | 5 | QBO remains optional downstream and intentionally last-last, not source-of-truth or launch-critical. | Later explicit downstream accounting integration decision after core payment lanes mature. |
-| True App Package / Device-App Experience | 0 | Installability baseline is complete; the current closeout lane is true app package/device-app experience. | Close this lane when owner-approved app/device acceptance criteria are met; keep deferred/future lanes unchanged unless explicitly reopened. |
+| True App Package / Device-App Experience | 1 | Installability and controlled-rollout device setup are complete; no further expansion is required for current intended release. | Reopen only if measured rollout feedback proves a specific device-app issue or if owner approval expands scope beyond the current web/PWA posture. |
 | Service Plans V2/expansion | 3 | Service Plans lane is closed for now; additional capability is intentionally blocked unless field evidence justifies reopen. | Real workflow bugs or strongly validated field feedback to reopen scope. |
 | Performance measured follow-up backlog | 1 | Broad campaign is intentionally parked; only measured regressions should trigger further work. | Measured evidence on real daily-use surfaces with benchmark-backed follow-up slices. |
 | Pre-launch hardening checklist items | 2 | Hardening items are intentionally staged for controlled pre-launch execution rather than ad-hoc implementation. | Pre-launch checklist/runbook execution window and sign-off. |
@@ -1257,7 +1259,8 @@ Recommended order after owner-release:
 7. QBO integration last-last (optional downstream accounting sync/export only).
 8. Product-mode configuration layer (settings/visibility/presets).
 9. Customer portal only if explicitly reopened.
-10. True App Package / Device-App Experience closeout lane (current).
+10. Owner Visibility / Business Pulse V1.
+11. Customer Communication Polish V1.
 
 Ordering rationale:
 - support safety first,
@@ -1269,20 +1272,18 @@ Ordering rationale:
 
 This is the current execution roadmap after evidence-based alignment with implemented behavior.
 
-1. Close active lane: True App Package / Device-App Experience.
-   - Confirm installability and mobile runtime acceptance criteria.
-   - Keep this as the only active closeout lane until sign-off is complete.
-2. Stabilize production operations and docs truth.
+1. Stabilize production operations and docs truth.
    - Keep Section 4.1 as the single open-lane register.
    - Keep completed lanes out of deferred lists.
-3. Execute controlled pre-launch hardening.
+2. Execute controlled pre-launch hardening.
    - Run pre-launch hardening checklist in a scheduled window.
    - Track only measured regressions; avoid broad speculative rewrites.
-4. Continue controlled onboarding.
+3. Continue controlled onboarding.
    - First-owner provisioning remains disciplined dry-run/apply operation.
    - Expand tester/operator usage gradually with support-response monitoring.
-5. Pull next lane by operational signal, not by assumption.
-   - Priority candidates: Support V1 read-only console, estimates customer-facing expansion, Service Plans V2 improvements.
+4. Pull next lane by operational signal, not by assumption.
+   - Priority order: Owner Visibility / Business Pulse V1 first, then Customer Communication Polish V1.
+   - Keep Support V1 read-only console, estimates customer-facing expansion, Service Plans V2 improvements, and other deferred lanes parked unless owner evidence explicitly reorders them.
    - Payment execution is already in place for current V1 scope; future payment work is Payments V2 add-ons only.
 6. Keep long-tail items parked unless explicitly reopened.
    - Customer portal broad scope, QBO last-last, product-mode expansion, and SMS provider sending remain future decisions.
