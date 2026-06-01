@@ -985,6 +985,70 @@ export async function CalendarView(props: Props) {
     ? 'Single technician'
     : 'All technicians';
 
+  const dispatchFocusControls = data.assignableUsers.length > 0 ? (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Dispatch Focus</p>
+          <p className="mt-0.5 text-xs text-slate-500">Filter the board without changing the schedule or assignments.</p>
+        </div>
+        <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+          {activeFilterLabel}
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <Link
+          href={buildCalendarHref(uiView, data.anchorDate)}
+          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            !activeTech
+              ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+          }`}
+        >
+          All technicians
+        </Link>
+        <Link
+          href={buildCalendarHref(uiView, data.anchorDate, { tech: CALENDAR_TECH_FILTER_UNASSIGNED })}
+          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            activeUnassignedFilter
+              ? 'border-rose-800 bg-rose-700 text-white shadow-sm'
+              : 'border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50'
+          }`}
+        >
+          Unassigned
+        </Link>
+        {data.assignableUsers.map((user) => (
+          <Link
+            key={user.user_id}
+            href={buildCalendarHref(uiView, data.anchorDate, { tech: user.user_id })}
+            className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              activeTech === user.user_id
+                ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            {user.display_name}
+          </Link>
+        ))}
+      </div>
+    </div>
+  ) : null;
+
+  const statusLegend = (
+    <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
+      <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+        Status Legend
+      </span>
+      {CALENDAR_STATUS_LEGEND.map((item) => (
+        <span key={item.key} className="inline-flex items-center gap-1.5 rounded-full border border-transparent bg-white/70 px-2.5 py-1">
+          <span className={`h-2 w-2 rounded-full ${item.dot}`} />
+          <span>{item.label}</span>
+        </span>
+      ))}
+    </div>
+  );
+
   return (
     <div className="space-y-5 pb-8">
       {banner ? (
@@ -1045,68 +1109,28 @@ export async function CalendarView(props: Props) {
           </div>
         </div>
 
-        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 shadow-sm shadow-slate-950/5">
-          {data.assignableUsers.length > 0 ? (
-            <div>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Dispatch Focus</p>
-                  <p className="mt-0.5 text-xs text-slate-500">Filter the board without changing the schedule or assignments.</p>
-                </div>
-                <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-                  {activeFilterLabel}
-                </div>
-              </div>
+        <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/70 px-3 py-2.5 sm:hidden">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800">Next dispatch action</p>
+          <p className="mt-0.5 text-xs text-blue-900/90">Open a job in Needs Scheduling, then place it on today&apos;s board.</p>
+        </div>
 
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
-                <Link
-                  href={buildCalendarHref(uiView, data.anchorDate)}
-                  className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    !activeTech
-                      ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                  }`}
-                >
-                  All technicians
-                </Link>
-                <Link
-                  href={buildCalendarHref(uiView, data.anchorDate, { tech: CALENDAR_TECH_FILTER_UNASSIGNED })}
-                  className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                    activeUnassignedFilter
-                      ? 'border-rose-800 bg-rose-700 text-white shadow-sm'
-                      : 'border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50'
-                  }`}
-                >
-                  Unassigned
-                </Link>
-                {data.assignableUsers.map((user) => (
-                  <Link
-                    key={user.user_id}
-                    href={buildCalendarHref(uiView, data.anchorDate, { tech: user.user_id })}
-                    className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-                      activeTech === user.user_id
-                        ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                    }`}
-                  >
-                    {user.display_name}
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : null}
-
-          <div className={`${data.assignableUsers.length > 0 ? 'mt-3 border-t border-slate-200 pt-3' : ''} flex flex-wrap items-center gap-3 text-xs text-slate-500`}>
-            <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-              Status Legend
+        <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 shadow-sm shadow-slate-950/5 sm:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-800 [&::-webkit-details-marker]:hidden">
+            <span>More controls</span>
+            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+              Filters + legend
             </span>
-            {CALENDAR_STATUS_LEGEND.map((item) => (
-              <span key={item.key} className="inline-flex items-center gap-1.5 rounded-full border border-transparent bg-white/70 px-2.5 py-1">
-                <span className={`h-2 w-2 rounded-full ${item.dot}`} />
-                <span>{item.label}</span>
-              </span>
-            ))}
+          </summary>
+
+          <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
+            {dispatchFocusControls}
+            <div className={dispatchFocusControls ? 'border-t border-slate-200 pt-3' : ''}>{statusLegend}</div>
           </div>
+        </details>
+
+        <div className="mt-3 hidden rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 shadow-sm shadow-slate-950/5 sm:block">
+          {dispatchFocusControls}
+          <div className={dispatchFocusControls ? 'mt-3 border-t border-slate-200 pt-3' : ''}>{statusLegend}</div>
         </div>
       </div>
 
