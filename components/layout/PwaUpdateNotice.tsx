@@ -81,7 +81,7 @@ export default function PwaUpdateNotice() {
 
         navigator.serviceWorker.addEventListener("controllerchange", handleControllerChange);
 
-        void registration.update();
+        await registration.update();
 
         if (!registration.waiting && !registration.installing && !navigator.serviceWorker.controller) {
           setState("idle");
