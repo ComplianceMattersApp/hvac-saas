@@ -289,16 +289,36 @@ export default async function AdminCompanyProfilePage({
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-slate-900">Account setup</div>
+          <div className="font-semibold text-slate-900">Day 1 essentials</div>
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
             {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
           </div>
         </div>
         <div className="mt-1 text-sm leading-6 text-slate-600">
-          Readiness tracks setup confirmations, not just whether a field has text.
+          Start with these areas first. Use the rest of this page as your company grows.
         </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <Link href="#company-details" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
+            Confirm company details
+          </Link>
+          <Link href="/ops/admin/internal-users" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
+            Invite your team
+          </Link>
+          <Link href="#account-billing" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
+            Set billing and payment readiness
+          </Link>
+          <Link href="#invoice-settings" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
+            Choose invoice workflow defaults
+          </Link>
+        </div>
+
+        <div className="mt-2 text-xs leading-5 text-slate-500">
+          Required setup items appear below under Needs setup. Authorized ECC raters and connected handoff accounts are optional unless your workflows require them.
+        </div>
+
         {readiness.isOperationallyReady ? (
-          <div className="mt-1 font-medium text-emerald-700">Ready for operations</div>
+          <div className="mt-2 font-medium text-emerald-700">Ready for operations</div>
         ) : (
           <div className="mt-2 space-y-1">
             <div className="font-medium text-amber-700">Needs setup</div>
@@ -362,7 +382,7 @@ export default async function AdminCompanyProfilePage({
           </div>
         </div>
 
-        <div className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
+        <div id="company-details" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
           <div className="space-y-1">
             <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Company details</h2>
             <p className="text-sm leading-6 text-slate-600">
@@ -461,7 +481,7 @@ export default async function AdminCompanyProfilePage({
         seatAuditPreview={seatAuditPreview}
       />
 
-      <div className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)]">
+      <div id="invoice-settings" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invoice Settings</h2>
           <p className="text-sm leading-6 text-slate-600">
