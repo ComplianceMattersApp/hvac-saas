@@ -184,6 +184,14 @@ export default async function EstimatesPage({
             <div className="mt-0.5 text-xs font-semibold">Multi-option</div>
           </div>
         </div>
+
+        <div className="mt-5 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
+          <p className="mt-1">
+            <span className="font-semibold text-slate-900">Stage:</span> Proposal workspace.
+            <span className="ml-2 font-semibold text-slate-900">Next:</span> Open a draft estimate to finalize customer delivery, or open a sent estimate to record the customer decision.
+          </p>
+        </div>
       </div>
 
       <section className="space-y-3">

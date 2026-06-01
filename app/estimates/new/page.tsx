@@ -103,6 +103,13 @@ export default async function NewEstimatePage({
         <p className="mt-0.5 text-sm text-slate-500">
           Create a draft estimate for a customer. Add line items after creation.
         </p>
+        <div className="mt-3 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
+          <p className="mt-1">
+            <span className="font-semibold text-slate-900">Stage:</span> Draft setup.
+            <span className="ml-2 font-semibold text-slate-900">Next:</span> Create the draft, then add proposal line items before finalizing customer delivery.
+          </p>
+        </div>
       </div>
 
       <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.18)]">

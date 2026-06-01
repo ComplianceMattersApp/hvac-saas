@@ -113,6 +113,72 @@ function statusGuidanceMessage(status: string) {
   }
 }
 
+function resolveEstimateRevenueWorkflowRail(params: {
+  status: string;
+  isMultiOptionProposal: boolean;
+  canConvertToJob: boolean;
+  canConvertToInvoiceDraft: boolean;
+  hasConvertedJob: boolean;
+  hasConvertedInvoice: boolean;
+}) {
+  if (params.hasConvertedInvoice) {
+    return {
+      stage: "Invoice draft linked",
+      next: "Open Invoice Workspace to issue, send, and collect payment when ready.",
+    };
+  }
+
+  if (params.hasConvertedJob) {
+    return params.canConvertToInvoiceDraft
+      ? {
+          stage: "Job linked",
+          next: "Create Draft Invoice when billed scope is ready.",
+        }
+      : {
+          stage: "Job linked",
+          next: "Open the linked job to continue operations, then return here for invoice conversion steps.",
+        };
+  }
+
+  if (params.status === "approved") {
+    return params.canConvertToJob
+      ? {
+          stage: "Approved",
+          next: "Convert to Job when operations should begin.",
+        }
+      : {
+          stage: "Approved",
+          next: "Review approval details and selected option snapshot before downstream conversion.",
+        };
+  }
+
+  if (params.status === "sent") {
+    return {
+      stage: "Awaiting customer decision",
+      next: "Record approval, decline, expiration, or cancellation based on customer response.",
+    };
+  }
+
+  if (params.status === "draft") {
+    return {
+      stage: params.isMultiOptionProposal ? "Draft with options" : "Draft proposal",
+      next: "Finish proposal content, then finalize customer delivery.",
+    };
+  }
+
+  if (params.status === "converted") {
+    return {
+      stage: "Converted",
+      next: "Use linked job and invoice records as the active workflow surface.",
+    };
+  }
+
+  return {
+    stage: statusLabel(params.status),
+    next: "Review estimate status and choose the next documented revenue step.",
+  };
+}
+
 const SAVE_TO_PRICEBOOK_SUPPORTED_TYPES = new Set(["service", "material", "diagnostic"]);
 
 function canShowSaveToPricebook(params: {
@@ -351,6 +417,15 @@ export default async function EstimateDetailPage({
     ? `/jobs/${estimate.converted_job_id}/invoice`
     : null;
 
+  const estimateRevenueWorkflowRail = resolveEstimateRevenueWorkflowRail({
+    status: estimate.status,
+    isMultiOptionProposal,
+    canConvertToJob,
+    canConvertToInvoiceDraft,
+    hasConvertedJob: Boolean(estimate.converted_job_id),
+    hasConvertedInvoice: Boolean(convertedInvoiceId),
+  });
+
   const proposalLinkRead = isSent
     ? await readActiveEstimateProposalLinkForInternal({
         estimateId: estimate.id,
@@ -515,6 +590,14 @@ export default async function EstimateDetailPage({
           <div>
             <span className="font-medium text-slate-700">Status:</span> {documentView.identity.statusLabel}
           </div>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700 print:hidden">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
+          <p className="mt-1">
+            <span className="font-semibold text-slate-900">Stage:</span> {estimateRevenueWorkflowRail.stage}.
+            <span className="ml-2 font-semibold text-slate-900">Next:</span> {estimateRevenueWorkflowRail.next}
+          </p>
         </div>
       </div>
 

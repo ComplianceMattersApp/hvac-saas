@@ -240,6 +240,60 @@ function readinessRow(label: string, ready: boolean, detail: string) {
   );
 }
 
+function resolveInvoiceRevenueWorkflowRail(params: {
+  hasInvoice: boolean;
+  invoiceStatus: InternalInvoiceStatus | null;
+  balanceDueCents: number;
+  hasFailedAutopayAttention: boolean;
+}) {
+  if (!params.hasInvoice) {
+    return {
+      stage: "No invoice draft",
+      next: "Create Draft Invoice to start billing charges.",
+    };
+  }
+
+  if (params.invoiceStatus === "draft") {
+    return {
+      stage: "Draft invoice",
+      next: "Review readiness checks, then issue when recipient, charges, and total are ready.",
+    };
+  }
+
+  if (params.invoiceStatus === "issued") {
+    if (params.hasFailedAutopayAttention) {
+      return {
+        stage: "Issued with payment attention",
+        next: "Review payment failure details before retrying collection.",
+      };
+    }
+
+    if (params.balanceDueCents > 0) {
+      return {
+        stage: "Issued and unpaid",
+        next: "Collect payment by link, saved card, or manual record.",
+      };
+    }
+
+    return {
+      stage: "Issued and paid",
+      next: "Review payment history and delivery audit details if needed.",
+    };
+  }
+
+  if (params.invoiceStatus === "void") {
+    return {
+      stage: "Voided",
+      next: "Start a replacement draft only when corrected billed scope is ready.",
+    };
+  }
+
+  return {
+    stage: "Invoice workflow",
+    next: "Review current invoice state and continue the documented billing sequence.",
+  };
+}
+
 export default async function InternalInvoiceWorkspacePage({
   params,
   searchParams,
@@ -526,6 +580,12 @@ export default async function InternalInvoiceWorkspacePage({
         : Number(paymentSummary?.balanceDueCents ?? 0) > 0
           ? "Create a payment link, charge the saved card once, or record a manual payment."
           : "Invoice is paid. Review payment history or audit details if needed.";
+  const invoiceRevenueWorkflowRail = resolveInvoiceRevenueWorkflowRail({
+    hasInvoice: Boolean(invoice),
+    invoiceStatus: normalizeInternalInvoiceStatus(invoice?.status ?? null),
+    balanceDueCents: Number(paymentSummary?.balanceDueCents ?? 0),
+    hasFailedAutopayAttention: failedAutopayAttentionItems.length > 0,
+  });
   const invoiceHeaderReference = invoice
     ? formatInvoiceDisplayReference({
         invoiceDisplayNumber: (invoice as { invoice_display_number?: string | null }).invoice_display_number,
@@ -557,6 +617,13 @@ export default async function InternalInvoiceWorkspacePage({
               {job.title || "Job"} / {customerName}{locationLabel ? ` / ${locationLabel}` : ""}
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-700">{nextActionSummary}</p>
+            <div className="mt-3 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
+              <p className="mt-1">
+                <span className="font-semibold text-slate-900">Stage:</span> {invoiceRevenueWorkflowRail.stage}.
+                <span className="ml-2 font-semibold text-slate-900">Next:</span> {invoiceRevenueWorkflowRail.next}
+              </p>
+            </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
               <span className={chipClass}>{invoice ? formatInternalInvoiceStatus(invoice.status) : "No draft"}</span>
               <span className={chipClass}>{lineItemCount} charge{lineItemCount === 1 ? "" : "s"}</span>

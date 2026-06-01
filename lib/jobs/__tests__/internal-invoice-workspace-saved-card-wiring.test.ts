@@ -8,6 +8,16 @@ const source = readFileSync(
 );
 
 describe("internal invoice workspace saved-card charge wiring", () => {
+  it("includes compact stage and next-step rail copy in header", () => {
+    expect(source).toContain("function resolveInvoiceRevenueWorkflowRail");
+    expect(source).toContain("Revenue Workflow Rail");
+    expect(source).toContain("Stage:</span> {invoiceRevenueWorkflowRail.stage}.");
+    expect(source).toContain("Next:</span> {invoiceRevenueWorkflowRail.next}");
+    expect(source).toContain('stage: "Draft invoice"');
+    expect(source).toContain('stage: "Issued and unpaid"');
+    expect(source).toContain('stage: "Issued and paid"');
+  });
+
   it("uses shared short invoice reference helper in the primary header", () => {
     expect(source).toContain('import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";');
     expect(source).toContain("const invoiceHeaderReference = invoice");
