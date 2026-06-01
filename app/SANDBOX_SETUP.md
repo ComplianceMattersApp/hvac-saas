@@ -9,6 +9,23 @@
 5. Run:
    npm run dev
 
+### Local Login Smoke Credentials
+
+Do not store raw local smoke credentials in this repository or any tracked document.
+
+For local-only browser smoke on `/login?next=/today`, keep the test account in an untracked local source such as:
+
+- a local password manager entry named `Compliance Matters Local Smoke`
+- `.env.local` entries such as:
+  - `LOCAL_SMOKE_LOGIN_EMAIL=...`
+  - `LOCAL_SMOKE_LOGIN_PASSWORD=...`
+
+Recommended usage:
+
+1. Keep the actual email and password only in local, untracked storage.
+2. Use that account only for local/sandbox login continuity smoke.
+3. If the account becomes unreliable or shared too broadly, rotate it rather than documenting it here.
+
 If sandbox gets dirty, abandon it and create a fresh one.
 Do not patch sandboxes manually unless debugging a specific issue.
 
