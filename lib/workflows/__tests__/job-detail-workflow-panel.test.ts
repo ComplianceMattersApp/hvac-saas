@@ -823,7 +823,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     const html = renderToStaticMarkup(jsx);
     expect(html).toContain("Send to Connected account 22222222");
     expect(html).toContain("Connected-account send creates request-scoped access");
-    expect(html).toContain("Connected-account handoff will create request-scoped access, but recipient-side response UI is not available yet.");
+    expect(html).toContain("Connected-account handoff creates request-scoped access, and connected recipients can respond from the Connected Handoff Requests queue.");
     expect(html).toContain("Connected account 22222222");
     expect(html).toContain("Record external ECC completion");
     expect(html).toContain("More actions");
@@ -898,7 +898,7 @@ describe("DeferredWorkflowMilestonesPanelBody", () => {
     expect(html).toContain("Send to rater");
     expect(html).toContain("Acme Ratings");
     expect(html).toContain("Connected-account send creates request-scoped access");
-    expect(html).toContain("Connected-account handoff will create request-scoped access, but recipient-side response UI is not available yet.");
+    expect(html).toContain("Connected-account handoff creates request-scoped access, and connected recipients can respond from the Connected Handoff Requests queue.");
     expect(html).toContain("Connected account 22222222");
   });
 

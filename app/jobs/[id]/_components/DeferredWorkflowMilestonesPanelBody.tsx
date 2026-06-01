@@ -561,7 +561,7 @@ export default async function DeferredWorkflowMilestonesPanelBody({
                         <div className="mt-2 rounded-md border border-amber-200 bg-amber-50/70 px-2.5 py-2 text-[11px] text-amber-900">
                           <div className="font-semibold">Connected-account send creates request-scoped access</div>
                           <div className="mt-0.5">
-                            Connected-account handoff will create request-scoped access, but recipient-side response UI is not available yet.
+                            Connected-account handoff creates request-scoped access, and connected recipients can respond from the Connected Handoff Requests queue.
                           </div>
                           <div className="mt-0.5">
                             {connectedAccountRecipientNames.length > 0

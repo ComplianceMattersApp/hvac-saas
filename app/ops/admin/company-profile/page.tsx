@@ -699,7 +699,7 @@ export default async function AdminCompanyProfilePage({
           </label>
 
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
-            V1 setup supports external/manual raters. Internal-user and connected-account raters are reserved for future slices.
+            External/manual raters are fully supported. Connected-account raters are supported through Connected Handoff Accounts.
           </div>
 
           <div className="flex justify-end">
