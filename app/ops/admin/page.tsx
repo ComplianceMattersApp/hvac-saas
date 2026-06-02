@@ -250,10 +250,10 @@ export default async function OpsAdminPage() {
           <div>
             <div className="text-xs font-semibold text-slate-500">Admin Center</div>
             <h1 className="mt-1 text-2xl font-semibold text-slate-950 sm:text-3xl">
-              Control the business workspace.
+              Start your 14-day trial with real work.
             </h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-              Manage setup readiness, people, contractor collaboration, company identity, and reusable admin tools.
+              Start here, set up your team, and run one real job from customer to invoice.
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="inline-flex min-h-8 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
@@ -287,7 +287,7 @@ export default async function OpsAdminPage() {
                 Organization
               </a>
               <a href="#future" className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-50">
-                Future modules
+                Later tools
               </a>
             </nav>
           </div>
@@ -298,7 +298,7 @@ export default async function OpsAdminPage() {
               <AdminSectionHeader
                 eyebrow="Account setup"
                 title={readiness.isOperationallyReady ? "Ready for operations" : "Needs setup"}
-                description="This checks setup steps, not just whether fields are filled in."
+                description="This checks your 14-day trial start path, not just whether fields are filled in."
               />
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">
                 <div className="text-2xl font-semibold text-slate-950">{readinessPercent}%</div>
@@ -310,6 +310,24 @@ export default async function OpsAdminPage() {
 
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-100">
               <div className="h-full rounded-full bg-slate-900" style={{ width: `${readinessPercent}%` }} />
+            </div>
+
+            <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
+              <div className="text-xs font-semibold">Start here in your 14-day trial</div>
+              <p className="mt-1 leading-6">
+                Follow this path first: customer to job, then schedule, field notes, closeout, and invoice. Use Today/Ops each morning to keep work moving.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs font-semibold">
+                <Link href="/customers/new" className="rounded-md border border-sky-300 bg-white px-2.5 py-1 text-sky-900 hover:bg-sky-100">
+                  Create first customer
+                </Link>
+                <Link href="/jobs/new" className="rounded-md border border-sky-300 bg-white px-2.5 py-1 text-sky-900 hover:bg-sky-100">
+                  Create first job
+                </Link>
+                <Link href="/today" className="rounded-md border border-sky-300 bg-white px-2.5 py-1 text-sky-900 hover:bg-sky-100">
+                  Open Today
+                </Link>
+              </div>
             </div>
 
             {incompleteRequiredItems.length > 0 ? (
@@ -339,7 +357,7 @@ export default async function OpsAdminPage() {
 
             {visibleOptionalItems.length > 0 ? (
               <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-semibold text-slate-600">Optional setup</div>
+                <div className="text-xs font-semibold text-slate-600">This can wait</div>
                 <div className="mt-3 space-y-3">
                   {visibleOptionalItems.map((item) => (
                     <div key={item.key} className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-700">
@@ -416,9 +434,9 @@ export default async function OpsAdminPage() {
           </section>
 
           <section id="future" className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-5 py-4">
-            <div className="text-xs font-semibold text-slate-500">Future modules</div>
+            <div className="text-xs font-semibold text-slate-500">Later tools</div>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Access policy and system diagnostics tools will appear here once they have a clear owned home inside the Admin Center.
+              Use this later for deeper account and support tools after your daily work rhythm is in place.
             </p>
           </section>
         </div>

@@ -196,7 +196,7 @@ export default async function AdminInternalUsersPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal Team</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Manage the employees, staff, and technicians inside your company.
+              Invite your office team and at least one tech so you can run your first 14-day trial jobs.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
               Internal Team is for people inside your company.
@@ -242,7 +242,7 @@ export default async function AdminInternalUsersPage({
         <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
           <p className="text-sm font-semibold text-amber-900">Team setup not yet confirmed</p>
           <p className="mt-1 text-sm leading-6 text-amber-800">
-            Review your team members below, then confirm team setup to mark this setup step complete.
+            Review your team list, then confirm team setup. Do this early so customer and job work can move without delays.
           </p>
           <form action={confirmTeamSetupFromForm} className="mt-3">
             <button
@@ -254,6 +254,16 @@ export default async function AdminInternalUsersPage({
           </form>
         </div>
       ) : null}
+
+      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
+        <div className="font-semibold text-slate-900">Start here for your 14-day trial</div>
+        <p className="mt-1 leading-6">
+          Invite dispatch/office and one tech first. Then create your first customer, create your first job, schedule and assign it, capture job notes, and close out to invoice.
+        </p>
+        <p className="mt-2 text-xs leading-5 text-slate-500">
+          This can wait: deeper role cleanup and optional team settings after your daily Today/Ops rhythm is working.
+        </p>
+      </div>
 
       {timeTrackingSavedUserId ? (
         <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-900 shadow-sm">

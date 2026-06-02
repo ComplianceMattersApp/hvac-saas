@@ -289,13 +289,13 @@ export default async function AdminCompanyProfilePage({
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-slate-900">Day 1 essentials</div>
+          <div className="font-semibold text-slate-900">14-day trial: Day 1 essentials</div>
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
             {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
           </div>
         </div>
         <div className="mt-1 text-sm leading-6 text-slate-600">
-          Start with these areas first. Use the rest of this page as your company grows.
+          Start with these areas first. Then run one real job end to end.
         </div>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -306,15 +306,15 @@ export default async function AdminCompanyProfilePage({
             Invite your team
           </Link>
           <Link href="#account-billing" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
-            Set billing and payment readiness
+            Review trial dates and account billing
           </Link>
           <Link href="#invoice-settings" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
-            Choose invoice workflow defaults
+            Pick your invoice mode
           </Link>
         </div>
 
         <div className="mt-2 text-xs leading-5 text-slate-500">
-          Required setup items appear below under Needs setup. Authorized ECC raters and connected handoff accounts are optional unless your workflows require them.
+          Next: create your first customer, create your first job, schedule/assign it, capture field notes on the job page, then close out and invoice. Authorized ECC raters and connected handoff accounts can wait unless you need them now.
         </div>
 
         {readiness.isOperationallyReady ? (
@@ -1051,7 +1051,7 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  trial: "Trial",
+  trial: "14-day trial",
   active: "Active",
   grace: "Grace period",
   suspended: "Suspended",
@@ -1126,7 +1126,7 @@ function PlatformAccountSection({
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
         <div className="text-sm font-semibold text-slate-950">Account &amp; Billing</div>
         <div className="mt-1 text-sm text-slate-600">
-          Manage your Compliance Matters subscription and account access.
+          Review your plan and trial dates. Focus first on running work from customer to invoice.
         </div>
         <div className="mt-2 text-xs leading-5 text-slate-500">
           This subscription is for Compliance Matters access. Customer invoice payments are managed
@@ -1145,7 +1145,7 @@ function PlatformAccountSection({
         <div className="border-t border-slate-100 bg-white px-5 py-3 text-sm leading-6 text-slate-700">
           {trialEndsLabel ? (
             <div>
-              Trial ends:{" "}
+              14-day trial ends:{" "}
               <span className="font-medium text-slate-900">{trialEndsLabel}</span>
             </div>
           ) : null}
@@ -1196,7 +1196,7 @@ function PlatformAccountSection({
         <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
           <span className="inline-flex items-center gap-2">
             <span aria-hidden="true" className="transition-transform group-open:rotate-90">›</span>
-            Advanced billing details
+            Billing details (this can wait)
           </span>
         </summary>
         <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
@@ -1244,7 +1244,7 @@ function TenantStripePaymentsSection({
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
         <div className="text-sm font-semibold text-slate-950">Tenant customer invoice payments</div>
         <div className="mt-1 text-sm text-slate-600">
-          Stripe Connect setup controls online invoice payment readiness for this company.
+          Stripe Connect setup controls online invoice payment readiness for this company. This can wait until you are ready to collect invoice payments online.
         </div>
       </div>
 
