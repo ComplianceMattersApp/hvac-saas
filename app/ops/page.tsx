@@ -451,6 +451,10 @@ function subtractBusinessDays(date: Date, days: number) {
     return customer || location || "Customer / location pending";
   }
 
+  // Initialize lifecycle maps before any workspace preview rendering to avoid TDZ crashes.
+  let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
+  let latestFailedRunByJob = new Map<string, any>();
+
   function workspaceAgeLabel(job: any) {
     const jobId = String(job?.id ?? "").trim();
     return (
@@ -2026,7 +2030,7 @@ if (failedRunsRes.error) throw failedRunsRes.error;
 if (opsTimingEnabled) console.log(`[ops:secondarySignalReads] ${Date.now() - _t_secondarySignalReads}ms`);
 
 const pendingInfoTransitionEvents = pendingInfoTransitionRes.data ?? [];
-const opsStatusEnteredAtByJob = buildOpsStatusEnteredAtByJob(
+opsStatusEnteredAtByJob = buildOpsStatusEnteredAtByJob(
   (opsStatusTransitionRes.data ?? []) as Array<{ job_id?: unknown; created_at?: unknown; meta?: unknown }>,
 );
 
@@ -2069,7 +2073,7 @@ const unreadContractorUpdateNotifications = unreadContractorAwarenessNotificatio
 
 const failedRuns = failedRunsRes.data ?? [];
 
-const latestFailedRunByJob = new Map<string, any>();
+latestFailedRunByJob = new Map<string, any>();
 for (const run of failedRuns ?? []) {
   const jobId = String((run as any)?.job_id ?? "").trim();
   if (!jobId) continue;
