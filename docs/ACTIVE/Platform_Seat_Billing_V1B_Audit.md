@@ -662,7 +662,7 @@ Flow:
   3. Upsert internal_users (role=admin, is_active=true, account_owner_user_id=self)
   4. Create account settings (product mode)
   5. Upsert platform_account_entitlements
-     - If entitlementMode='standard': plan_key='starter', status='trial', trial_ends_at=+30d
+    - If entitlementMode='standard': plan_key='starter', status='trial', trial_ends_at=+14d
      - If entitlementMode='internal_comped': status='active', notes='internal_comped_v1', seat_limit=null
   6. Seed pricebook (starter kit)
   7. Send invite
@@ -850,7 +850,7 @@ Flow:
      - plan_key: 'starter'
      - entitlement_status: 'trial'
      - seat_limit: null
-     - trial_ends_at: now() + 30 days
+    - trial_ends_at: now() + 14 days
   3. If entitlementMode='internal_comped':
      - plan_key: 'starter'
      - entitlement_status: 'active'

@@ -2645,6 +2645,8 @@ Public self-serve signup is now part of the active V1 onboarding baseline for st
 
 Operator first-owner provisioning remains active as a controlled/manual fallback path, and internal/comped owner provisioning remains operator-controlled (not public).
 
+The 14-Day Trial Success Pack is the current onboarding/GTM content source for reducing first-user "now what?" fatigue during controlled rollout. See `docs/ACTIVE/GTM_14_Day_Trial_Success_Pack.md`.
+
 Initial signup-page first-impression polish is complete and acceptable for current baseline; deeper public-brand/marketing polish remains deferred.
 
 This direction preserves controlled onboarding quality, protects `account_owner_user_id` tenant boundaries, and keeps tenant operational identity separate from global product brand identity.
