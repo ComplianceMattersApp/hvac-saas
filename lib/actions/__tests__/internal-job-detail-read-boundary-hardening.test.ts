@@ -30,20 +30,28 @@ describe("internal job-detail read boundary hardening", () => {
   it("allows same-account internal read preflight", async () => {
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
-    const { loadScopedInternalJobDetailReadBoundary } = await import(
+    const {
+      loadScopedInternalJobDetailReadBoundary,
+      loadScopedInternalJobDetailReadBoundaryOutcome,
+    } = await import(
       "@/lib/actions/internal-job-detail-read-boundary"
     );
 
     const scoped = await loadScopedInternalJobDetailReadBoundary({
       accountOwnerUserId: "owner-1",
-      jobId: "job-1",
+      jobId: "123e4567-e89b-42d3-a456-426614174000",
+    });
+    const outcome = await loadScopedInternalJobDetailReadBoundaryOutcome({
+      accountOwnerUserId: "owner-1",
+      jobId: "123e4567-e89b-42d3-a456-426614174000",
     });
 
     expect(scoped).toMatchObject({ id: "job-1" });
+    expect(outcome).toEqual({ status: "ok", job: { id: "job-1" } });
     expect(loadScopedInternalJobForMutationMock).toHaveBeenCalledWith(
       expect.objectContaining({
         accountOwnerUserId: "owner-1",
-        jobId: "job-1",
+        jobId: "123e4567-e89b-42d3-a456-426614174000",
         select: "id",
       }),
     );
@@ -51,17 +59,171 @@ describe("internal job-detail read boundary hardening", () => {
 
   it("denies cross-account internal read before assembly", async () => {
     loadScopedInternalJobForMutationMock.mockResolvedValue(null);
+    const admin = {
+      from: vi.fn((table: string) => {
+        if (table === "jobs") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: {
+                      id: "123e4567-e89b-42d3-a456-426614174001",
+                      customer_id: "223e4567-e89b-42d3-a456-426614174001",
+                    },
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
 
-    const { loadScopedInternalJobDetailReadBoundary } = await import(
+        if (table === "customers") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: {
+                    id: "223e4567-e89b-42d3-a456-426614174001",
+                    owner_user_id: "owner-other",
+                  },
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+            })),
+          })),
+        };
+      }),
+    };
+
+    const {
+      loadScopedInternalJobDetailReadBoundary,
+      loadScopedInternalJobDetailReadBoundaryOutcome,
+    } = await import(
       "@/lib/actions/internal-job-detail-read-boundary"
     );
 
     const scoped = await loadScopedInternalJobDetailReadBoundary({
       accountOwnerUserId: "owner-2",
-      jobId: "job-1",
+      jobId: "123e4567-e89b-42d3-a456-426614174001",
+      admin,
+    });
+    const outcome = await loadScopedInternalJobDetailReadBoundaryOutcome({
+      accountOwnerUserId: "owner-2",
+      jobId: "123e4567-e89b-42d3-a456-426614174001",
+      admin,
     });
 
     expect(scoped).toBeNull();
+    expect(outcome).toEqual({ status: "forbidden" });
+  });
+
+  it("returns not_found when scoped job does not exist", async () => {
+    loadScopedInternalJobForMutationMock.mockResolvedValue(null);
+    const admin = {
+      from: vi.fn((table: string) => {
+        if (table === "jobs") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                })),
+              })),
+            })),
+          };
+        }
+
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+            })),
+          })),
+        };
+      }),
+    };
+
+    const { loadScopedInternalJobDetailReadBoundaryOutcome } = await import(
+      "@/lib/actions/internal-job-detail-read-boundary"
+    );
+
+    const outcome = await loadScopedInternalJobDetailReadBoundaryOutcome({
+      accountOwnerUserId: "owner-2",
+      jobId: "123e4567-e89b-42d3-a456-426614174021",
+      admin,
+    });
+
+    expect(outcome).toEqual({ status: "not_found" });
+  });
+
+  it("short-circuits malformed UUID before scoped lookup", async () => {
+    const {
+      loadScopedInternalJobDetailReadBoundary,
+      loadScopedInternalJobDetailReadBoundaryOutcome,
+    } = await import("@/lib/actions/internal-job-detail-read-boundary");
+
+    const scoped = await loadScopedInternalJobDetailReadBoundary({
+      accountOwnerUserId: "owner-2",
+      jobId: "not-a-uuid",
+    });
+    const outcome = await loadScopedInternalJobDetailReadBoundaryOutcome({
+      accountOwnerUserId: "owner-2",
+      jobId: "not-a-uuid",
+    });
+
+    expect(scoped).toBeNull();
+    expect(outcome).toEqual({ status: "invalid_job_id" });
+    expect(loadScopedInternalJobForMutationMock).not.toHaveBeenCalled();
+  });
+
+  it("normalizes object-shaped scoped query errors", async () => {
+    loadScopedInternalJobForMutationMock.mockRejectedValue({
+      code: "22P02",
+      message: "invalid input syntax for type uuid",
+      details: "bad uuid literal",
+      hint: null,
+    });
+
+    const {
+      loadScopedInternalJobDetailReadBoundary,
+      loadScopedInternalJobDetailReadBoundaryOutcome,
+    } = await import("@/lib/actions/internal-job-detail-read-boundary");
+
+    const outcome = await loadScopedInternalJobDetailReadBoundaryOutcome({
+      accountOwnerUserId: "owner-2",
+      jobId: "123e4567-e89b-42d3-a456-426614174009",
+    });
+
+    expect(outcome).toEqual({
+      status: "query_error",
+      error: {
+        code: "22P02",
+        message: "invalid input syntax for type uuid",
+        details: "bad uuid literal",
+        hint: null,
+      },
+    });
+
+    await expect(
+      loadScopedInternalJobDetailReadBoundary({
+        accountOwnerUserId: "owner-2",
+        jobId: "123e4567-e89b-42d3-a456-426614174009",
+      }),
+    ).rejects.toMatchObject({
+      message: "invalid input syntax for type uuid",
+      code: "22P02",
+      details: "bad uuid literal",
+    });
   });
 
   it("preserves non-internal contractor redirect classification", async () => {

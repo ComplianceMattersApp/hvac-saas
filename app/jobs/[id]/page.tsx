@@ -88,7 +88,7 @@ import {
 } from "@/lib/actions/internal-invoice-actions";
 import { recordInternalInvoicePaymentFromForm } from "@/lib/actions/internal-invoice-payment-actions";
 import {
-  loadScopedInternalJobDetailReadBoundary,
+  loadScopedInternalJobDetailReadBoundaryOutcome,
   resolveJobDetailActor,
 } from "@/lib/actions/internal-job-detail-read-boundary";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
@@ -1291,12 +1291,27 @@ export default async function JobDetailPage({
   // Explicit same-account internal scoped-job preflight: deny before main job-detail read assembly
   let scopedReadJob: { id?: string | null } | null = null;
   try {
-    scopedReadJob = await timedPhase("sameAccountScopedJobBoundary", () =>
-      loadScopedInternalJobDetailReadBoundary({
+    const scopedReadOutcome = await timedPhase("sameAccountScopedJobBoundary", () =>
+      loadScopedInternalJobDetailReadBoundaryOutcome({
         accountOwnerUserId: internalUser.account_owner_user_id,
         jobId,
       }),
     );
+
+    if (scopedReadOutcome.status === "ok") {
+      scopedReadJob = scopedReadOutcome.job;
+    } else if (scopedReadOutcome.status === "query_error") {
+      console.error("[job-detail:sameAccountScopedJobBoundary] query_error fail-closed", {
+        jobId,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        code: scopedReadOutcome.error.code,
+        message: scopedReadOutcome.error.message,
+        details: scopedReadOutcome.error.details,
+      });
+      scopedReadJob = null;
+    } else {
+      scopedReadJob = null;
+    }
   } catch (error) {
     const boundaryErrorMessage =
       error instanceof Error
