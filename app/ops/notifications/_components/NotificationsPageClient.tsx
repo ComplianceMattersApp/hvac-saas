@@ -102,31 +102,17 @@ export function NotificationsPageClient({
     [visibleNotifications],
   );
 
-  const viewSummary = useMemo(() => {
-    if (categoryKey === "contractor_updates") {
-      return onlyUnread ? "Unread contractor updates" : "Contractor updates";
-    }
-
-    if (categoryKey === "new_job_notifications") {
-      if (isHvacServiceMode) {
-        return onlyUnread ? "Unread team alerts" : "Team alerts";
-      }
-      return onlyUnread ? "Unread new job notifications" : "New job notifications";
-    }
-
-    if (isHvacServiceMode) {
-      return onlyUnread ? "Unread alerts" : "All alerts";
-    }
-    return onlyUnread ? "Unread notifications" : "All notifications";
-  }, [categoryKey, onlyUnread, isHvacServiceMode]);
-
   const countSummary = useMemo(() => {
     if (onlyUnread) {
-      return `${unreadCount} unread`;
+      return "Showing unread notifications.";
     }
 
-    return `${visibleNotifications.length} total · ${unreadCount} unread`;
-  }, [onlyUnread, unreadCount, visibleNotifications.length]);
+    if (categoryKey) {
+      return "Showing filtered notifications.";
+    }
+
+    return "Showing recent notifications.";
+  }, [categoryKey, onlyUnread]);
 
   const handleMarkAsRead = async (notificationId: string) => {
     setPendingReadId(notificationId);
@@ -233,18 +219,11 @@ export function NotificationsPageClient({
             ) : null}
           </div>
 
-          <div className="mt-5 grid gap-2 sm:grid-cols-3">
+          <div className="mt-5">
             <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3">
               <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-blue-800">Unread</p>
               <p className="mt-1 text-2xl font-semibold text-slate-950">{unreadCount}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Visible</p>
-              <p className="mt-1 text-2xl font-semibold text-slate-950">{visibleNotifications.length}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-white px-3 py-3">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">View</p>
-              <p className="mt-1 truncate text-sm font-semibold text-slate-950">{viewSummary}</p>
+              <p className="mt-1 text-xs text-blue-800">Notifications that still need review.</p>
             </div>
           </div>
 
