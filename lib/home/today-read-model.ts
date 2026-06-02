@@ -40,6 +40,10 @@ import {
   getActiveJobAssignmentDisplayMap,
   type ActiveJobAssignmentDisplay,
 } from "@/lib/staffing/human-layer";
+import {
+  hasAnyActiveTechAssignment,
+  isTodayWithoutTechCandidateJob,
+} from "@/lib/ops/without-tech-predicate";
 
 // -----------------------------------------------------------------------------
 // Public types
@@ -616,41 +620,38 @@ async function safeLoadPriorityCounts(params: {
     try {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id")
+        .select("id, status, field_complete, scheduled_date")
         .is("deleted_at", null)
-        .neq("status", "cancelled")
-        .eq("field_complete", false)
         .eq("scheduled_date", today)
         .limit(400);
 
       if (error) return null;
 
-      const todayIds: string[] = Array.from(
-        new Set(
-          (data ?? [])
-            .map((row: any) => String(row?.id ?? "").trim())
-            .filter(Boolean),
-        ),
-      );
+      const todayIds: string[] = Array.from(new Set((data ?? [])
+        .filter((row: any) => isTodayWithoutTechCandidateJob(row, today))
+        .map((row: any) => String(row?.id ?? "").trim())
+        .filter(Boolean)));
 
       if (todayIds.length === 0) return 0;
 
       const { data: assignments, error: assignmentError } = await supabase
         .from("job_assignments")
-        .select("job_id")
-        .eq("is_active", true)
+        .select("job_id, is_active, deleted_at, removed_at")
         .in("job_id", todayIds);
 
       if (assignmentError) return null;
 
-      const assignedIds = new Set(
-        (assignments ?? [])
-          .map((row: any) => String(row?.job_id ?? "").trim())
-          .filter(Boolean),
-      );
+      const assignmentMap: Record<string, Array<any>> = {};
+      for (const row of assignments ?? []) {
+        const jobId = String(row?.job_id ?? "").trim();
+        if (!jobId) continue;
+        if (!Array.isArray(assignmentMap[jobId])) assignmentMap[jobId] = [];
+        assignmentMap[jobId].push(row);
+      }
 
       return todayIds.reduce((count: number, id: string) => {
-        return count + (assignedIds.has(id) ? 0 : 1);
+        const hasActiveAssignment = hasAnyActiveTechAssignment(assignmentMap[id] ?? []);
+        return count + (hasActiveAssignment ? 0 : 1);
       }, 0);
     } catch {
       return null;

@@ -7,7 +7,7 @@ import {
   customerLocationLabel,
   formatOpsStatusLabel,
 } from "@/lib/ops/focused-queues";
-import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { displayWindowLA, formatBusinessDateUS, startOfTodayUtcIsoLA } from "@/lib/utils/schedule-la";
 
 const withoutTechSelect =
   "id, title, status, ops_status, scheduled_date, window_start, window_end, customer_first_name, customer_last_name, city, job_address, created_at";
@@ -44,13 +44,13 @@ export default async function OpsWithoutTechQueuePage() {
   if (actorContext.kind === "contractor") redirect("/portal");
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
 
+  const today = startOfTodayUtcIsoLA();
+
   const { data, error } = await supabase
     .from("jobs")
     .select(withoutTechSelect)
     .is("deleted_at", null)
-    .neq("status", "cancelled")
-    .eq("status", "open")
-    .eq("ops_status", "scheduled")
+    .eq("scheduled_date", today)
     .order("scheduled_date", { ascending: true })
     .order("window_start", { ascending: true });
 
@@ -73,6 +73,7 @@ export default async function OpsWithoutTechQueuePage() {
     jobs: allScheduled,
     assignmentDisplayMap: buildAssignmentMap(assignmentRows ?? []),
     accountOwnerUserId: actorContext.internalUser.account_owner_user_id,
+    today,
   });
 
   return (

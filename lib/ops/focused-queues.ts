@@ -1,4 +1,8 @@
-import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
+import {
+  hasAnyActiveTechAssignment,
+  isTodayWithoutTechCandidateJob,
+  type WithoutTechAssignmentInput,
+} from "@/lib/ops/without-tech-predicate";
 
 export const WAITING_QUEUE_STATUSES = [
   "pending_info",
@@ -33,13 +37,11 @@ export type FocusedQueueJob = {
   created_at?: string | null;
   updated_at?: string | null;
   account_owner_user_id?: string | null;
+  field_complete?: boolean | null;
 };
 
-type AssignmentDisplayInput = {
+type AssignmentDisplayInput = WithoutTechAssignmentInput & {
   is_primary?: boolean;
-  is_active?: boolean;
-  deleted_at?: string | null;
-  removed_at?: string | null;
 };
 
 function normalize(value: unknown): string {
@@ -85,17 +87,31 @@ export function buildWithoutTechQueueRows(params: {
   jobs: FocusedQueueJob[];
   assignmentDisplayMap: Record<string, AssignmentDisplayInput[]>;
   accountOwnerUserId?: string | null;
+  today: string;
 }): FocusedQueueJob[] {
   const jobs = Array.isArray(params.jobs) ? params.jobs : [];
-  const snapshot = buildScheduledWithoutTechSnapshot({
-    jobs,
-    assignmentDisplayMap: params.assignmentDisplayMap ?? {},
-    accountOwnerUserId: params.accountOwnerUserId ?? null,
-    previewLimit: Math.max(1, jobs.length),
-  });
+  const assignmentDisplayMap = params.assignmentDisplayMap ?? {};
+  const scopedAccountOwner = String(params.accountOwnerUserId ?? "").trim();
+  const today = String(params.today ?? "").trim();
 
-  const ids = new Set(snapshot.preview.map((job) => String(job?.id ?? "").trim()).filter(Boolean));
-  return jobs.filter((job) => ids.has(String(job?.id ?? "").trim()));
+  if (!today) return [];
+
+  return jobs.filter((job) => {
+    const jobId = String(job?.id ?? "").trim();
+    if (!jobId) return false;
+
+    if (scopedAccountOwner) {
+      const jobAccountOwner = String(job?.account_owner_user_id ?? "").trim();
+      if (jobAccountOwner !== scopedAccountOwner) return false;
+    }
+
+    if (!isTodayWithoutTechCandidateJob(job, today)) return false;
+
+    const assignments = Array.isArray(assignmentDisplayMap[jobId])
+      ? assignmentDisplayMap[jobId]
+      : [];
+    return !hasAnyActiveTechAssignment(assignments);
+  });
 }
 
 export function formatOpsStatusLabel(opsStatus: unknown): string {

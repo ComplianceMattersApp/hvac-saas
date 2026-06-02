@@ -48,14 +48,15 @@ describe("focused ops queue filtering", () => {
     expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j4"]);
   });
 
-  it("without-tech queue includes only scheduled open jobs without active assignment", () => {
+  it("without-tech queue includes the same today-counted unassigned rows", () => {
     const rows = buildWithoutTechQueueRows({
       jobs: [
         {
           id: "j1",
           account_owner_user_id: "owner-1",
-          ops_status: "scheduled",
-          status: "open",
+          ops_status: "in_process",
+          status: "in_process",
+          field_complete: false,
           scheduled_date: "2026-05-25",
           window_start: "08:00:00",
         },
@@ -64,6 +65,7 @@ describe("focused ops queue filtering", () => {
           account_owner_user_id: "owner-1",
           ops_status: "scheduled",
           status: "open",
+          field_complete: false,
           scheduled_date: "2026-05-25",
           window_start: "09:00:00",
         },
@@ -72,17 +74,37 @@ describe("focused ops queue filtering", () => {
           account_owner_user_id: "owner-1",
           ops_status: "need_to_schedule",
           status: "open",
+          field_complete: false,
           scheduled_date: "2026-05-25",
           window_start: "10:00:00",
+        },
+        {
+          id: "j4",
+          account_owner_user_id: "owner-1",
+          ops_status: "scheduled",
+          status: "cancelled",
+          field_complete: false,
+          scheduled_date: "2026-05-25",
+          window_start: "11:00:00",
+        },
+        {
+          id: "j5",
+          account_owner_user_id: "owner-1",
+          ops_status: "scheduled",
+          status: "open",
+          field_complete: true,
+          scheduled_date: "2026-05-25",
+          window_start: "12:00:00",
         },
       ],
       assignmentDisplayMap: {
         j2: [{ is_active: true, is_primary: true }],
       },
       accountOwnerUserId: "owner-1",
+      today: "2026-05-25",
     });
 
-    expect(rows.map((row) => row.id)).toEqual(["j1"]);
+    expect(rows.map((row) => row.id)).toEqual(["j1", "j3"]);
   });
 });
 
