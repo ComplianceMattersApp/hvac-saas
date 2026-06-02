@@ -60,6 +60,12 @@ describe("/ops/call-list page", () => {
     expect(callListPageSource).toContain("Contractor");
   });
 
+  it("falls back to internal account naming when contractor is not assigned", () => {
+    expect(callListPageSource).toContain("resolveContractorResponsibleDisplay");
+    expect(callListPageSource).toContain("resolveInternalBusinessIdentityByAccountOwnerId");
+    expect(callListPageSource).not.toContain("Unassigned contractor");
+  });
+
   it("queries are account-scoped (no limit hardcoded — all items fetched)", () => {
     // No .limit() call means all need_to_schedule jobs are shown
     expect(callListPageSource).not.toContain(".limit(");

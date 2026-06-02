@@ -5,6 +5,8 @@ import { redirect } from "next/navigation";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import { updateJobScheduleFromForm } from "@/lib/actions";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { resolveContractorResponsibleDisplay } from "@/lib/ops/contractor-responsible-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import {
   buildLatestCustomerAttemptByJob,
@@ -41,9 +43,12 @@ function addressLine(j: any) {
   return addr || city || "No address";
 }
 
-function contractorDisplayName(j: any) {
+function contractorDisplayName(j: any, internalBusinessDisplayName: string) {
   const contractor = Array.isArray(j?.contractors) ? j.contractors[0] : j?.contractors;
-  return String(contractor?.name ?? "").trim() || "Unassigned contractor";
+  return resolveContractorResponsibleDisplay({
+    contractorName: contractor?.name,
+    internalBusinessDisplayName,
+  }).label;
 }
 
 function jobTitle(j: any) {
@@ -89,6 +94,12 @@ export default async function CallListPage({
   if (!user) redirect("/login");
   if (actorContext.kind === "contractor") redirect("/portal");
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
+
+  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: actorContext.internalUser.account_owner_user_id,
+  });
+  const internalBusinessDisplayName = internalBusinessIdentity.display_name;
 
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const contractor = (sp.contractor ?? "").trim() || null;
@@ -173,7 +184,7 @@ export default async function CallListPage({
             const addr = addressLine(j);
             const title = jobTitle(j);
             const badge = jobTypeBadge(j);
-            const contractorName = contractorDisplayName(j);
+            const contractorName = contractorDisplayName(j, internalBusinessDisplayName);
             const createdMs = j.created_at ? new Date(j.created_at).getTime() : null;
             const ageDays =
               createdMs != null

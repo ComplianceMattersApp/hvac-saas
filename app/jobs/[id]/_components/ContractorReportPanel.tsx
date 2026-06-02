@@ -263,7 +263,7 @@ export default function ContractorReportPanel({
             <div className="space-y-0.5 text-slate-700">
               <div><span className="font-medium text-slate-900">Customer:</span> {preview.customer_name}</div>
               <div><span className="font-medium text-slate-900">Location:</span> {preview.location_text}</div>
-              <div><span className="font-medium text-slate-900">Contractor:</span> {preview.contractor_name ?? "Not assigned"}</div>
+              <div><span className="font-medium text-slate-900">Contractor:</span> {preview.contractor_name ?? "Handled by your company"}</div>
               <div><span className="font-medium text-slate-900">Service / Test Date:</span> {preview.service_date_text}</div>
             </div>
           </div>

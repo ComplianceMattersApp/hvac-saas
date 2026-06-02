@@ -3,7 +3,9 @@ import { redirect } from "next/navigation";
 
 import { markInvoiceCompleteFromForm } from "@/lib/actions/job-ops-actions";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
+import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
+import { resolveContractorResponsibleDisplay } from "@/lib/ops/contractor-responsible-display";
 import {
   canShowExternalInvoiceSentAction,
   listCloseoutQueueJobs,
@@ -69,9 +71,12 @@ function addressLine(j: any) {
   return addr || city || "No address";
 }
 
-function contractorDisplayName(j: any) {
+function contractorDisplayName(j: any, internalBusinessDisplayName: string) {
   const contractor = Array.isArray(j?.contractors) ? j.contractors[0] : j?.contractors;
-  return String(contractor?.name ?? "").trim() || "Unassigned contractor";
+  return resolveContractorResponsibleDisplay({
+    contractorName: contractor?.name,
+    internalBusinessDisplayName,
+  }).label;
 }
 
 function jobTitle(j: any) {
@@ -144,6 +149,12 @@ export default async function CloseoutQueuePage({
   if (!user) redirect("/login");
   if (actorContext.kind === "contractor") redirect("/portal");
   if (actorContext.kind !== "internal" || !actorContext.internalUser) redirect("/login");
+
+  const internalBusinessIdentity = await resolveInternalBusinessIdentityByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: actorContext.internalUser.account_owner_user_id,
+  });
+  const internalBusinessDisplayName = internalBusinessIdentity.display_name;
 
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const contractor = (sp.contractor ?? "").trim() || null;
@@ -234,7 +245,7 @@ export default async function CloseoutQueuePage({
       return true;
     }),
     sort,
-    (row) => contractorDisplayName(row.job),
+    (row) => contractorDisplayName(row.job, internalBusinessDisplayName),
     (row) => String(row.job?.created_at ?? ""),
     (row) => String(row.job?.id ?? ""),
   );
@@ -377,7 +388,7 @@ export default async function CloseoutQueuePage({
             const title = jobTitle(job);
             const customerName = customerDisplayName(job);
             const location = addressLine(job);
-            const contractorName = contractorDisplayName(job);
+            const contractorName = contractorDisplayName(job, internalBusinessDisplayName);
             const phone = String(job?.customer_phone ?? "").trim();
             const badge = jobTypeBadge(job);
             const scheduledDate = formatBusinessDateUS(String(job?.scheduled_date ?? ""));

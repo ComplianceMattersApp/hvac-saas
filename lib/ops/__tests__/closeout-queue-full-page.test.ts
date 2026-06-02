@@ -88,6 +88,12 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).not.toContain("Customer follow-up is required");
   });
 
+  it("falls back to internal account naming when contractor is not assigned", () => {
+    expect(closeoutQueuePageSource).toContain("resolveContractorResponsibleDisplay");
+    expect(closeoutQueuePageSource).toContain("resolveInternalBusinessIdentityByAccountOwnerId");
+    expect(closeoutQueuePageSource).not.toContain("Unassigned contractor");
+  });
+
   it("renders an in-page contractor filter for narrowing the queue", () => {
     expect(closeoutQueuePageSource).toContain("ContractorFilter");
     expect(closeoutQueuePageSource).toContain("contractorOptions");
