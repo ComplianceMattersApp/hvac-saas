@@ -10,6 +10,11 @@ type SignupContentProps = {
   productIntent?: SignupProductIntent;
 };
 
+type SignupBenefitCard = {
+  title: string;
+  copy: string;
+};
+
 const SIGNUP_COPY: Record<
   SignupProductIntent,
   {
@@ -17,7 +22,7 @@ const SIGNUP_COPY: Record<
     title: string;
     intro: string;
     details: string;
-    cards: [string, string, string];
+    cards: SignupBenefitCard[];
     trialGoal: string;
     formIntro: string;
   }
@@ -29,9 +34,18 @@ const SIGNUP_COPY: Record<
       "Set up the daily work your team already handles in one place.",
     details: "We'll send a secure setup link so you can finish creating your account.",
     cards: [
-      "Track jobs and follow-up",
-      "Coordinate scheduling",
-      "Keep work organized",
+      {
+        title: "Track jobs and follow-up",
+        copy: "See what needs attention now and what should be checked later.",
+      },
+      {
+        title: "Coordinate scheduling",
+        copy: "Give the office and field team one place to stay aligned.",
+      },
+      {
+        title: "Keep work organized",
+        copy: "Keep job notes, status, and next steps easier to find.",
+      },
     ],
     trialGoal: "Your first 14 days: try a few real jobs and see how the routine feels for your team.",
     formIntro:
@@ -44,9 +58,18 @@ const SIGNUP_COPY: Record<
       "Set up the daily work your team already handles: customers, service calls, dispatch, field notes, invoices, and follow-up.",
     details: "We'll send a secure setup link so you can finish creating your HVAC Service trial.",
     cards: [
-      "Keep service calls organized",
-      "Help dispatch and field staff stay aligned",
-      "Follow up without losing the thread",
+      {
+        title: "Keep service calls organized",
+        copy: "Track customers, work orders, job status, and next steps.",
+      },
+      {
+        title: "Help dispatch and field staff stay aligned",
+        copy: "Give the office and technicians a shared place to see what needs attention.",
+      },
+      {
+        title: "Follow up without losing the thread",
+        copy: "Keep invoice status, job notes, and customer follow-up easier to find.",
+      },
     ],
     trialGoal:
       "Your first 14 days: enter a few real customers and service jobs, try the dispatch flow, and see whether it helps your office and field team stay on the same page.",
@@ -60,9 +83,18 @@ const SIGNUP_COPY: Record<
       "Keep ECC jobs, test scheduling, pass/fail results, corrections, contractors, and closeout details in one place.",
     details: "We'll send a secure setup link so you can finish creating your ECC / Compliance Testing trial.",
     cards: [
-      "Track ECC jobs from start to closeout",
-      "Coordinate testing work",
-      "Keep compliance details easier to prove",
+      {
+        title: "Track ECC jobs from start to closeout",
+        copy: "See job status, tests, corrections, and closeout work together.",
+      },
+      {
+        title: "Coordinate testing work",
+        copy: "Help raters, office staff, and contractors stay clear on what is open.",
+      },
+      {
+        title: "Keep compliance details easier to prove",
+        copy: "Organize pass/fail status, correction notes, and closeout steps.",
+      },
     ],
     trialGoal:
       "Your first 14 days: enter a few real ECC jobs, walk through test tracking, and confirm whether the flow fits how your team handles closeout.",
@@ -118,10 +150,12 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
             {copy.trialGoal}
           </div>
 
-          <div className="mt-7 grid gap-3 text-sm text-slate-200 sm:grid-cols-3">
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {copy.cards.map((card) => (
-              <div key={card} className="rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3">
-                {card}
+              <div key={card.title} className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4 text-slate-200 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.6)]">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Benefit</div>
+                <div className="mt-2 text-base font-semibold text-white">{card.title}</div>
+                <p className="mt-2 text-sm leading-6 text-slate-200">{card.copy}</p>
               </div>
             ))}
           </div>
@@ -139,13 +173,25 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
           <h2 className="text-xl font-semibold tracking-tight text-slate-900">Create your account</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">{copy.formIntro}</p>
 
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm">
             <div className="font-semibold text-slate-900">What happens next</div>
-            <ol className="mt-1 list-decimal space-y-1 pl-5">
-              <li>Enter your email</li>
-              <li>Get your setup link</li>
-              <li>Try real jobs for 14 days</li>
-            </ol>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {[
+                "Enter your email",
+                "Get your setup link",
+                "Try real jobs for 14 days",
+              ].map((step, index) => (
+                <div key={step} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[11px] text-white">
+                      {index + 1}
+                    </span>
+                    Step {index + 1}
+                  </div>
+                  <div className="mt-1.5 text-sm font-medium text-slate-900">{step}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <form action={action} className="mt-6 space-y-4">

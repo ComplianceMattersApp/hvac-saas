@@ -38,6 +38,8 @@ describe("landing and signup copy wiring", () => {
     expect(signupContent).toContain("Enter your email");
     expect(signupContent).toContain("Get your setup link");
     expect(signupContent).toContain("Try real jobs for 14 days");
+    expect(signupContent).toContain("Keep service calls organized");
+    expect(signupContent).toContain("Track ECC jobs from start to closeout");
     expect(signupContent).toContain("Your first 14 days: enter a few real customers and service jobs");
     expect(signupContent).toContain("Your first 14 days: enter a few real ECC jobs");
   });

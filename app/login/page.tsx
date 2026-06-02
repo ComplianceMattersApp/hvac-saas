@@ -289,28 +289,50 @@ export default function LoginPage() {
         </button>
       </form>
 
-      <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-3 dark:border-gray-800 dark:bg-gray-950/30">
-        <p className="text-center text-sm font-medium text-gray-900 dark:text-gray-100">New to Compliance Matters?</p>
-        <p className="mt-1 text-center text-xs text-gray-600 dark:text-gray-400">
-          Start a 14-day guided setup. No payment details needed.
-        </p>
-        <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+      <div className="rounded-2xl border border-gray-200 bg-gradient-to-br from-gray-50 via-white to-slate-50 p-4 shadow-sm dark:border-gray-800 dark:from-gray-950/70 dark:via-gray-950/55 dark:to-gray-900/30 sm:p-5">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">New to Compliance Matters?</p>
+            <p className="mt-1 text-xs leading-5 text-gray-600 dark:text-gray-400">
+              Start a 14-day guided setup. No payment details needed.
+            </p>
+          </div>
+          <span className="inline-flex h-fit items-center rounded-full border border-gray-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-gray-600 shadow-sm dark:border-gray-700 dark:bg-gray-900/80 dark:text-gray-300">
+            Guided trial
+          </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Link
             href="/signup/service"
-            className="inline-flex min-h-10 items-center justify-center rounded-md border border-indigo-300 bg-gradient-to-r from-indigo-600 to-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-px hover:from-indigo-500 hover:to-blue-500 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-indigo-700 dark:from-indigo-700 dark:to-blue-700 dark:text-white dark:hover:from-indigo-600 dark:hover:to-blue-600"
+            className="group flex min-h-28 flex-col justify-between rounded-2xl border border-indigo-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(238,242,255,0.98))] p-4 text-left shadow-[0_10px_24px_-20px_rgba(37,99,235,0.45)] transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-indigo-300 hover:shadow-[0_14px_28px_-20px_rgba(37,99,235,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-indigo-800/70 dark:bg-[linear-gradient(180deg,rgba(30,41,59,0.98),rgba(15,23,42,0.98))]"
           >
-            Start HVAC Service Trial
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-indigo-700 dark:text-indigo-300">
+              HVAC Service
+            </span>
+            <span className="mt-2 text-base font-semibold text-gray-900 dark:text-white">Start HVAC Service Trial</span>
+            <span className="mt-1 text-sm leading-5 text-gray-600 dark:text-gray-300">
+              For service calls, dispatch, work orders, and follow-up.
+            </span>
           </Link>
+
           <Link
             href="/signup/ecc"
-            className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-gradient-to-r from-emerald-600 to-emerald-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-px hover:from-emerald-500 hover:to-emerald-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 dark:border-emerald-700 dark:from-emerald-700 dark:to-emerald-600 dark:text-white dark:hover:from-emerald-600 dark:hover:to-emerald-500"
+            className="group flex min-h-28 flex-col justify-between rounded-2xl border border-emerald-200/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(236,253,245,0.98))] p-4 text-left shadow-[0_10px_24px_-20px_rgba(16,185,129,0.45)] transition-[transform,border-color,box-shadow] hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-[0_14px_28px_-20px_rgba(16,185,129,0.55)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 dark:border-emerald-800/70 dark:bg-[linear-gradient(180deg,rgba(16,24,40,0.98),rgba(8,15,28,0.98))]"
           >
-            Start ECC / Compliance Testing Trial
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700 dark:text-emerald-300">
+              ECC / Compliance Testing
+            </span>
+            <span className="mt-2 text-base font-semibold text-gray-900 dark:text-white">Start ECC / Compliance Testing Trial</span>
+            <span className="mt-1 text-sm leading-5 text-gray-600 dark:text-gray-300">
+              For ECC jobs, tests, corrections, and compliance closeout.
+            </span>
           </Link>
         </div>
+
         <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] leading-5 text-gray-500 dark:text-gray-400 sm:grid-cols-2">
-          <p>For service calls, dispatch, work orders, and follow-up.</p>
-          <p>For ECC jobs, tests, corrections, and compliance closeout.</p>
+          <p>Choose the path that matches how your team works.</p>
+          <p>Both start with a 14-day guided setup and no payment details.</p>
         </div>
       </div>
 
