@@ -6,6 +6,7 @@ type ProductChoiceCardProps = {
   buttonLabel: string;
   href: string;
   tone: "service" | "ecc";
+  previewItems: string[];
 };
 
 function ProductChoiceCard(props: ProductChoiceCardProps) {
@@ -37,12 +38,17 @@ function ProductChoiceCard(props: ProductChoiceCardProps) {
       </p>
 
       <div className="mt-4 flex-1 rounded-2xl border border-slate-200/80 bg-white/75 p-4 text-sm leading-6 text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
-        <p className="font-medium text-slate-900 dark:text-white">
-          Choose this path if your team needs a clear start point.
-        </p>
-        <p className="mt-1">
-          You can keep the first setup simple and come back for the rest later.
-        </p>
+        <p className="font-medium text-slate-900 dark:text-white">Preview</p>
+        <div className="mt-2 grid grid-cols-1 gap-2 text-[13px] leading-5">
+          {props.previewItems.map((item) => (
+            <div
+              key={item}
+              className="rounded-lg border border-slate-200/80 bg-white px-2.5 py-2 dark:border-white/10 dark:bg-slate-900/70"
+            >
+              {item}
+            </div>
+          ))}
+        </div>
       </div>
 
       <Link
@@ -120,6 +126,11 @@ export function SignupProductChoiceLanding() {
                   buttonLabel="Start HVAC Service Trial"
                   href="/signup/service"
                   tone="service"
+                  previewItems={[
+                    "Service call scheduled",
+                    "Field notes captured",
+                    "Closeout ready",
+                  ]}
                 />
                 <ProductChoiceCard
                   title="ECC"
@@ -127,6 +138,11 @@ export function SignupProductChoiceLanding() {
                   buttonLabel="Start ECC / Compliance Testing Trial"
                   href="/signup/ecc"
                   tone="ecc"
+                  previewItems={[
+                    "Duct test scheduled",
+                    "Correction needed",
+                    "Closeout pending",
+                  ]}
                 />
               </div>
             </div>

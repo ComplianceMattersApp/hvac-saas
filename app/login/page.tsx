@@ -334,6 +334,24 @@ export default function LoginPage() {
           <p>Choose the path that matches how your team works.</p>
           <p>Both start with a 14-day guided setup and no payment details.</p>
         </div>
+
+        <div className="mt-3 rounded-xl border border-gray-200/90 bg-white/85 p-3 dark:border-gray-700/80 dark:bg-gray-900/70">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-gray-600 dark:text-gray-300">
+            What the app helps with
+          </p>
+          <div className="mt-2 grid grid-cols-1 gap-2 text-xs text-gray-700 dark:text-gray-200 sm:grid-cols-2">
+            {[
+              "Today’s work",
+              "2 jobs need scheduling",
+              "1 job ready for closeout",
+              "0 unassigned scheduled jobs",
+            ].map((item) => (
+              <div key={item} className="rounded-lg border border-gray-200/80 bg-white px-2.5 py-2 leading-5 dark:border-gray-700/80 dark:bg-gray-900/80">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <p className="text-xs text-gray-400 dark:text-gray-500">

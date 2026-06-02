@@ -15,6 +15,26 @@ type SignupBenefitCard = {
   copy: string;
 };
 
+const PRODUCT_PREVIEW_ITEMS: Record<SignupProductIntent, string[]> = {
+  generic: [
+    "Start here",
+    "Create first job",
+    "Use Today/Ops each morning",
+  ],
+  service: [
+    "Maple Street Install",
+    "Tech notes added",
+    "Permit pending",
+    "Invoice ready",
+  ],
+  ecc: [
+    "Duct test scheduled",
+    "Correction needed",
+    "Test result tracked",
+    "Closeout pending",
+  ],
+};
+
 const SIGNUP_COPY: Record<
   SignupProductIntent,
   {
@@ -105,6 +125,7 @@ const SIGNUP_COPY: Record<
 
 export function SignupContent({ productIntent = "generic" }: SignupContentProps) {
   const copy = SIGNUP_COPY[productIntent] ?? SIGNUP_COPY.generic;
+  const previewItems = PRODUCT_PREVIEW_ITEMS[productIntent] ?? PRODUCT_PREVIEW_ITEMS.generic;
   const [state, action, isPending] = useActionState(
     submitSelfServeOnboardingForm,
     INITIAL_SELF_SERVE_ONBOARDING_STATE,
@@ -148,6 +169,25 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
 
           <div className="mt-5 rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm leading-6 text-slate-200">
             {copy.trialGoal}
+          </div>
+
+          <div className="mt-4 rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4 text-slate-200">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Preview</p>
+              {productIntent !== "generic" ? (
+                <span className="text-[11px] text-slate-400">Start here</span>
+              ) : null}
+            </div>
+            <div className="mt-2 grid grid-cols-1 gap-2 text-sm leading-5 sm:grid-cols-2">
+              {previewItems.map((item) => (
+                <div key={item} className="rounded-lg border border-slate-700/70 bg-slate-950/60 px-3 py-2">
+                  {item}
+                </div>
+              ))}
+            </div>
+            {productIntent !== "generic" ? (
+              <p className="mt-2 text-xs leading-5 text-slate-400">Use Today/Ops each morning</p>
+            ) : null}
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
