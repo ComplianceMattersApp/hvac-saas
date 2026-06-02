@@ -39,6 +39,7 @@ function job(overrides: Partial<TodayJobSummary> = {}): TodayJobSummary {
     customerLastName: null,
     customerPhone: null,
     fieldComplete: false,
+    fieldCompleteAt: null,
     ...overrides,
   };
 }

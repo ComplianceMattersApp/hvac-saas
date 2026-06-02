@@ -37,6 +37,10 @@ import {
   startOfTodayUtcIsoLA,
 } from "@/lib/utils/schedule-la";
 import {
+  buildOpsStatusEnteredAtByJob,
+  resolveLifecycleAging,
+} from "@/lib/utils/lifecycle-aging";
+import {
   getActiveJobAssignmentDisplayMap,
   type ActiveJobAssignmentDisplay,
 } from "@/lib/staffing/human-layer";
@@ -63,6 +67,7 @@ export type TodayJobSummary = {
   customerLastName: string | null;
   customerPhone: string | null;
   fieldComplete: boolean;
+  fieldCompleteAt: string | null;
 };
 
 export type TodayHeader = {
@@ -325,7 +330,7 @@ async function safeQueryAssignedJobIdsForUser(
 }
 
 const TODAY_JOB_SELECT =
-  "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, field_complete, deleted_at, created_at";
+  "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, field_complete, field_complete_at, deleted_at, created_at";
 
 function normalizeJob(row: any): TodayJobSummary | null {
   const id = String(row?.id ?? "").trim();
@@ -344,6 +349,7 @@ function normalizeJob(row: any): TodayJobSummary | null {
     customerLastName: row?.customer_last_name ? String(row.customer_last_name) : null,
     customerPhone: row?.customer_phone ? String(row.customer_phone) : null,
     fieldComplete: Boolean(row?.field_complete),
+    fieldCompleteAt: row?.field_complete_at ? String(row.field_complete_at) : null,
   };
 }
 
@@ -699,17 +705,6 @@ async function safeLoadPriorityCounts(params: {
   };
 }
 
-function buildItemAgeDisplay(createdAt: unknown): string | null {
-  const raw = String(createdAt ?? "").trim();
-  if (!raw) return null;
-  const stamp = new Date(raw).getTime();
-  if (!Number.isFinite(stamp)) return null;
-  const days = Math.max(0, Math.floor((Date.now() - stamp) / 86_400_000));
-  if (days === 0) return "today";
-  if (days === 1) return "1 day old";
-  return `${days} days old`;
-}
-
 async function safeLoadFollowUps(params: {
   supabase: any;
   accountOwnerUserId: string;
@@ -735,8 +730,47 @@ async function safeLoadFollowUps(params: {
 
     if (error) return [];
 
-    return (data ?? [])
-      .map((row: any) => {
+    const rows = Array.isArray(data) ? data : [];
+    const jobIds = rows.map((row: any) => String(row?.id ?? "").trim()).filter(Boolean);
+
+    const [statusEventsRes, failedRunsRes] = await Promise.all([
+      jobIds.length
+        ? params.supabase
+            .from("job_events")
+            .select("job_id, created_at, meta")
+            .in("job_id", jobIds)
+            .eq("event_type", "ops_update")
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      jobIds.length
+        ? params.supabase
+            .from("ecc_test_runs")
+            .select("job_id, created_at, computed_pass, override_pass, is_completed")
+            .in("job_id", jobIds)
+            .eq("is_completed", true)
+            .or("override_pass.eq.false,computed_pass.eq.false")
+            .order("created_at", { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+    ]);
+
+    if (statusEventsRes.error) return [];
+    if (failedRunsRes.error) return [];
+
+    const enteredAtByJob = buildOpsStatusEnteredAtByJob(
+      (statusEventsRes.data ?? []) as Array<{ job_id?: unknown; created_at?: unknown; meta?: unknown }>,
+    );
+
+    const failedEvidenceByJob = new Map<string, string>();
+    for (const run of failedRunsRes.data ?? []) {
+      const jobId = String((run as any)?.job_id ?? "").trim();
+      if (!jobId || failedEvidenceByJob.has(jobId)) continue;
+      const createdAt = String((run as any)?.created_at ?? "").trim();
+      if (!createdAt) continue;
+      failedEvidenceByJob.set(jobId, createdAt);
+    }
+
+    return rows
+      .map((row: any): FollowUpItem | null => {
         const job = normalizeJob(row);
         if (!job) return null;
         const reason = followUpReason({
@@ -750,6 +784,17 @@ async function safeLoadFollowUps(params: {
         const firstName = job.customerFirstName ?? null;
         const lastName = job.customerLastName ?? null;
         const fullName = [firstName, lastName].map((s) => (s ?? "").trim()).filter(Boolean).join(" ");
+        const lifecycleLabel = resolveLifecycleAging({
+          status: job.status,
+          opsStatus: job.opsStatus,
+          createdAt: row?.created_at ? String(row.created_at) : null,
+          scheduledDate: job.scheduledDate,
+          fieldCompleteAt: job.fieldCompleteAt,
+          stateEnteredAtByStatus: enteredAtByJob.get(job.id) ?? null,
+          failedEvidenceAt: failedEvidenceByJob.get(job.id) ?? null,
+          todayDate: params.today,
+        }).label;
+
         return {
           key: job.id,
           title: job.title,
@@ -761,8 +806,8 @@ async function safeLoadFollowUps(params: {
             : null,
           customerName: fullName || null,
           city: job.city || null,
-          ageDisplay: buildItemAgeDisplay(row.created_at),
-        } satisfies FollowUpItem;
+          ageDisplay: lifecycleLabel,
+        };
       })
       .filter((row: FollowUpItem | null): row is FollowUpItem => row != null);
   } catch {

@@ -7,6 +7,7 @@ import {
   customerLocationLabel,
   formatOpsStatusLabel,
 } from "@/lib/ops/focused-queues";
+import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 
 const waitingSelect =
@@ -47,17 +48,6 @@ function waitingStateLabel(job: any): string {
   return formatOpsStatusLabel(job?.ops_status ?? null);
 }
 
-function ageLabel(job: any): string {
-  const source = String(job?.created_at ?? "").trim();
-  if (!source) return "-";
-
-  const stamp = new Date(source).getTime();
-  if (!Number.isFinite(stamp)) return "-";
-
-  const days = Math.max(0, Math.floor((Date.now() - stamp) / 86400000));
-  return `${days}d`;
-}
-
 export default async function OpsWaitingQueuePage() {
   const actorContext = await getRequestActorContext();
   const supabase = actorContext.supabase;
@@ -79,6 +69,22 @@ export default async function OpsWaitingQueuePage() {
   if (error) throw error;
 
   const rows = buildWaitingQueueRows((data ?? []) as any[]);
+  const rowJobIds = rows.map((job: any) => String(job?.id ?? "").trim()).filter(Boolean);
+
+  const { data: statusEvents, error: statusEventsError } = rowJobIds.length
+    ? await supabase
+        .from("job_events")
+        .select("job_id, created_at, meta")
+        .in("job_id", rowJobIds)
+        .eq("event_type", "ops_update")
+        .order("created_at", { ascending: false })
+    : { data: [], error: null };
+
+  if (statusEventsError) throw statusEventsError;
+
+  const enteredAtByJob = buildOpsStatusEnteredAtByJob(
+    (statusEvents ?? []) as Array<{ job_id?: unknown; created_at?: unknown; meta?: unknown }>,
+  );
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -139,7 +145,12 @@ export default async function OpsWaitingQueuePage() {
                         {waitingStateLabel(job)}
                       </span>
                       <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-500">
-                        Age {ageLabel(job)}
+                        {resolveLifecycleAging({
+                          status: String(job?.status ?? "").trim() || null,
+                          opsStatus: String(job?.ops_status ?? "").trim() || null,
+                          createdAt: String(job?.created_at ?? "").trim() || null,
+                          stateEnteredAtByStatus: enteredAtByJob.get(jobId) ?? null,
+                        }).label ?? "-"}
                       </span>
                     </div>
                     <div className="mt-2 text-xs text-slate-600">Reason: {waitingReason(job)}</div>

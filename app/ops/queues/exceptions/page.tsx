@@ -7,6 +7,7 @@ import {
   customerLocationLabel,
   formatOpsStatusLabel,
 } from "@/lib/ops/focused-queues";
+import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
 
 const exceptionSelect =
   "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, created_at";
@@ -16,7 +17,15 @@ function jobTitle(job: any) {
 }
 
 function ageDays(job: any): number | null {
-  const source = String(job?.created_at ?? "").trim();
+  const resolved = resolveLifecycleAging({
+    status: String(job?.status ?? "").trim() || null,
+    opsStatus: String(job?.ops_status ?? "").trim() || null,
+    createdAt: String(job?.created_at ?? "").trim() || null,
+    stateEnteredAtByStatus: (job as any)._stateEnteredAtByStatus ?? null,
+    failedEvidenceAt: (job as any)._failedEvidenceAt ?? null,
+  });
+
+  const source = String(resolved.sourceTimestamp ?? "").trim();
   if (!source) return null;
 
   const stamp = new Date(source).getTime();
@@ -26,9 +35,15 @@ function ageDays(job: any): number | null {
 }
 
 function ageLabel(job: any): string {
-  const days = ageDays(job);
-  if (days == null) return "-";
-  return `${days}d`;
+  return (
+    resolveLifecycleAging({
+      status: String(job?.status ?? "").trim() || null,
+      opsStatus: String(job?.ops_status ?? "").trim() || null,
+      createdAt: String(job?.created_at ?? "").trim() || null,
+      stateEnteredAtByStatus: (job as any)._stateEnteredAtByStatus ?? null,
+      failedEvidenceAt: (job as any)._failedEvidenceAt ?? null,
+    }).label ?? "-"
+  );
 }
 
 export default async function OpsExceptionsQueuePage() {
@@ -52,7 +67,53 @@ export default async function OpsExceptionsQueuePage() {
   if (error) throw error;
 
   const rows = buildExceptionQueueRows((data ?? []) as any[]);
-  const agedOpenExceptions = rows.filter((job: any) => (ageDays(job) ?? 0) >= 14).length;
+  const rowJobIds = rows.map((job: any) => String(job?.id ?? "").trim()).filter(Boolean);
+
+  const [statusEventsRes, failedRunsRes] = await Promise.all([
+    rowJobIds.length
+      ? supabase
+          .from("job_events")
+          .select("job_id, created_at, meta")
+          .in("job_id", rowJobIds)
+          .eq("event_type", "ops_update")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+    rowJobIds.length
+      ? supabase
+          .from("ecc_test_runs")
+          .select("job_id, created_at, computed_pass, override_pass, is_completed")
+          .in("job_id", rowJobIds)
+          .eq("is_completed", true)
+          .or("override_pass.eq.false,computed_pass.eq.false")
+          .order("created_at", { ascending: false })
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (statusEventsRes.error) throw statusEventsRes.error;
+  if (failedRunsRes.error) throw failedRunsRes.error;
+
+  const enteredAtByJob = buildOpsStatusEnteredAtByJob(
+    (statusEventsRes.data ?? []) as Array<{ job_id?: unknown; created_at?: unknown; meta?: unknown }>,
+  );
+
+  const latestFailedEvidenceByJob = new Map<string, string>();
+  for (const row of failedRunsRes.data ?? []) {
+    const jobId = String((row as any)?.job_id ?? "").trim();
+    if (!jobId || latestFailedEvidenceByJob.has(jobId)) continue;
+    const createdAt = String((row as any)?.created_at ?? "").trim();
+    if (!createdAt) continue;
+    latestFailedEvidenceByJob.set(jobId, createdAt);
+  }
+
+  const rowsWithLifecycleMeta = rows.map((job: any) => {
+    const jobId = String(job?.id ?? "").trim();
+    return {
+      ...job,
+      _stateEnteredAtByStatus: enteredAtByJob.get(jobId) ?? null,
+      _failedEvidenceAt: latestFailedEvidenceByJob.get(jobId) ?? null,
+    };
+  });
+  const agedOpenExceptions = rowsWithLifecycleMeta.filter((job: any) => (ageDays(job) ?? 0) >= 14).length;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -94,7 +155,7 @@ export default async function OpsExceptionsQueuePage() {
         </div>
       ) : (
         <ul className="space-y-3">
-          {rows.map((job: any) => {
+          {rowsWithLifecycleMeta.map((job: any) => {
             const jobId = String(job?.id ?? "");
             const isAged = (ageDays(job) ?? 0) >= 14;
 

@@ -32,6 +32,10 @@ import {
   listInternalNewWorkRequestAwareness,
 } from "@/lib/actions/notification-read-actions";
 import {
+  buildOpsStatusEnteredAtByJob,
+  resolveLifecycleAging,
+} from "@/lib/utils/lifecycle-aging";
+import {
   didOpsStatusChangeTo,
   formatStatusAgeCompact,
   resolveStatusAgeDays,
@@ -448,12 +452,18 @@ function subtractBusinessDays(date: Date, days: number) {
   }
 
   function workspaceAgeLabel(job: any) {
-    const source = String(job?.created_at ?? "").trim();
-    if (!source) return "-";
-    const stamp = new Date(source).getTime();
-    if (!Number.isFinite(stamp)) return "-";
-    const days = Math.max(0, Math.floor((Date.now() - stamp) / 86400000));
-    return `${days}d`;
+    const jobId = String(job?.id ?? "").trim();
+    return (
+      resolveLifecycleAging({
+        status: String(job?.status ?? "").trim() || null,
+        opsStatus: String(job?.ops_status ?? "").trim() || null,
+        createdAt: String(job?.created_at ?? "").trim() || null,
+        scheduledDate: String(job?.scheduled_date ?? "").trim() || null,
+        fieldCompleteAt: String(job?.field_complete_at ?? "").trim() || null,
+        stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
+        failedEvidenceAt: failedStatusSinceByJob(jobId),
+      }).label ?? "-"
+    );
   }
 
   function wsStatusReason(job: any, queueKey: string) {
@@ -1912,6 +1922,7 @@ const pendingInfoJobIds = uniqueAllOpenOpsJobs
 const _t_secondarySignalReads = opsTimingEnabled ? Date.now() : 0;
 const [
   pendingInfoTransitionRes,
+  opsStatusTransitionRes,
   activeAssignmentDisplayMap,
   signalRes,
   customerAttemptEventsRes,
@@ -1929,6 +1940,17 @@ const [
           .eq("event_type", "ops_update")
           .order("created_at", { ascending: false })
           .range(0, 5000)
+      : Promise.resolve({ data: [], error: null })
+  ),
+  trackOpsTiming(
+    "ops:secondarySignalReads:opsStatusTransitions",
+    allOpenOpsJobIds.length
+      ? supabase
+          .from("job_events")
+          .select("job_id, created_at, meta")
+          .in("job_id", allOpenOpsJobIds)
+          .eq("event_type", "ops_update")
+          .order("created_at", { ascending: false })
       : Promise.resolve({ data: [], error: null })
   ),
   trackOpsTiming(
@@ -1997,12 +2019,16 @@ const [
 ]);
 
 if (pendingInfoTransitionRes.error) throw pendingInfoTransitionRes.error;
+if (opsStatusTransitionRes.error) throw opsStatusTransitionRes.error;
 if (signalRes.error) throw signalRes.error;
 if (customerAttemptEventsRes.error) throw customerAttemptEventsRes.error;
 if (failedRunsRes.error) throw failedRunsRes.error;
 if (opsTimingEnabled) console.log(`[ops:secondarySignalReads] ${Date.now() - _t_secondarySignalReads}ms`);
 
 const pendingInfoTransitionEvents = pendingInfoTransitionRes.data ?? [];
+const opsStatusEnteredAtByJob = buildOpsStatusEnteredAtByJob(
+  (opsStatusTransitionRes.data ?? []) as Array<{ job_id?: unknown; created_at?: unknown; meta?: unknown }>,
+);
 
 const pendingInfoSetAtByJob = new Map<string, string>();
 for (const ev of pendingInfoTransitionEvents ?? []) {
@@ -3256,15 +3282,18 @@ function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {
     return scheduleDate || scheduleWindow || "Schedule pending";
   }
 
-  const statusAgeDays = resolveStatusAgeDays({
-    status: String(job?.ops_status ?? ""),
-    failedInstant: failedStatusSinceByJob(String(job?.id ?? "")),
-    pendingInfoInstant: pendingInfoSetAtByJob.get(String(job?.id ?? "")) ?? null,
-    fallbackUpdatedAt: String(job?.created_at ?? "").trim() || null,
-  });
-
-  if (statusAgeDays == null) return "-";
-  return formatStatusAgeCompact(statusAgeDays);
+  const jobId = String(job?.id ?? "").trim();
+  return (
+    resolveLifecycleAging({
+      status: String(job?.status ?? "").trim() || null,
+      opsStatus: String(job?.ops_status ?? "").trim() || null,
+      createdAt: String(job?.created_at ?? "").trim() || null,
+      scheduledDate: String(job?.scheduled_date ?? "").trim() || null,
+      fieldCompleteAt: String(job?.field_complete_at ?? "").trim() || null,
+      stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
+      failedEvidenceAt: failedStatusSinceByJob(jobId),
+    }).label ?? "-"
+  );
 }
 
 if (opsTimingEnabled) console.log(`[ops:totalBeforeRender] ${Date.now() - _t_total}ms`);
