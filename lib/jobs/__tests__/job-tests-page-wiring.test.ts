@@ -59,11 +59,18 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("billingRecipientAddressParts");
   });
 
-  it("keeps account and distinct access action buttons available", () => {
-    expect(jobPageSource).toContain("Call account phone");
-    expect(jobPageSource).toContain("Text account phone");
-    expect(jobPageSource).toContain("Call access phone");
-    expect(jobPageSource).toContain("Text access phone");
+  it("keeps account and access action buttons available with compact labels", () => {
+    expect(jobPageSource).toContain("Account Contact");
+    expect(jobPageSource).toContain("const accountEmailLink =");
+    expect(jobPageSource).toContain("mailto:");
+    expect(jobPageSource).toContain("Call");
+    expect(jobPageSource).toContain("Text");
+    expect(jobPageSource).toContain("Email");
+    expect(jobPageSource).toContain("Access Call");
+    expect(jobPageSource).toContain("Access Text");
+    expect(jobPageSource).not.toContain("Call account phone");
+    expect(jobPageSource).not.toContain("Text account phone");
+    expect(jobPageSource).not.toContain("Open Map");
   });
 
   it("uses a field-first job command header instead of the job title as the main heading", () => {
@@ -83,16 +90,43 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("whitespace-pre-wrap break-words");
   });
 
+  it("does not duplicate intake note in right notes card and keeps honest empty-state copy", () => {
+    const jobNotesCardStart = jobPageSource.indexOf("<ChatIcon className=\"h-3.5 w-3.5\" />{rightRailNotesTitle}</div>");
+    const jobNotesCardEnd = jobPageSource.indexOf('href="#internal-notes"', jobNotesCardStart);
+    const jobNotesCardSlice =
+      jobNotesCardStart > -1 && jobNotesCardEnd > jobNotesCardStart
+        ? jobPageSource.slice(jobNotesCardStart, jobNotesCardEnd)
+        : "";
+
+    expect(jobPageSource).toContain("Intake Notes");
+    expect(jobNotesCardSlice).not.toContain("Intake note");
+    expect(jobPageSource).toContain("const rightRailNotesEmptyText = isEccJobType ? \"No shared or internal notes yet.\" : \"No notes yet.\";");
+    expect(jobPageSource).toContain("<ChatIcon className=\"h-3.5 w-3.5\" />{rightRailNotesTitle}</div>");
+    expect(jobPageSource).not.toContain("Notes & Comments");
+    expect(jobNotesCardSlice).not.toContain("Follow-up note");
+    expect(jobPageSource).toContain("View / Add Notes");
+  });
+
+  it("uses service-safe wording in top notes card and keeps shared wording ECC-only", () => {
+    expect(jobPageSource).toContain("const isEccJobType = job.job_type === \"ecc\";");
+    expect(jobPageSource).toContain("const rightRailNotesTitle = isEccJobType ? \"Shared Notes\" : \"Job Notes\";");
+    expect(jobPageSource).toContain("const rightRailNotesSubtitle = isEccJobType");
+    expect(jobPageSource).toContain("? \"Latest shared/internal note activity.\"");
+    expect(jobPageSource).toContain(": \"Latest job note activity.\";");
+    expect(jobPageSource).toContain("const rightRailNotesEmptyText = isEccJobType ? \"No shared or internal notes yet.\" : \"No notes yet.\";");
+  });
+
   it("keeps work needed after visit reason on mobile while spanning the desktop grid", () => {
     const visitReasonIndex = jobPageSource.indexOf("Visit Reason");
     const visitScopeIndex = jobPageSource.indexOf('id="visit-scope-section"');
-    const rightRailIndex = jobPageSource.indexOf("Right: permit and equipment reference rail");
+    const rightRailIndex = jobPageSource.indexOf("Right: quick reference rail");
     const assignedTeamIndex = jobPageSource.indexOf('id="assigned-team"');
 
     expect(visitReasonIndex).toBeGreaterThan(-1);
     expect(visitScopeIndex).toBeGreaterThan(visitReasonIndex);
+    expect(assignedTeamIndex).toBeGreaterThan(-1);
+    expect(assignedTeamIndex).toBeLessThan(visitScopeIndex);
     expect(rightRailIndex).toBeGreaterThan(visitScopeIndex);
-    expect(assignedTeamIndex).toBeGreaterThan(rightRailIndex);
     expect(jobPageSource).toContain("xl:order-4 xl:col-span-3");
     expect(jobPageSource).toContain("space-y-3 xl:order-3");
   });
@@ -101,8 +135,43 @@ describe("job detail field operations board layout", () => {
     expect(jobLocationPreviewSource).toContain("h-40 w-full object-cover");
     expect(jobLocationPreviewSource).toContain("sm:h-52 lg:h-56 xl:h-60");
     expect(jobLocationPreviewSource).toContain("mt-3 hidden flex-col gap-2 sm:flex");
+    expect(jobLocationPreviewSource).toContain("border border-gray-300 bg-white");
     expect(jobPageSource).toContain("h-40 w-full animate-pulse");
     expect(jobPageSource).toContain("mt-3 hidden flex-col gap-2 sm:flex");
+    expect(jobPageSource).toContain("Navigate");
+    expect(jobPageSource).toContain("Open in Maps");
+  });
+
+  it("uses permit quick reference in top rail and full permit details in lower footer row", () => {
+    const permitQuickRefIndex = jobPageSource.indexOf("><ClipboardIcon className=\"h-3.5 w-3.5\" />Permit Quick Ref</div>");
+    const footerEccSummaryIndex = jobPageSource.indexOf("<ClipboardIcon className=\"h-3.5 w-3.5\" />ECC Summary");
+    const footerPermitIndex = jobPageSource.indexOf("<ClipboardIcon className=\"h-3.5 w-3.5\" />Permit Details");
+    const footerEquipmentIndex = jobPageSource.indexOf("<ToolIcon className=\"h-3.5 w-3.5\" />Equipment");
+
+    expect(jobPageSource).toContain("Permit Quick Ref");
+    expect(jobPageSource).toContain("Permit number");
+    expect(jobPageSource).toContain("Permit Details");
+    expect(jobPageSource).toContain("Jurisdiction");
+    expect(jobPageSource).toContain("Date");
+    expect(permitQuickRefIndex).toBeGreaterThan(-1);
+    expect(footerEccSummaryIndex).toBeGreaterThan(-1);
+    expect(footerPermitIndex).toBeGreaterThan(footerEccSummaryIndex);
+    expect(footerEquipmentIndex).toBeGreaterThan(footerPermitIndex);
+  });
+
+  it("keeps equipment in the lower ECC footer row with manage action and notes rail near top", () => {
+    expect(jobPageSource).toContain("rightRailNotesTitle");
+    expect(jobPageSource).toContain('href="#internal-notes"');
+    expect(jobPageSource).not.toContain('href="#follow-up"');
+    expect(jobPageSource).toContain("View / Add Notes");
+    expect(jobPageSource).toContain("ECC Summary");
+    expect(jobPageSource).toContain("Permit Details");
+    expect(jobPageSource).toContain("Equipment");
+    expect(jobPageSource).toContain("Manage");
+  });
+
+  it("keeps destination notes section expanded by default", () => {
+    expect(jobPageSource).toContain('details id="internal-notes" className={jobRecordsDetailsClass} open');
   });
 
   it("includes location-linked contacts in site/access resolution priority", () => {

@@ -19,11 +19,10 @@ import {
   updateJobServiceContractFromForm,
   createNextServiceVisitFromForm,
   completeDataEntryFromForm,
-  type JobStatus,
   createRetestJobFromForm,
+  getOnTheWayUndoEligibility,
   promoteCompanionScopeToServiceJobFromForm,
   addPublicNoteFromForm,
-  getOnTheWayUndoEligibility,
   revertOnTheWayFromForm,
 } from "@/lib/actions/job-actions";
 import CancelJobButton from "@/components/jobs/CancelJobButton";
@@ -44,6 +43,7 @@ import ServiceStatusActions from "./_components/ServiceStatusActions";
 import { displayDateLA, formatBusinessDateUS, formatDateOnlyDisplay, formatTimestampDateDisplayLA, formatTimestampDateTimeDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { formatJobDisplayReference } from "@/lib/utils/display-references";
+import type { JobStatus } from "@/lib/types/job";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import UnscheduleButton from "./_components/UnscheduleButton";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
@@ -839,6 +839,7 @@ type JobLocationPreviewFallbackProps = {
   city?: string | null;
   state?: string | null;
   zip?: string | null;
+  showAddressOverlay?: boolean;
   showAddressFooter?: boolean;
   className?: string;
 };
@@ -849,6 +850,7 @@ function JobLocationPreviewFallback({
   city,
   state,
   zip,
+  showAddressOverlay,
   showAddressFooter,
   className,
 }: JobLocationPreviewFallbackProps) {
@@ -866,13 +868,23 @@ function JobLocationPreviewFallback({
 
   return (
     <div className={className}>
-      {addressDisplay ? (
-        <div className="h-40 w-full animate-pulse rounded-lg border border-slate-200 bg-slate-200/60 sm:h-52 lg:h-56 xl:h-60" />
-      ) : (
-        <div className="flex h-40 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-4 text-center text-sm font-medium text-slate-600 sm:h-52 lg:h-56 xl:h-60">
-          Location preview unavailable
-        </div>
-      )}
+      <div className="relative">
+        {addressDisplay ? (
+          <div className="h-40 w-full animate-pulse rounded-lg border border-slate-200 bg-slate-200/60 sm:h-52 lg:h-56 xl:h-60" />
+        ) : (
+          <div className="flex h-40 w-full items-center justify-center rounded-lg border border-slate-200 bg-slate-100 px-4 text-center text-sm font-medium text-slate-600 sm:h-52 lg:h-56 xl:h-60">
+            Location preview unavailable
+          </div>
+        )}
+
+        {showAddressOverlay && addressDisplay ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2.5 sm:p-3">
+            <div className="rounded-xl border border-white/70 bg-slate-950/52 px-3 py-2 text-sm font-semibold leading-6 text-white shadow-[0_14px_28px_-18px_rgba(15,23,42,0.75)] backdrop-blur-sm sm:px-3.5 sm:py-2.5 sm:text-base lg:text-lg">
+              {addressDisplay}
+            </div>
+          </div>
+        ) : null}
+      </div>
       {addressDisplay ? (
         <div className="mt-3 hidden flex-col gap-2 sm:flex sm:flex-row sm:items-stretch sm:justify-between">
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -881,7 +893,7 @@ function JobLocationPreviewFallback({
                 href={mapsDirectionsUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="hidden min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 sm:inline-flex"
+                className="hidden min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 sm:inline-flex"
               >
                 Navigate
               </a>
@@ -897,7 +909,7 @@ function JobLocationPreviewFallback({
               </a>
             ) : null}
           </div>
-          {showAddressFooter ? (
+          {!showAddressOverlay && showAddressFooter ? (
             <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-sm font-medium leading-6 text-slate-700 sm:max-w-[20rem] sm:text-right">
               {addressDisplay}
             </div>
@@ -915,6 +927,7 @@ type TimedJobLocationPreviewProps = {
   state?: string | null;
   zip?: string | null;
   className?: string;
+  showAddressOverlay?: boolean;
   showAddressFooter?: boolean;
   timingEnabled: boolean;
   onPhaseTiming: TimingPhaseRecorder;
@@ -1553,6 +1566,53 @@ export default async function JobDetailPage({
     }),
   );
 
+  const latestJobNotesPreviewPromise = timelineSummaryPromise.then((timelineSummary) =>
+    timedPhase("latestJobNotesPreview", async () => {
+      // Follow-up slice: Pinned Job Notes V1 (requires durable source-of-truth pin field).
+      const narrativeScopeJobIds = timelineSummary.narrativeScopeJobIds;
+      const previewEventTypes = job.job_type === "ecc"
+        ? ["internal_note", "public_note", "contractor_note", "contractor_correction_submission"]
+        : ["internal_note"];
+
+      const { data: previewRows, error: previewRowsErr } = await supabase
+        .from("job_events")
+        .select("created_at, event_type, meta")
+        .in("job_id", narrativeScopeJobIds)
+        .in("event_type", previewEventTypes)
+        .order("created_at", { ascending: false })
+        .limit(3);
+
+      if (previewRowsErr) return [] as Array<{ label: string; text: string }>;
+
+      return (previewRows ?? [])
+        .map((row: any) => {
+          const eventType = String(row?.event_type ?? "");
+          const meta = row?.meta ?? {};
+          const noteText = summarizePlainText(getEventNoteText(meta), 120);
+          if (!noteText) return null;
+
+          const label =
+            job.job_type !== "ecc"
+              ? "Note"
+              : eventType === "internal_note"
+              ? "Internal note"
+              : eventType === "public_note"
+              ? "Shared note"
+              : eventType === "contractor_note"
+              ? "Contractor note"
+              : eventType === "contractor_correction_submission"
+              ? "Correction note"
+              : "Job note";
+
+          return {
+            label,
+            text: noteText,
+          };
+        })
+        .filter((item): item is { label: string; text: string } => Boolean(item));
+    }),
+  );
+
   const customerAttemptSummaryPromise = timedPhase("customerAttemptSummary", async () => {
     try {
       const [attemptCountRes, latestAttemptRes] = await Promise.all([
@@ -1797,6 +1857,7 @@ export default async function JobDetailPage({
     serviceCaseSummary,
     timelineSummary,
     noteCountSummary,
+    latestJobNotesPreview,
     onTheWayUndoEligibility,
     billingPartyReads,
     visitScopePricebookTemplates,
@@ -1809,6 +1870,7 @@ export default async function JobDetailPage({
     serviceCaseSummaryPromise,
     timelineSummaryPromise,
     noteCountSummaryPromise,
+    latestJobNotesPreviewPromise,
     onTheWayUndoEligibilityPromise,
     billingPartyReadsPromise(),
     visitScopePricebookTemplatesPromise,
@@ -2448,12 +2510,12 @@ const telLink =
     ? `tel:${accountPhoneDigits}`
     : "";
 
-const accessTelLink = hasSeparateAccessPhone ? `tel:${accessPhoneDigits}` : "";
-
-const serviceMapsLink =
-  serviceAddressDisplay && serviceAddressDisplay !== "No address set"
-    ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(serviceAddressDisplay)}`
+const accountEmailLink =
+  customerEmail !== "—"
+    ? `mailto:${customerEmail}`
     : "";
+
+const accessTelLink = hasSeparateAccessPhone ? `tel:${accessPhoneDigits}` : "";
 
 const permitNumber = String(job.permit_number ?? "").trim();
 const permitJurisdiction = String((job as any).jurisdiction ?? "").trim();
@@ -2486,6 +2548,14 @@ const followUpOwnerLabel = String((job as any).action_required_by ?? "").trim();
 const followUpDateValue = String((job as any).follow_up_date ?? "").trim();
 const followUpDateSummary = followUpDateValue ? formatTimestampDateDisplayLA(followUpDateValue) : "";
 const nextActionPreview = truncateSummaryText(String((job as any).next_action_note ?? ""), 78);
+const isEccJobType = job.job_type === "ecc";
+const rightRailNoteCount = isEccJobType ? noteCountSummary.timelineNoteEventCount : noteCountSummary.internalCount;
+const rightRailNotesTitle = isEccJobType ? "Shared Notes" : "Job Notes";
+const rightRailNotesSubtitle = isEccJobType
+  ? "Latest shared/internal note activity."
+  : "Latest job note activity.";
+const rightRailNotesEmptyText = isEccJobType ? "No shared or internal notes yet." : "No notes yet.";
+const hasAnyRightRailNotes = latestJobNotesPreview.length > 0;
 const jobStatusSummaryText = activeWaitingState
   ? `Waiting${activeWaitingState.blockerReason ? ` • ${truncateSummaryText(activeWaitingState.blockerReason, 72)}` : ""}`
   : explicitPendingInfoActive
@@ -2546,11 +2616,10 @@ const headerMetaLine = [headerJobTypeLabel, serviceCity || serviceLocationLabel]
   .join(" • ");
 const showSharedNotesCard = !isHvacServiceMode;
 const showEccSummaryCard = job.job_type === "ecc";
-const lowerGridCardCount = 6 + (showSharedNotesCard ? 1 : 0) + (showEccSummaryCard ? 1 : 0);
+const lowerGridCardCount = 6 + (showSharedNotesCard ? 1 : 0);
 const lowerGridHasOrphan = lowerGridCardCount % 2 === 1;
 const sharedNotesCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
 const serviceChainCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && !showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
-const eccSummaryCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && showEccSummaryCard ? " xl:col-span-2" : ""}`;
 const sharedNotesMeta = noteCountSummary.sharedCount
   ? `${noteCountSummary.sharedCount} note${noteCountSummary.sharedCount === 1 ? "" : "s"}`
   : undefined;
@@ -3720,6 +3789,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   city={serviceCity}
                   state={serviceState}
                   zip={serviceZip}
+                  showAddressOverlay
                   className="px-4 pb-4"
                 />
               }
@@ -3730,6 +3800,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 city={serviceCity}
                 state={serviceState}
                 zip={serviceZip}
+                showAddressOverlay
                 className="px-4 pb-4 [&_a:first-child]:rounded-xl [&_img]:h-44"
                 timingEnabled={timingEnabled}
                 onPhaseTiming={recordBlockingPhase}
@@ -3746,37 +3817,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
           {(showEccNotice || sp?.schedule_required === "1" || activeWaitingState || showExternalDataEntryPrompt || showInternalInvoicingPlaceholder || showMobileInvoiceOpenAttention || markVisitCountedLinkId || suggestedNextDueProjection || isCloseoutPending) ? (
             <section className="space-y-2">
-              {showEccNotice ? (
-                <div className={mobileAttentionStripClass}>
-                  <span className="inline-flex items-center gap-1.5 font-semibold"><WarningIcon className="h-4 w-4" />ECC test needed</span>
-                  <span> / complete one test run before Field Complete.</span>
-                  <Link href={`/jobs/${job.id}/tests`} className="ml-2 font-semibold underline underline-offset-2">
-                    Open Tests
-                  </Link>
-                </div>
-              ) : null}
-
-              {sp?.schedule_required === "1" ? (
-                <div className={mobileAttentionStripClass}>
-                  <span className="inline-flex items-center gap-1.5 font-semibold"><ClockIcon className="h-4 w-4" />Schedule missing</span>
-                  <span> / continuing can auto-fill today.</span>
-                </div>
-              ) : null}
-
-                {activeWaitingState ? (
-                  <div className={mobileAttentionStripClass}>
-                    <span className="inline-flex items-center gap-1.5 font-semibold"><ClockIcon className="h-4 w-4" />Waiting</span>
-                    <span> / {activeWaitingState.blockerReason || "progress is paused."}</span>
-                    {canShowWaitingReleaseQuickAction ? (
-                      <form action={releaseAndReevaluateFromForm} className="mt-2">
-                        <input type="hidden" name="job_id" value={job.id} />
-                        <SubmitButton loadingText="Updating..." className={mobileAttentionActionClass}>
-                          Ready to Continue
-                        </SubmitButton>
-                      </form>
-                    ) : null}
-                  </div>
-                ) : null}
 
                 {showExternalDataEntryPrompt ? (
                   <div className={mobileAttentionStripClass}>
@@ -4626,25 +4666,40 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className="mt-2.5 space-y-2 border-t border-slate-200/70 pt-2.5 text-sm sm:mt-3 sm:space-y-2.5 sm:pt-3">
         <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Account Contact</div>
-          <div className="mt-1 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:mt-1.5 sm:grid-cols-2">
+          <div className="mt-1.5 space-y-1.5 text-xs text-slate-600">
             {customerPhone !== "—" ? (
-              <div className="inline-flex items-center gap-1.5">
+              <div className="inline-flex max-w-full items-center gap-1.5">
                 <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                <span className="font-semibold text-slate-500">Phone:</span> {customerPhone}
+                <span className="font-semibold text-slate-500">Phone:</span>
+                <span className="truncate font-medium text-slate-800" title={customerPhone}>{customerPhone}</span>
               </div>
             ) : null}
             {customerEmail !== "—" ? (
-              <div className="inline-flex items-center gap-1.5 break-all">
+              <div className="inline-flex max-w-full items-center gap-1.5">
                 <MessageIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                <span className="font-semibold text-slate-500">Email:</span> {customerEmail}
+                <span className="font-semibold text-slate-500">Email:</span>
+                <span className="truncate font-medium text-slate-800" title={customerEmail}>{customerEmail}</span>
               </div>
             ) : null}
           </div>
-        </div>
 
-        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400"><MapPinIcon className="h-3.5 w-3.5" />Address</div>
-          <div className="mt-1 text-xs text-slate-700">{serviceAddressDisplay}</div>
+          <div className="mt-2 hidden flex-wrap gap-1.5 sm:flex">
+            {telLink ? (
+              <a href={telLink} className={compactSecondaryButtonClass}>
+                Call
+              </a>
+            ) : null}
+            {customerPhone !== "—" ? (
+              <a href={`sms:${accountPhoneDigits}`} className={compactSecondaryButtonClass}>
+                Text
+              </a>
+            ) : null}
+            {accountEmailLink ? (
+              <a href={accountEmailLink} className={compactSecondaryButtonClass}>
+                Email
+              </a>
+            ) : null}
+          </div>
         </div>
 
         {showSiteAccessCard ? (
@@ -4741,30 +4796,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       </div>
 
       <div className="mt-3 hidden flex-wrap gap-2 sm:flex sm:gap-1.5 lg:gap-2">
-        {telLink ? (
-          <a
-            href={telLink}
-            className={compactSecondaryButtonClass}
-          >
-            Call account phone
-          </a>
-        ) : null}
-
-        {customerPhone !== "—" ? (
-          <a
-            href={`sms:${accountPhoneDigits}`}
-            className={compactSecondaryButtonClass}
-          >
-            Text account phone
-          </a>
-        ) : null}
-
         {accessTelLink ? (
           <a
             href={accessTelLink}
             className={compactSecondaryButtonClass}
           >
-            Call access phone
+            Access Call
           </a>
         ) : null}
 
@@ -4773,18 +4810,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             href={`sms:${accessPhoneDigits}`}
             className={compactSecondaryButtonClass}
           >
-            Text access phone
-          </a>
-        ) : null}
-
-        {serviceMapsLink ? (
-          <a
-            href={serviceMapsLink}
-            target="_blank"
-            rel="noreferrer"
-            className={compactSecondaryButtonClass}
-          >
-            Open Map
+            Access Text
           </a>
         ) : null}
       </div>
@@ -4796,6 +4822,83 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         action={logCustomerContactAttemptFromForm}
         buttonClassName={`${compactSecondaryButtonClass} inline-flex min-h-9 items-center justify-center w-full text-xs sm:w-auto`}
       />
+
+      <div id="assigned-team" className="mt-3 rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><UserIcon className="h-3.5 w-3.5" />Assigned Team</div>
+            <div className="mt-1 text-sm text-slate-600">Field ownership for this visit.</div>
+          </div>
+          <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
+        </div>
+        {assignedTeam.length > 0 ? (
+          <div className="mt-3 flex min-w-0 flex-wrap gap-2">
+            {assignedTeam.map((assignee) => (
+              <div
+                key={`${assignee.job_id}-${assignee.user_id}`}
+                className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]"
+              >
+                <span className="max-w-full break-words">{formatPersonNamePart(assignee.display_name)}</span>
+                {assignee.is_primary ? (
+                  <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                    Primary
+                  </span>
+                ) : null}
+
+                {isInternalUser && !assignee.is_primary ? (
+                  <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="user_id" value={assignee.user_id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
+                    <SubmitButton
+                      loadingText="Updating..."
+                      className={workspaceUtilityControlClass}
+                    >
+                      Make Primary
+                    </SubmitButton>
+                  </form>
+                ) : null}
+
+                {isInternalUser ? (
+                  <form action={removeJobAssigneeFromForm} className="shrink-0">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="user_id" value={assignee.user_id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
+                    <SubmitButton
+                      loadingText="Removing..."
+                      className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
+                    >
+                      Remove
+                    </SubmitButton>
+                  </form>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={`mt-3 ${workspaceEmptyStateClass}`}>No team assigned yet.</div>
+        )}
+
+        {isInternalUser ? (
+          <Suspense
+            fallback={
+              <div className="mt-3 flex min-w-0 animate-pulse flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
+                <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-56" />
+                <div className="h-4 w-28 rounded bg-slate-100" />
+                <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-20" />
+              </div>
+            }
+          >
+            <DeferredAddAssigneeForm
+              jobId={String(job.id)}
+              tab={tab}
+              assignedUserIds={assignedUserIds}
+            />
+          </Suspense>
+        ) : null}
+      </div>
 
       {roleContactSections.map((section, index) => (
         <RoleContactsCard
@@ -4825,7 +4928,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 city={serviceCity}
                 state={serviceState}
                 zip={serviceZip}
-                showAddressFooter
+                showAddressOverlay
                 className="[&>div:last-child]:pt-1"
               />
             }
@@ -4836,7 +4939,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               city={serviceCity}
               state={serviceState}
               zip={serviceZip}
-              showAddressFooter
+              showAddressOverlay
               className="[&>div:last-child]:pt-1"
               timingEnabled={timingEnabled}
               onPhaseTiming={recordBlockingPhase}
@@ -5041,17 +5144,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       </div>
     ) : null}
 
-    {/* Right: permit and equipment reference rail */}
+    {/* Right: quick reference rail */}
     <div className="space-y-3 xl:order-3">
       {job.job_type === "ecc" ? (
         <div className={`${workspaceSubtleCardClass} border-slate-200/70 p-4 ${hasPermitDetails ? "bg-white/92" : "bg-slate-50/88"}`}>
                 <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ClipboardIcon className="h-3.5 w-3.5" />Permit</div>
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ClipboardIcon className="h-3.5 w-3.5" />Permit Quick Ref</div>
               <div className="mt-1 text-sm text-slate-600">
-                {hasPermitDetails
-                  ? `${permitDetailCount} of 3 fields`
-                  : "Permit information pending"}
+                Permit number
               </div>
             </div>
             <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -5059,8 +5160,95 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </span>
           </div>
 
-          {hasPermitDetails ? (
-            <div className="space-y-2">
+          <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+            <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Number</div>
+            <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
+          </div>
+        </div>
+      ) : null}
+
+      <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <div>
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ChatIcon className="h-3.5 w-3.5" />{rightRailNotesTitle}</div>
+            <div className="mt-1 text-sm text-slate-600">{rightRailNotesSubtitle}</div>
+          </div>
+          <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            {rightRailNoteCount} notes
+          </span>
+        </div>
+        <div className="space-y-2">
+          {latestJobNotesPreview.map((preview, index) => (
+            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-xs text-slate-700">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">{preview.label}</div>
+              <div className="mt-0.5 leading-5">{preview.text}</div>
+            </div>
+          ))}
+          {!hasAnyRightRailNotes ? (
+            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
+              {rightRailNotesEmptyText}
+            </div>
+          ) : null}
+          {hasAnyRightRailNotes && rightRailNoteCount > latestJobNotesPreview.length ? (
+            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-xs text-slate-600">
+              Showing latest {latestJobNotesPreview.length} of {rightRailNoteCount} notes.
+            </div>
+          ) : null}
+        </div>
+        <div className="mt-2 hidden flex-wrap gap-1.5 sm:flex">
+          <a href="#internal-notes" className={compactSecondaryButtonClass}>View / Add Notes</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {job.job_type === "ecc" ? (
+    <div className="mt-4 grid grid-cols-1 gap-2 overflow-visible sm:gap-3 xl:grid-cols-3">
+      <details className="group relative overflow-visible">
+        <summary className="cursor-pointer list-none rounded-2xl border border-slate-200/80 bg-white/94 px-3 py-3 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.26)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ClipboardIcon className="h-3.5 w-3.5" />ECC Summary</div>
+            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+              {eccRunCount} run{eccRunCount === 1 ? "" : "s"}
+            </span>
+          </div>
+          <div className="mt-2 text-xs leading-5 text-slate-600">Test history and compliance context.</div>
+        </summary>
+        <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[min(34rem,calc(100vw-1.5rem))] group-open:block">
+          <div className="pointer-events-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70">
+            <p className="text-sm leading-6 text-slate-700">Test history and compliance context.</p>
+            {eccRunCount > 0 ? (
+              <p className="mt-2 text-xs leading-5 text-slate-600">
+                Latest result: <span className="font-semibold text-slate-800">{latestEccRunResultLabel}</span>
+                {latestEccRunDateLabel ? ` • ${latestEccRunDateLabel}` : ""}
+              </p>
+            ) : (
+              <p className="mt-2 text-xs leading-5 text-slate-600">No tests recorded yet.</p>
+            )}
+          </div>
+        </div>
+      </details>
+
+      <details className="group relative overflow-visible">
+        <summary className="cursor-pointer list-none rounded-2xl border border-slate-200/80 bg-white/94 px-3 py-3 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.26)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ClipboardIcon className="h-3.5 w-3.5" />Permit Details</div>
+            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+              {permitSummaryLabel}
+            </span>
+          </div>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              Number: {permitNumber || "Not added"}
+            </span>
+            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              Jurisdiction: {permitJurisdiction || "Not added"}
+            </span>
+          </div>
+        </summary>
+        <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[min(34rem,calc(100vw-1.5rem))] group-open:block">
+          <div className="pointer-events-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70">
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
               <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
                 <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Number</div>
                 <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
@@ -5074,141 +5262,72 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitDateLabel || "Not added"}</div>
               </div>
             </div>
-          ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-white/90 px-4 py-4 text-sm text-slate-600">
-              No permit details recorded yet.
-            </div>
-          )}
+          </div>
         </div>
-      ) : null}
+      </details>
 
-      <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ToolIcon className="h-3.5 w-3.5" />Equipment</div>
-            <div className="mt-1 text-sm text-slate-600">
-              {equipmentCount > 0 ? `${equipmentCount} item${equipmentCount === 1 ? "" : "s"} recorded` : "No equipment recorded yet."}
-            </div>
+      <details className="group relative overflow-visible">
+        <summary className="cursor-pointer list-none rounded-2xl border border-slate-200/80 bg-white/94 px-3 py-3 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.26)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ToolIcon className="h-3.5 w-3.5" />Equipment</div>
+            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+              Manage
+            </span>
           </div>
-          <Link
-            href={`/jobs/${job.id}/info?f=equipment`}
-            className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white"
-          >
-            Manage
-          </Link>
-        </div>
-
-        {equipmentCount > 0 ? (
-          <div className="space-y-2">
-            {equipmentItems.slice(0, 3).map((eq: any) => {
-              const meta = formatEquipmentMeta(eq);
-              return (
-                <div key={eq.id} className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                  <div className="text-sm font-semibold leading-5 text-slate-900">{formatEquipmentTitle(eq)}</div>
-                  {meta ? <div className="mt-0.5 text-xs leading-5 text-slate-600">{meta}</div> : null}
-                </div>
-              );
-            })}
-            {equipmentCount > 3 ? (
-              <div className="text-xs font-semibold text-slate-500">
-                +{equipmentCount - 3} more in Equipment
-              </div>
-            ) : null}
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
-            No equipment recorded yet.
-          </div>
-        )}
-      </div>
-    </div>
-  </div>
-
-  <div id="assigned-team" className={`${workspaceSubtleCardClass} mt-5 scroll-mt-24 border-slate-200/70 bg-white/92 p-4 sm:mt-0`}>
-    {assignmentBannerMessage ? (
-      <FlashBanner
-        type={assignmentBannerType as "success" | "warning"}
-        message={assignmentBannerMessage}
-      />
-    ) : null}
-
-    <div className="flex flex-wrap items-center justify-between gap-2">
-      <div>
-        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><UserIcon className="h-3.5 w-3.5" />Assigned Team</div>
-        <div className="mt-1 text-sm text-slate-600">Field ownership for this visit.</div>
-      </div>
-      <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
-    </div>
-    {assignedTeam.length > 0 ? (
-      <div className="mt-3 flex min-w-0 flex-wrap gap-2">
-        {assignedTeam.map((assignee) => (
-          <div
-            key={`${assignee.job_id}-${assignee.user_id}`}
-            className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]"
-          >
-            <span className="max-w-full break-words">{formatPersonNamePart(assignee.display_name)}</span>
-            {assignee.is_primary ? (
-              <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                Primary
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+              {equipmentCount > 0 ? `${equipmentCount} item${equipmentCount === 1 ? "" : "s"}` : "No equipment recorded yet."}
+            </span>
+            {equipmentCount > 0 ? (
+              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                {formatEquipmentTitle(equipmentItems[0] as any)}
               </span>
             ) : null}
-
-            {isInternalUser && !assignee.is_primary ? (
-              <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="user_id" value={assignee.user_id} />
-                <input type="hidden" name="tab" value={tab} />
-                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
-                <SubmitButton
-                  loadingText="Updating..."
-                  className={workspaceUtilityControlClass}
-                >
-                  Make Primary
-                </SubmitButton>
-              </form>
-            ) : null}
-
-            {isInternalUser ? (
-              <form action={removeJobAssigneeFromForm} className="shrink-0">
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="user_id" value={assignee.user_id} />
-                <input type="hidden" name="tab" value={tab} />
-                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
-                <SubmitButton
-                  loadingText="Removing..."
-                  className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
-                >
-                  Remove
-                </SubmitButton>
-              </form>
-            ) : null}
           </div>
-        ))}
-      </div>
-    ) : (
-      <div className={`mt-3 ${workspaceEmptyStateClass}`}>
-        No team assigned yet.
-      </div>
-    )}
+        </summary>
+        <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[min(34rem,calc(100vw-1.5rem))] group-open:block">
+          <div className="pointer-events-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <div>
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ToolIcon className="h-3.5 w-3.5" />Equipment</div>
+                <div className="mt-1 text-sm text-slate-600">Latest equipment items recorded for this job.</div>
+              </div>
+              <Link
+                href={`/jobs/${job.id}/info?f=equipment`}
+                className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-white"
+              >
+                Manage
+              </Link>
+            </div>
 
-    {isInternalUser ? (
-      <Suspense
-        fallback={
-          <div className="mt-3 flex min-w-0 animate-pulse flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-            <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-56" />
-            <div className="h-4 w-28 rounded bg-slate-100" />
-            <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-20" />
+            {equipmentCount > 0 ? (
+              <div className="space-y-2">
+                {equipmentItems.slice(0, 3).map((eq: any) => {
+                  const meta = formatEquipmentMeta(eq);
+                  return (
+                    <div key={eq.id} className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                      <div className="text-sm font-semibold leading-5 text-slate-900">{formatEquipmentTitle(eq)}</div>
+                      {meta ? <div className="mt-0.5 text-xs leading-5 text-slate-600">{meta}</div> : null}
+                    </div>
+                  );
+                })}
+                {equipmentCount > 3 ? (
+                  <div className="text-xs font-semibold text-slate-500">
+                    +{equipmentCount - 3} more in Equipment
+                  </div>
+                ) : null}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
+                No equipment recorded yet.
+              </div>
+            )}
           </div>
-        }
-      >
-        <DeferredAddAssigneeForm
-          jobId={String(job.id)}
-          tab={tab}
-          assignedUserIds={assignedUserIds}
-        />
-      </Suspense>
-    ) : null}
-  </div>
+        </div>
+      </details>
+    </div>
+
+  ) : null}
 
   {isInternalUser && job.job_type === "service" ? (
     <div className="mt-4 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)] sm:mt-3.5">
@@ -6779,9 +6898,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           {showEccSummaryCard ? <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{eccRunCount} ECC runs</span> : null}
         </div>
       </div>
-      <div className="grid grid-cols-1 gap-2 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3">
+      <div className="grid grid-cols-1 items-start gap-2 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3">
         {/* Internal Notes */}
-        <details id="internal-notes" className={jobRecordsDetailsClass} open={Boolean(internalNoteBannerMessage)}>
+        <details id="internal-notes" className={jobRecordsDetailsClass} open>
           <summary className="cursor-pointer list-none">
             <CollapsibleHeader
               title={internalNotesTitle}
@@ -7079,35 +7198,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </details>
         ) : null}
 
-        {showEccSummaryCard ? (
-          <details className={eccSummaryCardClass}>
-            <summary className="cursor-pointer list-none">
-              <CollapsibleHeader
-                title="ECC Summary"
-                subtitle="Test history and compliance context."
-                meta={`${eccRunCount} run${eccRunCount === 1 ? "" : "s"}`}
-                icon={<ClipboardIcon className="h-4 w-4" />}
-                compactOnMobile
-              />
-            </summary>
-
-            <div className={jobRecordsDetailsDividerClass}>
-              <div className="rounded-xl border border-slate-200/80 bg-white/96 px-4 py-4 text-sm text-slate-700">
-                <p className="text-sm leading-6 text-slate-700">
-                  Test history and compliance context.
-                </p>
-                {eccRunCount > 0 ? (
-                  <p className="mt-2 text-xs leading-5 text-slate-600">
-                    Latest result: <span className="font-semibold text-slate-800">{latestEccRunResultLabel}</span>
-                    {latestEccRunDateLabel ? ` • ${latestEccRunDateLabel}` : ""}
-                  </p>
-                ) : (
-                  <p className="mt-2 text-xs leading-5 text-slate-600">No tests recorded yet.</p>
-                )}
-              </div>
-            </div>
-          </details>
-        ) : null}
       </div>
     </section>
   </div>

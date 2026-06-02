@@ -5,6 +5,7 @@ type JobLocationPreviewProps = {
   state?: string | null;
   zip?: string | null;
   className?: string;
+  showAddressOverlay?: boolean;
   showAddressFooter?: boolean;
 };
 
@@ -93,25 +94,48 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
 
   return (
     <div className={props.className}>
-      <a
-        href={mapsSearchUrl}
-        target="_blank"
-        rel="noreferrer"
-        className="group block overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm transition hover:border-slate-300"
-        aria-label={`Open ${addressDisplay} in Google Maps`}
-      >
-        {imageUrl ? (
-          <img
-            src={imageUrl}
-            alt={imageAlt}
-            className="h-40 w-full object-cover transition duration-200 group-hover:scale-[1.01] sm:h-52 lg:h-56 xl:h-60"
-          />
-        ) : (
-          <div className="flex h-40 w-full items-center justify-center px-4 text-center text-sm font-medium text-slate-600 sm:h-52 lg:h-56 xl:h-60">
-            Location preview unavailable
+      <div className="relative">
+        <a
+          href={mapsSearchUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="group block overflow-hidden rounded-lg border border-slate-200 bg-slate-100 shadow-sm transition hover:border-slate-300"
+          aria-label={`Open ${addressDisplay} in Google Maps`}
+        >
+          {imageUrl ? (
+            <img
+              src={imageUrl}
+              alt={imageAlt}
+              className="h-40 w-full object-cover transition duration-200 group-hover:scale-[1.01] sm:h-52 lg:h-56 xl:h-60"
+            />
+          ) : (
+            <div className="flex h-40 w-full items-center justify-center px-4 text-center text-sm font-medium text-slate-600 sm:h-52 lg:h-56 xl:h-60">
+              Location preview unavailable
+            </div>
+          )}
+        </a>
+
+        {props.showAddressOverlay && addressDisplay ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2.5 sm:p-3">
+            <div className="flex items-center gap-2 rounded-xl border border-white/70 bg-slate-950/52 px-3 py-2 text-sm font-semibold leading-6 text-white shadow-[0_14px_28px_-18px_rgba(15,23,42,0.75)] backdrop-blur-sm sm:px-3.5 sm:py-2.5 sm:text-base lg:text-lg">
+              <svg
+                aria-hidden="true"
+                viewBox="0 0 24 24"
+                className="h-4.5 w-4.5 shrink-0 text-white/90 sm:h-5 sm:w-5"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.9"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M12 22s6-5.6 6-12a6 6 0 0 0-12 0c0 6.4 6 12 6 12Z" />
+                <circle cx="12" cy="10" r="2.2" />
+              </svg>
+              <span className="min-w-0 break-words">{addressDisplay}</span>
+            </div>
           </div>
-        )}
-      </a>
+        ) : null}
+      </div>
 
       <div className="mt-3 hidden flex-col gap-2 sm:flex sm:flex-row sm:items-stretch sm:justify-between">
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -119,7 +143,7 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
             href={mapsDirectionsUrl}
             target="_blank"
             rel="noreferrer"
-            className="hidden min-h-11 items-center justify-center rounded-md bg-slate-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-slate-800 sm:inline-flex"
+            className="hidden min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 sm:inline-flex"
           >
             Navigate
           </a>
@@ -133,7 +157,7 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
           </a>
         </div>
 
-        {props.showAddressFooter ? (
+        {!props.showAddressOverlay && props.showAddressFooter ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-sm font-medium leading-6 text-slate-700 sm:max-w-[20rem] sm:text-right">
             {addressDisplay}
           </div>
