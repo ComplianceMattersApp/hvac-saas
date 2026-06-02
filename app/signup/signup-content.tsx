@@ -18,6 +18,7 @@ const SIGNUP_COPY: Record<
     intro: string;
     details: string;
     cards: [string, string, string];
+    trialGoal: string;
     formIntro: string;
   }
 > = {
@@ -25,43 +26,48 @@ const SIGNUP_COPY: Record<
     eyebrow: "Compliance Matters Onboarding",
     title: "Create Your Company Account",
     intro:
-      "Set up the workspace your team will use to manage jobs, scheduling, compliance work, and service follow-up in one place.",
+      "Set up the daily work your team already handles in one place.",
     details: "We'll send a secure setup link so you can finish creating your account.",
     cards: [
       "Track jobs and follow-up",
       "Coordinate scheduling",
-      "Keep compliance work organized",
+      "Keep work organized",
     ],
+    trialGoal: "Your first 14 days: try a few real jobs and see how the routine feels for your team.",
     formIntro:
-      "Share a few details below. We'll email you a secure link to finish setting up your company workspace.",
+      "Tell us who should own the account. We'll email a secure setup link so you can finish creating your trial.",
   },
   service: {
-    eyebrow: "HVAC Service Onboarding",
-    title: "Create Your HVAC Service Workspace",
+    eyebrow: "HVAC Service Trial",
+    title: "Start Your HVAC Service Trial",
     intro:
-      "Set up the workspace your team will use to manage customers, work orders, dispatch, field work, invoice tracking, and service follow-up.",
-    details: "We'll send a secure setup link so you can finish creating your HVAC Service account.",
+      "Set up the daily work your team already handles: customers, service calls, dispatch, field notes, invoices, and follow-up.",
+    details: "We'll send a secure setup link so you can finish creating your HVAC Service trial.",
     cards: [
-      "Manage service work orders",
-      "Coordinate calendar and dispatch",
-      "Track invoice and job follow-up",
+      "Keep service calls organized",
+      "Help dispatch and field staff stay aligned",
+      "Follow up without losing the thread",
     ],
+    trialGoal:
+      "Your first 14 days: enter a few real customers and service jobs, try the dispatch flow, and see whether it helps your office and field team stay on the same page.",
     formIntro:
-      "Share a few details below. We'll email you a secure link to finish setting up your HVAC Service workspace.",
+      "Tell us who should own the account. We'll email a secure setup link so you can finish creating your HVAC Service trial.",
   },
   ecc: {
-    eyebrow: "ECC / Compliance Testing Onboarding",
-    title: "Create Your ECC Workspace",
+    eyebrow: "ECC / Compliance Testing Trial",
+    title: "Start Your ECC / Compliance Testing Trial",
     intro:
-      "Set up the workspace your team will use to manage ECC jobs, testing workflows, scheduling, pass/fail tracking, and compliance closeout.",
-    details: "We'll send a secure setup link so you can finish creating your ECC account.",
+      "Keep ECC jobs, test scheduling, pass/fail results, corrections, contractors, and closeout details in one place.",
+    details: "We'll send a secure setup link so you can finish creating your ECC / Compliance Testing trial.",
     cards: [
-      "Manage ECC jobs and tests",
-      "Coordinate scheduling",
-      "Keep compliance closeout organized",
+      "Track ECC jobs from start to closeout",
+      "Coordinate testing work",
+      "Keep compliance details easier to prove",
     ],
+    trialGoal:
+      "Your first 14 days: enter a few real ECC jobs, walk through test tracking, and confirm whether the flow fits how your team handles closeout.",
     formIntro:
-      "Share a few details below. We'll email you a secure link to finish setting up your ECC / Compliance Testing workspace.",
+      "Tell us who should own the account. We'll email a secure setup link so you can finish creating your ECC / Compliance Testing trial.",
   },
 };
 
@@ -108,6 +114,10 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
             {copy.details}
           </p>
 
+          <div className="mt-5 rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm leading-6 text-slate-200">
+            {copy.trialGoal}
+          </div>
+
           <div className="mt-7 grid gap-3 text-sm text-slate-200 sm:grid-cols-3">
             {copy.cards.map((card) => (
               <div key={card} className="rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3">
@@ -119,11 +129,24 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
           <div className="mt-3 rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
             No payment details are needed to get started. You can review account and billing options after setup.
           </div>
+
+          <div className="mt-3 rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
+            Setup is owner-led, so you can ask practical questions about how your company actually works.
+          </div>
         </section>
 
         <section className="rounded-3xl border border-slate-800 bg-white p-6 text-slate-900 shadow-2xl shadow-black/30 sm:p-8">
           <h2 className="text-xl font-semibold tracking-tight text-slate-900">Create your account</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">{copy.formIntro}</p>
+
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+            <div className="font-semibold text-slate-900">What happens next</div>
+            <ol className="mt-1 list-decimal space-y-1 pl-5">
+              <li>Enter your email</li>
+              <li>Get your setup link</li>
+              <li>Try real jobs for 14 days</li>
+            </ol>
+          </div>
 
           <form action={action} className="mt-6 space-y-4">
             {productIntent !== "generic" ? (
@@ -201,7 +224,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
           </form>
 
           <p className="mt-4 text-xs leading-relaxed text-slate-500">
-            You will not need payment details for this step. After setup, you can review account options from your workspace.
+            You will not need payment details for this step. After setup, you can review account options in your account.
           </p>
         </section>
       </div>

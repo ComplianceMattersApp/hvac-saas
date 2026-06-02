@@ -218,6 +218,9 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Log in</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">Log into your Compliance Matters account.</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">
+            Run service work, ECC testing, scheduling, and follow-up from one organized place.
+          </p>
         </div>
 
       <form onSubmit={onSubmit} className="space-y-4">
@@ -288,20 +291,26 @@ export default function LoginPage() {
 
       <div className="rounded-lg border border-gray-200 bg-gradient-to-br from-gray-50 to-white p-3 dark:border-gray-800 dark:bg-gray-950/30">
         <p className="text-center text-sm font-medium text-gray-900 dark:text-gray-100">New to Compliance Matters?</p>
-        <p className="mt-1 text-center text-xs text-gray-600 dark:text-gray-400">Choose your signup path:</p>
+        <p className="mt-1 text-center text-xs text-gray-600 dark:text-gray-400">
+          Start a 14-day guided setup. No payment details needed.
+        </p>
         <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
           <Link
             href="/signup/service"
             className="inline-flex min-h-10 items-center justify-center rounded-md border border-indigo-300 bg-gradient-to-r from-indigo-600 to-blue-600 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-px hover:from-indigo-500 hover:to-blue-500 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 dark:border-indigo-700 dark:from-indigo-700 dark:to-blue-700 dark:text-white dark:hover:from-indigo-600 dark:hover:to-blue-600"
           >
-            Sign up for HVAC Service
+            Start HVAC Service Trial
           </Link>
           <Link
             href="/signup/ecc"
             className="inline-flex min-h-10 items-center justify-center rounded-md border border-emerald-300 bg-gradient-to-r from-emerald-600 to-emerald-500 px-3 py-2 text-center text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-px hover:from-emerald-500 hover:to-emerald-400 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 dark:border-emerald-700 dark:from-emerald-700 dark:to-emerald-600 dark:text-white dark:hover:from-emerald-600 dark:hover:to-emerald-500"
           >
-            Sign up for ECC / Compliance Testing
+            Start ECC / Compliance Testing Trial
           </Link>
+        </div>
+        <div className="mt-3 grid grid-cols-1 gap-2 text-[11px] leading-5 text-gray-500 dark:text-gray-400 sm:grid-cols-2">
+          <p>For service calls, dispatch, work orders, and follow-up.</p>
+          <p>For ECC jobs, tests, corrections, and compliance closeout.</p>
         </div>
       </div>
 

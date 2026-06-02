@@ -32,10 +32,10 @@ export function SignupProductChoiceLanding() {
         <section className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-6 shadow-2xl shadow-black/25 backdrop-blur sm:p-8">
           <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-300">Compliance Matters Onboarding</p>
           <h1 className="mt-3 font-serif text-3xl tracking-tight text-white sm:text-4xl">
-            Choose Your Product Setup
+            Start a 14-day guided trial
           </h1>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-200 sm:text-base">
-            Start by selecting the workflow that fits your company. You can complete account setup on the next step.
+            Choose the path that fits your company. You can finish account setup on the next step without payment details.
           </p>
           <p className="mt-2 text-xs leading-5 text-slate-400 sm:text-sm">
             Hybrid / All-in-One setup is handled manually by operator support when needed.
@@ -45,14 +45,14 @@ export function SignupProductChoiceLanding() {
         <section className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
           <ProductChoiceCard
             title="SERVICE"
-            copy="For HVAC service companies managing customers, work orders, scheduling, estimates, and field work."
-            buttonLabel="Start Service Setup"
+            copy="For HVAC service companies managing customers, service calls, scheduling, field work, and follow-up."
+            buttonLabel="Start HVAC Service Trial"
             href="/signup/service"
           />
           <ProductChoiceCard
             title="ECC"
-            copy="For compliance testing companies managing ECC jobs, contractors, tests, corrections, and closeout."
-            buttonLabel="Start ECC Setup"
+            copy="For ECC and compliance testing teams managing jobs, tests, corrections, contractors, and closeout."
+            buttonLabel="Start ECC / Compliance Testing Trial"
             href="/signup/ecc"
           />
         </section>
