@@ -151,7 +151,6 @@ function dateToDateInput(value?: string | null) {
   return d.toISOString().slice(0, 10);
 }
 
-
 function formatDateLAFromIso(iso: string) {
   return formatTimestampDateDisplayLA(iso);
 }
@@ -159,7 +158,6 @@ function formatDateLAFromIso(iso: string) {
 function formatDateTimeLAFromIso(iso: string) {
   return formatTimestampDateTimeDisplayLA(iso);
 }
-
 
 function formatDateDisplay(date?: string | null) {
   if (!date) return "";
@@ -267,7 +265,6 @@ function serviceChainVisitLabel(visit: any, idx: number) {
   if (visit?.parent_job_id) return "Retest visit";
   return `Visit ${idx + 1}`;
 }
-
 
 function timeToTimeInput(value?: string | null) {
   if (!value) return "";
@@ -1158,7 +1155,10 @@ export default async function JobDetailPage({
       if (timingEnabled) {
         setPhaseValue(phaseName, Date.now() - startMs);
       }
-      throw error;
+      const message = error instanceof Error ? error.message : String(error);
+      const annotated = new Error(`[job-detail:${phaseName}] ${message}`);
+      (annotated as any).cause = error;
+      throw annotated;
     }
   };
 
@@ -2104,9 +2104,6 @@ export default async function JobDetailPage({
   const serviceAddressDisplay =
     serviceAddressParts.length > 0 ? serviceAddressParts.join(", ") : "No address set";
 
-  const serviceLocationLabel =
-    firstNonEmpty(serviceLocation?.nickname, serviceLocation?.label) ?? "Service address";
-
   const mobilePrimaryPhone = customerPhone !== "—" ? customerPhone : primarySiteAccessPhone || "";
   const mobilePrimaryPhoneDigits = mobilePrimaryPhone.replace(/\D/g, "");
   const mobileCallHref = mobilePrimaryPhoneDigits ? `tel:${mobilePrimaryPhoneDigits}` : null;
@@ -2611,12 +2608,15 @@ const headerJobTypeLabel = String(job.job_type ?? "service")
   .filter(Boolean)
   .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
   .join(" ");
-const headerMetaLine = [headerJobTypeLabel, serviceCity || serviceLocationLabel]
-  .filter((part) => String(part ?? "").trim().length > 0)
-  .join(" • ");
 const showSharedNotesCard = !isHvacServiceMode;
 const showEccSummaryCard = job.job_type === "ecc";
-const lowerGridCardCount = 6 + (showSharedNotesCard ? 1 : 0);
+const showJobRecordsPermitCard = showEccSummaryCard || hasPermitDetails;
+const lowerGridCardCount =
+  6 +
+  (showSharedNotesCard ? 1 : 0) +
+  1 +
+  (showEccSummaryCard ? 1 : 0) +
+  (showJobRecordsPermitCard ? 1 : 0);
 const lowerGridHasOrphan = lowerGridCardCount % 2 === 1;
 const sharedNotesCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
 const serviceChainCardClass = `${jobRecordsDetailsClass}${lowerGridHasOrphan && !showSharedNotesCard && !showEccSummaryCard ? " xl:col-span-2" : ""}`;
@@ -2782,6 +2782,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <div>
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice</div>
+
               <div className="mt-1 text-sm font-semibold text-slate-950">
                 {internalInvoice ? internalInvoice.invoice_number : "Not started"}
               </div>
@@ -3462,7 +3463,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   const showMobileContractorContext = job.job_type === "ecc" && Boolean(contractorId);
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[92rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
+    <div className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
       <div className="block min-h-screen bg-slate-100 px-3 py-4 text-slate-950 lg:hidden">
         <div className="mx-auto max-w-lg space-y-4">
           <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
@@ -4399,18 +4400,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
           {fieldHeaderTitle}
         </h1>
-        <div className="mt-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold tracking-[0.06em] text-slate-700">
-          {jobHeaderReference}
-        </div>
-        <div className="mt-1.5 text-sm font-medium text-slate-600">{headerMetaLine}</div>
-        {serviceAddressDisplay !== "No address set" ? (
-          <div className="mt-1 hidden max-w-2xl break-words text-sm leading-5 text-slate-500 sm:block">
-            {serviceAddressDisplay}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold tracking-[0.06em] text-slate-700">
+            {jobHeaderReference}
           </div>
-        ) : null}
-        <div className="mt-2 hidden items-center gap-2 rounded-full border border-slate-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 sm:inline-flex">
-          <span className="text-slate-400">Tech ID</span>
-          <span className="font-mono normal-case tracking-normal text-slate-600">{job.id}</span>
+          <div className="inline-flex rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+            {headerJobTypeLabel}
+          </div>
         </div>
       </div>
       <div id="field-status-actions" className="flex w-full flex-col gap-2.5 xl:w-auto xl:min-w-[24rem] xl:items-end">
@@ -4643,7 +4639,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
   </div>
 
-  <div className="mb-4 grid items-start gap-4 xl:grid-cols-[minmax(300px,0.92fr)_minmax(420px,1.25fr)_minmax(260px,0.83fr)]">
+  <div className="mb-4 grid items-start gap-4 xl:grid-cols-[minmax(300px,0.9fr)_minmax(420px,1.04fr)_minmax(360px,1.16fr)]">
     {/* Left: customer / contact info */}
     <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-3 sm:p-4`}>
       <div className="hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:block">
@@ -4655,47 +4651,47 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       {job.customer_id ? (
         <Link
           href={`/customers/${job.customer_id}`}
-          className="mt-1.5 hidden text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950 hover:underline sm:block"
+          className="mt-1.5 hidden text-[1.5rem] font-semibold leading-tight tracking-[-0.01em] text-slate-950 hover:underline sm:block"
         >
           {customerDisplayName}
         </Link>
       ) : (
-        <div className="mt-1.5 hidden text-[1.35rem] font-semibold tracking-[-0.01em] text-slate-950 sm:block">{customerDisplayName}</div>
+        <div className="mt-1.5 hidden text-[1.5rem] font-semibold leading-tight tracking-[-0.01em] text-slate-950 sm:block">{customerDisplayName}</div>
       )}
 
       <div className="mt-2.5 space-y-2 border-t border-slate-200/70 pt-2.5 text-sm sm:mt-3 sm:space-y-2.5 sm:pt-3">
         <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
           <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Account Contact</div>
-          <div className="mt-1.5 space-y-1.5 text-xs text-slate-600">
+          <div className="mt-1.5 space-y-2 text-sm text-slate-600">
             {customerPhone !== "—" ? (
-              <div className="inline-flex max-w-full items-center gap-1.5">
+              <div className="flex w-full items-center gap-1.5">
                 <PhoneIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                <span className="font-semibold text-slate-500">Phone:</span>
-                <span className="truncate font-medium text-slate-800" title={customerPhone}>{customerPhone}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Phone</span>
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-6 text-slate-900" title={customerPhone}>{customerPhone}</span>
               </div>
             ) : null}
             {customerEmail !== "—" ? (
-              <div className="inline-flex max-w-full items-center gap-1.5">
+              <div className="flex w-full items-center gap-1.5">
                 <MessageIcon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                <span className="font-semibold text-slate-500">Email:</span>
-                <span className="truncate font-medium text-slate-800" title={customerEmail}>{customerEmail}</span>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Email</span>
+                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold leading-6 text-slate-900" title={customerEmail}>{customerEmail}</span>
               </div>
             ) : null}
           </div>
 
           <div className="mt-2 hidden flex-wrap gap-1.5 sm:flex">
             {telLink ? (
-              <a href={telLink} className={compactSecondaryButtonClass}>
+              <a href={telLink} className={`${compactSecondaryButtonClass} text-[13px]`}>
                 Call
               </a>
             ) : null}
             {customerPhone !== "—" ? (
-              <a href={`sms:${accountPhoneDigits}`} className={compactSecondaryButtonClass}>
+              <a href={`sms:${accountPhoneDigits}`} className={`${compactSecondaryButtonClass} text-[13px]`}>
                 Text
               </a>
             ) : null}
             {accountEmailLink ? (
-              <a href={accountEmailLink} className={compactSecondaryButtonClass}>
+              <a href={accountEmailLink} className={`${compactSecondaryButtonClass} text-[13px]`}>
                 Email
               </a>
             ) : null}
@@ -4967,7 +4963,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
 
         <div className="mt-3 space-y-3">
-          <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5 whitespace-pre-wrap break-words text-sm leading-6 text-slate-900">
+          <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5 whitespace-pre-wrap break-words text-base leading-7 text-slate-900">
             {visitReasonText}
           </div>
 
@@ -4976,7 +4972,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                 Customer Concern
               </div>
-              <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
+              <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800">
                 {jobTitleText}
               </div>
             </div>
@@ -4987,7 +4983,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                 Intake Notes
               </div>
-              <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
+              <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800">
                 {jobNotesText}
               </div>
             </div>
@@ -4998,7 +4994,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                 Work Summary
               </div>
-              <div className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
+              <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800">
                 {visitScopeSummary}
               </div>
             </div>
@@ -5145,7 +5141,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     ) : null}
 
     {/* Right: quick reference rail */}
-    <div className="space-y-3 xl:order-3">
+    <div className="space-y-3 xl:order-3 xl:flex xl:h-full xl:self-stretch xl:flex-col xl:space-y-0 xl:gap-3">
       {job.job_type === "ecc" ? (
         <div className={`${workspaceSubtleCardClass} border-slate-200/70 p-4 ${hasPermitDetails ? "bg-white/92" : "bg-slate-50/88"}`}>
                 <div className="mb-3 flex items-start justify-between gap-3">
@@ -5167,11 +5163,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       ) : null}
 
-      <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4`}>
+      <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:justify-start`}>
         <div className="mb-2 flex items-start justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ChatIcon className="h-3.5 w-3.5" />{rightRailNotesTitle}</div>
-            <div className="mt-1 text-sm text-slate-600">{rightRailNotesSubtitle}</div>
+            <div className="mt-1 text-[15px] leading-6 text-slate-600">{rightRailNotesSubtitle}</div>
           </div>
           <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
             {rightRailNoteCount} notes
@@ -5179,9 +5175,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
         <div className="space-y-2">
           {latestJobNotesPreview.map((preview, index) => (
-            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-xs text-slate-700">
+            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-700">
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">{preview.label}</div>
-              <div className="mt-0.5 leading-5">{preview.text}</div>
+              <div className="mt-0.5 break-words leading-6">{preview.text}</div>
             </div>
           ))}
           {!hasAnyRightRailNotes ? (
@@ -5202,138 +5198,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
   </div>
 
-  {job.job_type === "ecc" ? (
-    <div className="mt-4 grid grid-cols-1 gap-2 overflow-visible sm:gap-3 xl:grid-cols-3">
-      <details className="group relative overflow-visible">
-        <summary className="cursor-pointer list-none rounded-2xl border border-slate-200/80 bg-white/94 px-3 py-3 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.26)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ClipboardIcon className="h-3.5 w-3.5" />ECC Summary</div>
-            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-              {eccRunCount} run{eccRunCount === 1 ? "" : "s"}
-            </span>
-          </div>
-          <div className="mt-2 text-xs leading-5 text-slate-600">Test history and compliance context.</div>
-        </summary>
-        <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[min(34rem,calc(100vw-1.5rem))] group-open:block">
-          <div className="pointer-events-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70">
-            <p className="text-sm leading-6 text-slate-700">Test history and compliance context.</p>
-            {eccRunCount > 0 ? (
-              <p className="mt-2 text-xs leading-5 text-slate-600">
-                Latest result: <span className="font-semibold text-slate-800">{latestEccRunResultLabel}</span>
-                {latestEccRunDateLabel ? ` • ${latestEccRunDateLabel}` : ""}
-              </p>
-            ) : (
-              <p className="mt-2 text-xs leading-5 text-slate-600">No tests recorded yet.</p>
-            )}
-          </div>
-        </div>
-      </details>
-
-      <details className="group relative overflow-visible">
-        <summary className="cursor-pointer list-none rounded-2xl border border-slate-200/80 bg-white/94 px-3 py-3 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.26)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ClipboardIcon className="h-3.5 w-3.5" />Permit Details</div>
-            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-              {permitSummaryLabel}
-            </span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-              Number: {permitNumber || "Not added"}
-            </span>
-            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-              Jurisdiction: {permitJurisdiction || "Not added"}
-            </span>
-          </div>
-        </summary>
-        <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[min(34rem,calc(100vw-1.5rem))] group-open:block">
-          <div className="pointer-events-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70">
-            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Number</div>
-                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
-              </div>
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Jurisdiction</div>
-                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitJurisdiction || "Not added"}</div>
-              </div>
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Date</div>
-                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitDateLabel || "Not added"}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </details>
-
-      <details className="group relative overflow-visible">
-        <summary className="cursor-pointer list-none rounded-2xl border border-slate-200/80 bg-white/94 px-3 py-3 shadow-[0_10px_24px_-28px_rgba(15,23,42,0.26)] transition-colors hover:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ToolIcon className="h-3.5 w-3.5" />Equipment</div>
-            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-              Manage
-            </span>
-          </div>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-              {equipmentCount > 0 ? `${equipmentCount} item${equipmentCount === 1 ? "" : "s"}` : "No equipment recorded yet."}
-            </span>
-            {equipmentCount > 0 ? (
-              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">
-                {formatEquipmentTitle(equipmentItems[0] as any)}
-              </span>
-            ) : null}
-          </div>
-        </summary>
-        <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[min(34rem,calc(100vw-1.5rem))] group-open:block">
-          <div className="pointer-events-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70">
-            <div className="mb-3 flex items-start justify-between gap-3">
-              <div>
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ToolIcon className="h-3.5 w-3.5" />Equipment</div>
-                <div className="mt-1 text-sm text-slate-600">Latest equipment items recorded for this job.</div>
-              </div>
-              <Link
-                href={`/jobs/${job.id}/info?f=equipment`}
-                className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-white"
-              >
-                Manage
-              </Link>
-            </div>
-
-            {equipmentCount > 0 ? (
-              <div className="space-y-2">
-                {equipmentItems.slice(0, 3).map((eq: any) => {
-                  const meta = formatEquipmentMeta(eq);
-                  return (
-                    <div key={eq.id} className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                      <div className="text-sm font-semibold leading-5 text-slate-900">{formatEquipmentTitle(eq)}</div>
-                      {meta ? <div className="mt-0.5 text-xs leading-5 text-slate-600">{meta}</div> : null}
-                    </div>
-                  );
-                })}
-                {equipmentCount > 3 ? (
-                  <div className="text-xs font-semibold text-slate-500">
-                    +{equipmentCount - 3} more in Equipment
-                  </div>
-                ) : null}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/80 px-4 py-4 text-sm text-slate-600">
-                No equipment recorded yet.
-              </div>
-            )}
-          </div>
-        </div>
-      </details>
-    </div>
-
-  ) : null}
-
   {isInternalUser && job.job_type === "service" ? (
     <div className="mt-4 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)] sm:mt-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ClockIcon className="h-3.5 w-3.5" />Next Service Action</div>
+
           <div className="mt-1 text-sm font-semibold text-slate-900">Create a linked follow-up visit.</div>
         </div>
         {serviceCaseVisitCount > 1 ? (
@@ -6342,6 +6212,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
             <div className={workspaceDetailsDividerClass}>
               <div className={`${workspaceInsetClass} p-4`}>
+                <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  <span className="text-slate-400">Tech ID</span>
+                  <span className="font-mono normal-case tracking-normal text-slate-700">{job.id}</span>
+                </div>
                 <div className="mb-3 text-sm font-semibold text-slate-900">Scheduling</div>
 
                 <form action={updateJobScheduleFromForm} className="space-y-4">
@@ -6889,8 +6763,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className="mb-3 flex flex-col gap-1.5 border-b border-slate-200/80 pb-2.5 sm:mb-4 sm:gap-2 sm:pb-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"><FolderIcon className="h-3.5 w-3.5" />Job Records</div>
-          <div className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:mt-1 sm:text-lg">Activity, Evidence, and History</div>
-          <div className="mt-1 hidden text-sm text-slate-600 sm:block">Notes, attachments, follow-up, and history.</div>
+          <div className="mt-0.5 text-lg font-semibold tracking-tight text-slate-950 sm:mt-1 sm:text-xl">Activity, Evidence, and History</div>
+          <div className="mt-1 hidden text-base text-slate-600 sm:block">Notes, attachments, follow-up, and history.</div>
         </div>
         <div className="flex flex-wrap gap-1">
           <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{noteCountSummary.timelineNoteEventCount} notes</span>
@@ -6899,6 +6773,99 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       </div>
       <div className="grid grid-cols-1 items-start gap-2 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3">
+        {showEccSummaryCard ? (
+          <details className={jobRecordsDetailsClass}>
+            <summary className="cursor-pointer list-none">
+              <CollapsibleHeader
+                title="ECC Summary"
+                subtitle="Test history and compliance context."
+                meta={`${eccRunCount} run${eccRunCount === 1 ? "" : "s"}`}
+                icon={<ClipboardIcon className="h-4 w-4" />}
+                compactOnMobile
+              />
+            </summary>
+
+            <div className={jobRecordsDetailsDividerClass}>
+              {eccRunCount > 0 ? (
+                <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5 text-sm leading-6 text-slate-700">
+                  Latest result: <span className="font-semibold text-slate-900">{latestEccRunResultLabel}</span>
+                  {latestEccRunDateLabel ? ` • ${latestEccRunDateLabel}` : ""}
+                </div>
+              ) : (
+                <div className={workspaceEmptyStateClass}>No tests recorded yet.</div>
+              )}
+            </div>
+          </details>
+        ) : null}
+
+        {showJobRecordsPermitCard ? (
+          <details className={jobRecordsDetailsClass}>
+            <summary className="cursor-pointer list-none">
+              <CollapsibleHeader
+                title="Permit Details"
+                subtitle="Number, jurisdiction, and date."
+                meta={permitSummaryLabel}
+                icon={<ClipboardIcon className="h-4 w-4" />}
+                compactOnMobile
+              />
+            </summary>
+
+            <div className={`${jobRecordsDetailsDividerClass} grid grid-cols-1 gap-2 sm:grid-cols-3`}>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Number</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
+              </div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Jurisdiction</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitJurisdiction || "Not added"}</div>
+              </div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Date</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitDateLabel || "Not added"}</div>
+              </div>
+            </div>
+          </details>
+        ) : null}
+
+        <details className={jobRecordsDetailsClass}>
+          <summary className="cursor-pointer list-none">
+            <CollapsibleHeader
+              title="Equipment"
+              subtitle="Latest equipment items recorded for this job."
+              meta={`${equipmentCount} item${equipmentCount === 1 ? "" : "s"}`}
+              icon={<ToolIcon className="h-4 w-4" />}
+              compactOnMobile
+            />
+          </summary>
+
+          <div className={jobRecordsDetailsDividerClass}>
+            <div className="mb-3 flex items-center justify-end">
+              <Link href={`/jobs/${job.id}/info?f=equipment`} className={secondaryButtonClass}>
+                Manage Equipment
+              </Link>
+            </div>
+
+            {equipmentCount > 0 ? (
+              <div className="space-y-2">
+                {equipmentItems.slice(0, 3).map((eq: any) => {
+                  const meta = formatEquipmentMeta(eq);
+                  return (
+                    <div key={eq.id} className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                      <div className="text-sm font-semibold leading-5 text-slate-900">{formatEquipmentTitle(eq)}</div>
+                      {meta ? <div className="mt-0.5 text-xs leading-5 text-slate-600">{meta}</div> : null}
+                    </div>
+                  );
+                })}
+                {equipmentCount > 3 ? (
+                  <div className="text-xs font-semibold text-slate-500">+{equipmentCount - 3} more in Equipment</div>
+                ) : null}
+              </div>
+            ) : (
+              <div className={workspaceEmptyStateClass}>No equipment recorded yet.</div>
+            )}
+          </div>
+        </details>
+
         {/* Internal Notes */}
         <details id="internal-notes" className={jobRecordsDetailsClass} open>
           <summary className="cursor-pointer list-none">

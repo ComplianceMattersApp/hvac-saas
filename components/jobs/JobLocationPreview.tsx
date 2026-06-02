@@ -117,7 +117,7 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
 
         {props.showAddressOverlay && addressDisplay ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2.5 sm:p-3">
-            <div className="flex items-center gap-2 rounded-xl border border-white/70 bg-slate-950/52 px-3 py-2 text-sm font-semibold leading-6 text-white shadow-[0_14px_28px_-18px_rgba(15,23,42,0.75)] backdrop-blur-sm sm:px-3.5 sm:py-2.5 sm:text-base lg:text-lg">
+            <div className="flex items-center gap-2 rounded-xl border border-white/70 bg-slate-950/52 px-3 py-2 text-base font-semibold leading-6 text-white shadow-[0_14px_28px_-18px_rgba(15,23,42,0.75)] backdrop-blur-sm sm:px-3.5 sm:py-2.5 sm:text-lg lg:text-[1.15rem]">
               <svg
                 aria-hidden="true"
                 viewBox="0 0 24 24"
@@ -131,7 +131,7 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
                 <path d="M12 22s6-5.6 6-12a6 6 0 0 0-12 0c0 6.4 6 12 6 12Z" />
                 <circle cx="12" cy="10" r="2.2" />
               </svg>
-              <span className="min-w-0 break-words">{addressDisplay}</span>
+              <span className="min-w-0 break-words [overflow-wrap:anywhere]">{addressDisplay}</span>
             </div>
           </div>
         ) : null}
@@ -158,7 +158,7 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
         </div>
 
         {!props.showAddressOverlay && props.showAddressFooter ? (
-          <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-sm font-medium leading-6 text-slate-700 sm:max-w-[20rem] sm:text-right">
+          <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-sm font-medium leading-6 text-slate-700 sm:max-w-[24rem] sm:text-right">
             {addressDisplay}
           </div>
         ) : null}

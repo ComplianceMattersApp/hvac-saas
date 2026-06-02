@@ -53,7 +53,7 @@ export default function JobDetailLoading() {
         <div className="h-7 w-44 animate-pulse rounded-full border border-slate-100 bg-white" />
       </div>
 
-      <div className="grid gap-4 xl:grid-cols-[minmax(300px,0.92fr)_minmax(420px,1.25fr)_minmax(260px,0.83fr)]">
+      <div className="grid gap-4 xl:grid-cols-[minmax(300px,0.9fr)_minmax(420px,1.04fr)_minmax(360px,1.16fr)]">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
           <div className="h-3 w-24 animate-pulse rounded bg-slate-200" />
           <div className="mt-3 h-7 w-56 max-w-full animate-pulse rounded bg-slate-200" />

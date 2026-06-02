@@ -142,32 +142,46 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("Open in Maps");
   });
 
-  it("uses permit quick reference in top rail and full permit details in lower footer row", () => {
+  it("keeps permit quick reference in the top rail", () => {
     const permitQuickRefIndex = jobPageSource.indexOf("><ClipboardIcon className=\"h-3.5 w-3.5\" />Permit Quick Ref</div>");
-    const footerEccSummaryIndex = jobPageSource.indexOf("<ClipboardIcon className=\"h-3.5 w-3.5\" />ECC Summary");
-    const footerPermitIndex = jobPageSource.indexOf("<ClipboardIcon className=\"h-3.5 w-3.5\" />Permit Details");
-    const footerEquipmentIndex = jobPageSource.indexOf("<ToolIcon className=\"h-3.5 w-3.5\" />Equipment");
 
     expect(jobPageSource).toContain("Permit Quick Ref");
     expect(jobPageSource).toContain("Permit number");
-    expect(jobPageSource).toContain("Permit Details");
-    expect(jobPageSource).toContain("Jurisdiction");
-    expect(jobPageSource).toContain("Date");
     expect(permitQuickRefIndex).toBeGreaterThan(-1);
-    expect(footerEccSummaryIndex).toBeGreaterThan(-1);
-    expect(footerPermitIndex).toBeGreaterThan(footerEccSummaryIndex);
-    expect(footerEquipmentIndex).toBeGreaterThan(footerPermitIndex);
   });
 
-  it("keeps equipment in the lower ECC footer row with manage action and notes rail near top", () => {
+  it("restores ECC summary, permit details, and equipment inside lower job records section", () => {
+    const recordsSectionIndex = jobPageSource.indexOf("Activity, Evidence, and History");
+    const recordsGridIndex = jobPageSource.indexOf('grid grid-cols-1 items-start gap-2 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3', recordsSectionIndex);
+    const lowerEccSummaryIndex = jobPageSource.indexOf('title="ECC Summary"', recordsGridIndex);
+    const lowerPermitIndex = jobPageSource.indexOf('title="Permit Details"', recordsGridIndex);
+    const lowerEquipmentIndex = jobPageSource.indexOf('title="Equipment"', recordsGridIndex);
+    const internalNotesIndex = jobPageSource.indexOf('details id="internal-notes"', recordsGridIndex);
+
+    expect(recordsSectionIndex).toBeGreaterThan(-1);
+    expect(recordsGridIndex).toBeGreaterThan(recordsSectionIndex);
+    expect(lowerEccSummaryIndex).toBeGreaterThan(recordsGridIndex);
+    expect(lowerPermitIndex).toBeGreaterThan(lowerEccSummaryIndex);
+    expect(lowerEquipmentIndex).toBeGreaterThan(lowerPermitIndex);
+    expect(internalNotesIndex).toBeGreaterThan(lowerEquipmentIndex);
+    expect(jobPageSource).toContain("showEccSummaryCard = job.job_type === \"ecc\"");
+    expect(jobPageSource).toContain("showJobRecordsPermitCard = showEccSummaryCard || hasPermitDetails");
+    expect(jobPageSource).toContain("Manage Equipment");
+  });
+
+  it("keeps ECC summary gated to ECC jobs while preserving permit and equipment cards", () => {
+    expect(jobPageSource).toContain('{showEccSummaryCard ? (');
+    expect(jobPageSource).toContain('title="ECC Summary"');
+    expect(jobPageSource).toContain('{showJobRecordsPermitCard ? (');
+    expect(jobPageSource).toContain('title="Permit Details"');
+    expect(jobPageSource).toContain('title="Equipment"');
+  });
+
+  it("keeps notes rail action near top with no follow-up shortcut", () => {
     expect(jobPageSource).toContain("rightRailNotesTitle");
     expect(jobPageSource).toContain('href="#internal-notes"');
     expect(jobPageSource).not.toContain('href="#follow-up"');
     expect(jobPageSource).toContain("View / Add Notes");
-    expect(jobPageSource).toContain("ECC Summary");
-    expect(jobPageSource).toContain("Permit Details");
-    expect(jobPageSource).toContain("Equipment");
-    expect(jobPageSource).toContain("Manage");
   });
 
   it("keeps destination notes section expanded by default", () => {
