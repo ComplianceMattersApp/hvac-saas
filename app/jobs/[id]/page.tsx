@@ -1289,12 +1289,32 @@ export default async function JobDetailPage({
   productMode = resolvedProductMode;
 
   // Explicit same-account internal scoped-job preflight: deny before main job-detail read assembly
-  const scopedReadJob = await timedPhase("sameAccountScopedJobBoundary", () =>
-    loadScopedInternalJobDetailReadBoundary({
-      accountOwnerUserId: internalUser.account_owner_user_id,
+  let scopedReadJob: { id?: string | null } | null = null;
+  try {
+    scopedReadJob = await timedPhase("sameAccountScopedJobBoundary", () =>
+      loadScopedInternalJobDetailReadBoundary({
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        jobId,
+      }),
+    );
+  } catch (error) {
+    const boundaryErrorMessage =
+      error instanceof Error
+        ? error.message
+        : (() => {
+            try {
+              return JSON.stringify(error);
+            } catch {
+              return String(error);
+            }
+          })();
+    console.error("[job-detail:sameAccountScopedJobBoundary] fail-closed", {
       jobId,
-    }),
-  );
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      message: boundaryErrorMessage,
+    });
+    scopedReadJob = null;
+  }
   if (!scopedReadJob?.id) {
     return notFound();
   }
