@@ -198,6 +198,15 @@ describe("customer detail relationship hub wiring", () => {
     );
   });
 
+  it("uses service-address fallback copy when explicit billing address is missing", () => {
+    expect(customerPageSource).toContain("resolveCustomerBillingAddress");
+    expect(customerPageSource).toContain("source: \"service_fallback\"");
+    expect(customerPageSource).toContain("Same as service address");
+    expect(customerPageSource).toContain("No billing or service address on file");
+    expect(customerPageSource).not.toContain("No billing address set");
+    expect(customerPageSource).toContain("No billing or service address saved yet");
+  });
+
   it("keeps managed locations and recent active work sections", () => {
     expect(customerPageSource).toContain("Managed Locations");
     expect(customerPageSource).toContain("Recent / Active Work");

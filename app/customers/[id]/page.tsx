@@ -282,6 +282,31 @@ function describeServiceAddressFallback(loc: LocationRow | null) {
   return { label, address };
 }
 
+function resolveCustomerBillingAddress(customer: CustomerRow, serviceFallback: { label: string; address: string } | null) {
+  const explicitBillingAddress = billingAddressLine(customer);
+  if (explicitBillingAddress) {
+    return {
+      address: explicitBillingAddress,
+      source: "explicit" as const,
+      label: null as string | null,
+    };
+  }
+
+  if (serviceFallback?.address) {
+    return {
+      address: serviceFallback.address,
+      source: "service_fallback" as const,
+      label: serviceFallback.label,
+    };
+  }
+
+  return {
+    address: null,
+    source: "missing" as const,
+    label: null as string | null,
+  };
+}
+
 function makeMapsHref(address?: string | null) {
   const q = String(address ?? "").trim();
   if (!q) return null;
@@ -744,7 +769,7 @@ export default async function CustomerDetailPage(props: {
 
   const callHref = makeTelHref(customer.phone);
   const smsHref = makeSmsHref(customer.phone);
-  const customerBillingAddress = billingAddressLine(customer);
+  const resolvedBillingAddress = resolveCustomerBillingAddress(customer, serviceAddressFallback);
   const locationRoleContactsByLocationId = locationRoleContacts.reduce<Record<string, typeof locationRoleContacts>>(
     (acc, recipient) => {
       const key = String(recipient.linked_entity_id ?? "").trim();
@@ -1564,18 +1589,19 @@ export default async function CustomerDetailPage(props: {
                 <div className="text-xs font-medium uppercase tracking-wide text-slate-500">
                   Billing Address
                 </div>
-                {customerBillingAddress ? (
-                  <div className="text-sm text-slate-900">{customerBillingAddress}</div>
+                {resolvedBillingAddress.address ? (
+                  <div className="space-y-1">
+                    <div className="text-sm text-slate-900">{resolvedBillingAddress.address}</div>
+                    {resolvedBillingAddress.source === "service_fallback" ? (
+                      <div className="text-xs text-slate-500">
+                        Same as service address{resolvedBillingAddress.label ? ` (${resolvedBillingAddress.label})` : ""}.
+                      </div>
+                    ) : null}
+                  </div>
                 ) : (
                   <div className="space-y-1.5">
-                    <div className="text-sm font-medium text-slate-700">No billing address set</div>
-                    {serviceAddressFallback ? (
-                      <div className="text-sm text-slate-500">
-                        Service address available from {serviceAddressFallback.label}: {serviceAddressFallback.address}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-slate-500">Add a billing address on the customer record to use it everywhere billing stays strict and canonical.</div>
-                    )}
+                    <div className="text-sm font-medium text-slate-700">No billing or service address on file</div>
+                    <div className="text-sm text-slate-500">Add a service location or a different billing address to set billing destination details.</div>
                   </div>
                 )}
               </div>
@@ -1609,7 +1635,15 @@ export default async function CustomerDetailPage(props: {
                 )}
               </div>
               <div>
-                <span className="font-semibold text-slate-900">Billing Address:</span> {customerBillingAddress || "Defaults to responsible account service address context"}
+                <span className="font-semibold text-slate-900">Billing Address:</span>{" "}
+                {resolvedBillingAddress.address ? (
+                  <>
+                    {resolvedBillingAddress.address}
+                    {resolvedBillingAddress.source === "service_fallback" ? " (same as service address)" : ""}
+                  </>
+                ) : (
+                  "No billing or service address saved yet"
+                )}
               </div>
               <div>
                 <span className="font-semibold text-slate-900">Billing Email:</span> {customer.email ?? "Defaults to account email when available"}
