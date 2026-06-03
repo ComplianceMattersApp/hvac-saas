@@ -38,7 +38,7 @@ function ProductChoiceCard(props: ProductChoiceCardProps) {
       </p>
 
       <div className="mt-4 flex-1 rounded-2xl border border-slate-200/80 bg-white/75 p-4 text-sm leading-6 text-slate-700 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
-        <p className="font-medium text-slate-900 dark:text-white">Preview</p>
+        <p className="font-medium text-slate-900 dark:text-white">{isService ? "Service preview" : "ECC preview"}</p>
         <div className="mt-2 grid grid-cols-1 gap-2 text-[13px] leading-5">
           {props.previewItems.map((item) => (
             <div

@@ -80,15 +80,15 @@ const SIGNUP_COPY: Record<
     cards: [
       {
         title: "Keep service calls organized",
-        copy: "Track customers, work orders, job status, and next steps.",
+        copy: "Track calls, work orders, and next steps in one place.",
       },
       {
-        title: "Help dispatch and field staff stay aligned",
-        copy: "Give the office and technicians a shared place to see what needs attention.",
+        title: "Keep office and field aligned",
+        copy: "Give dispatch and techs a shared view of what needs attention.",
       },
       {
-        title: "Follow up without losing the thread",
-        copy: "Keep invoice status, job notes, and customer follow-up easier to find.",
+        title: "Follow up without losing track",
+        copy: "Keep notes, invoice status, and follow-up easy to find.",
       },
     ],
     trialGoal:
@@ -104,15 +104,15 @@ const SIGNUP_COPY: Record<
     details: "We'll send a secure setup link so you can finish creating your ECC / Compliance Testing trial.",
     cards: [
       {
-        title: "Track ECC jobs from start to closeout",
-        copy: "See job status, tests, corrections, and closeout work together.",
+        title: "Track ECC jobs to closeout",
+        copy: "Keep job status, tests, corrections, and closeout connected.",
       },
       {
         title: "Coordinate testing work",
-        copy: "Help raters, office staff, and contractors stay clear on what is open.",
+        copy: "Help raters, office staff, and contractors stay clear on open work.",
       },
       {
-        title: "Keep compliance details easier to prove",
+        title: "Keep compliance details clear",
         copy: "Organize pass/fail status, correction notes, and closeout steps.",
       },
     ],
@@ -126,17 +126,25 @@ const SIGNUP_COPY: Record<
 export function SignupContent({ productIntent = "generic" }: SignupContentProps) {
   const copy = SIGNUP_COPY[productIntent] ?? SIGNUP_COPY.generic;
   const previewItems = PRODUCT_PREVIEW_ITEMS[productIntent] ?? PRODUCT_PREVIEW_ITEMS.generic;
+  const previewHeading =
+    productIntent === "service"
+      ? "Service preview"
+      : productIntent === "ecc"
+        ? "ECC preview"
+        : "Success Guide preview";
   const [state, action, isPending] = useActionState(
     submitSelfServeOnboardingForm,
     INITIAL_SELF_SERVE_ONBOARDING_STATE,
   );
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-950 px-4 py-10 text-slate-100 sm:px-6 sm:py-14 lg:py-18">
-      <div className="pointer-events-none absolute -left-20 top-0 h-72 w-72 rounded-full bg-cyan-500/25 blur-3xl" />
-      <div className="pointer-events-none absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-emerald-500/20 blur-3xl" />
+    <div className="relative min-h-screen bg-slate-950 px-4 py-10 text-slate-100 sm:px-6 sm:py-14 lg:py-18">
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-cyan-500/25 blur-3xl" />
+        <div className="absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-emerald-500/20 blur-3xl" />
+      </div>
 
-      <div className="relative mx-auto grid w-full max-w-6xl gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
+      <div className="relative mx-auto grid w-full max-w-6xl gap-6 lg:items-start lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
         <section className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-6 shadow-2xl shadow-black/25 backdrop-blur sm:p-8 lg:p-10">
           <div className="mb-4 flex items-center gap-3">
             <img
@@ -173,9 +181,9 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
 
           <div className="mt-4 rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4 text-slate-200">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Preview</p>
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">{previewHeading}</p>
               {productIntent !== "generic" ? (
-                <span className="text-[11px] text-slate-400">Start here</span>
+                <span className="text-[11px] text-slate-400">Success Guide</span>
               ) : null}
             </div>
             <div className="mt-2 grid grid-cols-1 gap-2 text-sm leading-5 sm:grid-cols-2">
@@ -190,14 +198,21 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
             ) : null}
           </div>
 
-          <div className="mt-6 grid gap-3 sm:grid-cols-3">
-            {copy.cards.map((card) => (
-              <div key={card.title} className="rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4 text-slate-200 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.6)]">
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Benefit</div>
-                <div className="mt-2 text-base font-semibold text-white">{card.title}</div>
-                <p className="mt-2 text-sm leading-6 text-slate-200">{card.copy}</p>
-              </div>
-            ))}
+          <div className="mt-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Why teams use it</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-2">
+              {copy.cards.map((card, index) => (
+                <div
+                  key={card.title}
+                  className={`rounded-2xl border border-slate-700/70 bg-slate-900/70 p-5 text-slate-200 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.6)] ${
+                    index === 2 ? "md:col-span-2" : ""
+                  }`}
+                >
+                  <div className="text-base font-semibold text-white">{card.title}</div>
+                  <p className="mt-2 text-sm leading-6 text-slate-200">{card.copy}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="mt-3 rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
@@ -209,7 +224,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
           </div>
         </section>
 
-        <section className="rounded-3xl border border-slate-800 bg-white p-6 text-slate-900 shadow-2xl shadow-black/30 sm:p-8">
+        <section className="self-start rounded-3xl border border-slate-800 bg-white p-6 text-slate-900 shadow-2xl shadow-black/30 sm:p-8 lg:sticky lg:top-6 lg:min-h-[calc(100vh-3rem)]">
           <h2 className="text-xl font-semibold tracking-tight text-slate-900">Create your account</h2>
           <p className="mt-2 text-sm leading-relaxed text-slate-600">{copy.formIntro}</p>
 
