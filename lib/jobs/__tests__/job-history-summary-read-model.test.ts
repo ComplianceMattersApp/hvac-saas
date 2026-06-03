@@ -45,9 +45,11 @@ describe("buildJobHistorySummary", () => {
       }),
     );
 
+    expect(summary.headline).toBe("Scheduled");
     expect(summary.currentState).toBe("scheduled");
     expect(summary.story).toContain("Currently scheduled for 2026-06-15 09:00-11:00.");
     expect(summary.nextAction).toBe("Execute scheduled field work and capture field notes.");
+    expect(summary.gaps).not.toContain("missing_schedule_change_event");
   });
 
   it("B) summarizes reschedule details from normalized scheduling metadata", () => {
@@ -86,6 +88,7 @@ describe("buildJobHistorySummary", () => {
       }),
     );
 
+    expect(summary.headline).toBe("Scheduled");
     expect(summary.story).toContain("Rescheduled from 2026-06-15 09:00-11:00 to 2026-06-18 10:00-12:00.");
     expect(summary.confidence).toBe("high");
     expect(summary.gaps).not.toContain("missing_actor");
@@ -120,6 +123,7 @@ describe("buildJobHistorySummary", () => {
       }),
     );
 
+    expect(summary.headline).toBe("On hold");
     expect(summary.story).toContain("Job is on hold: Awaiting permit clarification.");
     expect(summary.nextAction).toBe("Release hold and update schedule when ready.");
   });
@@ -154,6 +158,7 @@ describe("buildJobHistorySummary", () => {
       }),
     );
 
+    expect(summary.headline).toBe("Waiting on information");
     expect(summary.story).toContain("Job is waiting on info: Need test document.");
     expect(summary.nextAction).toBe("Collect missing information and clear pending-info blocker.");
   });
@@ -173,8 +178,12 @@ describe("buildJobHistorySummary", () => {
       }),
     );
 
+    expect(summary.headline).toBe("Invoice follow-up needed");
     expect(summary.story).toContain("Field work is complete, but closeout steps are still open.");
     expect(summary.story).toContain("Invoice follow-up is still required.");
+    expect(summary.story[0]).toBe("Field work is complete, but closeout steps are still open.");
+    expect(summary.story[1]).toBe("Invoice follow-up is still required.");
+    expect(summary.story[2]).toBe("Currently scheduled for 2026-06-10 08:00-10:00.");
     expect(summary.nextAction).toBe("Complete invoice follow-up to finish closeout.");
   });
 
@@ -193,8 +202,10 @@ describe("buildJobHistorySummary", () => {
       }),
     );
 
+    expect(summary.headline).toBe("Correction or retest needed");
     expect(summary.story).toContain("Job is in failed/exception state and needs correction or retest attention.");
     expect(summary.story.join(" ").toLowerCase()).not.toContain("passed");
+    expect(summary.story.join(" ").toLowerCase()).not.toContain("closed/completed");
     expect(summary.nextAction).toBe("Review failure details and schedule correction or retest steps.");
   });
 
@@ -221,8 +232,15 @@ describe("buildJobHistorySummary", () => {
       }),
     );
 
-    expect(summary.story).toContain("Linked retest/follow-up job count: 1.");
-    expect(summary.story).toContain("Linked retest/follow-up job job-2 is closed/completed.");
+    expect(summary.headline).toBe("Needs scheduling");
+    expect(summary.story).toContain("A linked retest/follow-up job exists.");
+    expect(summary.story).toContain("A linked retest/follow-up job is complete.");
+    expect(summary.story.join(" ")).not.toContain("job-2");
+    expect(summary.facts).toContainEqual({
+      code: "linked_retest_closed",
+      value: "job-2",
+      source: "linked_job",
+    });
     expect(summary.story.join(" ").toLowerCase()).not.toContain("parent passed");
   });
 
@@ -243,6 +261,7 @@ describe("buildJobHistorySummary", () => {
       }),
     );
 
+    expect(summary.headline).toBe("On hold");
     expect(summary.confidence).toBe("low");
     expect(summary.gaps).toContain("missing_hold_reason");
     expect(summary.gaps).toContain("missing_schedule_change_event");
@@ -281,6 +300,7 @@ describe("buildJobHistorySummary", () => {
       }),
     );
 
+    expect(summary.headline).toBe("Scheduled");
     expect(summary.story).toContain("Rescheduled from 2026-06-19 09:00-11:00 to 2026-06-21 09:00-11:00.");
     expect(summary.confidence).toBe("medium");
   });

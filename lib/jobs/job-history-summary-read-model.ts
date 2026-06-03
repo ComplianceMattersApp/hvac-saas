@@ -188,6 +188,29 @@ function latestRetestCreatedEvent(events: NormalizedEvent[]): NormalizedEvent | 
   return retestEvents[retestEvents.length - 1];
 }
 
+function buildHeadline(stateLabel: string, closedLike: boolean): string {
+  if (closedLike) return "Closed";
+
+  switch (stateLabel) {
+    case "scheduled":
+      return "Scheduled";
+    case "need_to_schedule":
+      return "Needs scheduling";
+    case "invoice_required":
+      return "Invoice follow-up needed";
+    case "paperwork_required":
+      return "Paperwork needed";
+    case "pending_info":
+      return "Waiting on information";
+    case "on_hold":
+      return "On hold";
+    case "failed":
+      return "Correction or retest needed";
+    default:
+      return "In progress";
+  }
+}
+
 export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobHistorySummary {
   const jobStatus = normalizeStatus(input.job.status);
   const opsStatus = normalizeStatus(input.job.ops_status);
@@ -198,7 +221,9 @@ export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobH
 
   const facts: JobHistorySummaryFact[] = [];
   const gaps = new Set<string>();
-  const story: string[] = [];
+  const operationalStory: string[] = [];
+  const scheduleStory: string[] = [];
+  const relationshipStory: string[] = [];
 
   const closedLike = isClosedLike(jobStatus, opsStatus);
   const stateLabel = opsStatus || jobStatus || "open";
@@ -207,7 +232,7 @@ export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobH
 
   if (hasSchedule(scheduleFromJob)) {
     facts.push({ code: "current_schedule", value: formatSchedule(scheduleFromJob), source: "job" });
-    story.push(`Currently scheduled for ${formatSchedule(scheduleFromJob)}.`);
+    scheduleStory.push(`Currently scheduled for ${formatSchedule(scheduleFromJob)}.`);
   }
 
   const scheduleEvent = latestSchedulingEvent(events);
@@ -216,14 +241,14 @@ export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobH
     const changed = formatSchedule(previous) !== formatSchedule(next);
 
     if (changed && hasSchedule(previous) && hasSchedule(next)) {
-      story.push(`Rescheduled from ${formatSchedule(previous)} to ${formatSchedule(next)}.`);
+      scheduleStory.push(`Rescheduled from ${formatSchedule(previous)} to ${formatSchedule(next)}.`);
       facts.push({ code: "schedule_change", value: `${formatSchedule(previous)} -> ${formatSchedule(next)}`, source: "event" });
     }
 
     if (!scheduleEvent.actorUserId) {
       gaps.add("missing_actor");
     }
-  } else if (hasSchedule(scheduleFromJob)) {
+  } else if (hasSchedule(scheduleFromJob) && opsStatus !== "scheduled") {
     gaps.add("missing_schedule_change_event");
   }
 
@@ -234,7 +259,7 @@ export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobH
     null;
 
   if (opsStatus === "on_hold") {
-    story.push(
+    operationalStory.push(
       blockerReason
         ? `Job is on hold: ${blockerReason}.`
         : "Job is on hold pending blocker release.",
@@ -244,7 +269,7 @@ export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobH
   }
 
   if (opsStatus === "pending_info") {
-    story.push(
+    operationalStory.push(
       blockerReason
         ? `Job is waiting on info: ${blockerReason}.`
         : "Job is waiting on additional information.",
@@ -254,25 +279,25 @@ export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobH
   }
 
   if (fieldComplete && !closedLike) {
-    story.push("Field work is complete, but closeout steps are still open.");
+    operationalStory.push("Field work is complete, but closeout steps are still open.");
     facts.push({ code: "field_complete", value: "true", source: "job" });
   }
 
   if (opsStatus === "failed" || jobStatus === "failed") {
-    story.push("Job is in failed/exception state and needs correction or retest attention.");
+    operationalStory.push("Job is in failed/exception state and needs correction or retest attention.");
     facts.push({ code: "failed_state", value: "true", source: "job" });
   }
 
   if (opsStatus === "paperwork_required") {
-    story.push("Closeout paperwork is still required.");
+    operationalStory.push("Paperwork is still required.");
   }
 
   if (opsStatus === "invoice_required") {
-    story.push("Invoice follow-up is still required.");
+    operationalStory.push("Invoice follow-up is still required.");
   }
 
   if (closedLike) {
-    story.push("Job is closed/completed.");
+    operationalStory.push("Job is closed/completed.");
   }
 
   const retestEvent = latestRetestCreatedEvent(events);
@@ -282,10 +307,14 @@ export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobH
   if (retestEvent || linkedChildren.length > 0) {
     const linkedCount = linkedChildren.length;
     if (linkedCount > 0) {
-      story.push(`Linked retest/follow-up job count: ${linkedCount}.`);
+      relationshipStory.push(
+        linkedCount === 1
+          ? "A linked retest/follow-up job exists."
+          : `${linkedCount} linked retest/follow-up jobs exist.`,
+      );
       facts.push({ code: "linked_retest_count", value: String(linkedCount), source: "linked_job" });
     } else {
-      story.push("Retest/follow-up was created.");
+      relationshipStory.push("A retest/follow-up was created.");
       facts.push({ code: "retest_created", value: "true", source: "event" });
     }
 
@@ -297,15 +326,17 @@ export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobH
       isClosedLike(normalizeStatus(child.status), normalizeStatus(child.ops_status)),
     );
     if (closedLinkedChild) {
-      story.push(`Linked retest/follow-up job ${closedLinkedChild.id} is closed/completed.`);
+      relationshipStory.push("A linked retest/follow-up job is complete.");
       facts.push({ code: "linked_retest_closed", value: closedLinkedChild.id, source: "linked_job" });
     }
   }
 
   if (clean(input.job.parent_job_id)) {
-    story.push(`This job is linked as a follow-up/retest to ${clean(input.job.parent_job_id)}.`);
+    relationshipStory.push("This job is a follow-up/retest linked to another job.");
     facts.push({ code: "parent_job_id", value: clean(input.job.parent_job_id), source: "job" });
   }
+
+  const story = [...operationalStory, ...scheduleStory, ...relationshipStory];
 
   let nextAction: string | null = null;
   if (closedLike) {
@@ -359,7 +390,7 @@ export function buildJobHistorySummary(input: BuildJobHistorySummaryInput): JobH
     story.push("Insufficient historical evidence to summarize beyond current job state.");
   }
 
-  const headline = closedLike ? "Job complete" : `Job ${stateLabel.replace(/_/g, " ")}`;
+  const headline = buildHeadline(stateLabel, closedLike);
   const currentState = stateLabel.replace(/_/g, " ");
 
   return {
