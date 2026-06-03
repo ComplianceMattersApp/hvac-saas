@@ -249,6 +249,11 @@ Selection rule:
 - Maintain deferred/runbook-gated boundaries unless explicitly reopened by owner decision.
 - Keep support routing owner-direct for the controlled rollout period rather than converting this pass into a formal support-system buildout.
 
+Deferred planning continuity note:
+- Workflow Presets / Operational Flow Templates remains a deferred future lane only.
+- It is intended as milestone-driven operational guidance for repeatable multi-step flows and does not authorize scheduler automation, hidden lifecycle mutation, or workflow lock behavior in current go-live posture.
+- Canonical lane control/sequence is maintained in `Release_Scope_Lock_and_Post_Launch_Roadmap.md`, with boundary alignment mirrored in the Active Spine.
+
 ---
 
 ## Cross-Reference Pointers

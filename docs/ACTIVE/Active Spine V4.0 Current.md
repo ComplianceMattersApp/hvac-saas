@@ -105,6 +105,44 @@ Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Laun
 Current posture: ECC/HERS-first with HVAC Service-ready shared foundation. No codebase split. No customer portal in current scope. Current intended release is complete at the current quality bar. True App / PWA V1 is complete for controlled tester use. Device setup now combines install or add-to-phone guidance with per-device notifications in the same setup surface. Login continuity, update-safe refresh notice, service-worker update failure handling, Today/Ops first-action clarity, revenue workflow rail clarity, calendar mobile control compression, and admin Day 1 essentials are complete. Deferred and runbook-gated items remain parked unless explicitly reopened, including native app-store wrapper work, deeper offline mode, SMS/provider messaging, QBO, customer portal, full support-system buildout, and deeper Payments V2 work.
 Canonical note: detailed deferred/remaining register authority stays in [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) Section 4.1; this spine mirrors that register instead of expanding duplicate long lists.
 
+**Future Lane - Workflow Presets / Operational Flow Templates (Deferred):**
+This lane is planning-only and explicitly deferred. It captures future guided operational lifecycle flows for repeatable multi-step service processes while preserving current source-of-truth boundaries.
+
+Purpose and examples (future posture only):
+- guided lifecycle continuity for repeatable service operations;
+- Install -> Permit -> ECC Test -> Final Inspection -> Closeout;
+- service-plan maintenance lifecycle continuity;
+- multi-visit corrective workflows;
+- future cross-account ECC handoff lifecycle.
+
+Core principles (locked):
+- milestone-driven, not rigid scheduler-driven;
+- existing jobs/events/history remain source-of-truth;
+- presets are guidance/continuity, not hidden automation;
+- operators can pause, branch, override, or manually complete steps;
+- future completion paths must support internal, external, and linked-account posture when enabled.
+
+Explicit non-goals in first posture:
+- no auto-dispatch engine;
+- no AI scheduling;
+- no forced workflow lock;
+- no hidden lifecycle mutation;
+- no marketplace/payment dependency;
+- no customer-facing workflow automation requirement.
+
+Sequencing guidance (deferred roadmap order):
+1. workflow preset foundation;
+2. external ECC completion mode;
+3. internal linked ECC completion mode;
+4. cross-account handoff lifecycle;
+5. optional workflow-summary/read-model layer.
+
+Foundation alignment:
+- this future lane builds on existing timeline/event truth, linked operational continuity groundwork, maintenance/service-plan groundwork, closeout operational projection posture, and existing payment/source-of-truth discipline.
+- deferred-until signal remains explicit: broadened field usage, wider production/customer feedback, and stabilized post-launch operational patterns.
+
+Authority note: canonical deferred-lane sequencing and release-scope control remain in [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md).
+
 **Estimate Multi-Option Proposal Model Lock:**
 Future Good / Better / Best proposal support is locked in [Estimate_Multi_Option_Proposal_Model_Spec.md](./Estimate_Multi_Option_Proposal_Model_Spec.md): one parent Estimate / Proposal with child Option Packages, editable labels, stored sort order, option-scoped line items/totals, and single-select primary option approval intent. Three linked estimates and fake option headers inside flat estimate line items are rejected. This is docs/model only and does not authorize schema, UI, approval, conversion, payment, email, portal, QBO, or SMS work.
 

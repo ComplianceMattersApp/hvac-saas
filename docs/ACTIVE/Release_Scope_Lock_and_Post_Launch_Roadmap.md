@@ -265,6 +265,53 @@ This packet therefore recommends:
 - start with Support V0 plus controlled onboarding,
 - sequence post-launch roadmap in low-risk dependency order.
 
+## Future Lane - Workflow Presets / Operational Flow Templates (Deferred)
+
+Status: Deferred planning lane only (not current functionality).
+
+Purpose:
+- define future guided operational lifecycle flows for repeatable multi-step service processes without changing current truth ownership.
+
+Example future paths:
+- Install -> Permit -> ECC Test -> Final Inspection -> Closeout
+- service-plan maintenance lifecycle
+- multi-visit corrective workflows
+- future cross-account ECC handoff lifecycle
+
+Core principles (lock):
+- milestone-driven, not rigid scheduler-driven
+- jobs/events/history remain source-of-truth
+- presets provide guidance and continuity, not hidden automation
+- operators can pause, branch, override, or manually complete steps
+- future completion posture must support internal, external, and linked-account paths
+
+Explicit non-goals for first posture:
+- no auto-dispatch engine
+- no AI scheduling
+- no forced workflow lock
+- no hidden lifecycle mutation
+- no marketplace/payment dependency
+- no customer-facing workflow automation requirement
+
+Future sequencing guidance:
+1. Workflow preset foundation
+2. External ECC completion mode
+3. Internal linked ECC completion mode
+4. Cross-account handoff lifecycle
+5. Optional workflow-summary/read-model layer
+
+Foundation dependencies already in place:
+- job event/timeline foundation
+- linked operational continuity groundwork
+- maintenance/service-plan groundwork
+- closeout operational projection posture
+- payment/source-of-truth discipline
+
+Deferred-until trigger:
+- additional field usage,
+- broader production/customer feedback,
+- stabilized post-launch operational patterns.
+
 Recent closeout status snapshot (May 2026):
 - Time Clock / Team Time Tracking lane is complete for current intended scope (V1 through V1.5A).
 - Completed Time Clock scope includes: account and per-user controls, consolidated internal-user list controls, employee `/time-clock` runtime actions, Ops Team Clock Status card, admin `/ops/admin/time-clock` review/correction center, correction controls for all admin entries with required reason and audit fields, rolling 7-Day review, and Report Center history/export.

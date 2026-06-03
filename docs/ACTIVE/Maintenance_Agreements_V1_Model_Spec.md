@@ -271,6 +271,11 @@ Financial/payment model boundary:
 - Payment status can drive warnings/reporting context, but must not hard-block service-plan operational workflow in current posture unless explicitly reopened later.
 - Money must not attach directly to service visit links, visit count rows, or `maintenance_agreement_visits`.
 
+Deferred future-lane cross-reference:
+- Workflow Presets / Operational Flow Templates is a deferred planning lane for future milestone-guided operational continuity across repeatable multi-step flows.
+- It does not change current maintenance agreement/source-of-truth/payment boundaries in this spec and does not authorize scheduler automation or hidden lifecycle mutation.
+- Canonical sequencing/governance for that lane is maintained in `Release_Scope_Lock_and_Post_Launch_Roadmap.md` and mirrored in the Active Spine.
+
 Phase 5B model lock (Service Plan Billing Period, docs/model only):
 
 - Table/terminology lock:
