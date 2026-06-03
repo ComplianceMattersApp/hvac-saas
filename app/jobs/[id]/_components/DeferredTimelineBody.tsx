@@ -2,6 +2,11 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
+import {
+  buildJobHistorySummary,
+  type JobHistorySummaryJobInput,
+  type JobHistorySummaryLinkedJobInput,
+} from "@/lib/jobs/job-history-summary-read-model";
 
 import DeferredNarrativeSectionFailure from "./DeferredNarrativeSectionFailure";
 
@@ -10,7 +15,19 @@ type DeferredTimelineBodyProps = {
   timelineJobIds: string[];
   hasDirectNarrativeChain: boolean;
   emptyStateClassName: string;
+  jobSummary: JobHistorySummaryJobInput;
 };
+
+const UUID_PATTERN =
+  /\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\b/gi;
+
+function sanitizeStoryLine(value: string): string {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "";
+
+  const withoutUuids = normalized.replace(UUID_PATTERN, "linked job");
+  return withoutUuids.replace(/\bjob-[0-9a-z-]+\b/gi, "linked job").trim();
+}
 
 function formatDateTimeLAFromIso(iso: string) {
   const d = new Date(iso);
@@ -378,6 +395,7 @@ export default async function DeferredTimelineBody({
   timelineJobIds,
   hasDirectNarrativeChain,
   emptyStateClassName,
+  jobSummary,
 }: DeferredTimelineBodyProps) {
   try {
     const supabase = await createClient();
@@ -396,38 +414,121 @@ export default async function DeferredTimelineBody({
     }
 
     const timelineItems = timelineEvents ?? [];
+    const hasRetestHistory = timelineItems.some(
+      (eventRow: any) => String(eventRow?.event_type ?? "").trim().toLowerCase() === "retest_created",
+    );
+
+    let linkedJobs: JobHistorySummaryLinkedJobInput[] = [];
+    if (hasRetestHistory) {
+      const { data: linkedRows, error: linkedErr } = await supabase
+        .from("jobs")
+        .select("id, status, ops_status, parent_job_id")
+        .eq("parent_job_id", jobId)
+        .order("created_at", { ascending: false })
+        .limit(20);
+
+      if (linkedErr) {
+        throw new Error(linkedErr.message);
+      }
+
+      linkedJobs = Array.isArray(linkedRows)
+        ? linkedRows.map((row: any) => ({
+            id: String(row?.id ?? "").trim(),
+            status: String(row?.status ?? "").trim() || null,
+            ops_status: String(row?.ops_status ?? "").trim() || null,
+            parent_job_id: String(row?.parent_job_id ?? "").trim() || null,
+          }))
+        : [];
+    }
+
+    const summary = buildJobHistorySummary({
+      job: {
+        id: String(jobSummary.id ?? "").trim() || jobId,
+        status: String(jobSummary.status ?? "").trim() || null,
+        ops_status: String(jobSummary.ops_status ?? "").trim() || null,
+        field_complete: Boolean(jobSummary.field_complete),
+        scheduled_date: String(jobSummary.scheduled_date ?? "").trim() || null,
+        window_start: String(jobSummary.window_start ?? "").trim() || null,
+        window_end: String(jobSummary.window_end ?? "").trim() || null,
+        parent_job_id: String(jobSummary.parent_job_id ?? "").trim() || null,
+        pending_info_reason: String(jobSummary.pending_info_reason ?? "").trim() || null,
+        on_hold_reason: String(jobSummary.on_hold_reason ?? "").trim() || null,
+      },
+      events: timelineItems.map((eventRow: any) => ({
+        event_type: String(eventRow?.event_type ?? "").trim() || null,
+        created_at: String(eventRow?.created_at ?? "").trim() || null,
+        meta: eventRow?.meta ?? {},
+      })),
+      linkedJobs,
+    });
+
+    const summaryStory = summary.story
+      .map(sanitizeStoryLine)
+      .filter(Boolean)
+      .slice(0, 4);
+
     const timelinePreviewItems = timelineItems.slice(0, 3);
     const timelineOverflowItems = timelineItems.slice(3);
 
-    if (!timelineItems.length) {
-      return (
-        <div className={emptyStateClassName}>
-          {hasDirectNarrativeChain
-            ? "No timeline events in this direct retest chain yet."
-            : "No timeline events yet."}
-        </div>
-      );
-    }
+    const timelineActorIds =
+      timelineItems.length > 0
+        ? Array.from(
+            new Set(
+              timelineItems
+                .flatMap((e: any) => {
+                  const meta =
+                    e?.meta && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
+                  return [String(e?.user_id ?? "").trim(), String(meta?.actor_user_id ?? "").trim()];
+                })
+                .filter(Boolean),
+            ),
+          )
+        : [];
 
-    const timelineActorIds = Array.from(
-      new Set(
-        timelineItems
-          .flatMap((e: any) => {
-            const meta =
-              e?.meta && typeof e.meta === "object" && !Array.isArray(e.meta) ? e.meta : null;
-            return [String(e?.user_id ?? "").trim(), String(meta?.actor_user_id ?? "").trim()];
+    const actorDisplayMap =
+      timelineActorIds.length > 0
+        ? await resolveUserDisplayMap({
+            supabase,
+            userIds: timelineActorIds,
           })
-          .filter(Boolean),
-      ),
-    );
-
-    const actorDisplayMap = await resolveUserDisplayMap({
-      supabase,
-      userIds: timelineActorIds,
-    });
+        : {};
 
     return (
       <>
+        <section className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-4 py-3">
+          <h3 className="text-sm font-semibold text-slate-900">Job History Summary</h3>
+          <p className="mt-1 text-xs text-slate-600">
+            A quick read of the job story. The detailed timeline below remains the full record.
+          </p>
+
+          <div className="mt-2 text-sm font-semibold text-slate-900">{summary.headline}</div>
+          <div className="mt-1 text-xs uppercase tracking-[0.08em] text-slate-500">
+            Current state: {summary.currentState}
+          </div>
+
+          {summaryStory.length > 0 ? (
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+              {summaryStory.map((line, index) => (
+                <li key={`summary-story-${index}`}>{line}</li>
+              ))}
+            </ul>
+          ) : null}
+
+          {summary.nextAction ? (
+            <div className="mt-2 text-sm text-slate-700">
+              <span className="font-medium text-slate-900">Next action:</span> {summary.nextAction}
+            </div>
+          ) : null}
+        </section>
+
+        {!timelineItems.length ? (
+          <div className={emptyStateClassName}>
+            {hasDirectNarrativeChain
+              ? "No timeline events in this direct retest chain yet."
+              : "No timeline events yet."}
+          </div>
+        ) : null}
+
         {timelinePreviewItems.map((e: any, idx: number) =>
           renderTimelineItem(e, `timeline-preview-${idx}`, actorDisplayMap),
         )}

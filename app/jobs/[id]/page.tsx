@@ -4382,6 +4382,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                       timelineJobIds={narrativeScopeJobIds}
                       hasDirectNarrativeChain={hasDirectNarrativeChain}
                       emptyStateClassName={workspaceEmptyStateClass}
+                      jobSummary={{
+                        id: String(job.id),
+                        status: job.status ?? null,
+                        ops_status: job.ops_status ?? null,
+                        field_complete: Boolean(job.field_complete),
+                        scheduled_date: job.scheduled_date ?? null,
+                        window_start: job.window_start ?? null,
+                        window_end: job.window_end ?? null,
+                        parent_job_id: job.parent_job_id ?? null,
+                        pending_info_reason: job.pending_info_reason ?? null,
+                        on_hold_reason: job.on_hold_reason ?? null,
+                      }}
                     />
                   </Suspense>
                 </div>
@@ -7079,6 +7091,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         timelineJobIds={narrativeScopeJobIds}
         hasDirectNarrativeChain={hasDirectNarrativeChain}
         emptyStateClassName={workspaceEmptyStateClass}
+        jobSummary={{
+          id: String(job.id),
+          status: job.status ?? null,
+          ops_status: job.ops_status ?? null,
+          field_complete: Boolean(job.field_complete),
+          scheduled_date: job.scheduled_date ?? null,
+          window_start: job.window_start ?? null,
+          window_end: job.window_end ?? null,
+          parent_job_id: job.parent_job_id ?? null,
+          pending_info_reason: job.pending_info_reason ?? null,
+          on_hold_reason: job.on_hold_reason ?? null,
+        }}
       />
     </Suspense>
           </div>
