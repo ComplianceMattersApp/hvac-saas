@@ -1590,7 +1590,9 @@ export async function releasePendingInfoAndRecompute(jobId: string, source = "ma
 
 export async function releaseAndReevaluate(
   jobId: string,
-  source = "manual_release_and_reevaluate"
+  source = "manual_release_and_reevaluate",
+  actorUserId?: string | null,
+  sourceAction?: string | null,
 ): Promise<string | null> {
   const supabase = await createClient();
 
@@ -1730,6 +1732,17 @@ export async function releaseAndReevaluate(
       event_type: "ops_update",
       message: "Released and re-evaluated",
       meta: {
+        timeline_v: 1,
+        event_family: "ops_blocker",
+        ...(actorUserId ? { actor_user_id: actorUserId } : {}),
+        source_action: String(sourceAction ?? "releaseAndReevaluate").trim() || "releaseAndReevaluate",
+        previous: {
+          ops_status: before.ops_status ?? null,
+        },
+        next: {
+          ops_status: nextOps,
+        },
+        reason: previousWaitingState?.parsed ? previousWaitingState.blockerReason : null,
         changes,
         source,
         blocker_action: "cleared",
@@ -1743,6 +1756,7 @@ export async function releaseAndReevaluate(
         release_to: nextOps,
         lifecycle_normalized: shouldSetCompletedLifecycle,
       },
+      ...(actorUserId ? { user_id: actorUserId } : {}),
     });
 
     if (eventErr) throw new Error(eventErr.message);
@@ -1793,7 +1807,7 @@ export async function releaseAndReevaluateFromForm(formData: FormData): Promise<
     accountOwnerUserId: authz.internalUser.account_owner_user_id,
   });
 
-  await releaseAndReevaluate(jobId, "job_detail");
+  await releaseAndReevaluate(jobId, "job_detail", authz.userId, "releaseAndReevaluateFromForm");
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
@@ -1973,6 +1987,27 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
     event_type: "ops_update",
     message: "Ops status updated",
     meta: {
+      timeline_v: 1,
+      event_family: "ops_blocker",
+      actor_user_id: authz.userId,
+      source_action: "updateJobOpsFromForm",
+      previous: {
+        ops_status: before.ops_status ?? null,
+      },
+      next: {
+        ops_status: nextOpsStatus,
+      },
+      reason: blockerReasonForMeta || null,
+      blocker_context: {
+        pending_reason:
+          nextOpsStatus === "pending_info"
+            ? after.pending_info_reason ?? null
+            : null,
+        hold_reason:
+          nextOpsStatus === "on_hold"
+            ? after.on_hold_reason ?? null
+            : null,
+      },
       changes,
       source: "job_detail",
       manual_allowed: true,
@@ -1989,6 +2024,7 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
         ? { next_action_note: String(before.next_action_note).trim() }
         : {}),
     },
+      user_id: authz.userId,
   });
 
   if (eventErr) throw new Error(eventErr.message);

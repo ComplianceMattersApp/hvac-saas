@@ -707,19 +707,37 @@ describe("internal same-account lifecycle scheduling hardening", () => {
         permit_date: "2026-04-15",
       }),
     );
-    expect(jobEvents[0]?.meta).toEqual(
+    expect(jobEvents[0]).toEqual(
       expect.objectContaining({
-        after: expect.objectContaining({
-          permit_number: "PERMIT-123",
-          jurisdiction: "Sacramento",
-          permit_date: "2026-04-15",
+        event_type: "schedule_updated",
+        user_id: "internal-user-1",
+        meta: expect.objectContaining({
+          timeline_v: 1,
+          event_family: "scheduling",
+          actor_user_id: "internal-user-1",
+          source_action: "updateJobScheduleFromForm",
+          previous: {
+            scheduled_date: "2026-04-20",
+            window_start: "08:00",
+            window_end: "10:00",
+          },
+          next: {
+            scheduled_date: "2026-04-24",
+            window_start: "09:00",
+            window_end: "11:00",
+          },
+          after: expect.objectContaining({
+            permit_number: "PERMIT-123",
+            jurisdiction: "Sacramento",
+            permit_date: "2026-04-15",
+          }),
         }),
       }),
     );
   });
 
   it("preserves permit fields when blank unschedule form omits permit inputs", async () => {
-    const { supabase, jobsUpdates } = makeSchedulePreservationFixture();
+    const { supabase, jobsUpdates, jobEvents } = makeSchedulePreservationFixture();
     createClientMock.mockResolvedValue(supabase);
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
 
@@ -740,6 +758,28 @@ describe("internal same-account lifecycle scheduling hardening", () => {
         permit_number: "PERMIT-123",
         jurisdiction: "Sacramento",
         permit_date: "2026-04-15",
+      }),
+    );
+    expect(jobEvents[0]).toEqual(
+      expect.objectContaining({
+        event_type: "unscheduled",
+        user_id: "internal-user-1",
+        meta: expect.objectContaining({
+          timeline_v: 1,
+          event_family: "scheduling",
+          actor_user_id: "internal-user-1",
+          source_action: "updateJobScheduleFromForm",
+          previous: {
+            scheduled_date: "2026-04-20",
+            window_start: "08:00",
+            window_end: "10:00",
+          },
+          next: {
+            scheduled_date: null,
+            window_start: null,
+            window_end: null,
+          },
+        }),
       }),
     );
   });

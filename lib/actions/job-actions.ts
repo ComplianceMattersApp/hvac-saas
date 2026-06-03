@@ -9347,7 +9347,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     redirectToScheduleTarget(banner);
   }
 
-  const { internalUser } = await requireInternalScopedJobAccessOrRedirect({
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
     supabase,
     jobId: id,
     onUnauthorized: () => redirectToScheduleTarget("not_authorized"),
@@ -9430,6 +9430,21 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     normalizeScheduleValue(before?.window_start) !== normalizeScheduleValue(window_start) ||
     normalizeScheduleValue(before?.window_end) !== normalizeScheduleValue(window_end);
 
+  const normalizedSchedulePrevious = {
+    scheduled_date: before?.scheduled_date ?? null,
+    window_start: before?.window_start ?? null,
+    window_end: before?.window_end ?? null,
+  };
+
+  const normalizedScheduleNext = {
+    scheduled_date,
+    window_start,
+    window_end,
+  };
+
+  const scheduleReason =
+    String(formData.get("schedule_reason") || formData.get("reason") || "").trim() || null;
+
   if (!didScheduleFieldsChange && !didPermitFieldsChange) {
     revalidatePath(`/jobs/${id}`);
     revalidatePath(`/calendar`);
@@ -9477,6 +9492,13 @@ export async function updateJobScheduleFromForm(formData: FormData) {
       jobId: id,
       event_type: "permit_info_updated",
       meta: {
+        timeline_v: 1,
+        event_family: "scheduling",
+        actor_user_id: actingUserId,
+        source_action: "updateJobScheduleFromForm",
+        previous: normalizedSchedulePrevious,
+        next: normalizedScheduleNext,
+        reason: scheduleReason,
         before: {
           permit_number: before?.permit_number ?? null,
           jurisdiction: before?.jurisdiction ?? null,
@@ -9488,6 +9510,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
           permit_date,
         },
       },
+      userId: actingUserId,
     });
   }
 
@@ -9511,6 +9534,13 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     jobId: id,
     event_type,
     meta: {
+      timeline_v: 1,
+      event_family: "scheduling",
+      actor_user_id: actingUserId,
+      source_action: "updateJobScheduleFromForm",
+      previous: normalizedSchedulePrevious,
+      next: normalizedScheduleNext,
+      reason: scheduleReason,
       before: {
         scheduled_date: before?.scheduled_date ?? null,
         window_start: before?.window_start ?? null,
@@ -9533,6 +9563,7 @@ export async function updateJobScheduleFromForm(formData: FormData) {
         permit_date,
       },
     },
+    userId: actingUserId,
   });
 
   if (shouldAutoReleaseHold) {
