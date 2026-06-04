@@ -83,7 +83,7 @@ describe("getRequestActorContext", () => {
     expect(getInternalUserMock).not.toHaveBeenCalled();
   });
 
-  it("returns contractor when contractor membership exists", async () => {
+  it("returns internal when both active internal and contractor memberships exist", async () => {
     const supabase = makeSupabaseFixture({ userId: "user-1", contractorId: "contractor-1" });
     createClientMock.mockResolvedValue(supabase);
     getInternalUserMock.mockResolvedValue({
@@ -93,6 +93,20 @@ describe("getRequestActorContext", () => {
       account_owner_user_id: "owner-1",
       created_by: null,
     });
+
+    const { getRequestActorContext } = await import("@/lib/auth/request-actor-context");
+    const context = await getRequestActorContext();
+
+    expect(context.kind).toBe("internal");
+    expect(context.contractorId).toBeNull();
+    expect(context.internalUser?.user_id).toBe("user-1");
+    expect(context.accountOwnerUserId).toBe("owner-1");
+  });
+
+  it("returns contractor when contractor membership exists and internal membership is missing", async () => {
+    const supabase = makeSupabaseFixture({ userId: "user-1", contractorId: "contractor-1" });
+    createClientMock.mockResolvedValue(supabase);
+    getInternalUserMock.mockResolvedValue(null);
 
     const { getRequestActorContext } = await import("@/lib/auth/request-actor-context");
     const context = await getRequestActorContext();

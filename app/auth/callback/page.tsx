@@ -195,6 +195,29 @@ async function routeByRole(
     return;
   }
 
+  const { data: internalUserData, error: internalUserError } = await supabase
+    .from("internal_users")
+    .select("user_id, is_active")
+    .eq("user_id", userData.user.id)
+    .maybeSingle();
+
+  if (internalUserError) {
+    setStatus("We could not complete sign-in. Redirecting to login...");
+    setTimeout(() => router.push("/login"), 1500);
+    return;
+  }
+
+  if (internalUserData?.user_id && internalUserData.is_active) {
+    setStatus("Redirecting...");
+    const resumePath = resolveSafeAuthReturnPath({
+      actorKind: "internal",
+      candidateNext: nextPath,
+      fallbackPath: "/today",
+    });
+    router.push(resumePath);
+    return;
+  }
+
   const { data: contractorData } = await supabase
     .from("contractor_users")
     .select("contractor_id, contractors ( lifecycle_state )")
@@ -214,12 +237,7 @@ async function routeByRole(
     });
     router.push(resumePath);
   } else {
-    setStatus("Redirecting...");
-    const resumePath = resolveSafeAuthReturnPath({
-      actorKind: "internal",
-      candidateNext: nextPath,
-      fallbackPath: "/today",
-    });
-    router.push(resumePath);
+    setStatus("This account is not configured for portal or internal access. Redirecting to login...");
+    setTimeout(() => router.push("/login"), 1500);
   }
 }

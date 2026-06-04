@@ -100,18 +100,8 @@ async function resolveRequestActorContextUncached(): Promise<RequestActorContext
 
   const contractorId = String(contractorUser?.contractor_id ?? "").trim() || null;
 
-  if (contractorId) {
-    finishOpsTiming("ops:requestActorContext:assembly", _t_assembly);
-    return {
-      supabase,
-      user,
-      kind: "contractor",
-      internalUser: null,
-      contractorId,
-      accountOwnerUserId: null,
-    };
-  }
-
+  // Dual-membership users must be able to land in internal workspace paths.
+  // Prefer active internal access, then fall back to contractor membership.
   if (internalUser?.is_active) {
     finishOpsTiming("ops:requestActorContext:assembly", _t_assembly);
     return {
@@ -121,6 +111,18 @@ async function resolveRequestActorContextUncached(): Promise<RequestActorContext
       internalUser,
       contractorId: null,
       accountOwnerUserId: String(internalUser.account_owner_user_id ?? "").trim() || null,
+    };
+  }
+
+  if (contractorId) {
+    finishOpsTiming("ops:requestActorContext:assembly", _t_assembly);
+    return {
+      supabase,
+      user,
+      kind: "contractor",
+      internalUser: null,
+      contractorId,
+      accountOwnerUserId: null,
     };
   }
 

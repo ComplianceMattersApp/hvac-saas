@@ -8,6 +8,18 @@ import { createClient } from "../../lib/supabase/client";
 import { resolveSafeAuthReturnPath } from "@/lib/auth/auth-return-path";
 
 async function resolveLoginDestination(supabase: ReturnType<typeof createClient>, userId: string) {
+  const { data: internalUser, error: internalUserError } = await supabase
+    .from("internal_users")
+    .select("user_id, is_active")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (internalUserError) throw internalUserError;
+
+  if (internalUser?.user_id && internalUser.is_active) {
+    return "/today";
+  }
+
   const { data: contractorUser, error: contractorError } = await supabase
     .from("contractor_users")
     .select("contractor_id, contractors ( lifecycle_state )")
@@ -22,18 +34,6 @@ async function resolveLoginDestination(supabase: ReturnType<typeof createClient>
 
   if (contractorUser?.contractor_id && contractorLifecycleState === "active") {
     return "/portal";
-  }
-
-  const { data: internalUser, error: internalUserError } = await supabase
-    .from("internal_users")
-    .select("user_id, is_active")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (internalUserError) throw internalUserError;
-
-  if (internalUser?.user_id && internalUser.is_active) {
-    return "/today";
   }
 
   return null;

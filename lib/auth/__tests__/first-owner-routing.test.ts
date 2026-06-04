@@ -129,7 +129,7 @@ describe("resolveSetPasswordDestinationWithFirstOwnerGate", () => {
     expect(decision.target).toBe("/today");
   });
 
-  it("contractor member path remains /portal", async () => {
+  it("contractor-only member path remains /portal", async () => {
     const supabase = makeSupabase();
 
     const decision = await resolveSetPasswordDestinationWithFirstOwnerGate({
@@ -144,6 +144,26 @@ describe("resolveSetPasswordDestinationWithFirstOwnerGate", () => {
     });
 
     expect(decision.target).toBe("/portal");
+  });
+
+  it("prefers internal destination when contractor and active internal memberships both exist", async () => {
+    const supabase = makeSupabase({
+      internalUser: {
+        user_id: ownerId,
+        account_owner_user_id: ownerId,
+        role: "admin",
+        is_active: true,
+      },
+    });
+
+    const decision = await resolveSetPasswordDestinationWithFirstOwnerGate({
+      supabase,
+      userId: ownerId,
+      isContractor: true,
+      userMetadata: {},
+    });
+
+    expect(decision.target).toBe("/today");
   });
 
   it("marker present but internal user not owner-anchored fails closed", async () => {

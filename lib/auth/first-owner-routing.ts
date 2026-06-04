@@ -44,13 +44,6 @@ export async function resolveSetPasswordDestinationWithFirstOwnerGate(params: {
   userMetadata: unknown;
   isContractor: boolean;
 }): Promise<FirstOwnerRoutingDecision> {
-  if (params.isContractor) {
-    return {
-      target: "/portal",
-      reason: "CONTRACTOR",
-    };
-  }
-
   const userId = toCleanString(params.userId);
   if (!userId) {
     return {
@@ -71,6 +64,13 @@ export async function resolveSetPasswordDestinationWithFirstOwnerGate(params: {
   const hasActiveInternalUser = Boolean(internal?.user_id) && Boolean(internal?.is_active);
 
   if (!hasActiveInternalUser) {
+    if (params.isContractor) {
+      return {
+        target: "/portal",
+        reason: "CONTRACTOR",
+      };
+    }
+
     return {
       target: null,
       reason: "ACCOUNT_NOT_CONFIGURED",
