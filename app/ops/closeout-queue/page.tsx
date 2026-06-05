@@ -3,8 +3,11 @@ import { redirect } from "next/navigation";
 
 import { markInvoiceCompleteFromForm } from "@/lib/actions/job-ops-actions";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
+import { canViewFinancialRegister } from "@/lib/auth/financial-access";
+import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
+import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import { resolveContractorResponsibleDisplay } from "@/lib/ops/contractor-responsible-display";
 import {
   canShowExternalInvoiceSentAction,
@@ -105,6 +108,21 @@ function followUpLabel(projection: any) {
   return getCloseoutQueueNextStepLabel(projection);
 }
 
+function formatUsdFromCents(cents: number | null | undefined) {
+  const amount = Number(cents ?? 0) / 100;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(Number.isFinite(amount) ? amount : 0);
+}
+
+function formatReconciliationStatus(status: string | null | undefined) {
+  const normalized = String(status ?? "").trim().toLowerCase();
+  if (normalized === "under_review") return "Under Review";
+  if (normalized === "needs_correction") return "Needs Correction";
+  return "Reported";
+}
+
 function parseDateOnlyYmd(value?: string | null): Date | null {
   const raw = String(value ?? "").trim();
   const match = raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -155,6 +173,27 @@ export default async function CloseoutQueuePage({
     accountOwnerUserId: actorContext.internalUser.account_owner_user_id,
   });
   const internalBusinessDisplayName = internalBusinessIdentity.display_name;
+
+  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    actorUserId: user.id,
+    internalUser: actorContext.internalUser,
+    resourceAccountOwnerUserId: actorContext.internalUser.account_owner_user_id,
+  });
+
+  const canViewFieldPaymentReconciliationAttention =
+    canViewFinancialRegister({
+      actorUserId: user.id,
+      internalUser: actorContext.internalUser,
+      resourceAccountOwnerUserId: actorContext.internalUser.account_owner_user_id,
+    }) || fieldBillingCapabilities.can_verify_non_card_collection;
+
+  const fieldPaymentReconciliationAttention = canViewFieldPaymentReconciliationAttention
+    ? await listFieldPaymentCollectionReportsForReconciliation({
+        admin: supabase,
+        accountOwnerUserId: actorContext.internalUser.account_owner_user_id,
+        limit: 10,
+      })
+    : null;
 
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const contractor = (sp.contractor ?? "").trim() || null;
@@ -366,6 +405,74 @@ export default async function CloseoutQueuePage({
           </div>
         </div>
       </section>
+
+      {canViewFieldPaymentReconciliationAttention ? (
+        <section className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.35)]">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-sm font-semibold text-amber-900">Field Payment Reconciliation Attention</h2>
+              <p className="mt-1 text-xs text-amber-800">
+                Field-reported payment requires office verification before it counts as collected.
+              </p>
+            </div>
+            <span className="inline-flex rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900">
+              Open reports: {fieldPaymentReconciliationAttention?.summary.openCount ?? 0}
+            </span>
+          </div>
+
+          <p className="mt-2 text-xs text-amber-800">
+            Card payments are confirmed by Stripe. Check, cash, and other field reports stay here until verified.
+          </p>
+
+          {!fieldPaymentReconciliationAttention?.items?.length ? (
+            <div className="mt-3 rounded-xl border border-dashed border-amber-300 bg-white px-4 py-3 text-xs text-amber-900">
+              No open field payment reconciliation reports.
+            </div>
+          ) : (
+            <div className="mt-3 overflow-x-auto">
+              <table className="min-w-full text-xs">
+                <thead>
+                  <tr className="text-left uppercase tracking-[0.08em] text-amber-800">
+                    <th className="px-2 py-2 font-semibold">Invoice</th>
+                    <th className="px-2 py-2 font-semibold">Job</th>
+                    <th className="px-2 py-2 font-semibold">Method</th>
+                    <th className="px-2 py-2 font-semibold">Amount</th>
+                    <th className="px-2 py-2 font-semibold">Status</th>
+                    <th className="px-2 py-2 font-semibold">Reference</th>
+                    <th className="px-2 py-2 font-semibold">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {fieldPaymentReconciliationAttention.items.map((item) => (
+                    <tr key={item.reportId} className="border-t border-amber-200/70 text-amber-900">
+                      <td className="px-2 py-2">{item.invoiceReference}</td>
+                      <td className="px-2 py-2">{item.jobReference}</td>
+                      <td className="px-2 py-2 uppercase">{item.paymentMethod}</td>
+                      <td className="px-2 py-2">{formatUsdFromCents(item.amountCents)}</td>
+                      <td className="px-2 py-2">{formatReconciliationStatus(item.status)}</td>
+                      <td className="px-2 py-2">{item.reference || "-"}</td>
+                      <td className="px-2 py-2">
+                        <div className="flex flex-wrap gap-2">
+                          <Link href={item.links.invoiceWorkspaceHref} className="font-semibold text-blue-700 hover:underline">
+                            Open invoice workspace
+                          </Link>
+                          <Link href={item.links.jobHref} className="font-semibold text-blue-700 hover:underline">
+                            Open job
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          <p className="mt-2 text-[11px] text-amber-800">
+            No verify/reject/correct/void actions in this queue section. No payment truth mutation. No invoice balance updates.
+          </p>
+        </section>
+      ) : null}
 
       {visibleRows.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">

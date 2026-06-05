@@ -109,4 +109,33 @@ describe("/ops/closeout-queue page", () => {
     expect(jobOpsActionsSource).toContain('revalidatePath(`/ops/closeout-queue`)');
     expect(jobOpsActionsSource).toContain("success_notice");
   });
+
+  it("surfaces field-reported non-card payment reconciliation in the closeout attention workflow", () => {
+    expect(closeoutQueuePageSource).toContain("listFieldPaymentCollectionReportsForReconciliation");
+    expect(closeoutQueuePageSource).toContain("Field Payment Reconciliation Attention");
+    expect(closeoutQueuePageSource).toContain(
+      "Field-reported payment requires office verification before it counts as collected.",
+    );
+  });
+
+  it("gates field payment reconciliation attention to financial authority or verification permission", () => {
+    expect(closeoutQueuePageSource).toContain("canViewFinancialRegister");
+    expect(closeoutQueuePageSource).toContain("resolveFieldBillingCapabilities");
+    expect(closeoutQueuePageSource).toContain("fieldBillingCapabilities.can_verify_non_card_collection");
+    expect(closeoutQueuePageSource).toContain("canViewFieldPaymentReconciliationAttention");
+  });
+
+  it("links reconciliation items to selected invoice workspace and job", () => {
+    expect(closeoutQueuePageSource).toContain("item.links.invoiceWorkspaceHref");
+    expect(closeoutQueuePageSource).toContain("Open invoice workspace");
+    expect(closeoutQueuePageSource).toContain("item.links.jobHref");
+    expect(closeoutQueuePageSource).toContain("Open job");
+  });
+
+  it("keeps reconciliation section read-only with no verification actions", () => {
+    expect(closeoutQueuePageSource).toContain("No verify/reject/correct/void actions in this queue section.");
+    expect(closeoutQueuePageSource).toContain("No payment truth mutation.");
+    expect(closeoutQueuePageSource).toContain("No invoice balance updates.");
+    expect(closeoutQueuePageSource).not.toContain("Verify Payment");
+  });
 });

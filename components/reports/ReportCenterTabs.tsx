@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 type Props = {
-  current: "jobs" | "service-cases" | "closeout" | "invoices" | "dashboard" | "kpis" | "time-clock" | "payments" | "failed-payments";
+  current: "jobs" | "service-cases" | "closeout" | "invoices" | "dashboard" | "kpis" | "time-clock" | "payments" | "failed-payments" | "payment-reconciliation";
 };
 
 const baseClass =
@@ -79,6 +79,16 @@ export default function ReportCenterTabs({ current }: Props) {
         }`}
       >
         Payments Register
+      </Link>
+      <Link
+        href="/reports/payment-reconciliation"
+        className={`${baseClass} ${
+          current === "payment-reconciliation"
+            ? "border-slate-900 bg-slate-900 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.45)]"
+            : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900"
+        }`}
+      >
+        Payment Reconciliation
       </Link>
       <Link
         href="/reports/failed-payments"
