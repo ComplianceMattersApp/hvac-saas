@@ -1,39 +1,8 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-
-type CheckoutStatus = "success" | "cancelled";
-
-function toClean(value: string | string[] | undefined) {
-  if (Array.isArray(value)) {
-    return String(value[0] ?? "").trim();
-  }
-  return String(value ?? "").trim();
-}
+import { resolveCheckoutCompleteViewModel } from "@/lib/payments/checkout-complete";
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
-}
-
-function normalizeStatus(value: string): CheckoutStatus {
-  return value === "cancelled" ? "cancelled" : "success";
-}
-
-async function isActiveInternalUser(userId: string) {
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from("internal_users")
-    .select("id")
-    .eq("user_id", userId)
-    .eq("is_active", true)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) {
-    return false;
-  }
-
-  return Boolean(data?.id);
 }
 
 export default async function CheckoutCompletePage({
@@ -42,35 +11,16 @@ export default async function CheckoutCompletePage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const sp = await searchParams;
-  const status = normalizeStatus(toClean(sp.status).toLowerCase());
-  const jobId = toClean(sp.job_id);
+  const jobId = String(Array.isArray(sp.job_id) ? sp.job_id[0] ?? "" : sp.job_id ?? "").trim();
+  const invoiceId = String(Array.isArray(sp.invoice_id) ? sp.invoice_id[0] ?? "" : sp.invoice_id ?? "").trim();
+  const hasInternalContext = isUuid(jobId) || isUuid(invoiceId);
 
-  if (isUuid(jobId)) {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (user?.id) {
-      const internal = await isActiveInternalUser(user.id);
-      if (internal) {
-        const banner =
-          status === "cancelled"
-            ? "internal_invoice_payment_checkout_cancelled"
-            : "internal_invoice_payment_checkout_success";
-        redirect(`/jobs/${jobId}/invoice?banner=${banner}#invoice-workspace`);
-      }
-    }
-  }
-
-  const heading =
-    status === "cancelled"
-      ? "Payment checkout cancelled"
-      : "Payment checkout complete";
-  const body =
-    status === "cancelled"
-      ? "No payment was submitted. You can close this page or return to the invoice link when you are ready."
-      : "Thank you. Your payment was submitted in Stripe Checkout. Your invoice balance will update after payment processing finishes.";
+  const viewModel = resolveCheckoutCompleteViewModel({
+    status: String(sp.status ?? "success"),
+    jobId,
+    invoiceId,
+    isInternalUser: hasInternalContext,
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 px-4 py-10 text-slate-900 sm:px-6">
@@ -78,17 +28,40 @@ export default async function CheckoutCompletePage({
         <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
           Invoice payment
         </div>
-        <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">{heading}</h1>
-        <p className="mt-3 text-sm leading-6 text-slate-600">{body}</p>
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">{viewModel.heading}</h1>
+        <p className="mt-3 text-sm leading-6 text-slate-600">{viewModel.body}</p>
+        {viewModel.refreshHref ? (
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            If the invoice still shows unpaid, refresh the invoice after Stripe processing completes.
+          </p>
+        ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2">
-          <Link
-            href="/login"
-            className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
-          >
-            Team sign in
-          </Link>
+          {viewModel.actions.map((action) => (
+            <Link
+              key={`${action.label}-${action.href}`}
+              href={action.href}
+              className={
+                action.variant === "primary"
+                  ? "inline-flex items-center rounded-lg bg-slate-950 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+                  : "inline-flex items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
+              }
+            >
+              {action.label}
+            </Link>
+          ))}
         </div>
+
+        {viewModel.refreshHref ? (
+          <div className="mt-4">
+            <Link
+              href={viewModel.refreshHref}
+              className="text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
+            >
+              Refresh payment status
+            </Link>
+          </div>
+        ) : null}
       </div>
     </div>
   );
