@@ -66,7 +66,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("invoice.invoice_kind === \"primary\"");
     expect(source).toContain("invoice.status === \"issued\"");
     expect(source).toContain("&& canManageFinancialInvoiceLifecycle");
-    expect(source).toContain("{canCreateSupplementalDraftFromCurrentInvoice ? (");
+    expect(source).toContain("{supplementalParentInvoiceId ? (");
     expect(source).toContain("Create Add-On Invoice");
     expect(source).toContain("Reason for add-on invoice");
     expect(source).toContain("Customer added warranty, service plan, or additional work.");
