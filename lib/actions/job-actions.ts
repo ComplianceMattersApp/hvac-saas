@@ -3181,6 +3181,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
   const sourceJobId = String(formData.get("job_id") || "").trim();
   const tabRaw = String(formData.get("tab") || "").trim();
   const returnToRaw = String(formData.get("return_to") || "").trim();
+  const visitIntentRaw = String(formData.get("visit_intent") || "").trim().toLowerCase();
   const nextVisitReasonRaw = String(formData.get("next_visit_reason") || "").trim();
 
   if (!sourceJobId) throw new Error("Missing job_id");
@@ -3254,9 +3255,14 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     String(sourceJob.service_case_id ?? "").trim() ||
     (await ensureServiceCaseForJob({ supabase, jobId: sourceJobId }));
 
-  const childTitle = `Follow-up: ${nextVisitReasonRaw}`.slice(0, 220);
-  const childVisitType =
-    normalizeServiceVisitType(String(sourceJob.service_visit_type ?? "").trim()) ?? "return_visit";
+  const isExplicitReturnVisitIntent = visitIntentRaw === "return_visit";
+
+  const childTitle = isExplicitReturnVisitIntent
+    ? `Return Visit: ${nextVisitReasonRaw}`.slice(0, 220)
+    : `Follow-up: ${nextVisitReasonRaw}`.slice(0, 220);
+  const childVisitType = isExplicitReturnVisitIntent
+    ? "return_visit"
+    : normalizeServiceVisitType(String(sourceJob.service_visit_type ?? "").trim()) ?? "return_visit";
 
   const activeWaitingState = getActiveWaitingState({
     ops_status: sourceJob.ops_status ?? null,
@@ -3288,7 +3294,9 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
       customer_phone: String(sourceJob.customer_phone ?? "").trim() || null,
       visit_scope_summary: null,
       visit_scope_items: [],
-      job_notes: `Created from prior service visit ${String(sourceJob.id).slice(0, 8)}.`,
+      job_notes: isExplicitReturnVisitIntent
+        ? `Created as return visit from prior service visit ${String(sourceJob.id).slice(0, 8)}.`
+        : `Created from prior service visit ${String(sourceJob.id).slice(0, 8)}.`,
     },
     {
       serviceCaseWriteClient: supabase,
@@ -3312,6 +3320,8 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
       child_job_id: created.id,
       service_case_id: serviceCaseId,
       next_visit_reason: nextVisitReasonRaw,
+      visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit",
+      child_service_visit_type: childVisitType,
       ...(activeWaitingState
         ? {
             waiting_state_type: activeWaitingState.blockerType,
@@ -3331,6 +3341,8 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
       child_job_id: created.id,
       service_case_id: serviceCaseId,
       next_visit_reason: nextVisitReasonRaw,
+      visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit",
+      child_service_visit_type: childVisitType,
     },
     userId: actingUserId,
   });

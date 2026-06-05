@@ -323,6 +323,8 @@ describe("focused ops queue pages", () => {
     expect(waitingQueuePageSource).toContain("getWaitingQueueDisplay");
     expect(waitingQueuePageSource).toContain("getWaitingQueueRecommendedNextStep");
     expect(waitingQueuePageSource).toContain("Next step:");
+    expect(waitingQueuePageSource).toContain("#next-service-action");
+    expect(waitingQueuePageSource).toContain("Create Return Visit");
     expect(exceptionsQueuePageSource).toContain("getExceptionQueueDisplayLabel");
   });
 

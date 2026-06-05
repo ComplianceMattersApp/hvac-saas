@@ -4173,16 +4173,17 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   {isInternalUser && job.job_type === "service" ? (
                     <details id="mobile-follow-up-job" className="group">
                       <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
-                        <span className="inline-flex items-center gap-2"><ToolIcon className="h-4.5 w-4.5" />Create Follow-Up Job</span>
+                        <span className="inline-flex items-center gap-2"><ToolIcon className="h-4.5 w-4.5" />Create Return Visit</span>
                       </summary>
                       <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
                         <form action={createNextServiceVisitFromForm} className="space-y-3">
                           <input type="hidden" name="job_id" value={job.id} />
                           <input type="hidden" name="tab" value={tab} />
+                          <input type="hidden" name="visit_intent" value="return_visit" />
                           <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-follow-up-job`} />
 
                           <div className="space-y-1">
-                            <label className="text-sm font-semibold text-slate-700">Reason for follow-up</label>
+                            <label className="text-sm font-semibold text-slate-700">Why is a return visit needed?</label>
                             <input
                               type="text"
                               name="next_visit_reason"
@@ -4191,10 +4192,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                               placeholder="Example: return to complete repair"
                               className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-slate-900"
                             />
+                            <p className="text-xs leading-5 text-slate-600">This creates an unscheduled office/dispatch item.</p>
                           </div>
 
                           <SubmitButton loadingText="Creating..." className={mobileToolLinkClass}>
-                            Create Follow-Up Job
+                            Create Return Visit
                           </SubmitButton>
                         </form>
                       </div>
@@ -5279,12 +5281,12 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   </div>
 
   {isInternalUser && job.job_type === "service" ? (
-    <div className="mt-4 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)] sm:mt-3.5">
+    <div id="next-service-action" className="mt-4 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)] sm:mt-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
           <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><ClockIcon className="h-3.5 w-3.5" />Next Service Action</div>
 
-          <div className="mt-1 text-sm font-semibold text-slate-900">Create a linked follow-up visit.</div>
+          <div className="mt-1 text-sm font-semibold text-slate-900">Create Return Visit</div>
         </div>
         {serviceCaseVisitCount > 1 ? (
           <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-600 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">
@@ -5311,25 +5313,26 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <form action={createNextServiceVisitFromForm} className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <input type="hidden" name="job_id" value={job.id} />
         <input type="hidden" name="tab" value={tab} />
+        <input type="hidden" name="visit_intent" value="return_visit" />
         <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}`} />
 
         <div className="space-y-1">
-          <label className={workspaceFieldLabelClass}>Reason for next visit</label>
+          <label className={workspaceFieldLabelClass}>Why is a return visit needed?</label>
           <input
             type="text"
             name="next_visit_reason"
             required
             maxLength={220}
-            placeholder="Example: install ordered part, return to complete repair, customer approved follow-up work"
+            placeholder="Example: install ordered part, return to complete repair, customer approved work"
             className={workspaceInputClass}
           />
           <p className="text-xs leading-5 text-slate-600">
-            Creates a linked visit only. Review Work Items on the new visit.
+            This creates an unscheduled office/dispatch item. Review Work Items on the new visit.
           </p>
         </div>
 
         <SubmitButton loadingText="Creating..." className={`${darkButtonClass} w-full sm:w-auto`}>
-          Create Next Visit
+          Create Return Visit
         </SubmitButton>
       </form>
     </div>

@@ -136,6 +136,12 @@ export default async function OpsWaitingQueuePage() {
                     >
                       Open Job
                     </Link>
+                    <Link
+                      href={`/jobs/${jobId}?tab=ops#next-service-action`}
+                      className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                    >
+                      Create Return Visit
+                    </Link>
                   </div>
                 </div>
               </li>
