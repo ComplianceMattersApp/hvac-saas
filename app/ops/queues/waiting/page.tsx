@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import {
+  WAITING_QUEUE_STATUSES,
   buildWaitingQueueRows,
   customerLocationLabel,
   formatOpsStatusLabel,
@@ -11,7 +12,7 @@ import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 
 const waitingSelect =
-  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, created_at";
+  "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, on_hold_reason, created_at";
 
 function jobTitle(job: any) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
@@ -63,7 +64,7 @@ export default async function OpsWaitingQueuePage() {
     .is("deleted_at", null)
     .neq("status", "cancelled")
     .neq("ops_status", "closed")
-    .in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"])
+    .in("ops_status", [...WAITING_QUEUE_STATUSES])
     .order("created_at", { ascending: true });
 
   if (error) throw error;

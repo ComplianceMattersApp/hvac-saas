@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import {
+  EXCEPTION_QUEUE_STATUSES,
   buildExceptionQueueRows,
   customerLocationLabel,
   formatOpsStatusLabel,
@@ -61,7 +62,7 @@ export default async function OpsExceptionsQueuePage() {
     .is("deleted_at", null)
     .neq("status", "cancelled")
     .neq("ops_status", "closed")
-    .in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"])
+    .in("ops_status", [...EXCEPTION_QUEUE_STATUSES])
     .order("created_at", { ascending: true });
 
   if (error) throw error;

@@ -3,22 +3,16 @@ import {
   isTodayWithoutTechCandidateJob,
   type WithoutTechAssignmentInput,
 } from "@/lib/ops/without-tech-predicate";
-
-export const WAITING_QUEUE_STATUSES = [
-  "pending_info",
-  "on_hold",
-  "waiting",
-  "pending_office_review",
-] as const;
-
-export const EXCEPTION_QUEUE_STATUSES = [
-  "failed",
-  "retest_needed",
-  "problem",
-] as const;
-
-const WAITING_QUEUE_STATUS_SET = new Set<string>(WAITING_QUEUE_STATUSES);
-const EXCEPTION_QUEUE_STATUS_SET = new Set<string>(EXCEPTION_QUEUE_STATUSES);
+export {
+  EXCEPTION_QUEUE_STATUSES,
+  WAITING_QUEUE_STATUSES,
+  isExceptionQueueStatus,
+  isWaitingQueueStatus,
+} from "@/lib/ops/queue-status-contracts";
+import {
+  isExceptionQueueStatus,
+  isWaitingQueueStatus,
+} from "@/lib/ops/queue-status-contracts";
 
 export type FocusedQueueJob = {
   id: string;
@@ -55,14 +49,6 @@ function compareByCreatedAtOldest(left: FocusedQueueJob, right: FocusedQueueJob)
   if (createdDiff !== 0) return createdDiff;
 
   return String(left.id ?? "").localeCompare(String(right.id ?? ""));
-}
-
-export function isWaitingQueueStatus(value: unknown): boolean {
-  return WAITING_QUEUE_STATUS_SET.has(normalize(value));
-}
-
-export function isExceptionQueueStatus(value: unknown): boolean {
-  return EXCEPTION_QUEUE_STATUS_SET.has(normalize(value));
 }
 
 export function buildWaitingQueueRows(jobs: FocusedQueueJob[]): FocusedQueueJob[] {

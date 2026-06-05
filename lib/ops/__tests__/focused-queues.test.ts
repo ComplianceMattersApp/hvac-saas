@@ -3,10 +3,20 @@ import { readFileSync } from "fs";
 import { resolve } from "path";
 
 import {
+  EXCEPTION_QUEUE_STATUSES,
+  WAITING_QUEUE_STATUSES,
   buildExceptionQueueRows,
   buildWaitingQueueRows,
   buildWithoutTechQueueRows,
 } from "@/lib/ops/focused-queues";
+import {
+  isActiveFieldWorkStatus,
+  isCloseoutBlockingQueueStatus,
+  isExceptionQueueStatus,
+  isOfficeReviewQueueStatus,
+  isScheduledAssignedMyWorkEligible,
+  isWaitingQueueStatus,
+} from "@/lib/ops/queue-status-contracts";
 
 const waitingQueuePageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/queues/waiting/page.tsx"),
@@ -24,28 +34,32 @@ const withoutTechQueuePageSource = readFileSync(
 );
 
 describe("focused ops queue filtering", () => {
-  it("waiting queue includes pending info, on hold, waiting, and pending office review", () => {
+  it("waiting queue includes waiting states but not office review exceptions", () => {
     const rows = buildWaitingQueueRows([
       { id: "j1", ops_status: "pending_info", created_at: "2026-01-01T00:00:00.000Z" },
       { id: "j2", ops_status: "on_hold", created_at: "2026-01-02T00:00:00.000Z" },
       { id: "j3", ops_status: "waiting", created_at: "2026-01-03T00:00:00.000Z" },
       { id: "j4", ops_status: "pending_office_review", created_at: "2026-01-04T00:00:00.000Z" },
       { id: "j5", ops_status: "failed", created_at: "2026-01-05T00:00:00.000Z" },
+      { id: "j6", ops_status: "closed", created_at: "2026-01-06T00:00:00.000Z" },
+      { id: "j7", ops_status: "scheduled", created_at: "2026-01-07T00:00:00.000Z" },
     ]);
 
-    expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j3", "j4"]);
+    expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j3"]);
   });
 
-  it("exceptions queue includes failed/retest/problem states", () => {
+  it("exceptions queue includes failed/retest/review/problem states", () => {
     const rows = buildExceptionQueueRows([
       { id: "j1", ops_status: "failed", created_at: "2026-01-01T00:00:00.000Z" },
       { id: "j2", ops_status: "retest_needed", created_at: "2026-01-02T00:00:00.000Z" },
       { id: "j3", ops_status: "pending_office_review", created_at: "2026-01-03T00:00:00.000Z" },
       { id: "j4", ops_status: "problem", created_at: "2026-01-04T00:00:00.000Z" },
       { id: "j5", ops_status: "on_hold", created_at: "2026-01-05T00:00:00.000Z" },
+      { id: "j6", ops_status: "closed", created_at: "2026-01-06T00:00:00.000Z" },
+      { id: "j7", ops_status: "scheduled", created_at: "2026-01-07T00:00:00.000Z" },
     ]);
 
-    expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j4"]);
+    expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j3", "j4"]);
   });
 
   it("without-tech queue includes the same today-counted unassigned rows", () => {
@@ -108,7 +122,86 @@ describe("focused ops queue filtering", () => {
   });
 });
 
+describe("canonical queue status contracts", () => {
+  it("classifies waiting and exception statuses from the B2-A contract", () => {
+    expect(isWaitingQueueStatus("pending_info")).toBe(true);
+    expect(isWaitingQueueStatus("on_hold")).toBe(true);
+    expect(isWaitingQueueStatus("waiting")).toBe(true);
+    expect(isWaitingQueueStatus("pending_office_review")).toBe(false);
+    expect(isWaitingQueueStatus("failed")).toBe(false);
+    expect(isWaitingQueueStatus("retest_needed")).toBe(false);
+    expect(isWaitingQueueStatus("problem")).toBe(false);
+    expect(isWaitingQueueStatus("closed")).toBe(false);
+    expect(isWaitingQueueStatus("scheduled")).toBe(false);
+
+    expect(isExceptionQueueStatus("pending_info")).toBe(false);
+    expect(isExceptionQueueStatus("on_hold")).toBe(false);
+    expect(isExceptionQueueStatus("waiting")).toBe(false);
+    expect(isExceptionQueueStatus("pending_office_review")).toBe(true);
+    expect(isExceptionQueueStatus("failed")).toBe(true);
+    expect(isExceptionQueueStatus("retest_needed")).toBe(true);
+    expect(isExceptionQueueStatus("problem")).toBe(true);
+    expect(isExceptionQueueStatus("closed")).toBe(false);
+    expect(isExceptionQueueStatus("scheduled")).toBe(false);
+  });
+
+  it("keeps office review and closeout-blocking contracts explicit", () => {
+    expect(isOfficeReviewQueueStatus("pending_office_review")).toBe(true);
+    expect(isOfficeReviewQueueStatus("pending_info")).toBe(false);
+
+    expect(isCloseoutBlockingQueueStatus("pending_info")).toBe(true);
+    expect(isCloseoutBlockingQueueStatus("on_hold")).toBe(true);
+    expect(isCloseoutBlockingQueueStatus("waiting")).toBe(false);
+    expect(isCloseoutBlockingQueueStatus("pending_office_review")).toBe(false);
+  });
+
+  it("keeps scheduled assigned My Work eligibility conservative", () => {
+    expect(isActiveFieldWorkStatus("on_the_way")).toBe(true);
+    expect(isActiveFieldWorkStatus("in_process")).toBe(true);
+    expect(isActiveFieldWorkStatus("scheduled")).toBe(false);
+
+    expect(isScheduledAssignedMyWorkEligible({
+      status: "on_the_way",
+      scheduledDate: null,
+      fieldComplete: false,
+    })).toBe(true);
+    expect(isScheduledAssignedMyWorkEligible({
+      status: "open",
+      scheduledDate: "2026-05-25",
+      fieldComplete: false,
+    })).toBe(true);
+    expect(isScheduledAssignedMyWorkEligible({
+      status: "open",
+      scheduledDate: null,
+      fieldComplete: false,
+    })).toBe(false);
+    expect(isScheduledAssignedMyWorkEligible({
+      status: "in_process",
+      scheduledDate: "2026-05-25",
+      fieldComplete: true,
+    })).toBe(false);
+  });
+});
+
 describe("focused ops queue pages", () => {
+  it("focused queue pages use canonical status constants for route filters", () => {
+    expect(waitingQueuePageSource).toContain("WAITING_QUEUE_STATUSES");
+    expect(exceptionsQueuePageSource).toContain("EXCEPTION_QUEUE_STATUSES");
+
+    for (const status of WAITING_QUEUE_STATUSES) {
+      expect(isWaitingQueueStatus(status)).toBe(true);
+    }
+
+    for (const status of EXCEPTION_QUEUE_STATUSES) {
+      expect(isExceptionQueueStatus(status)).toBe(true);
+    }
+  });
+
+  it("waiting page reads both pending info and on-hold reasons", () => {
+    expect(waitingQueuePageSource).toContain("pending_info_reason");
+    expect(waitingQueuePageSource).toContain("on_hold_reason");
+  });
+
   it("waiting page includes safe empty state and return navigation", () => {
     expect(waitingQueuePageSource).toContain("No waiting work right now.");
     expect(waitingQueuePageSource).toContain("Return to Operations");
