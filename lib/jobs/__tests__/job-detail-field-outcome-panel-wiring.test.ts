@@ -65,5 +65,6 @@ describe("job detail field outcome panel wiring", () => {
   it("keeps open and on-the-way flow on existing start actions", () => {
     expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" && !showFieldOutcomePanel');
     expect(jobDetailSource).toContain('!isFieldComplete && !showFieldOutcomePanel ? (');
+    expect(jobDetailSource).toContain(') : isFieldComplete || job.status === "completed" ? (');
   });
 });

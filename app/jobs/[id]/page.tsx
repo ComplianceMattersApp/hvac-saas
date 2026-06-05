@@ -3700,11 +3700,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   hasFullSchedule={hasFullSchedule}
                   variant="fieldMode"
                 />
-              ) : (
+              ) : isFieldComplete || job.status === "completed" ? (
                 <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-700 bg-emerald-700 px-5 py-2.5 text-base font-semibold text-white">
                   Field Complete
                 </span>
-              )}
+              ) : null}
 
               {onTheWayUndoEligibility.eligible ? (
                 <form action={revertOnTheWayFromForm} className="mt-2.5">
