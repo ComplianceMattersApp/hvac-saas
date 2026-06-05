@@ -36,20 +36,18 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).toContain("name=\"current_status\"");
     expect(panelSource).toContain("name=\"tab\"");
     expect(panelSource).toContain("Confirm field work complete");
-    expect(panelSource).toContain("Field work is marked complete and can move to closeout or billing as applicable.");
+    expect(panelSource).toContain("Ready to finish this visit? This moves the job to closeout for invoice/certs as needed.");
     expect(panelSource).toContain("Confirm Work Completed");
   });
 
   it("does not render disabled future outcome controls in the default panel", () => {
     expect(panelSource).not.toContain("route.code === \"work_completed\"");
     expect(panelSource).not.toContain('type="button"');
-    expect(panelSource).toContain("Only Work Completed is wired in this slice. Other outcomes remain unwired until future slices.");
+    expect(panelSource).not.toContain("Only Work Completed is wired in this slice. Other outcomes remain unwired until future slices.");
   });
 
   it("keeps ECC guardrail and section guidance copy", () => {
-    expect(panelSource).toContain("Notes, photos, tests, and work items stay in their sections.");
-    expect(panelSource).toContain("ECC guardrail: manual generic Failed is intentionally unavailable.");
-    expect(panelSource).toContain("Failed/retest results come from ECC test completion.");
+    expect(panelSource).toContain("ECC guardrail: Failed/retest outcomes come from ECC test completion.");
   });
 
   it("keeps open and on-the-way flow on existing start actions", () => {
