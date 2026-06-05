@@ -249,6 +249,14 @@ function visitScopeLineFormData(itemIds: string[], overrides: Partial<Record<str
   return formData;
 }
 
+function lineItemMutationFormData(overrides: Partial<Record<string, string>> = {}) {
+  const formData = manualLineFormData({
+    line_item_id: 'line-1',
+    ...overrides,
+  });
+  return formData;
+}
+
 describe('internal invoice line item pricebook plumbing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -291,6 +299,132 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(invoiceUpdates).toHaveLength(1);
     expect(invoiceUpdates[0].subtotal_cents).toBe(10000);
     expect(invoiceUpdates[0].total_cents).toBe(10000);
+  });
+
+  it.each([
+    {
+      label: 'structural owner',
+      userId: 'owner-1',
+      role: 'office',
+    },
+    {
+      label: 'admin',
+      userId: 'admin-1',
+      role: 'admin',
+    },
+    {
+      label: 'billing',
+      userId: 'billing-1',
+      role: 'billing',
+    },
+  ])('allows $label to add manual charge lines', async ({ userId, role }) => {
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId,
+      internalUser: {
+        user_id: userId,
+        role,
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { addInternalInvoiceLineItemFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    const result = await addInternalInvoiceLineItemFromForm(
+      manualLineFormData({ no_redirect: '1' }),
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      banner: 'internal_invoice_line_item_added',
+      fieldErrors: undefined,
+    });
+    expect(insertedLineItems).toHaveLength(1);
+    expect(invoiceUpdates).toHaveLength(1);
+  });
+
+  it('denies technician manual charge creation by default before line writes', async () => {
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { addInternalInvoiceLineItemFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemFromForm(manualLineFormData())).rejects.toThrow(
+      'banner=not_authorized',
+    );
+
+    expect(insertedLineItems).toHaveLength(0);
+    expect(invoiceUpdates).toHaveLength(0);
+  });
+
+  it('denies technician draft line price edits by default before line writes', async () => {
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
+      draftInvoice({
+        line_items: [
+          {
+            id: 'line-1',
+            source_kind: 'manual',
+            item_name_snapshot: 'Manual Service Line',
+            quantity: 1,
+            unit_price: 50,
+          },
+        ],
+      }),
+    );
+
+    const { updateInternalInvoiceLineItemFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      updateInternalInvoiceLineItemFromForm(lineItemMutationFormData({ unit_price: '75.00' })),
+    ).rejects.toThrow('banner=not_authorized');
+
+    expect(insertedLineItems).toHaveLength(0);
+    expect(invoiceUpdates).toHaveLength(0);
+  });
+
+  it('denies technician draft line removal by default before line writes', async () => {
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { removeInternalInvoiceLineItemFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(removeInternalInvoiceLineItemFromForm(lineItemMutationFormData())).rejects.toThrow(
+      'banner=not_authorized',
+    );
+
+    expect(insertedLineItems).toHaveLength(0);
+    expect(invoiceUpdates).toHaveLength(0);
   });
 
   it('manual add supports non-redirect mode and narrows revalidation to job detail', async () => {

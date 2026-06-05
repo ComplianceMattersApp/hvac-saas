@@ -7,6 +7,13 @@ import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
 import { requireInvoiceLifecycleAccessOrRedirect } from '@/lib/auth/financial-access';
 import {
+  requireFieldChargeEditAccessOrRedirect,
+  requireFieldChargeRemoveAccessOrRedirect,
+  requireManualFieldChargeAccessOrRedirect,
+  requirePricebookFieldChargeAccessOrRedirect,
+  requireVisitScopeFieldChargeAccessOrRedirect,
+} from '@/lib/auth/field-billing-access';
+import {
   resolveBillingModeByAccountOwnerId,
 } from '@/lib/business/internal-business-profile';
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
@@ -962,6 +969,19 @@ async function requireDraftInvoiceContext(formData: FormData) {
   return context;
 }
 
+function fieldChargeDeniedRedirect(context: Awaited<ReturnType<typeof loadInternalInvoiceContext>>) {
+  return buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo);
+}
+
+function fieldChargeAccessParams(context: Awaited<ReturnType<typeof loadInternalInvoiceContext>>) {
+  return {
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    redirectTo: fieldChargeDeniedRedirect(context),
+  };
+}
+
 async function logInvoiceEvent(params: {
   supabase: any;
   userId: string;
@@ -1426,6 +1446,7 @@ export async function voidInternalInvoiceFromForm(formData: FormData) {
 export async function addInternalInvoiceLineItemFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
   const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
+  requireManualFieldChargeAccessOrRedirect(fieldChargeAccessParams(context));
   const invoice = context.invoice!;
 
   let payload: ReturnType<typeof parseLineItemDraftFields>;
@@ -1483,6 +1504,7 @@ export async function addInternalInvoiceLineItemFromForm(formData: FormData): Pr
 export async function addInternalInvoiceLineItemFromPricebookForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
   const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
+  requirePricebookFieldChargeAccessOrRedirect(fieldChargeAccessParams(context));
   const invoice = context.invoice!;
 
   const pricebookItemId = getTrimmedString(formData.get('pricebook_item_id'));
@@ -1613,6 +1635,7 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
 export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
   const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
+  requireVisitScopeFieldChargeAccessOrRedirect(fieldChargeAccessParams(context));
   const invoice = context.invoice!;
 
   const { selectedIds, malformedIds } = parseSelectedVisitScopeItemIds(formData);
@@ -1795,6 +1818,7 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
 export async function updateInternalInvoiceLineItemFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
   const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
+  requireFieldChargeEditAccessOrRedirect(fieldChargeAccessParams(context));
   const invoice = context.invoice!;
   const lineItemId = getTrimmedString(formData.get('line_item_id'));
   if (!lineItemId) {
@@ -1876,6 +1900,7 @@ export async function updateInternalInvoiceLineItemFromForm(formData: FormData):
 export async function removeInternalInvoiceLineItemFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
   const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
+  requireFieldChargeRemoveAccessOrRedirect(fieldChargeAccessParams(context));
   const invoice = context.invoice!;
   const lineItemId = getTrimmedString(formData.get('line_item_id'));
   if (!lineItemId) {
