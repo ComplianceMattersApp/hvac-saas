@@ -328,14 +328,12 @@ describe("callback intake action", () => {
 });
 
 describe("callback intake job detail wiring", () => {
-  it("includes office callback report copy and explicit no-create/no-schedule guidance", () => {
+  it("keeps report-only callback logging out of primary next-service action UI", () => {
     const source = readFileSync(resolve(__dirname, "../../../app/jobs/[id]/page.tsx"), "utf-8");
 
-    expect(source).toContain("Record Callback Report");
-    expect(source).toContain(
-      "Use when a customer reports an issue after prior work was believed complete. This records the report only; it does not create or schedule a visit.",
-    );
-    expect(source).toContain("recordCallbackReportFromForm");
-    expect(source).toContain('name="callback_report_text"');
+    expect(source).not.toContain("Record report only (no visit creation)");
+    expect(source).not.toContain("Record Callback Report Only");
+    expect(source).not.toContain("recordCallbackReportFromForm");
+    expect(source).not.toContain('name="callback_report_text"');
   });
 });

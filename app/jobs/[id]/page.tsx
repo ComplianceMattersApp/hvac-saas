@@ -18,7 +18,6 @@ import {
   advanceJobStatusFromForm,
   updateJobServiceContractFromForm,
   createNextServiceVisitFromForm,
-  recordCallbackReportFromForm,
   createCallbackVisitFromForm,
   completeDataEntryFromForm,
   createRetestJobFromForm,
@@ -1620,7 +1619,7 @@ export default async function JobDetailPage({
         .order("created_at", { ascending: false })
         .limit(3);
 
-      if (previewRowsErr) return [] as Array<{ label: string; text: string }>;
+      if (previewRowsErr) return [] as Array<{ label: string; text: string; createdAt: string }>;
 
       return (previewRows ?? [])
         .map((row: any) => {
@@ -1645,9 +1644,10 @@ export default async function JobDetailPage({
           return {
             label,
             text: noteText,
+            createdAt: String(row?.created_at ?? "").trim(),
           };
         })
-        .filter((item): item is { label: string; text: string } => Boolean(item));
+        .filter((item): item is { label: string; text: string; createdAt: string } => Boolean(item));
     }),
   );
 
@@ -3659,6 +3659,34 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <FlashBanner type="success" message="Work Items saved." />
           ) : null}
 
+          {banner === "callback_report_recorded" ? (
+            <FlashBanner
+              type="success"
+              message="Callback report recorded in job history only. No visit was created or scheduled."
+            />
+          ) : null}
+
+          {banner === "callback_visit_created" ? (
+            <FlashBanner
+              type="success"
+              message="Callback visit created. This is an unscheduled office/dispatch item and will not appear in technician My Work until scheduled and assigned."
+            />
+          ) : null}
+
+          {banner === "callback_visit_requires_historical_anchor" ? (
+            <FlashBanner
+              type="warning"
+              message="Callback visit creation is available only for service jobs that are field-complete, completed, or closed."
+            />
+          ) : null}
+
+          {banner === "callback_report_requires_historical_anchor" ? (
+            <FlashBanner
+              type="warning"
+              message="Record Callback Report is available only for service jobs that are field-complete, completed, or closed."
+            />
+          ) : null}
+
           {banner === "internal_invoice_draft_created" || banner === "internal_invoice_draft_saved" || banner === "internal_invoice_issued" ? (
             <FlashBanner type="success" message="Invoice updated." />
           ) : null}
@@ -5268,7 +5296,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
         <div className="space-y-2">
           {latestJobNotesPreview.map((preview, index) => (
-            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-700">
+            <div
+              key={`${preview.createdAt || "note"}-${preview.label}-${preview.text.slice(0, 40)}-${index}`}
+              className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-700"
+            >
               <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">{preview.label}</div>
               <div className="mt-0.5 break-words leading-6">{preview.text}</div>
             </div>
@@ -5338,7 +5369,10 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             className={workspaceInputClass}
           />
           <p className="text-xs leading-5 text-slate-600">
-            This creates an unscheduled office/dispatch item. Review Work Items on the new visit.
+            Use when the original job is not finished yet and another visit is needed to complete it.
+          </p>
+          <p className="text-xs leading-5 text-slate-600">
+            Examples: waiting on a part, customer approval, or more time needed to complete the same job.
           </p>
         </div>
 
@@ -5348,44 +5382,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       </form>
 
       <div className="mt-3 border-t border-slate-200 pt-3">
-        <div className="text-sm font-semibold text-slate-900">Record Callback Report</div>
-        <p className="mt-1 text-xs leading-5 text-slate-600">
-          Use when a customer reports an issue after prior work was believed complete. This records the report only; it does not create or schedule a visit.
-        </p>
-
-        {callbackIntakeHistoricalAnchorEligible ? (
-          <form action={recordCallbackReportFromForm} className="mt-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
-            <input type="hidden" name="job_id" value={job.id} />
-            <input type="hidden" name="tab" value={tab} />
-            <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
-
-            <div className="space-y-1">
-              <label className={workspaceFieldLabelClass}>Customer callback report</label>
-              <textarea
-                name="callback_report_text"
-                required
-                maxLength={600}
-                rows={3}
-                placeholder="Example: Customer says same airflow issue returned after prior completion"
-                className={workspaceTextareaClass}
-              />
-            </div>
-
-            <SubmitButton loadingText="Recording..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
-              Record Callback Report
-            </SubmitButton>
-          </form>
-        ) : (
-          <p className="mt-2 text-xs text-slate-500">
-            Callback intake is available for service jobs that are field-complete, completed, or closed.
-          </p>
-        )}
-      </div>
-
-      <div className="mt-3 border-t border-slate-200 pt-3">
         <div className="text-sm font-semibold text-slate-900">Create Callback Visit</div>
         <p className="mt-1 text-xs leading-5 text-slate-600">
-          Use after a customer callback report has been recorded and office decides a visit is needed. This creates an unscheduled office/dispatch item.
+          Use when the customer calls back after the job was believed complete.
+        </p>
+        <p className="text-xs leading-5 text-slate-600">
+          This records the customer report and creates a new unscheduled office/dispatch callback item.
+          It will not appear in technician My Work until it is scheduled and assigned.
         </p>
 
         {callbackIntakeHistoricalAnchorEligible ? (
@@ -5395,13 +5398,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
 
             <div className="space-y-1">
-              <label className={workspaceFieldLabelClass}>Callback visit reason</label>
-              <input
-                type="text"
+              <label className={workspaceFieldLabelClass}>What did the customer report?</label>
+              <textarea
                 name="callback_visit_reason"
-                maxLength={220}
-                placeholder="Optional: leave blank to use latest callback report context"
-                className={workspaceInputClass}
+                required
+                maxLength={600}
+                rows={3}
+                placeholder="Example: customer says the same airflow issue returned after prior completion"
+                className={workspaceTextareaClass}
               />
             </div>
 
@@ -6038,6 +6042,34 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <FlashBanner
           type="success"
           message="Follow-up note added."
+        />
+      )}
+
+      {banner === "callback_report_recorded" && (
+        <FlashBanner
+          type="success"
+          message="Callback report recorded in job history only. No visit was created or scheduled."
+        />
+      )}
+
+      {banner === "callback_visit_created" && (
+        <FlashBanner
+          type="success"
+          message="Callback visit created. This is an unscheduled office/dispatch item and will not appear in technician My Work until scheduled and assigned."
+        />
+      )}
+
+      {banner === "callback_visit_requires_historical_anchor" && (
+        <FlashBanner
+          type="warning"
+          message="Callback visit creation is available only for service jobs that are field-complete, completed, or closed."
+        />
+      )}
+
+      {banner === "callback_report_requires_historical_anchor" && (
+        <FlashBanner
+          type="warning"
+          message="Record Callback Report is available only for service jobs that are field-complete, completed, or closed."
         />
       )}
 

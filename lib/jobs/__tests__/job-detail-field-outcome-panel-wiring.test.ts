@@ -21,6 +21,11 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}");
   });
 
+  it("keeps stable keys in latest notes preview list rendering", () => {
+    expect(jobDetailSource).toContain("latestJobNotesPreview.map((preview, index) => (");
+    expect(jobDetailSource).toContain("key={`${preview.createdAt || \"note\"}-${preview.label}-${preview.text.slice(0, 40)}-${index}`}");
+  });
+
   it("shows the active panel only for in-process not-yet-field-complete jobs", () => {
     expect(jobDetailSource).toContain("const isJobArchived = Boolean(job.deleted_at) || normalizedOpsStatus === \"archived\";");
     expect(jobDetailSource).toContain('const isJobClosed = normalizedOpsStatus === "closed";');

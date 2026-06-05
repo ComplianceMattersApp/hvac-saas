@@ -3452,31 +3452,7 @@ export async function createCallbackVisitFromForm(formData: FormData) {
     return;
   }
 
-  const { data: callbackIntakeRows, error: callbackIntakeErr } = await supabase
-    .from("job_events")
-    .select("id, meta, created_at")
-    .eq("job_id", sourceJobId)
-    .eq("event_type", "callback_reported")
-    .order("created_at", { ascending: false })
-    .limit(1);
-
-  if (callbackIntakeErr) throw callbackIntakeErr;
-
-  const latestCallbackIntake = Array.isArray(callbackIntakeRows) ? callbackIntakeRows[0] : null;
-  if (!latestCallbackIntake?.id) {
-    redirectToJobWithBanner({
-      jobId: sourceJobId,
-      banner: "callback_visit_requires_intake",
-      tabRaw,
-      returnToRaw,
-    });
-    return;
-  }
-
-  const callbackReportContext = String((latestCallbackIntake as any)?.meta?.callback_report_text ?? "").trim();
-  const callbackVisitReason = callbackVisitReasonRaw || callbackReportContext;
-
-  if (!callbackVisitReason) {
+  if (!callbackVisitReasonRaw) {
     redirectToJobWithBanner({
       jobId: sourceJobId,
       banner: "callback_visit_reason_required",
@@ -3485,6 +3461,7 @@ export async function createCallbackVisitFromForm(formData: FormData) {
     });
     return;
   }
+  const callbackVisitReason = callbackVisitReasonRaw;
 
   const customerId = String(sourceJob.customer_id ?? "").trim();
   const locationId = String(sourceJob.location_id ?? "").trim();
@@ -3502,6 +3479,20 @@ export async function createCallbackVisitFromForm(formData: FormData) {
   const serviceCaseId =
     String(sourceJob.service_case_id ?? "").trim() ||
     (await ensureServiceCaseForJob({ supabase, jobId: sourceJobId }));
+
+  const callbackIntakeEventId = await insertJobEvent({
+    supabase,
+    jobId: sourceJobId,
+    event_type: "callback_reported",
+    meta: {
+      source_action: "callback_intake_reported",
+      callback_report_text: callbackVisitReason,
+      anchor_job_id: sourceJobId,
+      service_case_id: serviceCaseId || null,
+      callback_reported_by_user_id: actingUserId,
+    },
+    userId: actingUserId,
+  });
 
   const created = await createJob(
     {
@@ -3552,7 +3543,7 @@ export async function createCallbackVisitFromForm(formData: FormData) {
       child_job_id: created.id,
       service_case_id: serviceCaseId,
       callback_visit_reason: callbackVisitReason,
-      callback_intake_event_id: String(latestCallbackIntake.id),
+      callback_intake_event_id: callbackIntakeEventId,
     },
     userId: actingUserId,
   });
@@ -3567,7 +3558,7 @@ export async function createCallbackVisitFromForm(formData: FormData) {
       child_job_id: created.id,
       service_case_id: serviceCaseId,
       callback_visit_reason: callbackVisitReason,
-      callback_intake_event_id: String(latestCallbackIntake.id),
+      callback_intake_event_id: callbackIntakeEventId,
     },
     userId: actingUserId,
   });

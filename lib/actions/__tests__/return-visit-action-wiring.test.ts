@@ -68,7 +68,8 @@ describe("return visit action wiring", () => {
 describe("office return visit entry points", () => {
   it("uses explicit office-facing return visit copy on job detail", () => {
     expect(jobPageSource).toContain("Create Return Visit");
-    expect(jobPageSource).toContain("This creates an unscheduled office/dispatch item.");
+    expect(jobPageSource).toContain("Use when the original job is not finished yet and another visit is needed to complete it.");
+    expect(jobPageSource).toContain("Examples: waiting on a part, customer approval, or more time needed to complete the same job.");
     expect(jobPageSource).toContain('id="next-service-action"');
   });
 

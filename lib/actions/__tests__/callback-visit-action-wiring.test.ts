@@ -38,22 +38,24 @@ describe("callback visit creation action wiring", () => {
     expect(actionBlock).toContain('scheduled_date: null');
   });
 
-  it("requires prior callback intake and keeps service-case continuity", () => {
+  it("requires callback report text and keeps service-case continuity", () => {
     const actionBlock = extractCreateCallbackVisitActionBlock();
 
-    expect(actionBlock).toContain('.eq("event_type", "callback_reported")');
-    expect(actionBlock).toContain('banner: "callback_visit_requires_intake"');
+    expect(actionBlock).toContain('if (!callbackVisitReasonRaw) {');
+    expect(actionBlock).toContain('banner: "callback_visit_reason_required"');
     expect(actionBlock).toContain('service_case_id: serviceCaseId');
     expect(actionBlock).toContain('await ensureServiceCaseForJob({ supabase, jobId: sourceJobId })');
   });
 
-  it("writes source and child linkage events for callback creation", () => {
+  it("writes callback intake plus source and child linkage events", () => {
     const actionBlock = extractCreateCallbackVisitActionBlock();
 
+    expect(actionBlock).toContain('event_type: "callback_reported"');
     expect(actionBlock).toContain('event_type: "callback_visit_created"');
     expect(actionBlock).toContain('event_type: "created_from_callback_report"');
+    expect(actionBlock).toContain('const callbackIntakeEventId = await insertJobEvent({');
     expect(actionBlock).toContain('source_action: "callback_visit_created_from_intake"');
-    expect(actionBlock).toContain('callback_intake_event_id: String(latestCallbackIntake.id)');
+    expect(actionBlock).toContain('callback_intake_event_id: callbackIntakeEventId');
   });
 
   it("does not mutate anchor lifecycle fields directly", () => {
@@ -68,9 +70,30 @@ describe("callback visit creation action wiring", () => {
 describe("callback visit UI placement", () => {
   it("shows office callback visit control near next service action", () => {
     expect(jobPageSource).toContain('id="next-service-action"');
+    expect(jobPageSource).toContain("Create Return Visit");
     expect(jobPageSource).toContain("Create Callback Visit");
-    expect(jobPageSource).toContain("This creates an unscheduled office/dispatch item.");
+    expect(jobPageSource).toContain("Use when the original job is not finished yet and another visit is needed to complete it.");
+    expect(jobPageSource).toContain("Use when the customer calls back after the job was believed complete.");
+    expect(jobPageSource).toContain("This records the customer report and creates a new unscheduled office/dispatch callback item.");
+    expect(jobPageSource).toContain("What did the customer report?");
+    expect(jobPageSource).toContain("It will not appear in technician My Work until it is scheduled and assigned.");
     expect(jobPageSource).toContain("createCallbackVisitFromForm");
+  });
+
+  it("keeps report-only callback logging out of primary next service workflow", () => {
+    expect(jobPageSource).not.toContain("Record report only (no visit creation)");
+    expect(jobPageSource).not.toContain("Record Callback Report Only");
+    expect(jobPageSource).not.toContain("recordCallbackReportFromForm");
+  });
+
+  it("surfaces callback intake/creation banners with explicit guidance", () => {
+    expect(jobPageSource).toContain('banner === "callback_report_recorded"');
+    expect(jobPageSource).toContain('banner === "callback_visit_created"');
+    expect(jobPageSource).toContain(
+      "Callback visit created. This is an unscheduled office/dispatch item and will not appear in technician My Work until scheduled and assigned.",
+    );
+    expect(jobPageSource).toContain('banner === "callback_visit_requires_historical_anchor"');
+    expect(jobPageSource).toContain('banner === "callback_report_requires_historical_anchor"');
   });
 
   it("keeps callback visit creation controls out of FieldOutcomePanel", () => {
