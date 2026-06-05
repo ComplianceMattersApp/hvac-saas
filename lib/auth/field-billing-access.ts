@@ -92,6 +92,13 @@ function allTrue(): FieldBillingCapabilities {
   };
 }
 
+function readOnlyInternal(): FieldBillingCapabilities {
+  return {
+    ...allFalse(),
+    can_view_field_billing_summary: true,
+  };
+}
+
 export function resolveFieldBillingCapabilities(params: FieldBillingAccessParams): FieldBillingCapabilities {
   if (!hasActiveScopedInternalUser(params)) {
     return allFalse();
@@ -105,12 +112,12 @@ export function resolveFieldBillingCapabilities(params: FieldBillingAccessParams
   const enabled = explicit.field_billing_enabled === true;
 
   if (!enabled) {
-    return allFalse();
+    return readOnlyInternal();
   }
 
   return {
     field_billing_enabled: true,
-    can_view_field_billing_summary: explicit.can_view_field_billing_summary === true,
+    can_view_field_billing_summary: explicit.can_view_field_billing_summary !== false,
     can_select_pricebook_lines: explicit.can_select_pricebook_lines === true,
     can_convert_visit_scope_to_invoice_line: explicit.can_convert_visit_scope_to_invoice_line === true,
     can_add_manual_charge: explicit.can_add_manual_charge === true,

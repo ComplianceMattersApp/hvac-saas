@@ -112,9 +112,11 @@ import DeferredSharedNotesBody from "./_components/DeferredSharedNotesBody";
 import DeferredInternalNotesBody from "./_components/DeferredInternalNotesBody";
 import DeferredInternalNoteMentionComposer from "./_components/DeferredInternalNoteMentionComposer";
 import FieldOutcomePanel from "./_components/FieldOutcomePanel";
+import FieldBillingSummary from "./_components/FieldBillingSummary";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
+import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import VisitScopeJobDetailForm from "@/components/jobs/VisitScopeJobDetailForm";
 import {
   buildVisitScopeReadModel,
@@ -1289,6 +1291,11 @@ export default async function JobDetailPage({
   internalBusinessDisplayName = internalBusinessIdentity.display_name;
   billingMode = resolvedBillingMode;
   productMode = resolvedProductMode;
+  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   // Explicit same-account internal scoped-job preflight: deny before main job-detail read assembly
   let scopedReadJob: { id?: string | null } | null = null;
@@ -2806,6 +2813,24 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         : internalInvoicePaymentSummary.paymentStatus === "partial"
           ? "border-amber-200 bg-amber-50 text-amber-800"
           : "border-slate-200 bg-slate-50 text-slate-700";
+    const fieldBillingInvoiceSnapshot = internalInvoice
+      ? {
+          status: internalInvoice.status as "draft" | "issued" | "void",
+          invoiceNumber: internalInvoice.invoice_number,
+          invoiceDisplayNumber: internalInvoice.invoice_display_number,
+          totalCents: Number(internalInvoice.total_cents ?? 0) || 0,
+          lineItemCount: internalInvoiceLineItemCount,
+        }
+      : null;
+    const fieldBillingLatestVoidedInvoiceSnapshot = latestVoidedInternalInvoice
+      ? {
+          status: "void" as const,
+          invoiceNumber: latestVoidedInternalInvoice.invoice_number,
+          invoiceDisplayNumber: latestVoidedInternalInvoice.invoice_display_number,
+          totalCents: Number(latestVoidedInternalInvoice.total_cents ?? 0) || 0,
+          lineItemCount: latestVoidedInternalInvoice.line_items?.length ?? 0,
+        }
+      : null;
 
     const internalInvoiceReadyToIssue =
       internalInvoice != null &&
@@ -2875,6 +2900,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
           </div>
         </div>
+
+        <FieldBillingSummary
+          capabilities={fieldBillingCapabilities}
+          invoice={fieldBillingInvoiceSnapshot}
+          latestVoidedInvoice={fieldBillingLatestVoidedInvoiceSnapshot}
+          paymentSummary={internalInvoice ? internalInvoicePaymentSummary : null}
+        />
 
         {!internalInvoice ? (
           <div className={`mt-4 rounded-xl border border-dashed px-4 py-4 ${hasVisitScopeDefined ? "border-slate-300 bg-slate-50/80" : "border-slate-200 bg-white/65"}`}>

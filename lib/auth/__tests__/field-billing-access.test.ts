@@ -42,6 +42,23 @@ const expectedFinancialCapabilities = {
   can_verify_non_card_collection: true,
 };
 
+const expectedReadOnlyCapabilities = {
+  ...expectedFinancialCapabilities,
+  field_billing_enabled: false,
+  can_select_pricebook_lines: false,
+  can_convert_visit_scope_to_invoice_line: false,
+  can_add_manual_charge: false,
+  can_edit_charge_description: false,
+  can_edit_charge_quantity: false,
+  can_edit_charge_price: false,
+  can_remove_field_charge: false,
+  can_submit_field_charges_for_review: false,
+  can_approve_field_charges: false,
+  can_collect_card_payment: false,
+  can_report_non_card_collection: false,
+  can_verify_non_card_collection: false,
+};
+
 describe('field billing access helper', () => {
   it('resolves full field billing capabilities for structural owner', () => {
     expect(
@@ -71,7 +88,7 @@ describe('field billing access helper', () => {
     ).toEqual(expectedFinancialCapabilities);
   });
 
-  it('resolves false by default for technician and office/dispatcher users', () => {
+  it('resolves read-only billing summary visibility for technician and office/dispatcher users by default', () => {
     for (const role of ['tech', 'technician', 'office', 'dispatcher']) {
       expect(
         resolveFieldBillingCapabilities({
@@ -79,23 +96,7 @@ describe('field billing access helper', () => {
           internalUser: internalUser(role),
           resourceAccountOwnerUserId: 'owner-1',
         }),
-      ).toEqual({
-        ...expectedFinancialCapabilities,
-        field_billing_enabled: false,
-        can_view_field_billing_summary: false,
-        can_select_pricebook_lines: false,
-        can_convert_visit_scope_to_invoice_line: false,
-        can_add_manual_charge: false,
-        can_edit_charge_description: false,
-        can_edit_charge_quantity: false,
-        can_edit_charge_price: false,
-        can_remove_field_charge: false,
-        can_submit_field_charges_for_review: false,
-        can_approve_field_charges: false,
-        can_collect_card_payment: false,
-        can_report_non_card_collection: false,
-        can_verify_non_card_collection: false,
-      });
+      ).toEqual(expectedReadOnlyCapabilities);
     }
   });
 
@@ -113,8 +114,8 @@ describe('field billing access helper', () => {
         actorUserId: 'office-1',
         internalUser: internalUser('office', { user_id: 'office-1' }),
         resourceAccountOwnerUserId: 'owner-1',
-      }).can_add_manual_charge,
-    ).toBe(false);
+      }),
+    ).toEqual(expectedReadOnlyCapabilities);
   });
 
   it('resolves false for inactive, contractor/portal, and unauthenticated contexts', () => {
