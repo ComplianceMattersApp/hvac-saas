@@ -110,6 +110,7 @@ import DeferredTimelineBody from "./_components/DeferredTimelineBody";
 import DeferredSharedNotesBody from "./_components/DeferredSharedNotesBody";
 import DeferredInternalNotesBody from "./_components/DeferredInternalNotesBody";
 import DeferredInternalNoteMentionComposer from "./_components/DeferredInternalNoteMentionComposer";
+import FieldOutcomePanel from "./_components/FieldOutcomePanel";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
@@ -2249,6 +2250,12 @@ function formatBillingAddress(a: {
 }
 
 const isFieldComplete = !!job.field_complete;
+const normalizedJobStatus = String(job.status ?? "").trim().toLowerCase();
+const normalizedOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+const isJobArchived = Boolean(job.deleted_at) || normalizedOpsStatus === "archived";
+const isJobClosed = normalizedOpsStatus === "closed";
+const isJobCancelled = normalizedJobStatus === "cancelled";
+const showFieldOutcomePanel = !(isJobClosed || isJobCancelled || isJobArchived);
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
@@ -3709,6 +3716,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
           </section>
 
+          {showFieldOutcomePanel ? (
+            <FieldOutcomePanel
+              anchorId="field-outcome"
+              isFieldComplete={isFieldComplete}
+              isEccJob={job.job_type === "ecc"}
+              className="mt-4"
+            />
+          ) : null}
+
           <section className={mobileSectionClass}>
             <div className="text-lg font-semibold">Field Actions</div>
             <div className="mt-3 grid grid-cols-2 gap-3">
@@ -4628,6 +4644,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           {hasVisitScopeDefined ? "View details" : "Add details"}
         </a>
       </div>
+    ) : null}
+
+    {showFieldOutcomePanel ? (
+      <FieldOutcomePanel
+        isFieldComplete={isFieldComplete}
+        isEccJob={job.job_type === "ecc"}
+        className="mt-3"
+      />
     ) : null}
   </div>
 
