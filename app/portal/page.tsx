@@ -35,6 +35,7 @@ import {
   portalPrimaryButtonClass,
   portalSecondaryButtonClass,
 } from "@/components/portal/PortalChrome";
+import { listPartnerWorkSourceLabelMapForJobs } from "@/lib/portal/partner-work-read-model";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -195,6 +196,10 @@ export default async function PortalPage({
   const scopedJobs = jobs.filter(matchesSearch);
 
   const scopedJobIds = scopedJobs.map((j: any) => j.id);
+  const partnerWorkSourceLabelByJobId = await listPartnerWorkSourceLabelMapForJobs({
+    supabase,
+    jobIds: scopedJobIds,
+  });
 
   const { data: visibleRuns, error: visibleRunsErr } = await supabase
     .from("ecc_test_runs")
@@ -541,6 +546,7 @@ export default async function PortalPage({
                 customerName={customerName(j)}
                 title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
                 address={displayAddress(j)}
+                sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? "Created by Rater"}
                 statusLabel={statusMeta.label}
                 statusToneClass={statusMeta.tone}
                 detailLine={detailLine}
@@ -603,6 +609,7 @@ export default async function PortalPage({
                   customerName={customerName(j)}
                   title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
                   address={displayAddress(j)}
+                  sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? "Created by Rater"}
                   statusLabel={statusMeta.label}
                   statusToneClass={statusMeta.tone}
                   detailLine={detailLine}
@@ -663,6 +670,7 @@ export default async function PortalPage({
                   customerName={customerName(j)}
                   title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
                   address={displayAddress(j)}
+                  sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? "Created by Rater"}
                   statusLabel={statusMeta.label}
                   statusToneClass={statusMeta.tone}
                   detailLine={detailLine}
@@ -743,6 +751,7 @@ export default async function PortalPage({
                   customerName={customerName(j)}
                   title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
                   address={displayAddress(j)}
+                  sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? "Created by Rater"}
                   statusLabel={statusMeta.label}
                   statusToneClass={statusMeta.tone}
                   detailLine={detailLine}
@@ -804,6 +813,7 @@ export default async function PortalPage({
                   customerName={customerName(j)}
                   title={normalizeRetestLinkedJobTitle(j.title) || "Untitled Job"}
                   address={displayAddress(j)}
+                  sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? "Created by Rater"}
                   statusLabel={statusMeta.label}
                   statusToneClass={statusMeta.tone}
                   detailLine={detailLine}

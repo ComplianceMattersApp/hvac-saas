@@ -12,6 +12,7 @@ type Props = {
   isEstimatesEnabled: boolean;
   servicePlansEnabled: boolean;
   showOperationalNotificationAwareness: boolean;
+  showPartnerWorkMenuItem: boolean;
   unreadNotificationCount: number;
   unreadNotificationBadgeLabel: string;
   primaryJobCtaLabel: string;
@@ -41,6 +42,7 @@ export default function MobileShellMenu({
   isEstimatesEnabled,
   servicePlansEnabled,
   showOperationalNotificationAwareness,
+  showPartnerWorkMenuItem,
   unreadNotificationCount,
   unreadNotificationBadgeLabel,
   primaryJobCtaLabel,
@@ -134,6 +136,11 @@ export default function MobileShellMenu({
           {isInternalUser ? (
             <Link href="/ops/field" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/ops/field", true))}>
               My Work
+            </Link>
+          ) : null}
+          {showPartnerWorkMenuItem ? (
+            <Link href="/portal" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/portal"))}>
+              Partner Work
             </Link>
           ) : null}
           <Link href="/customers" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/customers"))}>

@@ -14,6 +14,7 @@ import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
+import { shouldShowPartnerWorkMenuItem } from "@/lib/portal/partner-work-access";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 const geistSans = Geist({
@@ -80,6 +81,7 @@ export default async function RootLayout({
   const servicePlansEnabled = isMaintenanceAgreementsEnabled();
   let unreadNotificationCount = 0;
   let productMode: ProductMode = "hybrid";
+  let hasPartnerWorkAccess = false;
 
   if (actorContext.kind === "contractor") {
     homeHref = "/portal";
@@ -93,11 +95,26 @@ export default async function RootLayout({
       supabase,
       accountOwnerUserId,
     });
+
+    const { data: contractorMembership } = await supabase
+      .from("contractor_users")
+      .select("contractor_id, contractors ( lifecycle_state )")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    const contractorLifecycleState = String((contractorMembership as any)?.contractors?.lifecycle_state ?? "").trim().toLowerCase();
+    hasPartnerWorkAccess = Boolean(String((contractorMembership as any)?.contractor_id ?? "").trim()) && contractorLifecycleState === "active";
+
     productMode = await resolveProductModeForAccountOwnerId({
       supabase,
       accountOwnerUserId,
     });
   }
+
+  const showPartnerWorkMenuItem = shouldShowPartnerWorkMenuItem({
+    isInternalUser,
+    hasPartnerWorkAccess,
+  });
 
   const primaryJobCtaLabel = productMode === "hvac_service" ? "+ New Work Order" : "+ New Job";
   const createMenuItems: ShellCreateItem[] = [
@@ -201,6 +218,9 @@ export default async function RootLayout({
                           My Work
                         </ShellNavLink>
                       ) : null}
+                      {showPartnerWorkMenuItem ? (
+                        <ShellNavLink href="/portal">Partner Work</ShellNavLink>
+                      ) : null}
                       <ShellNavLink href="/customers">Customers</ShellNavLink>
                       {isInternalUser && servicePlansEnabled ? (
                         <ShellNavLink href="/service-plans">Service Plans</ShellNavLink>
@@ -242,6 +262,7 @@ export default async function RootLayout({
                       isAdmin={isAdmin}
                       isEstimatesEnabled={estimatesEnabled}
                       showOperationalNotificationAwareness={showOperationalNotificationAwareness}
+                      showPartnerWorkMenuItem={showPartnerWorkMenuItem}
                       unreadNotificationCount={unreadNotificationCount}
                       unreadNotificationBadgeLabel={unreadNotificationBadgeLabel}
                       primaryJobCtaLabel={primaryJobCtaLabel}
