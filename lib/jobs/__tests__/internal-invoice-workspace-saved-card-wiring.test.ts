@@ -67,6 +67,13 @@ describe("internal invoice workspace saved-card charge wiring", () => {
   });
 
   it("preserves existing payment actions while adding saved-card control", () => {
+    expect(source).toContain("collectIssuedInvoiceCardPaymentFromForm");
+    expect(source).toContain("Collect Card Payment");
+    expect(source).toContain("Launch secure Stripe Checkout to collect card payment in the field");
+    expect(source).toContain("Issue invoice before collecting card payment.");
+    expect(source).toContain("Invoice is paid or has no balance due.");
+    expect(source).toContain("Online payments are not ready.");
+    expect(source).toContain("canCollectCardPaymentAccess && !canManageFinancialInvoiceLifecycle");
     expect(source).toContain("Create payment link");
     expect(source).toContain("Record manual payment");
     expect(source).toContain("collectTenantInvoicePaymentNowFromForm");

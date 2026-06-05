@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
+import { resolveFieldBillingCapabilities } from '@/lib/auth/field-billing-access';
 import {
   requireInvoicePaymentRecordAccessOrRedirect,
   requireTenantInvoicePaymentLinkAccessOrRedirect,
@@ -666,6 +667,99 @@ export async function collectTenantInvoicePaymentNowFromForm(formData: FormData)
   forwardedFormData.set('redirect_to_checkout', '1');
 
   await createTenantInvoiceCheckoutSessionFromForm(forwardedFormData);
+}
+
+export async function collectIssuedInvoiceCardPaymentFromForm(formData: FormData): Promise<void> {
+  const jobId = getTrimmedString(formData.get('job_id'));
+  const invoiceIdInput = getTrimmedString(formData.get('invoice_id'));
+  const tab = getTrimmedString(formData.get('tab')) || 'info';
+  const returnTo = getTrimmedString(formData.get('return_to'));
+
+  if (!jobId) {
+    throw new Error('Job ID is required.');
+  }
+
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalUser({ supabase });
+
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: 'id',
+  });
+
+  if (!scopedJob?.id) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    actorUserId: userId,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  if (!fieldBillingCapabilities.can_collect_card_payment) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  await requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  if (billingMode !== 'internal_invoicing') {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoicing_billing_pending', returnTo));
+  }
+
+  const invoice = await resolveInternalInvoiceByJobId({
+    supabase,
+    jobId,
+  });
+
+  if (!invoice) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_missing', returnTo));
+  }
+
+  if (invoice.account_owner_user_id !== internalUser.account_owner_user_id || invoice.job_id !== jobId) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  if (invoiceIdInput && invoiceIdInput !== invoice.id) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  try {
+    const checkoutSession = await createTenantInvoiceCheckoutSession({
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+      invoiceId: invoice.id,
+      supabase,
+    });
+
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/jobs/${jobId}/invoice`);
+    revalidatePath('/jobs');
+    revalidatePath('/ops');
+    revalidatePath('/reports/invoices');
+
+    redirect(checkoutSession.checkoutSessionUrl);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('REDIRECT:')) {
+      throw error;
+    }
+
+    const mappedBanner = mapTenantInvoiceCheckoutHelperErrorToBanner(error);
+    if (mappedBanner) {
+      redirect(buildInternalInvoiceReturnHref(jobId, tab, mappedBanner, returnTo));
+    }
+
+    throw error;
+  }
 }
 
 export type { TenantInvoiceCheckoutSessionActionState } from '@/lib/actions/internal-invoice-payment-actions-state';

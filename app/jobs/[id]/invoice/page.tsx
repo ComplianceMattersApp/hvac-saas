@@ -46,6 +46,7 @@ import {
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
 import {
+  collectIssuedInvoiceCardPaymentFromForm,
   collectTenantInvoicePaymentNowFromForm,
   recordInternalInvoicePaymentFromForm,
   reverseInternalInvoicePaymentFromForm,
@@ -504,6 +505,7 @@ export default async function InternalInvoiceWorkspacePage({
   const canCreateDraftInvoice = Boolean(
     fieldBillingCapabilities.can_create_direct_invoice_draft || canManageFinancialInvoiceLifecycle,
   );
+  const canCollectCardPaymentAccess = fieldBillingCapabilities.can_collect_card_payment;
 
   const invoiceCustomerId = String(invoice?.customer_id ?? "").trim() || null;
   const savedCardMethodRows =
@@ -556,6 +558,7 @@ export default async function InternalInvoiceWorkspacePage({
     && tenantStripeReadiness.isReady
     && canManageFinancialInvoiceLifecycle,
   );
+  const hasOutstandingInvoiceBalance = Number(paymentSummary?.balanceDueCents ?? 0) > 0;
 
   const failedAutopayAttention = invoice
     ? await loadFailedAutopayAttentionItems({
@@ -1012,6 +1015,35 @@ export default async function InternalInvoiceWorkspacePage({
                   </SubmitButton>
                 </form>
 
+              </section>
+            ) : null}
+
+            {invoice && canCollectCardPaymentAccess && !canManageFinancialInvoiceLifecycle ? (
+              <section className={`${panelClass} order-5 p-4 sm:p-5`}>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Collection</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collect Card Payment</h2>
+                {invoice.status !== "issued" ? (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">Issue invoice before collecting card payment.</p>
+                ) : !hasOutstandingInvoiceBalance ? (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">Invoice is paid or has no balance due.</p>
+                ) : !tenantStripeReadiness.isReady ? (
+                  <p className="mt-2 text-sm leading-6 text-slate-600">Online payments are not ready.</p>
+                ) : (
+                  <>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Launch secure Stripe Checkout to collect card payment in the field. Payment is recorded only after Stripe webhook confirmation.
+                    </p>
+                    <form action={collectIssuedInvoiceCardPaymentFromForm} className="mt-4 space-y-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
+                      <input type="hidden" name="job_id" value={jobId} />
+                      <input type="hidden" name="invoice_id" value={invoice.id} />
+                      <input type="hidden" name="tab" value="info" />
+                      <input type="hidden" name="return_to" value={returnTo} />
+                      <SubmitButton loadingText="Opening checkout..." className={darkButtonClass}>
+                        Collect Card Payment
+                      </SubmitButton>
+                    </form>
+                  </>
+                )}
               </section>
             ) : null}
 

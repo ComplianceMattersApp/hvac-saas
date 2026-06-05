@@ -260,6 +260,24 @@ describe('field billing access helper', () => {
     expect(capabilities.can_verify_non_card_collection).toBe(false);
   });
 
+  it('can grant collect-card capability without granting issue/send authority', () => {
+    const capabilities = resolveFieldBillingCapabilities({
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+      explicitCapabilities: {
+        field_billing_enabled: true,
+        can_view_field_billing_summary: true,
+        can_collect_card_payment: true,
+      },
+    });
+
+    expect(capabilities.can_collect_card_payment).toBe(true);
+    expect(capabilities.can_issue_invoice).toBe(false);
+    expect(capabilities.can_send_invoice).toBe(false);
+    expect(capabilities.can_verify_non_card_collection).toBe(false);
+  });
+
   it('redirect helpers deny missing charge-authoring capabilities', () => {
     const params = {
       actorUserId: 'tech-1',

@@ -12,6 +12,7 @@ const upsertInvoicePaymentAllocationForPaymentRowMock = vi.fn();
 const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
+const resolveFieldBillingCapabilitiesMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
@@ -35,6 +36,11 @@ vi.mock('@/lib/auth/internal-user', () => ({
 vi.mock('@/lib/auth/internal-job-scope', () => ({
   loadScopedInternalJobForMutation: (...args: unknown[]) =>
     loadScopedInternalJobForMutationMock(...args),
+}));
+
+vi.mock('@/lib/auth/field-billing-access', () => ({
+  resolveFieldBillingCapabilities: (...args: unknown[]) =>
+    resolveFieldBillingCapabilitiesMock(...args),
 }));
 
 vi.mock('@/lib/business/internal-business-profile', () => ({
@@ -901,6 +907,147 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
         invoiceId: 'inv-1',
       }),
     );
+  });
+});
+
+describe('collectIssuedInvoiceCardPaymentFromForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+
+    requireInternalUserMock.mockResolvedValue({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    resolveFieldBillingCapabilitiesMock.mockReturnValue({
+      can_collect_card_payment: true,
+    });
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValue('internal_invoicing');
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: 'allowed_active',
+    });
+    resolveInternalInvoiceByJobIdMock.mockResolvedValue({
+      id: 'inv-1',
+      account_owner_user_id: 'owner-1',
+      job_id: 'job-1',
+      invoice_number: 'INV-1',
+      status: 'issued',
+      total_cents: 10000,
+    });
+    createTenantInvoiceCheckoutSessionMock.mockResolvedValue({
+      checkoutSessionId: 'cs_123',
+      checkoutSessionUrl: 'https://checkout.stripe.com/c/pay/cs_123',
+      connectedAccountId: 'acct_123',
+      balanceDueCents: 8000,
+    });
+
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+  });
+
+  function buildCollectFormData(overrides: Partial<Record<string, string>> = {}) {
+    const formData = new FormData();
+    formData.set('job_id', 'job-1');
+    formData.set('invoice_id', 'inv-1');
+    formData.set('tab', 'info');
+    formData.set('return_to', '/jobs/job-1/invoice#invoice-workspace');
+
+    for (const [key, value] of Object.entries(overrides)) {
+      if (value != null) {
+        formData.set(key, value);
+      }
+    }
+
+    return formData;
+  }
+
+  it('allows trusted field actor with collect-card capability to launch checkout', async () => {
+    const { collectIssuedInvoiceCardPaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      collectIssuedInvoiceCardPaymentFromForm(buildCollectFormData()),
+    ).rejects.toThrow('REDIRECT:https://checkout.stripe.com/c/pay/cs_123');
+
+    expect(createTenantInvoiceCheckoutSessionMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: 'owner-1',
+        jobId: 'job-1',
+        invoiceId: 'inv-1',
+      }),
+    );
+  });
+
+  it('rejects actor without collect-card capability', async () => {
+    resolveFieldBillingCapabilitiesMock.mockReturnValueOnce({
+      can_collect_card_payment: false,
+    });
+
+    const { collectIssuedInvoiceCardPaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      collectIssuedInvoiceCardPaymentFromForm(buildCollectFormData()),
+    ).rejects.toThrow('banner=not_authorized');
+
+    expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
+    expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects draft invoice collection attempts', async () => {
+    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+      new Error('Invoice must be issued to accept online payment'),
+    );
+
+    const { collectIssuedInvoiceCardPaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      collectIssuedInvoiceCardPaymentFromForm(buildCollectFormData()),
+    ).rejects.toThrow('banner=internal_invoice_payment_requires_issued');
+  });
+
+  it('rejects zero-balance collection attempts', async () => {
+    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+      new Error('Invoice balance must be greater than zero'),
+    );
+
+    const { collectIssuedInvoiceCardPaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      collectIssuedInvoiceCardPaymentFromForm(buildCollectFormData()),
+    ).rejects.toThrow('banner=internal_invoice_payment_no_balance_due');
+  });
+
+  it('rejects collection when Stripe readiness is missing', async () => {
+    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+      new Error('Tenant Stripe Connect account is not ready for checkout session creation.'),
+    );
+
+    const { collectIssuedInvoiceCardPaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      collectIssuedInvoiceCardPaymentFromForm(buildCollectFormData()),
+    ).rejects.toThrow('banner=internal_invoice_payment_connect_not_ready');
+  });
+
+  it('does not insert payment rows when launching field checkout', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { collectIssuedInvoiceCardPaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      collectIssuedInvoiceCardPaymentFromForm(buildCollectFormData()),
+    ).rejects.toThrow('REDIRECT:https://checkout.stripe.com/c/pay/cs_123');
+
+    expect(fixture.writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(false);
+    expect(insertJobEventMock).not.toHaveBeenCalled();
   });
 });
 
