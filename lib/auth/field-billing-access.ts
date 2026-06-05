@@ -224,12 +224,7 @@ type FieldBillingRedirectParams = FieldBillingAccessParams & {
 
 export function requireManualFieldChargeAccessOrRedirect(params: FieldBillingRedirectParams) {
   const capabilities = resolveFieldBillingCapabilities(params);
-  if (
-    capabilities.can_add_manual_invoice_line
-    && capabilities.can_edit_invoice_line_description
-    && capabilities.can_edit_invoice_line_quantity
-    && capabilities.can_edit_invoice_line_price
-  ) {
+  if (capabilities.can_add_manual_invoice_line) {
     return;
   }
 
@@ -256,8 +251,8 @@ export function requireFieldChargeEditAccessOrRedirect(params: FieldBillingRedir
   const capabilities = resolveFieldBillingCapabilities(params);
   if (
     capabilities.can_edit_invoice_line_description
-    && capabilities.can_edit_invoice_line_quantity
-    && capabilities.can_edit_invoice_line_price
+    || capabilities.can_edit_invoice_line_quantity
+    || capabilities.can_edit_invoice_line_price
   ) {
     return;
   }

@@ -7,6 +7,7 @@ import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
 import { requireInvoiceLifecycleAccessOrRedirect } from '@/lib/auth/financial-access';
 import {
+  resolveFieldBillingCapabilities,
   requireFieldChargeEditAccessOrRedirect,
   requireFieldChargeRemoveAccessOrRedirect,
   requireManualFieldChargeAccessOrRedirect,
@@ -397,26 +398,6 @@ function resolveSmallMutationResult(params: {
   }
 
   redirect(buildJobDetailHref(params.jobId, params.tab, params.banner));
-}
-
-function parseLineItemDraftFields(formData: FormData) {
-  const itemName = getTrimmedString(formData.get('item_name_snapshot'));
-  if (!itemName) {
-    throw new Error('Item name is required.');
-  }
-
-  const quantityHundredths = parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1');
-  const unitPriceCents = parseMoneyToCents(getTrimmedString(formData.get('unit_price')) || '0', 'Unit price');
-  const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
-
-  return {
-    item_name_snapshot: itemName,
-    description_snapshot: getOptionalText(formData.get('description_snapshot')),
-    item_type_snapshot: normalizeInternalInvoiceItemType(formData.get('item_type_snapshot')),
-    quantity: formatScaledInt(quantityHundredths, 2),
-    unit_price: formatScaledInt(unitPriceCents, 2),
-    line_subtotal: formatScaledInt(lineSubtotalCents, 2),
-  };
 }
 
 function parseSelectedVisitScopeItemIds(formData: FormData) {
@@ -982,6 +963,14 @@ function fieldChargeAccessParams(context: Awaited<ReturnType<typeof loadInternal
   };
 }
 
+function resolveFieldChargeCapabilities(context: Awaited<ReturnType<typeof loadInternalInvoiceContext>>) {
+  return resolveFieldBillingCapabilities({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+  });
+}
+
 async function logInvoiceEvent(params: {
   supabase: any;
   userId: string;
@@ -1448,10 +1437,31 @@ export async function addInternalInvoiceLineItemFromForm(formData: FormData): Pr
   const context = await requireDraftInvoiceContext(formData);
   requireManualFieldChargeAccessOrRedirect(fieldChargeAccessParams(context));
   const invoice = context.invoice!;
+  const capabilities = resolveFieldChargeCapabilities(context);
 
-  let payload: ReturnType<typeof parseLineItemDraftFields>;
+  const itemName = getTrimmedString(formData.get('item_name_snapshot'));
+  if (!itemName) {
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_line_item_invalid',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        item_name_snapshot: 'Item name is required.',
+      },
+    });
+  }
+
+  let quantityHundredths = 100;
+  let unitPriceCents = 0;
   try {
-    payload = parseLineItemDraftFields(formData);
+    quantityHundredths = capabilities.can_edit_invoice_line_quantity
+      ? parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1')
+      : 100;
+    unitPriceCents = capabilities.can_edit_invoice_line_price
+      ? parseMoneyToCents(getTrimmedString(formData.get('unit_price')) || '0', 'Unit price')
+      : 0;
   } catch {
     return resolveSmallMutationResult({
       jobId: context.jobId,
@@ -1464,6 +1474,17 @@ export async function addInternalInvoiceLineItemFromForm(formData: FormData): Pr
       },
     });
   }
+
+  const payload = {
+    item_name_snapshot: itemName,
+    description_snapshot: capabilities.can_edit_invoice_line_description
+      ? getOptionalText(formData.get('description_snapshot'))
+      : null,
+    item_type_snapshot: normalizeInternalInvoiceItemType(formData.get('item_type_snapshot')),
+    quantity: formatScaledInt(quantityHundredths, 2),
+    unit_price: formatScaledInt(unitPriceCents, 2),
+    line_subtotal: formatScaledInt(computeLineSubtotalCents(quantityHundredths, unitPriceCents), 2),
+  };
 
   const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
 
@@ -1506,6 +1527,7 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
   const context = await requireDraftInvoiceContext(formData);
   requirePricebookFieldChargeAccessOrRedirect(fieldChargeAccessParams(context));
   const invoice = context.invoice!;
+  const capabilities = resolveFieldChargeCapabilities(context);
 
   const pricebookItemId = getTrimmedString(formData.get('pricebook_item_id'));
   if (!pricebookItemId) {
@@ -1521,9 +1543,11 @@ export async function addInternalInvoiceLineItemFromPricebookForm(formData: Form
     });
   }
 
-  let quantityHundredths = 0;
+  let quantityHundredths = 100;
   try {
-    quantityHundredths = parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1');
+    quantityHundredths = capabilities.can_edit_invoice_line_quantity
+      ? parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1')
+      : 100;
   } catch {
     return resolveSmallMutationResult({
       jobId: context.jobId,
@@ -1637,6 +1661,7 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
   const context = await requireDraftInvoiceContext(formData);
   requireVisitScopeFieldChargeAccessOrRedirect(fieldChargeAccessParams(context));
   const invoice = context.invoice!;
+  const capabilities = resolveFieldChargeCapabilities(context);
 
   const { selectedIds, malformedIds } = parseSelectedVisitScopeItemIds(formData);
 
@@ -1668,7 +1693,9 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
 
   let quantityHundredths = 100;
   try {
-    quantityHundredths = parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1');
+    quantityHundredths = capabilities.can_edit_invoice_line_quantity
+      ? parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1')
+      : 100;
   } catch {
     return resolveSmallMutationResult({
       jobId: context.jobId,
@@ -1819,6 +1846,7 @@ export async function updateInternalInvoiceLineItemFromForm(formData: FormData):
   const noRedirect = isNoRedirectRequested(formData);
   const context = await requireDraftInvoiceContext(formData);
   requireFieldChargeEditAccessOrRedirect(fieldChargeAccessParams(context));
+  const capabilities = resolveFieldChargeCapabilities(context);
   const invoice = context.invoice!;
   const lineItemId = getTrimmedString(formData.get('line_item_id'));
   if (!lineItemId) {
@@ -1830,22 +1858,6 @@ export async function updateInternalInvoiceLineItemFromForm(formData: FormData):
       ok: false,
       fieldErrors: {
         line_item_id: 'Line item is missing.',
-      },
-    });
-  }
-
-  let payload: ReturnType<typeof parseLineItemDraftFields>;
-  try {
-    payload = parseLineItemDraftFields(formData);
-  } catch {
-    return resolveSmallMutationResult({
-      jobId: context.jobId,
-      tab: context.tab,
-      banner: 'internal_invoice_line_item_invalid',
-      noRedirect,
-      ok: false,
-      fieldErrors: {
-        _form: 'Line item fields are invalid.',
       },
     });
   }
@@ -1863,6 +1875,70 @@ export async function updateInternalInvoiceLineItemFromForm(formData: FormData):
       },
     });
   }
+
+  const canEditDescription = capabilities.can_edit_invoice_line_description;
+  const canEditQuantity = capabilities.can_edit_invoice_line_quantity;
+  const canEditPrice = capabilities.can_edit_invoice_line_price;
+
+  let nextItemName = String(targetLineItem.item_name_snapshot ?? '').trim() || 'Line item';
+  let nextDescription = getOptionalText(targetLineItem.description_snapshot);
+  let nextItemType = normalizeInternalInvoiceItemType(targetLineItem.item_type_snapshot);
+
+  if (canEditDescription) {
+    const candidateName = getTrimmedString(formData.get('item_name_snapshot'));
+    if (!candidateName) {
+      return resolveSmallMutationResult({
+        jobId: context.jobId,
+        tab: context.tab,
+        banner: 'internal_invoice_line_item_invalid',
+        noRedirect,
+        ok: false,
+        fieldErrors: {
+          item_name_snapshot: 'Item name is required.',
+        },
+      });
+    }
+
+    nextItemName = candidateName;
+    nextDescription = getOptionalText(formData.get('description_snapshot'));
+    nextItemType = normalizeInternalInvoiceItemType(formData.get('item_type_snapshot'));
+  }
+
+  const currentQuantityHundredths = Math.max(1, Math.round(Number(targetLineItem.quantity ?? 0) * 100));
+  const currentUnitPriceCents = Math.max(0, Math.round(Number(targetLineItem.unit_price ?? 0) * 100));
+
+  let nextQuantityHundredths = currentQuantityHundredths;
+  let nextUnitPriceCents = currentUnitPriceCents;
+
+  try {
+    if (canEditQuantity) {
+      nextQuantityHundredths = parseQuantityToHundredths(getTrimmedString(formData.get('quantity')) || '1');
+    }
+    if (canEditPrice) {
+      nextUnitPriceCents = parseMoneyToCents(getTrimmedString(formData.get('unit_price')) || '0', 'Unit price');
+    }
+  } catch {
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_line_item_invalid',
+      noRedirect,
+      ok: false,
+      fieldErrors: {
+        _form: 'Line item fields are invalid.',
+      },
+    });
+  }
+
+  const lineSubtotalCents = computeLineSubtotalCents(nextQuantityHundredths, nextUnitPriceCents);
+  const payload = {
+    item_name_snapshot: nextItemName,
+    description_snapshot: nextDescription,
+    item_type_snapshot: nextItemType,
+    quantity: formatScaledInt(nextQuantityHundredths, 2),
+    unit_price: formatScaledInt(nextUnitPriceCents, 2),
+    line_subtotal: formatScaledInt(lineSubtotalCents, 2),
+  };
 
   const { error } = await context.supabase
     .from('internal_invoice_line_items')

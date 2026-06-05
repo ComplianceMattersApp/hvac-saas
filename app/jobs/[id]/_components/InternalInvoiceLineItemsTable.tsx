@@ -7,6 +7,7 @@ import PricebookLineEntryFields, {
   type PricebookEntryItem,
 } from '@/components/pricebook/PricebookLineEntryFields';
 import type { InternalInvoiceItemType, InternalInvoiceLineItemRecord } from '@/lib/business/internal-invoice';
+import type { FieldBillingCapabilities } from '@/lib/auth/field-billing-access';
 
 type InternalInvoiceActionResult = {
   ok: boolean;
@@ -36,6 +37,7 @@ type VisitScopePickerItem = {
 type InternalInvoiceLineItemsTableProps = {
   jobId: string;
   tab: string;
+  capabilities: FieldBillingCapabilities;
   lineItems: InternalInvoiceLineItemRecord[];
   totalCents: number;
   addLineItemAction: ServerFormAction;
@@ -170,6 +172,7 @@ export function InternalInvoiceDraftSaveForm(props: {
 export default function InternalInvoiceLineItemsTable({
   jobId,
   tab,
+  capabilities,
   lineItems,
   totalCents,
   addLineItemAction,
@@ -192,6 +195,20 @@ export default function InternalInvoiceLineItemsTable({
     pricebookPickerItems[0]?.id ?? '',
   );
   const [selectedVisitScopeItemIds, setSelectedVisitScopeItemIds] = useState<string[]>([]);
+  const canAddPricebookLine = capabilities.can_select_pricebook_invoice_lines;
+  const canAddVisitScopeLine = capabilities.can_convert_visit_scope_to_invoice_lines;
+  const canAddManualLine = capabilities.can_add_manual_invoice_line;
+  const canEditDescription = capabilities.can_edit_invoice_line_description;
+  const canEditQuantity = capabilities.can_edit_invoice_line_quantity;
+  const canEditPrice = capabilities.can_edit_invoice_line_price;
+  const canEditAnyLine = canEditDescription || canEditQuantity || canEditPrice;
+  const canRemoveLine = capabilities.can_remove_invoice_line;
+  const canMutateDraftLines =
+    canAddPricebookLine
+    || canAddVisitScopeLine
+    || canAddManualLine
+    || canEditAnyLine
+    || canRemoveLine;
   const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded);
 
   function toggleVisitScopeItem(itemId: string) {
@@ -309,7 +326,7 @@ export default function InternalInvoiceLineItemsTable({
       ) : null}
 
       <div className="divide-y divide-slate-200/80">
-        {visitScopePickerItems.length > 0 ? (
+        {canAddVisitScopeLine && visitScopePickerItems.length > 0 ? (
           <form action={handleAddVisitScope} className="bg-sky-50/50 px-5 py-5">
             <input type="hidden" name="job_id" value={jobId} />
             <input type="hidden" name="tab" value={tab} />
@@ -384,6 +401,7 @@ export default function InternalInvoiceLineItemsTable({
           </form>
         ) : null}
 
+        {canAddPricebookLine ? (
         <form action={handleAddPricebook} className="bg-white/92 px-5 py-5">
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="tab" value={tab} />
@@ -442,6 +460,7 @@ export default function InternalInvoiceLineItemsTable({
             </div>
           )}
         </form>
+        ) : null}
 
         {lineItems.map((lineItem, index) => {
           const isPrimaryRow = index === 0;
@@ -477,13 +496,19 @@ export default function InternalInvoiceLineItemsTable({
                   </div>
 
                   <div className="flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => setExpandedAdditionalRowId(lineItem.id)}
-                      className="inline-flex min-h-9 items-center justify-center rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_-14px_rgba(2,132,199,0.65)] transition-[background-color,box-shadow,transform] hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
-                    >
-                      Edit Details
-                    </button>
+                    {canEditAnyLine || canRemoveLine ? (
+                      <button
+                        type="button"
+                        onClick={() => setExpandedAdditionalRowId(lineItem.id)}
+                        className="inline-flex min-h-9 items-center justify-center rounded-lg bg-sky-600 px-3 py-2 text-sm font-semibold text-white shadow-[0_8px_20px_-14px_rgba(2,132,199,0.65)] transition-[background-color,box-shadow,transform] hover:bg-sky-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
+                      >
+                        {canEditAnyLine ? 'Edit Details' : 'Manage Row'}
+                      </button>
+                    ) : (
+                      <span className="inline-flex min-h-9 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500">
+                        View only
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -525,6 +550,7 @@ export default function InternalInvoiceLineItemsTable({
                       name="item_name_snapshot"
                       defaultValue={lineItem.item_name_snapshot}
                       className={workspaceInputClass}
+                      disabled={!canEditDescription}
                       required
                     />
                   </div>
@@ -535,6 +561,7 @@ export default function InternalInvoiceLineItemsTable({
                       name="item_type_snapshot"
                       defaultValue={lineItem.item_type_snapshot}
                       className={workspaceInputClass}
+                      disabled={!canEditDescription}
                     >
                       <option value="service">Service</option>
                       <option value="material">Material</option>
@@ -551,6 +578,7 @@ export default function InternalInvoiceLineItemsTable({
                       inputMode="decimal"
                       defaultValue={formatDecimalInput(lineItem.quantity)}
                       className={workspaceInputClass}
+                      disabled={!canEditQuantity}
                       required
                     />
                   </div>
@@ -562,6 +590,7 @@ export default function InternalInvoiceLineItemsTable({
                       inputMode="decimal"
                       defaultValue={formatDecimalInput(lineItem.unit_price)}
                       className={workspaceInputClass}
+                      disabled={!canEditPrice}
                       required
                     />
                   </div>
@@ -579,24 +608,33 @@ export default function InternalInvoiceLineItemsTable({
                       name="description_snapshot"
                       defaultValue={String(lineItem.description_snapshot ?? '')}
                       className={`${workspaceInputClass} min-h-[5.5rem]`}
+                      disabled={!canEditDescription}
                       placeholder="Scope detail, work instruction, or install note"
                     />
                   </div>
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
-                  <div className="text-xs text-slate-500">Save after editing this row to keep totals and issued charges in sync.</div>
+                  <div className="text-xs text-slate-500">
+                    {canEditAnyLine
+                      ? 'Save after editing this row to keep totals and issued charges in sync.'
+                      : 'This row is read-only for edits under your current direct invoice permissions.'}
+                  </div>
                   <div className="flex flex-wrap items-center gap-2">
-                    <SubmitButton loadingText="Saving..." className={secondaryButtonClass}>
-                      Save Charge
-                    </SubmitButton>
-                    <button
-                      type="submit"
-                      form={`remove-line-item-${lineItem.id}`}
-                      className="inline-flex min-h-9 items-center justify-center rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
-                    >
-                      Remove Charge
-                    </button>
+                    {canEditAnyLine ? (
+                      <SubmitButton loadingText="Saving..." className={secondaryButtonClass}>
+                        Save Charge
+                      </SubmitButton>
+                    ) : null}
+                    {canRemoveLine ? (
+                      <button
+                        type="submit"
+                        form={`remove-line-item-${lineItem.id}`}
+                        className="inline-flex min-h-9 items-center justify-center rounded-lg border border-rose-300 bg-white px-3 py-2 text-sm font-semibold text-rose-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px]"
+                      >
+                        Remove Charge
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               </form>
@@ -612,7 +650,7 @@ export default function InternalInvoiceLineItemsTable({
           );
         })}
 
-        {isAddFormOpen ? (
+        {canAddManualLine && isAddFormOpen ? (
           <form action={handleAddManualLineItem} className="bg-slate-50/94 px-5 py-5">
             <input type="hidden" name="job_id" value={jobId} />
             <input type="hidden" name="tab" value={tab} />
@@ -652,12 +690,12 @@ export default function InternalInvoiceLineItemsTable({
 
               <div>
                 <label className={workspaceFieldLabelClass}>Quantity</label>
-                <input name="quantity" inputMode="decimal" defaultValue="1.00" className={workspaceInputClass} required />
+                <input name="quantity" inputMode="decimal" defaultValue="1.00" className={workspaceInputClass} disabled={!canEditQuantity} required />
               </div>
 
               <div>
                 <label className={workspaceFieldLabelClass}>Unit Price</label>
-                <input name="unit_price" inputMode="decimal" defaultValue="0.00" className={workspaceInputClass} required />
+                <input name="unit_price" inputMode="decimal" defaultValue="0.00" className={workspaceInputClass} disabled={!canEditPrice} required />
               </div>
 
               <div>
@@ -672,6 +710,7 @@ export default function InternalInvoiceLineItemsTable({
                 <textarea
                   name="description_snapshot"
                   className={`${workspaceInputClass} min-h-[5.5rem]`}
+                  disabled={!canEditDescription}
                   placeholder="Optional charge detail or technician-facing work detail"
                 />
               </div>
@@ -684,7 +723,7 @@ export default function InternalInvoiceLineItemsTable({
               </SubmitButton>
             </div>
           </form>
-        ) : (
+        ) : canAddManualLine ? (
           <div className="bg-slate-50/94 px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/82 px-4 py-3">
               <div>
@@ -698,6 +737,12 @@ export default function InternalInvoiceLineItemsTable({
               >
                 + Add Charge
               </button>
+            </div>
+          </div>
+        ) : canMutateDraftLines ? null : (
+          <div className="bg-slate-50/94 px-5 py-4">
+            <div className="rounded-xl border border-slate-200/80 bg-white/82 px-4 py-3 text-xs leading-5 text-slate-500">
+              Draft invoice lines are visible, but no direct line mutations are available under your current permissions.
             </div>
           </div>
         )}

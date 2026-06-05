@@ -2,6 +2,10 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
 import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
+import {
+  hasDirectInvoiceDraftMutationAccess,
+  resolveFieldBillingCapabilities,
+} from "@/lib/auth/field-billing-access";
 import { createClient } from "@/lib/supabase/server";
 import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-boundary";
 import { loadScopedInternalJobDetailReadBoundary } from "@/lib/actions/internal-job-detail-read-boundary";
@@ -487,6 +491,15 @@ export default async function InternalInvoiceWorkspacePage({
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
   });
+  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
+  const canAccessDraftLineWorkspace = hasDirectInvoiceDraftMutationAccess(fieldBillingCapabilities);
+  const canCreateDraftInvoice = Boolean(
+    fieldBillingCapabilities.can_create_direct_invoice_draft || canManageFinancialInvoiceLifecycle,
+  );
 
   const invoiceCustomerId = String(invoice?.customer_id ?? "").trim() || null;
   const savedCardMethodRows =
@@ -675,14 +688,20 @@ export default async function InternalInvoiceWorkspacePage({
             <p className="mt-2 text-sm leading-6 text-slate-600">
               Create a draft invoice to build billed charges from Work Items, Pricebook items, or custom charges.
             </p>
-            <form action={createInternalInvoiceDraftFromForm} className="mt-4">
-              <input type="hidden" name="job_id" value={jobId} />
-              <input type="hidden" name="tab" value="info" />
-              <input type="hidden" name="return_to" value={returnTo} />
-              <SubmitButton loadingText="Creating..." className={darkButtonClass}>
-                Create Draft Invoice
-              </SubmitButton>
-            </form>
+            {canCreateDraftInvoice ? (
+              <form action={createInternalInvoiceDraftFromForm} className="mt-4">
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="tab" value="info" />
+                <input type="hidden" name="return_to" value={returnTo} />
+                <SubmitButton loadingText="Creating..." className={darkButtonClass}>
+                  Create Draft Invoice
+                </SubmitButton>
+              </form>
+            ) : (
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm leading-6 text-slate-600">
+                Draft creation requires direct invoice draft authority.
+              </div>
+            )}
           </div>
         </section>
       ) : (
@@ -702,10 +721,11 @@ export default async function InternalInvoiceWorkspacePage({
                 </div>
               </div>
 
-              {invoice.status === "draft" ? (
+              {invoice.status === "draft" && canAccessDraftLineWorkspace ? (
                 <InternalInvoiceLineItemsTable
                   jobId={jobId}
                   tab="info"
+                  capabilities={fieldBillingCapabilities}
                   lineItems={invoice.line_items}
                   totalCents={invoice.total_cents}
                   addLineItemAction={addInternalInvoiceLineItemFromForm}
@@ -722,6 +742,11 @@ export default async function InternalInvoiceWorkspacePage({
                 />
               ) : (
                 <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/75">
+                  {invoice.status === "draft" && !canAccessDraftLineWorkspace ? (
+                    <div className="border-b border-slate-200/80 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      Draft invoice lines are view-only under your current permissions.
+                    </div>
+                  ) : null}
                   {invoice.line_items.length === 0 ? (
                     <div className="px-4 py-4 text-sm text-slate-600">No invoice lines were recorded on this invoice.</div>
                   ) : (
@@ -748,7 +773,7 @@ export default async function InternalInvoiceWorkspacePage({
               )}
             </section>
 
-            {invoicePaymentLinkUiState.showPanel ? (
+            {invoicePaymentLinkUiState.showPanel && canManageFinancialInvoiceLifecycle ? (
               <section className={`${panelClass} order-30 p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Link</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Create a customer payment link</h2>
@@ -781,7 +806,7 @@ export default async function InternalInvoiceWorkspacePage({
               </section>
             ) : null}
 
-            {invoice.status === "issued" ? (
+            {invoice.status === "issued" && canManageFinancialInvoiceLifecycle ? (
               <section className={`${panelClass} order-20 p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Attention</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Review payment failures</h2>
@@ -876,7 +901,7 @@ export default async function InternalInvoiceWorkspacePage({
               </section>
             ) : null}
 
-            {invoice.status === "issued" ? (
+            {invoice.status === "issued" && canManageFinancialInvoiceLifecycle ? (
               <section className={`${panelClass} order-10 p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Options</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Choose how to collect payment</h2>
@@ -986,7 +1011,7 @@ export default async function InternalInvoiceWorkspacePage({
               </section>
             ) : null}
 
-            {invoice.status === "issued" ? (
+            {invoice.status === "issued" && canManageFinancialInvoiceLifecycle ? (
               <section className={`${panelClass} order-50 p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment History</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collected and not-collected activity</h2>
@@ -1084,7 +1109,7 @@ export default async function InternalInvoiceWorkspacePage({
                 {readinessRow("Total", totalReady, totalReady ? formatCurrencyFromCents(invoice.total_cents) : "Total must be above $0.00.")}
                 {readinessRow("Job closeout", jobReady, jobReady ? "Job and field work are complete." : "Job must be completed and field complete.")}
               </div>
-              {invoice.status === "draft" ? (
+              {invoice.status === "draft" && canManageFinancialInvoiceLifecycle ? (
                 <form action={issueInternalInvoiceFromForm} className="mt-4">
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="tab" value="info" />
@@ -1093,6 +1118,10 @@ export default async function InternalInvoiceWorkspacePage({
                     Issue Invoice
                   </SubmitButton>
                 </form>
+              ) : invoice.status === "draft" ? (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/75 px-3 py-2.5 text-sm text-slate-600">
+                  Invoice issue authority is not available for your current role.
+                </div>
               ) : (
                 <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/75 px-3 py-2.5 text-sm text-emerald-900">
                   This invoice is issued. Charges are frozen as the billed record.
@@ -1110,7 +1139,7 @@ export default async function InternalInvoiceWorkspacePage({
                 <div className="mt-2 text-sm leading-6 text-slate-600">{billingAddress.join(", ")}</div>
               ) : null}
 
-              {invoice.status === "draft" ? (
+              {invoice.status === "draft" && canManageFinancialInvoiceLifecycle ? (
                 <details className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/70 p-3">
                   <summary className="cursor-pointer text-sm font-semibold text-slate-800">Edit Billing Details</summary>
                   <InternalInvoiceDraftSaveForm action={saveInternalInvoiceDraftFromForm} className="mt-3 space-y-3">
@@ -1158,7 +1187,7 @@ export default async function InternalInvoiceWorkspacePage({
               ) : null}
             </section>
 
-            {invoice.status === "issued" ? (
+              {invoice.status === "issued" && canManageFinancialInvoiceLifecycle ? (
               <section className={`${panelClass} p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Send Invoice</div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1237,6 +1266,7 @@ export default async function InternalInvoiceWorkspacePage({
               </details>
             </section>
 
+            {canManageFinancialInvoiceLifecycle ? (
             <section className={`${panelClass} p-4 sm:p-5`}>
               <details>
                 <summary className="cursor-pointer text-sm font-semibold text-slate-800">Danger Zone</summary>
@@ -1260,6 +1290,7 @@ export default async function InternalInvoiceWorkspacePage({
                 </div>
               </details>
             </section>
+            ) : null}
           </aside>
         </div>
       )}

@@ -90,6 +90,8 @@ type SupabaseFixtureParams = {
 
 function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
   const insertedLineItems: Array<Record<string, unknown>> = [];
+  const updatedLineItems: Array<Record<string, unknown>> = [];
+  const deletedLineItemIds: string[] = [];
   const invoiceUpdates: Array<Record<string, unknown>> = [];
   const pricebookItem = params.pricebookItem;
   const visitScopeItems = params.visitScopeItems ?? [];
@@ -148,9 +150,25 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
             }
             return Promise.resolve({ error: null });
           }),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            updatedLineItems.push(payload);
+            return {
+              eq: vi.fn(() => ({
+                eq: vi.fn(async () => ({ error: null })),
+              })),
+            };
+          }),
+          delete: vi.fn(() => ({
+            eq: vi.fn((lineItemId: string) => {
+              deletedLineItemIds.push(lineItemId);
+              return {
+                eq: vi.fn(async () => ({ error: null })),
+              };
+            }),
+          })),
           select: vi.fn(() => ({
             eq: vi.fn(async () => ({
-              data: insertedLineItems.map((lineItem) => ({
+              data: [...insertedLineItems, ...updatedLineItems].map((lineItem) => ({
                 line_subtotal: lineItem.line_subtotal,
               })),
               error: null,
@@ -174,7 +192,7 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
     }),
   };
 
-  return { supabase, insertedLineItems, invoiceUpdates };
+  return { supabase, insertedLineItems, updatedLineItems, deletedLineItemIds, invoiceUpdates };
 }
 
 function draftInvoice(overrides: Partial<Record<string, unknown>> = {}) {
@@ -369,7 +387,7 @@ describe('internal invoice line item pricebook plumbing', () => {
   });
 
   it('denies technician draft line price edits by default before line writes', async () => {
-    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture();
+    const { supabase, insertedLineItems, updatedLineItems, invoiceUpdates } = makeSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
     requireInternalUserMock.mockResolvedValueOnce({
       userId: 'tech-1',
@@ -401,7 +419,107 @@ describe('internal invoice line item pricebook plumbing', () => {
     ).rejects.toThrow('banner=not_authorized');
 
     expect(insertedLineItems).toHaveLength(0);
+    expect(updatedLineItems).toHaveLength(0);
     expect(invoiceUpdates).toHaveLength(0);
+  });
+
+  it('ignores forged description and price updates when actor only has quantity edit capability', async () => {
+    vi.resetModules();
+    const { supabase, updatedLineItems, invoiceUpdates } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'tech-quantity-1',
+      internalUser: {
+        user_id: 'tech-quantity-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
+      draftInvoice({
+        line_items: [
+          {
+            id: 'line-1',
+            source_kind: 'manual',
+            item_name_snapshot: 'Existing Name',
+            description_snapshot: 'Existing description',
+            item_type_snapshot: 'service',
+            quantity: 1,
+            unit_price: 50,
+            line_subtotal: 50,
+          },
+        ],
+      }),
+    );
+
+    const quantityOnlyCapabilities = {
+      field_billing_enabled: true,
+      can_view_field_billing_summary: true,
+      can_select_pricebook_lines: false,
+      can_convert_visit_scope_to_invoice_line: false,
+      can_add_manual_charge: false,
+      can_edit_charge_description: false,
+      can_edit_charge_quantity: false,
+      can_edit_charge_price: false,
+      can_remove_field_charge: false,
+      can_submit_field_charges_for_review: false,
+      can_approve_field_charges: false,
+      can_create_direct_invoice_draft: false,
+      can_select_pricebook_invoice_lines: false,
+      can_convert_visit_scope_to_invoice_lines: false,
+      can_add_manual_invoice_line: false,
+      can_edit_invoice_line_description: false,
+      can_edit_invoice_line_quantity: true,
+      can_edit_invoice_line_price: false,
+      can_remove_invoice_line: false,
+      can_issue_invoice: false,
+      can_send_invoice: false,
+      can_collect_card_payment: false,
+      can_report_non_card_collection: false,
+      can_verify_non_card_collection: false,
+    } as const;
+
+    vi.doMock('@/lib/auth/field-billing-access', async () => {
+      const actual = await vi.importActual<typeof import('@/lib/auth/field-billing-access')>('@/lib/auth/field-billing-access');
+      return {
+        ...actual,
+        resolveFieldBillingCapabilities: vi.fn(() => quantityOnlyCapabilities),
+        requireFieldChargeEditAccessOrRedirect: vi.fn(() => undefined),
+      };
+    });
+
+    const { updateInternalInvoiceLineItemFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    const result = await updateInternalInvoiceLineItemFromForm(lineItemMutationFormData({
+      no_redirect: '1',
+      item_name_snapshot: 'Forged Name',
+      description_snapshot: 'Forged description',
+      unit_price: '999.99',
+      quantity: '3.00',
+    }));
+
+    expect(result).toEqual({
+      ok: true,
+      banner: 'internal_invoice_line_item_saved',
+      fieldErrors: undefined,
+    });
+    expect(updatedLineItems).toHaveLength(1);
+    expect(updatedLineItems[0]).toEqual(expect.objectContaining({
+      item_name_snapshot: 'Existing Name',
+      description_snapshot: 'Existing description',
+      item_type_snapshot: 'service',
+      quantity: '3.00',
+      unit_price: '50.00',
+      line_subtotal: '150.00',
+      updated_by_user_id: 'tech-quantity-1',
+    }));
+    expect(invoiceUpdates).toHaveLength(1);
+    expect(invoiceUpdates[0]).toEqual(expect.objectContaining({
+      subtotal_cents: 15000,
+      total_cents: 15000,
+      updated_by_user_id: 'tech-quantity-1',
+    }));
   });
 
   it('denies technician draft line removal by default before line writes', async () => {

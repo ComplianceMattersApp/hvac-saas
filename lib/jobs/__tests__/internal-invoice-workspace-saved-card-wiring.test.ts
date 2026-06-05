@@ -8,6 +8,24 @@ const source = readFileSync(
 );
 
 describe("internal invoice workspace saved-card charge wiring", () => {
+  it("wires direct draft-line workspace access through field billing capabilities", () => {
+    expect(source).toContain('import {');
+    expect(source).toContain("resolveFieldBillingCapabilities");
+    expect(source).toContain("hasDirectInvoiceDraftMutationAccess");
+    expect(source).toContain("const fieldBillingCapabilities = resolveFieldBillingCapabilities");
+    expect(source).toContain("const canAccessDraftLineWorkspace = hasDirectInvoiceDraftMutationAccess(fieldBillingCapabilities)");
+    expect(source).toContain("invoice.status === \"draft\" && canAccessDraftLineWorkspace");
+    expect(source).toContain("capabilities={fieldBillingCapabilities}");
+    expect(source).toContain("Draft invoice lines are view-only under your current permissions.");
+  });
+
+  it("keeps lifecycle and payment controls behind financial lifecycle authorization", () => {
+    expect(source).toContain("invoicePaymentLinkUiState.showPanel && canManageFinancialInvoiceLifecycle");
+    expect(source).toContain("invoice.status === \"issued\" && canManageFinancialInvoiceLifecycle");
+    expect(source).toContain("invoice.status === \"draft\" && canManageFinancialInvoiceLifecycle");
+    expect(source).toContain("Invoice issue authority is not available for your current role.");
+  });
+
   it("includes compact stage and next-step rail copy in header", () => {
     expect(source).toContain("function resolveInvoiceRevenueWorkflowRail");
     expect(source).toContain("Revenue Workflow Rail");

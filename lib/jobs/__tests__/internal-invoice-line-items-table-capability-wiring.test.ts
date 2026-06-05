@@ -1,0 +1,34 @@
+import { readFileSync } from "fs";
+import { resolve } from "path";
+import { describe, expect, it } from "vitest";
+
+const source = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/InternalInvoiceLineItemsTable.tsx"),
+  "utf8",
+);
+
+describe("internal invoice line items table capability wiring", () => {
+  it("accepts field billing capabilities and derives direct mutation booleans", () => {
+    expect(source).toContain("capabilities: FieldBillingCapabilities");
+    expect(source).toContain("const canAddPricebookLine = capabilities.can_select_pricebook_invoice_lines");
+    expect(source).toContain("const canAddVisitScopeLine = capabilities.can_convert_visit_scope_to_invoice_lines");
+    expect(source).toContain("const canAddManualLine = capabilities.can_add_manual_invoice_line");
+    expect(source).toContain("const canEditAnyLine = canEditDescription || canEditQuantity || canEditPrice");
+    expect(source).toContain("const canRemoveLine = capabilities.can_remove_invoice_line");
+  });
+
+  it("gates draft-line editor controls by granular capabilities", () => {
+    expect(source).toContain("disabled={!canEditDescription}");
+    expect(source).toContain("disabled={!canEditQuantity}");
+    expect(source).toContain("disabled={!canEditPrice}");
+    expect(source).toContain("{canEditAnyLine ? (");
+    expect(source).toContain("{canRemoveLine ? (");
+    expect(source).toContain("Draft invoice lines are visible, but no direct line mutations are available under your current permissions.");
+  });
+
+  it("keeps add-from-work-item and add-from-pricebook paths capability-aware", () => {
+    expect(source).toContain("canAddVisitScopeLine && visitScopePickerItems.length > 0");
+    expect(source).toContain("{canAddPricebookLine ? (");
+    expect(source).toContain("{canAddManualLine && isAddFormOpen ? (");
+  });
+});

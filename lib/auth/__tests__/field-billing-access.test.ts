@@ -261,4 +261,36 @@ describe('field billing access helper', () => {
       'REDIRECT:/jobs/job-1?banner=not_authorized',
     );
   });
+
+  it('allows edit helper when any direct invoice line edit capability is granted', () => {
+    const params = {
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+      redirectTo: '/jobs/job-1?banner=not_authorized',
+      explicitCapabilities: {
+        field_billing_enabled: true,
+        can_view_field_billing_summary: true,
+        can_edit_invoice_line_quantity: true,
+      },
+    };
+
+    expect(() => requireFieldChargeEditAccessOrRedirect(params)).not.toThrow();
+  });
+
+  it('allows manual helper with manual-add permission even when other edit bits are off', () => {
+    const params = {
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+      redirectTo: '/jobs/job-1?banner=not_authorized',
+      explicitCapabilities: {
+        field_billing_enabled: true,
+        can_view_field_billing_summary: true,
+        can_add_manual_invoice_line: true,
+      },
+    };
+
+    expect(() => requireManualFieldChargeAccessOrRedirect(params)).not.toThrow();
+  });
 });
