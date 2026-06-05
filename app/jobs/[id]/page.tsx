@@ -2260,7 +2260,7 @@ const showFieldOutcomePanel =
   !isJobCancelled &&
   !isJobArchived &&
   !isFieldComplete &&
-  job.status === "completed";
+  normalizedJobStatus === "in_process";
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
@@ -3692,7 +3692,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     Mark Field Complete
                   </SubmitButton>
                 </form>
-              ) : !isFieldComplete ? (
+              ) : !isFieldComplete && !showFieldOutcomePanel ? (
                 <JobFieldActionButton
                   jobId={job.id}
                   currentStatus={job.status}
@@ -3725,6 +3725,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <FieldOutcomePanel
               anchorId="field-outcome"
               jobId={String(job.id)}
+              currentStatus={String(job.status ?? "")}
+              tab={tab}
               isEccJob={job.job_type === "ecc"}
               className="mt-4"
             />
@@ -4478,7 +4480,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       </div>
       <div id="field-status-actions" className="flex w-full flex-col gap-2.5 xl:w-auto xl:min-w-[24rem] xl:items-end">
-        {!isFieldComplete && job.status !== "completed" ? (
+        {!isFieldComplete && job.status !== "completed" && !showFieldOutcomePanel ? (
           <div className="hidden w-full sm:flex xl:justify-end">
             <JobFieldActionButton
               jobId={job.id}
@@ -4654,6 +4656,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     {showFieldOutcomePanel ? (
       <FieldOutcomePanel
         jobId={String(job.id)}
+        currentStatus={String(job.status ?? "")}
+        tab={tab}
         isEccJob={job.job_type === "ecc"}
         className="mt-3"
       />

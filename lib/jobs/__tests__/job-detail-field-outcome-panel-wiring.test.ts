@@ -20,19 +20,21 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("jobId={String(job.id)}");
   });
 
-  it("shows the active panel only for completed and not-yet-field-complete jobs", () => {
+  it("shows the active panel only for in-process not-yet-field-complete jobs", () => {
     expect(jobDetailSource).toContain("const isJobArchived = Boolean(job.deleted_at) || normalizedOpsStatus === \"archived\";");
     expect(jobDetailSource).toContain('const isJobClosed = normalizedOpsStatus === "closed";');
     expect(jobDetailSource).toContain('const isJobCancelled = normalizedJobStatus === "cancelled";');
     expect(jobDetailSource).toContain("const showFieldOutcomePanel =");
     expect(jobDetailSource).toContain("!isFieldComplete &&");
-    expect(jobDetailSource).toContain('job.status === "completed";');
+    expect(jobDetailSource).toContain('normalizedJobStatus === "in_process";');
   });
 
   it("wires only work_completed submit behavior", () => {
-    expect(panelSource).toContain('import { markJobFieldCompleteFromForm } from "@/lib/actions/job-ops-actions";');
-    expect(panelSource).toContain("form action={markJobFieldCompleteFromForm}");
+    expect(panelSource).toContain('import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";');
+    expect(panelSource).toContain("form action={advanceJobStatusFromForm}");
     expect(panelSource).toContain("name=\"job_id\"");
+    expect(panelSource).toContain("name=\"current_status\"");
+    expect(panelSource).toContain("name=\"tab\"");
     expect(panelSource).toContain("Confirm field work complete");
     expect(panelSource).toContain("Field work is marked complete and can move to closeout or billing as applicable.");
     expect(panelSource).toContain("Confirm Work Completed");
@@ -48,5 +50,10 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).toContain("Notes, photos, tests, and work items stay in their sections.");
     expect(panelSource).toContain("ECC guardrail: manual generic Failed is intentionally unavailable.");
     expect(panelSource).toContain("Failed/retest results come from ECC test completion.");
+  });
+
+  it("keeps open and on-the-way flow on existing start actions", () => {
+    expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" && !showFieldOutcomePanel');
+    expect(jobDetailSource).toContain('!isFieldComplete && !showFieldOutcomePanel ? (');
   });
 });

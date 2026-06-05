@@ -1,8 +1,10 @@
 import SubmitButton from "@/components/SubmitButton";
-import { markJobFieldCompleteFromForm } from "@/lib/actions/job-ops-actions";
+import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
 
 type FieldOutcomePanelProps = {
   jobId: string;
+  currentStatus: string;
+  tab: string;
   isEccJob: boolean;
   className?: string;
   anchorId?: string;
@@ -19,8 +21,10 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
         Field work is marked complete and can move to closeout or billing as applicable.
       </p>
 
-      <form action={markJobFieldCompleteFromForm} className="mt-3">
+      <form action={advanceJobStatusFromForm} className="mt-3">
         <input type="hidden" name="job_id" value={props.jobId} />
+        <input type="hidden" name="current_status" value={props.currentStatus} />
+        <input type="hidden" name="tab" value={props.tab} />
         <SubmitButton
           loadingText="Completing..."
           className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800"
