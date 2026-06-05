@@ -1,5 +1,11 @@
 import type { FieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import type { FieldChargeProposalRecord } from "@/lib/business/field-charge-proposals";
+import {
+  approveFieldChargeProposalForDraftInvoiceReviewForm,
+  createFieldChargeProposalFromPricebookEntryForm,
+  createFieldChargeProposalFromVisitScopeEntryForm,
+  rejectFieldChargeProposalReviewForm,
+} from "@/lib/actions/field-charge-proposal-actions";
 
 type FieldBillingInvoiceSnapshot = {
   status: "draft" | "issued" | "void";
@@ -15,12 +21,32 @@ type FieldBillingPaymentSummary = {
   paymentStatus: "unpaid" | "partial" | "paid";
 };
 
+type FieldChargeProposalPricebookItem = {
+  id: string;
+  item_name: string;
+  item_type: string | null;
+  category: string | null;
+  default_description: string | null;
+  default_unit_price: number | null;
+  unit_label: string | null;
+};
+
+type FieldChargeProposalVisitScopeItem = {
+  id?: string | null;
+  title: string;
+  details: string | null;
+};
+
 type FieldBillingSummaryProps = {
+  jobId: string;
+  tab?: string;
   capabilities: FieldBillingCapabilities;
   invoice: FieldBillingInvoiceSnapshot | null;
   latestVoidedInvoice?: FieldBillingInvoiceSnapshot | null;
   paymentSummary?: FieldBillingPaymentSummary | null;
   fieldChargeProposals?: FieldChargeProposalRecord[];
+  pricebookProposalItems?: FieldChargeProposalPricebookItem[];
+  visitScopeProposalItems?: FieldChargeProposalVisitScopeItem[];
 };
 
 function formatCurrencyFromCents(cents?: number | null) {
@@ -56,6 +82,15 @@ function formatProposalQuantity(value: number) {
     minimumFractionDigits: normalized % 1 === 0 ? 0 : 2,
     maximumFractionDigits: 2,
   })}`;
+}
+
+function formatPricebookOptionLabel(item: FieldChargeProposalPricebookItem) {
+  const bits = [
+    item.item_name,
+    item.category,
+    item.default_unit_price == null ? null : formatCurrencyFromCents(Math.round(Number(item.default_unit_price) * 100)),
+  ].filter(Boolean);
+  return bits.join(" - ");
 }
 
 function formatSubmittedAt(value?: string | null) {
@@ -132,10 +167,18 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
     return null;
   }
 
+  const tab = String(props.tab ?? "info").trim() || "info";
   const state = resolveSummaryState(props);
   const invoiceForMetrics = state.invoiceForMetrics;
   const paymentSummary = state.paymentSummary;
   const fieldChargeProposals = props.fieldChargeProposals ?? [];
+  const pricebookProposalItems = props.pricebookProposalItems ?? [];
+  const visitScopeProposalItems = (props.visitScopeProposalItems ?? []).filter((item) => String(item.id ?? "").trim());
+  const canReviewFieldCharges = props.capabilities.can_approve_field_charges;
+  const hasDraftInvoice = props.invoice?.status === "draft";
+  const canSubmitPricebookProposal = props.capabilities.can_select_pricebook_lines;
+  const canSubmitVisitScopeProposal = props.capabilities.can_convert_visit_scope_to_invoice_line;
+  const canShowProposalEntry = canSubmitPricebookProposal || canSubmitVisitScopeProposal;
   const proposedTotalCents = fieldChargeProposals.reduce((sum, proposal) => {
     if (proposal.status === "rejected" || proposal.status === "voided") return sum;
     return sum + Math.max(0, Number(proposal.proposed_subtotal_cents ?? 0) || 0);
@@ -204,7 +247,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
           <div>
             <h4 className="text-sm font-semibold text-slate-950">Field charge proposals</h4>
             <p className="mt-1 text-xs leading-5 text-slate-600">
-              Office review required before these become invoice charges. These proposals are not collectible yet.
+              Review before these become invoice charges. These proposals are not collectible yet.
             </p>
           </div>
           {hasProposedTotal ? (
@@ -221,6 +264,145 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
             </div>
           ) : null}
         </div>
+
+        {canShowProposalEntry ? (
+          <details className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2.5">
+            <summary className="cursor-pointer text-sm font-semibold text-blue-950">
+              Add proposed charge
+            </summary>
+            <p className="mt-2 text-xs leading-5 text-blue-900">
+              Submit charge for office review. These are proposals only and are not collectible until approved.
+            </p>
+            <div className="mt-3 grid gap-3 lg:grid-cols-2">
+              {canSubmitPricebookProposal ? (
+                <div className="rounded-lg border border-blue-100 bg-white/90 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">From Pricebook</div>
+                  {pricebookProposalItems.length > 0 ? (
+                    <form action={createFieldChargeProposalFromPricebookEntryForm} className="mt-2 grid gap-2">
+                      <input type="hidden" name="job_id" value={props.jobId} />
+                      <input type="hidden" name="tab" value={tab} />
+                      {!props.capabilities.can_edit_charge_quantity ? (
+                        <input type="hidden" name="quantity" value="1" />
+                      ) : null}
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Pricebook item</span>
+                        <select
+                          name="pricebook_item_id"
+                          required
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        >
+                          <option value="">Select an item...</option>
+                          {pricebookProposalItems.map((item) => (
+                            <option key={item.id} value={item.id}>
+                              {formatPricebookOptionLabel(item)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {props.capabilities.can_edit_charge_quantity ? (
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Quantity</span>
+                          <input
+                            name="quantity"
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0.01"
+                            defaultValue="1"
+                            required
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                          />
+                        </label>
+                      ) : null}
+                      {props.capabilities.can_edit_charge_price ? (
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Optional unit price override</span>
+                          <input
+                            name="proposed_unit_price"
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0"
+                            placeholder="Use Pricebook default"
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                          />
+                        </label>
+                      ) : null}
+                      <button
+                        type="submit"
+                        className="inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+                      >
+                        Submit charge for office review
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
+                      No active Pricebook items are available for proposal entry.
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
+              {canSubmitVisitScopeProposal ? (
+                <div className="rounded-lg border border-blue-100 bg-white/90 p-3">
+                  <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">From completed work / Visit Scope</div>
+                  {visitScopeProposalItems.length > 0 ? (
+                    <form action={createFieldChargeProposalFromVisitScopeEntryForm} className="mt-2 grid gap-2">
+                      <input type="hidden" name="job_id" value={props.jobId} />
+                      <input type="hidden" name="tab" value={tab} />
+                      {!props.capabilities.can_edit_charge_quantity ? (
+                        <input type="hidden" name="quantity" value="1" />
+                      ) : null}
+                      <label className="block">
+                        <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Visit Scope item</span>
+                        <select
+                          name="visit_scope_item_id"
+                          required
+                          className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        >
+                          <option value="">Select completed work...</option>
+                          {visitScopeProposalItems.map((item) => (
+                            <option key={String(item.id)} value={String(item.id)}>
+                              {item.title}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {props.capabilities.can_edit_charge_quantity ? (
+                        <label className="block">
+                          <span className="mb-1 block text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">Quantity</span>
+                          <input
+                            name="quantity"
+                            type="number"
+                            inputMode="decimal"
+                            step="0.01"
+                            min="0.01"
+                            defaultValue="1"
+                            required
+                            className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                          />
+                        </label>
+                      ) : null}
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                        Visit Scope pricing is context only here. Submitting this does not add an invoice charge.
+                      </div>
+                      <button
+                        type="submit"
+                        className="inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
+                      >
+                        Submit charge for office review
+                      </button>
+                    </form>
+                  ) : (
+                    <div className="mt-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600">
+                      No Visit Scope items are available for proposal entry.
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </div>
+          </details>
+        ) : null}
 
         {fieldChargeProposals.length === 0 ? (
           <div className="mt-3 rounded-lg border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-xs font-medium text-slate-500">
@@ -266,6 +448,56 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
                     ) : null}
                   </div>
                 </div>
+                {proposal.status === "submitted_for_review" ? (
+                  canReviewFieldCharges ? (
+                    <div className="mt-3 border-t border-slate-200 pt-3">
+                      {!hasDraftInvoice ? (
+                        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium leading-5 text-amber-800">
+                          Draft invoice required before approval. Create a draft invoice before approving field charge proposals.
+                        </div>
+                      ) : null}
+                      <div className="grid gap-2 md:grid-cols-[auto_minmax(0,1fr)] md:items-end">
+                        {hasDraftInvoice ? (
+                          <form action={approveFieldChargeProposalForDraftInvoiceReviewForm}>
+                            <input type="hidden" name="job_id" value={props.jobId} />
+                            <input type="hidden" name="tab" value={tab} />
+                            <input type="hidden" name="proposal_id" value={proposal.id} />
+                            <button
+                              type="submit"
+                              className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-emerald-600 bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-[0_10px_22px_-18px_rgba(5,150,105,0.5)] transition-colors hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 md:w-auto"
+                            >
+                              Approve
+                            </button>
+                          </form>
+                        ) : null}
+                        <form action={rejectFieldChargeProposalReviewForm} className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+                          <input type="hidden" name="job_id" value={props.jobId} />
+                          <input type="hidden" name="tab" value={tab} />
+                          <input type="hidden" name="proposal_id" value={proposal.id} />
+                          <label className="block">
+                            <span className="sr-only">Review note for {proposal.proposed_name || "field charge proposal"}</span>
+                            <textarea
+                              name="review_note"
+                              rows={1}
+                              placeholder="Optional rejection note"
+                              className="min-h-10 w-full resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] focus:border-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                            />
+                          </label>
+                          <button
+                            type="submit"
+                            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+                          >
+                            Reject
+                          </button>
+                        </form>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium leading-5 text-slate-600">
+                      Office/billing approval required before these become invoice charges.
+                    </div>
+                  )
+                ) : null}
               </div>
             ))}
           </div>

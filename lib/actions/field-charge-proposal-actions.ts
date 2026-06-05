@@ -525,6 +525,10 @@ export async function approveFieldChargeProposalForDraftInvoiceFromForm(
   });
 }
 
+export async function approveFieldChargeProposalForDraftInvoiceReviewForm(formData: FormData): Promise<void> {
+  await approveFieldChargeProposalForDraftInvoiceFromForm(formData);
+}
+
 export async function rejectFieldChargeProposalFromForm(
   formData: FormData,
 ): Promise<FieldChargeProposalActionResult | void> {
@@ -612,6 +616,10 @@ export async function rejectFieldChargeProposalFromForm(
     ok: true,
     proposalId: proposal.id,
   });
+}
+
+export async function rejectFieldChargeProposalReviewForm(formData: FormData): Promise<void> {
+  await rejectFieldChargeProposalFromForm(formData);
 }
 
 export async function createFieldChargeProposalFromPricebookForm(
@@ -762,6 +770,10 @@ export async function createFieldChargeProposalFromPricebookForm(
   });
 }
 
+export async function createFieldChargeProposalFromPricebookEntryForm(formData: FormData): Promise<void> {
+  await createFieldChargeProposalFromPricebookForm(formData);
+}
+
 export async function createFieldChargeProposalFromVisitScopeForm(
   formData: FormData,
 ): Promise<FieldChargeProposalActionResult | void> {
@@ -882,4 +894,8 @@ export async function createFieldChargeProposalFromVisitScopeForm(
     ok: true,
     proposalId,
   });
+}
+
+export async function createFieldChargeProposalFromVisitScopeEntryForm(formData: FormData): Promise<void> {
+  await createFieldChargeProposalFromVisitScopeForm(formData);
 }

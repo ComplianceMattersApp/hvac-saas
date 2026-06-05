@@ -38,16 +38,32 @@ const financialCapabilities: FieldBillingCapabilities = {
   can_verify_non_card_collection: true,
 };
 
+const pricebookOnlyCapabilities: FieldBillingCapabilities = {
+  ...readOnlyCapabilities,
+  field_billing_enabled: true,
+  can_select_pricebook_lines: true,
+};
+
+const visitScopeOnlyCapabilities: FieldBillingCapabilities = {
+  ...readOnlyCapabilities,
+  field_billing_enabled: true,
+  can_convert_visit_scope_to_invoice_line: true,
+};
+
 type SummaryProps = Parameters<typeof FieldBillingSummary>[0];
 
 function renderSummary(props: Partial<SummaryProps> = {}) {
   return renderToStaticMarkup(
     React.createElement(FieldBillingSummary, {
+      jobId: props.jobId ?? "job-1",
+      tab: props.tab ?? "info",
       capabilities: props.capabilities ?? readOnlyCapabilities,
       invoice: props.invoice ?? null,
       latestVoidedInvoice: props.latestVoidedInvoice ?? null,
       paymentSummary: props.paymentSummary ?? null,
       fieldChargeProposals: props.fieldChargeProposals ?? [],
+      pricebookProposalItems: props.pricebookProposalItems ?? [],
+      visitScopeProposalItems: props.visitScopeProposalItems ?? [],
     }),
   );
 }
@@ -158,6 +174,8 @@ describe("FieldBillingSummary", () => {
 
     expect(html).not.toContain("<form");
     expect(html).not.toContain("<button");
+    expect(html).not.toContain("Add proposed charge");
+    expect(html).not.toContain("Submit charge for office review");
     expect(html).not.toContain("Collect Payment");
     expect(html).not.toContain("Add Charge");
     expect(html).not.toContain("Edit Charge");
@@ -223,8 +241,9 @@ describe("FieldBillingSummary", () => {
     });
 
     expect(html).toContain("Field charge proposals");
-    expect(html).toContain("Office review required before these become invoice charges.");
+    expect(html).toContain("Review before these become invoice charges.");
     expect(html).toContain("These proposals are not collectible yet.");
+    expect(html).toContain("Office/billing approval required before these become invoice charges.");
     expect(html).toContain("Diagnostic Visit");
     expect(html).toContain("Source: Pricebook");
     expect(html).toContain("Qty 2");
@@ -235,6 +254,84 @@ describe("FieldBillingSummary", () => {
     expect(html).toContain("$175.00");
     expect(html).not.toContain("<form");
     expect(html).not.toContain("<button");
+    expect(html).not.toContain("Approve");
+    expect(html).not.toContain("Reject");
+    expect(html).not.toContain("Collect Payment");
+  });
+
+  it("shows compact Pricebook proposal entry only when Pricebook proposal capability is present", () => {
+    const html = renderSummary({
+      capabilities: pricebookOnlyCapabilities,
+      invoice: null,
+      pricebookProposalItems: [
+        {
+          id: "pb-1",
+          item_name: "Diagnostic Visit",
+          item_type: "diagnostic",
+          category: "HVAC",
+          default_description: "System diagnostic",
+          default_unit_price: 125,
+          unit_label: "each",
+        },
+      ],
+    });
+
+    expect(html).toContain("Add proposed charge");
+    expect(html).toContain("Submit charge for office review");
+    expect(html).toContain("These are proposals only and are not collectible until approved.");
+    expect(html).toContain("From Pricebook");
+    expect(html).toContain("Diagnostic Visit - HVAC - $125.00");
+    expect(html).not.toContain("From completed work / Visit Scope");
+    expect(html).not.toContain("Optional unit price override");
+    expect(html).not.toContain("Manual");
+    expect(html).not.toContain("Custom");
+    expect(html).not.toContain("Collect Payment");
+  });
+
+  it("shows Visit Scope proposal entry only when Visit Scope proposal capability is present", () => {
+    const html = renderSummary({
+      capabilities: visitScopeOnlyCapabilities,
+      invoice: null,
+      visitScopeProposalItems: [
+        {
+          id: "8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f",
+          title: "Repair blower assembly",
+          details: "Replace motor and verify airflow",
+        },
+      ],
+    });
+
+    expect(html).toContain("Add proposed charge");
+    expect(html).toContain("Submit charge for office review");
+    expect(html).toContain("From completed work / Visit Scope");
+    expect(html).toContain("Repair blower assembly");
+    expect(html).toContain("Visit Scope pricing is context only here.");
+    expect(html).toContain("Submitting this does not add an invoice charge.");
+    expect(html).not.toContain("From Pricebook");
+    expect(html).not.toContain("Manual");
+    expect(html).not.toContain("Custom");
+    expect(html).not.toContain("Collect Payment");
+  });
+
+  it("shows price override entry only when price edit capability is present", () => {
+    const html = renderSummary({
+      capabilities: financialCapabilities,
+      invoice: null,
+      pricebookProposalItems: [
+        {
+          id: "pb-1",
+          item_name: "Diagnostic Visit",
+          item_type: "diagnostic",
+          category: "HVAC",
+          default_description: "System diagnostic",
+          default_unit_price: 125,
+          unit_label: "each",
+        },
+      ],
+    });
+
+    expect(html).toContain("Optional unit price override");
+    expect(html).toContain("Submit charge for office review");
     expect(html).not.toContain("Collect Payment");
   });
 
@@ -285,5 +382,140 @@ describe("FieldBillingSummary", () => {
     expect(html).not.toContain("Approve");
     expect(html).not.toContain("Reject");
     expect(html).not.toContain("Convert");
+  });
+
+  it("renders approve and reject controls for authorized reviewers on submitted proposals with a draft invoice", () => {
+    const html = renderSummary({
+      capabilities: financialCapabilities,
+      invoice: {
+        status: "draft",
+        invoiceNumber: "INV-DRAFT-1",
+        invoiceDisplayNumber: null,
+        totalCents: 17500,
+        lineItemCount: 2,
+      },
+      fieldChargeProposals: [
+        {
+          id: "proposal-1",
+          account_owner_user_id: "owner-1",
+          job_id: "job-1",
+          internal_invoice_id: "inv-1",
+          source_kind: "pricebook",
+          source_pricebook_item_id: "pb-1",
+          source_visit_scope_item_id: null,
+          proposed_name: "Diagnostic Visit",
+          proposed_description: "System diagnostic",
+          proposed_item_type: "diagnostic",
+          proposed_quantity: 2,
+          proposed_unit_price_cents: 12500,
+          proposed_subtotal_cents: 25000,
+          proposed_currency: "usd",
+          status: "submitted_for_review",
+          proposed_by_user_id: "billing-1",
+          submitted_at: "2026-06-05T18:00:00.000Z",
+          reviewed_by_user_id: null,
+          reviewed_at: null,
+          review_note: null,
+          converted_internal_invoice_line_item_id: null,
+          created_at: "2026-06-05T18:00:00.000Z",
+          updated_at: "2026-06-05T18:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(html).toContain("<form");
+    expect(html).toContain("Approve");
+    expect(html).toContain("Reject");
+    expect(html).toContain("Optional rejection note");
+    expect(html).not.toContain("Draft invoice required before approval.");
+    expect(html).not.toContain("Collect Payment");
+    expect(html).not.toContain("Add Field Charge");
+  });
+
+  it("warns authorized reviewers when approval needs a draft invoice", () => {
+    const html = renderSummary({
+      capabilities: financialCapabilities,
+      invoice: null,
+      fieldChargeProposals: [
+        {
+          id: "proposal-1",
+          account_owner_user_id: "owner-1",
+          job_id: "job-1",
+          internal_invoice_id: null,
+          source_kind: "pricebook",
+          source_pricebook_item_id: "pb-1",
+          source_visit_scope_item_id: null,
+          proposed_name: "Diagnostic Visit",
+          proposed_description: "System diagnostic",
+          proposed_item_type: "diagnostic",
+          proposed_quantity: 2,
+          proposed_unit_price_cents: 12500,
+          proposed_subtotal_cents: 25000,
+          proposed_currency: "usd",
+          status: "submitted_for_review",
+          proposed_by_user_id: "billing-1",
+          submitted_at: "2026-06-05T18:00:00.000Z",
+          reviewed_by_user_id: null,
+          reviewed_at: null,
+          review_note: null,
+          converted_internal_invoice_line_item_id: null,
+          created_at: "2026-06-05T18:00:00.000Z",
+          updated_at: "2026-06-05T18:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(html).toContain("Draft invoice required before approval.");
+    expect(html).toContain("Create a draft invoice before approving field charge proposals.");
+    expect(html).toContain("Reject");
+    expect(html).not.toContain("Approve");
+    expect(html).not.toContain("Collect Payment");
+  });
+
+  it("does not show approval controls for already reviewed proposals", () => {
+    const html = renderSummary({
+      capabilities: financialCapabilities,
+      invoice: {
+        status: "draft",
+        invoiceNumber: "INV-DRAFT-1",
+        invoiceDisplayNumber: null,
+        totalCents: 17500,
+        lineItemCount: 2,
+      },
+      fieldChargeProposals: [
+        {
+          id: "proposal-approved",
+          account_owner_user_id: "owner-1",
+          job_id: "job-1",
+          internal_invoice_id: "inv-1",
+          source_kind: "pricebook",
+          source_pricebook_item_id: "pb-1",
+          source_visit_scope_item_id: null,
+          proposed_name: "Approved Diagnostic Visit",
+          proposed_description: "System diagnostic",
+          proposed_item_type: "diagnostic",
+          proposed_quantity: 1,
+          proposed_unit_price_cents: 12500,
+          proposed_subtotal_cents: 12500,
+          proposed_currency: "usd",
+          status: "approved",
+          proposed_by_user_id: "billing-1",
+          submitted_at: "2026-06-05T18:00:00.000Z",
+          reviewed_by_user_id: "billing-2",
+          reviewed_at: "2026-06-05T19:00:00.000Z",
+          review_note: null,
+          converted_internal_invoice_line_item_id: "line-1",
+          created_at: "2026-06-05T18:00:00.000Z",
+          updated_at: "2026-06-05T19:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(html).toContain("Approved Diagnostic Visit");
+    expect(html).toContain("Approved");
+    expect(html).not.toContain("<form");
+    expect(html).not.toContain(">Approve</button>");
+    expect(html).not.toContain("Reject");
+    expect(html).not.toContain("Collect Payment");
   });
 });

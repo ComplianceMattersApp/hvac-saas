@@ -2841,6 +2841,26 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           lineItemCount: latestVoidedInternalInvoice.line_items?.length ?? 0,
         }
       : null;
+    const fieldChargeProposalPricebookItems = visitScopePricebookTemplates
+      .filter((item) => {
+        const itemType = String(item.item_type ?? "").trim().toLowerCase();
+        const unitPrice = Number(item.default_unit_price ?? 0);
+        return ["service", "material", "diagnostic"].includes(itemType) && Number.isFinite(unitPrice) && unitPrice >= 0;
+      })
+      .map((item) => ({
+        id: item.id,
+        item_name: item.item_name,
+        item_type: item.item_type,
+        category: item.category,
+        default_description: item.default_description,
+        default_unit_price: item.default_unit_price,
+        unit_label: item.unit_label,
+      }));
+    const fieldChargeProposalVisitScopeItems = visitScopeItems.map((item) => ({
+      id: item.id,
+      title: item.title,
+      details: item.details,
+    }));
 
     const internalInvoiceReadyToIssue =
       internalInvoice != null &&
@@ -2912,11 +2932,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
 
         <FieldBillingSummary
+          jobId={job.id}
+          tab={tab}
           capabilities={fieldBillingCapabilities}
           invoice={fieldBillingInvoiceSnapshot}
           latestVoidedInvoice={fieldBillingLatestVoidedInvoiceSnapshot}
           paymentSummary={internalInvoice ? internalInvoicePaymentSummary : null}
           fieldChargeProposals={fieldChargeProposals}
+          pricebookProposalItems={fieldChargeProposalPricebookItems}
+          visitScopeProposalItems={fieldChargeProposalVisitScopeItems}
         />
 
         {!internalInvoice ? (
