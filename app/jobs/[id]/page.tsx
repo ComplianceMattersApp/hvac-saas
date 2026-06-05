@@ -19,6 +19,7 @@ import {
   updateJobServiceContractFromForm,
   createNextServiceVisitFromForm,
   recordCallbackReportFromForm,
+  createCallbackVisitFromForm,
   completeDataEntryFromForm,
   createRetestJobFromForm,
   getOnTheWayUndoEligibility,
@@ -5372,6 +5373,40 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : (
           <p className="mt-2 text-xs text-slate-500">
             Callback intake is available for service jobs that are field-complete, completed, or closed.
+          </p>
+        )}
+      </div>
+
+      <div className="mt-3 border-t border-slate-200 pt-3">
+        <div className="text-sm font-semibold text-slate-900">Create Callback Visit</div>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Use after a customer callback report has been recorded and office decides a visit is needed. This creates an unscheduled office/dispatch item.
+        </p>
+
+        {callbackIntakeHistoricalAnchorEligible ? (
+          <form action={createCallbackVisitFromForm} className="mt-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="tab" value={tab} />
+            <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+
+            <div className="space-y-1">
+              <label className={workspaceFieldLabelClass}>Callback visit reason</label>
+              <input
+                type="text"
+                name="callback_visit_reason"
+                maxLength={220}
+                placeholder="Optional: leave blank to use latest callback report context"
+                className={workspaceInputClass}
+              />
+            </div>
+
+            <SubmitButton loadingText="Creating..." className={`${darkButtonClass} w-full sm:w-auto`}>
+              Create Callback Visit
+            </SubmitButton>
+          </form>
+        ) : (
+          <p className="mt-2 text-xs text-slate-500">
+            Callback visit creation is available for service jobs that are field-complete, completed, or closed.
           </p>
         )}
       </div>

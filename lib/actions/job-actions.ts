@@ -3381,6 +3381,205 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
   redirect(`/jobs/${created.id}?banner=next_service_visit_created`);
 }
 
+export async function createCallbackVisitFromForm(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+  const sourceJobId = String(formData.get("job_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const callbackVisitReasonRaw = String(formData.get("callback_visit_reason") || "").trim();
+
+  if (!sourceJobId) throw new Error("Missing job_id");
+
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: sourceJobId,
+    onUnauthorized: () => {
+      redirectToJobWithBanner({ jobId: sourceJobId, banner: "not_authorized", tabRaw, returnToRaw });
+    },
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const { data: sourceJob, error: sourceJobErr } = await supabase
+    .from("jobs")
+    .select(
+      "id, job_type, status, ops_status, field_complete, customer_id, location_id, contractor_id, customer_first_name, customer_last_name, customer_email, customer_phone, job_address, city, service_case_id",
+    )
+    .eq("id", sourceJobId)
+    .maybeSingle();
+
+  if (sourceJobErr) throw sourceJobErr;
+
+  if (!sourceJob?.id) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_visit_create_failed",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  if (String(sourceJob.job_type ?? "").trim().toLowerCase() !== "service") {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_visit_not_service",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const normalizedStatus = String(sourceJob.status ?? "").trim().toLowerCase();
+  const normalizedOpsStatus = String(sourceJob.ops_status ?? "").trim().toLowerCase();
+  const callbackEligibleHistoricalAnchor =
+    Boolean(sourceJob.field_complete) ||
+    normalizedStatus === "completed" ||
+    normalizedOpsStatus === "closed";
+
+  if (!callbackEligibleHistoricalAnchor) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_visit_requires_historical_anchor",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const { data: callbackIntakeRows, error: callbackIntakeErr } = await supabase
+    .from("job_events")
+    .select("id, meta, created_at")
+    .eq("job_id", sourceJobId)
+    .eq("event_type", "callback_reported")
+    .order("created_at", { ascending: false })
+    .limit(1);
+
+  if (callbackIntakeErr) throw callbackIntakeErr;
+
+  const latestCallbackIntake = Array.isArray(callbackIntakeRows) ? callbackIntakeRows[0] : null;
+  if (!latestCallbackIntake?.id) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_visit_requires_intake",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const callbackReportContext = String((latestCallbackIntake as any)?.meta?.callback_report_text ?? "").trim();
+  const callbackVisitReason = callbackVisitReasonRaw || callbackReportContext;
+
+  if (!callbackVisitReason) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_visit_reason_required",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const customerId = String(sourceJob.customer_id ?? "").trim();
+  const locationId = String(sourceJob.location_id ?? "").trim();
+
+  if (!customerId || !locationId) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_visit_create_failed",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const serviceCaseId =
+    String(sourceJob.service_case_id ?? "").trim() ||
+    (await ensureServiceCaseForJob({ supabase, jobId: sourceJobId }));
+
+  const created = await createJob(
+    {
+      job_type: "service",
+      service_case_id: serviceCaseId,
+      service_visit_type: "callback",
+      service_visit_reason: callbackVisitReason,
+      service_visit_outcome: "follow_up_required",
+      title: `Callback: ${callbackVisitReason}`.slice(0, 220),
+      city: String(sourceJob.city ?? "").trim() || "Unknown",
+      job_address: String(sourceJob.job_address ?? "").trim() || null,
+      scheduled_date: null,
+      window_start: null,
+      window_end: null,
+      status: "open",
+      ops_status: "need_to_schedule",
+      contractor_id: String(sourceJob.contractor_id ?? "").trim() || null,
+      customer_id: customerId,
+      location_id: locationId,
+      customer_first_name: String(sourceJob.customer_first_name ?? "").trim() || null,
+      customer_last_name: String(sourceJob.customer_last_name ?? "").trim() || null,
+      customer_email: String(sourceJob.customer_email ?? "").trim() || null,
+      customer_phone: String(sourceJob.customer_phone ?? "").trim() || null,
+      visit_scope_summary: null,
+      visit_scope_items: [],
+      job_notes: `Created from callback intake on job ${String(sourceJob.id).slice(0, 8)}.`,
+    },
+    {
+      serviceCaseWriteClient: supabase,
+    },
+  );
+
+  await reconcileServiceCaseStatusAfterJobChange({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    serviceCaseId,
+    triggerJobId: created.id,
+    source: "create_callback_visit",
+  });
+
+  await insertJobEvent({
+    supabase,
+    jobId: sourceJobId,
+    event_type: "callback_visit_created",
+    meta: {
+      source_action: "callback_visit_created_from_intake",
+      anchor_job_id: sourceJobId,
+      child_job_id: created.id,
+      service_case_id: serviceCaseId,
+      callback_visit_reason: callbackVisitReason,
+      callback_intake_event_id: String(latestCallbackIntake.id),
+    },
+    userId: actingUserId,
+  });
+
+  await insertJobEvent({
+    supabase,
+    jobId: created.id,
+    event_type: "created_from_callback_report",
+    meta: {
+      source_action: "callback_visit_created_from_intake",
+      anchor_job_id: sourceJobId,
+      child_job_id: created.id,
+      service_case_id: serviceCaseId,
+      callback_visit_reason: callbackVisitReason,
+      callback_intake_event_id: String(latestCallbackIntake.id),
+    },
+    userId: actingUserId,
+  });
+
+  revalidatePath(`/jobs/${sourceJobId}`, "page");
+  revalidatePath(`/jobs/${created.id}`, "page");
+  revalidatePath("/ops", "page");
+  revalidatePath("/jobs", "page");
+
+  redirect(`/jobs/${created.id}?banner=callback_visit_created`);
+}
+
 export async function getContractors(accountOwnerUserId?: string | null) {
   const supabase = await createClient();
   return listScopedContractorsForJobDetail({

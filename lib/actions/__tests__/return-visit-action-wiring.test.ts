@@ -19,7 +19,7 @@ const waitingQueuePageSource = readFileSync(
 
 function extractCreateNextVisitActionBlock() {
   const start = jobActionsSource.indexOf("export async function createNextServiceVisitFromForm");
-  const end = jobActionsSource.indexOf("export async function getContractors", start);
+  const end = jobActionsSource.indexOf("export async function createCallbackVisitFromForm", start);
   if (start < 0 || end < 0 || end <= start) {
     throw new Error("Could not find createNextServiceVisitFromForm block boundaries.");
   }
