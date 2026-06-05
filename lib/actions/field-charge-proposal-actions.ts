@@ -9,6 +9,7 @@ import { resolveFieldBillingCapabilities } from '@/lib/auth/field-billing-access
 import { resolveBillingModeByAccountOwnerId } from '@/lib/business/internal-business-profile';
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { normalizeInternalInvoiceItemType, resolveInternalInvoiceByJobId } from '@/lib/business/internal-invoice';
+import { normalizeFieldChargeProposalRow, type FieldChargeProposalRecord } from '@/lib/business/field-charge-proposals';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/visit-scope';
 
@@ -118,6 +119,16 @@ function formatScaledInt(value: number, scale: number) {
 
 function computeSubtotalCents(quantityHundredths: number, unitPriceCents: number) {
   return Math.round((quantityHundredths * unitPriceCents) / 100);
+}
+
+function formatDecimalNumber(value: number) {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) return '0.00';
+  return normalized.toFixed(2);
+}
+
+function formatMoneyForInvoiceLine(cents: number) {
+  return formatScaledInt(Number(cents ?? 0) || 0, 2);
 }
 
 async function requireOperationalFieldChargeProposalEntitlementAccessOrRedirect(params: {
@@ -281,6 +292,326 @@ async function insertFieldChargeProposal(params: {
   revalidatePath('/ops');
 
   return proposalId;
+}
+
+async function syncDraftInvoiceTotalsFromLineItems(params: {
+  supabase: any;
+  invoiceId: string;
+  userId: string;
+}) {
+  const { data: lineItems, error: lineItemsErr } = await params.supabase
+    .from('internal_invoice_line_items')
+    .select('line_subtotal')
+    .eq('invoice_id', params.invoiceId);
+
+  if (lineItemsErr) throw lineItemsErr;
+
+  const subtotalCents = (lineItems ?? []).reduce((sum: number, row: any) => {
+    return sum + parseMoneyToCents(String(row?.line_subtotal ?? '0'), 'Line subtotal');
+  }, 0);
+
+  const { error: updateErr } = await params.supabase
+    .from('internal_invoices')
+    .update({
+      subtotal_cents: subtotalCents,
+      total_cents: subtotalCents,
+      updated_by_user_id: params.userId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', params.invoiceId);
+
+  if (updateErr) throw updateErr;
+  return subtotalCents;
+}
+
+async function loadScopedFieldChargeProposal(params: {
+  admin: any;
+  proposalId: string;
+  accountOwnerUserId: string;
+  jobId: string;
+}) {
+  const { data, error } = await params.admin
+    .from('field_charge_proposals')
+    .select('*')
+    .eq('id', params.proposalId)
+    .eq('account_owner_user_id', params.accountOwnerUserId)
+    .eq('job_id', params.jobId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? normalizeFieldChargeProposalRow(data) : null;
+}
+
+function requireFieldChargeProposalReviewAccessOrRedirect(
+  context: Awaited<ReturnType<typeof loadFieldChargeProposalContext>>,
+) {
+  const capabilities = resolveFieldBillingCapabilities(fieldBillingAccessParams(context));
+  if (capabilities.can_approve_field_charges) {
+    return;
+  }
+
+  redirect(buildJobDetailHref(context.jobId, context.tab, 'not_authorized'));
+}
+
+function buildInvoiceLinePayloadFromProposal(params: {
+  proposal: FieldChargeProposalRecord;
+  invoiceId: string;
+  sortOrder: number;
+  userId: string;
+}) {
+  const unitPriceCents = params.proposal.proposed_unit_price_cents;
+  const subtotalCents = params.proposal.proposed_subtotal_cents;
+  if (unitPriceCents === null || subtotalCents === null) {
+    throw new Error('Approved field charge proposals require a proposed price.');
+  }
+
+  return {
+    invoice_id: params.invoiceId,
+    sort_order: params.sortOrder,
+    source_kind: params.proposal.source_kind,
+    source_pricebook_item_id: params.proposal.source_pricebook_item_id,
+    source_visit_scope_item_id: params.proposal.source_visit_scope_item_id,
+    item_name_snapshot: params.proposal.proposed_name,
+    description_snapshot: params.proposal.proposed_description,
+    item_type_snapshot: normalizeInternalInvoiceItemType(params.proposal.proposed_item_type),
+    category_snapshot: null,
+    unit_label_snapshot: null,
+    quantity: formatDecimalNumber(params.proposal.proposed_quantity),
+    unit_price: formatMoneyForInvoiceLine(unitPriceCents),
+    line_subtotal: formatMoneyForInvoiceLine(subtotalCents),
+    created_by_user_id: params.userId,
+    updated_by_user_id: params.userId,
+  };
+}
+
+export async function approveFieldChargeProposalForDraftInvoiceFromForm(
+  formData: FormData,
+): Promise<FieldChargeProposalActionResult | void> {
+  const context = await loadFieldChargeProposalContext(formData);
+  requireFieldChargeProposalReviewAccessOrRedirect(context);
+
+  const proposalId = getTrimmedString(formData.get('proposal_id')) || getTrimmedString(formData.get('field_charge_proposal_id'));
+  if (!proposalId) {
+    return resolveActionResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'field_charge_proposal_missing',
+      noRedirect: context.noRedirect,
+      ok: false,
+      fieldErrors: { proposal_id: 'Select a field charge proposal.' },
+    });
+  }
+
+  if (!context.invoice?.id || context.invoice.status !== 'draft') {
+    return resolveActionResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'field_charge_draft_invoice_required',
+      noRedirect: context.noRedirect,
+      ok: false,
+    });
+  }
+
+  const proposal = await loadScopedFieldChargeProposal({
+    admin: context.admin,
+    proposalId,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    jobId: context.jobId,
+  });
+
+  if (!proposal?.id) {
+    return resolveActionResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'field_charge_proposal_not_found',
+      noRedirect: context.noRedirect,
+      ok: false,
+    });
+  }
+
+  if (proposal.status !== FIELD_CHARGE_PROPOSAL_STATUS || proposal.converted_internal_invoice_line_item_id) {
+    return resolveActionResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'field_charge_proposal_not_submitted',
+      noRedirect: context.noRedirect,
+      ok: false,
+    });
+  }
+
+  let linePayload: ReturnType<typeof buildInvoiceLinePayloadFromProposal>;
+  try {
+    linePayload = buildInvoiceLinePayloadFromProposal({
+      proposal,
+      invoiceId: context.invoice.id,
+      sortOrder: (context.invoice.line_items?.length ?? 0) + 1,
+      userId: context.userId,
+    });
+  } catch {
+    return resolveActionResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'field_charge_proposal_price_required',
+      noRedirect: context.noRedirect,
+      ok: false,
+    });
+  }
+
+  const { data: insertedLine, error: insertErr } = await context.supabase
+    .from('internal_invoice_line_items')
+    .insert(linePayload)
+    .select('id')
+    .single();
+
+  if (insertErr) throw insertErr;
+  const invoiceLineItemId = String(insertedLine?.id ?? '').trim();
+  if (!invoiceLineItemId) {
+    throw new Error('Failed to convert field charge proposal into invoice line item.');
+  }
+
+  await syncDraftInvoiceTotalsFromLineItems({
+    supabase: context.supabase,
+    invoiceId: context.invoice.id,
+    userId: context.userId,
+  });
+
+  const reviewedAt = new Date().toISOString();
+  const reviewNote = getOptionalText(formData.get('review_note'));
+  const { error: updateErr } = await context.admin
+    .from('field_charge_proposals')
+    .update({
+      status: 'approved',
+      internal_invoice_id: context.invoice.id,
+      reviewed_by_user_id: context.userId,
+      reviewed_at: reviewedAt,
+      review_note: reviewNote,
+      converted_internal_invoice_line_item_id: invoiceLineItemId,
+      updated_at: reviewedAt,
+    })
+    .eq('id', proposal.id)
+    .eq('account_owner_user_id', context.internalUser.account_owner_user_id)
+    .eq('job_id', context.jobId);
+
+  if (updateErr) throw updateErr;
+
+  await insertJobEvent({
+    supabase: context.supabase,
+    jobId: context.jobId,
+    event_type: 'field_charge_approved',
+    userId: context.userId,
+    meta: {
+      proposal_id: proposal.id,
+      invoice_id: context.invoice.id,
+      invoice_line_item_id: invoiceLineItemId,
+      source_kind: proposal.source_kind,
+      source_pricebook_item_id: proposal.source_pricebook_item_id,
+      source_visit_scope_item_id: proposal.source_visit_scope_item_id,
+      amount_cents: proposal.proposed_subtotal_cents,
+      source_action: 'approve_field_charge_proposal_for_draft_invoice',
+    },
+  });
+
+  revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath(`/jobs/${context.jobId}/invoice`);
+  revalidatePath('/ops');
+
+  return resolveActionResult({
+    jobId: context.jobId,
+    tab: context.tab,
+    banner: 'field_charge_proposal_approved',
+    noRedirect: context.noRedirect,
+    ok: true,
+    proposalId: proposal.id,
+  });
+}
+
+export async function rejectFieldChargeProposalFromForm(
+  formData: FormData,
+): Promise<FieldChargeProposalActionResult | void> {
+  const context = await loadFieldChargeProposalContext(formData);
+  requireFieldChargeProposalReviewAccessOrRedirect(context);
+
+  const proposalId = getTrimmedString(formData.get('proposal_id')) || getTrimmedString(formData.get('field_charge_proposal_id'));
+  if (!proposalId) {
+    return resolveActionResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'field_charge_proposal_missing',
+      noRedirect: context.noRedirect,
+      ok: false,
+      fieldErrors: { proposal_id: 'Select a field charge proposal.' },
+    });
+  }
+
+  const proposal = await loadScopedFieldChargeProposal({
+    admin: context.admin,
+    proposalId,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    jobId: context.jobId,
+  });
+
+  if (!proposal?.id) {
+    return resolveActionResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'field_charge_proposal_not_found',
+      noRedirect: context.noRedirect,
+      ok: false,
+    });
+  }
+
+  if (proposal.status !== FIELD_CHARGE_PROPOSAL_STATUS) {
+    return resolveActionResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'field_charge_proposal_not_submitted',
+      noRedirect: context.noRedirect,
+      ok: false,
+    });
+  }
+
+  const reviewedAt = new Date().toISOString();
+  const reviewNote = getOptionalText(formData.get('review_note'));
+  const { error: updateErr } = await context.admin
+    .from('field_charge_proposals')
+    .update({
+      status: 'rejected',
+      reviewed_by_user_id: context.userId,
+      reviewed_at: reviewedAt,
+      review_note: reviewNote,
+      updated_at: reviewedAt,
+    })
+    .eq('id', proposal.id)
+    .eq('account_owner_user_id', context.internalUser.account_owner_user_id)
+    .eq('job_id', context.jobId);
+
+  if (updateErr) throw updateErr;
+
+  await insertJobEvent({
+    supabase: context.supabase,
+    jobId: context.jobId,
+    event_type: 'field_charge_rejected',
+    userId: context.userId,
+    meta: {
+      proposal_id: proposal.id,
+      source_kind: proposal.source_kind,
+      review_note: reviewNote,
+      source_action: 'reject_field_charge_proposal',
+    },
+  });
+
+  revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath(`/jobs/${context.jobId}/invoice`);
+  revalidatePath('/ops');
+
+  return resolveActionResult({
+    jobId: context.jobId,
+    tab: context.tab,
+    banner: 'field_charge_proposal_rejected',
+    noRedirect: context.noRedirect,
+    ok: true,
+    proposalId: proposal.id,
+  });
 }
 
 export async function createFieldChargeProposalFromPricebookForm(
