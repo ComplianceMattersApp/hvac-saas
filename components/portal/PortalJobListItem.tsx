@@ -5,6 +5,7 @@ type PortalJobListItemProps = {
   customerName: string;
   title: string;
   address: string;
+  sourceLabel?: string;
   statusLabel: string;
   statusToneClass: string;
   detailLine?: string;
@@ -19,6 +20,7 @@ export default function PortalJobListItem(props: PortalJobListItemProps) {
     customerName,
     title,
     address,
+    sourceLabel,
     statusLabel,
     statusToneClass,
     detailLine,
@@ -38,6 +40,11 @@ export default function PortalJobListItem(props: PortalJobListItemProps) {
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between md:gap-5">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2 text-xs">
+            {sourceLabel ? (
+              <span className="inline-flex min-h-7 items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
+                {sourceLabel}
+              </span>
+            ) : null}
             <span className={`inline-flex min-h-7 items-center rounded-lg border px-2.5 py-1 text-xs font-semibold ${statusToneClass}`}>
               {statusLabel}
             </span>
