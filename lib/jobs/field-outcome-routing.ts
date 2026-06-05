@@ -18,11 +18,18 @@ export type FieldOutcomeExistingIntent =
   | "request_return_visit"
   | "review_visit_scope";
 
+export type FieldOutcomeApplicability =
+  | "default_closeout"
+  | "specialized"
+  | "callback_revisit";
+
 export type FieldOutcomeRoute = {
   code: FieldOutcomeCode;
   label: string;
   description: string;
   existingIntent: FieldOutcomeExistingIntent;
+  applicability: FieldOutcomeApplicability;
+  visibleInDefaultCloseout: boolean;
   officeOwnedAfterSubmission: boolean;
   leavesNormalFieldMyWork: boolean;
   waitingReasonType: WaitingStateType | null;
@@ -39,6 +46,8 @@ const FIELD_OUTCOME_ROUTES: Record<FieldOutcomeCode, FieldOutcomeRoute> = {
     label: "Work Completed",
     description: "Field work is done and can move to closeout or billing as applicable.",
     existingIntent: "complete_field_work",
+    applicability: "default_closeout",
+    visibleInDefaultCloseout: true,
     officeOwnedAfterSubmission: false,
     leavesNormalFieldMyWork: true,
     waitingReasonType: null,
@@ -53,6 +62,8 @@ const FIELD_OUTCOME_ROUTES: Record<FieldOutcomeCode, FieldOutcomeRoute> = {
     label: "Parts Needed",
     description: "Work is blocked until parts are ordered, received, or approved.",
     existingIntent: "set_waiting_reason",
+    applicability: "default_closeout",
+    visibleInDefaultCloseout: true,
     officeOwnedAfterSubmission: true,
     leavesNormalFieldMyWork: true,
     waitingReasonType: "waiting_on_part",
@@ -67,6 +78,8 @@ const FIELD_OUTCOME_ROUTES: Record<FieldOutcomeCode, FieldOutcomeRoute> = {
     label: "Approval Needed",
     description: "Work is blocked until the customer or responsible party approves the next step.",
     existingIntent: "set_waiting_reason",
+    applicability: "default_closeout",
+    visibleInDefaultCloseout: true,
     officeOwnedAfterSubmission: true,
     leavesNormalFieldMyWork: true,
     waitingReasonType: "waiting_on_customer_approval",
@@ -79,8 +92,10 @@ const FIELD_OUTCOME_ROUTES: Record<FieldOutcomeCode, FieldOutcomeRoute> = {
   access_issue: {
     code: "access_issue",
     label: "Access Issue",
-    description: "Work is blocked because the site, equipment, or required area was not accessible.",
+    description: "Work is blocked because the site, equipment, or required area was not accessible. In default closeout, handle as Unable to Complete detail.",
     existingIntent: "set_waiting_reason",
+    applicability: "specialized",
+    visibleInDefaultCloseout: false,
     officeOwnedAfterSubmission: true,
     leavesNormalFieldMyWork: true,
     waitingReasonType: "waiting_on_access",
@@ -95,6 +110,8 @@ const FIELD_OUTCOME_ROUTES: Record<FieldOutcomeCode, FieldOutcomeRoute> = {
     label: "Unable to Complete",
     description: "Work was interrupted and office review is needed to decide the next step.",
     existingIntent: "set_waiting_reason",
+    applicability: "default_closeout",
+    visibleInDefaultCloseout: true,
     officeOwnedAfterSubmission: true,
     leavesNormalFieldMyWork: true,
     waitingReasonType: "other",
@@ -109,6 +126,8 @@ const FIELD_OUTCOME_ROUTES: Record<FieldOutcomeCode, FieldOutcomeRoute> = {
     label: "Return Needed",
     description: "The original work needs a follow-up or return visit before it can be resolved.",
     existingIntent: "request_return_visit",
+    applicability: "specialized",
+    visibleInDefaultCloseout: false,
     officeOwnedAfterSubmission: true,
     leavesNormalFieldMyWork: true,
     waitingReasonType: null,
@@ -123,6 +142,8 @@ const FIELD_OUTCOME_ROUTES: Record<FieldOutcomeCode, FieldOutcomeRoute> = {
     label: "Different Issue Found",
     description: "A different issue or additional work was found and needs office/work-item review.",
     existingIntent: "review_visit_scope",
+    applicability: "callback_revisit",
+    visibleInDefaultCloseout: false,
     officeOwnedAfterSubmission: true,
     leavesNormalFieldMyWork: true,
     waitingReasonType: null,
@@ -136,6 +157,10 @@ const FIELD_OUTCOME_ROUTES: Record<FieldOutcomeCode, FieldOutcomeRoute> = {
 
 export function listFieldOutcomeRoutes(): FieldOutcomeRoute[] {
   return FIELD_OUTCOME_CODES.map((code) => FIELD_OUTCOME_ROUTES[code]);
+}
+
+export function listDefaultFieldCloseoutRoutes(): FieldOutcomeRoute[] {
+  return listFieldOutcomeRoutes().filter((route) => route.visibleInDefaultCloseout);
 }
 
 export function getFieldOutcomeRoute(code: unknown): FieldOutcomeRoute | null {

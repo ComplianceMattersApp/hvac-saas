@@ -5,6 +5,7 @@ import {
   getFieldOutcomeRoute,
   isFieldOutcomeCode,
   isManualEccFailureOutcomeAvailable,
+  listDefaultFieldCloseoutRoutes,
   listFieldOutcomeRoutes,
 } from "@/lib/jobs/field-outcome-routing";
 import { WAITING_STATE_TYPES } from "@/lib/utils/ops-status";
@@ -66,6 +67,33 @@ describe("field outcome routing contract", () => {
     expect(differentIssue?.waitingReasonType).toBeNull();
     expect(differentIssue?.createsDatabaseStatus).toBe(false);
     expect(differentIssue?.existingIntent).toBe("review_visit_scope");
+    expect(differentIssue?.visibleInDefaultCloseout).toBe(false);
+    expect(differentIssue?.applicability).toBe("callback_revisit");
+  });
+
+  it("exposes only first-pass closeout outcomes in the default closeout list", () => {
+    const defaultCodes = listDefaultFieldCloseoutRoutes().map((route) => route.code);
+    expect(defaultCodes).toEqual([
+      "work_completed",
+      "parts_needed",
+      "approval_needed",
+      "unable_to_complete",
+    ]);
+
+    expect(defaultCodes).not.toContain("access_issue");
+    expect(defaultCodes).not.toContain("return_needed");
+    expect(defaultCodes).not.toContain("different_issue_found");
+  });
+
+  it("marks access issue and return needed as non-default closeout options", () => {
+    const accessIssue = getFieldOutcomeRoute("access_issue");
+    expect(accessIssue?.visibleInDefaultCloseout).toBe(false);
+    expect(accessIssue?.applicability).toBe("specialized");
+    expect(accessIssue?.description).toContain("Unable to Complete detail");
+
+    const returnNeeded = getFieldOutcomeRoute("return_needed");
+    expect(returnNeeded?.visibleInDefaultCloseout).toBe(false);
+    expect(returnNeeded?.applicability).toBe("specialized");
   });
 
   it("does not expose generic manual ECC failure as a field outcome", () => {
