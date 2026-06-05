@@ -8,6 +8,10 @@ import {
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import {
+  isActiveFieldWorkStatus,
+  isScheduledAssignedMyWorkEligible,
+} from "@/lib/ops/queue-status-contracts";
 
 function todayBusinessDateLA() {
   return new Intl.DateTimeFormat("en-CA", {
@@ -308,23 +312,30 @@ export default async function OpsFieldPage() {
     return true;
   });
 
-  const inProgressJobs = activeJobs
+  const visibleMyWorkJobs = activeJobs.filter((job: any) =>
+    isScheduledAssignedMyWorkEligible({
+      status: job?.status,
+      scheduledDate: job?.scheduled_date,
+      fieldComplete: job?.field_complete,
+    }),
+  );
+
+  const inProgressJobs = visibleMyWorkJobs
     .filter((job: any) => {
-      const status = String(job?.status ?? "").toLowerCase();
-      return status === "on_the_way" || status === "in_process";
+      return isActiveFieldWorkStatus(job?.status);
     })
     .sort(sortBySchedule);
 
   const inProgressIds = new Set(inProgressJobs.map((job: any) => String(job.id ?? "")));
 
-  const todayJobs = activeJobs
+  const todayJobs = visibleMyWorkJobs
     .filter((job: any) => {
       const jobId = String(job?.id ?? "");
       return !inProgressIds.has(jobId) && String(job?.scheduled_date ?? "") === today;
     })
     .sort(sortBySchedule);
 
-  const overdueJobs = activeJobs
+  const overdueJobs = visibleMyWorkJobs
     .filter((job: any) => {
       const jobId = String(job?.id ?? "");
       if (inProgressIds.has(jobId)) return false;
@@ -335,24 +346,13 @@ export default async function OpsFieldPage() {
     .sort(sortBySchedule)
     .reverse();
 
-  const upcomingScheduledJobs = activeJobs
+  const upcomingScheduledJobs = visibleMyWorkJobs
     .filter((job: any) => {
       const jobId = String(job?.id ?? "");
       if (inProgressIds.has(jobId)) return false;
 
       const scheduledDate = String(job?.scheduled_date ?? "").trim();
       return !!scheduledDate && scheduledDate > today;
-    })
-    .sort(sortBySchedule);
-
-  const unscheduledJobs = activeJobs
-    .filter((job: any) => {
-      const jobId = String(job?.id ?? "");
-      if (inProgressIds.has(jobId)) return false;
-      if (String(job?.scheduled_date ?? "") === today) return false;
-
-      const scheduledDate = String(job?.scheduled_date ?? "").trim();
-      return !scheduledDate;
     })
     .sort(sortBySchedule);
 
@@ -381,12 +381,6 @@ export default async function OpsFieldPage() {
       subtitle: "Assigned upcoming scheduled work in chronological order.",
       jobs: upcomingScheduledJobs,
     },
-    {
-      key: "unscheduled",
-      title: "Unscheduled",
-      subtitle: "Assigned work awaiting a scheduled date.",
-      jobs: unscheduledJobs,
-    },
   ];
 
   const totalVisibleJobs = sections.reduce((sum, section) => sum + section.jobs.length, 0);
@@ -410,7 +404,7 @@ export default async function OpsFieldPage() {
           </Link>
         </div>
 
-        <div className="mt-5 grid gap-2 sm:grid-cols-5">
+        <div className="mt-5 grid gap-2 sm:grid-cols-4">
           {sections.map((section) => {
             const tone = sectionVisualTone(section.key);
             return (
@@ -430,7 +424,7 @@ export default async function OpsFieldPage() {
       {totalVisibleJobs === 0 ? (
         <div className="rounded-lg border border-slate-200 bg-white p-6 text-sm leading-6 text-slate-600 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.34)]">
           <div className="text-base font-semibold text-slate-950">No active assigned jobs right now.</div>
-          <div className="mt-1">You are clear from this field queue. New assignments will appear here when dispatch adds you to active work.</div>
+          <div className="mt-1">You are clear from this field queue. Unscheduled work is managed by dispatch and will appear here once scheduled or actively started.</div>
         </div>
       ) : null}
 

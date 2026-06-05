@@ -33,6 +33,11 @@ const withoutTechQueuePageSource = readFileSync(
   "utf-8",
 );
 
+const opsFieldPageSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/field/page.tsx"),
+  "utf-8",
+);
+
 describe("focused ops queue filtering", () => {
   it("waiting queue includes waiting states but not office review exceptions", () => {
     const rows = buildWaitingQueueRows([
@@ -181,6 +186,34 @@ describe("canonical queue status contracts", () => {
       fieldComplete: true,
     })).toBe(false);
   });
+
+  it("keeps generic assigned unscheduled jobs out of field My Work", () => {
+    expect(isScheduledAssignedMyWorkEligible({
+      status: "open",
+      scheduledDate: null,
+      fieldComplete: false,
+    })).toBe(false);
+    expect(isScheduledAssignedMyWorkEligible({
+      status: "open",
+      scheduledDate: "",
+      fieldComplete: false,
+    })).toBe(false);
+    expect(isScheduledAssignedMyWorkEligible({
+      status: "scheduled",
+      scheduledDate: "2026-05-25",
+      fieldComplete: false,
+    })).toBe(true);
+    expect(isScheduledAssignedMyWorkEligible({
+      status: "on_the_way",
+      scheduledDate: null,
+      fieldComplete: false,
+    })).toBe(true);
+    expect(isScheduledAssignedMyWorkEligible({
+      status: "in_process",
+      scheduledDate: null,
+      fieldComplete: false,
+    })).toBe(true);
+  });
 });
 
 describe("focused ops queue pages", () => {
@@ -218,5 +251,13 @@ describe("focused ops queue pages", () => {
     expect(withoutTechQueuePageSource).toContain("No coverage gaps right now.");
     expect(withoutTechQueuePageSource).toContain("Return to Operations");
     expect(withoutTechQueuePageSource).toContain('href="/ops"');
+  });
+
+  it("field My Work uses the scheduled/actionable contract and no unscheduled section", () => {
+    expect(opsFieldPageSource).toContain("isScheduledAssignedMyWorkEligible");
+    expect(opsFieldPageSource).toContain("isActiveFieldWorkStatus");
+    expect(opsFieldPageSource).toContain("Unscheduled work is managed by dispatch");
+    expect(opsFieldPageSource).not.toContain('key: "unscheduled"');
+    expect(opsFieldPageSource).not.toContain('title: "Unscheduled"');
   });
 });
