@@ -84,15 +84,15 @@ vi.mock('@/lib/business/payment-allocations', () => ({
 }));
 
 function makeSupabaseFixture(params?: { insertError?: { message: string } | null }) {
-  const writes: Array<{ table: string; op: string }> = [];
+  const writes: Array<{ table: string; op: string; payload?: unknown }> = [];
   const insertError = params?.insertError ?? null;
 
   const supabase = {
     from: vi.fn((table: string) => {
       if (table === 'internal_invoice_payments') {
         return {
-          insert: vi.fn(() => {
-            writes.push({ table, op: 'insert' });
+          insert: vi.fn((payload: unknown) => {
+            writes.push({ table, op: 'insert', payload });
             return {
               select: vi.fn(() => ({
                 single: vi.fn(async () => ({
@@ -100,6 +100,17 @@ function makeSupabaseFixture(params?: { insertError?: { message: string } | null
                   error: insertError,
                 })),
               })),
+            };
+          }),
+        };
+      }
+
+      if (table === 'field_payment_collection_reports') {
+        return {
+          insert: vi.fn(async (payload: unknown) => {
+            writes.push({ table, op: 'insert', payload });
+            return {
+              error: insertError,
             };
           }),
         };
@@ -120,6 +131,26 @@ function buildFormData(overrides: Partial<Record<string, string>> = {}) {
   formData.set('payment_method', 'cash');
   formData.set('received_reference', 'CHK-1001');
   formData.set('notes', 'Paid at office');
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value != null) {
+      formData.set(key, value);
+    }
+  }
+
+  return formData;
+}
+
+function buildFieldReportFormData(overrides: Partial<Record<string, string>> = {}) {
+  const formData = new FormData();
+  formData.set('job_id', 'job-1');
+  formData.set('invoice_id', 'inv-1');
+  formData.set('tab', 'info');
+  formData.set('return_to', '/jobs/job-1/invoice?invoice_id=inv-1#invoice-workspace');
+  formData.set('payment_amount', '25.00');
+  formData.set('payment_method', 'check');
+  formData.set('reference', 'CHK-1001');
+  formData.set('note', 'Collected in field');
 
   for (const [key, value] of Object.entries(overrides)) {
     if (value != null) {
@@ -1075,6 +1106,258 @@ describe('collectIssuedInvoiceCardPaymentFromForm', () => {
 
     expect(fixture.writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(false);
     expect(insertJobEventMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('reportNonCardFieldPaymentCollectionFromForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+
+    requireInternalUserMock.mockResolvedValue({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    resolveFieldBillingCapabilitiesMock.mockReturnValue({
+      can_collect_field_payment: true,
+      can_collect_card_payment: false,
+      can_report_non_card_collection: true,
+      can_verify_non_card_collection: false,
+    });
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValue('internal_invoicing');
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: 'allowed_active',
+    });
+    resolveInternalInvoiceByIdMock.mockResolvedValue({
+      id: 'inv-1',
+      account_owner_user_id: 'owner-1',
+      job_id: 'job-1',
+      customer_id: 'cust-1',
+      invoice_number: 'INV-1',
+      status: 'issued',
+      total_cents: 10000,
+    });
+    resolveInvoiceCollectedPaymentSummaryMock.mockResolvedValue({
+      invoiceId: 'inv-1',
+      invoiceTotalCents: 10000,
+      amountPaidCents: 2000,
+      balanceDueCents: 8000,
+      paymentStatus: 'partial',
+    });
+
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+  });
+
+  it('allows authorized field collector to report check payment on issued invoice with balance', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData({ payment_method: 'check' })),
+    ).rejects.toThrow('banner=field_payment_reported');
+
+    const reportWrite = fixture.writes.find(
+      (w) => w.table === 'field_payment_collection_reports' && w.op === 'insert',
+    );
+    expect(reportWrite).toBeTruthy();
+    expect(reportWrite?.payload).toEqual(
+      expect.objectContaining({
+        account_owner_user_id: 'owner-1',
+        job_id: 'job-1',
+        internal_invoice_id: 'inv-1',
+        customer_id: 'cust-1',
+        reported_by_user_id: 'tech-1',
+        payment_method: 'check',
+        amount_cents: 2500,
+        currency: 'usd',
+        reference: 'CHK-1001',
+        note: 'Collected in field',
+        status: 'reported',
+      }),
+    );
+    const payload = reportWrite?.payload as Record<string, unknown> | undefined;
+    expect(payload?.verified_by_user_id).toBeUndefined();
+    expect(payload?.verified_at).toBeUndefined();
+    expect(payload?.final_internal_invoice_payment_id).toBeUndefined();
+    expect(fixture.writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(false);
+    expect(upsertInvoicePaymentAllocationForPaymentRowMock).not.toHaveBeenCalled();
+    expect(insertJobEventMock).not.toHaveBeenCalled();
+  });
+
+  it('allows authorized field collector to report cash payment', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData({ payment_method: 'cash' })),
+    ).rejects.toThrow('banner=field_payment_reported');
+
+    const reportWrite = fixture.writes.find(
+      (w) => w.table === 'field_payment_collection_reports' && w.op === 'insert',
+    );
+    expect(reportWrite?.payload).toEqual(
+      expect.objectContaining({
+        payment_method: 'cash',
+      }),
+    );
+  });
+
+  it('allows authorized field collector to report other payment', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData({ payment_method: 'other' })),
+    ).rejects.toThrow('banner=field_payment_reported');
+
+    const reportWrite = fixture.writes.find(
+      (w) => w.table === 'field_payment_collection_reports' && w.op === 'insert',
+    );
+    expect(reportWrite?.payload).toEqual(
+      expect.objectContaining({
+        payment_method: 'other',
+      }),
+    );
+  });
+
+  it('rejects draft invoice reporting attempts', async () => {
+    resolveInternalInvoiceByIdMock.mockResolvedValueOnce({
+      id: 'inv-1',
+      account_owner_user_id: 'owner-1',
+      job_id: 'job-1',
+      customer_id: 'cust-1',
+      status: 'draft',
+      total_cents: 10000,
+    });
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData()),
+    ).rejects.toThrow('banner=field_payment_report_requires_issued');
+  });
+
+  it('rejects void invoice reporting attempts', async () => {
+    resolveInternalInvoiceByIdMock.mockResolvedValueOnce({
+      id: 'inv-1',
+      account_owner_user_id: 'owner-1',
+      job_id: 'job-1',
+      customer_id: 'cust-1',
+      status: 'void',
+      total_cents: 10000,
+    });
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData()),
+    ).rejects.toThrow('banner=field_payment_report_requires_issued');
+  });
+
+  it('rejects paid or zero-balance invoice reporting attempts', async () => {
+    resolveInvoiceCollectedPaymentSummaryMock.mockResolvedValueOnce({
+      invoiceId: 'inv-1',
+      invoiceTotalCents: 10000,
+      amountPaidCents: 10000,
+      balanceDueCents: 0,
+      paymentStatus: 'paid',
+    });
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData()),
+    ).rejects.toThrow('banner=field_payment_report_no_balance_due');
+  });
+
+  it('rejects over-balance reporting attempts', async () => {
+    resolveInvoiceCollectedPaymentSummaryMock.mockResolvedValueOnce({
+      invoiceId: 'inv-1',
+      invoiceTotalCents: 10000,
+      amountPaidCents: 9500,
+      balanceDueCents: 500,
+      paymentStatus: 'partial',
+    });
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData({ payment_amount: '6.00' })),
+    ).rejects.toThrow('banner=field_payment_report_overpay_denied');
+  });
+
+  it('rejects invalid non-card method', async () => {
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData({ payment_method: 'bank_transfer' })),
+    ).rejects.toThrow('banner=field_payment_report_method_invalid');
+  });
+
+  it('rejects missing selected invoice id', async () => {
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData({ invoice_id: '' })),
+    ).rejects.toThrow('banner=field_payment_report_invalid');
+  });
+
+  it('rejects unauthorized actor without non-card reporting authority', async () => {
+    resolveFieldBillingCapabilitiesMock.mockReturnValueOnce({
+      can_collect_field_payment: false,
+      can_collect_card_payment: false,
+      can_report_non_card_collection: false,
+      can_verify_non_card_collection: false,
+    });
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData()),
+    ).rejects.toThrow('banner=not_authorized');
+  });
+
+  it('rejects collect-card-only actor when non-card reporting capability is absent', async () => {
+    resolveFieldBillingCapabilitiesMock.mockReturnValueOnce({
+      can_collect_field_payment: true,
+      can_collect_card_payment: true,
+      can_report_non_card_collection: false,
+      can_verify_non_card_collection: false,
+    });
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData()),
+    ).rejects.toThrow('banner=not_authorized');
+  });
+
+  it('preserves selected supplemental invoice routing in redirect', async () => {
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(
+        buildFieldReportFormData({
+          invoice_id: 'inv-supp-1',
+          return_to: '/jobs/job-1/invoice?invoice_id=inv-supp-1#invoice-workspace',
+        }),
+      ),
+    ).rejects.toThrow('/jobs/job-1/invoice?invoice_id=inv-supp-1&banner=field_payment_reported#invoice-workspace');
   });
 });
 

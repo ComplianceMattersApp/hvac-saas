@@ -247,6 +247,14 @@ function bannerMessage(value?: string | null) {
       "Failed-autopay retry was declined by Stripe. Invoice payment records were not marked paid.",
     internal_invoice_failed_autopay_retry_failed_requires_action:
       "Failed-autopay retry requires customer action. No automatic retry was scheduled.",
+    field_payment_reported:
+      "Payment report submitted for office reconciliation. Invoice balance updates after the payment is verified.",
+    field_payment_report_invalid: "Payment report request was invalid.",
+    field_payment_report_requires_issued: "Invoice must be issued before reporting field payment collection.",
+    field_payment_report_method_invalid: "Select check, cash, or other for field-reported collection.",
+    field_payment_report_amount_invalid: "Enter a valid payment amount greater than zero.",
+    field_payment_report_no_balance_due: "Invoice has no balance due to report.",
+    field_payment_report_overpay_denied: "Reported amount cannot exceed the current invoice balance due.",
   };
   return messages[key] ?? null;
 }
