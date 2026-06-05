@@ -1792,6 +1792,31 @@ export default async function JobDetailPage({
 
   const { internalInvoiceTruth } = await immediateInvoiceTruthPromise;
 
+  const fieldBillingSummaryDataPromise = timedPhase("fieldBillingSummaryRead", async () => {
+    if (!(showInternalInvoicePanel && fieldBillingCapabilities.can_view_field_billing_summary)) {
+      return {
+        latestVoidedInternalInvoice: null as Awaited<ReturnType<typeof resolveLatestVoidedInternalInvoiceByJobId>> | null,
+        fieldChargeProposals: [] as Awaited<ReturnType<typeof listFieldChargeProposalsForJob>>,
+      };
+    }
+
+    const [latestVoidedInternalInvoice, fieldChargeProposals] = await Promise.all([
+      internalInvoiceTruth
+        ? Promise.resolve(null)
+        : resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId }),
+      listFieldChargeProposalsForJob({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        jobId,
+      }),
+    ]);
+
+    return {
+      latestVoidedInternalInvoice,
+      fieldChargeProposals,
+    };
+  });
+
   const loadDeferredInvoicePanelData = async () => {
     const deferredStartMs = timingEnabled ? Date.now() : 0;
     try {
@@ -1919,6 +1944,7 @@ export default async function JobDetailPage({
     locationRoleContacts,
     jobRoleContacts,
     customerAttemptSummary,
+    fieldBillingSummaryData,
   ] = await Promise.all([
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
@@ -1932,10 +1958,44 @@ export default async function JobDetailPage({
     locationRoleContactsPromise,
     jobRoleContactsPromise,
     customerAttemptSummaryPromise,
+    fieldBillingSummaryDataPromise,
   ]);
 
   const contractorBilling = billingPartyReads.contractorBilling;
   const customerBilling = billingPartyReads.customerBilling;
+  const fieldBillingInvoiceSnapshot = internalInvoiceTruth
+    ? {
+        status: internalInvoiceTruth.status as "draft" | "issued" | "void",
+        invoiceNumber: internalInvoiceTruth.invoice_number,
+        invoiceDisplayNumber: internalInvoiceTruth.invoice_display_number,
+        totalCents: Number(internalInvoiceTruth.total_cents ?? 0) || 0,
+        lineItemCount: Number(internalInvoiceTruth.line_item_count ?? 0) || 0,
+      }
+    : null;
+  const fieldBillingLatestVoidedInvoiceSnapshot = fieldBillingSummaryData.latestVoidedInternalInvoice
+    ? {
+        status: "void" as const,
+        invoiceNumber: fieldBillingSummaryData.latestVoidedInternalInvoice.invoice_number,
+        invoiceDisplayNumber: fieldBillingSummaryData.latestVoidedInternalInvoice.invoice_display_number,
+        totalCents: Number(fieldBillingSummaryData.latestVoidedInternalInvoice.total_cents ?? 0) || 0,
+        lineItemCount: fieldBillingSummaryData.latestVoidedInternalInvoice.line_items?.length ?? 0,
+      }
+    : null;
+  const fieldChargeProposalPricebookItems = visitScopePricebookTemplates
+    .filter((item) => {
+      const itemType = String(item.item_type ?? "").trim().toLowerCase();
+      const unitPrice = Number(item.default_unit_price ?? 0);
+      return ["service", "material", "diagnostic"].includes(itemType) && Number.isFinite(unitPrice) && unitPrice >= 0;
+    })
+    .map((item) => ({
+      id: item.id,
+      item_name: item.item_name,
+      item_type: item.item_type,
+      category: item.category,
+      default_description: item.default_description,
+      default_unit_price: item.default_unit_price,
+      unit_label: item.unit_label,
+    }));
   const compositionPrepStartedAt = Date.now();
 
   const assignedTeam =
@@ -2488,6 +2548,11 @@ try {
 } catch {
   visitScopeItems = [];
 }
+const fieldChargeProposalVisitScopeItems = visitScopeItems.map((item) => ({
+  id: item.id,
+  title: item.title,
+  details: item.details,
+}));
   setPhaseValue("compositionPrep", Date.now() - compositionPrepStartedAt);
 const visitScopeCount = visitScopeItems.length;
 const hasVisitScopeDefined = Boolean(visitScopeSummary) || visitScopeCount > 0;
@@ -6844,6 +6909,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         Invoice Charges are billed scope. Work Items remain operational scope.
       </div>
     </div>
+
+    <FieldBillingSummary
+      jobId={job.id}
+      tab={tab}
+      capabilities={fieldBillingCapabilities}
+      invoice={fieldBillingInvoiceSnapshot}
+      latestVoidedInvoice={fieldBillingLatestVoidedInvoiceSnapshot}
+      paymentSummary={null}
+      fieldChargeProposals={fieldBillingSummaryData.fieldChargeProposals}
+      pricebookProposalItems={fieldChargeProposalPricebookItems}
+      visitScopeProposalItems={fieldChargeProposalVisitScopeItems}
+    />
   </div>
 ) : null}
 
