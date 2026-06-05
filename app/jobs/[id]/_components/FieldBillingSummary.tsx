@@ -1,4 +1,5 @@
 import type { FieldBillingCapabilities } from "@/lib/auth/field-billing-access";
+import type { FieldChargeProposalRecord } from "@/lib/business/field-charge-proposals";
 
 type FieldBillingInvoiceSnapshot = {
   status: "draft" | "issued" | "void";
@@ -19,6 +20,7 @@ type FieldBillingSummaryProps = {
   invoice: FieldBillingInvoiceSnapshot | null;
   latestVoidedInvoice?: FieldBillingInvoiceSnapshot | null;
   paymentSummary?: FieldBillingPaymentSummary | null;
+  fieldChargeProposals?: FieldChargeProposalRecord[];
 };
 
 function formatCurrencyFromCents(cents?: number | null) {
@@ -31,6 +33,41 @@ function formatCurrencyFromCents(cents?: number | null) {
 
 function formatInvoiceReference(invoice: FieldBillingInvoiceSnapshot | null | undefined) {
   return String(invoice?.invoiceDisplayNumber ?? invoice?.invoiceNumber ?? "").trim() || "Not available";
+}
+
+function formatProposalSourceKind(value: FieldChargeProposalRecord["source_kind"]) {
+  if (value === "pricebook") return "Pricebook";
+  if (value === "visit_scope") return "Visit Scope";
+  return "Manual";
+}
+
+function formatProposalStatus(value: FieldChargeProposalRecord["status"]) {
+  if (value === "submitted_for_review") return "Submitted for Review";
+  if (value === "approved") return "Approved";
+  if (value === "rejected") return "Rejected";
+  if (value === "voided") return "Voided";
+  return "Draft";
+}
+
+function formatProposalQuantity(value: number) {
+  const normalized = Number(value ?? 0);
+  if (!Number.isFinite(normalized) || normalized <= 0) return "Qty not set";
+  return `Qty ${normalized.toLocaleString("en-US", {
+    minimumFractionDigits: normalized % 1 === 0 ? 0 : 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
+function formatSubmittedAt(value?: string | null) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "";
+  const parsed = new Date(normalized);
+  if (!Number.isFinite(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(parsed);
 }
 
 function resolveSummaryState(props: FieldBillingSummaryProps) {
@@ -98,6 +135,12 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
   const state = resolveSummaryState(props);
   const invoiceForMetrics = state.invoiceForMetrics;
   const paymentSummary = state.paymentSummary;
+  const fieldChargeProposals = props.fieldChargeProposals ?? [];
+  const proposedTotalCents = fieldChargeProposals.reduce((sum, proposal) => {
+    if (proposal.status === "rejected" || proposal.status === "voided") return sum;
+    return sum + Math.max(0, Number(proposal.proposed_subtotal_cents ?? 0) || 0);
+  }, 0);
+  const hasProposedTotal = proposedTotalCents > 0;
   const canMutateFieldBilling =
     props.capabilities.can_select_pricebook_lines
     || props.capabilities.can_convert_visit_scope_to_invoice_line
@@ -153,6 +196,79 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
           <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
             Billing actions remain in the invoice workspace.
           </span>
+        )}
+      </div>
+
+      <div className="mt-4 border-t border-slate-200/80 pt-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h4 className="text-sm font-semibold text-slate-950">Field charge proposals</h4>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Office review required before these become invoice charges. These proposals are not collectible yet.
+            </p>
+          </div>
+          {hasProposedTotal ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-right">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-700">
+                Proposed total
+              </div>
+              <div className="mt-0.5 text-sm font-semibold text-amber-950">
+                {formatCurrencyFromCents(proposedTotalCents)}
+              </div>
+              <div className="mt-0.5 text-[11px] font-medium text-amber-800">
+                Separate from invoice total
+              </div>
+            </div>
+          ) : null}
+        </div>
+
+        {fieldChargeProposals.length === 0 ? (
+          <div className="mt-3 rounded-lg border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-xs font-medium text-slate-500">
+            No field charge proposals.
+          </div>
+        ) : (
+          <div className="mt-3 grid gap-2">
+            {fieldChargeProposals.map((proposal) => (
+              <div key={proposal.id} className="rounded-lg border border-slate-200/80 bg-slate-50/70 px-3 py-2.5">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-950">{proposal.proposed_name || "Untitled proposal"}</div>
+                    {proposal.proposed_description ? (
+                      <div className="mt-1 text-xs leading-5 text-slate-600">{proposal.proposed_description}</div>
+                    ) : null}
+                    <div className="mt-2 flex flex-wrap gap-1.5 text-[11px] font-semibold text-slate-600">
+                      <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5">
+                        Source: {formatProposalSourceKind(proposal.source_kind)}
+                      </span>
+                      <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5">
+                        {formatProposalQuantity(proposal.proposed_quantity)}
+                      </span>
+                      {proposal.submitted_at ? (
+                        <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5">
+                          Submitted {formatSubmittedAt(proposal.submitted_at)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="flex flex-row items-center gap-2 sm:flex-col sm:items-end">
+                    <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">
+                      {formatProposalStatus(proposal.status)}
+                    </span>
+                    <span className="text-sm font-semibold text-slate-950">
+                      {proposal.proposed_subtotal_cents == null
+                        ? "Amount pending"
+                        : formatCurrencyFromCents(proposal.proposed_subtotal_cents)}
+                    </span>
+                    {proposal.proposed_unit_price_cents != null ? (
+                      <span className="text-[11px] font-medium text-slate-500">
+                        Unit {formatCurrencyFromCents(proposal.proposed_unit_price_cents)}
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </section>

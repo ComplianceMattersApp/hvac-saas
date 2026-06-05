@@ -88,3 +88,50 @@ export function normalizeFieldChargeProposalRow(row: any): FieldChargeProposalRe
     updated_at: String(row?.updated_at ?? '').trim(),
   };
 }
+
+const FIELD_CHARGE_PROPOSAL_SELECT = [
+  'id',
+  'account_owner_user_id',
+  'job_id',
+  'internal_invoice_id',
+  'source_kind',
+  'source_pricebook_item_id',
+  'source_visit_scope_item_id',
+  'proposed_name',
+  'proposed_description',
+  'proposed_item_type',
+  'proposed_quantity',
+  'proposed_unit_price_cents',
+  'proposed_subtotal_cents',
+  'proposed_currency',
+  'status',
+  'proposed_by_user_id',
+  'submitted_at',
+  'reviewed_by_user_id',
+  'reviewed_at',
+  'review_note',
+  'converted_internal_invoice_line_item_id',
+  'created_at',
+  'updated_at',
+].join(', ');
+
+export async function listFieldChargeProposalsForJob(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  jobId: string;
+}): Promise<FieldChargeProposalRecord[]> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? '').trim();
+  const jobId = String(params.jobId ?? '').trim();
+  if (!accountOwnerUserId || !jobId) return [];
+
+  const { data, error } = await params.supabase
+    .from('field_charge_proposals')
+    .select(FIELD_CHARGE_PROPOSAL_SELECT)
+    .eq('account_owner_user_id', accountOwnerUserId)
+    .eq('job_id', jobId)
+    .order('submitted_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return Array.isArray(data) ? data.map(normalizeFieldChargeProposalRow) : [];
+}

@@ -75,6 +75,7 @@ import {
   resolveInvoiceCollectedPaymentLedger,
   type InternalInvoicePaymentRow,
 } from "@/lib/business/internal-invoice-payments";
+import { listFieldChargeProposalsForJob } from "@/lib/business/field-charge-proposals";
 import {
   addInternalInvoiceLineItemFromForm,
   addInternalInvoiceLineItemFromPricebookForm,
@@ -1800,6 +1801,7 @@ export default async function JobDetailPage({
           latestVoidedInternalInvoice: null as Awaited<ReturnType<typeof resolveLatestVoidedInternalInvoiceByJobId>>,
           internalInvoiceEmailDeliveries: [] as InternalInvoiceEmailDeliveryRecord[],
           internalInvoicePaymentLedger: null as Awaited<ReturnType<typeof resolveInvoiceCollectedPaymentLedger>> | null,
+          fieldChargeProposals: [] as Awaited<ReturnType<typeof listFieldChargeProposalsForJob>>,
           pricebookPickerItems: [] as Array<{
             id: string;
             item_name: string;
@@ -1816,6 +1818,11 @@ export default async function JobDetailPage({
       const latestVoidedInternalInvoice = !internalInvoice
         ? await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId })
         : null;
+      const fieldChargeProposals = await listFieldChargeProposalsForJob({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        jobId,
+      });
 
       if (!internalInvoice) {
         return {
@@ -1823,6 +1830,7 @@ export default async function JobDetailPage({
           latestVoidedInternalInvoice,
           internalInvoiceEmailDeliveries: [] as InternalInvoiceEmailDeliveryRecord[],
           internalInvoicePaymentLedger: null as Awaited<ReturnType<typeof resolveInvoiceCollectedPaymentLedger>> | null,
+          fieldChargeProposals,
           pricebookPickerItems: [] as Array<{
             id: string;
             item_name: string;
@@ -1887,6 +1895,7 @@ export default async function JobDetailPage({
         latestVoidedInternalInvoice,
         internalInvoiceEmailDeliveries,
         internalInvoicePaymentLedger,
+        fieldChargeProposals,
         pricebookPickerItems,
       };
     } finally {
@@ -2715,6 +2724,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       latestVoidedInternalInvoice,
       internalInvoiceEmailDeliveries,
       internalInvoicePaymentLedger,
+      fieldChargeProposals,
       pricebookPickerItems,
     } = await loadDeferredInvoicePanelData();
 
@@ -2906,6 +2916,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           invoice={fieldBillingInvoiceSnapshot}
           latestVoidedInvoice={fieldBillingLatestVoidedInvoiceSnapshot}
           paymentSummary={internalInvoice ? internalInvoicePaymentSummary : null}
+          fieldChargeProposals={fieldChargeProposals}
         />
 
         {!internalInvoice ? (

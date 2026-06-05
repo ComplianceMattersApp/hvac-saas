@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
   FIELD_CHARGE_PROPOSAL_SOURCE_KINDS,
@@ -6,6 +6,7 @@ import {
   normalizeFieldChargeProposalRow,
   normalizeFieldChargeProposalSourceKind,
   normalizeFieldChargeProposalStatus,
+  listFieldChargeProposalsForJob,
 } from '@/lib/business/field-charge-proposals';
 
 describe('field charge proposal model foundation', () => {
@@ -64,5 +65,68 @@ describe('field charge proposal model foundation', () => {
     expect(row.proposed_subtotal_cents).toBe(25000);
     expect(row.proposed_currency).toBe('usd');
     expect(row.converted_internal_invoice_line_item_id).toBeNull();
+  });
+
+  it('lists proposals through a narrow account/job scoped read', async () => {
+    const calls: Array<{ method: string; args: unknown[] }> = [];
+    const chain = {
+      select: (...args: unknown[]) => {
+        calls.push({ method: 'select', args });
+        return chain;
+      },
+      eq: (...args: unknown[]) => {
+        calls.push({ method: 'eq', args });
+        return chain;
+      },
+      order: (...args: unknown[]) => {
+        calls.push({ method: 'order', args });
+        return chain;
+      },
+      then: undefined,
+    } as any;
+    chain.order = vi.fn((...args: unknown[]) => {
+      calls.push({ method: 'order', args });
+      if (calls.filter((call) => call.method === 'order').length === 2) {
+        return Promise.resolve({
+          data: [
+            {
+              id: 'proposal-1',
+              account_owner_user_id: 'owner-1',
+              job_id: 'job-1',
+              source_kind: 'pricebook',
+              proposed_name: 'Diagnostic',
+              proposed_item_type: 'diagnostic',
+              proposed_quantity: 1,
+              status: 'submitted_for_review',
+              proposed_by_user_id: 'billing-1',
+              created_at: '2026-06-05T18:00:00.000Z',
+              updated_at: '2026-06-05T18:00:00.000Z',
+            },
+          ],
+          error: null,
+        });
+      }
+      return chain;
+    });
+
+    const supabase = {
+      from: vi.fn(() => chain),
+    };
+
+    const rows = await listFieldChargeProposalsForJob({
+      supabase,
+      accountOwnerUserId: 'owner-1',
+      jobId: 'job-1',
+    });
+
+    expect(supabase.from).toHaveBeenCalledWith('field_charge_proposals');
+    expect(calls).toEqual(
+      expect.arrayContaining([
+        { method: 'eq', args: ['account_owner_user_id', 'owner-1'] },
+        { method: 'eq', args: ['job_id', 'job-1'] },
+      ]),
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].source_kind).toBe('pricebook');
   });
 });
