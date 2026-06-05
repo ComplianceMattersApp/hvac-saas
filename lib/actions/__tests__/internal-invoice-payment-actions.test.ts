@@ -1010,6 +1010,23 @@ describe('collectIssuedInvoiceCardPaymentFromForm', () => {
     expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
   });
 
+  it('rejects actor with report-only capability when card collect capability is absent', async () => {
+    resolveFieldBillingCapabilitiesMock.mockReturnValueOnce({
+      can_collect_field_payment: true,
+      can_report_non_card_collection: true,
+      can_collect_card_payment: false,
+      can_verify_non_card_collection: false,
+    });
+
+    const { collectIssuedInvoiceCardPaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      collectIssuedInvoiceCardPaymentFromForm(buildCollectFormData()),
+    ).rejects.toThrow('banner=not_authorized');
+
+    expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
+  });
+
   it('rejects draft invoice collection attempts', async () => {
     createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
       new Error('Invoice must be issued to accept online payment'),

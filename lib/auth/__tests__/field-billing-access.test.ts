@@ -16,6 +16,11 @@ import {
   requireVisitScopeFieldChargeAccessOrRedirect,
   resolveFieldBillingCapabilities,
 } from '@/lib/auth/field-billing-access';
+import {
+  canExportFinancialData,
+  canManageInvoiceLifecycle,
+  canRecordInvoicePayment,
+} from '@/lib/auth/financial-access';
 
 function internalUser(role: string, overrides: Record<string, unknown> = {}) {
   return {
@@ -49,6 +54,7 @@ const expectedFinancialCapabilities = {
   can_remove_invoice_line: true,
   can_issue_invoice: true,
   can_send_invoice: true,
+  can_collect_field_payment: true,
   can_collect_card_payment: true,
   can_report_non_card_collection: true,
   can_verify_non_card_collection: true,
@@ -76,6 +82,7 @@ const expectedReadOnlyCapabilities = {
   can_remove_invoice_line: false,
   can_issue_invoice: false,
   can_send_invoice: false,
+  can_collect_field_payment: false,
   can_collect_card_payment: false,
   can_report_non_card_collection: false,
   can_verify_non_card_collection: false,
@@ -273,9 +280,52 @@ describe('field billing access helper', () => {
     });
 
     expect(capabilities.can_collect_card_payment).toBe(true);
+    expect(capabilities.can_collect_field_payment).toBe(true);
     expect(capabilities.can_issue_invoice).toBe(false);
     expect(capabilities.can_send_invoice).toBe(false);
     expect(capabilities.can_verify_non_card_collection).toBe(false);
+  });
+
+  it('can grant report-non-card capability without granting verification or financial authority', () => {
+    const params = {
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+      explicitCapabilities: {
+        field_billing_enabled: true,
+        can_view_field_billing_summary: true,
+        can_report_non_card_collection: true,
+      },
+    };
+
+    const capabilities = resolveFieldBillingCapabilities(params);
+
+    expect(capabilities.can_collect_field_payment).toBe(true);
+    expect(capabilities.can_collect_card_payment).toBe(false);
+    expect(capabilities.can_report_non_card_collection).toBe(true);
+    expect(capabilities.can_verify_non_card_collection).toBe(false);
+
+    expect(canManageInvoiceLifecycle(params)).toBe(false);
+    expect(canRecordInvoicePayment(params)).toBe(false);
+    expect(canExportFinancialData(params)).toBe(false);
+  });
+
+  it('does not infer field collection family from verification-only capability', () => {
+    const capabilities = resolveFieldBillingCapabilities({
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+      explicitCapabilities: {
+        field_billing_enabled: true,
+        can_view_field_billing_summary: true,
+        can_verify_non_card_collection: true,
+      },
+    });
+
+    expect(capabilities.can_collect_field_payment).toBe(false);
+    expect(capabilities.can_collect_card_payment).toBe(false);
+    expect(capabilities.can_report_non_card_collection).toBe(false);
+    expect(capabilities.can_verify_non_card_collection).toBe(true);
   });
 
   it('redirect helpers deny missing charge-authoring capabilities', () => {

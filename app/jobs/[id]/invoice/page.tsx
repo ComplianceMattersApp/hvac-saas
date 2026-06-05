@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
 import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
 import {
+  hasFieldPaymentCollectionAccess,
   hasDirectInvoiceDraftMutationAccess,
   hasInvoiceIssueAccess,
   hasInvoiceSendAccess,
@@ -564,6 +565,7 @@ export default async function InternalInvoiceWorkspacePage({
   const supplementalParentInvoiceId = canCreateSupplementalDraftFromCurrentInvoice && invoice
     ? invoice.id
     : null;
+  const canCollectFieldPaymentAccess = hasFieldPaymentCollectionAccess(fieldBillingCapabilities);
   const canCollectCardPaymentAccess = fieldBillingCapabilities.can_collect_card_payment;
 
   const invoiceCustomerId = String(invoice?.customer_id ?? "").trim() || null;
@@ -623,6 +625,13 @@ export default async function InternalInvoiceWorkspacePage({
     && canManageFinancialInvoiceLifecycle,
   );
   const hasOutstandingInvoiceBalance = Number(paymentSummary?.balanceDueCents ?? 0) > 0;
+  const canShowFieldCollectionSection = Boolean(
+    invoice
+    && invoice.status === "issued"
+    && hasOutstandingInvoiceBalance
+    && canCollectFieldPaymentAccess
+    && !canManageFinancialInvoiceLifecycle,
+  );
 
   const failedAutopayAttention = invoice
     ? await loadFailedAutopayAttentionItems({
@@ -1021,6 +1030,9 @@ export default async function InternalInvoiceWorkspacePage({
                 <p className="mt-1 text-sm leading-6 text-slate-600">
                   Pick one available option below. Online card payments are recorded only after Stripe confirms them.
                 </p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Field-reported check, cash, and other collections are not enabled here yet. When enabled, office verification will be required before final payment truth.
+                </p>
 
                 {canShowManualSavedCardCharge ? (
                   <form
@@ -1125,21 +1137,24 @@ export default async function InternalInvoiceWorkspacePage({
               </section>
             ) : null}
 
-            {invoice && canCollectCardPaymentAccess && !canManageFinancialInvoiceLifecycle ? (
+            {canShowFieldCollectionSection ? (
               <section className={`${panelClass} order-5 p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Collection</div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collect Card Payment</h2>
-                {invoice.status !== "issued" ? (
-                  <p className="mt-2 text-sm leading-6 text-slate-600">Issue invoice before collecting card payment.</p>
-                ) : !hasOutstandingInvoiceBalance ? (
-                  <p className="mt-2 text-sm leading-6 text-slate-600">Invoice is paid or has no balance due.</p>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collect Payment</h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Card collection launches secure Stripe Checkout. Payment updates only after Stripe webhook confirmation.
+                </p>
+                <p className="mt-1 text-xs leading-5 text-slate-500">
+                  Check, cash, and other field reporting are not enabled in this slice. Future field reports will require office verification before final payment truth.
+                </p>
+                {!canCollectCardPaymentAccess ? (
+                  <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-600">
+                    Card collection is not enabled for your role.
+                  </div>
                 ) : !tenantStripeReadiness.isReady ? (
                   <p className="mt-2 text-sm leading-6 text-slate-600">Online payments are not ready.</p>
                 ) : (
                   <>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      Launch secure Stripe Checkout to collect card payment in the field. Payment is recorded only after Stripe webhook confirmation.
-                    </p>
                     <form action={collectIssuedInvoiceCardPaymentFromForm} className="mt-4 space-y-3 rounded-2xl border border-blue-200 bg-blue-50/60 p-4">
                       <input type="hidden" name="job_id" value={jobId} />
                       <input type="hidden" name="invoice_id" value={invoice.id} />

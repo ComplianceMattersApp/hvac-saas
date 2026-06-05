@@ -45,6 +45,7 @@ export type FieldBillingCapabilities = {
   can_send_invoice: boolean;
 
   // Payment/reporting capabilities remain separate from direct invoice authority.
+  can_collect_field_payment: boolean;
   can_collect_card_payment: boolean;
   can_report_non_card_collection: boolean;
   can_verify_non_card_collection: boolean;
@@ -95,6 +96,7 @@ function allFalse(): FieldBillingCapabilities {
     can_remove_invoice_line: false,
     can_issue_invoice: false,
     can_send_invoice: false,
+    can_collect_field_payment: false,
     can_collect_card_payment: false,
     can_report_non_card_collection: false,
     can_verify_non_card_collection: false,
@@ -128,6 +130,7 @@ function financialAuthorityDefaults(): FieldBillingCapabilities {
     can_issue_invoice: true,
     can_send_invoice: true,
 
+    can_collect_field_payment: true,
     can_collect_card_payment: true,
     can_report_non_card_collection: true,
     can_verify_non_card_collection: true,
@@ -173,6 +176,12 @@ export function resolveFieldBillingCapabilities(params: FieldBillingAccessParams
   const canEditInvoiceLineQuantity = explicit.can_edit_invoice_line_quantity === true;
   const canEditInvoiceLinePrice = explicit.can_edit_invoice_line_price === true;
   const canRemoveInvoiceLine = explicit.can_remove_invoice_line === true;
+  const canCollectCardPayment = explicit.can_collect_card_payment === true;
+  const canReportNonCardCollection = explicit.can_report_non_card_collection === true;
+  const canCollectFieldPayment =
+    explicit.can_collect_field_payment === true
+    || canCollectCardPayment
+    || canReportNonCardCollection;
 
   return {
     field_billing_enabled: true,
@@ -199,10 +208,19 @@ export function resolveFieldBillingCapabilities(params: FieldBillingAccessParams
     can_issue_invoice: explicit.can_issue_invoice === true,
     can_send_invoice: explicit.can_send_invoice === true,
 
-    can_collect_card_payment: explicit.can_collect_card_payment === true,
-    can_report_non_card_collection: explicit.can_report_non_card_collection === true,
+    can_collect_field_payment: canCollectFieldPayment,
+    can_collect_card_payment: canCollectCardPayment,
+    can_report_non_card_collection: canReportNonCardCollection,
     can_verify_non_card_collection: explicit.can_verify_non_card_collection === true,
   };
+}
+
+export function hasFieldPaymentCollectionAccess(capabilities: FieldBillingCapabilities) {
+  return Boolean(
+    capabilities.can_collect_field_payment
+      || capabilities.can_collect_card_payment
+      || capabilities.can_report_non_card_collection,
+  );
 }
 
 export function hasDirectInvoiceDraftMutationAccess(capabilities: FieldBillingCapabilities) {
