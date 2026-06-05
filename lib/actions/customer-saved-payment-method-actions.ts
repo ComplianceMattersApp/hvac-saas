@@ -73,7 +73,7 @@ function parseUuid(value: unknown) {
 }
 
 function normalizeInvoiceWorkspacePath(jobId: string, returnPath: string | null | undefined) {
-  const fallback = `/jobs/${jobId}/invoice`;
+  const fallback = new URL(`/jobs/${jobId}/invoice`, "https://app.local");
   const raw = clean(returnPath);
   if (!raw) return fallback;
 
@@ -82,7 +82,16 @@ function normalizeInvoiceWorkspacePath(jobId: string, returnPath: string | null 
     if (parsed.pathname !== `/jobs/${jobId}/invoice`) {
       return fallback;
     }
-    return parsed.pathname;
+
+    const selectedInvoiceId =
+      parseUuid(parsed.searchParams.get("invoice_id"))
+      || parseUuid(parsed.searchParams.get("supplemental_invoice_id"));
+
+    if (selectedInvoiceId) {
+      fallback.searchParams.set("invoice_id", selectedInvoiceId);
+    }
+
+    return fallback;
   } catch {
     return fallback;
   }
@@ -93,11 +102,10 @@ function redirectToInvoiceWorkspace(
   returnPath: string | null | undefined,
   banner: ManualSavedCardInvoiceBanner | FailedAutopayRetryInvoiceBanner,
 ): never {
-  const pathname = normalizeInvoiceWorkspacePath(jobId, returnPath);
-  const url = new URL(pathname, "https://app.local");
+  const url = normalizeInvoiceWorkspacePath(jobId, returnPath);
   url.searchParams.set("banner", banner);
   url.hash = "invoice-workspace";
-  revalidatePath(pathname);
+  revalidatePath(url.pathname);
   redirect(`${url.pathname}${url.search}${url.hash}`);
 }
 

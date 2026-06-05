@@ -238,7 +238,7 @@ describe('createSupplementalInternalInvoiceFromForm', () => {
     const { createSupplementalInternalInvoiceFromForm } = await import('@/lib/actions/internal-invoice-actions');
 
     await expect(createSupplementalInternalInvoiceFromForm(buildFormData())).rejects.toThrow(
-      'REDIRECT:/jobs/job-1/invoice?banner=internal_invoice_supplemental_draft_created&supplemental_invoice_id=inv-supp-new#invoice-workspace',
+      'REDIRECT:/jobs/job-1/invoice?banner=internal_invoice_supplemental_draft_created&invoice_id=inv-supp-new#invoice-workspace',
     );
 
     const invoiceInsert = fixture.writes.find((write) => write.table === 'internal_invoices' && write.op === 'insert');
@@ -270,7 +270,7 @@ describe('createSupplementalInternalInvoiceFromForm', () => {
     const { createSupplementalInternalInvoiceFromForm } = await import('@/lib/actions/internal-invoice-actions');
 
     await expect(createSupplementalInternalInvoiceFromForm(buildFormData())).rejects.toThrow(
-      'REDIRECT:/jobs/job-1/invoice?banner=internal_invoice_supplemental_draft_created&supplemental_invoice_id=inv-supp-new#invoice-workspace',
+      'REDIRECT:/jobs/job-1/invoice?banner=internal_invoice_supplemental_draft_created&invoice_id=inv-supp-new#invoice-workspace',
     );
 
     expect(fixture.writes.filter((write) => write.table === 'internal_invoices' && write.op === 'insert')).toHaveLength(1);

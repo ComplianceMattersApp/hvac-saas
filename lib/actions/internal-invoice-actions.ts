@@ -25,6 +25,7 @@ import { resolveJobBillingSource } from '@/lib/business/job-billing-source';
 import { resolveOperationalTenantIdentity } from '@/lib/email/operational-tenant-branding';
 import {
   normalizeInternalInvoiceItemType,
+  resolveInternalInvoiceById,
   resolveInternalInvoiceByJobId,
   type InternalInvoiceRecord,
 } from '@/lib/business/internal-invoice';
@@ -103,10 +104,10 @@ function buildSupplementalInvoiceWorkspaceReturnHref(params: {
 
   try {
     const parsed = new URL(baseHref, 'https://app.local');
-    parsed.searchParams.set('supplemental_invoice_id', params.supplementalInvoiceId);
+    parsed.searchParams.set('invoice_id', params.supplementalInvoiceId);
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
   } catch {
-    return `${baseHref}${baseHref.includes('?') ? '&' : '?'}supplemental_invoice_id=${encodeURIComponent(params.supplementalInvoiceId)}`;
+    return `${baseHref}${baseHref.includes('?') ? '&' : '?'}invoice_id=${encodeURIComponent(params.supplementalInvoiceId)}`;
   }
 }
 
@@ -540,6 +541,9 @@ async function loadInternalInvoiceContext(formData: FormData) {
   const jobId =
     getTrimmedString(formData.get('job_id')) ||
     getTrimmedString(formData.get('id'));
+  const invoiceIdInput =
+    getTrimmedString(formData.get('invoice_id')) ||
+    getTrimmedString(formData.get('supplemental_invoice_id'));
 
   if (!jobId) throw new Error('Job ID is required.');
 
@@ -580,7 +584,22 @@ async function loadInternalInvoiceContext(formData: FormData) {
 
   if (jobErr) throw jobErr;
 
-  const invoice = await resolveInternalInvoiceByJobId({ supabase, jobId });
+  const invoice = invoiceIdInput
+    ? await resolveInternalInvoiceById({
+        supabase,
+        invoiceId: invoiceIdInput,
+      })
+    : await resolveInternalInvoiceByJobId({ supabase, jobId });
+
+  if (
+    invoice
+    && (
+      invoice.account_owner_user_id !== internalUser.account_owner_user_id
+      || invoice.job_id !== jobId
+    )
+  ) {
+    redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
+  }
 
   return {
     supabase,

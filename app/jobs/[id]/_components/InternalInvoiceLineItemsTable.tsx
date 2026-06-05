@@ -36,6 +36,7 @@ type VisitScopePickerItem = {
 
 type InternalInvoiceLineItemsTableProps = {
   jobId: string;
+  selectedInvoiceId: string;
   tab: string;
   capabilities: FieldBillingCapabilities;
   lineItems: InternalInvoiceLineItemRecord[];
@@ -171,6 +172,7 @@ export function InternalInvoiceDraftSaveForm(props: {
 
 export default function InternalInvoiceLineItemsTable({
   jobId,
+  selectedInvoiceId,
   tab,
   capabilities,
   lineItems,
@@ -329,6 +331,7 @@ export default function InternalInvoiceLineItemsTable({
         {canAddVisitScopeLine && visitScopePickerItems.length > 0 ? (
           <form action={handleAddVisitScope} className="bg-sky-50/50 px-5 py-5">
             <input type="hidden" name="job_id" value={jobId} />
+            <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
             <input type="hidden" name="tab" value={tab} />
             <input type="hidden" name="quantity" value="1.00" />
 
@@ -404,6 +407,7 @@ export default function InternalInvoiceLineItemsTable({
         {canAddPricebookLine ? (
         <form action={handleAddPricebook} className="bg-white/92 px-5 py-5">
           <input type="hidden" name="job_id" value={jobId} />
+          <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
           <input type="hidden" name="tab" value={tab} />
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
@@ -519,6 +523,7 @@ export default function InternalInvoiceLineItemsTable({
             <div key={lineItem.id} className="bg-white/72">
               <form action={handleUpdateLineItem} className="px-5 py-5">
                 <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
                 <input type="hidden" name="tab" value={tab} />
                 <input type="hidden" name="line_item_id" value={lineItem.id} />
 
@@ -642,6 +647,7 @@ export default function InternalInvoiceLineItemsTable({
               <div className="sr-only">
                 <form id={`remove-line-item-${lineItem.id}`} action={handleRemoveLineItem}>
                   <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
                   <input type="hidden" name="tab" value={tab} />
                   <input type="hidden" name="line_item_id" value={lineItem.id} />
                 </form>
@@ -653,6 +659,7 @@ export default function InternalInvoiceLineItemsTable({
         {canAddManualLine && isAddFormOpen ? (
           <form action={handleAddManualLineItem} className="bg-slate-50/94 px-5 py-5">
             <input type="hidden" name="job_id" value={jobId} />
+            <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
             <input type="hidden" name="tab" value={tab} />
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">

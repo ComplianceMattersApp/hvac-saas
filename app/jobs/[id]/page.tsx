@@ -3198,6 +3198,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
                     <InternalInvoiceLineItemsTable
                       jobId={job.id}
+                      selectedInvoiceId={internalInvoice.id}
                       tab={tab}
                       capabilities={fieldBillingCapabilities}
                       lineItems={internalInvoice.line_items}

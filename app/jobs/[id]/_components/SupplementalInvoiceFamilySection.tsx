@@ -10,6 +10,7 @@ export type SupplementalInvoiceFamilyItem = {
   balanceDueCents: number;
   supplementalReason: string | null;
   workspaceHref?: string | null;
+  isSelected?: boolean;
 };
 
 type SupplementalInvoiceFamilySectionProps = {
@@ -98,7 +99,7 @@ export default function SupplementalInvoiceFamilySection(
                     href={invoice.workspaceHref}
                     className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
                   >
-                    Open invoice workspace
+                    {invoice.isSelected ? "Viewing in workspace" : "Open invoice workspace"}
                   </Link>
                 ) : null}
               </div>

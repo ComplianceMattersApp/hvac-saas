@@ -17,6 +17,7 @@ import {
 } from "@/lib/business/internal-business-profile";
 import {
   normalizeInternalInvoiceStatus,
+  resolveInternalInvoiceById,
   resolveInternalInvoiceByJobId,
   resolveInternalInvoiceFamilySummaryByJobId,
   resolveLatestVoidedInternalInvoiceByJobId,
@@ -156,6 +157,17 @@ function formatAutopayAttentionActionLabel(action?: string | null) {
   return "No action available";
 }
 
+function formatSupplementalReasonLabel(reason?: string | null) {
+  const normalized = String(reason ?? "").trim();
+  if (!normalized) return null;
+
+  return normalized
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function isStripeSourcedPayment(payment: InternalInvoicePaymentRow) {
   return (
     String(payment.payment_method ?? "").trim() === "card_stripe_online" ||
@@ -184,6 +196,8 @@ function bannerMessage(value?: string | null) {
   const key = String(value ?? "").trim().toLowerCase();
   const messages: Record<string, string> = {
     internal_invoice_draft_created: "Draft invoice created.",
+    internal_invoice_supplemental_draft_created: "Supplemental draft invoice created.",
+    internal_invoice_selection_invalid: "Requested invoice selection is unavailable. Showing the default invoice workspace.",
     internal_invoice_draft_exists: "A draft invoice already exists for this job.",
     internal_invoice_issued: "Invoice issued. Send it to the billing recipient when ready.",
     internal_invoice_issue_blocked: "Invoice cannot be issued until job and field work are complete.",
@@ -313,6 +327,7 @@ export default async function InternalInvoiceWorkspacePage({
   const { id: jobId } = await params;
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const banner = firstSearchValue(sp.banner);
+  const requestedInvoiceId = firstSearchValue(sp.invoice_id) ?? firstSearchValue(sp.supplemental_invoice_id);
   const checkoutSessionId = firstSearchValue(sp.checkout_session_id);
   const checkoutSessionUrl = firstSearchValue(sp.checkout_session_url);
   const supabase = await createClient();
@@ -390,7 +405,21 @@ export default async function InternalInvoiceWorkspacePage({
   if (jobErr) throw jobErr;
   if (!job?.id) notFound();
 
-  const invoice = await resolveInternalInvoiceByJobId({ supabase, jobId });
+  const currentPrimaryInvoice = await resolveInternalInvoiceByJobId({ supabase, jobId });
+  const requestedInvoice = requestedInvoiceId
+    ? await resolveInternalInvoiceById({
+        supabase,
+        invoiceId: requestedInvoiceId,
+      })
+    : null;
+  const canUseRequestedInvoice = Boolean(
+    requestedInvoice
+    && requestedInvoice.account_owner_user_id === internalUser.account_owner_user_id
+    && requestedInvoice.job_id === jobId,
+  );
+  const invoice = canUseRequestedInvoice ? requestedInvoice : currentPrimaryInvoice;
+  const invalidRequestedInvoiceSelection = Boolean(requestedInvoiceId && !canUseRequestedInvoice);
+
   const latestVoidedInternalInvoice = !invoice
     ? await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId })
     : null;
@@ -446,6 +475,8 @@ export default async function InternalInvoiceWorkspacePage({
     totalCents: familyInvoice.total_cents,
     balanceDueCents: familyInvoice.balance_due_cents,
     supplementalReason: familyInvoice.supplemental_reason,
+    workspaceHref: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(familyInvoice.id)}#invoice-workspace`,
+    isSelected: familyInvoice.id === invoice?.id,
   }));
 
   const rawVisitScopeRows = Array.isArray((job as any).visit_scope_items)
@@ -557,8 +588,13 @@ export default async function InternalInvoiceWorkspacePage({
     : paymentSummary?.paymentStatus === "partial"
     ? "Partially Paid"
     : "Unpaid";
-  const returnTo = `/jobs/${jobId}/invoice#invoice-workspace`;
-  const bannerText = bannerMessage(banner);
+  const returnTo = invoice
+    ? `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(invoice.id)}#invoice-workspace`
+    : `/jobs/${jobId}/invoice#invoice-workspace`;
+  const effectiveBanner = !banner && invalidRequestedInvoiceSelection
+    ? "internal_invoice_selection_invalid"
+    : banner;
+  const bannerText = bannerMessage(effectiveBanner);
   const invoicePaymentLinkUiState = resolveInvoicePaymentLinkUiState({
     billingMode,
     invoiceStatus: normalizeInternalInvoiceStatus(invoice?.status ?? null),
@@ -634,6 +670,7 @@ export default async function InternalInvoiceWorkspacePage({
   const legacyInvoiceReference = invoice
     ? String(invoice.invoice_number ?? "").trim() || null
     : null;
+  const supplementalReasonLabel = formatSupplementalReasonLabel(invoice?.supplemental_reason);
 
   return (
     <div id="invoice-workspace" className="mx-auto max-w-[92rem] space-y-5 bg-slate-50/45 p-4 sm:p-5 lg:p-6">
@@ -655,6 +692,12 @@ export default async function InternalInvoiceWorkspacePage({
               {job.title || "Job"} / {customerName}{locationLabel ? ` / ${locationLabel}` : ""}
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-700">{nextActionSummary}</p>
+            {invoice?.invoice_kind === "supplemental" ? (
+              <div className="mt-2 rounded-xl border border-blue-200 bg-blue-50/80 px-3 py-2 text-sm text-blue-900">
+                Viewing supplemental invoice context.
+                {supplementalReasonLabel ? ` Reason: ${supplementalReasonLabel}.` : ""}
+              </div>
+            ) : null}
             <div className="mt-3 rounded-xl border border-slate-200/85 bg-slate-50/85 px-4 py-3 text-sm text-slate-700">
               <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Revenue Workflow Rail</p>
               <p className="mt-1">
@@ -754,6 +797,7 @@ export default async function InternalInvoiceWorkspacePage({
               {invoice.status === "draft" && canAccessDraftLineWorkspace ? (
                 <InternalInvoiceLineItemsTable
                   jobId={jobId}
+                  selectedInvoiceId={invoice.id}
                   tab="info"
                   capabilities={fieldBillingCapabilities}
                   lineItems={invoice.line_items}
@@ -1001,6 +1045,7 @@ export default async function InternalInvoiceWorkspacePage({
 
                 <form action={recordInternalInvoicePaymentFromForm} className="mt-4 space-y-3 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4">
                   <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="invoice_id" value={invoice.id} />
                   <input type="hidden" name="tab" value="info" />
                   <input type="hidden" name="return_to" value={returnTo} />
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1100,6 +1145,7 @@ export default async function InternalInvoiceWorkspacePage({
                         ) : (
                           <form action={reverseInternalInvoicePaymentFromForm} className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50/70 p-2.5">
                             <input type="hidden" name="job_id" value={jobId} />
+                            <input type="hidden" name="invoice_id" value={invoice.id} />
                             <input type="hidden" name="payment_id" value={payment.id} />
                             <input type="hidden" name="tab" value="info" />
                             <input type="hidden" name="return_to" value={returnTo} />
@@ -1171,6 +1217,7 @@ export default async function InternalInvoiceWorkspacePage({
               {invoice.status === "draft" && canIssueInvoiceLifecycle ? (
                 <form action={issueInternalInvoiceFromForm} className="mt-4">
                   <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="invoice_id" value={invoice.id} />
                   <input type="hidden" name="tab" value="info" />
                   <input type="hidden" name="return_to" value={returnTo} />
                   <SubmitButton loadingText="Issuing..." className={`${darkButtonClass} w-full`} disabled={!canIssue}>
@@ -1203,6 +1250,7 @@ export default async function InternalInvoiceWorkspacePage({
                   <summary className="cursor-pointer text-sm font-semibold text-slate-800">Edit Billing Details</summary>
                   <InternalInvoiceDraftSaveForm action={saveInternalInvoiceDraftFromForm} className="mt-3 space-y-3">
                     <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
                     <input type="hidden" name="tab" value="info" />
                     <div>
                       <label className={labelClass}>Invoice #</label>
@@ -1254,6 +1302,7 @@ export default async function InternalInvoiceWorkspacePage({
                 </p>
                 <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
                   <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="invoice_id" value={invoice.id} />
                   <input type="hidden" name="tab" value="info" />
                   <input type="hidden" name="return_to" value={returnTo} />
                   <div>
@@ -1342,6 +1391,7 @@ export default async function InternalInvoiceWorkspacePage({
                   </p>
                   <form action={voidInternalInvoiceFromForm} className="mt-3 space-y-3">
                     <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
                     <input type="hidden" name="tab" value="info" />
                     <input type="hidden" name="return_to" value={returnTo} />
                     <div>

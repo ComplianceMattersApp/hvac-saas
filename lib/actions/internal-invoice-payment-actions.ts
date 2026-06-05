@@ -12,7 +12,7 @@ import {
 } from '@/lib/auth/financial-access';
 import { resolveBillingModeByAccountOwnerId } from '@/lib/business/internal-business-profile';
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
-import { resolveInternalInvoiceByJobId } from '@/lib/business/internal-invoice';
+import { resolveInternalInvoiceById, resolveInternalInvoiceByJobId } from '@/lib/business/internal-invoice';
 import {
   createTenantInvoiceCheckoutSession,
   INTERNAL_INVOICE_PAYMENT_METHODS,
@@ -175,6 +175,7 @@ async function requireOperationalInternalInvoicePaymentEntitlementAccessOrRedire
 
 export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   const jobId = getTrimmedString(formData.get('job_id'));
+  const invoiceIdInput = getTrimmedString(formData.get('invoice_id'));
   const tab = getTrimmedString(formData.get('tab')) || 'info';
   const returnTo = getTrimmedString(formData.get('return_to'));
 
@@ -216,10 +217,15 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoicing_billing_pending', returnTo));
   }
 
-  const invoice = await resolveInternalInvoiceByJobId({
-    supabase,
-    jobId,
-  });
+  const invoice = invoiceIdInput
+    ? await resolveInternalInvoiceById({
+        supabase,
+        invoiceId: invoiceIdInput,
+      })
+    : await resolveInternalInvoiceByJobId({
+        supabase,
+        jobId,
+      });
 
   if (!invoice) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_missing', returnTo));
@@ -368,20 +374,21 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoicing_billing_pending', returnTo));
   }
 
-  const invoice = await resolveInternalInvoiceByJobId({
-    supabase,
-    jobId,
-  });
+  const invoice = invoiceIdInput
+    ? await resolveInternalInvoiceById({
+        supabase,
+        invoiceId: invoiceIdInput,
+      })
+    : await resolveInternalInvoiceByJobId({
+        supabase,
+        jobId,
+      });
 
   if (!invoice) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_missing', returnTo));
   }
 
   if (invoice.account_owner_user_id !== internalUser.account_owner_user_id || invoice.job_id !== jobId) {
-    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
-  }
-
-  if (invoiceIdInput && invoiceIdInput !== invoice.id) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
 
@@ -716,20 +723,21 @@ export async function collectIssuedInvoiceCardPaymentFromForm(formData: FormData
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoicing_billing_pending', returnTo));
   }
 
-  const invoice = await resolveInternalInvoiceByJobId({
-    supabase,
-    jobId,
-  });
+  const invoice = invoiceIdInput
+    ? await resolveInternalInvoiceById({
+        supabase,
+        invoiceId: invoiceIdInput,
+      })
+    : await resolveInternalInvoiceByJobId({
+        supabase,
+        jobId,
+      });
 
   if (!invoice) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_missing', returnTo));
   }
 
   if (invoice.account_owner_user_id !== internalUser.account_owner_user_id || invoice.job_id !== jobId) {
-    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
-  }
-
-  if (invoiceIdInput && invoiceIdInput !== invoice.id) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
 

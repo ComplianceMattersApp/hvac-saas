@@ -49,6 +49,17 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).not.toContain("Add follow-up charge");
   });
 
+  it("supports selecting invoice workspace context by invoice_id", () => {
+    expect(source).toContain("const requestedInvoiceId = firstSearchValue(sp.invoice_id) ?? firstSearchValue(sp.supplemental_invoice_id);");
+    expect(source).toContain("resolveInternalInvoiceById");
+    expect(source).toContain("const canUseRequestedInvoice = Boolean(");
+    expect(source).toContain("const invalidRequestedInvoiceSelection = Boolean(requestedInvoiceId && !canUseRequestedInvoice);");
+    expect(source).toContain("internal_invoice_selection_invalid");
+    expect(source).toContain("workspaceHref: `/jobs/${jobId}/invoice?invoice_id=${encodeURIComponent(familyInvoice.id)}#invoice-workspace`");
+    expect(source).toContain("selectedInvoiceId={invoice.id}");
+    expect(source).toContain("<input type=\"hidden\" name=\"invoice_id\" value={invoice.id} />");
+  });
+
   it("uses shared short invoice reference helper in the primary header", () => {
     expect(source).toContain('import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";');
     expect(source).toContain("const invoiceHeaderReference = invoice");
