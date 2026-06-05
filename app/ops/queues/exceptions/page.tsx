@@ -6,7 +6,7 @@ import {
   EXCEPTION_QUEUE_STATUSES,
   buildExceptionQueueRows,
   customerLocationLabel,
-  formatOpsStatusLabel,
+  getExceptionQueueDisplayLabel,
 } from "@/lib/ops/focused-queues";
 import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
 
@@ -176,7 +176,7 @@ export default async function OpsExceptionsQueuePage() {
                     <div className="mt-1 text-sm text-slate-700">{customerLocationLabel(job)}</div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                       <span className="inline-flex rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-800">
-                        {formatOpsStatusLabel(job?.ops_status ?? null)}
+                        {getExceptionQueueDisplayLabel(job)}
                       </span>
                       <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-500">
                         Age {ageLabel(job)}

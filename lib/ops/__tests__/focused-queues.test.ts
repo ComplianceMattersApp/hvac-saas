@@ -8,6 +8,8 @@ import {
   buildExceptionQueueRows,
   buildWaitingQueueRows,
   buildWithoutTechQueueRows,
+  getExceptionQueueDisplayLabel,
+  getWaitingQueueDisplay,
 } from "@/lib/ops/focused-queues";
 import {
   isActiveFieldWorkStatus,
@@ -216,6 +218,60 @@ describe("canonical queue status contracts", () => {
   });
 });
 
+describe("focused queue display labels", () => {
+  it("maps structured waiting reasons to office-friendly labels", () => {
+    expect(getWaitingQueueDisplay({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on part: Compressor lead time",
+    })).toEqual({
+      label: "Waiting on Part",
+      reason: "Compressor lead time",
+    });
+
+    expect(getWaitingQueueDisplay({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on customer approval: Estimate sent",
+    })).toEqual({
+      label: "Approval Needed",
+      reason: "Estimate sent",
+    });
+
+    expect(getWaitingQueueDisplay({
+      ops_status: "on_hold",
+      on_hold_reason: "Waiting on access: Gate code missing",
+    })).toEqual({
+      label: "Waiting on Access",
+      reason: "Gate code missing",
+    });
+
+    expect(getWaitingQueueDisplay({
+      ops_status: "waiting",
+    })).toEqual({
+      label: "Waiting on Information",
+      reason: "Dependency pending",
+    });
+  });
+
+  it("maps exception statuses to office review labels without changing membership", () => {
+    expect(getExceptionQueueDisplayLabel({ ops_status: "pending_office_review" })).toBe("Office Review Needed");
+    expect(getExceptionQueueDisplayLabel({ ops_status: "failed" })).toBe("Failed Test");
+    expect(getExceptionQueueDisplayLabel({ ops_status: "retest_needed" })).toBe("Retest Needed");
+    expect(getExceptionQueueDisplayLabel({ ops_status: "problem" })).toBe("Operational Issue");
+
+    expect(EXCEPTION_QUEUE_STATUSES).toEqual([
+      "failed",
+      "retest_needed",
+      "pending_office_review",
+      "problem",
+    ]);
+    expect(WAITING_QUEUE_STATUSES).toEqual([
+      "pending_info",
+      "on_hold",
+      "waiting",
+    ]);
+  });
+});
+
 describe("focused ops queue pages", () => {
   it("focused queue pages use canonical status constants for route filters", () => {
     expect(waitingQueuePageSource).toContain("WAITING_QUEUE_STATUSES");
@@ -233,6 +289,11 @@ describe("focused ops queue pages", () => {
   it("waiting page reads both pending info and on-hold reasons", () => {
     expect(waitingQueuePageSource).toContain("pending_info_reason");
     expect(waitingQueuePageSource).toContain("on_hold_reason");
+  });
+
+  it("waiting and exception pages use focused queue display labels", () => {
+    expect(waitingQueuePageSource).toContain("getWaitingQueueDisplay");
+    expect(exceptionsQueuePageSource).toContain("getExceptionQueueDisplayLabel");
   });
 
   it("waiting page includes safe empty state and return navigation", () => {

@@ -13,6 +13,10 @@ import {
   isExceptionQueueStatus,
   isWaitingQueueStatus,
 } from "@/lib/ops/queue-status-contracts";
+import {
+  getActiveWaitingState,
+  type WaitingStateType,
+} from "@/lib/utils/ops-status";
 
 export type FocusedQueueJob = {
   id: string;
@@ -36,6 +40,22 @@ export type FocusedQueueJob = {
 
 type AssignmentDisplayInput = WithoutTechAssignmentInput & {
   is_primary?: boolean;
+};
+
+const WAITING_QUEUE_LABELS_BY_REASON: Record<WaitingStateType, string> = {
+  waiting_on_part: "Waiting on Part",
+  waiting_on_customer_approval: "Approval Needed",
+  estimate_needed: "Estimate Needed",
+  waiting_on_access: "Waiting on Access",
+  waiting_on_information: "Waiting on Information",
+  other: "Waiting",
+};
+
+const EXCEPTION_QUEUE_LABELS_BY_STATUS: Record<string, string> = {
+  failed: "Failed Test",
+  retest_needed: "Retest Needed",
+  pending_office_review: "Office Review Needed",
+  problem: "Operational Issue",
 };
 
 function normalize(value: unknown): string {
@@ -104,6 +124,46 @@ export function formatOpsStatusLabel(opsStatus: unknown): string {
   const normalized = normalize(opsStatus);
   if (!normalized) return "Unknown";
   return normalized.replaceAll("_", " ").replace(/\b\w/g, (match) => match.toUpperCase());
+}
+
+export function getWaitingQueueDisplay(job: Pick<FocusedQueueJob, "ops_status" | "pending_info_reason" | "on_hold_reason">): {
+  label: string;
+  reason: string;
+} {
+  const waitingState = getActiveWaitingState({
+    ops_status: job?.ops_status ?? null,
+    pending_info_reason: job?.pending_info_reason ?? null,
+    on_hold_reason: job?.on_hold_reason ?? null,
+  });
+
+  if (waitingState?.parsed) {
+    return {
+      label: WAITING_QUEUE_LABELS_BY_REASON[waitingState.blockerType],
+      reason: waitingState.blockerReason,
+    };
+  }
+
+  const pendingReason = String(job?.pending_info_reason ?? "").trim();
+  const holdReason = String(job?.on_hold_reason ?? "").trim();
+  const rawReason = pendingReason || holdReason;
+  const status = normalize(job?.ops_status);
+
+  if (rawReason) {
+    return {
+      label: status === "on_hold" ? "Waiting" : "Waiting on Information",
+      reason: rawReason,
+    };
+  }
+
+  return {
+    label: status === "on_hold" ? "Waiting" : "Waiting on Information",
+    reason: "Dependency pending",
+  };
+}
+
+export function getExceptionQueueDisplayLabel(job: Pick<FocusedQueueJob, "ops_status">): string {
+  const status = normalize(job?.ops_status);
+  return EXCEPTION_QUEUE_LABELS_BY_STATUS[status] ?? formatOpsStatusLabel(status);
 }
 
 export function customerLocationLabel(job: FocusedQueueJob): string {

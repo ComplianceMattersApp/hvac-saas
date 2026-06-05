@@ -6,47 +6,15 @@ import {
   WAITING_QUEUE_STATUSES,
   buildWaitingQueueRows,
   customerLocationLabel,
-  formatOpsStatusLabel,
+  getWaitingQueueDisplay,
 } from "@/lib/ops/focused-queues";
 import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
-import { getActiveWaitingState } from "@/lib/utils/ops-status";
 
 const waitingSelect =
   "id, title, status, ops_status, customer_first_name, customer_last_name, city, job_address, pending_info_reason, on_hold_reason, created_at";
 
 function jobTitle(job: any) {
   return String(job?.title ?? "").trim() || `Job ${String(job?.id ?? "").slice(0, 8)}`;
-}
-
-function waitingReason(job: any): string {
-  const waitingState = getActiveWaitingState({
-    ops_status: job?.ops_status ?? null,
-    pending_info_reason: job?.pending_info_reason ?? null,
-    on_hold_reason: job?.on_hold_reason ?? null,
-  });
-
-  if (waitingState?.parsed && waitingState.blockerReason) {
-    return waitingState.blockerReason;
-  }
-
-  const pendingReason = String(job?.pending_info_reason ?? "").trim();
-  if (pendingReason) return pendingReason;
-
-  const holdReason = String(job?.on_hold_reason ?? "").trim();
-  if (holdReason) return holdReason;
-
-  return "Dependency pending";
-}
-
-function waitingStateLabel(job: any): string {
-  const waitingState = getActiveWaitingState({
-    ops_status: job?.ops_status ?? null,
-    pending_info_reason: job?.pending_info_reason ?? null,
-    on_hold_reason: job?.on_hold_reason ?? null,
-  });
-
-  if (waitingState?.parsed) return waitingState.blockerLabel;
-  return formatOpsStatusLabel(job?.ops_status ?? null);
 }
 
 export default async function OpsWaitingQueuePage() {
@@ -126,6 +94,7 @@ export default async function OpsWaitingQueuePage() {
         <ul className="space-y-3">
           {rows.map((job: any) => {
             const jobId = String(job?.id ?? "");
+            const waitingDisplay = getWaitingQueueDisplay(job);
 
             return (
               <li
@@ -143,7 +112,7 @@ export default async function OpsWaitingQueuePage() {
                     <div className="mt-1 text-sm text-slate-700">{customerLocationLabel(job)}</div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                       <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-700">
-                        {waitingStateLabel(job)}
+                        {waitingDisplay.label}
                       </span>
                       <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-500">
                         {resolveLifecycleAging({
@@ -154,7 +123,7 @@ export default async function OpsWaitingQueuePage() {
                         }).label ?? "-"}
                       </span>
                     </div>
-                    <div className="mt-2 text-xs text-slate-600">Reason: {waitingReason(job)}</div>
+                    <div className="mt-2 text-xs text-slate-600">Reason: {waitingDisplay.reason}</div>
                   </div>
 
                   <div className="flex shrink-0 gap-2">
