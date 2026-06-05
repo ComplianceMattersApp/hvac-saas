@@ -4,6 +4,7 @@ import {
   listInternalInvoicesByJobId,
   resolveInternalInvoiceByJobId,
   resolveInternalInvoiceFamilyByJobId,
+  resolveInternalInvoiceFamilySummaryByJobId,
 } from "@/lib/business/internal-invoice";
 
 function buildSupabaseFixture() {
@@ -119,6 +120,54 @@ function buildSupabaseFixture() {
   ];
 
   const eqCalls: Array<{ column: string; value: unknown }> = [];
+  const paymentRows = [
+    {
+      id: "pay-primary",
+      account_owner_user_id: "owner-1",
+      invoice_id: "inv-primary",
+      job_id: "job-1",
+      payment_status: "recorded",
+      payment_method: "check",
+      amount_cents: 6000,
+      paid_at: "2026-06-05T01:00:00Z",
+      received_reference: null,
+      notes: null,
+      recorded_by_user_id: "user-1",
+      created_at: "2026-06-05T01:00:00Z",
+      updated_at: "2026-06-05T01:00:00Z",
+      reversed_at: null,
+      reversed_by_user_id: null,
+      reversal_reason: null,
+      processor_name: null,
+      stripe_checkout_session_id: null,
+      stripe_event_id: null,
+      stripe_payment_intent_id: null,
+      stripe_charged_at: null,
+    },
+    {
+      id: "pay-supp-2",
+      account_owner_user_id: "owner-1",
+      invoice_id: "inv-supp-2",
+      job_id: "job-1",
+      payment_status: "recorded",
+      payment_method: "cash",
+      amount_cents: 4500,
+      paid_at: "2026-06-07T01:00:00Z",
+      received_reference: null,
+      notes: null,
+      recorded_by_user_id: "user-1",
+      created_at: "2026-06-07T01:00:00Z",
+      updated_at: "2026-06-07T01:00:00Z",
+      reversed_at: null,
+      reversed_by_user_id: null,
+      reversal_reason: null,
+      processor_name: null,
+      stripe_checkout_session_id: null,
+      stripe_event_id: null,
+      stripe_payment_intent_id: null,
+      stripe_charged_at: null,
+    },
+  ];
 
   return {
     eqCalls,
@@ -177,6 +226,33 @@ function buildSupabaseFixture() {
           return query;
         }
 
+        if (table === "internal_invoice_payments") {
+          const state = {
+            filters: [] as Array<{ column: string; value: unknown }>,
+          };
+
+          const query: any = {
+            select: vi.fn(() => query),
+            eq: vi.fn((column: string, value: unknown) => {
+              state.filters.push({ column, value });
+              return query;
+            }),
+            order: vi.fn(() => query),
+          };
+
+          query.order = vi
+            .fn()
+            .mockReturnValueOnce(query)
+            .mockImplementationOnce(async () => ({
+              data: paymentRows.filter((row) =>
+                state.filters.every((filter) => row[filter.column as keyof typeof row] === filter.value),
+              ),
+              error: null,
+            }));
+
+          return query;
+        }
+
         throw new Error(`Unexpected table: ${table}`);
       },
     },
@@ -217,6 +293,32 @@ describe("internal invoice supplemental read helpers", () => {
       "inv-supp-2",
     ]);
     expect(family.supplementalInvoices.every((invoice) => invoice.original_internal_invoice_id === "inv-primary")).toBe(true);
+  });
+
+  it("builds read-only invoice family summaries with invoice-bound balances", async () => {
+    const fixture = buildSupabaseFixture();
+
+    const family = await resolveInternalInvoiceFamilySummaryByJobId({
+      supabase: fixture.supabase,
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+    });
+
+    expect(family.currentPrimaryInvoice?.balance_due_cents).toBe(4000);
+    expect(family.supplementalInvoices).toHaveLength(2);
+    expect(family.supplementalInvoices[0]).toMatchObject({
+      id: "inv-supp-1",
+      supplemental_reason: "forgotten_charge",
+      total_cents: 2500,
+      balance_due_cents: 2500,
+    });
+    expect(family.supplementalInvoices[1]).toMatchObject({
+      id: "inv-supp-2",
+      supplemental_reason: "service_plan",
+      total_cents: 5000,
+      balance_due_cents: 500,
+      amount_paid_cents: 4500,
+    });
   });
 
   it("keeps the existing one-invoice resolver scoped to the primary invoice", async () => {

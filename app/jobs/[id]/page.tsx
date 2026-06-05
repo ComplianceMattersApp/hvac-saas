@@ -69,6 +69,7 @@ import {
   type InternalInvoiceItemType,
   resolveLatestVoidedInternalInvoiceByJobId,
   resolveInternalInvoiceByJobId,
+  resolveInternalInvoiceFamilySummaryByJobId,
   type InternalInvoiceStatus,
 } from "@/lib/business/internal-invoice";
 import {
@@ -1517,6 +1518,7 @@ export default async function JobDetailPage({
       .from("internal_invoices")
       .select("id, status, invoice_display_number, invoice_number, issued_at, total_cents, billing_name, billing_email")
       .eq("job_id", jobId)
+      .eq("invoice_kind", "primary")
       .neq("status", "void")
       .maybeSingle();
 
@@ -1837,6 +1839,7 @@ export default async function JobDetailPage({
     if (!(showInternalInvoicePanelForFieldBillingRead && fieldBillingCapabilities.can_view_field_billing_summary)) {
       return {
         latestVoidedInternalInvoice: null as Awaited<ReturnType<typeof resolveLatestVoidedInternalInvoiceByJobId>> | null,
+        supplementalInvoices: [] as Awaited<ReturnType<typeof resolveInternalInvoiceFamilySummaryByJobId>>["supplementalInvoices"],
         fieldChargeProposals: [] as Awaited<ReturnType<typeof listFieldChargeProposalsForJob>>,
       };
     }
@@ -1877,9 +1880,42 @@ export default async function JobDetailPage({
     const latestVoidedInternalInvoice = internalInvoiceTruth
       ? null
       : await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId });
+    const supplementalInvoices = await resolveInternalInvoiceFamilySummaryByJobId({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+    }).then((family) => family.supplementalInvoices).catch((error) => {
+      const wrapped = (error && typeof error === "object" ? error : {}) as {
+        cause?: unknown;
+        code?: unknown;
+        details?: unknown;
+        hint?: unknown;
+      };
+      const cause = (wrapped.cause && typeof wrapped.cause === "object" ? wrapped.cause : {}) as {
+        code?: unknown;
+        details?: unknown;
+        hint?: unknown;
+      };
+      const message = error instanceof Error ? error.message : describePhaseError(error);
+      const code = String(wrapped.code ?? cause.code ?? "").trim() || null;
+      const details = String(wrapped.details ?? cause.details ?? "").trim() || null;
+      const hint = String(wrapped.hint ?? cause.hint ?? "").trim() || null;
+
+      console.error("[job-detail:fieldBillingSummaryRead] supplementalInvoicesUnavailable", {
+        jobId,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        code,
+        message,
+        details,
+        hint,
+      });
+
+      return [] as Awaited<ReturnType<typeof resolveInternalInvoiceFamilySummaryByJobId>>["supplementalInvoices"];
+    });
 
     return {
       latestVoidedInternalInvoice,
+      supplementalInvoices,
       fieldChargeProposals,
     };
   });
@@ -1893,6 +1929,7 @@ export default async function JobDetailPage({
           latestVoidedInternalInvoice: null as Awaited<ReturnType<typeof resolveLatestVoidedInternalInvoiceByJobId>>,
           internalInvoiceEmailDeliveries: [] as InternalInvoiceEmailDeliveryRecord[],
           internalInvoicePaymentLedger: null as Awaited<ReturnType<typeof resolveInvoiceCollectedPaymentLedger>> | null,
+          supplementalInvoices: [] as Awaited<ReturnType<typeof resolveInternalInvoiceFamilySummaryByJobId>>["supplementalInvoices"],
           fieldChargeProposals: [] as Awaited<ReturnType<typeof listFieldChargeProposalsForJob>>,
           pricebookPickerItems: [] as Array<{
             id: string;
@@ -1915,6 +1952,11 @@ export default async function JobDetailPage({
         accountOwnerUserId: internalUser.account_owner_user_id,
         jobId,
       });
+      const supplementalInvoices = await resolveInternalInvoiceFamilySummaryByJobId({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        jobId,
+      }).then((family) => family.supplementalInvoices);
 
       if (!internalInvoice) {
         return {
@@ -1922,6 +1964,7 @@ export default async function JobDetailPage({
           latestVoidedInternalInvoice,
           internalInvoiceEmailDeliveries: [] as InternalInvoiceEmailDeliveryRecord[],
           internalInvoicePaymentLedger: null as Awaited<ReturnType<typeof resolveInvoiceCollectedPaymentLedger>> | null,
+          supplementalInvoices,
           fieldChargeProposals,
           pricebookPickerItems: [] as Array<{
             id: string;
@@ -1987,6 +2030,7 @@ export default async function JobDetailPage({
         latestVoidedInternalInvoice,
         internalInvoiceEmailDeliveries,
         internalInvoicePaymentLedger,
+        supplementalInvoices,
         fieldChargeProposals,
         pricebookPickerItems,
       };
@@ -2048,6 +2092,16 @@ export default async function JobDetailPage({
         lineItemCount: fieldBillingSummaryData.latestVoidedInternalInvoice.line_items?.length ?? 0,
       }
     : null;
+  const fieldBillingSupplementalInvoiceSnapshots = fieldBillingSummaryData.supplementalInvoices.map((invoice) => ({
+    id: invoice.id,
+    invoiceDisplayNumber: invoice.invoice_display_number,
+    invoiceNumber: invoice.invoice_number,
+    status: invoice.status,
+    totalCents: Number(invoice.total_cents ?? 0) || 0,
+    balanceDueCents: Number(invoice.balance_due_cents ?? 0) || 0,
+    supplementalReason: invoice.supplemental_reason,
+    workspaceHref: `/jobs/${job.id}/invoice#supplemental-invoices`,
+  }));
   const fieldChargeProposalPricebookItems = visitScopePricebookTemplates
     .filter((item) => {
       const itemType = String(item.item_type ?? "").trim().toLowerCase();
@@ -2863,6 +2917,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       latestVoidedInternalInvoice,
       internalInvoiceEmailDeliveries,
       internalInvoicePaymentLedger,
+      supplementalInvoices,
       fieldChargeProposals,
       pricebookPickerItems,
     } = await loadDeferredInvoicePanelData();
@@ -2980,6 +3035,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           lineItemCount: latestVoidedInternalInvoice.line_items?.length ?? 0,
         }
       : null;
+    const fieldBillingSupplementalInvoiceSnapshots = supplementalInvoices.map((invoice) => ({
+      id: invoice.id,
+      invoiceDisplayNumber: invoice.invoice_display_number,
+      invoiceNumber: invoice.invoice_number,
+      status: invoice.status,
+      totalCents: Number(invoice.total_cents ?? 0) || 0,
+      balanceDueCents: Number(invoice.balance_due_cents ?? 0) || 0,
+      supplementalReason: invoice.supplemental_reason,
+      workspaceHref: `/jobs/${job.id}/invoice#supplemental-invoices`,
+    }));
     const fieldChargeProposalPricebookItems = visitScopePricebookTemplates
       .filter((item) => {
         const itemType = String(item.item_type ?? "").trim().toLowerCase();
@@ -3077,6 +3142,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           invoice={fieldBillingInvoiceSnapshot}
           latestVoidedInvoice={fieldBillingLatestVoidedInvoiceSnapshot}
           paymentSummary={internalInvoice ? internalInvoicePaymentSummary : null}
+          supplementalInvoices={fieldBillingSupplementalInvoiceSnapshots}
           fieldChargeProposals={fieldChargeProposals}
           pricebookProposalItems={fieldChargeProposalPricebookItems}
           visitScopeProposalItems={fieldChargeProposalVisitScopeItems}
@@ -7011,6 +7077,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       invoice={fieldBillingInvoiceSnapshot}
       latestVoidedInvoice={fieldBillingLatestVoidedInvoiceSnapshot}
       paymentSummary={null}
+      supplementalInvoices={fieldBillingSupplementalInvoiceSnapshots}
       fieldChargeProposals={fieldBillingSummaryData.fieldChargeProposals}
       pricebookProposalItems={fieldChargeProposalPricebookItems}
       visitScopeProposalItems={fieldChargeProposalVisitScopeItems}

@@ -1,3 +1,5 @@
+import { resolveInvoiceCollectedPaymentSummary } from "@/lib/business/internal-invoice-payments";
+
 export const INTERNAL_INVOICE_STATUSES = ["draft", "issued", "void"] as const;
 export const INTERNAL_INVOICE_ITEM_TYPES = ["service", "material", "diagnostic", "adjustment", "other"] as const;
 export const INTERNAL_INVOICE_KINDS = ["primary", "supplemental"] as const;
@@ -63,6 +65,21 @@ export type InternalInvoiceRecord = {
   created_at: string;
   updated_at: string;
   line_items: InternalInvoiceLineItemRecord[];
+};
+
+export type InternalInvoiceFamilySummaryRecord = {
+  id: string;
+  job_id: string;
+  invoice_kind: InternalInvoiceKind;
+  invoice_display_number: string | null;
+  invoice_number: string;
+  status: InternalInvoiceStatus;
+  total_cents: number;
+  amount_paid_cents: number;
+  balance_due_cents: number;
+  supplemental_reason: string | null;
+  original_internal_invoice_id: string | null;
+  created_at: string;
 };
 
 const INTERNAL_INVOICE_SELECT = [
@@ -318,6 +335,62 @@ export async function resolveInternalInvoiceFamilyByJobId(params: {
   allInvoices: InternalInvoiceRecord[];
 }> {
   const allInvoices = await listInternalInvoicesByJobId(params);
+
+  return {
+    currentPrimaryInvoice:
+      allInvoices.find((invoice) => invoice.invoice_kind === "primary" && invoice.status !== "void") ?? null,
+    supplementalInvoices: allInvoices.filter((invoice) => invoice.invoice_kind === "supplemental"),
+    allInvoices,
+  };
+}
+
+export async function resolveInternalInvoiceFamilySummaryByJobId(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  jobId: string;
+}): Promise<{
+  currentPrimaryInvoice: InternalInvoiceFamilySummaryRecord | null;
+  supplementalInvoices: InternalInvoiceFamilySummaryRecord[];
+  allInvoices: InternalInvoiceFamilySummaryRecord[];
+}> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  if (!accountOwnerUserId) {
+    return {
+      currentPrimaryInvoice: null,
+      supplementalInvoices: [],
+      allInvoices: [],
+    };
+  }
+
+  const family = await resolveInternalInvoiceFamilyByJobId({
+    supabase: params.supabase,
+    jobId: params.jobId,
+  });
+
+  const allInvoices = await Promise.all(
+    family.allInvoices.map(async (invoice) => {
+      const paymentSummary = await resolveInvoiceCollectedPaymentSummary(
+        accountOwnerUserId,
+        invoice.id,
+        params.supabase,
+      );
+
+      return {
+        id: invoice.id,
+        job_id: invoice.job_id,
+        invoice_kind: invoice.invoice_kind,
+        invoice_display_number: invoice.invoice_display_number,
+        invoice_number: invoice.invoice_number,
+        status: invoice.status,
+        total_cents: Number(invoice.total_cents ?? 0) || 0,
+        amount_paid_cents: Number(paymentSummary.amountPaidCents ?? 0) || 0,
+        balance_due_cents: Number(paymentSummary.balanceDueCents ?? 0) || 0,
+        supplemental_reason: invoice.supplemental_reason,
+        original_internal_invoice_id: invoice.original_internal_invoice_id,
+        created_at: invoice.created_at,
+      } satisfies InternalInvoiceFamilySummaryRecord;
+    }),
+  );
 
   return {
     currentPrimaryInvoice:

@@ -40,6 +40,15 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain('stage: "Issued and paid"');
   });
 
+  it("shows supplemental invoice family context as read-only when supplemental invoices exist", () => {
+    expect(source).toContain("resolveInternalInvoiceFamilySummaryByJobId");
+    expect(source).toContain("const supplementalInvoiceFamilyItems =");
+    expect(source).toContain("<SupplementalInvoiceFamilySection");
+    expect(source).toContain('description="Primary invoice controls stay focused on the current invoice. Supplemental invoices remain read-only family context here."');
+    expect(source).not.toContain("Create Supplemental Invoice");
+    expect(source).not.toContain("Add follow-up charge");
+  });
+
   it("uses shared short invoice reference helper in the primary header", () => {
     expect(source).toContain('import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";');
     expect(source).toContain("const invoiceHeaderReference = invoice");

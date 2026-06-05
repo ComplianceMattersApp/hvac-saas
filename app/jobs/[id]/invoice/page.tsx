@@ -18,6 +18,7 @@ import {
 import {
   normalizeInternalInvoiceStatus,
   resolveInternalInvoiceByJobId,
+  resolveInternalInvoiceFamilySummaryByJobId,
   resolveLatestVoidedInternalInvoiceByJobId,
   type InternalInvoiceItemType,
   type InternalInvoiceStatus,
@@ -56,6 +57,7 @@ import {
   retryFailedScheduledAutopayAttemptFromForm,
 } from "@/lib/actions/customer-saved-payment-method-actions";
 import TenantInvoicePaymentLinkPanel from "./_components/TenantInvoicePaymentLinkPanel";
+import SupplementalInvoiceFamilySection from "../_components/SupplementalInvoiceFamilySection";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "../_components/InternalInvoiceLineItemsTable";
@@ -429,6 +431,22 @@ export default async function InternalInvoiceWorkspacePage({
           : Promise.resolve([]),
       ])
     : [[], null, []];
+  const invoiceFamilySummary = invoice
+    ? await resolveInternalInvoiceFamilySummaryByJobId({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        jobId,
+      })
+    : null;
+  const supplementalInvoiceFamilyItems = (invoiceFamilySummary?.supplementalInvoices ?? []).map((familyInvoice) => ({
+    id: familyInvoice.id,
+    invoiceDisplayNumber: familyInvoice.invoice_display_number,
+    invoiceNumber: familyInvoice.invoice_number,
+    status: familyInvoice.status,
+    totalCents: familyInvoice.total_cents,
+    balanceDueCents: familyInvoice.balance_due_cents,
+    supplementalReason: familyInvoice.supplemental_reason,
+  }));
 
   const rawVisitScopeRows = Array.isArray((job as any).visit_scope_items)
     ? (job as any).visit_scope_items
@@ -685,6 +703,11 @@ export default async function InternalInvoiceWorkspacePage({
             A previous invoice was voided. Start a replacement draft when the corrected billed scope is ready.
           </div>
         ) : null}
+
+        <SupplementalInvoiceFamilySection
+          items={supplementalInvoiceFamilyItems}
+          description="Primary invoice controls stay focused on the current invoice. Supplemental invoices remain read-only family context here."
+        />
       </section>
 
       {!invoice ? (

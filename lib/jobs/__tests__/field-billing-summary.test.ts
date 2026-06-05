@@ -97,6 +97,7 @@ function renderSummary(props: Partial<SummaryProps> = {}) {
       invoice: props.invoice ?? null,
       latestVoidedInvoice: props.latestVoidedInvoice ?? null,
       paymentSummary: props.paymentSummary ?? null,
+      supplementalInvoices: props.supplementalInvoices ?? [],
       fieldChargeProposals: props.fieldChargeProposals ?? [],
       pricebookProposalItems: props.pricebookProposalItems ?? [],
       visitScopeProposalItems: props.visitScopeProposalItems ?? [],
@@ -131,6 +132,76 @@ describe("FieldBillingSummary", () => {
     expect(html).toContain("Charges are not ready for collection until reviewed and issued.");
     expect(html).toContain("$175.00");
     expect(html).toContain("2 lines");
+  });
+
+  it("keeps primary-only jobs free of supplemental invoice clutter", () => {
+    const html = renderSummary({
+      invoice: {
+        status: "issued",
+        invoiceNumber: "INV-PRIMARY-1",
+        invoiceDisplayNumber: "2050",
+        totalCents: 25000,
+        lineItemCount: 3,
+      },
+      paymentSummary: {
+        amountPaidCents: 5000,
+        balanceDueCents: 20000,
+        paymentStatus: "partial",
+      },
+      supplementalInvoices: [],
+    });
+
+    expect(html).not.toContain("Supplemental invoices");
+    expect(html).not.toContain("Create Supplemental Invoice");
+    expect(html).not.toContain("Add follow-up charge");
+  });
+
+  it("renders supplemental invoices as a read-only section with status total balance and reason", () => {
+    const html = renderSummary({
+      invoice: {
+        status: "issued",
+        invoiceNumber: "INV-PRIMARY-1",
+        invoiceDisplayNumber: "2050",
+        totalCents: 25000,
+        lineItemCount: 3,
+      },
+      supplementalInvoices: [
+        {
+          id: "inv-supp-1",
+          invoiceDisplayNumber: "2051",
+          invoiceNumber: "INV-SUPP-1",
+          status: "draft",
+          totalCents: 4500,
+          balanceDueCents: 4500,
+          supplementalReason: "forgotten_charge",
+          workspaceHref: "/jobs/job-1/invoice#supplemental-invoices",
+        },
+        {
+          id: "inv-supp-2",
+          invoiceDisplayNumber: null,
+          invoiceNumber: "INV-SUPP-2",
+          status: "issued",
+          totalCents: 3000,
+          balanceDueCents: 500,
+          supplementalReason: null,
+          workspaceHref: "/jobs/job-1/invoice#supplemental-invoices",
+        },
+      ],
+    });
+
+    expect(html).toContain("Supplemental invoices");
+    expect(html).toContain("Each invoice keeps separate billed and payment truth.");
+    expect(html).toContain("Invoice #2051");
+    expect(html).toContain("Invoice INV-SUPP-2");
+    expect(html).toContain("Draft");
+    expect(html).toContain("Issued");
+    expect(html).toContain("Total $45.00");
+    expect(html).toContain("Balance $45.00");
+    expect(html).toContain("Balance $5.00");
+    expect(html).toContain("Reason: Forgotten Charge");
+    expect(html).toContain("Open invoice workspace");
+    expect(html).not.toContain("Create Supplemental Invoice");
+    expect(html).not.toContain("Collect Payment");
   });
 
   it("renders issued invoice balance due as read-only", () => {

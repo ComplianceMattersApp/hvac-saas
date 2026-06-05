@@ -2,6 +2,9 @@ import Link from "next/link";
 import type { FieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import { hasDirectInvoiceDraftMutationAccess } from "@/lib/auth/field-billing-access";
 import type { FieldChargeProposalRecord } from "@/lib/business/field-charge-proposals";
+import SupplementalInvoiceFamilySection, {
+  type SupplementalInvoiceFamilyItem,
+} from "./SupplementalInvoiceFamilySection";
 import {
   approveFieldChargeProposalForDraftInvoiceReviewForm,
   createFieldChargeProposalFromPricebookEntryForm,
@@ -47,6 +50,7 @@ type FieldBillingSummaryProps = {
   invoice: FieldBillingInvoiceSnapshot | null;
   latestVoidedInvoice?: FieldBillingInvoiceSnapshot | null;
   paymentSummary?: FieldBillingPaymentSummary | null;
+  supplementalInvoices?: SupplementalInvoiceFamilyItem[];
   fieldChargeProposals?: FieldChargeProposalRecord[];
   pricebookProposalItems?: FieldChargeProposalPricebookItem[];
   visitScopeProposalItems?: FieldChargeProposalVisitScopeItem[];
@@ -174,6 +178,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
   const state = resolveSummaryState(props);
   const invoiceForMetrics = state.invoiceForMetrics;
   const paymentSummary = state.paymentSummary;
+  const supplementalInvoices = props.supplementalInvoices ?? [];
   const fieldChargeProposals = props.fieldChargeProposals ?? [];
   const pricebookProposalItems = props.pricebookProposalItems ?? [];
   const visitScopeProposalItems = (props.visitScopeProposalItems ?? []).filter((item) => String(item.id ?? "").trim());
@@ -274,6 +279,11 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
           </Link>
         </div>
       ) : null}
+
+      <SupplementalInvoiceFamilySection
+        items={supplementalInvoices}
+        description="These stay read-only here. Each invoice keeps separate billed and payment truth."
+      />
 
       {showProposalSection ? (
       <div className="mt-4 border-t border-slate-200/80 pt-4">

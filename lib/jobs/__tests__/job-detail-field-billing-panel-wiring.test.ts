@@ -25,15 +25,25 @@ describe("job detail field billing panel wiring", () => {
 
   it("passes read-only summary and proposal entry data without requiring issued invoice state", () => {
     const summaryIndex = source.indexOf("<FieldBillingSummary", source.indexOf("{showInternalInvoicePanel ? ("));
-    const summarySlice = source.slice(summaryIndex, summaryIndex + 700);
+    const summarySlice = source.slice(summaryIndex, summaryIndex + 900);
 
     expect(summarySlice).toContain("capabilities={fieldBillingCapabilities}");
     expect(summarySlice).toContain("parentProvidesInvoiceCta={hasDirectInvoiceWorkflowAccess}");
     expect(summarySlice).toContain("invoice={fieldBillingInvoiceSnapshot}");
+    expect(summarySlice).toContain("supplementalInvoices={fieldBillingSupplementalInvoiceSnapshots}");
     expect(summarySlice).toContain("fieldChargeProposals={fieldBillingSummaryData.fieldChargeProposals}");
     expect(summarySlice).toContain("pricebookProposalItems={fieldChargeProposalPricebookItems}");
     expect(summarySlice).toContain("visitScopeProposalItems={fieldChargeProposalVisitScopeItems}");
     expect(summarySlice).not.toContain("status === \"issued\"");
+  });
+
+  it("keeps the immediate job-detail invoice read scoped to the primary invoice", () => {
+    const immediateReadIndex = source.indexOf('.from("internal_invoices")');
+    const immediateReadSlice = source.slice(immediateReadIndex, immediateReadIndex + 300);
+
+    expect(immediateReadSlice).toContain('.eq("job_id", jobId)');
+    expect(immediateReadSlice).toContain('.eq("invoice_kind", "primary")');
+    expect(immediateReadSlice).toContain('.neq("status", "void")');
   });
 
   it("degrades field proposal summary reads without crashing job detail", () => {
