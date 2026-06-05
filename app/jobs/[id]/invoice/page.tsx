@@ -39,6 +39,7 @@ import {
   addInternalInvoiceLineItemFromForm,
   addInternalInvoiceLineItemFromPricebookForm,
   addInternalInvoiceLineItemsFromVisitScopeForm,
+  createSupplementalInternalInvoiceFromForm,
   createInternalInvoiceDraftFromForm,
   issueInternalInvoiceFromForm,
   removeInternalInvoiceLineItemFromForm,
@@ -554,6 +555,15 @@ export default async function InternalInvoiceWorkspacePage({
   const canCreateDraftInvoice = Boolean(
     fieldBillingCapabilities.can_create_direct_invoice_draft || canManageFinancialInvoiceLifecycle,
   );
+  const canCreateSupplementalDraftFromCurrentInvoice = Boolean(
+    invoice
+    && invoice.invoice_kind === "primary"
+    && invoice.status === "issued"
+    && canManageFinancialInvoiceLifecycle,
+  );
+  const supplementalParentInvoiceId = canCreateSupplementalDraftFromCurrentInvoice && invoice
+    ? invoice.id
+    : null;
   const canCollectCardPaymentAccess = fieldBillingCapabilities.can_collect_card_payment;
 
   const invoiceCustomerId = String(invoice?.customer_id ?? "").trim() || null;
@@ -751,6 +761,35 @@ export default async function InternalInvoiceWorkspacePage({
           items={supplementalInvoiceFamilyItems}
           description="Primary invoice controls stay focused on the current invoice. Supplemental invoices remain read-only family context here."
         />
+
+        {supplementalParentInvoiceId ? (
+          <section className="mt-4 rounded-xl border border-emerald-200/90 bg-emerald-50/60 p-4">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-900">Add-On Invoice</div>
+            <h2 className="mt-1 text-lg font-semibold tracking-tight text-emerald-950">Create Add-On Invoice</h2>
+            <p className="mt-2 text-sm leading-6 text-emerald-900">
+              Use this when the customer adds work or a charge after this invoice was issued or paid. The original invoice stays unchanged.
+            </p>
+            <form action={createSupplementalInternalInvoiceFromForm} className="mt-3 space-y-3">
+              <input type="hidden" name="job_id" value={jobId} />
+              <input type="hidden" name="invoice_id" value={supplementalParentInvoiceId} />
+              <input type="hidden" name="original_internal_invoice_id" value={supplementalParentInvoiceId} />
+              <input type="hidden" name="tab" value="info" />
+              <input type="hidden" name="return_to" value={returnTo} />
+              <div>
+                <label className={labelClass}>Reason for add-on invoice</label>
+                <textarea
+                  name="supplemental_reason"
+                  rows={3}
+                  className={`${inputClass} min-h-[5.5rem]`}
+                  placeholder="Customer added warranty, service plan, or additional work."
+                />
+              </div>
+              <SubmitButton loadingText="Creating..." className={darkButtonClass}>
+                Create Add-On Invoice
+              </SubmitButton>
+            </form>
+          </section>
+        ) : null}
       </section>
 
       {!invoice ? (

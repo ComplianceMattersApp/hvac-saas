@@ -5,6 +5,7 @@ const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 const resolveBillingModeByAccountOwnerIdMock = vi.fn();
+const resolveInternalInvoiceByIdMock = vi.fn();
 const resolveInternalInvoiceByJobIdMock = vi.fn();
 const resolveInvoiceCollectedPaymentSummaryMock = vi.fn();
 const createTenantInvoiceCheckoutSessionMock = vi.fn();
@@ -54,6 +55,7 @@ vi.mock('@/lib/business/platform-entitlement', () => ({
 }));
 
 vi.mock('@/lib/business/internal-invoice', () => ({
+  resolveInternalInvoiceById: (...args: unknown[]) => resolveInternalInvoiceByIdMock(...args),
   resolveInternalInvoiceByJobId: (...args: unknown[]) => resolveInternalInvoiceByJobIdMock(...args),
 }));
 
@@ -215,6 +217,14 @@ describe('recordInternalInvoicePaymentFromForm', () => {
 
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });
     resolveBillingModeByAccountOwnerIdMock.mockResolvedValue('internal_invoicing');
+    resolveInternalInvoiceByIdMock.mockResolvedValue({
+      id: 'inv-1',
+      account_owner_user_id: 'owner-1',
+      job_id: 'job-1',
+      invoice_number: 'INV-1',
+      status: 'issued',
+      total_cents: 10000,
+    });
     resolveInternalInvoiceByJobIdMock.mockResolvedValue({
       id: 'inv-1',
       account_owner_user_id: 'owner-1',

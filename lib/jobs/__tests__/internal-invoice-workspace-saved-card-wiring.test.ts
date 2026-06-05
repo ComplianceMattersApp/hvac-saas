@@ -60,6 +60,20 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("<input type=\"hidden\" name=\"invoice_id\" value={invoice.id} />");
   });
 
+  it("shows Create Add-On Invoice only for issued primary invoice with lifecycle authority", () => {
+    expect(source).toContain("createSupplementalInternalInvoiceFromForm");
+    expect(source).toContain("const canCreateSupplementalDraftFromCurrentInvoice = Boolean(");
+    expect(source).toContain("invoice.invoice_kind === \"primary\"");
+    expect(source).toContain("invoice.status === \"issued\"");
+    expect(source).toContain("&& canManageFinancialInvoiceLifecycle");
+    expect(source).toContain("{canCreateSupplementalDraftFromCurrentInvoice ? (");
+    expect(source).toContain("Create Add-On Invoice");
+    expect(source).toContain("Reason for add-on invoice");
+    expect(source).toContain("Customer added warranty, service plan, or additional work.");
+    expect(source).toContain("original_internal_invoice_id");
+    expect(source).toContain("Use this when the customer adds work or a charge after this invoice was issued or paid. The original invoice stays unchanged.");
+  });
+
   it("uses shared short invoice reference helper in the primary header", () => {
     expect(source).toContain('import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";');
     expect(source).toContain("const invoiceHeaderReference = invoice");
