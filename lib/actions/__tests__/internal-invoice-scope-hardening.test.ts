@@ -52,6 +52,7 @@ vi.mock('@/lib/business/internal-business-profile', () => ({
 
 vi.mock('@/lib/business/internal-invoice', () => ({
   normalizeInternalInvoiceItemType: vi.fn(() => 'service'),
+  resolveInternalInvoiceById: vi.fn(async () => null),
   resolveInternalInvoiceByJobId: vi.fn(async () => null),
 }));
 

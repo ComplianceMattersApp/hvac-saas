@@ -208,6 +208,39 @@ export async function listInternalInvoiceLineItems(params: {
   return Array.isArray(data) ? data.map(normalizeInternalInvoiceLineItemRow) : [];
 }
 
+export async function resolveInternalInvoiceById(params: {
+  supabase: any;
+  invoiceId: string;
+}): Promise<InternalInvoiceRecord | null> {
+  const invoiceId = String(params.invoiceId ?? "").trim();
+  if (!invoiceId) return null;
+
+  const { data, error } = await params.supabase
+    .from("internal_invoices")
+    .select(INTERNAL_INVOICE_SELECT)
+    .eq("id", invoiceId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const lineItems = await listInternalInvoiceLineItems({
+    supabase: params.supabase,
+    invoiceId: String(data.id ?? ""),
+  });
+
+  return {
+    ...data,
+    invoice_kind: normalizeInternalInvoiceKind(data.invoice_kind),
+    original_internal_invoice_id: String(data.original_internal_invoice_id ?? "").trim() || null,
+    supplemental_reason: String(data.supplemental_reason ?? "").trim() || null,
+    status: normalizeInternalInvoiceStatus(data.status),
+    subtotal_cents: Number(data.subtotal_cents ?? 0) || 0,
+    total_cents: Number(data.total_cents ?? 0) || 0,
+    line_items: lineItems,
+  } as InternalInvoiceRecord;
+}
+
 export async function resolveInternalInvoiceByJobId(params: {
   supabase: any;
   jobId: string;

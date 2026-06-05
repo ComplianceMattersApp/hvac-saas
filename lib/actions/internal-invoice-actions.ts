@@ -87,6 +87,29 @@ function buildInternalInvoiceReturnHref(jobId: string, tab: string, banner: stri
   }
 }
 
+function buildSupplementalInvoiceWorkspaceReturnHref(params: {
+  jobId: string;
+  tab: string;
+  banner: string;
+  supplementalInvoiceId: string;
+  returnTo?: string | null;
+}) {
+  const baseHref = buildInternalInvoiceReturnHref(
+    params.jobId,
+    params.tab,
+    params.banner,
+    params.returnTo,
+  );
+
+  try {
+    const parsed = new URL(baseHref, 'https://app.local');
+    parsed.searchParams.set('supplemental_invoice_id', params.supplementalInvoiceId);
+    return `${parsed.pathname}${parsed.search}${parsed.hash}`;
+  } catch {
+    return `${baseHref}${baseHref.includes('?') ? '&' : '?'}supplemental_invoice_id=${encodeURIComponent(params.supplementalInvoiceId)}`;
+  }
+}
+
 function buildInternalInvoiceNumber() {
   const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '');
   const suffix = crypto.randomUUID().slice(0, 8).toUpperCase();
@@ -371,6 +394,49 @@ async function syncInvoiceTotalsFromLineItems(params: {
 
 function redirectInternalInvoiceValidation(jobId: string, tab: string, banner: string): never {
   redirect(buildJobDetailHref(jobId, tab, banner));
+}
+
+async function resolveSupplementalParentInvoiceContext(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  parentInvoiceId?: string;
+  fallbackJobId?: string;
+}) {
+  const parentInvoiceId = String(params.parentInvoiceId ?? '').trim();
+  const fallbackJobId = String(params.fallbackJobId ?? '').trim();
+
+  if (!parentInvoiceId && !fallbackJobId) {
+    return null;
+  }
+
+  if (parentInvoiceId) {
+    const { data, error } = await params.supabase
+      .from('internal_invoices')
+      .select(
+        'id, account_owner_user_id, job_id, customer_id, location_id, service_case_id, invoice_kind, original_internal_invoice_id, supplemental_reason, invoice_number, status, source_type, total_cents, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip',
+      )
+      .eq('id', parentInvoiceId)
+      .eq('account_owner_user_id', params.accountOwnerUserId)
+      .maybeSingle();
+
+    if (error) throw error;
+    if (!data) return null;
+    return data;
+  }
+
+  const { data, error } = await params.supabase
+    .from('internal_invoices')
+    .select(
+      'id, account_owner_user_id, job_id, customer_id, location_id, service_case_id, invoice_kind, original_internal_invoice_id, supplemental_reason, invoice_number, status, source_type, total_cents, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip',
+    )
+    .eq('job_id', fallbackJobId)
+    .eq('account_owner_user_id', params.accountOwnerUserId)
+    .eq('invoice_kind', 'primary')
+    .neq('status', 'void')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
 }
 
 export type InternalInvoiceActionResult = {
@@ -1158,6 +1224,158 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
   revalidatePath('/jobs');
   revalidatePath('/ops');
   redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_draft_created', context.returnTo));
+}
+
+export async function createSupplementalInternalInvoiceFromForm(formData: FormData) {
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalUser({ supabase });
+
+  const requestedJobId =
+    getTrimmedString(formData.get('job_id')) ||
+    getTrimmedString(formData.get('id'));
+  const parentInvoiceId =
+    getTrimmedString(formData.get('original_internal_invoice_id')) ||
+    getTrimmedString(formData.get('parent_invoice_id')) ||
+    getTrimmedString(formData.get('invoice_id'));
+  const tab = getTrimmedString(formData.get('tab')) || 'info';
+  const returnTo = getTrimmedString(formData.get('return_to'));
+  const supplementalReason = getOptionalText(formData.get('supplemental_reason'));
+
+  if (!requestedJobId && !parentInvoiceId) {
+    redirect(buildJobDetailHref('unknown', tab, 'internal_invoice_supplemental_parent_required'));
+  }
+
+  await requireOperationalInternalInvoiceEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  if (billingMode !== 'internal_invoicing') {
+    redirect(buildJobDetailHref(requestedJobId || 'unknown', tab, 'internal_invoicing_billing_pending'));
+  }
+
+  const parentInvoice = await resolveSupplementalParentInvoiceContext({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    parentInvoiceId,
+    fallbackJobId: requestedJobId,
+  });
+
+  if (!parentInvoice) {
+    redirect(buildJobDetailHref(requestedJobId || 'unknown', tab, 'internal_invoice_supplemental_parent_missing'));
+  }
+
+  const jobId = String(parentInvoice.job_id ?? '').trim() || requestedJobId;
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: 'id',
+  });
+
+  if (!scopedJob?.id) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  requireInvoiceLifecycleAccessOrRedirect({
+    actorUserId: userId,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    redirectTo: buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo),
+  });
+
+  if (requestedJobId && requestedJobId !== String(parentInvoice.job_id ?? '').trim()) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_supplemental_parent_invalid', returnTo));
+  }
+
+  const parentInvoiceKind = String(parentInvoice.invoice_kind ?? '').trim().toLowerCase();
+  if (parentInvoiceKind !== 'primary') {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_supplemental_parent_invalid', returnTo));
+  }
+
+  const parentStatus = String(parentInvoice.status ?? '').trim().toLowerCase();
+  const allowedParentStatuses = new Set(['issued', 'sent', 'partially_paid', 'paid']);
+  if (!allowedParentStatuses.has(parentStatus)) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_supplemental_parent_invalid_state', returnTo));
+  }
+
+  const draftPayload = {
+    account_owner_user_id: internalUser.account_owner_user_id,
+    job_id: String(parentInvoice.job_id ?? '').trim() || jobId,
+    customer_id: parentInvoice.customer_id ?? null,
+    location_id: parentInvoice.location_id ?? null,
+    service_case_id: parentInvoice.service_case_id ?? null,
+    invoice_kind: 'supplemental',
+    original_internal_invoice_id: String(parentInvoice.id ?? '').trim(),
+    supplemental_reason: supplementalReason,
+    invoice_number: buildInternalInvoiceNumber(),
+    status: 'draft',
+    invoice_date: new Date().toISOString().slice(0, 10),
+    source_type: String(parentInvoice.source_type ?? '').trim() || 'job',
+    subtotal_cents: 0,
+    total_cents: 0,
+    notes: null,
+    billing_name: getOptionalText(parentInvoice.billing_name),
+    billing_email: getOptionalText(parentInvoice.billing_email),
+    billing_phone: getOptionalText(parentInvoice.billing_phone),
+    billing_address_line1: getOptionalText(parentInvoice.billing_address_line1),
+    billing_address_line2: getOptionalText(parentInvoice.billing_address_line2),
+    billing_city: getOptionalText(parentInvoice.billing_city),
+    billing_state: getOptionalText(parentInvoice.billing_state),
+    billing_zip: getOptionalText(parentInvoice.billing_zip),
+    created_by_user_id: userId,
+    updated_by_user_id: userId,
+  };
+
+  const { data, error } = await supabase
+    .from('internal_invoices')
+    .insert(draftPayload)
+    .select('id, invoice_number, invoice_display_number, status, total_cents')
+    .single();
+
+  if (error) throw error;
+
+  const invoiceDisplayNumber = String(data?.invoice_display_number ?? '').trim();
+  if (!invoiceDisplayNumber) {
+    throw new Error('Supplemental invoice draft insert failed: missing invoice_display_number');
+  }
+
+  await logInvoiceEvent({
+    supabase,
+    userId,
+    jobId,
+    eventType: 'internal_invoice_drafted',
+    invoice: {
+      id: String(data.id),
+      invoice_number: String(data.invoice_number),
+      status: String(data.status),
+      total_cents: Number(data.total_cents ?? 0) || 0,
+    },
+    extraMeta: {
+      invoice_kind: 'supplemental',
+      original_internal_invoice_id: String(parentInvoice.id ?? '').trim(),
+      supplemental_reason: supplementalReason,
+    },
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoice`);
+  revalidatePath('/jobs');
+  revalidatePath('/ops');
+
+  redirect(
+    buildSupplementalInvoiceWorkspaceReturnHref({
+      jobId,
+      tab,
+      banner: 'internal_invoice_supplemental_draft_created',
+      supplementalInvoiceId: String(data.id),
+      returnTo,
+    }),
+  );
 }
 
 export async function saveInternalInvoiceDraftFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
