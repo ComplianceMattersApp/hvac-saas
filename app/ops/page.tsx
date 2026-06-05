@@ -6,6 +6,8 @@ import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { canViewFinancialRegister } from "@/lib/auth/financial-access";
+import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
+import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import { loadFailedPaymentReconciliationItems } from "@/lib/business/failed-payment-reconciliation-read-model";
 
 import {
@@ -293,6 +295,31 @@ export default async function OpsPage({
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
   });
+
+  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const canViewFieldPaymentVerificationAttention =
+    canViewFinancialRegister({
+      actorUserId: user.id,
+      internalUser,
+      resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    }) || fieldBillingCapabilities.can_verify_non_card_collection;
+
+  const fieldPaymentReconciliationAttention = canViewFieldPaymentVerificationAttention
+    ? await listFieldPaymentCollectionReportsForReconciliation({
+      admin: supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      limit: 1,
+    })
+    : null;
+
+  const showFieldPaymentVerificationChip =
+    canViewFieldPaymentVerificationAttention
+    && (fieldPaymentReconciliationAttention?.summary.openCount ?? 0) > 0;
 
   const failedPaymentReconciliation = canViewFailedPaymentAttention
     ? await loadFailedPaymentReconciliationItems({
@@ -4246,6 +4273,16 @@ return (
           <div>
             <div className={`${opsUtilityLabelClass} text-violet-700`}>Closeout</div>
             <div className="text-[15px] font-semibold tracking-tight text-slate-950">Closeout Work Queue</div>
+            {showFieldPaymentVerificationChip ? (
+              <div className="mt-1">
+                <Link
+                  href={`/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}#field-payment-reconciliation-attention`}
+                  className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
+                >
+                  Field payment verification needed: {fieldPaymentReconciliationAttention?.summary.openCount ?? 0}
+                </Link>
+              </div>
+            ) : null}
           </div>
           <div className="flex items-center gap-3">
             {sectionCountPill(prioritizedCloseoutJobs.length)}

@@ -132,6 +132,10 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).toContain("Open job");
   });
 
+  it("exposes a stable section anchor for Ops dashboard reconciliation chips", () => {
+    expect(closeoutQueuePageSource).toContain('id="field-payment-reconciliation-attention"');
+  });
+
   it("keeps reconciliation section read-only with no verification actions", () => {
     expect(closeoutQueuePageSource).toContain("No verify/reject/correct/void actions in this queue section.");
     expect(closeoutQueuePageSource).toContain("No payment truth mutation.");

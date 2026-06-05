@@ -407,7 +407,7 @@ export default async function CloseoutQueuePage({
       </section>
 
       {canViewFieldPaymentReconciliationAttention ? (
-        <section className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.35)]">
+        <section id="field-payment-reconciliation-attention" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.35)]">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold text-amber-900">Field Payment Reconciliation Attention</h2>
