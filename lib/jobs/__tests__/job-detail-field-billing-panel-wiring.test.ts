@@ -34,4 +34,14 @@ describe("job detail field billing panel wiring", () => {
     expect(summarySlice).toContain("visitScopeProposalItems={fieldChargeProposalVisitScopeItems}");
     expect(summarySlice).not.toContain("status === \"issued\"");
   });
+
+  it("degrades field proposal summary reads without crashing job detail", () => {
+    const fieldBillingReadIndex = source.indexOf("timedPhase(\"fieldBillingSummaryRead\"");
+    const fieldBillingReadSlice = source.slice(fieldBillingReadIndex, fieldBillingReadIndex + 2200);
+
+    expect(fieldBillingReadIndex).toBeGreaterThanOrEqual(0);
+    expect(fieldBillingReadSlice).toContain("fieldChargeProposalsUnavailable");
+    expect(fieldBillingReadSlice).toContain("return [] as Awaited<ReturnType<typeof listFieldChargeProposalsForJob>>");
+    expect(fieldBillingReadSlice).toContain("resolveLatestVoidedInternalInvoiceByJobId");
+  });
 });

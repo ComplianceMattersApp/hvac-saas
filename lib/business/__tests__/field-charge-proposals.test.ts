@@ -129,4 +129,54 @@ describe('field charge proposal model foundation', () => {
     expect(rows).toHaveLength(1);
     expect(rows[0].source_kind).toBe('pricebook');
   });
+
+  it('throws structured read errors with code/message/details/hint context', async () => {
+    const chain = {
+      select: () => chain,
+      eq: () => chain,
+      order: vi.fn(() => {
+        if (chain.order.mock.calls.length === 2) {
+          return Promise.resolve({
+            data: null,
+            error: {
+              code: '42P01',
+              message: 'relation "field_charge_proposals" does not exist',
+              details: null,
+              hint: 'Apply migration 20260605110000_field_charge_proposals_foundation.sql',
+            },
+          });
+        }
+        return chain;
+      }),
+    } as any;
+
+    const supabase = {
+      from: vi.fn(() => chain),
+    };
+
+    await expect(
+      listFieldChargeProposalsForJob({
+        supabase,
+        accountOwnerUserId: 'owner-1',
+        jobId: 'job-1',
+      }),
+    ).rejects.toThrow(/code=42P01/);
+
+    try {
+      await listFieldChargeProposalsForJob({
+        supabase,
+        accountOwnerUserId: 'owner-1',
+        jobId: 'job-1',
+      });
+    } catch (error) {
+      const err = error as Error & { code?: string; hint?: string | null };
+      expect(err.message).toContain('field-charge-proposals:list');
+      expect(err.message).toContain('message=relation "field_charge_proposals" does not exist');
+      expect(err.message).toContain('hint=Apply migration 20260605110000_field_charge_proposals_foundation.sql');
+      expect(err.message).toContain('accountOwnerUserId=owner-1');
+      expect(err.message).toContain('jobId=job-1');
+      expect(err.code).toBe('42P01');
+      expect(err.hint).toContain('20260605110000_field_charge_proposals_foundation.sql');
+    }
+  });
 });

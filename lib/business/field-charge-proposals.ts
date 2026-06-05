@@ -115,6 +115,39 @@ const FIELD_CHARGE_PROPOSAL_SELECT = [
   'updated_at',
 ].join(', ');
 
+function buildFieldChargeProposalReadError(error: unknown, context: { accountOwnerUserId: string; jobId: string }) {
+  const candidate = (error && typeof error === 'object' ? error : {}) as {
+    code?: unknown;
+    message?: unknown;
+    details?: unknown;
+    hint?: unknown;
+  };
+
+  const code = String(candidate.code ?? '').trim() || 'unknown';
+  const message = String(candidate.message ?? '').trim() || String(error);
+  const details = String(candidate.details ?? '').trim();
+  const hint = String(candidate.hint ?? '').trim();
+
+  const wrappedMessage = [
+    '[field-charge-proposals:list] read failed',
+    `code=${code}`,
+    `message=${message}`,
+    details ? `details=${details}` : '',
+    hint ? `hint=${hint}` : '',
+    `accountOwnerUserId=${context.accountOwnerUserId}`,
+    `jobId=${context.jobId}`,
+  ]
+    .filter(Boolean)
+    .join(' | ');
+
+  const wrapped = new Error(wrappedMessage);
+  (wrapped as any).cause = error;
+  (wrapped as any).code = code;
+  (wrapped as any).details = details || null;
+  (wrapped as any).hint = hint || null;
+  return wrapped;
+}
+
 export async function listFieldChargeProposalsForJob(params: {
   supabase: any;
   accountOwnerUserId: string;
@@ -132,6 +165,11 @@ export async function listFieldChargeProposalsForJob(params: {
     .order('submitted_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false });
 
-  if (error) throw error;
+  if (error) {
+    throw buildFieldChargeProposalReadError(error, {
+      accountOwnerUserId,
+      jobId,
+    });
+  }
   return Array.isArray(data) ? data.map(normalizeFieldChargeProposalRow) : [];
 }

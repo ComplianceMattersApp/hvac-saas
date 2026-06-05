@@ -1148,6 +1148,35 @@ export default async function JobDetailPage({
     phaseDurationsMs[phaseName] = durationMs;
   };
 
+  const describePhaseError = (error: unknown) => {
+    if (error instanceof Error) return error.message;
+    if (error && typeof error === "object") {
+      const candidate = error as {
+        code?: unknown;
+        message?: unknown;
+        details?: unknown;
+        hint?: unknown;
+      };
+      const code = String(candidate.code ?? "").trim();
+      const message = String(candidate.message ?? "").trim();
+      const details = String(candidate.details ?? "").trim();
+      const hint = String(candidate.hint ?? "").trim();
+      const parts = [
+        code ? `code=${code}` : "",
+        message ? `message=${message}` : "",
+        details ? `details=${details}` : "",
+        hint ? `hint=${hint}` : "",
+      ].filter(Boolean);
+      if (parts.length > 0) return parts.join(" | ");
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return String(error);
+      }
+    }
+    return String(error);
+  };
+
   const timedPhase = async <T,>(phaseName: string, factory: () => Promise<T>) => {
     const startMs = timingEnabled ? Date.now() : 0;
     try {
@@ -1160,7 +1189,7 @@ export default async function JobDetailPage({
       if (timingEnabled) {
         setPhaseValue(phaseName, Date.now() - startMs);
       }
-      const message = error instanceof Error ? error.message : String(error);
+      const message = describePhaseError(error);
       const annotated = new Error(`[job-detail:${phaseName}] ${message}`);
       (annotated as any).cause = error;
       throw annotated;
@@ -1791,25 +1820,58 @@ export default async function JobDetailPage({
   });
 
   const { internalInvoiceTruth } = await immediateInvoiceTruthPromise;
+  const showInternalInvoicePanelForFieldBillingRead =
+    isInternalUser &&
+    buildJobBillingStateReadModel({
+      billingMode,
+      invoiceComplete: job.invoice_complete,
+      internalInvoice: internalInvoiceTruth,
+    }).internalInvoicePanelEnabled;
 
   const fieldBillingSummaryDataPromise = timedPhase("fieldBillingSummaryRead", async () => {
-    if (!(showInternalInvoicePanel && fieldBillingCapabilities.can_view_field_billing_summary)) {
+    if (!(showInternalInvoicePanelForFieldBillingRead && fieldBillingCapabilities.can_view_field_billing_summary)) {
       return {
         latestVoidedInternalInvoice: null as Awaited<ReturnType<typeof resolveLatestVoidedInternalInvoiceByJobId>> | null,
         fieldChargeProposals: [] as Awaited<ReturnType<typeof listFieldChargeProposalsForJob>>,
       };
     }
 
-    const [latestVoidedInternalInvoice, fieldChargeProposals] = await Promise.all([
-      internalInvoiceTruth
-        ? Promise.resolve(null)
-        : resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId }),
-      listFieldChargeProposalsForJob({
-        supabase,
-        accountOwnerUserId: internalUser.account_owner_user_id,
+    const fieldChargeProposals = await listFieldChargeProposalsForJob({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+    }).catch((error) => {
+      const wrapped = (error && typeof error === "object" ? error : {}) as {
+        cause?: unknown;
+        code?: unknown;
+        details?: unknown;
+        hint?: unknown;
+      };
+      const cause = (wrapped.cause && typeof wrapped.cause === "object" ? wrapped.cause : {}) as {
+        code?: unknown;
+        details?: unknown;
+        hint?: unknown;
+      };
+      const message = error instanceof Error ? error.message : describePhaseError(error);
+      const code = String(wrapped.code ?? cause.code ?? "").trim() || null;
+      const details = String(wrapped.details ?? cause.details ?? "").trim() || null;
+      const hint = String(wrapped.hint ?? cause.hint ?? "").trim() || null;
+
+      console.error("[job-detail:fieldBillingSummaryRead] fieldChargeProposalsUnavailable", {
         jobId,
-      }),
-    ]);
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        code,
+        message,
+        details,
+        hint,
+      });
+
+      return [] as Awaited<ReturnType<typeof listFieldChargeProposalsForJob>>;
+    });
+
+    const latestVoidedInternalInvoice = internalInvoiceTruth
+      ? null
+      : await resolveLatestVoidedInternalInvoiceByJobId({ supabase, jobId });
 
     return {
       latestVoidedInternalInvoice,
