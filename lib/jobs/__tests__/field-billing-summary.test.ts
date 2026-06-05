@@ -92,6 +92,7 @@ function renderSummary(props: Partial<SummaryProps> = {}) {
     React.createElement(FieldBillingSummary, {
       jobId: props.jobId ?? "job-1",
       tab: props.tab ?? "info",
+      parentProvidesInvoiceCta: props.parentProvidesInvoiceCta ?? false,
       capabilities: props.capabilities ?? readOnlyCapabilities,
       invoice: props.invoice ?? null,
       latestVoidedInvoice: props.latestVoidedInvoice ?? null,
@@ -111,8 +112,8 @@ describe("FieldBillingSummary", () => {
     expect(html).toContain("No invoice has been created yet.");
     expect(html).toContain("Office billing review may be needed before payment can be collected.");
     expect(html).toContain("You can view billing status only.");
-    expect(html).toContain("Field charge proposals");
-    expect(html).toContain("No field charge proposals.");
+    expect(html).not.toContain("Field charge proposals");
+    expect(html).not.toContain("No field charge proposals.");
   });
 
   it("renders draft invoice state as not ready for collection", () => {
@@ -232,7 +233,7 @@ describe("FieldBillingSummary", () => {
       },
     });
 
-    expect(html).toContain("Direct invoice workflow is primary.");
+    expect(html).toContain("Use invoice workspace for billing actions.");
     expect(html).toContain("Review Invoice");
     expect(html).not.toContain("Add proposed charge");
   });
@@ -249,10 +250,89 @@ describe("FieldBillingSummary", () => {
       },
     });
 
-    expect(html).toContain("Direct invoice workflow is primary.");
+    expect(html).toContain("Use invoice workspace for billing actions.");
     expect(html).toContain("Review Invoice");
     expect(html).not.toContain("Add proposed charge");
     expect(html).not.toContain("Submit charge for office review");
+  });
+
+  it("suppresses duplicate direct invoice CTA when parent billing card already provides it", () => {
+    const html = renderSummary({
+      capabilities: directInvoiceOnlyCapabilities,
+      parentProvidesInvoiceCta: true,
+      invoice: {
+        status: "draft",
+        invoiceNumber: "INV-DRAFT-1",
+        invoiceDisplayNumber: null,
+        totalCents: 17500,
+        lineItemCount: 2,
+      },
+    });
+
+    expect(html).toContain("Use invoice workspace for billing actions.");
+    expect(html).not.toContain("Review Invoice");
+    expect(html).not.toContain("Build Invoice");
+    expect(html).not.toContain("Open Invoice Workspace");
+  });
+
+  it("hides empty field charge proposal section for direct-authority users", () => {
+    const html = renderSummary({
+      capabilities: directInvoiceOnlyCapabilities,
+      invoice: {
+        status: "draft",
+        invoiceNumber: "INV-DRAFT-1",
+        invoiceDisplayNumber: null,
+        totalCents: 17500,
+        lineItemCount: 2,
+      },
+      fieldChargeProposals: [],
+    });
+
+    expect(html).not.toContain("Field charge proposals");
+    expect(html).not.toContain("No field charge proposals.");
+  });
+
+  it("shows field charge proposal section for direct-authority users when proposals exist", () => {
+    const html = renderSummary({
+      capabilities: directInvoiceOnlyCapabilities,
+      invoice: {
+        status: "draft",
+        invoiceNumber: "INV-DRAFT-1",
+        invoiceDisplayNumber: null,
+        totalCents: 17500,
+        lineItemCount: 2,
+      },
+      fieldChargeProposals: [
+        {
+          id: "proposal-1",
+          account_owner_user_id: "owner-1",
+          job_id: "job-1",
+          internal_invoice_id: "inv-1",
+          source_kind: "pricebook",
+          source_pricebook_item_id: "pb-1",
+          source_visit_scope_item_id: null,
+          proposed_name: "Diagnostic Visit",
+          proposed_description: "System diagnostic",
+          proposed_item_type: "diagnostic",
+          proposed_quantity: 1,
+          proposed_unit_price_cents: 12500,
+          proposed_subtotal_cents: 12500,
+          proposed_currency: "usd",
+          status: "submitted_for_review",
+          proposed_by_user_id: "billing-1",
+          submitted_at: "2026-06-05T18:00:00.000Z",
+          reviewed_by_user_id: null,
+          reviewed_at: null,
+          review_note: null,
+          converted_internal_invoice_line_item_id: null,
+          created_at: "2026-06-05T18:00:00.000Z",
+          updated_at: "2026-06-05T18:00:00.000Z",
+        },
+      ],
+    });
+
+    expect(html).toContain("Field charge proposals");
+    expect(html).toContain("Diagnostic Visit");
   });
 
   it("renders submitted Pricebook proposal as read-only and non-collectible", () => {
@@ -330,6 +410,8 @@ describe("FieldBillingSummary", () => {
     });
 
     expect(html).toContain("Add proposed charge");
+    expect(html).toContain("Field charge proposals");
+    expect(html).toContain("No field charge proposals.");
     expect(html).toContain("Submit charge for office review");
     expect(html).toContain("These are proposals only and are not collectible until approved.");
     expect(html).toContain("From Pricebook");

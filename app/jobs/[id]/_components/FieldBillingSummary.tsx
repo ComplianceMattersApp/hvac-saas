@@ -42,6 +42,7 @@ type FieldChargeProposalVisitScopeItem = {
 type FieldBillingSummaryProps = {
   jobId: string;
   tab?: string;
+  parentProvidesInvoiceCta?: boolean;
   capabilities: FieldBillingCapabilities;
   invoice: FieldBillingInvoiceSnapshot | null;
   latestVoidedInvoice?: FieldBillingInvoiceSnapshot | null;
@@ -184,6 +185,8 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
   const canSubmitVisitScopeProposal = props.capabilities.can_convert_visit_scope_to_invoice_line;
   const hasProposalEntryAuthority = canSubmitPricebookProposal || canSubmitVisitScopeProposal;
   const canShowProposalEntry = !hasDirectInvoiceAuthority && hasProposalEntryAuthority;
+  const showDirectInvoiceCta = hasDirectInvoiceAuthority && !props.parentProvidesInvoiceCta;
+  const showProposalSection = fieldChargeProposals.length > 0 || canShowProposalEntry;
   const proposedTotalCents = fieldChargeProposals.reduce((sum, proposal) => {
     if (proposal.status === "rejected" || proposal.status === "voided") return sum;
     return sum + Math.max(0, Number(proposal.proposed_subtotal_cents ?? 0) || 0);
@@ -238,11 +241,11 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
         </span>
         {hasDirectInvoiceAuthority ? (
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-800">
-            Direct invoice workflow is primary.
+            Use invoice workspace for billing actions.
           </span>
         ) : hasProposalEntryAuthority ? (
           <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-800">
-            Proposal workflow is primary for this role.
+            Use proposals for office review.
           </span>
         ) : !canMutateFieldBilling ? (
           <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
@@ -255,7 +258,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
         )}
       </div>
 
-      {hasDirectInvoiceAuthority ? (
+      {showDirectInvoiceCta ? (
         <div className="mt-3">
           <Link
             href={reviewInvoiceHref}
@@ -272,6 +275,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
         </div>
       ) : null}
 
+      {showProposalSection ? (
       <div className="mt-4 border-t border-slate-200/80 pt-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -533,6 +537,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
           </div>
         )}
       </div>
+      ) : null}
     </section>
   );
 }

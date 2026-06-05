@@ -28,6 +28,7 @@ describe("job detail field billing panel wiring", () => {
     const summarySlice = source.slice(summaryIndex, summaryIndex + 700);
 
     expect(summarySlice).toContain("capabilities={fieldBillingCapabilities}");
+    expect(summarySlice).toContain("parentProvidesInvoiceCta={hasDirectInvoiceWorkflowAccess}");
     expect(summarySlice).toContain("invoice={fieldBillingInvoiceSnapshot}");
     expect(summarySlice).toContain("fieldChargeProposals={fieldBillingSummaryData.fieldChargeProposals}");
     expect(summarySlice).toContain("pricebookProposalItems={fieldChargeProposalPricebookItems}");

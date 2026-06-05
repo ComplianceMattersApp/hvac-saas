@@ -6984,6 +6984,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     <FieldBillingSummary
       jobId={job.id}
       tab={tab}
+      parentProvidesInvoiceCta={hasDirectInvoiceWorkflowAccess}
       capabilities={fieldBillingCapabilities}
       invoice={fieldBillingInvoiceSnapshot}
       latestVoidedInvoice={fieldBillingLatestVoidedInvoiceSnapshot}
