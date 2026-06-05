@@ -117,7 +117,7 @@ import FieldBillingSummary from "./_components/FieldBillingSummary";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
-import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
+import { hasDirectInvoiceDraftMutationAccess, resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import VisitScopeJobDetailForm from "@/components/jobs/VisitScopeJobDetailForm";
 import {
   buildVisitScopeReadModel,
@@ -2411,6 +2411,11 @@ const showExternalDataEntryPrompt =
 const showInternalInvoicePanel =
   isInternalUser &&
   billingState.internalInvoicePanelEnabled;
+
+const hasDirectInvoiceWorkflowAccess = hasDirectInvoiceDraftMutationAccess(fieldBillingCapabilities);
+const hasProposalEntryWorkflowAccess =
+  !hasDirectInvoiceWorkflowAccess
+  && (fieldBillingCapabilities.can_select_pricebook_lines || fieldBillingCapabilities.can_convert_visit_scope_to_invoice_line);
 
 const maintenanceAgreementsEnabled = isMaintenanceAgreementsEnabled();
 let markVisitCountedLinkId: string | null = null;
@@ -6891,7 +6896,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
 
     <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200/80 pt-3">
-      {!internalInvoiceTruth ? (
+      {hasDirectInvoiceWorkflowAccess ? (!internalInvoiceTruth ? (
         <form action={createInternalInvoiceDraftFromForm}>
           <input type="hidden" name="job_id" value={job.id} />
           <input type="hidden" name="tab" value={tab} />
@@ -6904,7 +6909,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={darkButtonClass}>
           {internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review Invoice" : "Build Invoice") : "Open Invoice Workspace"}
         </Link>
-      )}
+      )) : hasProposalEntryWorkflowAccess ? (
+        <Link href={`#field-billing-summary-title`} className={darkButtonClass}>
+          Add Proposed Charge
+        </Link>
+      ) : null}
       <div className="flex min-h-10 items-center text-xs leading-5 text-slate-500">
         Invoice Charges are billed scope. Work Items remain operational scope.
       </div>

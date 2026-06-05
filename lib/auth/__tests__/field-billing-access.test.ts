@@ -37,6 +37,16 @@ const expectedFinancialCapabilities = {
   can_remove_field_charge: true,
   can_submit_field_charges_for_review: true,
   can_approve_field_charges: true,
+  can_create_direct_invoice_draft: true,
+  can_select_pricebook_invoice_lines: true,
+  can_convert_visit_scope_to_invoice_lines: true,
+  can_add_manual_invoice_line: true,
+  can_edit_invoice_line_description: true,
+  can_edit_invoice_line_quantity: true,
+  can_edit_invoice_line_price: true,
+  can_remove_invoice_line: true,
+  can_issue_invoice: true,
+  can_send_invoice: true,
   can_collect_card_payment: true,
   can_report_non_card_collection: true,
   can_verify_non_card_collection: true,
@@ -54,6 +64,16 @@ const expectedReadOnlyCapabilities = {
   can_remove_field_charge: false,
   can_submit_field_charges_for_review: false,
   can_approve_field_charges: false,
+  can_create_direct_invoice_draft: false,
+  can_select_pricebook_invoice_lines: false,
+  can_convert_visit_scope_to_invoice_lines: false,
+  can_add_manual_invoice_line: false,
+  can_edit_invoice_line_description: false,
+  can_edit_invoice_line_quantity: false,
+  can_edit_invoice_line_price: false,
+  can_remove_invoice_line: false,
+  can_issue_invoice: false,
+  can_send_invoice: false,
   can_collect_card_payment: false,
   can_report_non_card_collection: false,
   can_verify_non_card_collection: false,
@@ -106,7 +126,7 @@ describe('field billing access helper', () => {
         actorUserId: 'owner-1',
         internalUser: internalUser('office', { user_id: 'owner-1' }),
         resourceAccountOwnerUserId: 'owner-1',
-      }).can_add_manual_charge,
+      }).can_add_manual_invoice_line,
     ).toBe(true);
 
     expect(
@@ -176,16 +196,44 @@ describe('field billing access helper', () => {
         field_billing_enabled: true,
         can_view_field_billing_summary: true,
         can_select_pricebook_lines: true,
+        can_select_pricebook_invoice_lines: true,
         can_edit_charge_quantity: true,
+        can_edit_invoice_line_quantity: true,
       },
     });
 
     expect(capabilities.field_billing_enabled).toBe(true);
     expect(capabilities.can_view_field_billing_summary).toBe(true);
     expect(capabilities.can_select_pricebook_lines).toBe(true);
+    expect(capabilities.can_select_pricebook_invoice_lines).toBe(true);
     expect(capabilities.can_edit_charge_quantity).toBe(true);
+    expect(capabilities.can_edit_invoice_line_quantity).toBe(true);
     expect(capabilities.can_add_manual_charge).toBe(false);
+    expect(capabilities.can_add_manual_invoice_line).toBe(false);
     expect(capabilities.can_edit_charge_price).toBe(false);
+    expect(capabilities.can_edit_invoice_line_price).toBe(false);
+    expect(capabilities.can_collect_card_payment).toBe(false);
+    expect(capabilities.can_verify_non_card_collection).toBe(false);
+  });
+
+  it('does not imply payment collection or verification from direct invoice capability alone', () => {
+    const capabilities = resolveFieldBillingCapabilities({
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+      explicitCapabilities: {
+        field_billing_enabled: true,
+        can_view_field_billing_summary: true,
+        can_create_direct_invoice_draft: true,
+        can_select_pricebook_invoice_lines: true,
+        can_edit_invoice_line_quantity: true,
+      },
+    });
+
+    expect(capabilities.can_create_direct_invoice_draft).toBe(true);
+    expect(capabilities.can_select_pricebook_invoice_lines).toBe(true);
+    expect(capabilities.can_edit_invoice_line_quantity).toBe(true);
+    expect(capabilities.can_collect_card_payment).toBe(false);
     expect(capabilities.can_verify_non_card_collection).toBe(false);
   });
 

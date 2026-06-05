@@ -1,4 +1,6 @@
+import Link from "next/link";
 import type { FieldBillingCapabilities } from "@/lib/auth/field-billing-access";
+import { hasDirectInvoiceDraftMutationAccess } from "@/lib/auth/field-billing-access";
 import type { FieldChargeProposalRecord } from "@/lib/business/field-charge-proposals";
 import {
   approveFieldChargeProposalForDraftInvoiceReviewForm,
@@ -174,11 +176,14 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
   const fieldChargeProposals = props.fieldChargeProposals ?? [];
   const pricebookProposalItems = props.pricebookProposalItems ?? [];
   const visitScopeProposalItems = (props.visitScopeProposalItems ?? []).filter((item) => String(item.id ?? "").trim());
+  const reviewInvoiceHref = `/jobs/${props.jobId}/invoice#invoice-workspace`;
+  const hasDirectInvoiceAuthority = hasDirectInvoiceDraftMutationAccess(props.capabilities);
   const canReviewFieldCharges = props.capabilities.can_approve_field_charges;
   const hasDraftInvoice = props.invoice?.status === "draft";
   const canSubmitPricebookProposal = props.capabilities.can_select_pricebook_lines;
   const canSubmitVisitScopeProposal = props.capabilities.can_convert_visit_scope_to_invoice_line;
-  const canShowProposalEntry = canSubmitPricebookProposal || canSubmitVisitScopeProposal;
+  const hasProposalEntryAuthority = canSubmitPricebookProposal || canSubmitVisitScopeProposal;
+  const canShowProposalEntry = !hasDirectInvoiceAuthority && hasProposalEntryAuthority;
   const proposedTotalCents = fieldChargeProposals.reduce((sum, proposal) => {
     if (proposal.status === "rejected" || proposal.status === "voided") return sum;
     return sum + Math.max(0, Number(proposal.proposed_subtotal_cents ?? 0) || 0);
@@ -231,7 +236,15 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
         <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
           {invoiceForMetrics?.lineItemCount ?? 0} line{(invoiceForMetrics?.lineItemCount ?? 0) === 1 ? "" : "s"}
         </span>
-        {!canMutateFieldBilling ? (
+        {hasDirectInvoiceAuthority ? (
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-800">
+            Direct invoice workflow is primary.
+          </span>
+        ) : hasProposalEntryAuthority ? (
+          <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-800">
+            Proposal workflow is primary for this role.
+          </span>
+        ) : !canMutateFieldBilling ? (
           <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
             You can view billing status only. Charge edits and payment collection require permission.
           </span>
@@ -241,6 +254,23 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
           </span>
         )}
       </div>
+
+      {hasDirectInvoiceAuthority ? (
+        <div className="mt-3">
+          <Link
+            href={reviewInvoiceHref}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+          >
+            {props.invoice
+              ? props.invoice.status === "draft"
+                ? props.invoice.lineItemCount > 0
+                  ? "Review Invoice"
+                  : "Build Invoice"
+                : "Open Invoice Workspace"
+              : "Review Invoice"}
+          </Link>
+        </div>
+      ) : null}
 
       <div className="mt-4 border-t border-slate-200/80 pt-4">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">

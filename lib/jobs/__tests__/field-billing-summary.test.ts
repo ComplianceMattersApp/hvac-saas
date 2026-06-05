@@ -16,6 +16,16 @@ const readOnlyCapabilities: FieldBillingCapabilities = {
   can_remove_field_charge: false,
   can_submit_field_charges_for_review: false,
   can_approve_field_charges: false,
+  can_create_direct_invoice_draft: false,
+  can_select_pricebook_invoice_lines: false,
+  can_convert_visit_scope_to_invoice_lines: false,
+  can_add_manual_invoice_line: false,
+  can_edit_invoice_line_description: false,
+  can_edit_invoice_line_quantity: false,
+  can_edit_invoice_line_price: false,
+  can_remove_invoice_line: false,
+  can_issue_invoice: false,
+  can_send_invoice: false,
   can_collect_card_payment: false,
   can_report_non_card_collection: false,
   can_verify_non_card_collection: false,
@@ -33,6 +43,16 @@ const financialCapabilities: FieldBillingCapabilities = {
   can_remove_field_charge: true,
   can_submit_field_charges_for_review: true,
   can_approve_field_charges: true,
+  can_create_direct_invoice_draft: true,
+  can_select_pricebook_invoice_lines: true,
+  can_convert_visit_scope_to_invoice_lines: true,
+  can_add_manual_invoice_line: true,
+  can_edit_invoice_line_description: true,
+  can_edit_invoice_line_quantity: true,
+  can_edit_invoice_line_price: true,
+  can_remove_invoice_line: true,
+  can_issue_invoice: true,
+  can_send_invoice: true,
   can_collect_card_payment: true,
   can_report_non_card_collection: true,
   can_verify_non_card_collection: true,
@@ -42,12 +62,27 @@ const pricebookOnlyCapabilities: FieldBillingCapabilities = {
   ...readOnlyCapabilities,
   field_billing_enabled: true,
   can_select_pricebook_lines: true,
+  can_submit_field_charges_for_review: true,
 };
 
 const visitScopeOnlyCapabilities: FieldBillingCapabilities = {
   ...readOnlyCapabilities,
   field_billing_enabled: true,
   can_convert_visit_scope_to_invoice_line: true,
+  can_submit_field_charges_for_review: true,
+};
+
+const directInvoiceOnlyCapabilities: FieldBillingCapabilities = {
+  ...readOnlyCapabilities,
+  field_billing_enabled: true,
+  can_create_direct_invoice_draft: true,
+  can_select_pricebook_invoice_lines: true,
+  can_edit_invoice_line_quantity: true,
+};
+
+const proposalWithPriceOverrideCapabilities: FieldBillingCapabilities = {
+  ...pricebookOnlyCapabilities,
+  can_edit_charge_price: true,
 };
 
 type SummaryProps = Parameters<typeof FieldBillingSummary>[0];
@@ -197,9 +232,27 @@ describe("FieldBillingSummary", () => {
       },
     });
 
-    expect(html).toContain("Billing actions remain in the invoice workspace.");
-    expect(html).not.toContain("<form");
-    expect(html).not.toContain("<button");
+    expect(html).toContain("Direct invoice workflow is primary.");
+    expect(html).toContain("Review Invoice");
+    expect(html).not.toContain("Add proposed charge");
+  });
+
+  it("shows direct invoice workflow as primary when direct invoice authority exists", () => {
+    const html = renderSummary({
+      capabilities: directInvoiceOnlyCapabilities,
+      invoice: {
+        status: "draft",
+        invoiceNumber: "INV-DRAFT-1",
+        invoiceDisplayNumber: null,
+        totalCents: 17500,
+        lineItemCount: 2,
+      },
+    });
+
+    expect(html).toContain("Direct invoice workflow is primary.");
+    expect(html).toContain("Review Invoice");
+    expect(html).not.toContain("Add proposed charge");
+    expect(html).not.toContain("Submit charge for office review");
   });
 
   it("renders submitted Pricebook proposal as read-only and non-collectible", () => {
@@ -315,7 +368,7 @@ describe("FieldBillingSummary", () => {
 
   it("shows price override entry only when price edit capability is present", () => {
     const html = renderSummary({
-      capabilities: financialCapabilities,
+      capabilities: proposalWithPriceOverrideCapabilities,
       invoice: null,
       pricebookProposalItems: [
         {
