@@ -29,14 +29,22 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('normalizedJobStatus === "in_process";');
   });
 
-  it("wires only work_completed submit behavior", () => {
+  it("wires work_completed and parts_needed submit behavior only", () => {
     expect(panelSource).toContain('import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";');
+    expect(panelSource).toContain('import { markJobPartsNeededFromForm } from "@/lib/actions/job-ops-actions";');
     expect(panelSource).toContain("form action={advanceJobStatusFromForm}");
+    expect(panelSource).toContain("form action={markJobPartsNeededFromForm}");
     expect(panelSource).toContain("name=\"job_id\"");
     expect(panelSource).toContain("name=\"current_status\"");
     expect(panelSource).toContain("name=\"tab\"");
+    expect(panelSource).toContain("name=\"parts_note\"");
     expect(panelSource).toContain("Confirm field work complete");
     expect(panelSource).toContain("Ready to finish this visit? This moves the job to closeout for invoice/certs as needed.");
+    expect(panelSource).toContain("Can&apos;t finish today?");
+    expect(panelSource).toContain("Need parts instead?");
+    expect(panelSource).toContain("Send this visit to office/dispatch as Waiting on Part.");
+    expect(panelSource).toContain("placeholder=\"What part or issue is needed?\"");
+    expect(panelSource).toContain("Submit Parts Needed");
     expect(panelSource).toContain("Confirm Work Completed");
   });
 
@@ -44,6 +52,10 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).not.toContain("route.code === \"work_completed\"");
     expect(panelSource).not.toContain('type="button"');
     expect(panelSource).not.toContain("Only Work Completed is wired in this slice. Other outcomes remain unwired until future slices.");
+    expect(panelSource).not.toContain("approval_needed");
+    expect(panelSource).not.toContain("unable_to_complete");
+    expect(panelSource).not.toContain("different_issue_found");
+    expect(panelSource).not.toContain("return_needed");
   });
 
   it("keeps ECC guardrail and section guidance copy", () => {

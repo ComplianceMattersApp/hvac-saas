@@ -2035,6 +2035,175 @@ export async function updateJobOpsFromForm(formData: FormData): Promise<void> {
   redirectToOpsSection("ops_status_saved");
 }
 
+export async function markJobPartsNeededFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+
+  const jobIdRaw = formData.get("job_id");
+  if (typeof jobIdRaw !== "string" || !jobIdRaw.trim()) {
+    throw new Error("Missing job_id");
+  }
+  const jobId = jobIdRaw.trim();
+
+  const tab = String(formData.get("tab") || "info").trim() || "info";
+  const partsNote = String(formData.get("parts_note") || "").trim();
+
+  const redirectToFieldOutcome = (banner?: string): never =>
+    redirect(
+      buildJobOpsRedirectPath({
+        jobId,
+        fallbackPath: `/jobs/${jobId}?tab=${tab}#field-outcome`,
+        banner,
+      }),
+    );
+
+  if (!partsNote) {
+    redirectToFieldOutcome("parts_needed_note_required");
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+  const actingUserId = authz.userId;
+
+  const { data: beforeJob, error: beforeErr } = await supabase
+    .from("jobs")
+    .select(
+      "id, status, ops_status, field_complete, field_complete_at, pending_info_reason, on_hold_reason"
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (beforeErr) throw new Error(beforeErr.message);
+  if (!beforeJob?.id) throw new Error("Job not found");
+
+  if (Boolean(beforeJob.field_complete)) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirectToFieldOutcome("parts_needed_already_completed");
+  }
+
+  if (String(beforeJob.status ?? "").trim().toLowerCase() !== "in_process") {
+    revalidatePath(`/jobs/${jobId}`);
+    redirectToFieldOutcome("parts_needed_invalid_status");
+  }
+
+  const completedAt = new Date().toISOString();
+  const waitingReason = formatWaitingStateReason("waiting_on_part", partsNote);
+  const hadActiveWaitingState = Boolean(
+    getActiveWaitingState({
+      ops_status: beforeJob.ops_status ?? null,
+      pending_info_reason: beforeJob.pending_info_reason ?? null,
+      on_hold_reason: beforeJob.on_hold_reason ?? null,
+    }),
+  );
+
+  const { error: updateErr } = await supabase
+    .from("jobs")
+    .update({
+      status: "completed",
+      field_complete: true,
+      field_complete_at: completedAt,
+      ops_status: "pending_info",
+      pending_info_reason: waitingReason,
+      on_hold_reason: null,
+    })
+    .eq("id", jobId);
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  let assignmentId: string | null = null;
+  if (actingUserId) {
+    const { data: activeAssignment, error: assignmentErr } = await supabase
+      .from("job_assignments")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("user_id", actingUserId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (assignmentErr) throw new Error(assignmentErr.message);
+    assignmentId = String(activeAssignment?.id ?? "").trim() || null;
+  }
+
+  const movementMeta = {
+    ...buildMovementEventMeta({
+      from: beforeJob.status ?? "in_process",
+      to: "completed",
+      trigger: "field_outcome",
+      sourceAction: "mark_job_parts_needed_from_form",
+    }),
+    actor_user_id: actingUserId,
+    ...(assignmentId ? { assignment_id: assignmentId } : {}),
+  };
+
+  const { error: completionEventErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "job_completed",
+    meta: movementMeta,
+    user_id: actingUserId,
+  });
+
+  if (completionEventErr) throw new Error(completionEventErr.message);
+
+  const { error: opsEventErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "ops_update",
+    message: "Parts needed routed for office follow-up",
+    meta: {
+      timeline_v: 1,
+      event_family: "ops_blocker",
+      source: "field_outcome_panel",
+      source_action: "markJobPartsNeededFromForm",
+      blocker_action: hadActiveWaitingState ? "updated" : "set",
+      blocker_type: "waiting_on_part",
+      blocker_reason: partsNote,
+      reason: partsNote,
+      previous: {
+        status: beforeJob.status ?? null,
+        ops_status: beforeJob.ops_status ?? null,
+        field_complete: Boolean(beforeJob.field_complete ?? false),
+        pending_info_reason: beforeJob.pending_info_reason ?? null,
+        on_hold_reason: beforeJob.on_hold_reason ?? null,
+      },
+      next: {
+        status: "completed",
+        ops_status: "pending_info",
+        field_complete: true,
+        pending_info_reason: waitingReason,
+        on_hold_reason: null,
+      },
+      blocker_context: {
+        pending_reason: waitingReason,
+        hold_reason: null,
+      },
+      changes: [
+        { field: "status", from: beforeJob.status ?? null, to: "completed" },
+        { field: "field_complete", from: Boolean(beforeJob.field_complete ?? false), to: true },
+        { field: "field_complete_at", from: beforeJob.field_complete_at ?? null, to: completedAt },
+        { field: "ops_status", from: beforeJob.ops_status ?? null, to: "pending_info" },
+        { field: "pending_info_reason", from: beforeJob.pending_info_reason ?? null, to: waitingReason },
+        { field: "on_hold_reason", from: beforeJob.on_hold_reason ?? null, to: null },
+      ],
+      ...movementMeta,
+    },
+    user_id: actingUserId,
+  });
+
+  if (opsEventErr) throw new Error(opsEventErr.message);
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
+  revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs/${jobId}`);
+  redirectToFieldOutcome("parts_needed_saved");
+}
+
 export async function markJobFieldCompleteFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
 

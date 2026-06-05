@@ -1,5 +1,6 @@
 import SubmitButton from "@/components/SubmitButton";
 import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
+import { markJobPartsNeededFromForm } from "@/lib/actions/job-ops-actions";
 
 type FieldOutcomePanelProps = {
   jobId: string;
@@ -32,6 +33,46 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
           Confirm Work Completed
         </SubmitButton>
       </form>
+
+      <details className="mt-3 w-full rounded-xl border border-amber-200/80 bg-amber-50/40 p-3">
+        <summary className="list-none cursor-pointer">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-semibold text-amber-900">Can&apos;t finish today?</p>
+              <p className="mt-1 text-xs leading-5 text-amber-900/90">Need parts instead?</p>
+            </div>
+            <span className="inline-flex min-h-8 items-center justify-center rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900">
+              Open
+            </span>
+          </div>
+        </summary>
+
+        <form action={markJobPartsNeededFromForm} className="mt-3 border-t border-amber-200/80 pt-3">
+          <input type="hidden" name="job_id" value={props.jobId} />
+          <input type="hidden" name="current_status" value={props.currentStatus} />
+          <input type="hidden" name="tab" value={props.tab} />
+          <p className="text-xs leading-5 text-amber-900/90">
+            Send this visit to office/dispatch as Waiting on Part.
+          </p>
+          <textarea
+            id={`parts-note-${props.jobId}`}
+            name="parts_note"
+            required
+            rows={2}
+            maxLength={280}
+            className="mt-2 w-full rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-xs text-slate-900 shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-amber-200"
+            placeholder="What part or issue is needed?"
+          />
+          <div className="mt-2 flex items-center">
+            <SubmitButton
+              loadingText="Saving..."
+              className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
+            >
+              Submit Parts Needed
+            </SubmitButton>
+          </div>
+        </form>
+      </details>
 
       {props.isEccJob ? (
         <p className="mt-3 rounded-lg border border-sky-200/80 bg-sky-50/70 px-2.5 py-2 text-xs leading-5 text-sky-900">
