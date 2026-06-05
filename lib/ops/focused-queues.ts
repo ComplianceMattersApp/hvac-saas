@@ -47,7 +47,7 @@ const WAITING_QUEUE_LABELS_BY_REASON: Record<WaitingStateType, string> = {
   waiting_on_customer_approval: "Approval Needed",
   estimate_needed: "Estimate Needed",
   waiting_on_access: "Waiting on Access",
-  waiting_on_information: "Waiting on Information",
+  waiting_on_information: "Unable to Complete / Waiting on Information",
   other: "Waiting",
 };
 
@@ -159,6 +159,38 @@ export function getWaitingQueueDisplay(job: Pick<FocusedQueueJob, "ops_status" |
     label: status === "on_hold" ? "Waiting" : "Waiting on Information",
     reason: "Dependency pending",
   };
+}
+
+export function getWaitingQueueRecommendedNextStep(
+  job: Pick<FocusedQueueJob, "ops_status" | "pending_info_reason" | "on_hold_reason">,
+): string {
+  const waitingState = getActiveWaitingState({
+    ops_status: job?.ops_status ?? null,
+    pending_info_reason: job?.pending_info_reason ?? null,
+    on_hold_reason: job?.on_hold_reason ?? null,
+  });
+
+  if (!waitingState?.parsed) {
+    return "Review blocker details and set next office action.";
+  }
+
+  if (waitingState.blockerType === "waiting_on_part") {
+    return "Confirm part sourcing status and plan return scheduling.";
+  }
+  if (waitingState.blockerType === "waiting_on_customer_approval") {
+    return "Contact customer/decision-maker and capture approval outcome.";
+  }
+  if (waitingState.blockerType === "waiting_on_information") {
+    return "Review visit note and decide contact, reschedule, or office review next step.";
+  }
+  if (waitingState.blockerType === "waiting_on_access") {
+    return "Resolve access blocker and reschedule when site access is confirmed.";
+  }
+  if (waitingState.blockerType === "estimate_needed") {
+    return "Prepare/send estimate and track customer decision.";
+  }
+
+  return "Review blocker details and set next office action.";
 }
 
 export function getExceptionQueueDisplayLabel(job: Pick<FocusedQueueJob, "ops_status">): string {

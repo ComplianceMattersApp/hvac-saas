@@ -7,6 +7,7 @@ import {
   buildWaitingQueueRows,
   customerLocationLabel,
   getWaitingQueueDisplay,
+  getWaitingQueueRecommendedNextStep,
 } from "@/lib/ops/focused-queues";
 import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
 
@@ -95,6 +96,7 @@ export default async function OpsWaitingQueuePage() {
           {rows.map((job: any) => {
             const jobId = String(job?.id ?? "");
             const waitingDisplay = getWaitingQueueDisplay(job);
+            const nextStep = getWaitingQueueRecommendedNextStep(job);
 
             return (
               <li
@@ -124,6 +126,7 @@ export default async function OpsWaitingQueuePage() {
                       </span>
                     </div>
                     <div className="mt-2 text-xs text-slate-600">Reason: {waitingDisplay.reason}</div>
+                    <div className="mt-1 text-xs text-slate-500">Next step: {nextStep}</div>
                   </div>
 
                   <div className="flex shrink-0 gap-2">

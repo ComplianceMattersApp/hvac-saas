@@ -10,6 +10,7 @@ import {
   buildWithoutTechQueueRows,
   getExceptionQueueDisplayLabel,
   getWaitingQueueDisplay,
+  getWaitingQueueRecommendedNextStep,
 } from "@/lib/ops/focused-queues";
 import {
   isActiveFieldWorkStatus,
@@ -248,7 +249,7 @@ describe("focused queue display labels", () => {
       ops_status: "pending_info",
       pending_info_reason: "Waiting on information: Customer not home",
     })).toEqual({
-      label: "Waiting on Information",
+      label: "Unable to Complete / Waiting on Information",
       reason: "Customer not home",
     });
 
@@ -258,6 +259,25 @@ describe("focused queue display labels", () => {
       label: "Waiting on Information",
       reason: "Dependency pending",
     });
+
+    expect(getWaitingQueueRecommendedNextStep({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on part: Compressor lead time",
+    })).toBe("Confirm part sourcing status and plan return scheduling.");
+
+    expect(getWaitingQueueRecommendedNextStep({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on customer approval: Estimate sent",
+    })).toBe("Contact customer/decision-maker and capture approval outcome.");
+
+    expect(getWaitingQueueRecommendedNextStep({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on information: Customer not home",
+    })).toBe("Review visit note and decide contact, reschedule, or office review next step.");
+
+    expect(getWaitingQueueRecommendedNextStep({
+      ops_status: "waiting",
+    })).toBe("Review blocker details and set next office action.");
   });
 
   it("maps exception statuses to office review labels without changing membership", () => {
@@ -301,6 +321,8 @@ describe("focused ops queue pages", () => {
 
   it("waiting and exception pages use focused queue display labels", () => {
     expect(waitingQueuePageSource).toContain("getWaitingQueueDisplay");
+    expect(waitingQueuePageSource).toContain("getWaitingQueueRecommendedNextStep");
+    expect(waitingQueuePageSource).toContain("Next step:");
     expect(exceptionsQueuePageSource).toContain("getExceptionQueueDisplayLabel");
   });
 
