@@ -2256,6 +2256,7 @@ const isJobArchived = Boolean(job.deleted_at) || normalizedOpsStatus === "archiv
 const isJobClosed = normalizedOpsStatus === "closed";
 const isJobCancelled = normalizedJobStatus === "cancelled";
 const showFieldOutcomePanel = !(isJobClosed || isJobCancelled || isJobArchived);
+const canSubmitWorkCompletedFromOutcomePanel = !isFieldComplete && job.status === "completed";
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
@@ -3719,7 +3720,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           {showFieldOutcomePanel ? (
             <FieldOutcomePanel
               anchorId="field-outcome"
+              jobId={String(job.id)}
               isFieldComplete={isFieldComplete}
+              canSubmitWorkCompleted={canSubmitWorkCompletedFromOutcomePanel}
               isEccJob={job.job_type === "ecc"}
               className="mt-4"
             />
@@ -4648,7 +4651,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
     {showFieldOutcomePanel ? (
       <FieldOutcomePanel
+        jobId={String(job.id)}
         isFieldComplete={isFieldComplete}
+        canSubmitWorkCompleted={canSubmitWorkCompletedFromOutcomePanel}
         isEccJob={job.job_type === "ecc"}
         className="mt-3"
       />

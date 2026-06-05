@@ -1,7 +1,11 @@
 import { listFieldOutcomeRoutes } from "@/lib/jobs/field-outcome-routing";
+import SubmitButton from "@/components/SubmitButton";
+import { markJobFieldCompleteFromForm } from "@/lib/actions/job-ops-actions";
 
 type FieldOutcomePanelProps = {
+  jobId: string;
   isFieldComplete: boolean;
+  canSubmitWorkCompleted: boolean;
   isEccJob: boolean;
   className?: string;
   anchorId?: string;
@@ -27,34 +31,64 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
       ) : (
         <div className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
           {outcomeRoutes.map((route) => (
-            <fieldset
+            <div
               key={route.code}
-              disabled
               className="rounded-xl border border-slate-200/80 bg-slate-50/65 px-3 py-2.5"
             >
-              <label className="block cursor-not-allowed select-none">
-                <span className="flex items-start gap-2.5">
-                  <input type="radio" disabled className="mt-0.5 h-3.5 w-3.5" />
-                  <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-slate-900">{route.label}</span>
-                    <span className="mt-0.5 block text-xs leading-5 text-slate-600">{route.description}</span>
-                    <span className="mt-1 block text-[11px] font-medium text-slate-500">
-                      {route.officeOwnedAfterSubmission
-                        ? "Routes to office/dispatch after submit (future)"
-                        : "Remains in field completion flow (future)"}
-                    </span>
-                  </span>
-                </span>
-              </label>
-            </fieldset>
+              <div className="text-sm font-semibold text-slate-900">{route.label}</div>
+              <div className="mt-0.5 text-xs leading-5 text-slate-600">{route.description}</div>
+
+              {route.code === "work_completed" ? (
+                <div className="mt-2.5 space-y-2">
+                  {props.canSubmitWorkCompleted ? (
+                    <form action={markJobFieldCompleteFromForm}>
+                      <input type="hidden" name="job_id" value={props.jobId} />
+                      <SubmitButton
+                        loadingText="Completing..."
+                        className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800"
+                      >
+                        Confirm Work Completed
+                      </SubmitButton>
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex min-h-10 w-full cursor-not-allowed items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-400"
+                    >
+                      Confirm Work Completed
+                    </button>
+                  )}
+
+                  {!props.canSubmitWorkCompleted ? (
+                    <p className="text-[11px] leading-5 text-slate-500">
+                      Mark the job complete first, then confirm field completion.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="mt-2.5 space-y-1.5">
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex min-h-10 w-full cursor-not-allowed items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-400"
+                  >
+                    {route.label}
+                  </button>
+                  <p className="text-[11px] font-medium text-slate-500">
+                    {route.officeOwnedAfterSubmission
+                      ? "Routes to office/dispatch after submit (future)"
+                      : "Remains in field completion flow (future)"}
+                  </p>
+                </div>
+              )}
+            </div>
           ))}
         </div>
       )}
 
       <div className="mt-3 space-y-2 text-xs leading-5 text-slate-600">
-        <p>
-          Submission wiring is coming in a future slice. This panel currently does not send actions or update job state.
-        </p>
+        <p>Only Work Completed is wired in this slice. Other outcomes remain read-only until future slices.</p>
         <p>
           Office-owned outcomes route to office/dispatch after submission in a future slice.
         </p>
