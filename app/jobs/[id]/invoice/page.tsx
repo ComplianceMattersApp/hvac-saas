@@ -255,6 +255,28 @@ function bannerMessage(value?: string | null) {
     field_payment_report_amount_invalid: "Enter a valid payment amount greater than zero.",
     field_payment_report_no_balance_due: "Invoice has no balance due to report.",
     field_payment_report_overpay_denied: "Reported amount cannot exceed the current invoice balance due.",
+    field_payment_verification_not_found: "Field payment report was not found.",
+    field_payment_verification_invalid: "Field payment verification request was invalid.",
+    field_payment_verification_self_denied: "The reporting user cannot verify their own field payment report.",
+    field_payment_verification_status_closed:
+      "This field payment report is no longer open for verification. Refresh to view current status.",
+    field_payment_verification_terminal:
+      "This field payment report is already closed and cannot be verified again.",
+    field_payment_verification_method_invalid:
+      "Only check, cash, and other field payment reports can be verified in this flow.",
+    field_payment_verification_requires_issued: "Invoice must remain issued before verification can finalize payment truth.",
+    field_payment_verification_no_balance_due: "Invoice has no balance due. This report cannot be verified into payment truth.",
+    field_payment_verification_overpay_denied:
+      "Reported amount exceeds current invoice balance due and cannot be verified.",
+    field_payment_verified:
+      "Field payment verified. Final payment truth was recorded and invoice totals were updated through the payment register path.",
+    field_payment_verification_verified:
+      "Field payment verified. Final payment truth was recorded and invoice totals were updated through the payment register path.",
+    field_payment_verification_rejection_reason_required: "A rejection reason is required to reject this field payment report.",
+    field_payment_rejected:
+      "Field payment report rejected. No final payment truth was created and invoice balance was unchanged.",
+    field_payment_verification_rejected:
+      "Field payment report rejected. No final payment truth was created and invoice balance was unchanged.",
   };
   return messages[key] ?? null;
 }

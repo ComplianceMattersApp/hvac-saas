@@ -7,6 +7,7 @@ import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
 import { resolveFieldBillingCapabilities } from '@/lib/auth/field-billing-access';
 import {
+  canRecordInvoicePayment,
   requireInvoicePaymentRecordAccessOrRedirect,
   requireTenantInvoicePaymentLinkAccessOrRedirect,
 } from '@/lib/auth/financial-access';
@@ -145,6 +146,94 @@ function normalizeFieldReportedNonCardMethod(value: FormDataEntryValue | null | 
   return null;
 }
 
+function normalizeOpenFieldPaymentReportStatus(value: unknown) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'reported') return 'reported';
+  if (normalized === 'under_review') return 'under_review';
+  if (normalized === 'needs_correction') return 'needs_correction';
+  return null;
+}
+
+function normalizeTerminalFieldPaymentReportStatus(value: unknown) {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  if (normalized === 'verified') return 'verified';
+  if (normalized === 'rejected') return 'rejected';
+  if (normalized === 'voided') return 'voided';
+  if (normalized === 'corrected') return 'corrected';
+  return null;
+}
+
+async function createFinalManualInvoicePaymentTruthRecord(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  invoiceId: string;
+  jobId: string;
+  method: (typeof INTERNAL_INVOICE_PAYMENT_METHODS)[number];
+  amountCents: number;
+  receivedReference?: string | null;
+  notes?: string | null;
+  recordedByUserId: string;
+}) {
+  const { data: insertedPayment, error: insertErr } = await params.supabase
+    .from('internal_invoice_payments')
+    .insert({
+      account_owner_user_id: params.accountOwnerUserId,
+      invoice_id: params.invoiceId,
+      job_id: params.jobId,
+      payment_status: 'recorded',
+      payment_method: params.method,
+      amount_cents: params.amountCents,
+      paid_at: new Date().toISOString(),
+      received_reference: params.receivedReference ?? null,
+      notes: params.notes ?? null,
+      recorded_by_user_id: params.recordedByUserId,
+    })
+    .select('id')
+    .single();
+
+  if (insertErr) throw insertErr;
+
+  const paymentId = String(insertedPayment?.id ?? '').trim();
+  if (!paymentId) {
+    throw new Error('Failed to create final payment truth row.');
+  }
+
+  const allocationUpsertResult = await upsertInvoicePaymentAllocationForPaymentRow({
+    supabase: params.supabase,
+    paymentRow: {
+      id: paymentId,
+      account_owner_user_id: params.accountOwnerUserId,
+      invoice_id: params.invoiceId,
+      amount_cents: params.amountCents,
+      payment_status: 'recorded',
+    },
+  });
+
+  if (!allocationUpsertResult.ok) {
+    console.warn('Manual payment allocation dual-write failed after payment row success', {
+      paymentId,
+      invoiceId: params.invoiceId,
+      jobId: params.jobId,
+      allocationStatus: allocationUpsertResult.allocationStatus,
+      allocationResultStatus: allocationUpsertResult.status,
+      allocationReason: allocationUpsertResult.reason,
+    });
+  }
+
+  return { paymentId };
+}
+
+function revalidateFieldPaymentReconciliationVisibilityPaths(jobId: string) {
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/invoice`);
+  revalidatePath('/jobs');
+  revalidatePath('/ops');
+  revalidatePath('/ops/closeout-queue');
+  revalidatePath('/reports/invoices');
+  revalidatePath('/reports/payments');
+  revalidatePath('/reports/payment-reconciliation');
+}
+
 function isStripeSourcedPaymentRow(row: {
   payment_method?: string | null;
   processor_name?: string | null;
@@ -269,46 +358,17 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_overpay_denied', returnTo));
   }
 
-  const { data: insertedPayment, error: insertErr } = await supabase
-    .from('internal_invoice_payments')
-    .insert({
-      account_owner_user_id: internalUser.account_owner_user_id,
-      invoice_id: invoice.id,
-      job_id: jobId,
-      payment_status: 'recorded',
-      payment_method: method,
-      amount_cents: amountCents,
-      paid_at: new Date().toISOString(),
-      received_reference: getOptionalText(formData.get('received_reference')),
-      notes: getOptionalText(formData.get('notes')),
-      recorded_by_user_id: userId,
-    })
-    .select('id')
-    .single();
-
-  if (insertErr) throw insertErr;
-
-  const allocationUpsertResult = await upsertInvoicePaymentAllocationForPaymentRow({
+  const paymentTruth = await createFinalManualInvoicePaymentTruthRecord({
     supabase,
-    paymentRow: {
-      id: String(insertedPayment?.id ?? '').trim(),
-      account_owner_user_id: internalUser.account_owner_user_id,
-      invoice_id: invoice.id,
-      amount_cents: amountCents,
-      payment_status: 'recorded',
-    },
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    invoiceId: invoice.id,
+    jobId,
+    method,
+    amountCents,
+    receivedReference: getOptionalText(formData.get('received_reference')),
+    notes: getOptionalText(formData.get('notes')),
+    recordedByUserId: userId,
   });
-
-  if (!allocationUpsertResult.ok) {
-    console.warn('Manual payment allocation dual-write failed after payment row success', {
-      paymentId: insertedPayment?.id ?? null,
-      invoiceId: invoice.id,
-      jobId,
-      allocationStatus: allocationUpsertResult.allocationStatus,
-      allocationResultStatus: allocationUpsertResult.status,
-      allocationReason: allocationUpsertResult.reason,
-    });
-  }
 
   await insertJobEvent({
     supabase,
@@ -318,7 +378,7 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
     meta: {
       invoice_id: invoice.id,
       invoice_number: invoice.invoice_number,
-      payment_id: insertedPayment?.id ?? null,
+      payment_id: paymentTruth.paymentId,
       payment_status: 'recorded',
       payment_method: method,
       amount_cents: amountCents,
@@ -899,6 +959,370 @@ export async function reportNonCardFieldPaymentCollectionFromForm(formData: Form
   revalidatePath('/reports/invoices');
 
   redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_reported', returnTo));
+}
+
+export async function verifyFieldPaymentCollectionReportFromForm(formData: FormData): Promise<void> {
+  const jobId = getTrimmedString(formData.get('job_id'));
+  const reportId =
+    getTrimmedString(formData.get('field_payment_report_id')) || getTrimmedString(formData.get('report_id'));
+  const selectedInvoiceId = getTrimmedString(formData.get('invoice_id'));
+  const tab = getTrimmedString(formData.get('tab')) || 'info';
+  const returnTo = getTrimmedString(formData.get('return_to'));
+
+  if (!jobId || !reportId) {
+    throw new Error('Job ID and report ID are required.');
+  }
+
+  const verificationNote = getOptionalText(formData.get('verification_note'));
+
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const { userId, internalUser } = await requireInternalUser({ supabase });
+
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: 'id',
+  });
+
+  if (!scopedJob?.id) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    actorUserId: userId,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const hasVerificationAuthority =
+    canRecordInvoicePayment({
+      actorUserId: userId,
+      internalUser,
+      resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    }) || fieldBillingCapabilities.can_verify_non_card_collection;
+
+  if (!hasVerificationAuthority) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  await requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  if (billingMode !== 'internal_invoicing') {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoicing_billing_pending', returnTo));
+  }
+
+  const { data: reportRowRaw, error: reportErr } = await admin
+    .from('field_payment_collection_reports')
+    .select(
+      [
+        'id',
+        'account_owner_user_id',
+        'job_id',
+        'internal_invoice_id',
+        'customer_id',
+        'reported_by_user_id',
+        'payment_method',
+        'amount_cents',
+        'reference',
+        'note',
+        'status',
+      ].join(', '),
+    )
+    .eq('id', reportId)
+    .maybeSingle();
+
+  if (reportErr) {
+    throw reportErr;
+  }
+
+  if (!reportRowRaw) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_invalid', returnTo));
+  }
+
+  const reportRow = reportRowRaw as unknown as {
+    id: string;
+    account_owner_user_id: string;
+    job_id: string;
+    internal_invoice_id: string;
+    customer_id: string | null;
+    reported_by_user_id: string;
+    payment_method: string;
+    amount_cents: number;
+    reference: string | null;
+    note: string | null;
+    status: string;
+  };
+
+  if (
+    reportRow.account_owner_user_id !== internalUser.account_owner_user_id ||
+    reportRow.job_id !== jobId ||
+    (selectedInvoiceId && reportRow.internal_invoice_id !== selectedInvoiceId)
+  ) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  if (String(reportRow.reported_by_user_id ?? '').trim() === userId) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_self_denied', returnTo));
+  }
+
+  const openStatus = normalizeOpenFieldPaymentReportStatus(reportRow.status);
+  if (!openStatus) {
+    const terminalStatus = normalizeTerminalFieldPaymentReportStatus(reportRow.status);
+    if (terminalStatus) {
+      redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_terminal', returnTo));
+    }
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_invalid', returnTo));
+  }
+
+  const method = normalizeFieldReportedNonCardMethod(reportRow.payment_method);
+  if (!method) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_invalid', returnTo));
+  }
+
+  const invoice = await resolveInternalInvoiceById({
+    supabase,
+    invoiceId: reportRow.internal_invoice_id,
+  });
+
+  if (!invoice) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_missing', returnTo));
+  }
+
+  if (invoice.account_owner_user_id !== internalUser.account_owner_user_id || invoice.job_id !== jobId) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  if (invoice.status !== 'issued') {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_requires_issued', returnTo));
+  }
+
+  const summary = await resolveInvoiceCollectedPaymentSummary(
+    internalUser.account_owner_user_id,
+    invoice.id,
+    supabase,
+  );
+
+  if (summary.balanceDueCents <= 0) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_no_balance_due', returnTo));
+  }
+
+  const reportAmountCents = Number(reportRow.amount_cents ?? 0);
+  if (!Number.isFinite(reportAmountCents) || reportAmountCents <= 0) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_invalid', returnTo));
+  }
+
+  if (reportAmountCents > summary.balanceDueCents) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_overpay_denied', returnTo));
+  }
+
+  const paymentTruth = await createFinalManualInvoicePaymentTruthRecord({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    invoiceId: invoice.id,
+    jobId,
+    method,
+    amountCents: reportAmountCents,
+    receivedReference: getOptionalText(reportRow.reference),
+    notes: getOptionalText(reportRow.note),
+    recordedByUserId: userId,
+  });
+
+  const nowIso = new Date().toISOString();
+  const { error: reportUpdateErr } = await admin
+    .from('field_payment_collection_reports')
+    .update({
+      status: 'verified',
+      verified_by_user_id: userId,
+      verified_at: nowIso,
+      verification_note: verificationNote,
+      final_internal_invoice_payment_id: paymentTruth.paymentId,
+      updated_at: nowIso,
+    })
+    .eq('id', reportId)
+    .eq('account_owner_user_id', internalUser.account_owner_user_id)
+    .eq('status', openStatus);
+
+  if (reportUpdateErr) {
+    throw reportUpdateErr;
+  }
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: 'field_payment_collection_verified',
+    userId,
+    meta: {
+      invoice_id: invoice.id,
+      invoice_number: invoice.invoice_number,
+      field_payment_report_id: reportId,
+      verified_status: 'verified',
+      payment_id: paymentTruth.paymentId,
+      payment_method: method,
+      amount_cents: reportAmountCents,
+      verification_note: verificationNote,
+      source: 'field_payment_reconciliation',
+    },
+  });
+
+  revalidateFieldPaymentReconciliationVisibilityPaths(jobId);
+
+  redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_verified', returnTo));
+}
+
+export async function rejectFieldPaymentCollectionReportFromForm(formData: FormData): Promise<void> {
+  const jobId = getTrimmedString(formData.get('job_id'));
+  const reportId =
+    getTrimmedString(formData.get('field_payment_report_id')) || getTrimmedString(formData.get('report_id'));
+  const selectedInvoiceId = getTrimmedString(formData.get('invoice_id'));
+  const tab = getTrimmedString(formData.get('tab')) || 'info';
+  const returnTo = getTrimmedString(formData.get('return_to'));
+  const rejectionReason = getTrimmedString(formData.get('rejection_reason'));
+
+  if (!jobId || !reportId) {
+    throw new Error('Job ID and report ID are required.');
+  }
+
+  if (!rejectionReason) {
+    redirect(
+      buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_rejection_reason_required', returnTo),
+    );
+  }
+
+  const supabase = await createClient();
+  const admin = createAdminClient();
+  const { userId, internalUser } = await requireInternalUser({ supabase });
+
+  const scopedJob = await loadScopedInternalJobForMutation({
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    jobId,
+    select: 'id',
+  });
+
+  if (!scopedJob?.id) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    actorUserId: userId,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const hasVerificationAuthority =
+    canRecordInvoicePayment({
+      actorUserId: userId,
+      internalUser,
+      resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    }) || fieldBillingCapabilities.can_verify_non_card_collection;
+
+  if (!hasVerificationAuthority) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  await requireOperationalInternalInvoicePaymentEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  if (billingMode !== 'internal_invoicing') {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoicing_billing_pending', returnTo));
+  }
+
+  const { data: reportRowRaw, error: reportErr } = await admin
+    .from('field_payment_collection_reports')
+    .select(
+      [
+        'id',
+        'account_owner_user_id',
+        'job_id',
+        'internal_invoice_id',
+        'status',
+      ].join(', '),
+    )
+    .eq('id', reportId)
+    .maybeSingle();
+
+  if (reportErr) {
+    throw reportErr;
+  }
+
+  if (!reportRowRaw) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_invalid', returnTo));
+  }
+
+  const reportRow = reportRowRaw as unknown as {
+    id: string;
+    account_owner_user_id: string;
+    job_id: string;
+    internal_invoice_id: string;
+    status: string;
+  };
+
+  if (
+    reportRow.account_owner_user_id !== internalUser.account_owner_user_id ||
+    reportRow.job_id !== jobId ||
+    (selectedInvoiceId && reportRow.internal_invoice_id !== selectedInvoiceId)
+  ) {
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
+  }
+
+  const openStatus = normalizeOpenFieldPaymentReportStatus(reportRow.status);
+  if (!openStatus) {
+    const terminalStatus = normalizeTerminalFieldPaymentReportStatus(reportRow.status);
+    if (terminalStatus) {
+      redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_terminal', returnTo));
+    }
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_invalid', returnTo));
+  }
+
+  const nowIso = new Date().toISOString();
+  const { error: reportUpdateErr } = await admin
+    .from('field_payment_collection_reports')
+    .update({
+      status: 'rejected',
+      rejected_by_user_id: userId,
+      rejected_at: nowIso,
+      rejection_reason: rejectionReason,
+      updated_at: nowIso,
+    })
+    .eq('id', reportId)
+    .eq('account_owner_user_id', internalUser.account_owner_user_id)
+    .eq('status', openStatus);
+
+  if (reportUpdateErr) {
+    throw reportUpdateErr;
+  }
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: 'field_payment_collection_rejected',
+    userId,
+    meta: {
+      field_payment_report_id: reportId,
+      rejected_status: 'rejected',
+      rejection_reason: rejectionReason,
+      source: 'field_payment_reconciliation',
+    },
+  });
+
+  revalidateFieldPaymentReconciliationVisibilityPaths(jobId);
+
+  redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_verification_rejected', returnTo));
 }
 
 export type { TenantInvoiceCheckoutSessionActionState } from '@/lib/actions/internal-invoice-payment-actions-state';
