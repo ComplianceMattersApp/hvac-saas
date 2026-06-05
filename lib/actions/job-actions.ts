@@ -3389,6 +3389,115 @@ export async function getContractors(accountOwnerUserId?: string | null) {
   });
 }
 
+export async function recordCallbackReportFromForm(formData: FormData) {
+  "use server";
+
+  const supabase = await createClient();
+  const sourceJobId = String(formData.get("job_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const callbackReportText = String(formData.get("callback_report_text") || "").trim();
+
+  if (!sourceJobId) throw new Error("Missing job_id");
+
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: sourceJobId,
+    onUnauthorized: () => {
+      redirectToJobWithBanner({ jobId: sourceJobId, banner: "not_authorized", tabRaw, returnToRaw });
+    },
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  if (!callbackReportText) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_report_reason_required",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const { data: sourceJob, error: sourceJobErr } = await supabase
+    .from("jobs")
+    .select("id, job_type, status, ops_status, field_complete, service_case_id")
+    .eq("id", sourceJobId)
+    .maybeSingle();
+
+  if (sourceJobErr) throw sourceJobErr;
+
+  if (!sourceJob?.id) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_report_failed",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  if (String(sourceJob.job_type ?? "").trim().toLowerCase() !== "service") {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_report_not_service",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const normalizedStatus = String(sourceJob.status ?? "").trim().toLowerCase();
+  const normalizedOpsStatus = String(sourceJob.ops_status ?? "").trim().toLowerCase();
+  const callbackEligibleHistoricalAnchor =
+    Boolean(sourceJob.field_complete) ||
+    normalizedStatus === "completed" ||
+    normalizedOpsStatus === "closed";
+
+  if (!callbackEligibleHistoricalAnchor) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "callback_report_requires_historical_anchor",
+      tabRaw,
+      returnToRaw,
+    });
+    return;
+  }
+
+  const serviceCaseId =
+    String(sourceJob.service_case_id ?? "").trim() ||
+    (await ensureServiceCaseForJob({ supabase, jobId: sourceJobId }));
+
+  await insertJobEvent({
+    supabase,
+    jobId: sourceJobId,
+    event_type: "callback_reported",
+    meta: {
+      source_action: "callback_intake_reported",
+      callback_report_text: callbackReportText,
+      anchor_job_id: sourceJobId,
+      service_case_id: serviceCaseId || null,
+      callback_reported_by_user_id: actingUserId,
+    },
+    userId: actingUserId,
+  });
+
+  revalidatePath(`/jobs/${sourceJobId}`, "page");
+  revalidatePath("/ops", "page");
+  revalidatePath("/jobs", "page");
+
+  redirectToJobWithBanner({
+    jobId: sourceJobId,
+    banner: "callback_report_recorded",
+    tabRaw,
+    returnToRaw,
+    cacheBust: true,
+  });
+}
+
 async function notifyInternalNextActionChanged(params: {
   supabase: any;
   jobId: string;

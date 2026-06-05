@@ -69,6 +69,7 @@ vi.mock("@/lib/email/sendEmail", () => ({
 
 type TargetAction =
   | "createNextServiceVisitFromForm"
+  | "recordCallbackReportFromForm"
   | "createRetestJobFromForm"
   | "archiveJobFromForm"
   | "cancelJobFromForm";
@@ -85,6 +86,15 @@ function buildCreateNextServiceVisitFormData() {
 function buildCreateRetestFormData() {
   const formData = new FormData();
   formData.set("parent_job_id", "job-1");
+  return formData;
+}
+
+function buildRecordCallbackReportFormData() {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("callback_report_text", "Customer reported same issue after prior completion");
+  formData.set("tab", "ops");
+  formData.set("return_to", "/jobs/job-1?tab=ops#next-service-action");
   return formData;
 }
 
@@ -108,6 +118,10 @@ const targets: Array<{ name: TargetAction; buildFormData: () => FormData }> = [
   {
     name: "createRetestJobFromForm",
     buildFormData: buildCreateRetestFormData,
+  },
+  {
+    name: "recordCallbackReportFromForm",
+    buildFormData: buildRecordCallbackReportFormData,
   },
   {
     name: "archiveJobFromForm",

@@ -18,6 +18,7 @@ import {
   advanceJobStatusFromForm,
   updateJobServiceContractFromForm,
   createNextServiceVisitFromForm,
+  recordCallbackReportFromForm,
   completeDataEntryFromForm,
   createRetestJobFromForm,
   getOnTheWayUndoEligibility,
@@ -2261,6 +2262,10 @@ const showFieldOutcomePanel =
   !isJobArchived &&
   !isFieldComplete &&
   normalizedJobStatus === "in_process";
+const callbackIntakeHistoricalAnchorEligible =
+  isFieldComplete ||
+  normalizedJobStatus === "completed" ||
+  normalizedOpsStatus === "closed";
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
@@ -5335,6 +5340,41 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           Create Return Visit
         </SubmitButton>
       </form>
+
+      <div className="mt-3 border-t border-slate-200 pt-3">
+        <div className="text-sm font-semibold text-slate-900">Record Callback Report</div>
+        <p className="mt-1 text-xs leading-5 text-slate-600">
+          Use when a customer reports an issue after prior work was believed complete. This records the report only; it does not create or schedule a visit.
+        </p>
+
+        {callbackIntakeHistoricalAnchorEligible ? (
+          <form action={recordCallbackReportFromForm} className="mt-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
+            <input type="hidden" name="job_id" value={job.id} />
+            <input type="hidden" name="tab" value={tab} />
+            <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+
+            <div className="space-y-1">
+              <label className={workspaceFieldLabelClass}>Customer callback report</label>
+              <textarea
+                name="callback_report_text"
+                required
+                maxLength={600}
+                rows={3}
+                placeholder="Example: Customer says same airflow issue returned after prior completion"
+                className={workspaceTextareaClass}
+              />
+            </div>
+
+            <SubmitButton loadingText="Recording..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+              Record Callback Report
+            </SubmitButton>
+          </form>
+        ) : (
+          <p className="mt-2 text-xs text-slate-500">
+            Callback intake is available for service jobs that are field-complete, completed, or closed.
+          </p>
+        )}
+      </div>
     </div>
   ) : null}
 
