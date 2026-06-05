@@ -44,7 +44,7 @@ describe("field outcome routing contract", () => {
       parts_needed: "waiting_on_part",
       approval_needed: "waiting_on_customer_approval",
       access_issue: "waiting_on_access",
-      unable_to_complete: "other",
+      unable_to_complete: "waiting_on_information",
     } as const;
 
     for (const [code, expectedWaitingType] of Object.entries(waitingOutcomeExpectations)) {

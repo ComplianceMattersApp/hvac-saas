@@ -245,6 +245,14 @@ describe("focused queue display labels", () => {
     });
 
     expect(getWaitingQueueDisplay({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on information: Customer not home",
+    })).toEqual({
+      label: "Waiting on Information",
+      reason: "Customer not home",
+    });
+
+    expect(getWaitingQueueDisplay({
       ops_status: "waiting",
     })).toEqual({
       label: "Waiting on Information",

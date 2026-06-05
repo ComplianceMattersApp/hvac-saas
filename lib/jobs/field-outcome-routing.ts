@@ -114,7 +114,7 @@ const FIELD_OUTCOME_ROUTES: Record<FieldOutcomeCode, FieldOutcomeRoute> = {
     visibleInDefaultCloseout: true,
     officeOwnedAfterSubmission: true,
     leavesNormalFieldMyWork: true,
-    waitingReasonType: "other",
+    waitingReasonType: "waiting_on_information",
     returnVisitIntent: false,
     requiresVisitScopeReview: false,
     requiresShortReason: true,

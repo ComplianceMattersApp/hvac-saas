@@ -29,30 +29,38 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('normalizedJobStatus === "in_process";');
   });
 
-  it("wires work_completed, parts_needed, and approval_needed submit behavior", () => {
+  it("wires work_completed, parts_needed, approval_needed, and unable_to_complete submit behavior", () => {
     expect(panelSource).toContain('import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";');
     expect(panelSource).toContain('from "@/lib/actions/job-ops-actions";');
     expect(panelSource).toContain("markJobPartsNeededFromForm");
     expect(panelSource).toContain("markJobApprovalNeededFromForm");
+    expect(panelSource).toContain("markJobUnableToCompleteFromForm");
     expect(panelSource).toContain("form action={advanceJobStatusFromForm}");
     expect(panelSource).toContain("form action={markJobPartsNeededFromForm}");
     expect(panelSource).toContain("form action={markJobApprovalNeededFromForm}");
+    expect(panelSource).toContain("form action={markJobUnableToCompleteFromForm}");
     expect(panelSource).toContain("name=\"job_id\"");
     expect(panelSource).toContain("name=\"current_status\"");
     expect(panelSource).toContain("name=\"tab\"");
     expect(panelSource).toContain("name=\"parts_note\"");
     expect(panelSource).toContain("name=\"approval_note\"");
+    expect(panelSource).toContain("name=\"unable_note\"");
     expect(panelSource).toContain("Confirm field work complete");
     expect(panelSource).toContain("Ready to finish this visit? This moves the job to closeout for invoice/certs as needed.");
     expect(panelSource).toContain("Can&apos;t finish today?");
-    expect(panelSource).toContain("Need parts or approval?");
+    expect(panelSource).toContain("Need parts, approval, or unable to complete?");
     expect(panelSource).toContain("Need approval?");
+    expect(panelSource).toContain("Unable to complete?");
     expect(panelSource).toContain("Send this visit to office/dispatch as Waiting on Part.");
     expect(panelSource).toContain("Send this visit to office/dispatch as Approval Needed.");
+    expect(panelSource).toContain("Send this visit to office/dispatch for review.");
+    expect(panelSource).toContain("Why couldn&apos;t the visit be completed?");
     expect(panelSource).toContain("placeholder=\"What part or issue is needed?\"");
     expect(panelSource).toContain("placeholder=\"Example: customer approval for repair, owner approval for added work\"");
+    expect(panelSource).toContain("placeholder=\"Example: customer not home, no access, unsafe condition, missing information\"");
     expect(panelSource).toContain("Submit Parts Needed");
     expect(panelSource).toContain("Submit Approval Needed");
+    expect(panelSource).toContain("Submit Unable to Complete");
     expect(panelSource).toContain("Confirm Work Completed");
   });
 
@@ -60,7 +68,6 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).not.toContain("route.code === \"work_completed\"");
     expect(panelSource).not.toContain('type="button"');
     expect(panelSource).not.toContain("Only Work Completed is wired in this slice. Other outcomes remain unwired until future slices.");
-    expect(panelSource).not.toContain("unable_to_complete");
     expect(panelSource).not.toContain("different_issue_found");
     expect(panelSource).not.toContain("return_needed");
   });

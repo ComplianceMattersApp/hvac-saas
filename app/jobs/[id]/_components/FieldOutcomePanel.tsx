@@ -2,6 +2,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
 import {
   markJobApprovalNeededFromForm,
+  markJobUnableToCompleteFromForm,
   markJobPartsNeededFromForm,
 } from "@/lib/actions/job-ops-actions";
 
@@ -42,7 +43,7 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
           <div className="flex items-start justify-between gap-3">
             <div>
               <p className="text-xs font-semibold text-amber-900">Can&apos;t finish today?</p>
-              <p className="mt-1 text-xs leading-5 text-amber-900/90">Need parts or approval?</p>
+              <p className="mt-1 text-xs leading-5 text-amber-900/90">Need parts, approval, or unable to complete?</p>
             </div>
             <span className="inline-flex min-h-8 items-center justify-center rounded-lg border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900">
               Open
@@ -101,6 +102,34 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
                 className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
               >
                 Submit Approval Needed
+              </SubmitButton>
+            </div>
+          </form>
+
+          <form action={markJobUnableToCompleteFromForm} className="rounded-lg border border-amber-200/80 bg-white/80 p-3">
+            <input type="hidden" name="job_id" value={props.jobId} />
+            <input type="hidden" name="current_status" value={props.currentStatus} />
+            <input type="hidden" name="tab" value={props.tab} />
+            <p className="text-xs font-semibold text-amber-900">Unable to complete?</p>
+            <p className="mt-1 text-xs leading-5 text-amber-900/90">
+              Send this visit to office/dispatch for review.
+            </p>
+            <p className="mt-2 text-xs font-medium text-amber-900">Why couldn&apos;t the visit be completed?</p>
+            <textarea
+              id={`unable-note-${props.jobId}`}
+              name="unable_note"
+              required
+              rows={2}
+              maxLength={280}
+              className="mt-2 w-full rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-xs text-slate-900 shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-amber-200"
+              placeholder="Example: customer not home, no access, unsafe condition, missing information"
+            />
+            <div className="mt-2 flex items-center">
+              <SubmitButton
+                loadingText="Saving..."
+                className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
+              >
+                Submit Unable to Complete
               </SubmitButton>
             </div>
           </form>

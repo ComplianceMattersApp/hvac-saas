@@ -123,6 +123,15 @@ function buildApprovalNeededFormData(note: string) {
   return formData;
 }
 
+function buildUnableToCompleteFormData(note: string) {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("current_status", "in_process");
+  formData.set("tab", "info");
+  formData.set("unable_note", note);
+  return formData;
+}
+
 function makeSupabaseForPartsNeeded(beforeJob: PartsNeededJob) {
   const jobUpdates: Record<string, unknown>[] = [];
   const jobEvents: Record<string, unknown>[] = [];
@@ -455,6 +464,150 @@ describe("markJobApprovalNeededFromForm", () => {
     await expect(
       markJobApprovalNeededFromForm(buildApprovalNeededFormData("   ")),
     ).rejects.toThrow("banner=approval_needed_note_required");
+
+    expect(jobUpdates).toHaveLength(0);
+    expect(jobEvents).toHaveLength(0);
+  });
+});
+
+describe("markJobUnableToCompleteFromForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+
+    requireInternalUserMock.mockResolvedValue({
+      userId: "internal-user-1",
+      internalUser: {
+        user_id: "internal-user-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
+  });
+
+  it("marks in-process visit complete and routes unable-to-complete to waiting_on_information", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "in_process",
+      ops_status: "scheduled",
+      field_complete: false,
+      field_complete_at: null,
+      pending_info_reason: null,
+      on_hold_reason: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markJobUnableToCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markJobUnableToCompleteFromForm(
+        buildUnableToCompleteFormData("Customer not home and no access to equipment room"),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=unable_to_complete_saved#field-outcome");
+
+    expect(jobUpdates).toHaveLength(1);
+    expect(jobUpdates[0]).toEqual(
+      expect.objectContaining({
+        status: "completed",
+        field_complete: true,
+        ops_status: "pending_info",
+        pending_info_reason: "Waiting on information: Customer not home and no access to equipment room",
+        on_hold_reason: null,
+      }),
+    );
+
+    expect(jobEvents).toHaveLength(2);
+    expect(jobEvents[0]).toEqual(
+      expect.objectContaining({
+        event_type: "job_completed",
+        user_id: "internal-user-1",
+      }),
+    );
+    expect(jobEvents[1]).toEqual(
+      expect.objectContaining({
+        event_type: "ops_update",
+        user_id: "internal-user-1",
+        meta: expect.objectContaining({
+          event_family: "ops_blocker",
+          blocker_type: "waiting_on_information",
+          blocker_reason: "Customer not home and no access to equipment room",
+          source_action: "markJobUnableToCompleteFromForm",
+          next: expect.objectContaining({
+            ops_status: "pending_info",
+            pending_info_reason: "Waiting on information: Customer not home and no access to equipment room",
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("rejects unable-to-complete transition when job is already field complete", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "in_process",
+      ops_status: "pending_info",
+      field_complete: true,
+      field_complete_at: "2026-06-04T01:02:03.000Z",
+      pending_info_reason: "Waiting on information: Existing blocker",
+      on_hold_reason: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markJobUnableToCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markJobUnableToCompleteFromForm(buildUnableToCompleteFormData("Unsafe work area today")),
+    ).rejects.toThrow("banner=unable_to_complete_already_completed");
+
+    expect(jobUpdates).toHaveLength(0);
+    expect(jobEvents).toHaveLength(0);
+  });
+
+  it("rejects unable-to-complete transition when job is not in_process", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "open",
+      ops_status: "scheduled",
+      field_complete: false,
+      field_complete_at: null,
+      pending_info_reason: null,
+      on_hold_reason: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markJobUnableToCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markJobUnableToCompleteFromForm(buildUnableToCompleteFormData("No site access")),
+    ).rejects.toThrow("banner=unable_to_complete_invalid_status");
+
+    expect(jobUpdates).toHaveLength(0);
+    expect(jobEvents).toHaveLength(0);
+  });
+
+  it("requires a short unable-to-complete reason", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "in_process",
+      ops_status: "scheduled",
+      field_complete: false,
+      field_complete_at: null,
+      pending_info_reason: null,
+      on_hold_reason: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markJobUnableToCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markJobUnableToCompleteFromForm(buildUnableToCompleteFormData("   ")),
+    ).rejects.toThrow("banner=unable_to_complete_note_required");
 
     expect(jobUpdates).toHaveLength(0);
     expect(jobEvents).toHaveLength(0);
