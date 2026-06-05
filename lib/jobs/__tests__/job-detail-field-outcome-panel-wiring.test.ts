@@ -18,12 +18,15 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('<FieldOutcomePanel');
     expect(jobDetailSource).toContain('anchorId="field-outcome"');
     expect(jobDetailSource).toContain("jobId={String(job.id)}");
+    expect(jobDetailSource).toContain("showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}");
   });
 
   it("shows the active panel only for in-process not-yet-field-complete jobs", () => {
     expect(jobDetailSource).toContain("const isJobArchived = Boolean(job.deleted_at) || normalizedOpsStatus === \"archived\";");
     expect(jobDetailSource).toContain('const isJobClosed = normalizedOpsStatus === "closed";');
     expect(jobDetailSource).toContain('const isJobCancelled = normalizedJobStatus === "cancelled";');
+    expect(jobDetailSource).toContain('const normalizedServiceVisitType = String(job.service_visit_type ?? "").trim().toLowerCase();');
+    expect(jobDetailSource).toContain('normalizedServiceVisitType === "callback" || normalizedServiceVisitType === "return_visit";');
     expect(jobDetailSource).toContain("const showFieldOutcomePanel =");
     expect(jobDetailSource).toContain("!isFieldComplete &&");
     expect(jobDetailSource).toContain('normalizedJobStatus === "in_process";');
@@ -45,6 +48,9 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).toContain("name=\"parts_note\"");
     expect(panelSource).toContain("name=\"approval_note\"");
     expect(panelSource).toContain("name=\"unable_note\"");
+    expect(panelSource).toContain("markJobDifferentIssueFoundFromForm");
+    expect(panelSource).toContain("form action={markJobDifferentIssueFoundFromForm}");
+    expect(panelSource).toContain("name=\"different_issue_note\"");
     expect(panelSource).toContain("Confirm field work complete");
     expect(panelSource).toContain("Ready to finish this visit? This moves the job to closeout for invoice/certs as needed.");
     expect(panelSource).toContain("Can&apos;t finish today?");
@@ -58,17 +64,20 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).toContain("placeholder=\"What part or issue is needed?\"");
     expect(panelSource).toContain("placeholder=\"Example: customer approval for repair, owner approval for added work\"");
     expect(panelSource).toContain("placeholder=\"Example: customer not home, no access, unsafe condition, missing information\"");
+    expect(panelSource).toContain("placeholder=\"Example: original issue resolved, but separate airflow issue found in upstairs zone\"");
     expect(panelSource).toContain("Submit Parts Needed");
     expect(panelSource).toContain("Submit Approval Needed");
     expect(panelSource).toContain("Submit Unable to Complete");
+    expect(panelSource).toContain("Submit Different Issue Found");
     expect(panelSource).toContain("Confirm Work Completed");
   });
 
-  it("does not render disabled future outcome controls in the default panel", () => {
+  it("gates Different Issue Found to callback/revisit-only rendering", () => {
     expect(panelSource).not.toContain("route.code === \"work_completed\"");
     expect(panelSource).not.toContain('type="button"');
     expect(panelSource).not.toContain("Only Work Completed is wired in this slice. Other outcomes remain unwired until future slices.");
-    expect(panelSource).not.toContain("different_issue_found");
+    expect(panelSource).toContain("props.showDifferentIssueFoundOutcome ? (");
+    expect(panelSource).toContain("Callback/revisit-only: send this visit to office review without creating a new visit.");
     expect(panelSource).not.toContain("return_needed");
   });
 

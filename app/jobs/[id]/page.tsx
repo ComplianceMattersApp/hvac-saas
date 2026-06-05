@@ -2267,6 +2267,9 @@ const callbackIntakeHistoricalAnchorEligible =
   isFieldComplete ||
   normalizedJobStatus === "completed" ||
   normalizedOpsStatus === "closed";
+const normalizedServiceVisitType = String(job.service_visit_type ?? "").trim().toLowerCase();
+const showDifferentIssueFoundOutcome =
+  normalizedServiceVisitType === "callback" || normalizedServiceVisitType === "return_visit";
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
@@ -3734,6 +3737,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               currentStatus={String(job.status ?? "")}
               tab={tab}
               isEccJob={job.job_type === "ecc"}
+              showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}
               className="mt-4"
             />
           ) : null}
@@ -4667,6 +4671,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         currentStatus={String(job.status ?? "")}
         tab={tab}
         isEccJob={job.job_type === "ecc"}
+        showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}
         className="mt-3"
       />
     ) : null}

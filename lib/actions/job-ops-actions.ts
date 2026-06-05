@@ -2542,6 +2542,178 @@ export async function markJobUnableToCompleteFromForm(formData: FormData): Promi
   redirectToFieldOutcome("unable_to_complete_saved");
 }
 
+export async function markJobDifferentIssueFoundFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+
+  const jobIdRaw = formData.get("job_id");
+  if (typeof jobIdRaw !== "string" || !jobIdRaw.trim()) {
+    throw new Error("Missing job_id");
+  }
+  const jobId = jobIdRaw.trim();
+
+  const tab = String(formData.get("tab") || "info").trim() || "info";
+  const differentIssueNote = String(formData.get("different_issue_note") || "").trim();
+
+  const redirectToFieldOutcome = (banner?: string): never =>
+    redirect(
+      buildJobOpsRedirectPath({
+        jobId,
+        fallbackPath: `/jobs/${jobId}?tab=${tab}#field-outcome`,
+        banner,
+      }),
+    );
+
+  if (!differentIssueNote) {
+    redirectToFieldOutcome("different_issue_found_note_required");
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+  const actingUserId = authz.userId;
+
+  const { data: beforeJob, error: beforeErr } = await supabase
+    .from("jobs")
+    .select(
+      "id, status, job_type, service_visit_type, ops_status, field_complete, field_complete_at, pending_info_reason, on_hold_reason, next_action_note"
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (beforeErr) throw new Error(beforeErr.message);
+  if (!beforeJob?.id) throw new Error("Job not found");
+
+  if (String(beforeJob.job_type ?? "").trim().toLowerCase() !== "service") {
+    revalidatePath(`/jobs/${jobId}`);
+    redirectToFieldOutcome("different_issue_found_service_only");
+  }
+
+  const normalizedVisitType = String(beforeJob.service_visit_type ?? "").trim().toLowerCase();
+  if (normalizedVisitType !== "callback" && normalizedVisitType !== "return_visit") {
+    revalidatePath(`/jobs/${jobId}`);
+    redirectToFieldOutcome("different_issue_found_callback_revisit_only");
+  }
+
+  if (Boolean(beforeJob.field_complete)) {
+    revalidatePath(`/jobs/${jobId}`);
+    redirectToFieldOutcome("different_issue_found_already_completed");
+  }
+
+  if (String(beforeJob.status ?? "").trim().toLowerCase() !== "in_process") {
+    revalidatePath(`/jobs/${jobId}`);
+    redirectToFieldOutcome("different_issue_found_invalid_status");
+  }
+
+  const completedAt = new Date().toISOString();
+  const nextActionNote = `Different issue found: ${differentIssueNote}`;
+
+  const { error: updateErr } = await supabase
+    .from("jobs")
+    .update({
+      status: "completed",
+      field_complete: true,
+      field_complete_at: completedAt,
+      ops_status: "pending_office_review",
+      pending_info_reason: null,
+      on_hold_reason: null,
+      next_action_note: nextActionNote,
+    })
+    .eq("id", jobId);
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  let assignmentId: string | null = null;
+  if (actingUserId) {
+    const { data: activeAssignment, error: assignmentErr } = await supabase
+      .from("job_assignments")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("user_id", actingUserId)
+      .eq("is_active", true)
+      .maybeSingle();
+
+    if (assignmentErr) throw new Error(assignmentErr.message);
+    assignmentId = String(activeAssignment?.id ?? "").trim() || null;
+  }
+
+  const movementMeta = {
+    ...buildMovementEventMeta({
+      from: beforeJob.status ?? "in_process",
+      to: "completed",
+      trigger: "field_outcome",
+      sourceAction: "mark_job_different_issue_found_from_form",
+    }),
+    actor_user_id: actingUserId,
+    ...(assignmentId ? { assignment_id: assignmentId } : {}),
+  };
+
+  const { error: completionEventErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "job_completed",
+    meta: movementMeta,
+    user_id: actingUserId,
+  });
+
+  if (completionEventErr) throw new Error(completionEventErr.message);
+
+  const { error: opsEventErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "ops_update",
+    message: "Different issue found routed for office review",
+    meta: {
+      timeline_v: 1,
+      event_family: "ops_exception",
+      source: "field_outcome_panel",
+      source_action: "markJobDifferentIssueFoundFromForm",
+      exception_outcome: "different_issue_found",
+      reason: differentIssueNote,
+      callback_revisit_only: true,
+      previous: {
+        status: beforeJob.status ?? null,
+        ops_status: beforeJob.ops_status ?? null,
+        field_complete: Boolean(beforeJob.field_complete ?? false),
+        pending_info_reason: beforeJob.pending_info_reason ?? null,
+        on_hold_reason: beforeJob.on_hold_reason ?? null,
+        next_action_note: beforeJob.next_action_note ?? null,
+      },
+      next: {
+        status: "completed",
+        ops_status: "pending_office_review",
+        field_complete: true,
+        pending_info_reason: null,
+        on_hold_reason: null,
+        next_action_note: nextActionNote,
+      },
+      changes: [
+        { field: "status", from: beforeJob.status ?? null, to: "completed" },
+        { field: "field_complete", from: Boolean(beforeJob.field_complete ?? false), to: true },
+        { field: "field_complete_at", from: beforeJob.field_complete_at ?? null, to: completedAt },
+        { field: "ops_status", from: beforeJob.ops_status ?? null, to: "pending_office_review" },
+        { field: "pending_info_reason", from: beforeJob.pending_info_reason ?? null, to: null },
+        { field: "on_hold_reason", from: beforeJob.on_hold_reason ?? null, to: null },
+        { field: "next_action_note", from: beforeJob.next_action_note ?? null, to: nextActionNote },
+      ],
+      ...movementMeta,
+    },
+    user_id: actingUserId,
+  });
+
+  if (opsEventErr) throw new Error(opsEventErr.message);
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
+  revalidatePath(`/portal`);
+  revalidatePath(`/portal/jobs/${jobId}`);
+  redirectToFieldOutcome("different_issue_found_saved");
+}
+
 export async function markJobFieldCompleteFromForm(formData: FormData): Promise<void> {
   const supabase = await createClient();
 

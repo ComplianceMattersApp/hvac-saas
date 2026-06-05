@@ -2,6 +2,7 @@ import SubmitButton from "@/components/SubmitButton";
 import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
 import {
   markJobApprovalNeededFromForm,
+  markJobDifferentIssueFoundFromForm,
   markJobUnableToCompleteFromForm,
   markJobPartsNeededFromForm,
 } from "@/lib/actions/job-ops-actions";
@@ -11,6 +12,7 @@ type FieldOutcomePanelProps = {
   currentStatus: string;
   tab: string;
   isEccJob: boolean;
+  showDifferentIssueFoundOutcome?: boolean;
   className?: string;
   anchorId?: string;
 };
@@ -133,6 +135,36 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
               </SubmitButton>
             </div>
           </form>
+
+          {props.showDifferentIssueFoundOutcome ? (
+            <form action={markJobDifferentIssueFoundFromForm} className="rounded-lg border border-amber-200/80 bg-white/80 p-3">
+              <input type="hidden" name="job_id" value={props.jobId} />
+              <input type="hidden" name="current_status" value={props.currentStatus} />
+              <input type="hidden" name="tab" value={props.tab} />
+              <p className="text-xs font-semibold text-amber-900">Different issue found?</p>
+              <p className="mt-1 text-xs leading-5 text-amber-900/90">
+                Callback/revisit-only: send this visit to office review without creating a new visit.
+              </p>
+              <p className="mt-2 text-xs font-medium text-amber-900">What different issue was identified on site?</p>
+              <textarea
+                id={`different-issue-note-${props.jobId}`}
+                name="different_issue_note"
+                required
+                rows={2}
+                maxLength={280}
+                className="mt-2 w-full rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-xs text-slate-900 shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-amber-200"
+                placeholder="Example: original issue resolved, but separate airflow issue found in upstairs zone"
+              />
+              <div className="mt-2 flex items-center">
+                <SubmitButton
+                  loadingText="Saving..."
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
+                >
+                  Submit Different Issue Found
+                </SubmitButton>
+              </div>
+            </form>
+          ) : null}
         </div>
       </details>
 

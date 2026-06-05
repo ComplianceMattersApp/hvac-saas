@@ -73,8 +73,7 @@ describe("callback visit UI placement", () => {
     expect(jobPageSource).toContain("createCallbackVisitFromForm");
   });
 
-  it("keeps Different Issue Found and callback visit creation out of FieldOutcomePanel", () => {
+  it("keeps callback visit creation controls out of FieldOutcomePanel", () => {
     expect(fieldOutcomePanelSource).not.toContain("Create Callback Visit");
-    expect(fieldOutcomePanelSource).not.toContain("different_issue_found");
   });
 });

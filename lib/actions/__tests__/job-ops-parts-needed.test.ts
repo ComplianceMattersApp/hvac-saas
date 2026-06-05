@@ -98,11 +98,14 @@ vi.mock("@/lib/portal/resolveContractorIssues", () => ({
 type PartsNeededJob = {
   id: string;
   status: string;
+  job_type?: string;
+  service_visit_type?: string | null;
   ops_status: string | null;
   field_complete: boolean;
   field_complete_at: string | null;
   pending_info_reason: string | null;
   on_hold_reason: string | null;
+  next_action_note?: string | null;
 };
 
 function buildPartsNeededFormData(note: string) {
@@ -129,6 +132,15 @@ function buildUnableToCompleteFormData(note: string) {
   formData.set("current_status", "in_process");
   formData.set("tab", "info");
   formData.set("unable_note", note);
+  return formData;
+}
+
+function buildDifferentIssueFoundFormData(note: string) {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("current_status", "in_process");
+  formData.set("tab", "info");
+  formData.set("different_issue_note", note);
   return formData;
 }
 
@@ -608,6 +620,167 @@ describe("markJobUnableToCompleteFromForm", () => {
     await expect(
       markJobUnableToCompleteFromForm(buildUnableToCompleteFormData("   ")),
     ).rejects.toThrow("banner=unable_to_complete_note_required");
+
+    expect(jobUpdates).toHaveLength(0);
+    expect(jobEvents).toHaveLength(0);
+  });
+});
+
+describe("markJobDifferentIssueFoundFromForm", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+
+    requireInternalUserMock.mockResolvedValue({
+      userId: "internal-user-1",
+      internalUser: {
+        user_id: "internal-user-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
+  });
+
+  it("marks callback/revisit visit complete and routes to pending_office_review", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "in_process",
+      job_type: "service",
+      service_visit_type: "callback",
+      ops_status: "scheduled",
+      field_complete: false,
+      field_complete_at: null,
+      pending_info_reason: null,
+      on_hold_reason: null,
+      next_action_note: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markJobDifferentIssueFoundFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markJobDifferentIssueFoundFromForm(
+        buildDifferentIssueFoundFormData("Original complaint resolved, found separate zone damper issue"),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=info&banner=different_issue_found_saved#field-outcome");
+
+    expect(jobUpdates).toHaveLength(1);
+    expect(jobUpdates[0]).toEqual(
+      expect.objectContaining({
+        status: "completed",
+        field_complete: true,
+        ops_status: "pending_office_review",
+        pending_info_reason: null,
+        on_hold_reason: null,
+        next_action_note: "Different issue found: Original complaint resolved, found separate zone damper issue",
+      }),
+    );
+
+    expect(jobEvents).toHaveLength(2);
+    expect(jobEvents[0]).toEqual(
+      expect.objectContaining({
+        event_type: "job_completed",
+        user_id: "internal-user-1",
+      }),
+    );
+    expect(jobEvents[1]).toEqual(
+      expect.objectContaining({
+        event_type: "ops_update",
+        user_id: "internal-user-1",
+        meta: expect.objectContaining({
+          event_family: "ops_exception",
+          exception_outcome: "different_issue_found",
+          source_action: "markJobDifferentIssueFoundFromForm",
+          reason: "Original complaint resolved, found separate zone damper issue",
+          next: expect.objectContaining({
+            ops_status: "pending_office_review",
+            next_action_note: "Different issue found: Original complaint resolved, found separate zone damper issue",
+          }),
+        }),
+      }),
+    );
+  });
+
+  it("rejects different-issue-found for non callback/revisit service visits", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "in_process",
+      job_type: "service",
+      service_visit_type: "diagnostic",
+      ops_status: "scheduled",
+      field_complete: false,
+      field_complete_at: null,
+      pending_info_reason: null,
+      on_hold_reason: null,
+      next_action_note: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markJobDifferentIssueFoundFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markJobDifferentIssueFoundFromForm(
+        buildDifferentIssueFoundFormData("Found separate issue unrelated to callback reason"),
+      ),
+    ).rejects.toThrow("banner=different_issue_found_callback_revisit_only");
+
+    expect(jobUpdates).toHaveLength(0);
+    expect(jobEvents).toHaveLength(0);
+  });
+
+  it("rejects different-issue-found for non-service jobs", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "in_process",
+      job_type: "ecc",
+      service_visit_type: "callback",
+      ops_status: "scheduled",
+      field_complete: false,
+      field_complete_at: null,
+      pending_info_reason: null,
+      on_hold_reason: null,
+      next_action_note: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markJobDifferentIssueFoundFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markJobDifferentIssueFoundFromForm(
+        buildDifferentIssueFoundFormData("ECC issue is outside callback/revisit path"),
+      ),
+    ).rejects.toThrow("banner=different_issue_found_service_only");
+
+    expect(jobUpdates).toHaveLength(0);
+    expect(jobEvents).toHaveLength(0);
+  });
+
+  it("requires a short different-issue note", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "in_process",
+      job_type: "service",
+      service_visit_type: "return_visit",
+      ops_status: "scheduled",
+      field_complete: false,
+      field_complete_at: null,
+      pending_info_reason: null,
+      on_hold_reason: null,
+      next_action_note: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markJobDifferentIssueFoundFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markJobDifferentIssueFoundFromForm(buildDifferentIssueFoundFormData("   ")),
+    ).rejects.toThrow("banner=different_issue_found_note_required");
 
     expect(jobUpdates).toHaveLength(0);
     expect(jobEvents).toHaveLength(0);
