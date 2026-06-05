@@ -218,6 +218,14 @@ export function hasDirectInvoiceDraftMutationAccess(capabilities: FieldBillingCa
   );
 }
 
+export function hasInvoiceIssueAccess(capabilities: FieldBillingCapabilities) {
+  return capabilities.can_issue_invoice;
+}
+
+export function hasInvoiceSendAccess(capabilities: FieldBillingCapabilities) {
+  return capabilities.can_send_invoice;
+}
+
 type FieldBillingRedirectParams = FieldBillingAccessParams & {
   redirectTo: string;
 };
@@ -262,6 +270,22 @@ export function requireFieldChargeEditAccessOrRedirect(params: FieldBillingRedir
 
 export function requireFieldChargeRemoveAccessOrRedirect(params: FieldBillingRedirectParams) {
   if (resolveFieldBillingCapabilities(params).can_remove_invoice_line) {
+    return;
+  }
+
+  redirect(params.redirectTo);
+}
+
+export function requireFieldInvoiceIssueAccessOrRedirect(params: FieldBillingRedirectParams) {
+  if (resolveFieldBillingCapabilities(params).can_issue_invoice) {
+    return;
+  }
+
+  redirect(params.redirectTo);
+}
+
+export function requireFieldInvoiceSendAccessOrRedirect(params: FieldBillingRedirectParams) {
+  if (resolveFieldBillingCapabilities(params).can_send_invoice) {
     return;
   }
 

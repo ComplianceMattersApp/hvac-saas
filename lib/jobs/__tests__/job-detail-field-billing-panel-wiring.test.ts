@@ -45,4 +45,13 @@ describe("job detail field billing panel wiring", () => {
     expect(fieldBillingReadSlice).toContain("return [] as Awaited<ReturnType<typeof listFieldChargeProposalsForJob>>");
     expect(fieldBillingReadSlice).toContain("resolveLatestVoidedInternalInvoiceByJobId");
   });
+
+  it("gates issue and send controls through explicit field billing lifecycle capabilities", () => {
+    expect(source).toContain("const canIssueInvoiceLifecycleAccess = hasInvoiceIssueAccess(fieldBillingCapabilities)");
+    expect(source).toContain("const canSendInvoiceLifecycleAccess = hasInvoiceSendAccess(fieldBillingCapabilities)");
+    expect(source).toContain("{canIssueInvoiceLifecycleAccess ? (");
+    expect(source).toContain("{canSendInvoiceLifecycleAccess ? (");
+    expect(source).toContain("Invoice issue authority is not available for your current role.");
+    expect(source).toContain("Invoice send authority is not available for your current role.");
+  });
 });

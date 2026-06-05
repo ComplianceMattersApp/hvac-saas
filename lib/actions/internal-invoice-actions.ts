@@ -10,6 +10,8 @@ import {
   resolveFieldBillingCapabilities,
   requireFieldChargeEditAccessOrRedirect,
   requireFieldChargeRemoveAccessOrRedirect,
+  requireFieldInvoiceIssueAccessOrRedirect,
+  requireFieldInvoiceSendAccessOrRedirect,
   requireManualFieldChargeAccessOrRedirect,
   requirePricebookFieldChargeAccessOrRedirect,
   requireVisitScopeFieldChargeAccessOrRedirect,
@@ -1266,7 +1268,7 @@ export async function saveInternalInvoiceDraftFromForm(formData: FormData): Prom
 export async function issueInternalInvoiceFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
-  requireInvoiceLifecycleAccessOrRedirect({
+  requireFieldInvoiceIssueAccessOrRedirect({
     actorUserId: context.userId,
     internalUser: context.internalUser,
     resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
@@ -2038,7 +2040,7 @@ export async function removeInternalInvoiceLineItemFromForm(formData: FormData):
 export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
-  requireInvoiceLifecycleAccessOrRedirect({
+  requireFieldInvoiceSendAccessOrRedirect({
     actorUserId: context.userId,
     internalUser: context.internalUser,
     resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,

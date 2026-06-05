@@ -117,7 +117,12 @@ import FieldBillingSummary from "./_components/FieldBillingSummary";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
-import { hasDirectInvoiceDraftMutationAccess, resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
+import {
+  hasDirectInvoiceDraftMutationAccess,
+  hasInvoiceIssueAccess,
+  hasInvoiceSendAccess,
+  resolveFieldBillingCapabilities,
+} from "@/lib/auth/field-billing-access";
 import VisitScopeJobDetailForm from "@/components/jobs/VisitScopeJobDetailForm";
 import {
   buildVisitScopeReadModel,
@@ -2475,6 +2480,8 @@ const showInternalInvoicePanel =
   billingState.internalInvoicePanelEnabled;
 
 const hasDirectInvoiceWorkflowAccess = hasDirectInvoiceDraftMutationAccess(fieldBillingCapabilities);
+const canIssueInvoiceLifecycleAccess = hasInvoiceIssueAccess(fieldBillingCapabilities);
+const canSendInvoiceLifecycleAccess = hasInvoiceSendAccess(fieldBillingCapabilities);
 const hasProposalEntryWorkflowAccess =
   !hasDirectInvoiceWorkflowAccess
   && (fieldBillingCapabilities.can_select_pricebook_lines || fieldBillingCapabilities.can_convert_visit_scope_to_invoice_line);
@@ -3282,17 +3289,23 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                       <div className="mt-1"><span className="font-semibold text-slate-900">Review charges:</span> {internalInvoiceLineItemCount} item{internalInvoiceLineItemCount === 1 ? "" : "s"}</div>
                     </div>
 
-                    <form action={issueInternalInvoiceFromForm} className="mt-3">
-                      <input type="hidden" name="job_id" value={job.id} />
-                      <input type="hidden" name="tab" value={tab} />
-                      <SubmitButton
-                        loadingText="Issuing..."
-                        className={darkButtonClass}
-                        disabled={!internalInvoiceReadyToIssue}
-                      >
-                        Issue Invoice
-                      </SubmitButton>
-                    </form>
+                    {canIssueInvoiceLifecycleAccess ? (
+                      <form action={issueInternalInvoiceFromForm} className="mt-3">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="tab" value={tab} />
+                        <SubmitButton
+                          loadingText="Issuing..."
+                          className={darkButtonClass}
+                          disabled={!internalInvoiceReadyToIssue}
+                        >
+                          Issue Invoice
+                        </SubmitButton>
+                      </form>
+                    ) : (
+                      <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-3 text-sm text-slate-700">
+                        Invoice issue authority is not available for your current role.
+                      </div>
+                    )}
 
                     {!internalInvoiceReadyToIssue ? (
                       <div className="mt-2 text-xs leading-5 text-slate-500">
@@ -3421,38 +3434,46 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                       <div className="font-semibold text-slate-900">Send / Resend</div>
                       <div className="mt-1 leading-6">Send the already-issued invoice to the billing recipient. Resending is communication only and does not create a second invoice or change the saved charge lines.</div>
 
-                      <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
-                        <input type="hidden" name="job_id" value={job.id} />
-                        <input type="hidden" name="tab" value={tab} />
+                      {canSendInvoiceLifecycleAccess ? (
+                        <>
+                          <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
+                            <input type="hidden" name="job_id" value={job.id} />
+                            <input type="hidden" name="tab" value={tab} />
 
-                        <div>
-                          <label className={workspaceFieldLabelClass}>Send To</label>
-                          <input
-                            type="email"
-                            name="recipient_email"
-                            defaultValue={internalInvoiceSendTargetDefault}
-                            placeholder="billing@example.com"
-                            className={workspaceInputClass}
-                          />
-                        </div>
+                            <div>
+                              <label className={workspaceFieldLabelClass}>Send To</label>
+                              <input
+                                type="email"
+                                name="recipient_email"
+                                defaultValue={internalInvoiceSendTargetDefault}
+                                placeholder="billing@example.com"
+                                className={workspaceInputClass}
+                              />
+                            </div>
 
-                        <SubmitButton
-                          loadingText="Sending..."
-                          className={darkButtonClass}
-                        >
-                          {internalInvoiceEmailButtonLabel}
-                        </SubmitButton>
-                      </form>
+                            <SubmitButton
+                              loadingText="Sending..."
+                              className={darkButtonClass}
+                            >
+                              {internalInvoiceEmailButtonLabel}
+                            </SubmitButton>
+                          </form>
 
-                      {internalInvoiceSendTargetMissing ? (
-                        <div className="mt-2 text-xs leading-5 text-amber-700">
-                          Add a billing email first. Sending is available only after issue and with a recipient email.
+                          {internalInvoiceSendTargetMissing ? (
+                            <div className="mt-2 text-xs leading-5 text-amber-700">
+                              Add a billing email first. Sending is available only after issue and with a recipient email.
+                            </div>
+                          ) : lastInternalInvoiceSentLabel ? (
+                            <div className="mt-2 text-xs leading-5 text-slate-500">
+                              Last sent {lastInternalInvoiceSentLabel} to {latestSuccessfulInternalInvoiceEmailDelivery?.recipientEmail ?? internalInvoiceSendTargetDefault}.
+                            </div>
+                          ) : null}
+                        </>
+                      ) : (
+                        <div className="mt-3 rounded-lg border border-slate-200 bg-white/90 px-3 py-2.5 text-sm text-slate-600">
+                          Invoice send authority is not available for your current role.
                         </div>
-                      ) : lastInternalInvoiceSentLabel ? (
-                        <div className="mt-2 text-xs leading-5 text-slate-500">
-                          Last sent {lastInternalInvoiceSentLabel} to {latestSuccessfulInternalInvoiceEmailDelivery?.recipientEmail ?? internalInvoiceSendTargetDefault}.
-                        </div>
-                      ) : null}
+                      )}
                     </div>
                   </>
                 ) : (

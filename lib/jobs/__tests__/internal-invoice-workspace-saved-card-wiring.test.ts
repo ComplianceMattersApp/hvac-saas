@@ -22,8 +22,12 @@ describe("internal invoice workspace saved-card charge wiring", () => {
   it("keeps lifecycle and payment controls behind financial lifecycle authorization", () => {
     expect(source).toContain("invoicePaymentLinkUiState.showPanel && canManageFinancialInvoiceLifecycle");
     expect(source).toContain("invoice.status === \"issued\" && canManageFinancialInvoiceLifecycle");
-    expect(source).toContain("invoice.status === \"draft\" && canManageFinancialInvoiceLifecycle");
+    expect(source).toContain("const canIssueInvoiceLifecycle = hasInvoiceIssueAccess(fieldBillingCapabilities)");
+    expect(source).toContain("const canSendInvoiceLifecycle = hasInvoiceSendAccess(fieldBillingCapabilities)");
+    expect(source).toContain("invoice.status === \"draft\" && canIssueInvoiceLifecycle");
+    expect(source).toContain("invoice.status === \"issued\" && canSendInvoiceLifecycle");
     expect(source).toContain("Invoice issue authority is not available for your current role.");
+    expect(source).toContain("Invoice send authority is not available for your current role.");
   });
 
   it("includes compact stage and next-step rail copy in header", () => {

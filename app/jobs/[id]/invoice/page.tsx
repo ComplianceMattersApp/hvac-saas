@@ -4,6 +4,8 @@ import SubmitButton from "@/components/SubmitButton";
 import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
 import {
   hasDirectInvoiceDraftMutationAccess,
+  hasInvoiceIssueAccess,
+  hasInvoiceSendAccess,
   resolveFieldBillingCapabilities,
 } from "@/lib/auth/field-billing-access";
 import { createClient } from "@/lib/supabase/server";
@@ -497,6 +499,8 @@ export default async function InternalInvoiceWorkspacePage({
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
   });
   const canAccessDraftLineWorkspace = hasDirectInvoiceDraftMutationAccess(fieldBillingCapabilities);
+  const canIssueInvoiceLifecycle = hasInvoiceIssueAccess(fieldBillingCapabilities);
+  const canSendInvoiceLifecycle = hasInvoiceSendAccess(fieldBillingCapabilities);
   const canCreateDraftInvoice = Boolean(
     fieldBillingCapabilities.can_create_direct_invoice_draft || canManageFinancialInvoiceLifecycle,
   );
@@ -1109,7 +1113,7 @@ export default async function InternalInvoiceWorkspacePage({
                 {readinessRow("Total", totalReady, totalReady ? formatCurrencyFromCents(invoice.total_cents) : "Total must be above $0.00.")}
                 {readinessRow("Job closeout", jobReady, jobReady ? "Job and field work are complete." : "Job must be completed and field complete.")}
               </div>
-              {invoice.status === "draft" && canManageFinancialInvoiceLifecycle ? (
+              {invoice.status === "draft" && canIssueInvoiceLifecycle ? (
                 <form action={issueInternalInvoiceFromForm} className="mt-4">
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="tab" value="info" />
@@ -1187,7 +1191,7 @@ export default async function InternalInvoiceWorkspacePage({
               ) : null}
             </section>
 
-              {invoice.status === "issued" && canManageFinancialInvoiceLifecycle ? (
+              {invoice.status === "issued" && canSendInvoiceLifecycle ? (
               <section className={`${panelClass} p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Send Invoice</div>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1237,6 +1241,12 @@ export default async function InternalInvoiceWorkspacePage({
                     ))}
                   </div>
                 ) : null}
+              </section>
+            ) : invoice.status === "issued" ? (
+              <section className={`${panelClass} p-4 sm:p-5`}>
+                <div className="rounded-xl border border-slate-200 bg-slate-50/75 px-3 py-2.5 text-sm text-slate-600">
+                  Invoice send authority is not available for your current role.
+                </div>
               </section>
             ) : null}
 

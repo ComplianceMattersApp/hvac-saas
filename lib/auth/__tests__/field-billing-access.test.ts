@@ -7,6 +7,8 @@ vi.mock('next/navigation', () => ({
 }));
 
 import {
+  requireFieldInvoiceIssueAccessOrRedirect,
+  requireFieldInvoiceSendAccessOrRedirect,
   requireFieldChargeEditAccessOrRedirect,
   requireFieldChargeRemoveAccessOrRedirect,
   requireManualFieldChargeAccessOrRedirect,
@@ -235,6 +237,27 @@ describe('field billing access helper', () => {
     expect(capabilities.can_edit_invoice_line_quantity).toBe(true);
     expect(capabilities.can_collect_card_payment).toBe(false);
     expect(capabilities.can_verify_non_card_collection).toBe(false);
+    expect(capabilities.can_issue_invoice).toBe(false);
+    expect(capabilities.can_send_invoice).toBe(false);
+  });
+
+  it('can grant issue/send explicitly without granting payment collection authority', () => {
+    const capabilities = resolveFieldBillingCapabilities({
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+      explicitCapabilities: {
+        field_billing_enabled: true,
+        can_view_field_billing_summary: true,
+        can_issue_invoice: true,
+        can_send_invoice: true,
+      },
+    });
+
+    expect(capabilities.can_issue_invoice).toBe(true);
+    expect(capabilities.can_send_invoice).toBe(true);
+    expect(capabilities.can_collect_card_payment).toBe(false);
+    expect(capabilities.can_verify_non_card_collection).toBe(false);
   });
 
   it('redirect helpers deny missing charge-authoring capabilities', () => {
@@ -258,6 +281,12 @@ describe('field billing access helper', () => {
       'REDIRECT:/jobs/job-1?banner=not_authorized',
     );
     expect(() => requireFieldChargeRemoveAccessOrRedirect(params)).toThrow(
+      'REDIRECT:/jobs/job-1?banner=not_authorized',
+    );
+    expect(() => requireFieldInvoiceIssueAccessOrRedirect(params)).toThrow(
+      'REDIRECT:/jobs/job-1?banner=not_authorized',
+    );
+    expect(() => requireFieldInvoiceSendAccessOrRedirect(params)).toThrow(
       'REDIRECT:/jobs/job-1?banner=not_authorized',
     );
   });
@@ -292,5 +321,23 @@ describe('field billing access helper', () => {
     };
 
     expect(() => requireManualFieldChargeAccessOrRedirect(params)).not.toThrow();
+  });
+
+  it('allows issue and send helpers when explicit lifecycle authority is granted', () => {
+    const params = {
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+      redirectTo: '/jobs/job-1?banner=not_authorized',
+      explicitCapabilities: {
+        field_billing_enabled: true,
+        can_view_field_billing_summary: true,
+        can_issue_invoice: true,
+        can_send_invoice: true,
+      },
+    };
+
+    expect(() => requireFieldInvoiceIssueAccessOrRedirect(params)).not.toThrow();
+    expect(() => requireFieldInvoiceSendAccessOrRedirect(params)).not.toThrow();
   });
 });
