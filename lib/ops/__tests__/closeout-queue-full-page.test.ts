@@ -136,10 +136,47 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).toContain('id="field-payment-reconciliation-attention"');
   });
 
-  it("keeps reconciliation section read-only with no verification actions", () => {
-    expect(closeoutQueuePageSource).toContain("No verify/reject/correct/void actions in this queue section.");
-    expect(closeoutQueuePageSource).toContain("No payment truth mutation.");
-    expect(closeoutQueuePageSource).toContain("No invoice balance updates.");
-    expect(closeoutQueuePageSource).not.toContain("Verify Payment");
+  it("shows verify and reject controls for authorized reconciliation viewers", () => {
+    expect(closeoutQueuePageSource).toContain("verifyFieldPaymentCollectionReportFromForm");
+    expect(closeoutQueuePageSource).toContain("rejectFieldPaymentCollectionReportFromForm");
+    expect(closeoutQueuePageSource).toMatch(/>\s*Verify\s*</);
+    expect(closeoutQueuePageSource).toMatch(/>\s*Reject\s*</);
+  });
+
+  it("posts required B7-R payload fields for verify and reject actions", () => {
+    expect(closeoutQueuePageSource).toContain('name="field_payment_report_id"');
+    expect(closeoutQueuePageSource).toContain('name="report_id"');
+    expect(closeoutQueuePageSource).toContain('name="invoice_id"');
+    expect(closeoutQueuePageSource).toContain('name="job_id"');
+    expect(closeoutQueuePageSource).toContain('name="verification_note"');
+    expect(closeoutQueuePageSource).toContain('name="rejection_reason"');
+    expect(closeoutQueuePageSource).toContain('name="return_to"');
+  });
+
+  it("requires rejection reason in the closeout verification UI", () => {
+    expect(closeoutQueuePageSource).toContain('name="rejection_reason"');
+    expect(closeoutQueuePageSource).toContain("required");
+  });
+
+  it("shows self-verification UI block when reporter matches current actor", () => {
+    expect(closeoutQueuePageSource).toContain("item.reportedByUserId === user.id");
+    expect(closeoutQueuePageSource).toContain("Reporter cannot verify their own report.");
+  });
+
+  it("keeps correction and void controls out of this slice", () => {
+    expect(closeoutQueuePageSource).toContain("Correction and void actions are not enabled in this slice.");
+    expect(closeoutQueuePageSource).not.toMatch(/>\s*Correct\s*</);
+    expect(closeoutQueuePageSource).not.toMatch(/>\s*Void\s*</);
+  });
+
+  it("uses required B7-S verification/rejection copy", () => {
+    expect(closeoutQueuePageSource).toContain(
+      "Use Verify only after the office confirms this check, cash, or other payment was received.",
+    );
+    expect(closeoutQueuePageSource).toContain("Verification records this as final payment truth.");
+    expect(closeoutQueuePageSource).toContain("Rejecting does not record payment.");
+    expect(closeoutQueuePageSource).toContain(
+      "Rejecting removes this item from active reconciliation and does not record payment.",
+    );
   });
 });

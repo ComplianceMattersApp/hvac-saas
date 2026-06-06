@@ -29,7 +29,11 @@ describe("field payment reconciliation queue page wiring", () => {
   it("renders required office-verification copy", () => {
     expect(queuePageSource).toContain("Field-reported payments need office verification before they count as collected.");
     expect(queuePageSource).toContain("Card payments are confirmed by Stripe. Check, cash, and other field reports stay here until verified.");
-    expect(queuePageSource).toContain("Verifying payments will be added in a later step.");
+    expect(queuePageSource).toContain("Verification records this as final payment truth.");
+    expect(queuePageSource).toContain("Rejecting does not record payment.");
+    expect(queuePageSource).toContain(
+      "Use Verify only after the office confirms this check, cash, or other payment was received.",
+    );
   });
 
   it("renders queue row details for office reconciliation", () => {
@@ -53,19 +57,41 @@ describe("field payment reconciliation queue page wiring", () => {
     expect(queuePageSource).toContain("item.links.customerHref");
   });
 
-  it("does not expose verify reject correct or void actions", () => {
-    expect(queuePageSource).not.toMatch(/>\s*Verify\s*</);
-    expect(queuePageSource).not.toMatch(/>\s*Reject\s*</);
+  it("wires verify and reject actions for authorized reconciliation users", () => {
+    expect(queuePageSource).toContain("verifyFieldPaymentCollectionReportFromForm");
+    expect(queuePageSource).toContain("rejectFieldPaymentCollectionReportFromForm");
+    expect(queuePageSource).toMatch(/>\s*Verify\s*</);
+    expect(queuePageSource).toMatch(/>\s*Reject\s*</);
+  });
+
+  it("posts verify and reject payloads with required report context", () => {
+    expect(queuePageSource).toContain('name="field_payment_report_id"');
+    expect(queuePageSource).toContain('name="report_id"');
+    expect(queuePageSource).toContain('name="invoice_id"');
+    expect(queuePageSource).toContain('name="job_id"');
+    expect(queuePageSource).toContain('name="verification_note"');
+    expect(queuePageSource).toContain('name="rejection_reason"');
+    expect(queuePageSource).toContain('name="return_to"');
+  });
+
+  it("requires rejection reason and blocks self-verification in UI", () => {
+    expect(queuePageSource).toContain('name="rejection_reason"');
+    expect(queuePageSource).toContain("required");
+    expect(queuePageSource).toContain("item.reportedByUserId === user.id");
+    expect(queuePageSource).toContain("Reporter cannot verify their own report.");
+  });
+
+  it("does not expose correction or void actions", () => {
     expect(queuePageSource).not.toMatch(/>\s*Correct\s*</);
     expect(queuePageSource).not.toMatch(/>\s*Void\s*</);
   });
 
-  it("documents read-only truth boundaries in UI", () => {
-    expect(queuePageSource).toContain("No verify/reject/correct/void actions.");
-    expect(queuePageSource).toContain("No internal_invoice_payments writes.");
-    expect(queuePageSource).toContain("No internal_invoice_payment_allocations writes.");
-    expect(queuePageSource).toContain("No invoice paid/balance mutation.");
-    expect(queuePageSource).toContain("No Stripe/webhook mutation.");
+  it("documents B7-S truth boundaries in UI", () => {
+    expect(queuePageSource).toContain(
+      "Verification records final payment truth through existing internal invoice payment actions.",
+    );
+    expect(queuePageSource).toContain("Rejection writes no payment truth.");
+    expect(queuePageSource).toContain("No correction/void actions are enabled in this slice.");
   });
 
   it("uses report center tab entry for payment reconciliation", () => {

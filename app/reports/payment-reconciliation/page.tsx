@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import {
+  rejectFieldPaymentCollectionReportFromForm,
+  verifyFieldPaymentCollectionReportFromForm,
+} from "@/lib/actions/internal-invoice-payment-actions";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
@@ -16,6 +20,7 @@ import {
   reportTableHeadClass,
   reportTableRowClass,
 } from "@/components/reports/ReportLedgerChrome";
+import SubmitButton from "@/components/SubmitButton";
 
 export const metadata = {
   title: "Payment Reconciliation",
@@ -122,7 +127,7 @@ export default async function PaymentReconciliationPage() {
         title="Payment Reconciliation"
         description="Field-reported payments need office verification before they count as collected."
         countSummary={`Open field payment reports: ${queue.summary.openCount}`}
-        truthNote="Card payments are confirmed by Stripe. Check, cash, and other field reports stay here until verified. Verifying payments will be added in a later step."
+        truthNote="Card payments are confirmed by Stripe. Check, cash, and other field reports stay here until verified. Verification records this as final payment truth. Rejecting does not record payment."
       />
 
       <ReportCenterTabs current="payment-reconciliation" />
@@ -170,11 +175,11 @@ export default async function PaymentReconciliationPage() {
           </div>
         </div>
         <div className="mt-1 text-xs text-slate-600">
-          Queue visibility only. Verification actions and payment truth conversion are intentionally deferred.
+          Use Verify only after the office confirms this check, cash, or other payment was received.
         </div>
       </section>
 
-      <ReportTableShell note="Read-only queue. No verify, reject, correct, or void actions are enabled in this slice.">
+      <ReportTableShell note="Verify converts the report to final payment truth. Reject leaves no payment truth. Correction and void actions are not enabled in this slice.">
         {queue.items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
             <div className="font-semibold text-slate-900">No field payment reports need reconciliation.</div>
@@ -194,6 +199,7 @@ export default async function PaymentReconciliationPage() {
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Note</th>
                 <th className="px-3 py-3">Links</th>
+                <th className="px-3 py-3">Verification</th>
               </tr>
             </thead>
             <tbody>
@@ -230,6 +236,63 @@ export default async function PaymentReconciliationPage() {
                       ) : null}
                     </div>
                   </td>
+                  <td className="px-3 py-3 text-slate-700">
+                    {item.reportedByUserId === user.id ? (
+                      <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-900">
+                        Reporter cannot verify their own report.
+                      </div>
+                    ) : (
+                      <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2 text-[11px]">
+                        <form action={verifyFieldPaymentCollectionReportFromForm} className="space-y-2">
+                          <input type="hidden" name="field_payment_report_id" value={item.reportId} />
+                          <input type="hidden" name="report_id" value={item.reportId} />
+                          <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
+                          <input type="hidden" name="job_id" value={item.jobId} />
+                          <input type="hidden" name="tab" value="info" />
+                          <input type="hidden" name="return_to" value="/reports/payment-reconciliation" />
+                          <label className="block">
+                            <span className="mb-1 block font-semibold text-slate-900">Verification note</span>
+                            <input
+                              name="verification_note"
+                              type="text"
+                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900"
+                              placeholder="Optional office confirmation details"
+                            />
+                          </label>
+                          <SubmitButton
+                            className="inline-flex h-7 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                            loadingText="Verifying..."
+                          >
+                            Verify
+                          </SubmitButton>
+                        </form>
+                        <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2">
+                          <input type="hidden" name="field_payment_report_id" value={item.reportId} />
+                          <input type="hidden" name="report_id" value={item.reportId} />
+                          <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
+                          <input type="hidden" name="job_id" value={item.jobId} />
+                          <input type="hidden" name="tab" value="info" />
+                          <input type="hidden" name="return_to" value="/reports/payment-reconciliation" />
+                          <label className="block">
+                            <span className="mb-1 block font-semibold text-slate-900">Rejection reason</span>
+                            <input
+                              name="rejection_reason"
+                              type="text"
+                              required
+                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900"
+                              placeholder="Required"
+                            />
+                          </label>
+                          <SubmitButton
+                            className="inline-flex h-7 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                            loadingText="Rejecting..."
+                          >
+                            Reject
+                          </SubmitButton>
+                        </form>
+                      </div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -238,7 +301,7 @@ export default async function PaymentReconciliationPage() {
       </ReportTableShell>
 
       <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm shadow-slate-950/5">
-        No verify/reject/correct/void actions. No internal_invoice_payments writes. No internal_invoice_payment_allocations writes. No invoice paid/balance mutation. No Stripe/webhook mutation.
+        Verification records final payment truth through existing internal invoice payment actions. Rejection writes no payment truth. No correction/void actions are enabled in this slice.
       </section>
     </div>
   );

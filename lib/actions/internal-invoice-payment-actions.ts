@@ -49,12 +49,21 @@ function buildInternalInvoiceReturnHref(jobId: string, tab: string, banner: stri
 
   try {
     const parsed = new URL(raw, 'https://app.local');
-    const allowedPaths = new Set([`/jobs/${jobId}`, `/jobs/${jobId}/invoice`]);
+    const allowedPaths = new Set([
+      `/jobs/${jobId}`,
+      `/jobs/${jobId}/invoice`,
+      '/ops/closeout-queue',
+      '/reports/payment-reconciliation',
+    ]);
     if (!allowedPaths.has(parsed.pathname)) return fallback;
 
     parsed.searchParams.set('banner', banner);
-    if (!parsed.hash) {
-      parsed.hash = parsed.pathname.endsWith('/invoice') ? 'invoice-workspace' : INTERNAL_INVOICE_PANEL_HASH;
+    if (!parsed.hash && parsed.pathname.endsWith('/invoice')) {
+      parsed.hash = 'invoice-workspace';
+    }
+
+    if (!parsed.hash && parsed.pathname === `/jobs/${jobId}`) {
+      parsed.hash = INTERNAL_INVOICE_PANEL_HASH;
     }
 
     return `${parsed.pathname}${parsed.search}${parsed.hash}`;
