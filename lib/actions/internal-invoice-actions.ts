@@ -2044,11 +2044,13 @@ export async function addInternalInvoiceLineItemsFromVisitScopeForm(formData: Fo
   }
 
   const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
-  const unitPriceCents = 0;
-  const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
 
   const payload = idsToInsert.map((scopeItemId, index) => {
     const scopeItem = scopeItemsById.get(scopeItemId)!;
+    const unitPriceCents = scopeItem.expected_unit_price == null
+      ? 0
+      : parseNonNegativeMoneyNumberToCents(scopeItem.expected_unit_price, 'Unit price');
+    const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
     return {
       invoice_id: invoice.id,
       sort_order: nextSortOrder + index,

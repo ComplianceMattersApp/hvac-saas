@@ -31,6 +31,7 @@ type VisitScopePickerItem = {
   title: string;
   details: string | null;
   kind: 'primary' | 'companion_service';
+  expectedUnitPrice: number | null;
   alreadyAdded: boolean;
 };
 
@@ -342,7 +343,7 @@ export default function InternalInvoiceLineItemsTable({
                   Start from the Work Items already captured for this visit. Imported items become draft charges for this invoice.
                 </div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
-                  Imported Work Items start as draft Invoice Charges with Qty 1.00 and Unit Price $0.00. Review and edit pricing before issuing.
+                  Work Item price carries into the draft charge when available. Review quantity and price before issuing.
                 </div>
               </div>
             </div>
@@ -376,6 +377,9 @@ export default function InternalInvoiceLineItemsTable({
                               Already added
                             </span>
                           ) : null}
+                          <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-700">
+                            Price {formatCurrencyFromAmount(item.expectedUnitPrice)}
+                          </span>
                         </div>
                         {item.details ? (
                           <div className="mt-1 text-xs leading-5 text-slate-600">{item.details}</div>

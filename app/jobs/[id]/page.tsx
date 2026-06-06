@@ -2965,6 +2965,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           title: string;
           details: string | null;
           kind: "primary" | "companion_service";
+          expected_unit_price?: number | null;
         }> = [];
         try {
           sanitizedRowItems = sanitizeVisitScopeItems([rawRow]);
@@ -2980,6 +2981,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           title: sanitizedRow.title,
           details: sanitizedRow.details,
           kind: sanitizedRow.kind,
+          expectedUnitPrice: sanitizedRow.expected_unit_price ?? null,
           alreadyAdded: existingVisitScopeInvoiceSourceIds.has(persistedItemId),
         };
       })
@@ -2988,6 +2990,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         title: string;
         details: string | null;
         kind: "primary" | "companion_service";
+        expectedUnitPrice: number | null;
         alreadyAdded: boolean;
       }>;
     const internalInvoiceRecipientName = String(internalInvoice?.billing_name ?? "").trim() || "Billing recipient not set";

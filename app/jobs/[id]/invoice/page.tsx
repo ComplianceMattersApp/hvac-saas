@@ -539,6 +539,7 @@ export default async function InternalInvoiceWorkspacePage({
         title: sanitizedRow.title,
         details: sanitizedRow.details,
         kind: sanitizedRow.kind,
+        expectedUnitPrice: sanitizedRow.expected_unit_price,
         alreadyAdded: existingVisitScopeInvoiceSourceIds.has(persistedItemId),
       };
     })
@@ -547,6 +548,7 @@ export default async function InternalInvoiceWorkspacePage({
       title: string;
       details: string | null;
       kind: "primary" | "companion_service";
+      expectedUnitPrice: number | null;
       alreadyAdded: boolean;
     }>;
 

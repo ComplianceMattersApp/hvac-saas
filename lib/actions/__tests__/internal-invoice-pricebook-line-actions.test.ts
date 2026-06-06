@@ -737,6 +737,7 @@ describe('internal invoice line item pricebook plumbing', () => {
           title: 'Repair blower assembly',
           details: 'Replace failed motor and verify airflow',
           kind: 'primary',
+          expected_unit_price: 189.5,
         },
       ],
     });
@@ -757,13 +758,50 @@ describe('internal invoice line item pricebook plumbing', () => {
         description_snapshot: 'Replace failed motor and verify airflow',
         item_type_snapshot: 'service',
         quantity: '1.00',
-        unit_price: '0.00',
-        line_subtotal: '0.00',
+        unit_price: '189.50',
+        line_subtotal: '189.50',
         category_snapshot: null,
         unit_label_snapshot: null,
       }),
     );
 
+    expect(invoiceUpdates).toHaveLength(1);
+    expect(invoiceUpdates[0].subtotal_cents).toBe(18950);
+    expect(invoiceUpdates[0].total_cents).toBe(18950);
+  });
+
+  it('keeps unpriced visit scope items at zero dollars when importing draft charges', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Inspect condensate drain',
+          details: 'Clear line and verify drainage',
+          kind: 'primary',
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { addInternalInvoiceLineItemsFromVisitScopeForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(addInternalInvoiceLineItemsFromVisitScopeForm(visitScopeLineFormData([selectedScopeId]))).rejects.toThrow(
+      'banner=internal_invoice_visit_scope_line_item_added',
+    );
+
+    expect(insertedLineItems).toHaveLength(1);
+    expect(insertedLineItems[0]).toEqual(
+      expect.objectContaining({
+        source_kind: 'visit_scope',
+        source_visit_scope_item_id: selectedScopeId,
+        item_name_snapshot: 'Inspect condensate drain',
+        description_snapshot: 'Clear line and verify drainage',
+        quantity: '1.00',
+        unit_price: '0.00',
+        line_subtotal: '0.00',
+      }),
+    );
     expect(invoiceUpdates).toHaveLength(1);
     expect(invoiceUpdates[0].subtotal_cents).toBe(0);
     expect(invoiceUpdates[0].total_cents).toBe(0);
