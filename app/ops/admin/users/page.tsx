@@ -559,7 +559,7 @@ export default async function AdminUsersCommandCenterPage({
                             type="submit"
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Manage Team Access
+                            Update Role
                           </button>
                         </form>
                       ) : null}

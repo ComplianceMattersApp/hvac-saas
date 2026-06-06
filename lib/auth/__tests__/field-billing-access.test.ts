@@ -129,6 +129,24 @@ describe('field billing access helper', () => {
     }
   });
 
+  it('does not grant field payment/report authority from technician role alone', () => {
+    const capabilities = resolveFieldBillingCapabilities({
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+    });
+
+    expect(capabilities.can_collect_field_payment).toBe(false);
+    expect(capabilities.can_collect_card_payment).toBe(false);
+    expect(capabilities.can_report_non_card_collection).toBe(false);
+    expect(capabilities.can_verify_non_card_collection).toBe(false);
+    expect(canRecordInvoicePayment({
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+    })).toBe(false);
+  });
+
   it('keeps office allowed only when they are structural owner', () => {
     expect(
       resolveFieldBillingCapabilities({
