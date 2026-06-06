@@ -93,7 +93,7 @@ beforeEach(() => {
   loadFieldBillingExplicitCapabilitiesForUserMock.mockResolvedValue({});
 });
 
-function makeSupabaseFixture(params?: { insertError?: { message: string } | null }) {
+function makeSupabaseFixture(params?: { insertError?: { message: string; code?: string } | null }) {
   const writes: Array<{ table: string; op: string; payload?: unknown }> = [];
   const insertError = params?.insertError ?? null;
 
@@ -1301,6 +1301,7 @@ describe('reportNonCardFieldPaymentCollectionFromForm', () => {
     loadFieldBillingExplicitCapabilitiesForUserMock.mockResolvedValueOnce(explicitCapabilities);
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
 
     const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
 
@@ -1350,6 +1351,7 @@ describe('reportNonCardFieldPaymentCollectionFromForm', () => {
   it('allows authorized field collector to report cash payment', async () => {
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
 
     const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
 
@@ -1370,6 +1372,7 @@ describe('reportNonCardFieldPaymentCollectionFromForm', () => {
   it('allows authorized field collector to report other payment', async () => {
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
 
     const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
 
@@ -1385,6 +1388,27 @@ describe('reportNonCardFieldPaymentCollectionFromForm', () => {
         payment_method: 'other',
       }),
     );
+  });
+
+  it('converts raw report insert permission errors into a safe failure banner', async () => {
+    const fixture = makeSupabaseFixture({
+      insertError: {
+        code: '42501',
+        message: 'new row violates row-level security policy for table "field_payment_collection_reports"',
+      },
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
+
+    await expect(
+      reportNonCardFieldPaymentCollectionFromForm(buildFieldReportFormData({ payment_method: 'cash' })),
+    ).rejects.toThrow('banner=field_payment_report_failed');
+
+    expect(fixture.writes.some((w) => w.table === 'field_payment_collection_reports' && w.op === 'insert')).toBe(true);
+    expect(fixture.writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(false);
+    expect(upsertInvoicePaymentAllocationForPaymentRowMock).not.toHaveBeenCalled();
   });
 
   it('rejects draft invoice reporting attempts', async () => {
@@ -1500,6 +1524,9 @@ describe('reportNonCardFieldPaymentCollectionFromForm', () => {
   });
 
   it('preserves selected supplemental invoice routing in redirect', async () => {
+    const fixture = makeSupabaseFixture();
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
     const { reportNonCardFieldPaymentCollectionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
 
     await expect(

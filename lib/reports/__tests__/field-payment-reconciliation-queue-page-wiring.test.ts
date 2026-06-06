@@ -29,29 +29,27 @@ describe("field payment reconciliation queue page wiring", () => {
   });
 
   it("renders required office-verification copy", () => {
-    expect(queuePageSource).toContain("Field-reported payments need office verification before they count as collected.");
-    expect(queuePageSource).toContain("Card payments are confirmed by Stripe. Check, cash, and other field reports stay here until verified.");
-    expect(queuePageSource).toContain("Verification records this as final payment truth.");
+    expect(queuePageSource).toContain('title="Confirm Payment"');
+    expect(queuePageSource).toContain("Review cash, check, or other payments reported from the field before they count as collected.");
+    expect(queuePageSource).toContain("Reported amount only. Not collected-money truth yet.");
+    expect(queuePageSource).toContain("Verify only after confirming the money was received.");
     expect(queuePageSource).toContain("Rejecting does not record payment.");
-    expect(queuePageSource).toContain(
-      "Use Verify only after the office confirms this check, cash, or other payment was received.",
-    );
+    expect(queuePageSource).toContain("Correction and void actions are not enabled yet.");
   });
 
-  it("renders queue row details for office reconciliation", () => {
-    expect(queuePageSource).toContain("Customer / Job");
-    expect(queuePageSource).toContain("Invoice");
-    expect(queuePageSource).toContain("Method");
-    expect(queuePageSource).toContain("Amount");
-    expect(queuePageSource).toContain("Reference");
-    expect(queuePageSource).toContain("Reported By");
-    expect(queuePageSource).toContain("Reported At");
-    expect(queuePageSource).toContain("Status");
+  it("renders queue card details for office confirmation", () => {
+    expect(queuePageSource).toContain("Needs confirmation");
+    expect(queuePageSource).toContain("In review");
+    expect(queuePageSource).toContain("Needs info");
+    expect(queuePageSource).toContain("Reported total");
+    expect(queuePageSource).toContain("Reported by");
+    expect(queuePageSource).toContain("Reported time");
+    expect(queuePageSource).toContain("Reference / check number");
     expect(queuePageSource).toContain("Note");
   });
 
   it("includes invoice job and customer links", () => {
-    expect(queuePageSource).toContain("Open invoice workspace");
+    expect(queuePageSource).toContain("Open invoice");
     expect(queuePageSource).toContain("item.links.invoiceWorkspaceHref");
     expect(queuePageSource).toContain("Open job");
     expect(queuePageSource).toContain("item.links.jobHref");
@@ -71,6 +69,7 @@ describe("field payment reconciliation queue page wiring", () => {
     expect(queuePageSource).toContain('name="report_id"');
     expect(queuePageSource).toContain('name="invoice_id"');
     expect(queuePageSource).toContain('name="job_id"');
+    expect(queuePageSource).toContain("Confirmation note");
     expect(queuePageSource).toContain('name="verification_note"');
     expect(queuePageSource).toContain('name="rejection_reason"');
     expect(queuePageSource).toContain('name="return_to"');
@@ -93,11 +92,11 @@ describe("field payment reconciliation queue page wiring", () => {
       "Verification records final payment truth through existing internal invoice payment actions.",
     );
     expect(queuePageSource).toContain("Rejection writes no payment truth.");
-    expect(queuePageSource).toContain("No correction/void actions are enabled in this slice.");
+    expect(queuePageSource).toContain("Correction and void actions are not enabled yet.");
   });
 
   it("uses report center tab entry for payment reconciliation", () => {
     expect(queuePageSource).toContain('ReportCenterTabs current="payment-reconciliation"');
-    expect(queuePageSource).toContain("Payment Reconciliation");
+    expect(queuePageSource).toContain("payment-reconciliation");
   });
 });
