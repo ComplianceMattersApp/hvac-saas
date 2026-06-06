@@ -13,6 +13,14 @@ import {
 } from "@/lib/auth/internal-user";
 import { FIELD_BILLING_ACCESS_CAPABILITY_KEYS } from "@/lib/auth/internal-user-access-capabilities";
 
+const FIELD_BILLING_INCLUDED_CAPABILITY_KEYS = [
+  "field_billing_enabled",
+  "can_view_field_billing_summary",
+  "can_collect_field_payment",
+  "can_collect_card_payment",
+  "can_report_non_card_collection",
+] as const;
+
 type InternalUserRecord = {
   user_id: string;
   role: InternalRole;
@@ -408,12 +416,16 @@ export async function updateInternalUserFieldBillingCapabilitiesFromForm(formDat
     }
   }
 
-  const enabledCapabilityKeys = new Set(submittedCapabilityKeys);
+  const requestedCapabilityKeys = new Set(submittedCapabilityKeys);
+  const fieldBillingAccessEnabled = requestedCapabilityKeys.has("field_billing_enabled");
+  const fieldPaymentConfirmationEnabled = requestedCapabilityKeys.has("can_verify_non_card_collection");
   const rows = FIELD_BILLING_ACCESS_CAPABILITY_KEYS.map((capabilityKey) => ({
     account_owner_user_id: actorInternalUser.account_owner_user_id,
     internal_user_id: target.user_id,
     capability_key: capabilityKey,
-    enabled: enabledCapabilityKeys.has(capabilityKey),
+    enabled: FIELD_BILLING_INCLUDED_CAPABILITY_KEYS.includes(capabilityKey as any)
+      ? fieldBillingAccessEnabled
+      : fieldPaymentConfirmationEnabled,
     updated_by_user_id: actorUserId,
   }));
 

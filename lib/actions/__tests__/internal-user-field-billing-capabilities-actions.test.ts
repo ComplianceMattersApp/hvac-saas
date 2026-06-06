@@ -116,6 +116,10 @@ function makeAdminFixture() {
   return { admin, writes };
 }
 
+function capabilityRow(rows: Array<Record<string, unknown>>, key: string) {
+  return rows.find((row) => row.capability_key === key);
+}
+
 describe("updateInternalUserFieldBillingCapabilitiesFromForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -125,50 +129,7 @@ describe("updateInternalUserFieldBillingCapabilitiesFromForm", () => {
     requireInternalRoleMock.mockResolvedValue(adminActor("admin"));
   });
 
-  it("upserts allowlisted enabled and disabled capability rows without changing the Technician role", async () => {
-    const fixture = makeAdminFixture();
-    createAdminClientMock.mockReturnValue(fixture.admin);
-
-    const mod = await import("@/lib/actions/internal-user-actions");
-
-    await expect(
-      mod.updateInternalUserFieldBillingCapabilitiesFromForm(
-        buildCapabilityFormData([
-          "field_billing_enabled",
-          "can_view_field_billing_summary",
-          "can_collect_field_payment",
-          "can_report_non_card_collection",
-        ]),
-      ),
-    ).resolves.toBeUndefined();
-
-    expect(requireInternalRoleMock).toHaveBeenCalledWith("admin", { supabase: {} });
-    expect(fixture.writes.updatedInternalUsers).toHaveLength(0);
-    expect(fixture.writes.upsertedCapabilityRows).toHaveLength(6);
-    expect(fixture.writes.upsertedCapabilityRows).toContainEqual(
-      expect.objectContaining({
-        account_owner_user_id: "owner-1",
-        internal_user_id: "tech-1",
-        capability_key: "can_report_non_card_collection",
-        enabled: true,
-        updated_by_user_id: "admin-1",
-      }),
-    );
-    expect(fixture.writes.upsertedCapabilityRows).toContainEqual(
-      expect.objectContaining({
-        capability_key: "can_collect_card_payment",
-        enabled: false,
-      }),
-    );
-    expect(fixture.writes.upsertedCapabilityRows).toContainEqual(
-      expect.objectContaining({
-        capability_key: "can_verify_non_card_collection",
-        enabled: false,
-      }),
-    );
-  });
-
-  it("sets disabled toggles to enabled=false instead of deleting rows", async () => {
+  it("saving Enable field billing access on upserts the included field billing/payment rows without changing the Technician role", async () => {
     const fixture = makeAdminFixture();
     createAdminClientMock.mockReturnValue(fixture.admin);
 
@@ -180,15 +141,76 @@ describe("updateInternalUserFieldBillingCapabilitiesFromForm", () => {
       ),
     ).resolves.toBeUndefined();
 
-    const disabledRows = fixture.writes.upsertedCapabilityRows.filter((row) => row.enabled === false);
-    expect(disabledRows.map((row) => row.capability_key)).toEqual(
-      expect.arrayContaining([
-        "can_view_field_billing_summary",
-        "can_collect_field_payment",
-        "can_report_non_card_collection",
-        "can_collect_card_payment",
-        "can_verify_non_card_collection",
-      ]),
+    expect(requireInternalRoleMock).toHaveBeenCalledWith("admin", { supabase: {} });
+    expect(fixture.writes.updatedInternalUsers).toHaveLength(0);
+    expect(fixture.writes.upsertedCapabilityRows).toHaveLength(6);
+    for (const key of [
+      "field_billing_enabled",
+      "can_view_field_billing_summary",
+      "can_collect_field_payment",
+      "can_collect_card_payment",
+      "can_report_non_card_collection",
+    ]) {
+      expect(capabilityRow(fixture.writes.upsertedCapabilityRows, key)).toEqual(
+        expect.objectContaining({
+          account_owner_user_id: "owner-1",
+          internal_user_id: "tech-1",
+          capability_key: key,
+          enabled: true,
+          updated_by_user_id: "admin-1",
+        }),
+      );
+    }
+    expect(capabilityRow(fixture.writes.upsertedCapabilityRows, "can_verify_non_card_collection")).toEqual(
+      expect.objectContaining({ enabled: false }),
+    );
+  });
+
+  it("saving Enable field billing access off persists the included field billing/payment rows as disabled", async () => {
+    const fixture = makeAdminFixture();
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const mod = await import("@/lib/actions/internal-user-actions");
+
+    await expect(
+      mod.updateInternalUserFieldBillingCapabilitiesFromForm(
+        buildCapabilityFormData([]),
+      ),
+    ).resolves.toBeUndefined();
+
+    for (const key of [
+      "field_billing_enabled",
+      "can_view_field_billing_summary",
+      "can_collect_field_payment",
+      "can_collect_card_payment",
+      "can_report_non_card_collection",
+    ]) {
+      expect(capabilityRow(fixture.writes.upsertedCapabilityRows, key)).toEqual(
+        expect.objectContaining({ enabled: false }),
+      );
+    }
+  });
+
+  it("persists Confirm field-reported payments independently from field billing access", async () => {
+    const fixture = makeAdminFixture();
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const mod = await import("@/lib/actions/internal-user-actions");
+
+    await expect(
+      mod.updateInternalUserFieldBillingCapabilitiesFromForm(
+        buildCapabilityFormData(["can_verify_non_card_collection"]),
+      ),
+    ).resolves.toBeUndefined();
+
+    expect(capabilityRow(fixture.writes.upsertedCapabilityRows, "can_verify_non_card_collection")).toEqual(
+      expect.objectContaining({ enabled: true }),
+    );
+    expect(capabilityRow(fixture.writes.upsertedCapabilityRows, "field_billing_enabled")).toEqual(
+      expect.objectContaining({ enabled: false }),
+    );
+    expect(capabilityRow(fixture.writes.upsertedCapabilityRows, "can_report_non_card_collection")).toEqual(
+      expect.objectContaining({ enabled: false }),
     );
   });
 
