@@ -14,6 +14,7 @@ Current source-of-truth posture remains:
 - Field-reported cash/check/other payment is pending confirmation until office verification.
 - Confirm Payment means office/owner/billing verifies reported non-card money before it counts as collected.
 - Supplemental/add-on invoices preserve the original issued/paid invoice truth.
+- Cash/check/other should be one natural payment entry point, not two competing user-facing layers. The user enters amount, reference/check number when applicable, note, and submits once. The system routes the submission by actor authority: final manual payment truth for actors with Owner/Admin/Billing final manual payment authority, or a pending `field_payment_collection_reports` row for actors with field collection/report authority but no final payment verification/manual-payment authority.
 
 Observed UI posture:
 - Mobile job detail has a `FieldBillingSummary` card with invoice status, totals, balance, add-on family context, and field charge proposal controls.
@@ -31,14 +32,15 @@ Expected fast-path for a field user:
 4. If the user has direct draft charge authority, open invoice workspace and add permitted charges from Work Items first, Pricebook second, manual exception last.
 5. If invoice is issued and unpaid, choose one obvious collection path:
    - `Collect Card Payment` for Stripe checkout.
-   - `Report Payment Collected` for cash/check/other.
-6. If reporting cash/check/other, submit amount, method, reference, and note with `Submit for Confirmation`.
+   - `Payment Collected` for cash/check/other.
+6. If submitting cash/check/other as a field collector, enter amount, method, reference/check number if applicable, and note with `Submit for Confirmation`.
 7. Return to job knowing the invoice state is either paid, unpaid, partially paid, or awaiting office confirmation.
 
 Current field friction:
 - The job-detail Billing card can say payment collection is not enabled from field view, which conflicts with B7 field payment capability goals.
-- The field invoice workspace primary payment section currently says non-card reporting is not enabled in this slice, so a tech cannot discover the intended `Report Payment Collected` path from the workspace.
+- The field invoice workspace primary payment section currently says non-card reporting is not enabled in this slice, so a tech cannot discover the intended cash/check/other payment path from the workspace.
 - Field collection is separated from Owner/Admin/Billing payment options, which is good, but the field section needs to become the obvious mobile primary action when available.
+- The UI should not make technicians choose between `Record Manual Payment` and `Report Payment Collected`; that distinction should be permission-driven routing.
 - The field charge language is partly field-friendly (`Work Items`, `Add Selected Work Items`) and partly accounting-oriented (`Invoice Charges`, `Unit Price`, `Pricebook`).
 - Add-on invoice context is understandable in the office workspace, but field users may not know what to do when the customer adds work after payment unless the Billing card gives a plain-language next step.
 
@@ -49,13 +51,15 @@ Expected desktop path:
 2. Confirm selected invoice context, including whether it is primary or supplemental/add-on.
 3. Review charges and readiness.
 4. Issue/send where allowed.
-5. Choose final-truth collection option:
+5. Choose collection option:
    - Charge saved card once.
    - Create payment link / open Stripe checkout.
-   - Record Manual Payment for office-confirmed off-platform money.
-6. Review Payment History for recorded, failed, reversed, and not-collected activity.
-7. Use closeout queue `Confirm Payment` when a field user reported check/cash/other payment.
-8. Verify only after confirming money was received, or reject with a reason.
+   - Cash/check/other entry for non-card money.
+6. If the actor has Owner/Admin/Billing final manual payment authority, cash/check/other submission uses the existing manual/off-platform payment path, creates final payment truth, and updates invoice paid/balance projection through the existing truth/allocation path. No Confirm Payment queue item is needed.
+7. If the actor has field collection/report authority but lacks final payment verification/manual-payment authority, the same cash/check/other intent creates a `field_payment_collection_reports` row, does not create `internal_invoice_payments`, does not update invoice paid/balance as collected, shows pending/awaiting confirmation state, and routes to Closeout as `Confirm Payment`.
+8. Review Payment History for recorded, failed, reversed, and not-collected activity.
+9. Use closeout queue `Confirm Payment` when a field user reported check/cash/other payment.
+10. Verify only after confirming money was received, or reject with a reason.
 
 Current owner/admin strengths:
 - Office payment controls are clearly absent from the non-financial field collection section.
@@ -77,7 +81,7 @@ Labels/surfaces to tighten:
 - `Field Billing Summary`: good for internal model, but mobile title could simply be `Billing` with field-specific status underneath.
 - `Payment collection is not enabled from field view yet`: misleading after B7 capabilities; replace when field collection/reporting is available.
 - `Check, cash, and other field reporting are not enabled in this slice`: should not remain once B7-P/B7-Q/B7-R/B7-S are considered baseline.
-- `Record manual payment`: correct for Owner/Admin/Billing only, but dangerous if field users ever see it because it sounds similar to reporting collected money.
+- `Record manual payment`: correct for Owner/Admin/Billing final-truth copy, but it should not appear as a competing field-visible choice beside a reporting path.
 - `Payment Link` plus `Create payment link` inside `Payment Options`: duplicate CTAs for the same Stripe-hosted link path.
 - `Supplemental invoices`: model-accurate but less field-friendly than `Add-On invoices`; keep supplemental as secondary/internal context where needed.
 - `reconciliation`: avoid in primary field and closeout copy. Keep it in code/read-model docs, not field UI.
@@ -85,15 +89,17 @@ Labels/surfaces to tighten:
 ## 5. Recommended User-Facing Language
 
 Use these labels:
-- Field cash/check/other entry point: `Report Payment Collected`.
+- Shared cash/check/other intent: `Payment Collected`.
+- Field cash/check/other copy: `Payment collected - submit for office confirmation.`
 - Field non-card submit button: `Submit for Confirmation`.
 - Office queue/filter/chip: `Confirm Payment`.
-- Office final-truth form: `Record Manual Payment`.
+- Owner/Admin/Billing action: `Record Manual Payment`.
 - Add-on after issued/paid invoice: `Create Add-On Invoice`.
 - Field status for non-card report: `Awaiting Confirmation`.
 
 Suggested copy:
-- Field report explainer: `Use this when the customer paid by cash, check, or another non-card method. Office confirmation is required before the invoice is marked paid.`
+- Shared non-card explainer: `Use this when the customer paid by cash, check, or another non-card method.`
+- Field report explainer: `Payment collected - submit for office confirmation. The invoice is not marked paid until the office confirms the money was received.`
 - Field card explainer: `Card payments open secure Stripe Checkout. The invoice updates after Stripe confirms payment.`
 - Office manual payment explainer: `Use only after the office has confirmed the money was received. This records final payment truth in Compliance Matters.`
 - Confirm Payment queue explainer: `A field user reported payment. Verify only after confirming the money was received.`
@@ -108,12 +114,12 @@ For field users on mobile, the Billing card and invoice workspace should priorit
    - No invoice/draft without field direct authority: `Add Proposed Charge`.
    - Draft with direct authority: `Build Invoice`.
    - Issued with balance and card authority: `Collect Card Payment`.
-   - Issued with balance and non-card authority: `Report Payment Collected`.
+   - Issued with balance and non-card authority: `Payment Collected`.
    - Paid: `Payment Complete`.
    - Pending non-card report: `Awaiting Confirmation`.
 3. Secondary action: `Open Invoice Workspace` only when needed.
 4. Charges section: Work Items first, Pricebook second, manual exception last.
-5. Payment method choice: card and cash/check/other as separate cards, not mixed into office financial controls.
+5. Payment method choice: card and cash/check/other as separate actions, not mixed into office financial controls.
 6. Add-on guidance: show `Create Add-On Invoice` or `Request Add-On Invoice` only when the original invoice is issued/paid and the user has the correct authority.
 7. Office-only controls hidden entirely from field users: saved-card charge, manual payment record, reversal, payment history correction, failed autopay retry.
 
@@ -127,8 +133,8 @@ For Owner/Admin/Billing on desktop, keep richer controls but group them by truth
    - `Create payment link`.
    - Stripe readiness/failure notices.
 4. Office Final Payment:
-   - `Record Manual Payment`.
-   - Copy says it is final office truth.
+   - Cash/check/other entry may use office copy: `Record manual payment - this records final payment truth.`
+   - The action should reuse the existing final manual payment path when the actor has authority.
 5. Field Reports:
    - `Confirm Payment` attention, if a pending field report exists for this invoice/job.
    - Link to queue item or inline read-only summary with verify/reject only for authorized verifiers.
@@ -148,11 +154,14 @@ Field collector with card authority:
 - Hide `Charge saved card once`, `Record Manual Payment`, reversal, failed autopay retry, and full office payment history controls.
 
 Field collector with non-card reporting authority:
-- Show `Report Payment Collected`.
+- Show the cash/check/other intent as `Payment Collected`.
+- Copy says `Payment collected - submit for office confirmation.`
 - Submit button is `Submit for Confirmation`.
 - Show pending state as `Awaiting Confirmation`.
 - Never show `Record Manual Payment`.
 - Never show Verify/Reject for the user's own report.
+- Submission creates a `field_payment_collection_reports` row only because the actor lacks final payment verification/manual-payment authority.
+- Do not create `internal_invoice_payments` or update invoice paid/balance as collected until confirmation.
 
 Field charge proposal actor:
 - Show `Add Proposed Charge`.
@@ -166,7 +175,10 @@ Trusted field direct invoice actor:
 
 Owner/Admin/Billing:
 - Show final-truth payment controls.
-- Show `Record Manual Payment` only here.
+- Show cash/check/other entry as `Record Manual Payment`.
+- Route cash/check/other submission through the existing manual/off-platform payment path.
+- Create final payment truth and update invoice paid/balance projection through the existing truth/allocation path.
+- Do not create a Confirm Payment queue item for this authorized final-truth path.
 - Show `Confirm Payment` queue and Verify/Reject where allowed.
 - Show full payment history and correction/reversal controls under existing rules.
 
@@ -185,8 +197,11 @@ Why first:
 
 Slice contents:
 - Replace field-facing "not enabled" copy with the approved language when `can_report_non_card_collection` is true.
-- Add a visible `Report Payment Collected` field panel for issued invoices with balance when the actor has non-card reporting authority and lacks financial lifecycle authority.
-- Use `Submit for Confirmation` as the submit label.
+- Add one visible cash/check/other payment intent for issued invoices with balance.
+- Route that intent by actor authority:
+  - Owner/Admin/Billing final manual payment authority uses the existing manual/off-platform payment path, creates final payment truth, updates invoice paid/balance through existing truth/allocation, and creates no Confirm Payment queue item.
+  - field collection/report authority without final payment verification/manual-payment authority creates a `field_payment_collection_reports` row, creates no `internal_invoice_payments`, does not update invoice paid/balance as collected, and routes to Confirm Payment.
+- Use `Submit for Confirmation` only for actors whose submission will remain pending.
 - Add `Awaiting Confirmation` status display where a pending field report read-model is available.
 - Keep `Record Manual Payment` hidden from field-only actors.
 - Keep no payment truth, Stripe, schema, or issue/send behavior changes.
@@ -212,26 +227,31 @@ This B8-A audit does not recommend doing any of the following in this slice:
 - No automatic verification of field-reported money.
 - No treating a field report as collected payment before office confirmation.
 - No exposing `Record Manual Payment` to field-only users.
+- No duplicate non-card payment layer or duplicate non-card payment truth.
+- No making technicians choose between manual payment and field report paths.
+- No Confirm Payment queue item for Owner/Admin/Billing final manual payment submissions.
+- No `internal_invoice_payments` row from a field collector pending-confirmation report.
+- No invoice paid/balance collected update from a pending field report.
 - No merging supplemental/add-on balances back into the original invoice.
 
 ## Top Field-User Friction Points
 
 1. Field-facing copy still says payment collection/non-card reporting is not enabled, which conflicts with the B7 baseline and hides the intended path.
 2. There is not yet one obvious mobile primary action that adapts across draft charges, card collection, non-card reporting, paid, and awaiting-confirmation states.
-3. Field users can understand card collection, but cash/check/other reporting is not yet surfaced as a first-class field action in the workspace.
+3. Field users can understand card collection, but cash/check/other collection is not yet surfaced as a first-class field action whose result is routed by authority.
 4. Charge creation still mixes helpful field language (`Work Items`) with accounting language (`Invoice Charges`, `Unit Price`, `Pricebook`) that may slow a tech on mobile.
 5. Add-on invoice truth is protected, but field users need clearer "customer added something after payment" guidance.
 
 ## Top Owner/Admin/Billing Friction Points
 
 1. Payment actions are split across multiple boxes, including duplicate payment-link surfaces.
-2. `Record Manual Payment` needs stronger point-of-action final-truth language.
+2. Cash/check/other final manual payment needs stronger point-of-action final-truth language for authorized office users.
 3. Verify/Reject controls are correct but dense; Verify should be visually clearer without making Reject feel casual.
 4. Payment history should label source context more explicitly after Stripe, office manual, and verified field report payments.
 5. Supplemental/add-on context is present, but the desktop hierarchy should keep add-on creation separate from core collection controls.
 
 ## Audit Conclusion
 
-The current permission model is directionally correct: field users are mostly protected from office-only final payment tools, and Owner/Admin/Billing can still access deeper controls. The main B8-A risk is not payment truth; it is discoverability and language. Field users need a compact mobile path that says exactly what they can do now: build/add permitted charges, collect card through Stripe, or report cash/check/other for office confirmation.
+The current permission model is directionally correct: field users are mostly protected from office-only final payment tools, and Owner/Admin/Billing can still access deeper controls. The main B8-A risk is not payment truth; it is discoverability and language. Field users need a compact mobile path that says exactly what they can do now: build/add permitted charges, collect card through Stripe, or submit cash/check/other collected payment for office confirmation. Owner/Admin/Billing can use the same cash/check/other intent, but their authorized submission records final manual payment truth through the existing path.
 
 Recommended first implementation slice: Field Payment Workspace Copy + Hierarchy Alignment.
