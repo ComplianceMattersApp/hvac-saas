@@ -4,15 +4,18 @@ type SupabaseLikeClient = {
   from: (table: string) => {
     select: (columns: string) => {
       eq: (column: string, value: unknown) => any;
+      in?: (column: string, values: unknown[]) => any;
     };
   };
 };
 
 type CapabilityRow = {
+  internal_user_id?: string | null;
   capability_key?: string | null;
+  enabled?: boolean | null;
 };
 
-const FIELD_BILLING_CAPABILITY_KEYS = [
+export const FIELD_BILLING_ACCESS_CAPABILITY_KEYS = [
   'field_billing_enabled',
   'can_view_field_billing_summary',
   'can_collect_field_payment',
@@ -21,7 +24,9 @@ const FIELD_BILLING_CAPABILITY_KEYS = [
   'can_verify_non_card_collection',
 ] as const satisfies ReadonlyArray<keyof FieldBillingCapabilities>;
 
-const FIELD_BILLING_CAPABILITY_KEY_SET = new Set<string>(FIELD_BILLING_CAPABILITY_KEYS);
+export type FieldBillingAccessCapabilityKey = (typeof FIELD_BILLING_ACCESS_CAPABILITY_KEYS)[number];
+
+const FIELD_BILLING_CAPABILITY_KEY_SET = new Set<string>(FIELD_BILLING_ACCESS_CAPABILITY_KEYS);
 
 function cleanId(value: unknown) {
   return String(value ?? '').trim();
@@ -68,4 +73,48 @@ export async function loadFieldBillingExplicitCapabilitiesForUser(params: {
   }
 
   return mapCapabilityRows(data as CapabilityRow[] | null | undefined);
+}
+
+export async function loadFieldBillingCapabilityStatesForUsers(params: {
+  supabase: SupabaseLikeClient;
+  accountOwnerUserId?: string | null;
+  internalUserIds?: Array<string | null | undefined> | null;
+}): Promise<Record<string, Partial<Record<FieldBillingAccessCapabilityKey, boolean>>>> {
+  const accountOwnerUserId = cleanId(params.accountOwnerUserId);
+  const internalUserIds = Array.from(
+    new Set((params.internalUserIds ?? []).map(cleanId).filter(Boolean)),
+  );
+
+  if (!accountOwnerUserId || internalUserIds.length === 0) {
+    return {};
+  }
+
+  const query = params.supabase
+    .from('internal_user_access_capabilities')
+    .select('internal_user_id, capability_key, enabled')
+    .eq('account_owner_user_id', accountOwnerUserId);
+
+  const { data, error } = await (typeof query.in === 'function'
+    ? query.in('internal_user_id', internalUserIds)
+    : query);
+
+  if (error) {
+    console.warn('Failed to load internal user field billing capability states', {
+      accountOwnerUserId,
+      internalUserIds,
+      error: error instanceof Error ? error.message : String((error as any)?.message ?? error),
+    });
+    return {};
+  }
+
+  const states: Record<string, Partial<Record<FieldBillingAccessCapabilityKey, boolean>>> = {};
+  for (const row of (data ?? []) as CapabilityRow[]) {
+    const internalUserId = cleanId(row.internal_user_id);
+    const capabilityKey = cleanId(row.capability_key);
+    if (!internalUserId || !FIELD_BILLING_CAPABILITY_KEY_SET.has(capabilityKey)) continue;
+    states[internalUserId] ??= {};
+    states[internalUserId][capabilityKey as FieldBillingAccessCapabilityKey] = row.enabled === true;
+  }
+
+  return states;
 }

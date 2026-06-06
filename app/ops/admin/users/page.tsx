@@ -10,8 +10,13 @@ import {
   activateInternalUserFromForm,
   deactivateInternalUserFromForm,
   inviteInternalUserFromForm,
+  updateInternalUserFieldBillingCapabilitiesFromForm,
   updateInternalUserRoleFromForm,
 } from "@/lib/actions/internal-user-actions";
+import {
+  loadFieldBillingCapabilityStatesForUsers,
+  type FieldBillingAccessCapabilityKey,
+} from "@/lib/auth/internal-user-access-capabilities";
 import {
   resendContractorInviteFromForm,
   resendInternalInviteFromForm,
@@ -39,7 +44,83 @@ type UserRecord = {
   isActiveFlag: boolean | null;
   contractorId: string | null;
   source: "membership" | "invite";
+  fieldBillingCapabilities?: Partial<Record<FieldBillingAccessCapabilityKey, boolean>>;
 };
+
+const FIELD_BILLING_ACCESS_TOGGLES: Array<{
+  key: FieldBillingAccessCapabilityKey;
+  label: string;
+  helper?: string;
+  tone?: "standard" | "verify";
+}> = [
+  { key: "field_billing_enabled", label: "Enable field billing access" },
+  { key: "can_view_field_billing_summary", label: "View billing summary" },
+  { key: "can_collect_field_payment", label: "Field payment collection" },
+  { key: "can_report_non_card_collection", label: "Report cash/check/other payment" },
+  { key: "can_collect_card_payment", label: "Collect card payment" },
+  {
+    key: "can_verify_non_card_collection",
+    label: "Verify reported non-card payments",
+    helper: "Grant only to office or trusted financial reviewers.",
+    tone: "verify",
+  },
+];
+
+function FieldBillingAccessControls(params: {
+  userId: string;
+  capabilities?: Partial<Record<FieldBillingAccessCapabilityKey, boolean>>;
+}) {
+  return (
+    <form
+      action={updateInternalUserFieldBillingCapabilitiesFromForm}
+      className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3"
+    >
+      <input type="hidden" name="user_id" value={params.userId} />
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+        <div className="space-y-1">
+          <h3 className="text-sm font-semibold text-slate-950">Field Billing Access</h3>
+          <p className="text-xs leading-5 text-slate-600">These permissions do not change the user's role.</p>
+          <p className="text-xs leading-5 text-slate-600">
+            Reporting cash/check/other creates a Confirm Payment item unless the user has verification/final payment authority.
+          </p>
+        </div>
+        <button
+          type="submit"
+          className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
+        >
+          Save Field Billing Access
+        </button>
+      </div>
+      <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+        {FIELD_BILLING_ACCESS_TOGGLES.map((toggle) => (
+          <label
+            key={toggle.key}
+            className={`flex items-start gap-2 rounded-xl border bg-white px-3 py-2 text-sm ${
+              toggle.tone === "verify"
+                ? "border-amber-200 text-amber-950"
+                : "border-slate-200 text-slate-800"
+            }`}
+          >
+            <input
+              type="checkbox"
+              name="capability_key"
+              value={toggle.key}
+              defaultChecked={params.capabilities?.[toggle.key] === true}
+              className="mt-0.5 h-4 w-4 rounded border-slate-300 text-slate-900"
+            />
+            <span>
+              <span className="block font-medium">{toggle.label}</span>
+              {toggle.helper ? <span className="block text-xs leading-5 text-amber-800">{toggle.helper}</span> : null}
+            </span>
+          </label>
+        ))}
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-500">
+        This does not grant Billing/Admin role, final manual payment authority, refunds, reversals, exports, or invoice issue/send authority.
+      </p>
+    </form>
+  );
+}
 
 const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   invite_resent: { tone: "success", message: "Invite link resent successfully." },
@@ -217,6 +298,14 @@ export default async function AdminUsersCommandCenterPage({
   for (const row of contractorUsers ?? []) userIds.add(String(row.user_id));
 
   const ids = Array.from(userIds);
+  const internalUserIds = (internalUsers ?? [])
+    .map((row: any) => String(row?.user_id ?? "").trim())
+    .filter(Boolean);
+  const fieldBillingCapabilityStates = await loadFieldBillingCapabilityStatesForUsers({
+    supabase: supabase as any,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    internalUserIds,
+  });
 
   const profileMap = new Map<string, { email: string; fullName: string }>();
   if (ids.length > 0) {
@@ -269,6 +358,7 @@ export default async function AdminUsersCommandCenterPage({
       isActiveFlag: Boolean(row.is_active),
       contractorId: null,
       source: "membership",
+      fieldBillingCapabilities: fieldBillingCapabilityStates[id] ?? {},
     });
   }
 
@@ -630,6 +720,12 @@ export default async function AdminUsersCommandCenterPage({
                       ) : null}
                     </div>
                   </div>
+                  {record.category === "internal" && record.userId ? (
+                    <FieldBillingAccessControls
+                      userId={record.userId}
+                      capabilities={record.fieldBillingCapabilities}
+                    />
+                  ) : null}
                 </div>
               );
             })}

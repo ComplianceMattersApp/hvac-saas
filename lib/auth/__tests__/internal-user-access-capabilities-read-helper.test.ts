@@ -198,6 +198,28 @@ describe('loadFieldBillingExplicitCapabilitiesForUser', () => {
     expect(canRecordInvoicePayment(techParams(explicitCapabilities))).toBe(false);
   });
 
+  it('lets a Technician with saved collect/report capability get field report authority without verification authority', async () => {
+    const fixture = makeSupabase([
+      { account_owner_user_id: 'owner-1', internal_user_id: 'tech-1', enabled: true, capability_key: 'field_billing_enabled' },
+      { account_owner_user_id: 'owner-1', internal_user_id: 'tech-1', enabled: true, capability_key: 'can_view_field_billing_summary' },
+      { account_owner_user_id: 'owner-1', internal_user_id: 'tech-1', enabled: true, capability_key: 'can_collect_field_payment' },
+      { account_owner_user_id: 'owner-1', internal_user_id: 'tech-1', enabled: true, capability_key: 'can_report_non_card_collection' },
+      { account_owner_user_id: 'owner-1', internal_user_id: 'tech-1', enabled: false, capability_key: 'can_verify_non_card_collection' },
+    ]);
+
+    const explicitCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
+      supabase: fixture.supabase,
+      accountOwnerUserId: 'owner-1',
+      internalUserId: 'tech-1',
+    });
+    const resolved = resolveFieldBillingCapabilities(techParams(explicitCapabilities));
+
+    expect(resolved.can_collect_field_payment).toBe(true);
+    expect(resolved.can_report_non_card_collection).toBe(true);
+    expect(resolved.can_verify_non_card_collection).toBe(false);
+    expect(canRecordInvoicePayment(techParams(explicitCapabilities))).toBe(false);
+  });
+
   it('fails closed to empty capabilities and logs read failures', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const fixture = makeSupabase([], new Error('relation missing'));

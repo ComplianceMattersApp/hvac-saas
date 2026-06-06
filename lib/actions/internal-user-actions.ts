@@ -11,6 +11,7 @@ import {
   requireInternalRole,
   type InternalRole,
 } from "@/lib/auth/internal-user";
+import { FIELD_BILLING_ACCESS_CAPABILITY_KEYS } from "@/lib/auth/internal-user-access-capabilities";
 
 type InternalUserRecord = {
   user_id: string;
@@ -42,6 +43,9 @@ function revalidateInternalUserViews() {
   revalidatePath("/ops/admin");
   revalidatePath("/ops/admin/internal-users");
   revalidatePath("/ops/admin/users");
+  revalidatePath("/ops/closeout-queue");
+  revalidatePath("/reports/payment-reconciliation");
+  revalidatePath("/jobs");
   revalidatePath("/account");
   revalidatePath("/");
 }
@@ -367,6 +371,57 @@ export async function updateInternalUserRoleFromForm(formData: FormData): Promis
     .eq("account_owner_user_id", actorInternalUser.account_owner_user_id)
     .select("user_id")
     .single();
+
+  if (error) throw error;
+
+  revalidateInternalUserViews();
+}
+
+export async function updateInternalUserFieldBillingCapabilitiesFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const {
+    userId: actorUserId,
+    internalUser: actorInternalUser,
+  } = await requireInternalRole("admin", { supabase });
+
+  const admin = createAdminClient();
+  const targetUserId = String(formData.get("user_id") ?? "").trim();
+  if (!targetUserId) {
+    throw new Error("MISSING_TARGET_USER_ID");
+  }
+
+  const target = await requireScopedTarget(
+    admin,
+    actorInternalUser.account_owner_user_id,
+    targetUserId,
+  );
+
+  const allowedCapabilityKeys = new Set<string>(FIELD_BILLING_ACCESS_CAPABILITY_KEYS);
+  const submittedCapabilityKeys = formData
+    .getAll("capability_key")
+    .map((value) => String(value ?? "").trim())
+    .filter(Boolean);
+
+  for (const capabilityKey of submittedCapabilityKeys) {
+    if (!allowedCapabilityKeys.has(capabilityKey)) {
+      throw new Error("UNKNOWN_FIELD_BILLING_CAPABILITY");
+    }
+  }
+
+  const enabledCapabilityKeys = new Set(submittedCapabilityKeys);
+  const rows = FIELD_BILLING_ACCESS_CAPABILITY_KEYS.map((capabilityKey) => ({
+    account_owner_user_id: actorInternalUser.account_owner_user_id,
+    internal_user_id: target.user_id,
+    capability_key: capabilityKey,
+    enabled: enabledCapabilityKeys.has(capabilityKey),
+    updated_by_user_id: actorUserId,
+  }));
+
+  const { error } = await admin
+    .from("internal_user_access_capabilities")
+    .upsert(rows, {
+      onConflict: "account_owner_user_id,internal_user_id,capability_key",
+    });
 
   if (error) throw error;
 
