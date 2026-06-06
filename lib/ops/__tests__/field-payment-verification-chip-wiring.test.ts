@@ -26,9 +26,9 @@ describe("/ops field payment verification chip wiring", () => {
     expect(opsPageSource).toContain("(fieldPaymentReconciliationAttention?.summary.openCount ?? 0) > 0");
   });
 
-  it("renders closeout attention chip copy and links to closeout reconciliation anchor", () => {
-    expect(opsPageSource).toContain("Field payment verification needed:");
-    expect(opsPageSource).toContain("#field-payment-reconciliation-attention");
+  it("renders Confirm Payment chip copy and links to closeout confirm payment filter", () => {
+    expect(opsPageSource).toContain("Confirm Payment:");
+    expect(opsPageSource).toContain('filter: "confirm_payment"');
     expect(opsPageSource).toContain("/ops/closeout-queue");
   });
 

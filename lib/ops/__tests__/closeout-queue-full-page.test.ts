@@ -110,12 +110,10 @@ describe("/ops/closeout-queue page", () => {
     expect(jobOpsActionsSource).toContain("success_notice");
   });
 
-  it("surfaces field-reported non-card payment reconciliation in the closeout attention workflow", () => {
+  it("loads field-reported non-card payment reconciliation through the existing read model", () => {
     expect(closeoutQueuePageSource).toContain("listFieldPaymentCollectionReportsForReconciliation");
-    expect(closeoutQueuePageSource).toContain("Field Payment Reconciliation Attention");
-    expect(closeoutQueuePageSource).toContain(
-      "Field-reported payment requires office verification before it counts as collected.",
-    );
+    expect(closeoutQueuePageSource).toContain("openFieldPaymentItems");
+    expect(closeoutQueuePageSource).toContain("visibleFieldPaymentItems");
   });
 
   it("gates field payment reconciliation attention to financial authority or verification permission", () => {
@@ -125,22 +123,26 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).toContain("canViewFieldPaymentReconciliationAttention");
   });
 
-  it("links reconciliation items to selected invoice workspace and job", () => {
+  it("links confirm payment cards to selected invoice workspace and job", () => {
     expect(closeoutQueuePageSource).toContain("item.links.invoiceWorkspaceHref");
     expect(closeoutQueuePageSource).toContain("Open invoice workspace");
     expect(closeoutQueuePageSource).toContain("item.links.jobHref");
-    expect(closeoutQueuePageSource).toContain("Open job");
+    expect(closeoutQueuePageSource).toContain("View Job");
   });
 
-  it("exposes a stable section anchor for Ops dashboard reconciliation chips", () => {
-    expect(closeoutQueuePageSource).toContain('id="field-payment-reconciliation-attention"');
+  it("adds a Confirm Payment queue filter chip when open reports exist", () => {
+    expect(closeoutQueuePageSource).toContain("showConfirmPaymentFilter");
+    expect(closeoutQueuePageSource).toContain("Confirm Payment (");
+    expect(closeoutQueuePageSource).toContain("filter=confirm_payment");
+    expect(closeoutQueuePageSource).toContain("openFieldPaymentCount");
   });
 
-  it("shows verify and reject controls for authorized reconciliation viewers", () => {
+  it("shows verify and reject controls integrated into closeout-style confirm payment cards", () => {
     expect(closeoutQueuePageSource).toContain("verifyFieldPaymentCollectionReportFromForm");
     expect(closeoutQueuePageSource).toContain("rejectFieldPaymentCollectionReportFromForm");
     expect(closeoutQueuePageSource).toMatch(/>\s*Verify\s*</);
     expect(closeoutQueuePageSource).toMatch(/>\s*Reject\s*</);
+    expect(closeoutQueuePageSource).toContain("Field-reported payment needs confirmation.");
   });
 
   it("posts required B7-R payload fields for verify and reject actions", () => {
@@ -164,19 +166,20 @@ describe("/ops/closeout-queue page", () => {
   });
 
   it("keeps correction and void controls out of this slice", () => {
-    expect(closeoutQueuePageSource).toContain("Correction and void actions are not enabled in this slice.");
     expect(closeoutQueuePageSource).not.toMatch(/>\s*Correct\s*</);
     expect(closeoutQueuePageSource).not.toMatch(/>\s*Void\s*</);
   });
 
-  it("uses required B7-S verification/rejection copy", () => {
+  it("uses required Confirm Payment helper and action copy", () => {
     expect(closeoutQueuePageSource).toContain(
-      "Use Verify only after the office confirms this check, cash, or other payment was received.",
+      "Check, cash, and other field-reported payments count as collected only after office confirmation.",
     );
-    expect(closeoutQueuePageSource).toContain("Verification records this as final payment truth.");
+    expect(closeoutQueuePageSource).toContain("Verify only after confirming the money was received.");
     expect(closeoutQueuePageSource).toContain("Rejecting does not record payment.");
-    expect(closeoutQueuePageSource).toContain(
-      "Rejecting removes this item from active reconciliation and does not record payment.",
-    );
+  });
+
+  it("removes large standalone yellow reconciliation panel as primary presentation", () => {
+    expect(closeoutQueuePageSource).not.toContain("Field Payment Reconciliation Attention");
+    expect(closeoutQueuePageSource).not.toContain("bg-amber-50/60");
   });
 });

@@ -4276,10 +4276,13 @@ return (
             {showFieldPaymentVerificationChip ? (
               <div className="mt-1">
                 <Link
-                  href={`/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}#field-payment-reconciliation-attention`}
+                  href={`/ops/closeout-queue${buildQueryString({
+                    contractor: contractorScopeFilter ?? "",
+                    filter: "confirm_payment",
+                  })}`}
                   className="inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900 hover:bg-amber-100"
                 >
-                  Field payment verification needed: {fieldPaymentReconciliationAttention?.summary.openCount ?? 0}
+                  Confirm Payment: {fieldPaymentReconciliationAttention?.summary.openCount ?? 0}
                 </Link>
               </div>
             ) : null}

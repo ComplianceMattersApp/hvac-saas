@@ -27,7 +27,7 @@ import { formatBusinessDateUS, formatTimestampDateDisplayLA } from "@/lib/utils/
 const baseSelect =
   "id, title, status, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, location_id, created_at, next_action_note, action_required_by, visit_scope_summary";
 
-type CloseoutFilter = "all" | "invoice_required" | "paperwork_required" | "failed_review";
+type CloseoutFilter = "all" | "invoice_required" | "paperwork_required" | "failed_review" | "confirm_payment";
 type CloseoutSort = "newest" | "oldest" | "contractor";
 type CloseoutNotice = "external_billing_complete" | "external_invoice_sent" | "";
 
@@ -36,6 +36,7 @@ function normalizeFilter(value?: string | null): CloseoutFilter {
   if (normalized === "invoice_required") return "invoice_required";
   if (normalized === "paperwork_required") return "paperwork_required";
   if (normalized === "failed_review") return "failed_review";
+  if (normalized === "confirm_payment") return "confirm_payment";
   return "all";
 }
 
@@ -133,6 +134,12 @@ function formatMethodLabel(method: string | null | undefined) {
   if (normalized === "check") return "Check";
   if (normalized === "other") return "Other";
   return "Other";
+}
+
+function formatReportedAt(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return "-";
+  return formatTimestampDateDisplayLA(normalized) || "-";
 }
 
 function parseDateOnlyYmd(value?: string | null): Date | null {
@@ -286,6 +293,7 @@ export default async function CloseoutQueuePage({
 
   const visibleRows = sortCloseoutQueueJobs(
     enriched.filter((row) => {
+      if (filter === "confirm_payment") return false;
       if (filter === "invoice_required") return row.needs.needsInvoice;
       if (filter === "paperwork_required") return row.needs.needsCerts;
       if (filter === "failed_review") {
@@ -300,6 +308,18 @@ export default async function CloseoutQueuePage({
     (row) => String(row.job?.created_at ?? ""),
     (row) => String(row.job?.id ?? ""),
   );
+
+  const openFieldPaymentItems = canViewFieldPaymentReconciliationAttention
+    ? fieldPaymentReconciliationAttention?.items ?? []
+    : [];
+  const openFieldPaymentCount = canViewFieldPaymentReconciliationAttention
+    ? fieldPaymentReconciliationAttention?.summary.openCount ?? 0
+    : 0;
+  const showConfirmPaymentFilter = canViewFieldPaymentReconciliationAttention && openFieldPaymentCount > 0;
+  const visibleFieldPaymentItems =
+    canViewFieldPaymentReconciliationAttention && (filter === "all" || filter === "confirm_payment")
+      ? openFieldPaymentItems
+      : [];
 
   const summary = {
     total: enriched.length,
@@ -393,6 +413,14 @@ export default async function CloseoutQueuePage({
           >
             Failed / Review Required
           </Link>
+          {showConfirmPaymentFilter ? (
+            <Link
+              href={`${baseHref}${contractor ? "&" : "?"}filter=confirm_payment&sort=${sort}`}
+              className={`inline-flex rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${filter === "confirm_payment" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
+            >
+              Confirm Payment ({openFieldPaymentCount})
+            </Link>
+          ) : null}
 
           <div className="ml-auto flex items-center gap-1.5">
             <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Sort</span>
@@ -416,143 +444,15 @@ export default async function CloseoutQueuePage({
             </Link>
           </div>
         </div>
+
+        {canViewFieldPaymentReconciliationAttention ? (
+          <p className="mt-3 text-xs text-slate-600">
+            Check, cash, and other field-reported payments count as collected only after office confirmation.
+          </p>
+        ) : null}
       </section>
 
-      {canViewFieldPaymentReconciliationAttention ? (
-        <section id="field-payment-reconciliation-attention" className="mb-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.35)]">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <h2 className="text-sm font-semibold text-amber-900">Field Payment Reconciliation Attention</h2>
-              <p className="mt-1 text-xs text-amber-800">
-                Field-reported payment requires office verification before it counts as collected.
-              </p>
-            </div>
-            <span className="inline-flex rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-amber-900">
-              Open reports: {fieldPaymentReconciliationAttention?.summary.openCount ?? 0}
-            </span>
-          </div>
-
-          <p className="mt-2 text-xs text-amber-800">
-            Card payments are confirmed by Stripe. Check, cash, and other field reports stay here until verified.
-          </p>
-          <p className="mt-1 text-xs text-amber-800">
-            Use Verify only after the office confirms this check, cash, or other payment was received.
-          </p>
-          <p className="mt-1 text-xs text-amber-800">Verification records this as final payment truth.</p>
-          <p className="mt-1 text-xs text-amber-800">Rejecting does not record payment.</p>
-
-          {!fieldPaymentReconciliationAttention?.items?.length ? (
-            <div className="mt-3 rounded-xl border border-dashed border-amber-300 bg-white px-4 py-3 text-xs text-amber-900">
-              No open field payment reconciliation reports.
-            </div>
-          ) : (
-            <div className="mt-3 overflow-x-auto">
-              <table className="min-w-full text-xs">
-                <thead>
-                  <tr className="text-left uppercase tracking-[0.08em] text-amber-800">
-                    <th className="px-2 py-2 font-semibold">Invoice</th>
-                    <th className="px-2 py-2 font-semibold">Job</th>
-                    <th className="px-2 py-2 font-semibold">Method</th>
-                    <th className="px-2 py-2 font-semibold">Amount</th>
-                    <th className="px-2 py-2 font-semibold">Status</th>
-                    <th className="px-2 py-2 font-semibold">Reference</th>
-                    <th className="px-2 py-2 font-semibold">Action</th>
-                    <th className="px-2 py-2 font-semibold">Verification</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fieldPaymentReconciliationAttention.items.map((item) => {
-                    const isSelfReported = item.reportedByUserId === user.id;
-                    return (
-                      <tr key={item.reportId} className="border-t border-amber-200/70 text-amber-900">
-                        <td className="px-2 py-2">{item.invoiceReference}</td>
-                        <td className="px-2 py-2">{item.jobReference}</td>
-                        <td className="px-2 py-2">{formatMethodLabel(item.paymentMethod)}</td>
-                        <td className="px-2 py-2">{formatUsdFromCents(item.amountCents)}</td>
-                        <td className="px-2 py-2">{formatReconciliationStatus(item.status)}</td>
-                        <td className="px-2 py-2">{item.reference || "-"}</td>
-                        <td className="px-2 py-2">
-                          <div className="flex flex-wrap gap-2">
-                            <Link href={item.links.invoiceWorkspaceHref} className="font-semibold text-blue-700 hover:underline">
-                              Open invoice workspace
-                            </Link>
-                            <Link href={item.links.jobHref} className="font-semibold text-blue-700 hover:underline">
-                              Open job
-                            </Link>
-                          </div>
-                        </td>
-                        <td className="px-2 py-2">
-                          {isSelfReported ? (
-                            <div className="rounded-lg border border-amber-300 bg-amber-100 px-2 py-1 text-[11px] font-semibold text-amber-900">
-                              Reporter cannot verify their own report.
-                            </div>
-                          ) : (
-                            <div className="space-y-2 rounded-lg border border-amber-200 bg-white p-2 text-[11px]">
-                              <form action={verifyFieldPaymentCollectionReportFromForm} className="space-y-2">
-                                <input type="hidden" name="field_payment_report_id" value={item.reportId} />
-                                <input type="hidden" name="report_id" value={item.reportId} />
-                                <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
-                                <input type="hidden" name="job_id" value={item.jobId} />
-                                <input type="hidden" name="tab" value="info" />
-                                <input type="hidden" name="return_to" value={`${currentQueueHref}#field-payment-reconciliation-attention`} />
-                                <label className="block">
-                                  <span className="mb-1 block font-semibold text-amber-900">Verification note</span>
-                                  <input
-                                    name="verification_note"
-                                    type="text"
-                                    className="w-full rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] text-amber-900"
-                                    placeholder="Optional office confirmation details"
-                                  />
-                                </label>
-                                <p className="text-[10px] text-amber-800">
-                                  Use Verify only after the office confirms this check, cash, or other payment was received.
-                                </p>
-                                <SubmitButton className={compactActionClass} loadingText="Verifying...">
-                                  Verify
-                                </SubmitButton>
-                              </form>
-                              <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2">
-                                <input type="hidden" name="field_payment_report_id" value={item.reportId} />
-                                <input type="hidden" name="report_id" value={item.reportId} />
-                                <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
-                                <input type="hidden" name="job_id" value={item.jobId} />
-                                <input type="hidden" name="tab" value="info" />
-                                <input type="hidden" name="return_to" value={`${currentQueueHref}#field-payment-reconciliation-attention`} />
-                                <label className="block">
-                                  <span className="mb-1 block font-semibold text-amber-900">Rejection reason</span>
-                                  <input
-                                    name="rejection_reason"
-                                    type="text"
-                                    required
-                                    className="w-full rounded-md border border-amber-300 bg-white px-2 py-1 text-[11px] text-amber-900"
-                                    placeholder="Required"
-                                  />
-                                </label>
-                                <p className="text-[10px] text-amber-800">
-                                  Rejecting removes this item from active reconciliation and does not record payment.
-                                </p>
-                                <SubmitButton className={compactActionClass} loadingText="Rejecting...">
-                                  Reject
-                                </SubmitButton>
-                              </form>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <p className="mt-2 text-[11px] text-amber-800">
-            Correction and void actions are not enabled in this slice.
-          </p>
-        </section>
-      ) : null}
-
-      {visibleRows.length === 0 ? (
+      {visibleRows.length === 0 && visibleFieldPaymentItems.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-6 py-12 text-center">
           <p className="text-sm font-medium text-slate-500">No closeout work is waiting right now.</p>
           <p className="mt-1 text-xs text-slate-400">
@@ -567,6 +467,137 @@ export default async function CloseoutQueuePage({
         </div>
       ) : (
         <div className="space-y-3">
+          {visibleFieldPaymentItems.map((item) => {
+            const isSelfReported = item.reportedByUserId === user.id;
+            return (
+              <article
+                id={`field-payment-report-${item.reportId}`}
+                key={item.reportId}
+                className="rounded-xl border border-l-4 border-slate-200 border-l-violet-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-violet-900/35 sm:px-5"
+              >
+                <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,1.05fr)_minmax(15rem,0.76fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-5">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Link
+                        href={item.links.jobHref}
+                        className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                      >
+                        {item.jobTitle || item.jobReference}
+                      </Link>
+                      <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-violet-700">
+                        Confirm Payment
+                      </span>
+                    </div>
+
+                    <div className="mt-2 text-sm font-semibold text-slate-800">{item.customerDisplayName || "Customer"}</div>
+                    <div className="mt-2 grid gap-1 text-sm leading-5 text-slate-500">
+                      <div>
+                        <span className={labelClass}>Reason</span>
+                        <div className="font-medium text-slate-700">Field-reported payment needs confirmation.</div>
+                      </div>
+                      <div>
+                        <span className={labelClass}>Invoice</span>
+                        <div className="font-medium text-slate-700">{item.invoiceReference}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                    <div className="grid gap-1.5">
+                      <span className={labelClass}>Method</span>
+                      <span className={subtleChipClass}>{formatMethodLabel(item.paymentMethod)}</span>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <span className={labelClass}>Amount</span>
+                      <span className={subtleChipClass}>{formatUsdFromCents(item.amountCents)}</span>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <span className={labelClass}>Reference</span>
+                      <span className={subtleChipClass}>{item.reference || "-"}</span>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <span className={labelClass}>Reported By</span>
+                      <span className={subtleChipClass}>{item.reportedByDisplayName}</span>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <span className={labelClass}>Reported</span>
+                      <span className={subtleChipClass}>{formatReportedAt(item.reportedAt)}</span>
+                    </div>
+                    <div className="grid gap-1.5">
+                      <span className={labelClass}>Status</span>
+                      <span className={subtleChipClass}>{formatReconciliationStatus(item.status)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+                    <span className={labelClass}>Next Step</span>
+                    <p className="text-sm leading-5 text-slate-700">Field-reported payment needs confirmation.</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <Link href={item.links.jobHref} className={primaryActionClass}>
+                        View Job
+                      </Link>
+                      <Link href={item.links.invoiceWorkspaceHref} className={compactActionClass}>
+                        Open invoice workspace
+                      </Link>
+                    </div>
+
+                    {isSelfReported ? (
+                      <div className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
+                        Reporter cannot verify their own report.
+                      </div>
+                    ) : (
+                      <div className="mt-1 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-[11px]">
+                        <form action={verifyFieldPaymentCollectionReportFromForm} className="space-y-2">
+                          <input type="hidden" name="field_payment_report_id" value={item.reportId} />
+                          <input type="hidden" name="report_id" value={item.reportId} />
+                          <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
+                          <input type="hidden" name="job_id" value={item.jobId} />
+                          <input type="hidden" name="tab" value="info" />
+                          <input type="hidden" name="return_to" value={`${currentQueueHref}#field-payment-report-${item.reportId}`} />
+                          <label className="block">
+                            <span className="mb-1 block font-semibold text-slate-900">Verification note</span>
+                            <input
+                              name="verification_note"
+                              type="text"
+                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900"
+                              placeholder="Optional office confirmation details"
+                            />
+                          </label>
+                          <p className="text-[10px] text-slate-600">Verify only after confirming the money was received.</p>
+                          <SubmitButton className={compactActionClass} loadingText="Verifying...">
+                            Verify
+                          </SubmitButton>
+                        </form>
+                        <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2">
+                          <input type="hidden" name="field_payment_report_id" value={item.reportId} />
+                          <input type="hidden" name="report_id" value={item.reportId} />
+                          <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
+                          <input type="hidden" name="job_id" value={item.jobId} />
+                          <input type="hidden" name="tab" value="info" />
+                          <input type="hidden" name="return_to" value={`${currentQueueHref}#field-payment-report-${item.reportId}`} />
+                          <label className="block">
+                            <span className="mb-1 block font-semibold text-slate-900">Rejection reason</span>
+                            <input
+                              name="rejection_reason"
+                              type="text"
+                              required
+                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900"
+                              placeholder="Required"
+                            />
+                          </label>
+                          <p className="text-[10px] text-slate-600">Rejecting does not record payment.</p>
+                          <SubmitButton className={compactActionClass} loadingText="Rejecting...">
+                            Reject
+                          </SubmitButton>
+                        </form>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+
           {visibleRows.map(({ job, needs, overdueDays, canMarkExternalInvoiceSent }) => {
             const jobId = String(job?.id ?? "");
             const projection = getProjection(job);
