@@ -37,11 +37,11 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("disabled={!searchQuery}");
   });
 
-  it("keeps details field-first, keeps optional price, and hides metadata controls", () => {
+  it("keeps details field-first, keeps price, and hides metadata controls", () => {
     expect(builderSource).toContain("<details");
     expect(builderSource).toContain("Details");
-    expect(builderSource).toContain("Optional price");
-    expect(builderSource).toContain("does not create an invoice charge");
+    expect(builderSource).toContain("Price");
+    expect(builderSource).toContain("Carries into the draft invoice charge when you build the invoice.");
     expect(builderSource).not.toContain("Unit Label");
     expect(builderSource).not.toContain("Metadata:");
   });
@@ -106,7 +106,7 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("setExpandedItemId((prev) => (prev === item.id ? null : item.id))");
     expect(builderSource).toContain("lg:min-w-[12rem]");
     expect(builderSource).toContain("lg:text-right");
-    expect(builderSource).toContain('aria-label={`Optional price for ${item.title.trim() || "scope item"}`}');
+    expect(builderSource).toContain('aria-label={`Price for ${item.title.trim() || "scope item"}`}');
     expect(builderSource).toContain("value={item.title}");
     expect(builderSource).toContain("value={item.expected_unit_price ?? 0}");
     expect(builderSource).toContain("value={item.details}");

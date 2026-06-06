@@ -756,7 +756,7 @@ export default function VisitScopeBuilder({
                     <div className="w-full space-y-2 lg:w-auto lg:min-w-[12rem] lg:max-w-[12rem]">
                       <div className="space-y-1">
                         <label className="block text-[11px] font-medium uppercase tracking-wide text-slate-500 lg:text-right">
-                          Optional price
+                          Price
                         </label>
                         <div className="relative">
                           <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">
@@ -774,11 +774,11 @@ export default function VisitScopeBuilder({
                             }
                             className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-7 pr-3 text-right text-sm text-slate-900 shadow-sm"
                             placeholder="0.00"
-                            aria-label={`Optional price for ${item.title.trim() || "scope item"}`}
+                            aria-label={`Price for ${item.title.trim() || "scope item"}`}
                           />
                         </div>
                         <p className="text-xs text-slate-500 lg:text-right">
-                          This helps with upfront context only. It does not create an invoice charge.
+                          Carries into the draft invoice charge when you build the invoice.
                         </p>
                       </div>
 

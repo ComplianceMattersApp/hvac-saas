@@ -43,7 +43,7 @@ describe("Visit scope visit-type suggestion UX", () => {
     expect(builderSource).toContain("From saved work item");
     expect(builderSource).toContain("Custom work");
     expect(builderSource).toContain("rounded-xl border border-slate-200 bg-white px-3 py-2.5");
-    expect(builderSource).toContain("Optional price");
-    expect(builderSource).toContain('aria-label={`Optional price for ${item.title.trim() || "scope item"}`}');
+    expect(builderSource).toContain("Price");
+    expect(builderSource).toContain('aria-label={`Price for ${item.title.trim() || "scope item"}`}');
   });
 });

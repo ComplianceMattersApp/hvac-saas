@@ -190,7 +190,18 @@ describe("internal same-account job mutation hardening", () => {
     formData.set("job_id", "job-1");
     formData.set("tab", "info");
     formData.set("visit_scope_summary", "New scoped summary");
-    formData.set("visit_scope_items_json", "[]");
+    formData.set(
+      "visit_scope_items_json",
+      JSON.stringify([
+        {
+          id: "8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f",
+          title: "Replace capacitor",
+          details: "Install 45/5 capacitor",
+          kind: "primary",
+          expected_unit_price: 189.5,
+        },
+      ]),
+    );
 
     await expect(updateJobVisitScopeFromForm(formData)).rejects.toThrow(
       /REDIRECT:\/jobs\/job-1\?tab=info&banner=visit_scope_saved&rv=/,
@@ -200,7 +211,15 @@ describe("internal same-account job mutation hardening", () => {
       table: "jobs",
       values: {
         visit_scope_summary: "New scoped summary",
-        visit_scope_items: [],
+        visit_scope_items: [
+          expect.objectContaining({
+            id: "8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f",
+            title: "Replace capacitor",
+            details: "Install 45/5 capacitor",
+            kind: "primary",
+            expected_unit_price: 189.5,
+          }),
+        ],
       },
       eq: [["id", "job-1"]],
     });

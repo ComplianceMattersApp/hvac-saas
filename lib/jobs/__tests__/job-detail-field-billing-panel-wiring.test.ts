@@ -67,4 +67,22 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("Invoice issue authority is not available for your current role.");
     expect(source).toContain("Invoice send authority is not available for your current role.");
   });
+
+  it("routes Build Invoice directly to the invoice workspace after draft creation", () => {
+    const noInvoicePanelIndex = source.indexOf("Build a draft invoice from the Work Items when billing is ready.");
+    const noInvoicePanelSlice = source.slice(noInvoicePanelIndex, noInvoicePanelIndex + 900);
+
+    expect(noInvoicePanelIndex).toBeGreaterThanOrEqual(0);
+    expect(noInvoicePanelSlice).toContain("createInternalInvoiceDraftFromForm");
+    expect(noInvoicePanelSlice).toContain("return_to");
+    expect(noInvoicePanelSlice).toContain("/invoice#invoice-workspace");
+    expect(noInvoicePanelSlice).toContain("Build Invoice");
+    expect(noInvoicePanelSlice).not.toContain("Create Draft Invoice");
+  });
+
+  it("shows job-page Work Item pricing as invoice-ready context", () => {
+    expect(source).toContain("Price ${Number(item.expected_unit_price).toFixed(2)}");
+    expect(source).toContain("Build an invoice later when billing is ready.");
+    expect(source).toContain("Build invoice");
+  });
 });

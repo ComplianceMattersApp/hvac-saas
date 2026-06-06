@@ -3175,14 +3175,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               {showReplacementInvoicePrompt
                 ? "A previous invoice was voided. Start a replacement draft when the corrected billed scope is ready."
                 : hasVisitScopeDefined
-                ? "Create a draft invoice when the billed scope is ready."
-                : "Work Items come first. Start an invoice later when billing is ready."}
+                ? "Build a draft invoice from the Work Items when billing is ready."
+                : "Work Items come first. Build an invoice later when billing is ready."}
             </div>
             <form action={createInternalInvoiceDraftFromForm} className="mt-3">
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="tab" value={tab} />
+              <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
               <SubmitButton loadingText="Creating..." className={hasVisitScopeDefined ? primaryButtonClass : secondaryButtonClass}>
-                {showReplacementInvoicePrompt ? "Create Replacement Invoice" : "Create Draft Invoice"}
+                {showReplacementInvoicePrompt ? "Create Replacement Invoice" : "Build Invoice"}
               </SubmitButton>
             </form>
           </div>
@@ -4135,7 +4136,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     <SubmitButton loadingText="Starting..." className={mobileFieldActionClass}>
                       <span className="inline-flex items-center gap-2">
                         <ReceiptIcon className="h-4.5 w-4.5" />
-                        <span>Start Invoice</span>
+                        <span>Build Invoice</span>
                       </span>
                     </SubmitButton>
                   </form>
@@ -4151,7 +4152,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 <span className={mobileDisabledActionClass}>
                   <span className="inline-flex items-center gap-2">
                     <ReceiptIcon className="h-4.5 w-4.5" />
-                    <span>Start Invoice</span>
+                    <span>Build Invoice</span>
                   </span>
                 </span>
               )}
@@ -4235,7 +4236,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                       <div>
                         <span className="inline-flex items-center gap-1.5 font-semibold"><ReceiptIcon className="h-4 w-4" />Invoice required</span>
                         <span className="text-amber-900/90"> · </span>
-                        <span>{internalInvoiceTruth ? "Open invoice" : "Start invoice"}</span>
+                        <span>{internalInvoiceTruth ? "Open invoice" : "Build invoice"}</span>
                       </div>
                       {internalInvoiceTruth ? (
                         <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100">
@@ -4247,7 +4248,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                           <input type="hidden" name="tab" value={tab} />
                           <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
                           <SubmitButton loadingText="Starting..." className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100">
-                            Start invoice
+                            Build invoice
                           </SubmitButton>
                         </form>
                       )}
@@ -4554,7 +4555,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                         <input type="hidden" name="tab" value={tab} />
                         <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
                         <SubmitButton loadingText="Starting..." className={mobileToolLinkClass}>
-                          Start Invoice
+                          Build Invoice
                         </SubmitButton>
                       </form>
                     )
@@ -5476,11 +5477,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   <div className="mt-2 space-y-2.5">
                     {primaryVisitScopeItems.map((item, index) => (
                       <div key={`primary-${index}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
-                        <div className="text-sm font-semibold leading-5 text-slate-900">
-                          {item.title}
-                          {item.expected_unit_price !== null && item.expected_unit_price !== undefined
-                            ? ` - $${Number(item.expected_unit_price).toFixed(2)}`
-                            : ""}
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="text-sm font-semibold leading-5 text-slate-900">{item.title}</div>
+                          {item.expected_unit_price !== null && item.expected_unit_price !== undefined ? (
+                            <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700">
+                              Price ${Number(item.expected_unit_price).toFixed(2)}
+                            </span>
+                          ) : null}
                         </div>
                         {item.details ? (
                           <div className="text-sm leading-6 text-slate-600">{item.details}</div>
@@ -5505,6 +5508,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                           <div className="flex flex-wrap items-center gap-2">
                             <div className="text-sm font-semibold leading-5 text-slate-900">{item.title}</div>
                             <div className="text-xs text-slate-500">{formatVisitScopeItemKindLabel(item.kind)}</div>
+                            {item.expected_unit_price !== null && item.expected_unit_price !== undefined ? (
+                              <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700">
+                                Price ${Number(item.expected_unit_price).toFixed(2)}
+                              </span>
+                            ) : null}
                             {isVisitScopeItemPromoted(item) ? (
                               <div className="text-xs font-medium text-emerald-700">Promoted</div>
                             ) : null}
@@ -7052,7 +7060,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
           <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Next Step</div>
           <div className="mt-0.5 text-sm font-semibold text-slate-900">
-            {!internalInvoiceTruth ? "Start invoice" : internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review invoice" : "Build charges") : "Open invoice"}
+            {!internalInvoiceTruth ? "Build invoice" : internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review invoice" : "Build charges") : "Open invoice"}
           </div>
         </div>
       </div>
@@ -7065,7 +7073,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <input type="hidden" name="tab" value={tab} />
           <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
           <SubmitButton loadingText="Starting..." className={darkButtonClass}>
-            Start Invoice
+            Build Invoice
           </SubmitButton>
         </form>
       ) : (
