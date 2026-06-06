@@ -963,7 +963,8 @@ export async function reportNonCardFieldPaymentCollectionFromForm(formData: Form
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_report_overpay_denied', returnTo));
   }
 
-  const { error: reportInsertError } = await supabase
+  const admin = createAdminClient();
+  const { error: reportInsertError } = await admin
     .from('field_payment_collection_reports')
     .insert({
       account_owner_user_id: internalUser.account_owner_user_id,
@@ -980,7 +981,17 @@ export async function reportNonCardFieldPaymentCollectionFromForm(formData: Form
     });
 
   if (reportInsertError) {
-    throw reportInsertError;
+    console.warn('Field payment report insert failed', {
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobId,
+      invoiceId: invoice.id,
+      reportedByUserId: userId,
+      message: reportInsertError instanceof Error
+        ? reportInsertError.message
+        : String((reportInsertError as any)?.message ?? reportInsertError),
+      code: (reportInsertError as any)?.code ?? null,
+    });
+    redirect(buildInternalInvoiceReturnHref(jobId, tab, 'field_payment_report_failed', returnTo));
   }
 
   revalidatePath(`/jobs/${jobId}`);

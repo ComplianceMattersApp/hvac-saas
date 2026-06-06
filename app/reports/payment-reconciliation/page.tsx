@@ -18,14 +18,12 @@ import {
   ReportStatGrid,
   ReportTableShell,
   reportPageClass,
-  reportTableHeadClass,
-  reportTableRowClass,
 } from "@/components/reports/ReportLedgerChrome";
 import SubmitButton from "@/components/SubmitButton";
 
 export const metadata = {
-  title: "Payment Reconciliation",
-  description: "Read-only queue for field-reported non-card payment verification work",
+  title: "Confirm Payment",
+  description: "Review field-reported cash, check, and other payments before they count as collected.",
 };
 
 function formatUsdFromCents(cents: number | null | undefined) {
@@ -46,9 +44,9 @@ function formatMethodLabel(method: string | null | undefined) {
 
 function formatStatusLabel(status: string | null | undefined) {
   const normalized = String(status ?? "").trim().toLowerCase();
-  if (normalized === "reported") return "Reported";
-  if (normalized === "under_review") return "Under Review";
-  if (normalized === "needs_correction") return "Needs Correction";
+  if (normalized === "reported") return "Needs confirmation";
+  if (normalized === "under_review") return "In review";
+  if (normalized === "needs_correction") return "Needs info";
   return "Open";
 }
 
@@ -131,41 +129,35 @@ export default async function PaymentReconciliationPage() {
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Payment Reconciliation"
-        description="Field-reported payments need office verification before they count as collected."
-        countSummary={`Open field payment reports: ${queue.summary.openCount}`}
-        truthNote="Card payments are confirmed by Stripe. Check, cash, and other field reports stay here until verified. Verification records this as final payment truth. Rejecting does not record payment."
+        title="Confirm Payment"
+        description="Review cash, check, or other payments reported from the field before they count as collected."
+        countSummary={`Needs confirmation: ${queue.summary.openCount}`}
+        truthNote="Verify only after confirming the money was received. Rejecting does not record payment."
       />
 
       <ReportCenterTabs current="payment-reconciliation" />
 
       <ReportStatGrid>
         <ReportStatCard
-          label="Open reports"
+          label="Needs confirmation"
           value={queue.summary.openCount}
-          helperText="Field collection reports awaiting reconciliation."
+          helperText="Reported payments awaiting office confirmation."
           tone="slate"
         />
         <ReportStatCard
-          label="Reported"
-          value={queue.summary.reportedCount}
-          helperText="New reports not yet reviewed."
+          label="In review"
+          value={queue.summary.underReviewCount}
+          helperText="Payments already being checked by the office."
           tone="blue"
         />
         <ReportStatCard
-          label="Under review"
-          value={queue.summary.underReviewCount}
-          helperText="Reports currently in office review."
-          tone="slate"
-        />
-        <ReportStatCard
-          label="Needs correction"
+          label="Needs info"
           value={queue.summary.needsCorrectionCount}
-          helperText="Reports needing follow-up context."
+          helperText="Reports needing more context before confirmation."
           tone="rose"
         />
         <ReportStatCard
-          label="Total reported amount"
+          label="Reported total"
           value={formatUsdFromCents(queue.summary.totalReportedAmountCents)}
           helperText="Reported amount only. Not collected-money truth yet."
           tone="slate"
@@ -182,75 +174,85 @@ export default async function PaymentReconciliationPage() {
           </div>
         </div>
         <div className="mt-1 text-xs text-slate-600">
-          Use Verify only after the office confirms this check, cash, or other payment was received.
+          Verify only after confirming the money was received. Rejecting does not record payment.
         </div>
       </section>
 
-      <ReportTableShell note="Verify converts the report to final payment truth. Reject leaves no payment truth. Correction and void actions are not enabled in this slice.">
+      <ReportTableShell note="Reported amount only. Not collected-money truth yet. Correction and void actions are not enabled yet.">
         {queue.items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
-            <div className="font-semibold text-slate-900">No field payment reports need reconciliation.</div>
+            <div className="font-semibold text-slate-900">No payments need confirmation.</div>
             <div className="mt-1">When field users report check, cash, or other collection, open items will appear here.</div>
           </div>
         ) : (
-          <table className="min-w-full text-sm">
-            <thead className="bg-slate-50/90">
-              <tr className={reportTableHeadClass}>
-                <th className="px-3 py-3">Customer / Job</th>
-                <th className="px-3 py-3">Invoice</th>
-                <th className="px-3 py-3">Method</th>
-                <th className="px-3 py-3">Amount</th>
-                <th className="px-3 py-3">Reference</th>
-                <th className="px-3 py-3">Reported By</th>
-                <th className="px-3 py-3">Reported At</th>
-                <th className="px-3 py-3">Status</th>
-                <th className="px-3 py-3">Note</th>
-                <th className="px-3 py-3">Links</th>
-                <th className="px-3 py-3">Verification</th>
-              </tr>
-            </thead>
-            <tbody>
-              {queue.items.map((item) => (
-                <tr key={item.reportId} className={reportTableRowClass}>
-                  <td className="px-3 py-3 text-slate-700">
-                    <div className="font-semibold text-slate-900">{item.customerDisplayName || "Customer"}</div>
-                    <div className="text-xs text-slate-600">{item.jobReference}</div>
-                    {item.jobTitle ? <div className="text-xs text-slate-600">{item.jobTitle}</div> : null}
-                    {item.locationLabel ? <div className="text-xs text-slate-500">{item.locationLabel}</div> : null}
-                  </td>
-                  <td className="px-3 py-3 text-slate-700">{item.invoiceReference}</td>
-                  <td className="px-3 py-3 text-slate-700">{formatMethodLabel(item.paymentMethod)}</td>
-                  <td className="px-3 py-3 text-slate-700">{formatUsdFromCents(item.amountCents)}</td>
-                  <td className="px-3 py-3 text-slate-700">{item.reference || "-"}</td>
-                  <td className="px-3 py-3 text-slate-700">{item.reportedByDisplayName}</td>
-                  <td className="px-3 py-3 text-slate-700">{formatDate(item.reportedAt)}</td>
-                  <td className="px-3 py-3 text-slate-700">{formatStatusLabel(item.status)}</td>
-                  <td className="px-3 py-3 text-slate-700">
-                    <div className="max-w-[20rem] truncate">{item.note || "-"}</div>
-                  </td>
-                  <td className="px-3 py-3 text-slate-700">
-                    <div className="flex flex-wrap gap-2">
-                      <Link href={item.links.invoiceWorkspaceHref} className="text-blue-700 hover:underline">
-                        Open invoice workspace
+          <div className="space-y-4">
+            {queue.items.map((item) => (
+              <article key={item.reportId} className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-800">
+                        {formatStatusLabel(item.status)}
+                      </span>
+                      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                        {item.invoiceReference}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-4 md:grid-cols-[minmax(0,1fr)_auto]">
+                      <div>
+                        <div className="text-base font-semibold text-slate-950">{item.customerDisplayName || "Customer"}</div>
+                        <div className="mt-1 text-sm text-slate-600">{item.jobReference}{item.jobTitle ? ` - ${item.jobTitle}` : ""}</div>
+                        {item.locationLabel ? <div className="mt-1 text-xs text-slate-500">{item.locationLabel}</div> : null}
+                      </div>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 md:min-w-48 md:text-right">
+                        <div className="text-2xl font-semibold text-slate-950">{formatUsdFromCents(item.amountCents)}</div>
+                        <div className="mt-1 text-sm font-semibold text-slate-700">{formatMethodLabel(item.paymentMethod)}</div>
+                        <div className="mt-1 text-xs text-slate-500">Reported amount only. Not collected-money truth yet.</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 grid gap-3 text-sm text-slate-700 sm:grid-cols-2 lg:grid-cols-4">
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Reported by</div>
+                        <div className="mt-1 font-medium text-slate-900">{item.reportedByDisplayName}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Reported time</div>
+                        <div className="mt-1 font-medium text-slate-900">{formatDate(item.reportedAt)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Reference / check number</div>
+                        <div className="mt-1 font-medium text-slate-900">{item.reference || "-"}</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Note</div>
+                        <div className="mt-1 font-medium text-slate-900">{item.note || "-"}</div>
+                      </div>
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap gap-3 text-sm">
+                      <Link href={item.links.invoiceWorkspaceHref} className="font-semibold text-blue-700 hover:underline">
+                        Open invoice
                       </Link>
-                      <Link href={item.links.jobHref} className="text-blue-700 hover:underline">
+                      <Link href={item.links.jobHref} className="font-semibold text-blue-700 hover:underline">
                         Open job
                       </Link>
                       {item.links.customerHref ? (
-                        <Link href={item.links.customerHref} className="text-blue-700 hover:underline">
+                        <Link href={item.links.customerHref} className="font-semibold text-blue-700 hover:underline">
                           Open customer
                         </Link>
                       ) : null}
                     </div>
-                  </td>
-                  <td className="px-3 py-3 text-slate-700">
+                  </div>
+
+                  <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs lg:w-80">
                     {item.reportedByUserId === user.id ? (
-                      <div className="rounded-md border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-900">
+                      <div className="rounded-md border border-amber-300 bg-amber-50 px-3 py-2 font-semibold text-amber-900">
                         Reporter cannot verify their own report.
                       </div>
                     ) : (
-                      <div className="space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2 text-[11px]">
-                        <form action={verifyFieldPaymentCollectionReportFromForm} className="space-y-2">
+                      <div className="space-y-3">
+                        <form action={verifyFieldPaymentCollectionReportFromForm} className="space-y-2 rounded-md border border-emerald-200 bg-white p-3">
                           <input type="hidden" name="field_payment_report_id" value={item.reportId} />
                           <input type="hidden" name="report_id" value={item.reportId} />
                           <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
@@ -258,22 +260,23 @@ export default async function PaymentReconciliationPage() {
                           <input type="hidden" name="tab" value="info" />
                           <input type="hidden" name="return_to" value="/reports/payment-reconciliation" />
                           <label className="block">
-                            <span className="mb-1 block font-semibold text-slate-900">Verification note</span>
+                            <span className="mb-1 block font-semibold text-slate-900">Confirmation note</span>
                             <input
                               name="verification_note"
                               type="text"
-                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900"
+                              className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900"
                               placeholder="Optional office confirmation details"
                             />
                           </label>
+                          <div className="text-[11px] leading-4 text-slate-600">Verify only after confirming the money was received.</div>
                           <SubmitButton
-                            className="inline-flex h-7 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                            className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                             loadingText="Verifying..."
                           >
                             Verify
                           </SubmitButton>
                         </form>
-                        <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2">
+                        <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2 rounded-md border border-rose-200 bg-white p-3">
                           <input type="hidden" name="field_payment_report_id" value={item.reportId} />
                           <input type="hidden" name="report_id" value={item.reportId} />
                           <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
@@ -286,12 +289,13 @@ export default async function PaymentReconciliationPage() {
                               name="rejection_reason"
                               type="text"
                               required
-                              className="w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900"
+                              className="w-full rounded-md border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900"
                               placeholder="Required"
                             />
                           </label>
+                          <div className="text-[11px] leading-4 text-slate-600">Rejecting does not record payment.</div>
                           <SubmitButton
-                            className="inline-flex h-7 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                            className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
                             loadingText="Rejecting..."
                           >
                             Reject
@@ -299,16 +303,17 @@ export default async function PaymentReconciliationPage() {
                         </form>
                       </div>
                     )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    <div className="mt-3 text-[11px] leading-4 text-slate-500">Correction and void actions are not enabled yet.</div>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
         )}
       </ReportTableShell>
 
       <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm shadow-slate-950/5">
-        Verification records final payment truth through existing internal invoice payment actions. Rejection writes no payment truth. No correction/void actions are enabled in this slice.
+        Verification records final payment truth through existing internal invoice payment actions. Rejection writes no payment truth. Correction and void actions are not enabled yet.
       </section>
     </div>
   );
