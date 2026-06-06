@@ -9,6 +9,7 @@ import {
   hasInvoiceSendAccess,
   resolveFieldBillingCapabilities,
 } from "@/lib/auth/field-billing-access";
+import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
 import { createClient } from "@/lib/supabase/server";
 import { resolveJobDetailActor } from "@/lib/actions/internal-job-detail-read-boundary";
 import { loadScopedInternalJobDetailReadBoundary } from "@/lib/actions/internal-job-detail-read-boundary";
@@ -576,10 +577,16 @@ export default async function InternalInvoiceWorkspacePage({
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
   });
+  const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
+    supabase: supabase as any,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    internalUserId: user.id,
+  });
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: user.id,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    explicitCapabilities: explicitFieldBillingCapabilities,
   });
   const canAccessDraftLineWorkspace = hasDirectInvoiceDraftMutationAccess(fieldBillingCapabilities);
   const canIssueInvoiceLifecycle = hasInvoiceIssueAccess(fieldBillingCapabilities);

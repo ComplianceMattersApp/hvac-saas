@@ -17,6 +17,8 @@ describe("field payment reconciliation queue page wiring", () => {
   it("uses financial authority OR verification capability access gate", () => {
     expect(queuePageSource).toContain("canViewFinancialRegister");
     expect(queuePageSource).toContain("resolveFieldBillingCapabilities");
+    expect(queuePageSource).toContain("loadFieldBillingExplicitCapabilitiesForUser");
+    expect(queuePageSource).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
     expect(queuePageSource).toContain("fieldBillingCapabilities.can_verify_non_card_collection");
     expect(queuePageSource).toContain("const canAccessQueue =");
   });

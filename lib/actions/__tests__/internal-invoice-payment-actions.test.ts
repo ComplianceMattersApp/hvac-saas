@@ -14,6 +14,7 @@ const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const resolveFieldBillingCapabilitiesMock = vi.fn();
+const loadFieldBillingExplicitCapabilitiesForUserMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
@@ -42,6 +43,11 @@ vi.mock('@/lib/auth/internal-job-scope', () => ({
 vi.mock('@/lib/auth/field-billing-access', () => ({
   resolveFieldBillingCapabilities: (...args: unknown[]) =>
     resolveFieldBillingCapabilitiesMock(...args),
+}));
+
+vi.mock('@/lib/auth/internal-user-access-capabilities', () => ({
+  loadFieldBillingExplicitCapabilitiesForUser: (...args: unknown[]) =>
+    loadFieldBillingExplicitCapabilitiesForUserMock(...args),
 }));
 
 vi.mock('@/lib/business/internal-business-profile', () => ({
@@ -82,6 +88,10 @@ vi.mock('@/lib/business/payment-allocations', () => ({
   upsertInvoicePaymentAllocationForPaymentRow: (...args: unknown[]) =>
     upsertInvoicePaymentAllocationForPaymentRowMock(...args),
 }));
+
+beforeEach(() => {
+  loadFieldBillingExplicitCapabilitiesForUserMock.mockResolvedValue({});
+});
 
 function makeSupabaseFixture(params?: { insertError?: { message: string } | null }) {
   const writes: Array<{ table: string; op: string; payload?: unknown }> = [];
@@ -1116,6 +1126,15 @@ describe('collectIssuedInvoiceCardPaymentFromForm', () => {
   }
 
   it('allows trusted field actor with collect-card capability to launch checkout', async () => {
+    const explicitCapabilities = {
+      field_billing_enabled: true,
+      can_collect_field_payment: true,
+      can_collect_card_payment: true,
+    };
+    loadFieldBillingExplicitCapabilitiesForUserMock.mockResolvedValueOnce(explicitCapabilities);
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+
     const { collectIssuedInvoiceCardPaymentFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
 
     await expect(
@@ -1127,6 +1146,17 @@ describe('collectIssuedInvoiceCardPaymentFromForm', () => {
         accountOwnerUserId: 'owner-1',
         jobId: 'job-1',
         invoiceId: 'inv-1',
+      }),
+    );
+    expect(loadFieldBillingExplicitCapabilitiesForUserMock).toHaveBeenCalledWith({
+      supabase: fixture.supabase,
+      accountOwnerUserId: 'owner-1',
+      internalUserId: 'tech-1',
+    });
+    expect(resolveFieldBillingCapabilitiesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 'tech-1',
+        explicitCapabilities,
       }),
     );
   });
@@ -1263,6 +1293,12 @@ describe('reportNonCardFieldPaymentCollectionFromForm', () => {
   });
 
   it('allows authorized field collector to report check payment on issued invoice with balance', async () => {
+    const explicitCapabilities = {
+      field_billing_enabled: true,
+      can_collect_field_payment: true,
+      can_report_non_card_collection: true,
+    };
+    loadFieldBillingExplicitCapabilitiesForUserMock.mockResolvedValueOnce(explicitCapabilities);
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
 
@@ -1298,6 +1334,17 @@ describe('reportNonCardFieldPaymentCollectionFromForm', () => {
     expect(fixture.writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(false);
     expect(upsertInvoicePaymentAllocationForPaymentRowMock).not.toHaveBeenCalled();
     expect(insertJobEventMock).not.toHaveBeenCalled();
+    expect(loadFieldBillingExplicitCapabilitiesForUserMock).toHaveBeenCalledWith({
+      supabase: fixture.supabase,
+      accountOwnerUserId: 'owner-1',
+      internalUserId: 'tech-1',
+    });
+    expect(resolveFieldBillingCapabilitiesMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorUserId: 'tech-1',
+        explicitCapabilities,
+      }),
+    );
   });
 
   it('allows authorized field collector to report cash payment', async () => {

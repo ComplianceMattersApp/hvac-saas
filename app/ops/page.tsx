@@ -7,6 +7,7 @@ import { redirect } from "next/navigation";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
+import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import { loadFailedPaymentReconciliationItems } from "@/lib/business/failed-payment-reconciliation-read-model";
 
@@ -296,10 +297,16 @@ export default async function OpsPage({
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
   });
 
+  const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
+    supabase: supabase as any,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    internalUserId: internalUser.user_id,
+  });
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: user.id,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
   const canViewFieldPaymentVerificationAttention =

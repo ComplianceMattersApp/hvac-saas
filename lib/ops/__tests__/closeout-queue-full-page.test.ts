@@ -119,6 +119,8 @@ describe("/ops/closeout-queue page", () => {
   it("gates field payment reconciliation attention to financial authority or verification permission", () => {
     expect(closeoutQueuePageSource).toContain("canViewFinancialRegister");
     expect(closeoutQueuePageSource).toContain("resolveFieldBillingCapabilities");
+    expect(closeoutQueuePageSource).toContain("loadFieldBillingExplicitCapabilitiesForUser");
+    expect(closeoutQueuePageSource).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
     expect(closeoutQueuePageSource).toContain("fieldBillingCapabilities.can_verify_non_card_collection");
     expect(closeoutQueuePageSource).toContain("canViewFieldPaymentReconciliationAttention");
   });

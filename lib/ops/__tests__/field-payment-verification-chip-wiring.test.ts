@@ -18,6 +18,8 @@ describe("/ops field payment verification chip wiring", () => {
     expect(opsPageSource).toContain("canViewFieldPaymentVerificationAttention");
     expect(opsPageSource).toContain("canViewFinancialRegister");
     expect(opsPageSource).toContain("resolveFieldBillingCapabilities");
+    expect(opsPageSource).toContain("loadFieldBillingExplicitCapabilitiesForUser");
+    expect(opsPageSource).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
     expect(opsPageSource).toContain("fieldBillingCapabilities.can_verify_non_card_collection");
   });
 

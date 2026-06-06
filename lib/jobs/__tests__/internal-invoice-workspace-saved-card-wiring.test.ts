@@ -11,6 +11,9 @@ describe("internal invoice workspace saved-card charge wiring", () => {
   it("wires direct draft-line workspace access through field billing capabilities", () => {
     expect(source).toContain('import {');
     expect(source).toContain("resolveFieldBillingCapabilities");
+    expect(source).toContain("loadFieldBillingExplicitCapabilitiesForUser");
+    expect(source).toContain("const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser");
+    expect(source).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
     expect(source).toContain("hasDirectInvoiceDraftMutationAccess");
     expect(source).toContain("const fieldBillingCapabilities = resolveFieldBillingCapabilities");
     expect(source).toContain("const canAccessDraftLineWorkspace = hasDirectInvoiceDraftMutationAccess(fieldBillingCapabilities)");

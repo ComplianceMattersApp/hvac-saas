@@ -6,6 +6,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
 import { resolveFieldBillingCapabilities } from '@/lib/auth/field-billing-access';
+import { loadFieldBillingExplicitCapabilitiesForUser } from '@/lib/auth/internal-user-access-capabilities';
 import {
   canRecordInvoicePayment,
   requireInvoicePaymentRecordAccessOrRedirect,
@@ -27,6 +28,17 @@ import {
 } from '@/lib/actions/internal-invoice-payment-actions-state';
 
 const INTERNAL_INVOICE_PANEL_HASH = 'internal-invoice-panel';
+
+async function loadPaymentActionExplicitFieldBillingCapabilities(params: {
+  supabase: any;
+  internalUser: { account_owner_user_id?: string | null; user_id?: string | null };
+}) {
+  return loadFieldBillingExplicitCapabilitiesForUser({
+    supabase: params.supabase,
+    accountOwnerUserId: params.internalUser.account_owner_user_id,
+    internalUserId: params.internalUser.user_id,
+  });
+}
 
 function getTrimmedString(value: FormDataEntryValue | null | undefined) {
   return String(value ?? '').trim();
@@ -776,10 +788,15 @@ export async function collectIssuedInvoiceCardPaymentFromForm(formData: FormData
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
 
+  const explicitFieldBillingCapabilities = await loadPaymentActionExplicitFieldBillingCapabilities({
+    supabase,
+    internalUser,
+  });
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: userId,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
   if (!fieldBillingCapabilities.can_collect_card_payment) {
@@ -870,10 +887,15 @@ export async function reportNonCardFieldPaymentCollectionFromForm(formData: Form
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
 
+  const explicitFieldBillingCapabilities = await loadPaymentActionExplicitFieldBillingCapabilities({
+    supabase,
+    internalUser,
+  });
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: userId,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
   if (!fieldBillingCapabilities.can_report_non_card_collection) {
@@ -998,10 +1020,15 @@ export async function verifyFieldPaymentCollectionReportFromForm(formData: FormD
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
 
+  const explicitFieldBillingCapabilities = await loadPaymentActionExplicitFieldBillingCapabilities({
+    supabase,
+    internalUser,
+  });
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: userId,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
   const hasVerificationAuthority =
@@ -1220,10 +1247,15 @@ export async function rejectFieldPaymentCollectionReportFromForm(formData: FormD
     redirect(buildInternalInvoiceReturnHref(jobId, tab, 'not_authorized', returnTo));
   }
 
+  const explicitFieldBillingCapabilities = await loadPaymentActionExplicitFieldBillingCapabilities({
+    supabase,
+    internalUser,
+  });
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: userId,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
   const hasVerificationAuthority =

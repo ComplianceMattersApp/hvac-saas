@@ -10,6 +10,7 @@ const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const capabilityOverride = vi.hoisted(() => ({ value: null as any }));
+const loadFieldBillingExplicitCapabilitiesForUserMock = vi.fn();
 
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
@@ -45,6 +46,11 @@ vi.mock('@/lib/auth/field-billing-access', async () => {
       capabilityOverride.value ?? actual.resolveFieldBillingCapabilities(...args),
   };
 });
+
+vi.mock('@/lib/auth/internal-user-access-capabilities', () => ({
+  loadFieldBillingExplicitCapabilitiesForUser: (...args: unknown[]) =>
+    loadFieldBillingExplicitCapabilitiesForUserMock(...args),
+}));
 
 vi.mock('@/lib/business/internal-business-profile', () => ({
   resolveBillingModeByAccountOwnerId: (...args: unknown[]) =>
@@ -347,6 +353,7 @@ describe('field charge proposal server actions', () => {
     vi.clearAllMocks();
     vi.resetModules();
     capabilityOverride.value = null;
+    loadFieldBillingExplicitCapabilitiesForUserMock.mockResolvedValue({});
 
     setInternalUser('billing-1', 'billing');
     loadScopedInternalJobForMutationMock.mockResolvedValue({ id: 'job-1' });

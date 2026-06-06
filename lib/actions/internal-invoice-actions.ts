@@ -16,6 +16,7 @@ import {
   requirePricebookFieldChargeAccessOrRedirect,
   requireVisitScopeFieldChargeAccessOrRedirect,
 } from '@/lib/auth/field-billing-access';
+import { loadFieldBillingExplicitCapabilitiesForUser } from '@/lib/auth/internal-user-access-capabilities';
 import {
   resolveBillingModeByAccountOwnerId,
 } from '@/lib/business/internal-business-profile';
@@ -601,6 +602,12 @@ async function loadInternalInvoiceContext(formData: FormData) {
     redirect(buildJobDetailHref(jobId, tab, 'not_authorized'));
   }
 
+  const fieldBillingExplicitCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
+    supabase: supabase as any,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    internalUserId: internalUser.user_id,
+  });
+
   return {
     supabase,
     userId,
@@ -610,6 +617,7 @@ async function loadInternalInvoiceContext(formData: FormData) {
     internalUser,
     job,
     invoice,
+    fieldBillingExplicitCapabilities,
   };
 }
 
@@ -1046,6 +1054,7 @@ function fieldChargeAccessParams(context: Awaited<ReturnType<typeof loadInternal
     actorUserId: context.userId,
     internalUser: context.internalUser,
     resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
     redirectTo: fieldChargeDeniedRedirect(context),
   };
 }
@@ -1055,6 +1064,7 @@ function resolveFieldChargeCapabilities(context: Awaited<ReturnType<typeof loadI
     actorUserId: context.userId,
     internalUser: context.internalUser,
     resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
   });
 }
 
@@ -1509,6 +1519,7 @@ export async function issueInternalInvoiceFromForm(formData: FormData) {
     actorUserId: context.userId,
     internalUser: context.internalUser,
     resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
     redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
   });
 
@@ -2281,6 +2292,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     actorUserId: context.userId,
     internalUser: context.internalUser,
     resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
     redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
   });
 

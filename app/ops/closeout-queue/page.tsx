@@ -9,6 +9,7 @@ import {
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
+import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { buildBillingTruthCloseoutProjectionMap } from "@/lib/business/job-billing-state";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
@@ -193,10 +194,16 @@ export default async function CloseoutQueuePage({
   });
   const internalBusinessDisplayName = internalBusinessIdentity.display_name;
 
+  const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
+    supabase: supabase as any,
+    accountOwnerUserId: actorContext.internalUser.account_owner_user_id,
+    internalUserId: actorContext.internalUser.user_id,
+  });
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: user.id,
     internalUser: actorContext.internalUser,
     resourceAccountOwnerUserId: actorContext.internalUser.account_owner_user_id,
+    explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
   const canViewFieldPaymentReconciliationAttention =

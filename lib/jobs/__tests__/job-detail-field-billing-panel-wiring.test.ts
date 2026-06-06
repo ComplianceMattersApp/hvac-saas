@@ -57,6 +57,9 @@ describe("job detail field billing panel wiring", () => {
   });
 
   it("gates issue and send controls through explicit field billing lifecycle capabilities", () => {
+    expect(source).toContain("loadFieldBillingExplicitCapabilitiesForUser");
+    expect(source).toContain("fieldBillingExplicitCapabilitiesRead");
+    expect(source).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
     expect(source).toContain("const canIssueInvoiceLifecycleAccess = hasInvoiceIssueAccess(fieldBillingCapabilities)");
     expect(source).toContain("const canSendInvoiceLifecycleAccess = hasInvoiceSendAccess(fieldBillingCapabilities)");
     expect(source).toContain("{canIssueInvoiceLifecycleAccess ? (");

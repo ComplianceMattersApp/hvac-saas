@@ -6,6 +6,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
 import { resolveFieldBillingCapabilities } from '@/lib/auth/field-billing-access';
+import { loadFieldBillingExplicitCapabilitiesForUser } from '@/lib/auth/internal-user-access-capabilities';
 import { resolveBillingModeByAccountOwnerId } from '@/lib/business/internal-business-profile';
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { normalizeInternalInvoiceItemType, resolveInternalInvoiceByJobId } from '@/lib/business/internal-invoice';
@@ -206,6 +207,12 @@ async function loadFieldChargeProposalContext(formData: FormData) {
       ? invoice
       : null;
 
+  const fieldBillingExplicitCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
+    supabase: supabase as any,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    internalUserId: internalUser.user_id,
+  });
+
   return {
     supabase,
     admin,
@@ -215,6 +222,7 @@ async function loadFieldChargeProposalContext(formData: FormData) {
     tab,
     job,
     invoice: safeInvoice,
+    fieldBillingExplicitCapabilities,
     noRedirect: isNoRedirectRequested(formData),
   };
 }
@@ -224,6 +232,7 @@ function fieldBillingAccessParams(context: Awaited<ReturnType<typeof loadFieldCh
     actorUserId: context.userId,
     internalUser: context.internalUser,
     resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
   };
 }
 

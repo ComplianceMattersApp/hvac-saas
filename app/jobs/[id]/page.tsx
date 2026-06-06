@@ -124,6 +124,7 @@ import {
   hasInvoiceSendAccess,
   resolveFieldBillingCapabilities,
 } from "@/lib/auth/field-billing-access";
+import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
 import VisitScopeJobDetailForm from "@/components/jobs/VisitScopeJobDetailForm";
 import {
   buildVisitScopeReadModel,
@@ -1327,10 +1328,18 @@ export default async function JobDetailPage({
   internalBusinessDisplayName = internalBusinessIdentity.display_name;
   billingMode = resolvedBillingMode;
   productMode = resolvedProductMode;
+  const explicitFieldBillingCapabilities = await timedPhase("fieldBillingExplicitCapabilitiesRead", () =>
+    loadFieldBillingExplicitCapabilitiesForUser({
+      supabase: supabase as any,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      internalUserId: user.id,
+    }),
+  );
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: user.id,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
   // Explicit same-account internal scoped-job preflight: deny before main job-detail read assembly

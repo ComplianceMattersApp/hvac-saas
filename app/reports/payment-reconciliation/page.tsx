@@ -8,6 +8,7 @@ import {
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
+import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import ReportCenterTabs from "@/components/reports/ReportCenterTabs";
@@ -91,10 +92,16 @@ export default async function PaymentReconciliationPage() {
     throw error;
   }
 
+  const explicitFieldBillingCapabilities = await loadFieldBillingExplicitCapabilitiesForUser({
+    supabase: supabase as any,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    internalUserId: internalUser.user_id,
+  });
   const fieldBillingCapabilities = resolveFieldBillingCapabilities({
     actorUserId: user.id,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    explicitCapabilities: explicitFieldBillingCapabilities,
   });
 
   const canAccessQueue =
