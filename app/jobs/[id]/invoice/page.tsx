@@ -53,6 +53,7 @@ import {
   collectIssuedInvoiceCardPaymentFromForm,
   collectTenantInvoicePaymentNowFromForm,
   recordInternalInvoicePaymentFromForm,
+  reportNonCardFieldPaymentCollectionFromForm,
   reverseInternalInvoicePaymentFromForm,
 } from "@/lib/actions/internal-invoice-payment-actions";
 import {
@@ -597,6 +598,7 @@ export default async function InternalInvoiceWorkspacePage({
     : null;
   const canCollectFieldPaymentAccess = hasFieldPaymentCollectionAccess(fieldBillingCapabilities);
   const canCollectCardPaymentAccess = fieldBillingCapabilities.can_collect_card_payment;
+  const canReportNonCardPaymentAccess = fieldBillingCapabilities.can_report_non_card_collection;
 
   const invoiceCustomerId = String(invoice?.customer_id ?? "").trim() || null;
   const savedCardMethodRows =
@@ -662,6 +664,31 @@ export default async function InternalInvoiceWorkspacePage({
     && canCollectFieldPaymentAccess
     && !canManageFinancialInvoiceLifecycle,
   );
+  const canShowFieldNonCardPaymentForm = Boolean(
+    canShowFieldCollectionSection
+    && canReportNonCardPaymentAccess,
+  );
+
+  const openFieldPaymentReportsForSelectedInvoice =
+    invoice
+      ? await (async () => {
+          const { data, error } = await supabase
+            .from("field_payment_collection_reports")
+            .select("id, status, amount_cents, payment_method, reference, reported_at")
+            .eq("account_owner_user_id", internalUser.account_owner_user_id)
+            .eq("internal_invoice_id", invoice.id)
+            .in("status", ["reported", "under_review", "needs_correction"])
+            .order("reported_at", { ascending: false })
+            .limit(3);
+
+          if (error) {
+            throw error;
+          }
+
+          return Array.isArray(data) ? data : [];
+        })()
+      : [];
+  const hasOpenFieldPaymentReportForSelectedInvoice = openFieldPaymentReportsForSelectedInvoice.length > 0;
 
   const failedAutopayAttention = invoice
     ? await loadFailedAutopayAttentionItems({
@@ -700,8 +727,12 @@ export default async function InternalInvoiceWorkspacePage({
         : "Review the readiness checks before issuing the invoice."
       : failedAutopayAttentionItems.length > 0
         ? "Payment failed - invoice is still unpaid. Review before retrying."
-        : Number(paymentSummary?.balanceDueCents ?? 0) > 0
-          ? "Create a payment link, charge the saved card once, or record a manual payment."
+        : hasOpenFieldPaymentReportForSelectedInvoice
+          ? "Payment collected - awaiting office confirmation."
+          : Number(paymentSummary?.balanceDueCents ?? 0) > 0
+          ? canManageFinancialInvoiceLifecycle
+            ? "Create a payment link, charge the saved card once, or record a manual payment."
+            : "Collect card payment or submit cash, check, or other payment for confirmation."
           : "Invoice is paid. Review payment history or audit details if needed.";
   const invoiceRevenueWorkflowRail = resolveInvoiceRevenueWorkflowRail({
     hasInvoice: Boolean(invoice),
@@ -760,6 +791,7 @@ export default async function InternalInvoiceWorkspacePage({
               <span className={chipClass}>{formatCurrencyFromCents(invoice?.total_cents ?? 0)}</span>
               {latestSuccessfulInternalInvoiceEmailDelivery ? <span className={chipClass}>Sent</span> : null}
               {paymentSummary ? <span className={chipClass}>{paymentStatusLabel}</span> : null}
+              {hasOpenFieldPaymentReportForSelectedInvoice ? <span className={chipClass}>Awaiting Confirmation</span> : null}
             </div>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -1061,7 +1093,7 @@ export default async function InternalInvoiceWorkspacePage({
                   Pick one available option below. Online card payments are recorded only after Stripe confirms them.
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Field-reported check, cash, and other collections are not enabled here yet. When enabled, office verification will be required before final payment truth.
+                  Use manual payment only after the office has confirmed the money was received. This records final payment truth in Compliance Matters.
                 </p>
 
                 {canShowManualSavedCardCharge ? (
@@ -1129,6 +1161,12 @@ export default async function InternalInvoiceWorkspacePage({
                   <input type="hidden" name="invoice_id" value={invoice.id} />
                   <input type="hidden" name="tab" value="info" />
                   <input type="hidden" name="return_to" value={returnTo} />
+                  <div>
+                    <div className="text-sm font-semibold text-slate-950">Record Manual Payment</div>
+                    <div className="mt-1 text-sm leading-6 text-slate-600">
+                      Use only after the office has confirmed the money was received. This records final payment truth in Compliance Matters.
+                    </div>
+                  </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div>
                       <label className={labelClass}>Amount</label>
@@ -1160,7 +1198,7 @@ export default async function InternalInvoiceWorkspacePage({
                     className={darkButtonClass}
                     disabled={!paymentSummary || paymentSummary.balanceDueCents <= 0}
                   >
-                    Record manual payment
+                    Record Manual Payment
                   </SubmitButton>
                 </form>
 
@@ -1175,8 +1213,16 @@ export default async function InternalInvoiceWorkspacePage({
                   Card collection launches secure Stripe Checkout. Payment updates only after Stripe webhook confirmation.
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Check, cash, and other field reporting are not enabled in this slice. Future field reports will require office verification before final payment truth.
+                  Cash, check, and other collected payments are submitted for office confirmation before the invoice is marked paid.
                 </p>
+                {hasOpenFieldPaymentReportForSelectedInvoice ? (
+                  <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-900">
+                    <div className="font-semibold">Awaiting Confirmation</div>
+                    <div className="mt-1">
+                      Payment collected - office confirmation is still required before this invoice is marked paid.
+                    </div>
+                  </div>
+                ) : null}
                 {!canCollectCardPaymentAccess ? (
                   <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-600">
                     Card collection is not enabled for your role.
@@ -1196,6 +1242,46 @@ export default async function InternalInvoiceWorkspacePage({
                     </form>
                   </>
                 )}
+                {canShowFieldNonCardPaymentForm ? (
+                  <form action={reportNonCardFieldPaymentCollectionFromForm} className="mt-4 space-y-3 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="invoice_id" value={invoice.id} />
+                    <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="return_to" value={returnTo} />
+                    <div>
+                      <div className="text-sm font-semibold text-amber-950">Payment Collected</div>
+                      <div className="mt-1 text-sm leading-6 text-slate-700">
+                        Payment collected - submit for office confirmation. The invoice is not marked paid until the office confirms the money was received.
+                      </div>
+                    </div>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className={labelClass}>Amount</label>
+                        <input name="payment_amount" inputMode="decimal" placeholder="0.00" className={inputClass} required />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Payment Method</label>
+                        <select name="payment_method" className={inputClass} defaultValue="" required>
+                          <option value="" disabled>Select method</option>
+                          <option value="cash">Cash</option>
+                          <option value="check">Check</option>
+                          <option value="other">Other</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className={labelClass}>Reference / Check Number</label>
+                        <input name="reference" placeholder="Check # or reference" className={inputClass} />
+                      </div>
+                      <div>
+                        <label className={labelClass}>Note</label>
+                        <input name="note" placeholder="Optional note" className={inputClass} />
+                      </div>
+                    </div>
+                    <SubmitButton loadingText="Submitting..." className={darkButtonClass}>
+                      Submit for Confirmation
+                    </SubmitButton>
+                  </form>
+                ) : null}
               </section>
             ) : null}
 

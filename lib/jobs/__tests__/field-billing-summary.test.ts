@@ -223,10 +223,38 @@ describe("FieldBillingSummary", () => {
     });
 
     expect(html).toContain("Issued invoice.");
-    expect(html).toContain("Payment collection is not enabled from field view yet.");
+    expect(html).toContain("Open the invoice workspace for payment options when collection is available.");
     expect(html).toContain("INV-2026-1");
     expect(html).toContain("$50.00");
     expect(html).toContain("$200.00");
+  });
+
+  it("points field collectors with payment authority to the invoice workspace", () => {
+    const html = renderSummary({
+      capabilities: {
+        ...readOnlyCapabilities,
+        field_billing_enabled: true,
+        can_collect_field_payment: true,
+        can_report_non_card_collection: true,
+      },
+      invoice: {
+        status: "issued",
+        invoiceNumber: "INV-ISSUED-2",
+        invoiceDisplayNumber: "INV-2026-2",
+        totalCents: 25000,
+        lineItemCount: 3,
+      },
+      paymentSummary: {
+        amountPaidCents: 0,
+        balanceDueCents: 25000,
+        paymentStatus: "unpaid",
+      },
+    });
+
+    expect(html).toContain("Issued invoice.");
+    expect(html).toContain("Open the invoice workspace to collect card payment or submit cash, check, or other payment for confirmation.");
+    expect(html).not.toContain("Payment collection is not enabled from field view yet.");
+    expect(html).not.toContain("Record Manual Payment");
   });
 
   it("renders paid invoice state", () => {

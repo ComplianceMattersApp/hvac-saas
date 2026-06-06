@@ -116,6 +116,9 @@ function resolveSummaryState(props: FieldBillingSummaryProps) {
   const invoice = props.invoice;
   const latestVoidedInvoice = props.latestVoidedInvoice ?? null;
   const paymentSummary = props.paymentSummary ?? null;
+  const hasFieldPaymentAction =
+    Boolean(props.capabilities.can_collect_card_payment)
+    || Boolean(props.capabilities.can_report_non_card_collection);
 
   if (!invoice && latestVoidedInvoice) {
     return {
@@ -163,7 +166,9 @@ function resolveSummaryState(props: FieldBillingSummaryProps) {
     headline: paid ? "Invoice paid." : "Issued invoice.",
     body: paid
       ? "Payment history is read-only from this field view."
-      : "Payment collection is not enabled from field view yet.",
+      : hasFieldPaymentAction
+        ? "Open the invoice workspace to collect card payment or submit cash, check, or other payment for confirmation."
+        : "Open the invoice workspace for payment options when collection is available.",
     invoiceForMetrics: invoice,
     paymentSummary,
   };
