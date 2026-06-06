@@ -214,7 +214,7 @@ describe('field billing access helper', () => {
     ).toBe(false);
   });
 
-  it('can model explicit future field billing permissions without granting financial authority', () => {
+  it('can model explicit field billing permissions without granting financial authority', () => {
     const capabilities = resolveFieldBillingCapabilities({
       actorUserId: 'tech-1',
       internalUser: internalUser('tech'),
@@ -238,12 +238,14 @@ describe('field billing access helper', () => {
     expect(capabilities.can_add_manual_charge).toBe(false);
     expect(capabilities.can_add_manual_invoice_line).toBe(false);
     expect(capabilities.can_edit_charge_price).toBe(false);
-    expect(capabilities.can_edit_invoice_line_price).toBe(false);
+    expect(capabilities.can_edit_invoice_line_description).toBe(true);
+    expect(capabilities.can_edit_invoice_line_quantity).toBe(true);
+    expect(capabilities.can_edit_invoice_line_price).toBe(true);
     expect(capabilities.can_collect_card_payment).toBe(false);
     expect(capabilities.can_verify_non_card_collection).toBe(false);
   });
 
-  it('does not imply payment collection or verification from direct invoice capability alone', () => {
+  it('derives a safe field invoice path from field billing access without final money authority', () => {
     const capabilities = resolveFieldBillingCapabilities({
       actorUserId: 'tech-1',
       internalUser: internalUser('tech'),
@@ -251,18 +253,20 @@ describe('field billing access helper', () => {
       explicitCapabilities: {
         field_billing_enabled: true,
         can_view_field_billing_summary: true,
-        can_create_direct_invoice_draft: true,
-        can_select_pricebook_invoice_lines: true,
-        can_edit_invoice_line_quantity: true,
       },
     });
 
     expect(capabilities.can_create_direct_invoice_draft).toBe(true);
-    expect(capabilities.can_select_pricebook_invoice_lines).toBe(true);
+    expect(capabilities.can_convert_visit_scope_to_invoice_lines).toBe(true);
+    expect(capabilities.can_issue_invoice).toBe(true);
+    expect(capabilities.can_select_pricebook_invoice_lines).toBe(false);
+    expect(capabilities.can_add_manual_invoice_line).toBe(false);
+    expect(capabilities.can_edit_invoice_line_description).toBe(true);
     expect(capabilities.can_edit_invoice_line_quantity).toBe(true);
+    expect(capabilities.can_edit_invoice_line_price).toBe(true);
+    expect(capabilities.can_remove_invoice_line).toBe(false);
     expect(capabilities.can_collect_card_payment).toBe(false);
     expect(capabilities.can_verify_non_card_collection).toBe(false);
-    expect(capabilities.can_issue_invoice).toBe(false);
     expect(capabilities.can_send_invoice).toBe(false);
   });
 
@@ -285,7 +289,7 @@ describe('field billing access helper', () => {
     expect(capabilities.can_verify_non_card_collection).toBe(false);
   });
 
-  it('can grant collect-card capability without granting issue/send authority', () => {
+  it('can grant collect-card capability without granting send or verification authority', () => {
     const capabilities = resolveFieldBillingCapabilities({
       actorUserId: 'tech-1',
       internalUser: internalUser('tech'),
@@ -299,7 +303,7 @@ describe('field billing access helper', () => {
 
     expect(capabilities.can_collect_card_payment).toBe(true);
     expect(capabilities.can_collect_field_payment).toBe(true);
-    expect(capabilities.can_issue_invoice).toBe(false);
+    expect(capabilities.can_issue_invoice).toBe(true);
     expect(capabilities.can_send_invoice).toBe(false);
     expect(capabilities.can_verify_non_card_collection).toBe(false);
   });
@@ -321,6 +325,7 @@ describe('field billing access helper', () => {
     expect(capabilities.can_collect_field_payment).toBe(true);
     expect(capabilities.can_collect_card_payment).toBe(false);
     expect(capabilities.can_report_non_card_collection).toBe(true);
+    expect(capabilities.can_issue_invoice).toBe(true);
     expect(capabilities.can_verify_non_card_collection).toBe(false);
 
     expect(canManageInvoiceLifecycle(params)).toBe(false);
@@ -375,6 +380,35 @@ describe('field billing access helper', () => {
     expect(() => requireFieldInvoiceSendAccessOrRedirect(params)).toThrow(
       'REDIRECT:/jobs/job-1?banner=not_authorized',
     );
+  });
+
+  it('allows field billing users to draft from work items and issue without manual, pricebook, or send authority', () => {
+    const params = {
+      actorUserId: 'tech-1',
+      internalUser: internalUser('tech'),
+      resourceAccountOwnerUserId: 'owner-1',
+      redirectTo: '/jobs/job-1?banner=not_authorized',
+      explicitCapabilities: {
+        field_billing_enabled: true,
+        can_view_field_billing_summary: true,
+        can_collect_field_payment: true,
+        can_report_non_card_collection: true,
+      },
+    };
+
+    expect(() => requireVisitScopeFieldChargeAccessOrRedirect(params)).not.toThrow();
+    expect(() => requireFieldChargeEditAccessOrRedirect(params)).not.toThrow();
+    expect(() => requireFieldInvoiceIssueAccessOrRedirect(params)).not.toThrow();
+    expect(() => requireManualFieldChargeAccessOrRedirect(params)).toThrow(
+      'REDIRECT:/jobs/job-1?banner=not_authorized',
+    );
+    expect(() => requirePricebookFieldChargeAccessOrRedirect(params)).toThrow(
+      'REDIRECT:/jobs/job-1?banner=not_authorized',
+    );
+    expect(() => requireFieldInvoiceSendAccessOrRedirect(params)).toThrow(
+      'REDIRECT:/jobs/job-1?banner=not_authorized',
+    );
+    expect(canRecordInvoicePayment(params)).toBe(false);
   });
 
   it('allows edit helper when any direct invoice line edit capability is granted', () => {

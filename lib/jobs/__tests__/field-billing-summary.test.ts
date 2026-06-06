@@ -357,6 +357,17 @@ describe("FieldBillingSummary", () => {
     expect(html).not.toContain("Submit charge for office review");
   });
 
+  it("labels the direct no-invoice CTA as start invoice for field billing users", () => {
+    const html = renderSummary({
+      capabilities: directInvoiceOnlyCapabilities,
+      invoice: null,
+    });
+
+    expect(html).toContain("Use invoice workspace for billing actions.");
+    expect(html).toContain("Start Invoice");
+    expect(html).not.toContain("Review Invoice");
+  });
+
   it("suppresses duplicate direct invoice CTA when parent billing card already provides it", () => {
     const html = renderSummary({
       capabilities: directInvoiceOnlyCapabilities,

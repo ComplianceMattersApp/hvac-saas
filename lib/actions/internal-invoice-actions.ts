@@ -5,7 +5,10 @@ import { redirect } from 'next/navigation';
 import { createAdminClient, createClient } from '@/lib/supabase/server';
 import { requireInternalUser } from '@/lib/auth/internal-user';
 import { loadScopedInternalJobForMutation } from '@/lib/auth/internal-job-scope';
-import { requireInvoiceLifecycleAccessOrRedirect } from '@/lib/auth/financial-access';
+import {
+  canManageInvoiceLifecycle,
+  requireInvoiceLifecycleAccessOrRedirect,
+} from '@/lib/auth/financial-access';
 import {
   resolveFieldBillingCapabilities,
   requireFieldChargeEditAccessOrRedirect,
@@ -1068,6 +1071,18 @@ function resolveFieldChargeCapabilities(context: Awaited<ReturnType<typeof loadI
   });
 }
 
+function hasDraftInvoiceCreateAccess(context: Awaited<ReturnType<typeof loadInternalInvoiceContext>>) {
+  if (canManageInvoiceLifecycle({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+  })) {
+    return true;
+  }
+
+  return resolveFieldChargeCapabilities(context).can_create_direct_invoice_draft;
+}
+
 async function logInvoiceEvent(params: {
   supabase: any;
   userId: string;
@@ -1110,12 +1125,9 @@ async function logInvoiceEvent(params: {
 export async function createInternalInvoiceDraftFromForm(formData: FormData) {
   const context = await loadInternalInvoiceContext(formData);
 
-  requireInvoiceLifecycleAccessOrRedirect({
-    actorUserId: context.userId,
-    internalUser: context.internalUser,
-    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
-    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
-  });
+  if (!hasDraftInvoiceCreateAccess(context)) {
+    redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo));
+  }
 
   if (context.invoice) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_draft_exists', context.returnTo));

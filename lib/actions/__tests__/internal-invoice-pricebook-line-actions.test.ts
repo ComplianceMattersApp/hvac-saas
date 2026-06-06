@@ -86,6 +86,7 @@ vi.mock('@/lib/notifications/account-owner', () => ({
 type SupabaseFixtureParams = {
   pricebookItem?: Record<string, unknown> | null;
   visitScopeItems?: Array<Record<string, unknown>>;
+  capabilityKeys?: string[];
 };
 
 function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
@@ -95,6 +96,7 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
   const invoiceUpdates: Array<Record<string, unknown>> = [];
   const pricebookItem = params.pricebookItem;
   const visitScopeItems = params.visitScopeItems ?? [];
+  const capabilityRows = (params.capabilityKeys ?? []).map((capabilityKey) => ({ capability_key: capabilityKey }));
 
   const supabase = {
     from: vi.fn((table: string) => {
@@ -185,6 +187,21 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
               eq: vi.fn(async () => ({ error: null })),
             };
           }),
+        };
+      }
+
+      if (table === 'internal_user_access_capabilities') {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(async () => ({
+                  data: capabilityRows,
+                  error: null,
+                })),
+              })),
+            })),
+          })),
         };
       }
 
@@ -421,6 +438,77 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(insertedLineItems).toHaveLength(0);
     expect(updatedLineItems).toHaveLength(0);
     expect(invoiceUpdates).toHaveLength(0);
+  });
+
+  it('allows technician with Field Billing Access to edit imported draft line description, quantity, and unit price', async () => {
+    const { supabase, updatedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      capabilityKeys: [
+        'field_billing_enabled',
+        'can_view_field_billing_summary',
+        'can_collect_field_payment',
+        'can_report_non_card_collection',
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'tech-field-billing-1',
+      internalUser: {
+        user_id: 'tech-field-billing-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
+      draftInvoice({
+        line_items: [
+          {
+            id: 'line-1',
+            source_kind: 'visit_scope',
+            source_visit_scope_item_id: 'scope-1',
+            item_name_snapshot: 'Imported work item',
+            description_snapshot: 'Original work instruction',
+            item_type_snapshot: 'service',
+            quantity: 1,
+            unit_price: 0,
+            line_subtotal: 0,
+          },
+        ],
+      }),
+    );
+
+    const { updateInternalInvoiceLineItemFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    const result = await updateInternalInvoiceLineItemFromForm(lineItemMutationFormData({
+      no_redirect: '1',
+      item_name_snapshot: 'Diagnostic and repair',
+      description_snapshot: 'Replaced failed contactor and verified startup.',
+      item_type_snapshot: 'service',
+      quantity: '2.50',
+      unit_price: '125.00',
+    }));
+
+    expect(result).toEqual({
+      ok: true,
+      banner: 'internal_invoice_line_item_saved',
+      fieldErrors: undefined,
+    });
+    expect(updatedLineItems).toHaveLength(1);
+    expect(updatedLineItems[0]).toEqual(expect.objectContaining({
+      item_name_snapshot: 'Diagnostic and repair',
+      description_snapshot: 'Replaced failed contactor and verified startup.',
+      item_type_snapshot: 'service',
+      quantity: '2.50',
+      unit_price: '125.00',
+      line_subtotal: '312.50',
+      updated_by_user_id: 'tech-field-billing-1',
+    }));
+    expect(invoiceUpdates).toHaveLength(1);
+    expect(invoiceUpdates[0]).toEqual(expect.objectContaining({
+      subtotal_cents: 31250,
+      total_cents: 31250,
+      updated_by_user_id: 'tech-field-billing-1',
+    }));
   });
 
   it('ignores forged description and price updates when actor only has quantity edit capability', async () => {

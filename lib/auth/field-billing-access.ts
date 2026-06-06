@@ -168,13 +168,17 @@ export function resolveFieldBillingCapabilities(params: FieldBillingAccessParams
   const canEditProposalPrice = explicit.can_edit_charge_price === true;
   const canRemoveProposalCharge = explicit.can_remove_field_charge === true;
 
-  const canCreateDirectInvoiceDraft = explicit.can_create_direct_invoice_draft === true;
+  // Field Billing Access is the master gate for the narrow field invoice path:
+  // start a draft, add approved work items, price those draft lines, issue/freeze,
+  // then collect/report payment.
+  // Broader office-only charge tools stay explicit below.
+  const canCreateDirectInvoiceDraft = true;
   const canSelectPricebookInvoiceLines = explicit.can_select_pricebook_invoice_lines === true;
-  const canConvertVisitScopeInvoiceLines = explicit.can_convert_visit_scope_to_invoice_lines === true;
+  const canConvertVisitScopeInvoiceLines = true;
   const canAddManualInvoiceLine = explicit.can_add_manual_invoice_line === true;
-  const canEditInvoiceLineDescription = explicit.can_edit_invoice_line_description === true;
-  const canEditInvoiceLineQuantity = explicit.can_edit_invoice_line_quantity === true;
-  const canEditInvoiceLinePrice = explicit.can_edit_invoice_line_price === true;
+  const canEditInvoiceLineDescription = true;
+  const canEditInvoiceLineQuantity = true;
+  const canEditInvoiceLinePrice = true;
   const canRemoveInvoiceLine = explicit.can_remove_invoice_line === true;
   const canCollectCardPayment = explicit.can_collect_card_payment === true;
   const canReportNonCardCollection = explicit.can_report_non_card_collection === true;
@@ -205,7 +209,7 @@ export function resolveFieldBillingCapabilities(params: FieldBillingAccessParams
     can_edit_invoice_line_price: canEditInvoiceLinePrice,
     can_remove_invoice_line: canRemoveInvoiceLine,
 
-    can_issue_invoice: explicit.can_issue_invoice === true,
+    can_issue_invoice: true,
     can_send_invoice: explicit.can_send_invoice === true,
 
     can_collect_field_payment: canCollectFieldPayment,

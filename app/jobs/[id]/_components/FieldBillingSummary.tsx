@@ -280,7 +280,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
                   ? "Review Invoice"
                   : "Build Invoice"
                 : "Open Invoice Workspace"
-              : "Review Invoice"}
+              : "Start Invoice"}
           </Link>
         </div>
       ) : null}

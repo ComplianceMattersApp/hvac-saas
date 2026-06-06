@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 
 const createClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
@@ -177,6 +179,11 @@ const lifecycleEntrypoints: InvoiceLifecycleEntrypoint[] = [
   'voidInternalInvoiceFromForm',
   'sendInternalInvoiceEmailFromForm',
 ];
+
+const internalInvoiceActionsSource = readFileSync(
+  resolve(__dirname, '../internal-invoice-actions.ts'),
+  'utf8',
+);
 
 async function invokeEntrypoint(name: InvoiceMutationEntrypoint, formData: FormData) {
   const invoiceActions = await import('@/lib/actions/internal-invoice-actions');
@@ -460,4 +467,17 @@ describe('internal invoice mutation same-account hardening', () => {
       expect(sendEmailMock).not.toHaveBeenCalled();
     });
   }
+
+  it('keeps draft creation open to derived field billing draft authority without broad lifecycle access', () => {
+    const draftCreateIndex = internalInvoiceActionsSource.indexOf('export async function createInternalInvoiceDraftFromForm');
+    const draftCreateSlice = internalInvoiceActionsSource.slice(draftCreateIndex, draftCreateIndex + 600);
+    const supplementalCreateIndex = internalInvoiceActionsSource.indexOf('export async function createSupplementalInternalInvoiceFromForm');
+    const supplementalCreateSlice = internalInvoiceActionsSource.slice(supplementalCreateIndex, supplementalCreateIndex + 3000);
+
+    expect(internalInvoiceActionsSource).toContain('function hasDraftInvoiceCreateAccess');
+    expect(internalInvoiceActionsSource).toContain('return resolveFieldChargeCapabilities(context).can_create_direct_invoice_draft;');
+    expect(draftCreateSlice).toContain('if (!hasDraftInvoiceCreateAccess(context))');
+    expect(draftCreateSlice).not.toContain('requireInvoiceLifecycleAccessOrRedirect');
+    expect(supplementalCreateSlice).toContain('requireInvoiceLifecycleAccessOrRedirect');
+  });
 });
