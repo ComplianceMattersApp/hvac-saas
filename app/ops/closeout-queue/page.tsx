@@ -454,7 +454,7 @@ export default async function CloseoutQueuePage({
 
         {canViewFieldPaymentReconciliationAttention ? (
           <p className="mt-3 text-xs text-slate-600">
-            Check, cash, and other field-reported payments count as collected only after office confirmation.
+            Check, cash, and other reported payments count as collected payment only after office confirmation.
           </p>
         ) : null}
       </section>
@@ -572,7 +572,7 @@ export default async function CloseoutQueuePage({
                           </label>
                           <p className="text-[10px] text-slate-600">Verify only after confirming the money was received.</p>
                           <SubmitButton className={compactActionClass} loadingText="Verifying...">
-                            Verify
+                            Confirm Payment
                           </SubmitButton>
                         </form>
                         <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2">
@@ -594,7 +594,7 @@ export default async function CloseoutQueuePage({
                           </label>
                           <p className="text-[10px] text-slate-600">Rejecting does not record payment.</p>
                           <SubmitButton className={compactActionClass} loadingText="Rejecting...">
-                            Reject
+                            Reject Report
                           </SubmitButton>
                         </form>
                       </div>

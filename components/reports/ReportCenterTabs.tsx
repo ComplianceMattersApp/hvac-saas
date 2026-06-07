@@ -88,7 +88,7 @@ export default function ReportCenterTabs({ current }: Props) {
             : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900"
         }`}
       >
-        Payment Reconciliation
+        Confirm Payment
       </Link>
       <Link
         href="/reports/failed-payments"

@@ -106,7 +106,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Charge saved card once");
     expect(source).toContain("This is not autopay");
     expect(source).toContain("no subscription is created");
-    expect(source).toContain("recorded only after Stripe webhook confirmation");
+    expect(source).toContain("collected payment updates only after Stripe confirms the charge");
   });
 
   it("preserves existing payment actions while adding saved-card control", () => {
@@ -119,14 +119,14 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("&& hasOutstandingInvoiceBalance");
     expect(source).toContain("&& canCollectFieldPaymentAccess");
     expect(source).toContain("collectIssuedInvoiceCardPaymentFromForm");
-    expect(source).toContain("Collect Payment");
+    expect(source).toContain("Collect or report payment");
     expect(source).toContain("Card payments open a secure checkout page. Once the payment is complete, this invoice updates automatically.");
-    expect(source).toContain("Cash, check, and other collected payments are submitted for office confirmation before the invoice is marked paid.");
+    expect(source).toContain("Cash, check, and other reported payments are submitted for office confirmation before the invoice is marked paid.");
     expect(source).toContain("Card collection is not enabled for your role.");
     expect(source).toContain("Online payments are not ready.");
-    expect(source).toContain("Use manual payment only after the office has confirmed the money was received. This records final payment truth in Compliance Matters.");
+    expect(source).toContain("Use Record Office Payment only after the office has confirmed the money was received. This records collected payment truth in Compliance Matters.");
     expect(source).toContain("Create payment link");
-    expect(source).toContain("Record Manual Payment");
+    expect(source).toContain("Record Office Payment");
     expect(source).toContain("collectTenantInvoicePaymentNowFromForm");
     expect(source).toContain("recordInternalInvoicePaymentFromForm");
     expect(source).toContain("reportNonCardFieldPaymentCollectionFromForm");
@@ -136,7 +136,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Charges");
     expect(source).toContain("Issue Readiness");
     expect(source).toContain("Billing Recipient");
-    expect(source).toContain("Payment Options");
+    expect(source).toContain("Collection Actions");
     expect(source).toContain("Payment History");
     expect(source).not.toContain("Audit / Technical Details");
     expect(source).not.toContain("Source-of-truth audit details remain available below.");
@@ -160,9 +160,8 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("const canShowFieldNonCardPaymentForm = Boolean(");
     expect(source).toContain("&& canReportNonCardPaymentAccess");
     expect(source).toContain("action={reportNonCardFieldPaymentCollectionFromForm}");
-    expect(source).toContain("Payment Collected");
-    expect(source).toContain("Submit for Confirmation");
-    expect(source).toContain("Payment collected - submit for office confirmation. The invoice is not marked paid until the office confirms the money was received.");
+    expect(source).toContain("Report Payment");
+    expect(source).toContain("Report this payment for office confirmation. The invoice is not marked paid until the office confirms the money was received.");
     expect(source).toContain("<option value=\"cash\">Cash</option>");
     expect(source).toContain("<option value=\"check\">Check</option>");
     expect(source).toContain("<option value=\"other\">Other</option>");
@@ -176,16 +175,17 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain(".eq(\"internal_invoice_id\", invoice.id)");
     expect(source).toContain(".in(\"status\", [\"reported\", \"under_review\", \"needs_correction\"])");
     expect(source).toContain("const hasOpenFieldPaymentReportForSelectedInvoice = openFieldPaymentReportsForSelectedInvoice.length > 0;");
-    expect(source).toContain("Awaiting Confirmation");
-    expect(source).toContain("Payment collected - office confirmation is still required before this invoice is marked paid.");
+    expect(source).toContain("Reported Payment");
+    expect(source).toContain("Reported payment awaiting confirmation");
+    expect(source).toContain("Reported payment is awaiting office confirmation before this invoice is marked paid.");
     expect(source).not.toContain("verifyFieldPaymentCollectionReportFromForm");
     expect(source).not.toContain("rejectFieldPaymentCollectionReportFromForm");
   });
 
   it("keeps owner manual payment as final truth path and not confirm-payment routing", () => {
     expect(source).toContain("action={recordInternalInvoicePaymentFromForm}");
-    expect(source).toContain("Use only after the office has confirmed the money was received. This records final payment truth in Compliance Matters.");
-    expect(source).toContain("Record Manual Payment");
+    expect(source).toContain("Use only after the office has confirmed the money was received. This records collected payment truth in Compliance Matters.");
+    expect(source).toContain("Record Office Payment");
     expect(source).not.toContain("Confirm Payment queue item");
   });
 

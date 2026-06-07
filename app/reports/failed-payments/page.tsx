@@ -112,12 +112,16 @@ export default async function FailedPaymentReconciliationPage() {
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
         title="Failed Payment Reconciliation"
-        description="Failed payments are not collected payments. Review the invoice workspace before retrying or contacting the customer."
+        description="Failed attempts are not collected payments. Review the invoice workspace before retrying or contacting the customer."
         countSummary={`Open failed payments: ${queue.summary.openCount}`}
         truthNote="Attention queue truth is tenant_saved_method_payment_attempts. Payment-event truth remains internal_invoice_payments and allocation truth remains internal_invoice_payment_allocations."
       />
 
       <ReportCenterTabs current="failed-payments" />
+
+      <section className="rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-600">
+        Failed Payments shows failed attempts needing review. Payments Register shows collected payment truth. Confirm Payment shows reported payments awaiting verification.
+      </section>
 
       <ReportStatGrid>
         <ReportStatCard label="Open failed payments" value={queue.summary.openCount} helperText="Unresolved scheduled autopay failures needing operator review." tone="rose" />

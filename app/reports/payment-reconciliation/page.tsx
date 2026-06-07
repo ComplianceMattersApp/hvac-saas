@@ -130,12 +130,16 @@ export default async function PaymentReconciliationPage() {
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
         title="Confirm Payment"
-        description="Review cash, check, or other payments reported from the field before they count as collected."
+        description="Review cash, check, or other reported payments from the field before they count as collected payment."
         countSummary={`Needs confirmation: ${queue.summary.openCount}`}
         truthNote="Verify only after confirming the money was received. Rejecting does not record payment."
       />
 
       <ReportCenterTabs current="payment-reconciliation" />
+
+      <section className="rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-600">
+        Confirm Payment shows reported payments awaiting verification. Payments Register shows collected payment truth. Failed Payments shows failed attempts needing review.
+      </section>
 
       <ReportStatGrid>
         <ReportStatCard
@@ -159,7 +163,7 @@ export default async function PaymentReconciliationPage() {
         <ReportStatCard
           label="Reported total"
           value={formatUsdFromCents(queue.summary.totalReportedAmountCents)}
-          helperText="Reported amount only. Not collected-money truth yet."
+          helperText="Reported payment amount only. Not collected payment truth yet."
           tone="slate"
         />
       </ReportStatGrid>
@@ -178,11 +182,11 @@ export default async function PaymentReconciliationPage() {
         </div>
       </section>
 
-      <ReportTableShell note="Reported amount only. Not collected-money truth yet. Correction and void actions are not enabled yet.">
+      <ReportTableShell note="Reported payment amount only. Not collected payment truth yet. Correction and void actions are not enabled yet.">
         {queue.items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
             <div className="font-semibold text-slate-900">No payments need confirmation.</div>
-            <div className="mt-1">When field users report check, cash, or other collection, open items will appear here.</div>
+            <div className="mt-1">When field users report check, cash, or other payments, open items will appear here.</div>
           </div>
         ) : (
           <div className="space-y-4">
@@ -207,7 +211,7 @@ export default async function PaymentReconciliationPage() {
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 md:min-w-48 md:text-right">
                         <div className="text-2xl font-semibold text-slate-950">{formatUsdFromCents(item.amountCents)}</div>
                         <div className="mt-1 text-sm font-semibold text-slate-700">{formatMethodLabel(item.paymentMethod)}</div>
-                        <div className="mt-1 text-xs text-slate-500">Reported amount only. Not collected-money truth yet.</div>
+                        <div className="mt-1 text-xs text-slate-500">Reported payment amount only. Not collected payment truth yet.</div>
                       </div>
                     </div>
 
@@ -273,7 +277,7 @@ export default async function PaymentReconciliationPage() {
                             className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-emerald-700 bg-emerald-700 px-3 py-2 text-xs font-semibold text-white transition-colors hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                             loadingText="Verifying..."
                           >
-                            Verify
+                            Confirm Payment
                           </SubmitButton>
                         </form>
                         <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2 rounded-md border border-rose-200 bg-white p-3">
@@ -298,7 +302,7 @@ export default async function PaymentReconciliationPage() {
                             className="inline-flex min-h-9 w-full items-center justify-center rounded-md border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition-colors hover:border-rose-300 hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
                             loadingText="Rejecting..."
                           >
-                            Reject
+                            Reject Report
                           </SubmitButton>
                         </form>
                       </div>

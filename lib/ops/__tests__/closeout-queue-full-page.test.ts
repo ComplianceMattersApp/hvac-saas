@@ -142,8 +142,8 @@ describe("/ops/closeout-queue page", () => {
   it("shows verify and reject controls integrated into closeout-style confirm payment cards", () => {
     expect(closeoutQueuePageSource).toContain("verifyFieldPaymentCollectionReportFromForm");
     expect(closeoutQueuePageSource).toContain("rejectFieldPaymentCollectionReportFromForm");
-    expect(closeoutQueuePageSource).toMatch(/>\s*Verify\s*</);
-    expect(closeoutQueuePageSource).toMatch(/>\s*Reject\s*</);
+    expect(closeoutQueuePageSource).toMatch(/>\s*Confirm Payment\s*</);
+    expect(closeoutQueuePageSource).toMatch(/>\s*Reject Report\s*</);
     expect(closeoutQueuePageSource).toContain("Field-reported payment needs confirmation.");
   });
 
@@ -174,7 +174,7 @@ describe("/ops/closeout-queue page", () => {
 
   it("uses required Confirm Payment helper and action copy", () => {
     expect(closeoutQueuePageSource).toContain(
-      "Check, cash, and other field-reported payments count as collected only after office confirmation.",
+      "Check, cash, and other reported payments count as collected payment only after office confirmation.",
     );
     expect(closeoutQueuePageSource).toContain("Verify only after confirming the money was received.");
     expect(closeoutQueuePageSource).toContain("Rejecting does not record payment.");

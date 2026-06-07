@@ -30,8 +30,8 @@ describe("field payment reconciliation queue page wiring", () => {
 
   it("renders required office-verification copy", () => {
     expect(queuePageSource).toContain('title="Confirm Payment"');
-    expect(queuePageSource).toContain("Review cash, check, or other payments reported from the field before they count as collected.");
-    expect(queuePageSource).toContain("Reported amount only. Not collected-money truth yet.");
+    expect(queuePageSource).toContain("Review cash, check, or other reported payments from the field before they count as collected payment.");
+    expect(queuePageSource).toContain("Reported payment amount only. Not collected payment truth yet.");
     expect(queuePageSource).toContain("Verify only after confirming the money was received.");
     expect(queuePageSource).toContain("Rejecting does not record payment.");
     expect(queuePageSource).toContain("Correction and void actions are not enabled yet.");
@@ -60,8 +60,8 @@ describe("field payment reconciliation queue page wiring", () => {
   it("wires verify and reject actions for authorized reconciliation users", () => {
     expect(queuePageSource).toContain("verifyFieldPaymentCollectionReportFromForm");
     expect(queuePageSource).toContain("rejectFieldPaymentCollectionReportFromForm");
-    expect(queuePageSource).toMatch(/>\s*Verify\s*</);
-    expect(queuePageSource).toMatch(/>\s*Reject\s*</);
+    expect(queuePageSource).toMatch(/>\s*Confirm Payment\s*</);
+    expect(queuePageSource).toMatch(/>\s*Reject Report\s*</);
   });
 
   it("posts verify and reject payloads with required report context", () => {
@@ -97,6 +97,8 @@ describe("field payment reconciliation queue page wiring", () => {
 
   it("uses report center tab entry for payment reconciliation", () => {
     expect(queuePageSource).toContain('ReportCenterTabs current="payment-reconciliation"');
-    expect(queuePageSource).toContain("payment-reconciliation");
+    expect(queuePageSource).toContain("Confirm Payment shows reported payments awaiting verification.");
+    expect(queuePageSource).toContain("Payments Register shows collected payment truth.");
+    expect(queuePageSource).toContain("Failed Payments shows failed attempts needing review.");
   });
 });

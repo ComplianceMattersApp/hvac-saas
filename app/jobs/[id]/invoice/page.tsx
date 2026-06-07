@@ -220,7 +220,7 @@ function bannerMessage(value?: string | null) {
     internal_invoice_payment_reversal_failed_blocked: "Failed payment attempts cannot be reversed.",
     internal_invoice_payment_reversal_not_recorded: "Only recorded payments can be reversed.",
     internal_invoice_payment_reversal_online_blocked:
-      "Online Stripe payments cannot be reversed here. Use Stripe refund/reversal workflows and let webhooks update records.",
+      "Online Stripe payments cannot be reversed here. Use Stripe refund/reversal workflows and let Stripe confirmation update records.",
     internal_invoice_voided: "Invoice voided.",
     internal_invoice_missing: "Invoice was not found.",
     internal_invoice_saved_card_charge_denied: "You do not have permission to charge a saved card for this invoice.",
@@ -233,7 +233,7 @@ function bannerMessage(value?: string | null) {
     internal_invoice_saved_card_charge_requires_issued: "Invoice must be issued before charging a saved card.",
     internal_invoice_saved_card_charge_no_balance_due: "Invoice has no balance due.",
     internal_invoice_saved_card_charge_submitted:
-      "Saved-card charge submitted to Stripe. Payment records update only after webhook confirmation.",
+      "Saved-card charge submitted to Stripe. Collected payment records update only after Stripe confirmation.",
     internal_invoice_saved_card_charge_failed_declined:
       "Saved-card charge was declined by Stripe. Invoice payment records were not marked paid.",
     internal_invoice_saved_card_charge_failed_requires_action:
@@ -244,7 +244,7 @@ function bannerMessage(value?: string | null) {
     internal_invoice_failed_autopay_retry_blocked:
       "Failed-autopay retry is currently blocked by invoice or payment readiness checks.",
     internal_invoice_failed_autopay_retry_submitted:
-      "Failed-autopay retry submitted to Stripe. Payment records update only after webhook confirmation.",
+      "Failed-autopay retry submitted to Stripe. Collected payment records update only after Stripe confirmation.",
     internal_invoice_failed_autopay_retry_failed_declined:
       "Failed-autopay retry was declined by Stripe. Invoice payment records were not marked paid.",
     internal_invoice_failed_autopay_retry_failed_requires_action:
@@ -735,13 +735,13 @@ export default async function InternalInvoiceWorkspacePage({
         ? "Issue the invoice when the readiness checks are all ready."
         : "Review the readiness checks before issuing the invoice."
       : failedAutopayAttentionItems.length > 0
-        ? "Payment failed - invoice is still unpaid. Review before retrying."
+        ? "Failed attempt - invoice is still unpaid. Review before retrying."
         : hasOpenFieldPaymentReportForSelectedInvoice
-          ? "Payment collected - awaiting office confirmation."
+          ? "Reported payment awaiting office confirmation."
           : Number(paymentSummary?.balanceDueCents ?? 0) > 0
           ? canManageFinancialInvoiceLifecycle
-            ? "Create a payment link, charge the saved card once, or record a manual payment."
-            : "Collect card payment or submit cash, check, or other payment for confirmation."
+            ? "Collect card payment, report cash/check/other for confirmation, or record office payment."
+            : "Collect card payment or report cash, check, or other payment for confirmation."
           : "Invoice is paid. Review payment history or audit details if needed.";
   const invoiceRevenueWorkflowRail = resolveInvoiceRevenueWorkflowRail({
     hasInvoice: Boolean(invoice),
@@ -800,7 +800,7 @@ export default async function InternalInvoiceWorkspacePage({
               <span className={chipClass}>{formatCurrencyFromCents(invoice?.total_cents ?? 0)}</span>
               {latestSuccessfulInternalInvoiceEmailDelivery ? <span className={chipClass}>Sent</span> : null}
               {paymentSummary ? <span className={chipClass}>{paymentStatusLabel}</span> : null}
-              {hasOpenFieldPaymentReportForSelectedInvoice ? <span className={chipClass}>Awaiting Confirmation</span> : null}
+              {hasOpenFieldPaymentReportForSelectedInvoice ? <span className={chipClass}>Reported Payment</span> : null}
             </div>
           </div>
           <div className="flex flex-wrap gap-2 lg:justify-end">
@@ -1004,10 +1004,10 @@ export default async function InternalInvoiceWorkspacePage({
 
             {invoice.status === "issued" && canManageFinancialInvoiceLifecycle ? (
               <section className={`${panelClass} order-20 p-4 sm:p-5`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Attention</div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Review payment failures</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Failed Attempts</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Review failed attempts</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Payment failed - invoice is still unpaid. Review before retrying. Failed payments are not counted as paid.
+                  Failed attempt - invoice is still unpaid. Review before retrying. Failed attempts are not counted as collected payment.
                 </p>
 
                 {failedAutopayAttentionItems.length === 0 ? (
@@ -1082,7 +1082,7 @@ export default async function InternalInvoiceWorkspacePage({
                               />
                               <div className="text-sm font-semibold text-slate-950">Retry saved card</div>
                               <div className="mt-1 text-xs leading-5 text-slate-600">
-                                This will attempt the saved payment method again. Payment is only recorded after Stripe confirms it through webhook.
+                                This will attempt the saved payment method again. Collected payment updates only after Stripe confirms the result.
                               </div>
                               <SubmitButton loadingText="Retrying..." className={`${secondaryButtonClass} mt-3`}>
                                 Retry saved card
@@ -1099,13 +1099,13 @@ export default async function InternalInvoiceWorkspacePage({
 
             {invoice.status === "issued" && canManageFinancialInvoiceLifecycle ? (
               <section className={`${panelClass} order-10 p-4 sm:p-5`}>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment Options</div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Choose how to collect payment</h2>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Collection Actions</div>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Choose a payment action</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Pick one available option below. Online card payments are recorded only after Stripe confirms them.
+                  Choose one available action below: collect card payment, create a payment link, or record office payment.
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Use manual payment only after the office has confirmed the money was received. This records final payment truth in Compliance Matters.
+                  Use Record Office Payment only after the office has confirmed the money was received. This records collected payment truth in Compliance Matters.
                 </p>
 
                 {canShowManualSavedCardCharge ? (
@@ -1125,7 +1125,7 @@ export default async function InternalInvoiceWorkspacePage({
                     <div className="text-sm font-semibold text-emerald-950">Charge saved card once</div>
                     <div className="text-sm leading-6 text-slate-700">
                       Uses the active saved card on file for this customer.
-                      This is not autopay, no subscription is created, and invoice payment is recorded only after Stripe webhook confirmation.
+                      This is not autopay, no subscription is created, and collected payment updates only after Stripe confirms the charge.
                     </div>
                     <div className="text-xs text-slate-600">
                       Card: {String(defaultSavedCardMethod?.display_brand ?? "Card")} •••• {String(defaultSavedCardMethod?.display_last4 ?? "")}
@@ -1174,9 +1174,9 @@ export default async function InternalInvoiceWorkspacePage({
                   <input type="hidden" name="tab" value="info" />
                   <input type="hidden" name="return_to" value={returnTo} />
                   <div>
-                    <div className="text-sm font-semibold text-slate-950">Record Manual Payment</div>
+                    <div className="text-sm font-semibold text-slate-950">Record Office Payment</div>
                     <div className="mt-1 text-sm leading-6 text-slate-600">
-                      Use only after the office has confirmed the money was received. This records final payment truth in Compliance Matters.
+                      Use only after the office has confirmed the money was received. This records collected payment truth in Compliance Matters.
                     </div>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
@@ -1210,7 +1210,7 @@ export default async function InternalInvoiceWorkspacePage({
                     className={darkButtonClass}
                     disabled={!paymentSummary || paymentSummary.balanceDueCents <= 0}
                   >
-                    Record Manual Payment
+                    Record Office Payment
                   </SubmitButton>
                 </form>
 
@@ -1220,18 +1220,18 @@ export default async function InternalInvoiceWorkspacePage({
             {canShowFieldCollectionSection ? (
               <section className={`${panelClass} order-5 p-4 sm:p-5`}>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Collection</div>
-                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collect Payment</h2>
+                <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collect or report payment</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   Card payments open a secure checkout page. Once the payment is complete, this invoice updates automatically.
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Cash, check, and other collected payments are submitted for office confirmation before the invoice is marked paid.
+                  Cash, check, and other reported payments are submitted for office confirmation before the invoice is marked paid.
                 </p>
                 {hasOpenFieldPaymentReportForSelectedInvoice ? (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-900">
-                    <div className="font-semibold">Awaiting Confirmation</div>
+                    <div className="font-semibold">Reported payment awaiting confirmation</div>
                     <div className="mt-1">
-                      Payment collected - office confirmation is still required before this invoice is marked paid.
+                      Reported payment is awaiting office confirmation before this invoice is marked paid.
                     </div>
                   </div>
                 ) : null}
@@ -1261,9 +1261,9 @@ export default async function InternalInvoiceWorkspacePage({
                     <input type="hidden" name="tab" value="info" />
                     <input type="hidden" name="return_to" value={returnTo} />
                     <div>
-                      <div className="text-sm font-semibold text-amber-950">Payment Collected</div>
+                      <div className="text-sm font-semibold text-amber-950">Report Payment</div>
                       <div className="mt-1 text-sm leading-6 text-slate-700">
-                        Payment collected - submit for office confirmation. The invoice is not marked paid until the office confirms the money was received.
+                        Report this payment for office confirmation. The invoice is not marked paid until the office confirms the money was received.
                       </div>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">
@@ -1290,7 +1290,7 @@ export default async function InternalInvoiceWorkspacePage({
                       </div>
                     </div>
                     <SubmitButton loadingText="Submitting..." className={darkButtonClass}>
-                      Submit for Confirmation
+                      Report Payment
                     </SubmitButton>
                   </form>
                 ) : null}
@@ -1302,7 +1302,7 @@ export default async function InternalInvoiceWorkspacePage({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Payment History</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collected and not-collected activity</h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  Collected payments appear first. Failed or reversed attempts are listed as not collected.
+                  Collected payments appear first. Failed attempts or reversed payments are listed as not collected.
                 </p>
 
                 {recordedInternalInvoicePaymentRows.length > 0 ? (

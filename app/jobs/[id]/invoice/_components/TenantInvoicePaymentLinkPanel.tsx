@@ -73,7 +73,7 @@ export default function TenantInvoicePaymentLinkPanel({
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-1 pb-4 pt-1">
         <div className="text-sm font-semibold text-slate-950">Payment link</div>
         <div className="mt-1 text-sm text-slate-600">
-          Creates a Stripe-hosted payment page for this invoice balance. Payment is recorded after Stripe confirms it.
+          Card payments open a secure checkout page. Once the payment is complete, this invoice updates automatically.
         </div>
       </div>
 
@@ -87,10 +87,6 @@ export default function TenantInvoicePaymentLinkPanel({
           <input type="hidden" name="invoice_id" value={invoiceId} />
           <input type="hidden" name="tab" value="info" />
           <input type="hidden" name="return_to" value={returnTo} />
-
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-600">
-            Creates a Stripe-hosted payment page for this invoice balance. Payment is recorded after Stripe confirms it.
-          </div>
 
           <SubmitButton loadingText="Creating..." className={`${darkButtonClass} w-full`}>
             Create payment link

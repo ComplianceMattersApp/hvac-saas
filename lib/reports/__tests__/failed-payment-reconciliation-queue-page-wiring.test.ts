@@ -87,5 +87,6 @@ describe("failed payment reconciliation queue page wiring", () => {
   it("uses reports tab and labels this as reconciliation queue surface", () => {
     expect(queuePageSource).toContain('ReportCenterTabs current="failed-payments"');
     expect(queuePageSource).toContain("Failed Payment Reconciliation");
+    expect(queuePageSource).toContain("Failed Payments shows failed attempts needing review.");
   });
 });
