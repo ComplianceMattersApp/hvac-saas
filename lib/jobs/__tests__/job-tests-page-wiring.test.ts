@@ -97,7 +97,7 @@ describe("job detail field operations board layout", () => {
 
   it("does not duplicate intake note in right notes card and keeps honest empty-state copy", () => {
     const jobNotesCardStart = jobPageSource.indexOf("<ChatIcon className=\"h-3.5 w-3.5\" />{rightRailNotesTitle}</div>");
-    const jobNotesCardEnd = jobPageSource.indexOf('href="#internal-notes"', jobNotesCardStart);
+    const jobNotesCardEnd = jobPageSource.indexOf('id="next-service-action"', jobNotesCardStart);
     const jobNotesCardSlice =
       jobNotesCardStart > -1 && jobNotesCardEnd > jobNotesCardStart
         ? jobPageSource.slice(jobNotesCardStart, jobNotesCardEnd)
@@ -136,6 +136,51 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("space-y-3 xl:order-3");
   });
 
+  it("shows every saved Work Scope item on mobile without a hidden more-items summary", () => {
+    const mobileWorkScopeStart = jobPageSource.indexOf('id="mobile-work-scope"');
+    const mobileNotesStart = jobPageSource.indexOf('id="mobile-notes-hub"', mobileWorkScopeStart);
+    const mobileWorkScopeSlice =
+      mobileWorkScopeStart > -1 && mobileNotesStart > mobileWorkScopeStart
+        ? jobPageSource.slice(mobileWorkScopeStart, mobileNotesStart)
+        : "";
+
+    expect(mobileWorkScopeSlice).toContain("{visitScopeItems.map((item, index) => (");
+    expect(mobileWorkScopeSlice).not.toContain("primaryVisitScopeItems.slice(0, 2)");
+    expect(mobileWorkScopeSlice).not.toContain("more work item");
+    expect(mobileWorkScopeSlice).toContain("formatVisitScopeItemKindLabel(item.kind)");
+    expect(mobileWorkScopeSlice).toContain("Number(item.expected_unit_price).toFixed(2)");
+  });
+
+  it("keeps mobile Visit Reason editing aligned inside the Visit Reason card", () => {
+    const mobileVisitReasonStart = jobPageSource.indexOf('id="mobile-visit-reason-card"');
+    const mobileVisitReasonEnd = jobPageSource.indexOf("{visitScopeItems.map((item, index) => (", mobileVisitReasonStart);
+    const mobileVisitReasonSlice =
+      mobileVisitReasonStart > -1 && mobileVisitReasonEnd > mobileVisitReasonStart
+        ? jobPageSource.slice(mobileVisitReasonStart, mobileVisitReasonEnd)
+        : "";
+
+    expect(mobileVisitReasonSlice).toContain('<details className="group">');
+    expect(mobileVisitReasonSlice).toContain('className="mt-3 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm"');
+    expect(mobileVisitReasonSlice).toContain('className="mt-3 grid grid-cols-2 gap-2"');
+    expect(mobileVisitReasonSlice).toContain('inline-flex min-h-10 items-center justify-center rounded-xl');
+    expect(mobileVisitReasonSlice).toContain('name="visit_scope_summary"');
+    expect(mobileVisitReasonSlice).toContain('name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit}');
+  });
+
+  it("removes the mobile Tools jump button while preserving lower tools", () => {
+    const mobileWorkScopeStart = jobPageSource.indexOf('id="mobile-work-scope"');
+    const mobileNotesStart = jobPageSource.indexOf('id="mobile-notes-hub"', mobileWorkScopeStart);
+    const mobileWorkScopeSlice =
+      mobileWorkScopeStart > -1 && mobileNotesStart > mobileWorkScopeStart
+        ? jobPageSource.slice(mobileWorkScopeStart, mobileNotesStart)
+        : "";
+
+    expect(mobileWorkScopeSlice).not.toContain('href="#mobile-tools"');
+    expect(mobileWorkScopeSlice).not.toContain(">Tools");
+    expect(jobPageSource).toContain('id="mobile-tools"');
+    expect(jobPageSource).toContain("More Details / Tools");
+  });
+
   it("keeps the location preview compact on mobile and hides lower map actions there", () => {
     expect(jobLocationPreviewSource).toContain("h-40 w-full object-cover");
     expect(jobLocationPreviewSource).toContain("sm:h-52 lg:h-56 xl:h-60");
@@ -147,6 +192,28 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("Open in Maps");
   });
 
+  it("deduplicates mobile Service Location address and navigation actions", () => {
+    const mobileLocationStart = jobPageSource.indexOf("<span>Service Location</span>");
+    const mobileLocationEnd = jobPageSource.indexOf('id="mobile-work-scope"', mobileLocationStart);
+    const mobileLocationSlice =
+      mobileLocationStart > -1 && mobileLocationEnd > mobileLocationStart
+        ? jobPageSource.slice(mobileLocationStart, mobileLocationEnd)
+        : "";
+
+    expect(mobileLocationSlice).toContain("showAddressOverlay");
+    expect(mobileLocationSlice).toContain("showAddressFooter");
+    expect(mobileLocationSlice).toContain("showActionsOnMobile");
+    expect(mobileLocationSlice).not.toContain("{serviceAddressDisplay}");
+    expect(mobileLocationSlice).not.toContain("mobileNavigateHref");
+    expect(mobileLocationSlice).not.toContain("<span>Navigate</span>");
+    expect(jobLocationPreviewSource).toContain("showActionsOnMobile?: boolean");
+    expect(jobLocationPreviewSource).toContain('props.showActionsOnMobile ? "mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between"');
+    expect(jobLocationPreviewSource).toContain("props.showAddressOverlay && imageUrl && addressDisplay");
+    expect(jobLocationPreviewSource).toContain("(!props.showAddressOverlay || !imageUrl) && props.showAddressFooter");
+    expect(jobLocationPreviewSource).toContain("Navigate");
+    expect(jobLocationPreviewSource).toContain("Open in Maps");
+  });
+
   it("keeps permit quick reference in the top rail", () => {
     const permitQuickRefIndex = jobPageSource.indexOf("><ClipboardIcon className=\"h-3.5 w-3.5\" />Permit Quick Ref</div>");
 
@@ -156,19 +223,19 @@ describe("job detail field operations board layout", () => {
   });
 
   it("restores ECC summary, permit details, and equipment inside lower job records section", () => {
-    const recordsSectionIndex = jobPageSource.indexOf("Activity, Evidence, and History");
-    const recordsGridIndex = jobPageSource.indexOf('grid grid-cols-1 items-start gap-2 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3', recordsSectionIndex);
+    const recordsSectionIndex = jobPageSource.indexOf("Job Details & Records");
+    const recordsGridIndex = jobPageSource.indexOf('grid grid-cols-1 items-start gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4', recordsSectionIndex);
     const lowerEccSummaryIndex = jobPageSource.indexOf('title="ECC Summary"', recordsGridIndex);
     const lowerPermitIndex = jobPageSource.indexOf('title="Permit Details"', recordsGridIndex);
     const lowerEquipmentIndex = jobPageSource.indexOf('title="Equipment"', recordsGridIndex);
-    const internalNotesIndex = jobPageSource.indexOf('details id="internal-notes"', recordsGridIndex);
+    const attachmentsIndex = jobPageSource.indexOf('title="Attachments"', recordsGridIndex);
 
     expect(recordsSectionIndex).toBeGreaterThan(-1);
     expect(recordsGridIndex).toBeGreaterThan(recordsSectionIndex);
     expect(lowerEccSummaryIndex).toBeGreaterThan(recordsGridIndex);
     expect(lowerPermitIndex).toBeGreaterThan(lowerEccSummaryIndex);
     expect(lowerEquipmentIndex).toBeGreaterThan(lowerPermitIndex);
-    expect(internalNotesIndex).toBeGreaterThan(lowerEquipmentIndex);
+    expect(attachmentsIndex).toBeGreaterThan(lowerEquipmentIndex);
     expect(jobPageSource).toContain("showEccSummaryCard = job.job_type === \"ecc\"");
     expect(jobPageSource).toContain("showJobRecordsPermitCard = showEccSummaryCard || hasPermitDetails");
     expect(jobPageSource).toContain("Manage Equipment");
@@ -183,14 +250,135 @@ describe("job detail field operations board layout", () => {
   });
 
   it("keeps notes rail action near top with no follow-up shortcut", () => {
+    const jobNotesCardStart = jobPageSource.indexOf("<ChatIcon className=\"h-3.5 w-3.5\" />{rightRailNotesTitle}</div>");
+    const jobNotesCardEnd = jobPageSource.indexOf('id="next-service-action"', jobNotesCardStart);
+    const jobNotesCardSlice =
+      jobNotesCardStart > -1 && jobNotesCardEnd > jobNotesCardStart
+        ? jobPageSource.slice(jobNotesCardStart, jobNotesCardEnd)
+        : "";
+
     expect(jobPageSource).toContain("rightRailNotesTitle");
-    expect(jobPageSource).toContain('href="#internal-notes"');
-    expect(jobPageSource).not.toContain('href="#follow-up"');
+    expect(jobPageSource).toContain('id="internal-notes"');
+    expect(jobPageSource).toContain("DeferredInternalNoteMentionComposer");
+    expect(jobPageSource).toContain("DeferredInternalNotesBody");
+    expect(jobNotesCardSlice).not.toContain('href="#follow-up"');
     expect(jobPageSource).toContain("View / Add Notes");
   });
 
-  it("keeps destination notes section expanded by default", () => {
-    expect(jobPageSource).toContain('details id="internal-notes" className={jobRecordsDetailsClass} open');
+  it("keeps job notes in the top rail instead of a duplicate lower record card", () => {
+    const topNotesIndex = jobPageSource.indexOf('id="internal-notes"');
+    const recordsSectionIndex = jobPageSource.indexOf("Job Details & Records");
+
+    expect(topNotesIndex).toBeGreaterThan(-1);
+    expect(topNotesIndex).toBeLessThan(recordsSectionIndex);
+    expect(jobPageSource).not.toContain('details id="internal-notes" className={jobRecordsDetailsClass}');
+    expect(jobPageSource).not.toContain("title={internalNotesTitle}");
+  });
+
+  it("gates callback creation until the anchor job is believed complete", () => {
+    const callbackGateIndex = jobPageSource.indexOf("{callbackIntakeHistoricalAnchorEligible ? (");
+    const callbackTitleIndex = jobPageSource.indexOf("Create Callback Visit", callbackGateIndex);
+
+    expect(callbackGateIndex).toBeGreaterThan(-1);
+    expect(callbackTitleIndex).toBeGreaterThan(callbackGateIndex);
+    expect(jobPageSource).not.toContain("Callback visit creation is available for service jobs that are field-complete, completed, or closed.");
+  });
+
+  it("keeps Next Service Action separate from Work & Invoice", () => {
+    const workInvoiceIndex = jobPageSource.indexOf("Work & Invoice");
+    const nextServiceIndex = jobPageSource.indexOf('id="next-service-action"');
+    const workInvoiceSectionEnd = jobPageSource.indexOf("{/* Right: quick reference rail */}", workInvoiceIndex);
+
+    expect(workInvoiceIndex).toBeGreaterThan(-1);
+    expect(nextServiceIndex).toBeGreaterThan(workInvoiceSectionEnd);
+    expect(jobPageSource).toContain("Next Service Action");
+    expect(jobPageSource).toContain("Create Return Visit");
+  });
+
+  it("consolidates Job Details and Job Status inside the Job Details & Records grid", () => {
+    const recordsSectionIndex = jobPageSource.indexOf("Job Details & Records");
+    const recordsGridIndex = jobPageSource.indexOf('grid grid-cols-1 items-start gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4', recordsSectionIndex);
+    const editJobIndex = jobPageSource.indexOf('href="#edit-job" data-record-launcher="edit-job"', recordsGridIndex);
+    const jobStatusIndex = jobPageSource.indexOf('href="#job-status" data-record-launcher="job-status"', recordsGridIndex);
+    const equipmentIndex = jobPageSource.indexOf('title="Equipment"', recordsGridIndex);
+    const attachmentsIndex = jobPageSource.indexOf('title="Attachments"', recordsGridIndex);
+    const followUpIndex = jobPageSource.indexOf('title="Follow Up"', recordsGridIndex);
+    const followUpHistoryIndex = jobPageSource.indexOf('title="Follow-Up History"', recordsGridIndex);
+    const timelineIndex = jobPageSource.indexOf("title={timelineTitle}", recordsGridIndex);
+    const serviceChainIndex = jobPageSource.indexOf('title="Service Chain"', recordsGridIndex);
+
+    expect(recordsSectionIndex).toBeGreaterThan(-1);
+    expect(recordsGridIndex).toBeGreaterThan(recordsSectionIndex);
+    expect(editJobIndex).toBeGreaterThan(recordsGridIndex);
+    expect(jobStatusIndex).toBeGreaterThan(editJobIndex);
+    expect(equipmentIndex).toBeGreaterThan(jobStatusIndex);
+    expect(attachmentsIndex).toBeGreaterThan(equipmentIndex);
+    expect(followUpIndex).toBeGreaterThan(attachmentsIndex);
+    expect(followUpHistoryIndex).toBeGreaterThan(followUpIndex);
+    expect(timelineIndex).toBeGreaterThan(followUpHistoryIndex);
+    expect(serviceChainIndex).toBeGreaterThan(timelineIndex);
+    expect(jobPageSource).toContain('title="Job Details"');
+    expect(jobPageSource).toContain('title="Job Status"');
+    expect(jobPageSource).toContain("Details, status, equipment, attachments, follow-up, and history.");
+    expect(jobPageSource).toContain("[&[open]]:xl:col-span-2");
+    expect(jobPageSource).not.toContain('<div className="mb-4 grid grid-cols-1 items-start gap-2 sm:gap-3 xl:grid-cols-2">');
+    expect(jobPageSource).not.toContain('<details id="edit-job" className={`${workspaceDetailsClass} mb-6`}>');
+    expect(jobPageSource).not.toContain('<details id="job-status" className={`${workspaceDetailsClass} mb-6');
+  });
+
+  it("uses compact record launchers with one shared wide detail panel", () => {
+    const recordsSectionIndex = jobPageSource.indexOf('id="job-details-records"');
+    const recordsGridIndex = jobPageSource.indexOf('grid grid-cols-1 items-start gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4', recordsSectionIndex);
+    const sharedPanelIndex = jobPageSource.indexOf('id="job-record-detail-panel"', recordsGridIndex);
+    const gridSlice =
+      recordsGridIndex > -1 && sharedPanelIndex > recordsGridIndex
+        ? jobPageSource.slice(recordsGridIndex, sharedPanelIndex)
+        : "";
+    const panelSlice =
+      sharedPanelIndex > -1
+        ? jobPageSource.slice(sharedPanelIndex, jobPageSource.indexOf("</section>", sharedPanelIndex) + "</section>".length)
+        : "";
+
+    expect(recordsSectionIndex).toBeGreaterThan(-1);
+    expect(sharedPanelIndex).toBeGreaterThan(recordsGridIndex);
+    expect(jobPageSource).toContain("const recordLauncherClass =");
+    expect(jobPageSource).toContain("const recordPanelClass =");
+    expect(jobPageSource).toContain("#job-record-detail-panel > [data-record-panel] { display: none; }");
+    expect(jobPageSource).toContain("#job-record-detail-panel > [data-record-panel]:target { display: block; }");
+    expect(jobPageSource).toContain('data-record-panel="edit-job"');
+    expect(jobPageSource).toContain('data-record-panel="job-status"');
+    expect(jobPageSource).toContain('data-record-panel="job-record-equipment"');
+    expect(jobPageSource).toContain('data-record-panel="job-record-attachments"');
+    expect(jobPageSource).toContain('data-record-panel="follow-up"');
+    expect(jobPageSource).toContain('data-record-panel="job-record-follow-up-history"');
+    expect(jobPageSource).toContain('data-record-panel="job-record-timeline"');
+    expect(jobPageSource).toContain('data-record-panel="service-chain"');
+    expect(gridSlice).not.toContain("Save Scheduling");
+    expect(gridSlice).not.toContain("Manage Equipment");
+    expect(gridSlice).not.toContain("DeferredJobAttachmentsInternal");
+    expect(jobPageSource).toContain('href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>');
+    expect(jobPageSource).toContain('#job-details-records:has(#edit-job:target) [data-record-launcher="edit-job"]');
+    expect(panelSlice).toContain("Selected record panel");
+  });
+
+  it("keeps the Job Status shared panel focused on lifecycle and interrupt state", () => {
+    const jobStatusPanelStart = jobPageSource.indexOf('data-record-panel="job-status"');
+    const jobStatusPanelEnd = jobPageSource.indexOf('data-record-panel="job-record-equipment"', jobStatusPanelStart);
+    const jobStatusPanelSlice =
+      jobStatusPanelStart > -1 && jobStatusPanelEnd > jobStatusPanelStart
+        ? jobPageSource.slice(jobStatusPanelStart, jobStatusPanelEnd)
+        : "";
+
+    expect(jobStatusPanelSlice).toContain("Current lifecycle");
+    expect(jobStatusPanelSlice).toContain("{formatOpsStatusLabel(job.ops_status)}");
+    expect(jobStatusPanelSlice).toContain("InterruptStateFields");
+    expect(jobStatusPanelSlice).toContain("initialInterruptState={currentInterruptState");
+    expect(jobStatusPanelSlice).toContain("initialStatusReason={initialInterruptReason}");
+    expect(jobStatusPanelSlice).toContain('className="space-y-4 rounded-xl border border-slate-200/80 bg-white/96 p-4"');
+    expect(jobStatusPanelSlice).toContain('className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200/80 pt-3"');
+    expect(jobStatusPanelSlice).toContain("Save Interrupt State");
+    expect(jobStatusPanelSlice).not.toContain("TimedServiceStatusActions");
+    expect(jobStatusPanelSlice).not.toContain("Service Closeout");
   });
 
   it("includes location-linked contacts in site/access resolution priority", () => {

@@ -69,6 +69,18 @@ describe("visit scope inline composer slice 1", () => {
     expect(jobDetailFormSource).toContain("Save Work Updates");
   });
 
+  it("keeps saved work browsing collapsed while search and staged items stay primary", () => {
+    expect(builderSource).toContain('const [showSavedDefaults, setShowSavedDefaults] = useState(false);');
+    expect(builderSource).toContain('Search Pricebook or type custom work...');
+    expect(builderSource).toContain("searchQuery.length > 0");
+    expect(builderSource).toContain("filteredPricebookTemplates.map((item) => {");
+    expect(builderSource).toContain('open={showSavedDefaults}');
+    expect(builderSource).toContain("setShowSavedDefaults((event.currentTarget as HTMLDetailsElement).open)");
+    expect(builderSource).toContain("Browse saved work");
+    expect(builderSource).toContain("visibleCompletedItems.map((item) => {");
+    expect(builderSource).toContain("findExistingScopeItem(items, candidate)");
+  });
+
   it("keeps service-required behavior intact for jobs new", () => {
     expect(newJobFormSource).toContain("hasStructuredVisitScopeItemsJson");
     expect(newJobFormSource).toContain('modeSafeJobType === "service"');

@@ -851,6 +851,7 @@ type JobLocationPreviewFallbackProps = {
   zip?: string | null;
   showAddressOverlay?: boolean;
   showAddressFooter?: boolean;
+  showActionsOnMobile?: boolean;
   className?: string;
 };
 
@@ -862,6 +863,7 @@ function JobLocationPreviewFallback({
   zip,
   showAddressOverlay,
   showAddressFooter,
+  showActionsOnMobile,
   className,
 }: JobLocationPreviewFallbackProps) {
   const parts = [addressLine1, addressLine2, [city, state, zip].filter(Boolean).join(" ")]
@@ -896,14 +898,14 @@ function JobLocationPreviewFallback({
         ) : null}
       </div>
       {addressDisplay ? (
-        <div className="mt-3 hidden flex-col gap-2 sm:flex sm:flex-row sm:items-stretch sm:justify-between">
+        <div className={showActionsOnMobile ? "mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between" : "mt-3 hidden flex-col gap-2 sm:flex sm:flex-row sm:items-stretch sm:justify-between"}>
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
             {mapsDirectionsUrl ? (
               <a
                 href={mapsDirectionsUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="hidden min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 sm:inline-flex"
+                className={showActionsOnMobile ? "inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50" : "hidden min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 sm:inline-flex"}
               >
                 Navigate
               </a>
@@ -939,6 +941,7 @@ type TimedJobLocationPreviewProps = {
   className?: string;
   showAddressOverlay?: boolean;
   showAddressFooter?: boolean;
+  showActionsOnMobile?: boolean;
   timingEnabled: boolean;
   onPhaseTiming: TimingPhaseRecorder;
 };
@@ -1018,8 +1021,12 @@ const workspaceDetailsClass =
   `${workspaceSectionClass} group text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] [&[open]_.disclosure-icon]:rotate-90`;
 const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
 const jobRecordsDetailsClass =
-  `${workspacePanelClass} group rounded-2xl p-2.5 text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] sm:rounded-3xl sm:p-5 [&[open]_.disclosure-icon]:rotate-90`;
+  `${workspacePanelClass} group rounded-2xl p-2.5 text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] sm:rounded-3xl sm:p-5 [&[open]_.disclosure-icon]:rotate-90 [&[open]]:xl:col-span-2 [&[open]]:2xl:col-span-3`;
 const jobRecordsDetailsDividerClass = "mt-2 border-t border-slate-200/90 pt-2.5 sm:mt-3 sm:pt-4";
+const recordLauncherClass =
+  `${workspacePanelClass} group block rounded-2xl p-2.5 text-left text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:bg-white hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:rounded-3xl sm:p-5`;
+const recordPanelClass =
+  "scroll-mt-24 rounded-2xl border border-slate-300/80 bg-white/96 p-4 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/80 sm:rounded-3xl sm:p-5";
 const workspaceSoftCardClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
 const workspaceEmptyStateClass =
@@ -2933,7 +2940,7 @@ const showSharedNotesCard = !isHvacServiceMode;
 const showEccSummaryCard = job.job_type === "ecc";
 const showJobRecordsPermitCard = showEccSummaryCard || hasPermitDetails;
 const lowerGridCardCount =
-  6 +
+  7 +
   (showSharedNotesCard ? 1 : 0) +
   1 +
   (showEccSummaryCard ? 1 : 0) +
@@ -4219,22 +4226,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
           <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
             <div className="px-4 pb-3 pt-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 text-lg font-semibold">
-                    <MapPinIcon className="h-5 w-5 text-slate-600" />
-                    <span>Service Location</span>
-                  </div>
-                  <div className="mt-1 break-words text-base leading-6 text-slate-700">{serviceAddressDisplay}</div>
-                </div>
-                {mobileNavigateHref ? (
-                  <a href={mobileNavigateHref} target="_blank" rel="noreferrer" className="shrink-0 rounded-xl bg-slate-950 px-3 py-2 text-sm font-semibold text-white">
-                    <span className="inline-flex items-center gap-1.5">
-                      <NavigateIcon className="h-4 w-4" />
-                      <span>Navigate</span>
-                    </span>
-                  </a>
-                ) : null}
+              <div className="inline-flex items-center gap-1.5 text-lg font-semibold">
+                <MapPinIcon className="h-5 w-5 text-slate-600" />
+                <span>Service Location</span>
               </div>
             </div>
             <Suspense
@@ -4246,6 +4240,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   state={serviceState}
                   zip={serviceZip}
                   showAddressOverlay
+                  showAddressFooter
+                  showActionsOnMobile
                   className="px-4 pb-4"
                 />
               }
@@ -4257,6 +4253,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 state={serviceState}
                 zip={serviceZip}
                 showAddressOverlay
+                showAddressFooter
+                showActionsOnMobile
                 className="px-4 pb-4 [&_a:first-child]:rounded-xl [&_img]:h-44"
                 timingEnabled={timingEnabled}
                 onPhaseTiming={recordBlockingPhase}
@@ -4389,67 +4387,75 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   {visitScopeCount} item{visitScopeCount === 1 ? "" : "s"} added
                 </div>
               </div>
-              <a href="#mobile-tools" className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700">
-                Tools
-              </a>
             </div>
 
             <div className="mt-4 space-y-3">
               <div id="mobile-visit-reason-card" className="rounded-xl bg-slate-50 px-3 py-3">
-                <div className="flex items-start justify-between gap-3">
+                {isInternalUser ? (
+                  <details className="group">
+                    <summary className="cursor-pointer list-none">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
+                        <span className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors group-hover:bg-slate-50">
+                          Edit
+                        </span>
+                      </div>
+                    </summary>
+                    <form action={updateJobVisitScopeFromForm} className="mt-3 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="tab" value={tab} />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-visit-reason-card`} />
+                      <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
+                      <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                        Visit Reason / Visit Title
+                      </label>
+                      <textarea
+                        name="visit_scope_summary"
+                        defaultValue={visitScopeSummary ?? ""}
+                        rows={3}
+                        maxLength={600}
+                        className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+                      />
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+                          Save
+                        </SubmitButton>
+                        <a href="#mobile-visit-reason-card" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                          Cancel
+                        </a>
+                      </div>
+                    </form>
+                  </details>
+                ) : (
                   <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
-                  {isInternalUser ? (
-                    <details className="group">
-                      <summary className="cursor-pointer list-none rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
-                        Edit
-                      </summary>
-                      <form action={updateJobVisitScopeFromForm} className="mt-2 min-w-[16rem] rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-                        <input type="hidden" name="job_id" value={job.id} />
-                        <input type="hidden" name="tab" value={tab} />
-                        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-visit-reason-card`} />
-                        <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
-                        <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                          Visit Reason / Visit Title
-                        </label>
-                        <textarea
-                          name="visit_scope_summary"
-                          defaultValue={visitScopeSummary ?? ""}
-                          rows={3}
-                          maxLength={600}
-                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
-                        />
-                        <div className="mt-2 flex flex-wrap items-center gap-2">
-                          <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
-                            Save
-                          </SubmitButton>
-                          <a href="#mobile-visit-reason-card" className="text-xs font-semibold text-slate-600 hover:text-slate-900">
-                            Cancel
-                          </a>
-                        </div>
-                      </form>
-                    </details>
-                  ) : null}
-                </div>
+                )}
                 <div className="mt-1 whitespace-pre-wrap break-words text-lg font-semibold leading-7 text-slate-950">
                   {visitReasonText}
                 </div>
               </div>
 
-              {primaryVisitScopeItems.length > 0 ? (
+              {visitScopeItems.length > 0 ? (
                 <div className="space-y-2">
-                  {primaryVisitScopeItems.slice(0, 2).map((item, index) => (
+                  {visitScopeItems.map((item, index) => (
                     <div key={`mobile-primary-${index}-${item.title}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                      <div className="text-base font-semibold leading-6 text-slate-950">{item.title}</div>
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0 text-base font-semibold leading-6 text-slate-950">{item.title}</div>
+                        {item.expected_unit_price !== null && item.expected_unit_price !== undefined ? (
+                          <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                            ${Number(item.expected_unit_price).toFixed(2)}
+                          </span>
+                        ) : null}
+                      </div>
+                      {item.kind === "companion_service" ? (
+                        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                          {formatVisitScopeItemKindLabel(item.kind)}
+                        </div>
+                      ) : null}
                       {item.details ? (
                         <div className="mt-1 whitespace-pre-wrap break-words text-base leading-6 text-slate-700">{item.details}</div>
                       ) : null}
                     </div>
                   ))}
-                  {primaryVisitScopeItems.length > 2 ? (
-                    <div className="text-base font-semibold text-slate-600">
-                      +{primaryVisitScopeItems.length - 2} more work item{primaryVisitScopeItems.length - 2 === 1 ? "" : "s"}
-                    </div>
-                  ) : null}
                 </div>
               ) : null}
 
@@ -5761,7 +5767,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       ) : null}
 
-      <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:justify-start`}>
+      <div id="internal-notes" className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:justify-start`}>
         <div className="mb-2 flex items-start justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ChatIcon className="h-3.5 w-3.5" />{rightRailNotesTitle}</div>
@@ -5771,7 +5777,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             {rightRailNoteCount} notes
           </span>
         </div>
-        <div className="space-y-2">
+        <div className="space-y-2 xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
           {latestJobNotesPreview.map((preview, index) => (
             <div
               key={`${preview.createdAt || "note"}-${preview.label}-${preview.text.slice(0, 40)}-${index}`}
@@ -5792,9 +5798,40 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
           ) : null}
         </div>
-        <div className="mt-2 hidden flex-wrap gap-1.5 sm:flex">
-          <a href="#internal-notes" className={compactSecondaryButtonClass}>View / Add Notes</a>
-        </div>
+        <details className="mt-3 rounded-xl border border-slate-200/80 bg-white/88 px-3 py-2.5">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-800">
+            View / Add Notes
+          </summary>
+          <div className="mt-3 space-y-3 border-t border-slate-200/80 pt-3">
+            {internalNoteBannerMessage ? (
+              <FlashBanner
+                type={internalNoteBannerType as "success" | "warning" | "error"}
+                message={internalNoteBannerMessage}
+              />
+            ) : null}
+
+            <Suspense fallback={<div className="h-12 animate-pulse rounded-xl bg-slate-100" />}>
+              <DeferredInternalNoteMentionComposer
+                jobId={String(job.id)}
+                tab={tab}
+                accountOwnerUserId={internalUser.account_owner_user_id}
+                textareaClassName={workspaceTextareaClass}
+                selectClassName={workspaceInputClass}
+                helperTextClassName="text-xs text-slate-500"
+                buttonClassName={secondaryButtonClass}
+              />
+            </Suspense>
+
+            <Suspense fallback={<NarrativeNotesBodyFallback />}>
+              <DeferredInternalNotesBody
+                jobId={String(job.id)}
+                timelineJobIds={narrativeScopeJobIds}
+                hasDirectNarrativeChain={hasDirectNarrativeChain}
+                emptyStateClassName={workspaceEmptyStateClass}
+              />
+            </Suspense>
+          </div>
+        </details>
       </div>
     </div>
   </div>
@@ -5858,6 +5895,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </SubmitButton>
       </form>
 
+      {callbackIntakeHistoricalAnchorEligible ? (
       <div className="mt-3 border-t border-slate-200 pt-3">
         <div className="text-sm font-semibold text-slate-900">Create Callback Visit</div>
         <p className="mt-1 text-xs leading-5 text-slate-600">
@@ -5868,7 +5906,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           It will not appear in technician My Work until it is scheduled and assigned.
         </p>
 
-        {callbackIntakeHistoricalAnchorEligible ? (
           <form action={createCallbackVisitFromForm} className="mt-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="tab" value={tab} />
@@ -5890,12 +5927,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               Create Callback Visit
             </SubmitButton>
           </form>
-        ) : (
-          <p className="mt-2 text-xs text-slate-500">
-            Callback visit creation is available for service jobs that are field-complete, completed, or closed.
-          </p>
-        )}
       </div>
+      ) : null}
     </div>
   ) : null}
 
@@ -6873,15 +6906,379 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   </div>
 ) : null}
 
-          <details id="edit-job" className={`${workspaceDetailsClass} mb-6`}>
-            <summary className="cursor-pointer list-none">
-              <CollapsibleHeader
-                title="Edit Job"
+{showSeparateFieldBillingDetails ? (
+  <div id="internal-invoice-panel" className="mt-6 scroll-mt-24 rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-4 shadow-[0_20px_42px_-34px_rgba(15,23,42,0.32)] ring-1 ring-slate-200/70 sm:p-5">
+    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div>
+        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"><ReceiptIcon className="h-3.5 w-3.5" />Billing</div>
+        <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+          {internalInvoiceTruth ? formatInternalInvoiceStatus(internalInvoiceTruth.status) : "Invoice required"}
+        </div>
+        <div className="mt-1 text-sm leading-6 text-slate-600">
+          {internalInvoiceTruth
+            ? jobPageInvoiceSummaryText
+            : "No draft invoice yet. Build charges in the Invoice Workspace when billing is ready."}
+        </div>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[28rem]">
+        <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Closeout Billing</div>
+          <div className="mt-0.5 text-sm font-semibold text-slate-900">{billingState.statusLabel}</div>
+        </div>
+        <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Recipient</div>
+          <div className="mt-0.5 truncate text-sm font-semibold text-slate-900">
+            {internalInvoiceTruth?.billing_name || internalInvoiceTruth?.billing_email || "Review needed"}
+          </div>
+        </div>
+        <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Next Step</div>
+          <div className="mt-0.5 text-sm font-semibold text-slate-900">
+            {!internalInvoiceTruth ? "Build invoice" : internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review invoice" : "Build charges") : "Open invoice"}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200/80 pt-3">
+      {hasDirectInvoiceWorkflowAccess ? (!internalInvoiceTruth ? (
+        <form action={createInternalInvoiceDraftFromForm}>
+          <input type="hidden" name="job_id" value={job.id} />
+          <input type="hidden" name="tab" value={tab} />
+          <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+          <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+          <SubmitButton loadingText="Starting..." className={darkButtonClass}>
+            Build Invoice
+          </SubmitButton>
+        </form>
+      ) : (
+        <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={darkButtonClass}>
+          {internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review Invoice" : "Build Invoice") : "Open Invoice Workspace"}
+        </Link>
+      )) : hasProposalEntryWorkflowAccess ? (
+        <Link href={`#field-billing-summary-title`} className={darkButtonClass}>
+          Add Proposed Charge
+        </Link>
+      ) : null}
+      <div className="flex min-h-10 items-center text-xs leading-5 text-slate-500">
+        Invoice Charges are billed scope. Work Items remain operational scope.
+      </div>
+    </div>
+
+    <FieldBillingSummary
+      jobId={job.id}
+      tab={tab}
+      parentProvidesInvoiceCta={hasDirectInvoiceWorkflowAccess}
+      capabilities={fieldBillingCapabilities}
+      invoice={fieldBillingInvoiceSnapshot}
+      latestVoidedInvoice={fieldBillingLatestVoidedInvoiceSnapshot}
+      paymentSummary={null}
+      supplementalInvoices={fieldBillingSupplementalInvoiceSnapshots}
+      fieldChargeProposals={fieldBillingSummaryData.fieldChargeProposals}
+      pricebookProposalItems={fieldChargeProposalPricebookItems}
+      visitScopeProposalItems={fieldChargeProposalVisitScopeItems}
+    />
+  </div>
+) : null}
+
+  <div className="mb-8 space-y-5">
+      {markVisitCountedLinkId && !suggestedNextDueProjection ? (
+        <div id="service-plan-visit-count" className="mt-4 scroll-mt-24 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
+          <div className="text-sm font-semibold text-emerald-900">Service Plan Visit Count Review</div>
+          <p className="mt-1 text-xs leading-5 text-emerald-900/90">
+            This completed maintenance visit is eligible to count against
+            {" "}
+            <span className="font-semibold">{markVisitCountedAgreementName}</span>.
+            Counting is manual and operator-confirmed.
+          </p>
+          <div className="mt-3">
+            <MarkVisitCountedActionButton jobId={String(job.id)} linkId={markVisitCountedLinkId} tab={tab} />
+          </div>
+        </div>
+      ) : null}
+
+      {suggestedNextDueProjection ? (
+        <div id="service-plan-next-due" className="mt-4 scroll-mt-24 rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 text-slate-900">
+          <div className="text-sm font-semibold text-blue-900">Suggested next due date</div>
+          {confirmedNextDueContext ? (
+            <>
+              <p className="mt-1 text-xs leading-5 text-blue-900/90">
+                Next due date already confirmed for this counted visit.
+              </p>
+              <div className="mt-2 text-sm font-semibold text-blue-900">
+                Confirmed: {formatDateOnlyUs(confirmedNextDueContext.confirmedNextDueDate) || "Manual scheduling required."}
+              </div>
+              <div className="mt-1 text-xs leading-5 text-blue-900/90">
+                Previous due date: {formatDateOnlyUs(confirmedNextDueContext.baselineNextDueDate) || "Not recorded."}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-xs leading-5 text-blue-900/90">
+                Suggestion only. Confirm updates the Service Plan next due date and does not create a job, schedule, invoice, or payment.
+              </p>
+              <div className="mt-2 text-sm font-semibold text-blue-900">
+                {suggestedNextDueProjection.manualSchedulingRequired
+                  ? "Manual scheduling required."
+                  : formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || "Manual scheduling required."}
+              </div>
+              <p className="mt-1 text-xs leading-5 text-blue-900/90">
+                {suggestedNextDueProjection.seasonalWindowPlaceholder}
+              </p>
+              {!suggestedNextDueProjection.manualSchedulingRequired && suggestedNextDueProjection.suggestedNextDueDate ? (
+                <div className="mt-3">
+                  <ConfirmNextDueDateActionButton
+                    jobId={String(job.id)}
+                    agreementId={suggestedNextDueProjection.agreementId}
+                    suggestedNextDueDate={suggestedNextDueProjection.suggestedNextDueDate}
+                    baselineNextDueDate={suggestedNextDueProjection.baselineNextDueDate || ""}
+                    displayDate={formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
+                    tab={tab}
+                  />
+                </div>
+              ) : null}
+            </>
+          )}
+        </div>
+      ) : null}
+
+    <section id="job-details-records" className="rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.99))] p-3.5 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-5">
+      <div className="mb-3 flex flex-col gap-1.5 border-b border-slate-200/80 pb-2.5 sm:mb-4 sm:gap-2 sm:pb-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"><FolderIcon className="h-3.5 w-3.5" />Job Records</div>
+          <div className="mt-0.5 text-lg font-semibold tracking-tight text-slate-950 sm:mt-1 sm:text-xl">Job Details & Records</div>
+          <div className="mt-1 hidden text-base text-slate-600 sm:block">Details, status, equipment, attachments, follow-up, and history.</div>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{noteCountSummary.timelineNoteEventCount} notes</span>
+          <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{serviceCaseVisitCount} visits</span>
+          {showEccSummaryCard ? <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{eccRunCount} ECC runs</span> : null}
+        </div>
+      </div>
+      <style>{`
+        #job-record-detail-panel > [data-record-panel] { display: none; }
+        #job-record-detail-panel > [data-record-panel]:target { display: block; }
+        #job-details-records:has(#edit-job:target) [data-record-launcher="edit-job"],
+        #job-details-records:has(#job-status:target) [data-record-launcher="job-status"],
+        #job-details-records:has(#job-record-equipment:target) [data-record-launcher="job-record-equipment"],
+        #job-details-records:has(#job-record-attachments:target) [data-record-launcher="job-record-attachments"],
+        #job-details-records:has(#follow-up:target) [data-record-launcher="follow-up"],
+        #job-details-records:has(#job-record-follow-up-history:target) [data-record-launcher="job-record-follow-up-history"],
+        #job-details-records:has(#job-record-timeline:target) [data-record-launcher="job-record-timeline"],
+        #job-details-records:has(#service-chain:target) [data-record-launcher="service-chain"] {
+          border-color: rgb(37 99 235);
+          background: rgb(239 246 255 / 0.88);
+          box-shadow: 0 20px 44px -32px rgb(37 99 235 / 0.5);
+        }
+        #job-details-records:has(#edit-job:target) [data-record-launcher="edit-job"] .disclosure-icon,
+        #job-details-records:has(#job-status:target) [data-record-launcher="job-status"] .disclosure-icon,
+        #job-details-records:has(#job-record-equipment:target) [data-record-launcher="job-record-equipment"] .disclosure-icon,
+        #job-details-records:has(#job-record-attachments:target) [data-record-launcher="job-record-attachments"] .disclosure-icon,
+        #job-details-records:has(#follow-up:target) [data-record-launcher="follow-up"] .disclosure-icon,
+        #job-details-records:has(#job-record-follow-up-history:target) [data-record-launcher="job-record-follow-up-history"] .disclosure-icon,
+        #job-details-records:has(#job-record-timeline:target) [data-record-launcher="job-record-timeline"] .disclosure-icon,
+        #job-details-records:has(#service-chain:target) [data-record-launcher="service-chain"] .disclosure-icon {
+          color: rgb(37 99 235);
+          transform: rotate(90deg);
+        }
+      `}</style>
+      <div className="grid grid-cols-1 items-start gap-2 sm:gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <a href="#edit-job" data-record-launcher="edit-job" className={recordLauncherClass}>
+          <CollapsibleHeader
+                title="Job Details"
                 subtitle="All editable controls for this job."
                 icon={<SettingsIcon className="h-4 w-4" />}
+                compactOnMobile
+              />
+        </a>
+
+        <a href="#job-status" data-record-launcher="job-status" className={recordLauncherClass}>
+          <CollapsibleHeader
+      title="Job Status"
+      subtitle={jobStatusSummaryText}
+      icon={<SettingsIcon className="h-4 w-4" />}
+      compactOnMobile
+    />
+        </a>
+
+        {showEccSummaryCard ? (
+          <details className={jobRecordsDetailsClass}>
+            <summary className="cursor-pointer list-none">
+              <CollapsibleHeader
+                title="ECC Summary"
+                subtitle="Test history and compliance context."
+                meta={`${eccRunCount} run${eccRunCount === 1 ? "" : "s"}`}
+                icon={<ClipboardIcon className="h-4 w-4" />}
+                compactOnMobile
               />
             </summary>
 
+            <div className={jobRecordsDetailsDividerClass}>
+              {eccRunCount > 0 ? (
+                <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5 text-sm leading-6 text-slate-700">
+                  Latest result: <span className="font-semibold text-slate-900">{latestEccRunResultLabel}</span>
+                  {latestEccRunDateLabel ? ` • ${latestEccRunDateLabel}` : ""}
+                </div>
+              ) : (
+                <div className={workspaceEmptyStateClass}>No tests recorded yet.</div>
+              )}
+            </div>
+          </details>
+        ) : null}
+
+        {showJobRecordsPermitCard ? (
+          <details className={jobRecordsDetailsClass}>
+            <summary className="cursor-pointer list-none">
+              <CollapsibleHeader
+                title="Permit Details"
+                subtitle="Number, jurisdiction, and date."
+                meta={permitSummaryLabel}
+                icon={<ClipboardIcon className="h-4 w-4" />}
+                compactOnMobile
+              />
+            </summary>
+
+            <div className={`${jobRecordsDetailsDividerClass} grid grid-cols-1 gap-2 sm:grid-cols-3`}>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Number</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
+              </div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Jurisdiction</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitJurisdiction || "Not added"}</div>
+              </div>
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
+                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Date</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitDateLabel || "Not added"}</div>
+              </div>
+            </div>
+          </details>
+        ) : null}
+
+                <a href="#job-record-equipment" data-record-launcher="job-record-equipment" className={recordLauncherClass}>
+          <CollapsibleHeader
+              title="Equipment"
+              subtitle="Latest equipment items recorded for this job."
+              meta={`${equipmentCount} item${equipmentCount === 1 ? "" : "s"}`}
+              icon={<ToolIcon className="h-4 w-4" />}
+              compactOnMobile
+            />
+        </a>
+
+        {/* Attachments */}
+                <a href="#job-record-attachments" data-record-launcher="job-record-attachments" className={recordLauncherClass}>
+          <CollapsibleHeader
+              title="Attachments"
+              icon={<PaperclipIcon className="h-4 w-4" />}
+              compactOnMobile
+            />
+        </a>
+
+        {/* Section A: Follow Up (Active Edit Area) */}
+                <a href="#follow-up" data-record-launcher="follow-up" className={recordLauncherClass}>
+          <CollapsibleHeader
+              title="Follow Up"
+              subtitle={followUpSummaryText}
+              icon={<ClockIcon className="h-4 w-4" />}
+              compactOnMobile
+            />
+        </a>
+
+                <a href="#job-record-follow-up-history" data-record-launcher="job-record-follow-up-history" className={recordLauncherClass}>
+          <CollapsibleHeader
+              title="Follow-Up History"
+              subtitle={followUpHistorySummaryText}
+              icon={<ClockIcon className="h-4 w-4" />}
+              compactOnMobile
+            />
+        </a>
+
+        {/* Timeline - Activity/History */}
+                <a href="#job-record-timeline" data-record-launcher="job-record-timeline" className={recordLauncherClass}>
+          <CollapsibleHeader
+              title={timelineTitle}
+              subtitle={timelineSummaryText}
+              meta={timelineNotesMeta}
+              icon={<ClockIcon className="h-4 w-4" />}
+              compactOnMobile
+            />
+        </a>
+
+                <a href="#service-chain" data-record-launcher="service-chain" className={recordLauncherClass}>
+          <CollapsibleHeader
+              title="Service Chain"
+              subtitle={serviceChainSummaryText}
+              meta={`${serviceCaseVisitCount} visit${serviceCaseVisitCount === 1 ? "" : "s"}`}
+              icon={<ToolIcon className="h-4 w-4" />}
+              compactOnMobile
+            />
+        </a>
+
+        {showSharedNotesCard ? (
+          <details id="shared-notes" className={sharedNotesCardClass} open={Boolean(sharedNoteBannerMessage)}>
+            <summary className="cursor-pointer list-none">
+              <CollapsibleHeader
+                title={sharedNotesTitle}
+                subtitle={sharedNotesSummaryText}
+                meta={sharedNotesMeta}
+                icon={<ChatIcon className="h-4 w-4" />}
+                compactOnMobile
+              />
+            </summary>
+
+            <div className={`${jobRecordsDetailsDividerClass} space-y-2`}>
+              {sharedNoteBannerMessage ? (
+                <FlashBanner
+                  type={sharedNoteBannerType as "success" | "warning" | "error"}
+                  message={sharedNoteBannerMessage}
+                />
+              ) : null}
+
+  <form action={addPublicNoteFromForm} className="mb-4 space-y-3">
+      <input type="hidden" name="note_scope" value="shared" />
+      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#shared-notes`} />
+    <input type="hidden" name="job_id" value={job.id} />
+    <input type="hidden" name="tab" value={tab} />
+
+    <textarea
+      name="note"
+      rows={3}
+      placeholder="Add a note visible to the contractor..."
+      className={workspaceTextareaClass}
+    />
+
+    <div className="flex justify-end">
+      <SubmitButton
+        loadingText="Adding note..."
+        className={secondaryButtonClass}
+      >
+        Save shared note
+      </SubmitButton>
+    </div>
+  </form>
+
+  <Suspense fallback={<NarrativeNotesBodyFallback />}>
+    <DeferredSharedNotesBody
+      jobId={String(job.id)}
+      timelineJobIds={narrativeScopeJobIds}
+      hasDirectNarrativeChain={hasDirectNarrativeChain}
+      emptyStateClassName={workspaceEmptyStateClass}
+    />
+  </Suspense>
+            </div>
+          </details>
+        ) : null}
+
+      </div>
+      <div id="job-record-detail-panel" className="mt-4 space-y-4" aria-live="polite">        <section id="edit-job" data-record-panel="edit-job" className={recordPanelClass} tabIndex={-1}>
+          <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Job Details</div>
+            </div>
+            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+          </div>
+          <div className="mt-4">
             <div className={workspaceDetailsDividerClass}>
               <div className={`${workspaceInsetClass} p-4`}>
                 <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -7198,100 +7595,33 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               </details>
               ) : null}
             </div>
-          </details>
-
-
-{showSeparateFieldBillingDetails ? (
-  <div id="internal-invoice-panel" className="mt-6 scroll-mt-24 rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-4 shadow-[0_20px_42px_-34px_rgba(15,23,42,0.32)] ring-1 ring-slate-200/70 sm:p-5">
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div>
-        <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"><ReceiptIcon className="h-3.5 w-3.5" />Billing</div>
-        <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
-          {internalInvoiceTruth ? formatInternalInvoiceStatus(internalInvoiceTruth.status) : "Invoice required"}
-        </div>
-        <div className="mt-1 text-sm leading-6 text-slate-600">
-          {internalInvoiceTruth
-            ? jobPageInvoiceSummaryText
-            : "No draft invoice yet. Build charges in the Invoice Workspace when billing is ready."}
-        </div>
-      </div>
-      <div className="grid gap-2 sm:grid-cols-3 lg:min-w-[28rem]">
-        <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Closeout Billing</div>
-          <div className="mt-0.5 text-sm font-semibold text-slate-900">{billingState.statusLabel}</div>
-        </div>
-        <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Recipient</div>
-          <div className="mt-0.5 truncate text-sm font-semibold text-slate-900">
-            {internalInvoiceTruth?.billing_name || internalInvoiceTruth?.billing_email || "Review needed"}
           </div>
-        </div>
-        <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Next Step</div>
-          <div className="mt-0.5 text-sm font-semibold text-slate-900">
-            {!internalInvoiceTruth ? "Build invoice" : internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review invoice" : "Build charges") : "Open invoice"}
+        </section>
+        <section id="job-status" data-record-panel="job-status" className={recordPanelClass} tabIndex={-1}>
+          <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Job Status</div>
+            </div>
+            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
           </div>
-        </div>
-      </div>
-    </div>
+          <div className="mt-4">
+            <div className={workspaceDetailsDividerClass}>
 
-    <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200/80 pt-3">
-      {hasDirectInvoiceWorkflowAccess ? (!internalInvoiceTruth ? (
-        <form action={createInternalInvoiceDraftFromForm}>
-          <input type="hidden" name="job_id" value={job.id} />
-          <input type="hidden" name="tab" value={tab} />
-          <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
-          <input type="hidden" name="auto_import_visit_scope_items" value="1" />
-          <SubmitButton loadingText="Starting..." className={darkButtonClass}>
-            Build Invoice
-          </SubmitButton>
-        </form>
-      ) : (
-        <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={darkButtonClass}>
-          {internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review Invoice" : "Build Invoice") : "Open Invoice Workspace"}
-        </Link>
-      )) : hasProposalEntryWorkflowAccess ? (
-        <Link href={`#field-billing-summary-title`} className={darkButtonClass}>
-          Add Proposed Charge
-        </Link>
-      ) : null}
-      <div className="flex min-h-10 items-center text-xs leading-5 text-slate-500">
-        Invoice Charges are billed scope. Work Items remain operational scope.
-      </div>
+  <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-3 text-sm font-medium text-slate-900">
+    <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-blue-800">
+      Current lifecycle
     </div>
-
-    <FieldBillingSummary
-      jobId={job.id}
-      tab={tab}
-      parentProvidesInvoiceCta={hasDirectInvoiceWorkflowAccess}
-      capabilities={fieldBillingCapabilities}
-      invoice={fieldBillingInvoiceSnapshot}
-      latestVoidedInvoice={fieldBillingLatestVoidedInvoiceSnapshot}
-      paymentSummary={null}
-      supplementalInvoices={fieldBillingSupplementalInvoiceSnapshots}
-      fieldChargeProposals={fieldBillingSummaryData.fieldChargeProposals}
-      pricebookProposalItems={fieldChargeProposalPricebookItems}
-      visitScopeProposalItems={fieldChargeProposalVisitScopeItems}
-    />
+    <div className="mt-1 text-base font-semibold text-slate-950">
+      {formatOpsStatusLabel(job.ops_status)}
+    </div>
   </div>
-) : null}
 
-<details id="job-status" className={`${workspaceDetailsClass} mb-6 border-blue-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(239,246,255,0.5))]`}>
-  <summary className="cursor-pointer list-none">
-    <CollapsibleHeader
-      title="Job Status"
-      subtitle={jobStatusSummaryText}
-      icon={<SettingsIcon className="h-4 w-4" />}
-    />
-  </summary>
-
-  <div className={workspaceDetailsDividerClass}>
-
-  <form action={updateJobOpsFromForm} className="flex flex-col gap-3 sm:gap-2 sm:flex-row sm:items-end sm:flex-wrap">
+  <form action={updateJobOpsFromForm} className="space-y-4 rounded-xl border border-slate-200/80 bg-white/96 p-4">
     <input type="hidden" name="job_id" value={job.id} />
     <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
 
-    <div className="flex-1 min-w-xs">
+    <div className="space-y-4">
       {activeWaitingState ? (
         <div className="mb-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm">
           <div className="inline-flex items-center rounded-full border border-amber-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-amber-800">
@@ -7318,17 +7648,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       ) : null}
 
-      {!["need_to_schedule", "scheduled", "pending_info", "on_hold"].includes(
-        String(job.ops_status ?? "")
-      ) ? (
-        <div className="mb-3 rounded-xl border border-blue-200 bg-blue-50/80 px-3.5 py-3 text-sm font-medium text-slate-900">
-          Lifecycle:{" "}
-          <span>
-            {formatOpsStatusLabel(job.ops_status)}
-          </span>
-        </div>
-      ) : null}
-
       <InterruptStateFields
         workspaceFieldLabelClass={workspaceFieldLabelClass}
         workspaceInputClass={workspaceInputClass}
@@ -7339,9 +7658,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       />
     </div>
 
-    <SubmitButton loadingText="Saving..." className={`${primaryButtonClass} sm:shrink-0`}>
-      Save Interrupt State
-    </SubmitButton>
+    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200/80 pt-3">
+      <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+        Save Interrupt State
+      </SubmitButton>
+    </div>
   </form>
 
   {currentInterruptState ? (
@@ -7377,159 +7698,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
       </div>
 
-      <TimedServiceStatusActions
-        jobId={job.id}
-        billingMode={billingMode}
-        jobType={job.job_type}
-        opsStatus={job.ops_status}
-        timingEnabled={timingEnabled}
-        onPhaseTiming={recordBlockingPhase}
-      />
-
-</details>
-
-
-  <div className="mb-8 space-y-5">
-      {markVisitCountedLinkId && !suggestedNextDueProjection ? (
-        <div id="service-plan-visit-count" className="mt-4 scroll-mt-24 rounded-xl border border-emerald-200/80 bg-emerald-50/60 p-4 text-slate-900">
-          <div className="text-sm font-semibold text-emerald-900">Service Plan Visit Count Review</div>
-          <p className="mt-1 text-xs leading-5 text-emerald-900/90">
-            This completed maintenance visit is eligible to count against
-            {" "}
-            <span className="font-semibold">{markVisitCountedAgreementName}</span>.
-            Counting is manual and operator-confirmed.
-          </p>
-          <div className="mt-3">
-            <MarkVisitCountedActionButton jobId={String(job.id)} linkId={markVisitCountedLinkId} tab={tab} />
           </div>
-        </div>
-      ) : null}
-
-      {suggestedNextDueProjection ? (
-        <div id="service-plan-next-due" className="mt-4 scroll-mt-24 rounded-xl border border-blue-200/80 bg-blue-50/60 p-4 text-slate-900">
-          <div className="text-sm font-semibold text-blue-900">Suggested next due date</div>
-          {confirmedNextDueContext ? (
-            <>
-              <p className="mt-1 text-xs leading-5 text-blue-900/90">
-                Next due date already confirmed for this counted visit.
-              </p>
-              <div className="mt-2 text-sm font-semibold text-blue-900">
-                Confirmed: {formatDateOnlyUs(confirmedNextDueContext.confirmedNextDueDate) || "Manual scheduling required."}
-              </div>
-              <div className="mt-1 text-xs leading-5 text-blue-900/90">
-                Previous due date: {formatDateOnlyUs(confirmedNextDueContext.baselineNextDueDate) || "Not recorded."}
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="mt-1 text-xs leading-5 text-blue-900/90">
-                Suggestion only. Confirm updates the Service Plan next due date and does not create a job, schedule, invoice, or payment.
-              </p>
-              <div className="mt-2 text-sm font-semibold text-blue-900">
-                {suggestedNextDueProjection.manualSchedulingRequired
-                  ? "Manual scheduling required."
-                  : formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || "Manual scheduling required."}
-              </div>
-              <p className="mt-1 text-xs leading-5 text-blue-900/90">
-                {suggestedNextDueProjection.seasonalWindowPlaceholder}
-              </p>
-              {!suggestedNextDueProjection.manualSchedulingRequired && suggestedNextDueProjection.suggestedNextDueDate ? (
-                <div className="mt-3">
-                  <ConfirmNextDueDateActionButton
-                    jobId={String(job.id)}
-                    agreementId={suggestedNextDueProjection.agreementId}
-                    suggestedNextDueDate={suggestedNextDueProjection.suggestedNextDueDate}
-                    baselineNextDueDate={suggestedNextDueProjection.baselineNextDueDate || ""}
-                    displayDate={formatDateOnlyUs(suggestedNextDueProjection.suggestedNextDueDate) || suggestedNextDueProjection.suggestedNextDueDate}
-                    tab={tab}
-                  />
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
-      ) : null}
-
-    <section className="rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.99))] p-3.5 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-5">
-      <div className="mb-3 flex flex-col gap-1.5 border-b border-slate-200/80 pb-2.5 sm:mb-4 sm:gap-2 sm:pb-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"><FolderIcon className="h-3.5 w-3.5" />Job Records</div>
-          <div className="mt-0.5 text-lg font-semibold tracking-tight text-slate-950 sm:mt-1 sm:text-xl">Activity, Evidence, and History</div>
-          <div className="mt-1 hidden text-base text-slate-600 sm:block">Notes, attachments, follow-up, and history.</div>
-        </div>
-        <div className="flex flex-wrap gap-1">
-          <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{noteCountSummary.timelineNoteEventCount} notes</span>
-          <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{serviceCaseVisitCount} visits</span>
-          {showEccSummaryCard ? <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{eccRunCount} ECC runs</span> : null}
-        </div>
-      </div>
-      <div className="grid grid-cols-1 items-start gap-2 sm:gap-3 xl:grid-cols-2 2xl:grid-cols-3">
-        {showEccSummaryCard ? (
-          <details className={jobRecordsDetailsClass}>
-            <summary className="cursor-pointer list-none">
-              <CollapsibleHeader
-                title="ECC Summary"
-                subtitle="Test history and compliance context."
-                meta={`${eccRunCount} run${eccRunCount === 1 ? "" : "s"}`}
-                icon={<ClipboardIcon className="h-4 w-4" />}
-                compactOnMobile
-              />
-            </summary>
-
+        </section>
+        <section id="job-record-equipment" data-record-panel="job-record-equipment" className={recordPanelClass} tabIndex={-1}>
+          <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Equipment</div>
+            </div>
+            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+          </div>
+          <div className="mt-4">
             <div className={jobRecordsDetailsDividerClass}>
-              {eccRunCount > 0 ? (
-                <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5 text-sm leading-6 text-slate-700">
-                  Latest result: <span className="font-semibold text-slate-900">{latestEccRunResultLabel}</span>
-                  {latestEccRunDateLabel ? ` • ${latestEccRunDateLabel}` : ""}
-                </div>
-              ) : (
-                <div className={workspaceEmptyStateClass}>No tests recorded yet.</div>
-              )}
-            </div>
-          </details>
-        ) : null}
-
-        {showJobRecordsPermitCard ? (
-          <details className={jobRecordsDetailsClass}>
-            <summary className="cursor-pointer list-none">
-              <CollapsibleHeader
-                title="Permit Details"
-                subtitle="Number, jurisdiction, and date."
-                meta={permitSummaryLabel}
-                icon={<ClipboardIcon className="h-4 w-4" />}
-                compactOnMobile
-              />
-            </summary>
-
-            <div className={`${jobRecordsDetailsDividerClass} grid grid-cols-1 gap-2 sm:grid-cols-3`}>
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Number</div>
-                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
-              </div>
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Jurisdiction</div>
-                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitJurisdiction || "Not added"}</div>
-              </div>
-              <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Date</div>
-                <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitDateLabel || "Not added"}</div>
-              </div>
-            </div>
-          </details>
-        ) : null}
-
-        <details className={jobRecordsDetailsClass}>
-          <summary className="cursor-pointer list-none">
-            <CollapsibleHeader
-              title="Equipment"
-              subtitle="Latest equipment items recorded for this job."
-              meta={`${equipmentCount} item${equipmentCount === 1 ? "" : "s"}`}
-              icon={<ToolIcon className="h-4 w-4" />}
-              compactOnMobile
-            />
-          </summary>
-
-          <div className={jobRecordsDetailsDividerClass}>
             <div className="mb-3 flex items-center justify-end">
               <Link href={`/jobs/${job.id}/info?f=equipment`} className={secondaryButtonClass}>
                 Manage Equipment
@@ -7555,61 +7735,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <div className={workspaceEmptyStateClass}>No equipment recorded yet.</div>
             )}
           </div>
-        </details>
-
-        {/* Internal Notes */}
-        <details id="internal-notes" className={jobRecordsDetailsClass} open>
-          <summary className="cursor-pointer list-none">
-            <CollapsibleHeader
-              title={internalNotesTitle}
-              subtitle={internalNotesSummaryText}
-              meta={internalNotesMeta}
-              icon={<LockIcon className="h-4 w-4" />}
-              compactOnMobile
-            />
-          </summary>
-
-          <div className={`${jobRecordsDetailsDividerClass} space-y-2`}>
-            {internalNoteBannerMessage ? (
-              <FlashBanner
-                type={internalNoteBannerType as "success" | "warning" | "error"}
-                message={internalNoteBannerMessage}
-              />
-            ) : null}
-
-            <Suspense fallback={<div className="h-12 animate-pulse rounded-xl bg-slate-100" />}>
-              <DeferredInternalNoteMentionComposer
-                jobId={String(job.id)}
-                tab={tab}
-                accountOwnerUserId={internalUser.account_owner_user_id}
-                textareaClassName={workspaceTextareaClass}
-                selectClassName={workspaceInputClass}
-                helperTextClassName="text-xs text-slate-500"
-                buttonClassName={secondaryButtonClass}
-              />
-            </Suspense>
-
-            <Suspense fallback={<NarrativeNotesBodyFallback />}>
-              <DeferredInternalNotesBody
-                jobId={String(job.id)}
-                timelineJobIds={narrativeScopeJobIds}
-                hasDirectNarrativeChain={hasDirectNarrativeChain}
-                emptyStateClassName={workspaceEmptyStateClass}
-              />
-            </Suspense>
           </div>
-        </details>
-
-        {/* Attachments */}
-        <details className={jobRecordsDetailsClass}>
-          <summary className="cursor-pointer list-none">
-            <CollapsibleHeader
-              title="Attachments"
-              icon={<PaperclipIcon className="h-4 w-4" />}
-              compactOnMobile
-            />
-          </summary>
-          <div className={`${jobRecordsDetailsDividerClass} px-0 pb-0`}>
+        </section>
+        <section id="job-record-attachments" data-record-panel="job-record-attachments" className={recordPanelClass} tabIndex={-1}>
+          <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Attachments</div>
+            </div>
+            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+          </div>
+          <div className="mt-4">
+            <div className={`${jobRecordsDetailsDividerClass} px-0 pb-0`}>
             <div className="mb-3 flex items-center justify-end">
               <Link
                 href={`/jobs/${job.id}/attachments`}
@@ -7625,20 +7762,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               />
             </Suspense>
           </div>
-        </details>
-
-        {/* Section A: Follow Up (Active Edit Area) */}
-        <details id="follow-up" className={jobRecordsDetailsClass}>
-          <summary className="cursor-pointer list-none">
-            <CollapsibleHeader
-              title="Follow Up"
-              subtitle={followUpSummaryText}
-              icon={<ClockIcon className="h-4 w-4" />}
-              compactOnMobile
-            />
-          </summary>
-
-          <div className={jobRecordsDetailsDividerClass}>
+          </div>
+        </section>
+        <section id="follow-up" data-record-panel="follow-up" className={recordPanelClass} tabIndex={-1}>
+          <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Follow Up</div>
+            </div>
+            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+          </div>
+          <div className="mt-4">
+            <div className={jobRecordsDetailsDividerClass}>
             <div className="rounded-xl border border-slate-200/80 bg-white/96 p-4">
 
             {hasFollowUpReminder ? (
@@ -7693,19 +7828,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </form>
           </div>
         </div>
-        </details>
-
-        <details className={jobRecordsDetailsClass}>
-          <summary className="cursor-pointer list-none">
-            <CollapsibleHeader
-              title="Follow-Up History"
-              subtitle={followUpHistorySummaryText}
-              icon={<ClockIcon className="h-4 w-4" />}
-              compactOnMobile
-            />
-          </summary>
-
-          <div className={`${jobRecordsDetailsDividerClass} rounded-xl border border-slate-200/80 bg-white/96 p-4`}>
+          </div>
+        </section>
+        <section id="job-record-follow-up-history" data-record-panel="job-record-follow-up-history" className={recordPanelClass} tabIndex={-1}>
+          <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Follow-Up History</div>
+            </div>
+            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+          </div>
+          <div className="mt-4">
+            <div className={`${jobRecordsDetailsDividerClass} rounded-xl border border-slate-200/80 bg-white/96 p-4`}>
             <Suspense fallback={<FollowUpHistorySectionFallback />}>
               <DeferredCustomerAttemptsHistory
                 jobId={String(job.id)}
@@ -7714,21 +7848,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               />
             </Suspense>
           </div>
-        </details>
-
-        {/* Timeline - Activity/History */}
-        <details className={jobRecordsDetailsClass}>
-          <summary className="cursor-pointer list-none">
-            <CollapsibleHeader
-              title={timelineTitle}
-              subtitle={timelineSummaryText}
-              meta={timelineNotesMeta}
-              icon={<ClockIcon className="h-4 w-4" />}
-              compactOnMobile
-            />
-          </summary>
-
-          <div className={`${jobRecordsDetailsDividerClass} space-y-2`}>
+          </div>
+        </section>
+        <section id="job-record-timeline" data-record-panel="job-record-timeline" className={recordPanelClass} tabIndex={-1}>
+          <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Timeline</div>
+            </div>
+            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+          </div>
+          <div className="mt-4">
+            <div className={`${jobRecordsDetailsDividerClass} space-y-2`}>
     <Suspense fallback={<NarrativeTimelineBodyFallback />}>
       <DeferredTimelineBody
         jobId={String(job.id)}
@@ -7750,20 +7881,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       />
     </Suspense>
           </div>
-        </details>
-
-        <details id="service-chain" className={serviceChainCardClass}>
-          <summary className="cursor-pointer list-none">
-            <CollapsibleHeader
-              title="Service Chain"
-              subtitle={serviceChainSummaryText}
-              meta={`${serviceCaseVisitCount} visit${serviceCaseVisitCount === 1 ? "" : "s"}`}
-              icon={<ToolIcon className="h-4 w-4" />}
-              compactOnMobile
-            />
-          </summary>
-
-          <div className={jobRecordsDetailsDividerClass}>
+          </div>
+        </section>
+        <section id="service-chain" data-record-panel="service-chain" className={recordPanelClass} tabIndex={-1}>
+          <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
+              <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Service Chain</div>
+            </div>
+            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+          </div>
+          <div className="mt-4">
+            <div className={jobRecordsDetailsDividerClass}>
             {serviceCaseId ? (
               <div className="mb-3 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                 Case: {serviceCaseId.slice(0, 8)}…
@@ -7811,64 +7940,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               </div>
             )}
           </div>
-        </details>
-
-        {showSharedNotesCard ? (
-          <details id="shared-notes" className={sharedNotesCardClass} open={Boolean(sharedNoteBannerMessage)}>
-            <summary className="cursor-pointer list-none">
-              <CollapsibleHeader
-                title={sharedNotesTitle}
-                subtitle={sharedNotesSummaryText}
-                meta={sharedNotesMeta}
-                icon={<ChatIcon className="h-4 w-4" />}
-                compactOnMobile
-              />
-            </summary>
-
-            <div className={`${jobRecordsDetailsDividerClass} space-y-2`}>
-              {sharedNoteBannerMessage ? (
-                <FlashBanner
-                  type={sharedNoteBannerType as "success" | "warning" | "error"}
-                  message={sharedNoteBannerMessage}
-                />
-              ) : null}
-
-  <form action={addPublicNoteFromForm} className="mb-4 space-y-3">
-      <input type="hidden" name="note_scope" value="shared" />
-      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#shared-notes`} />
-    <input type="hidden" name="job_id" value={job.id} />
-    <input type="hidden" name="tab" value={tab} />
-
-    <textarea
-      name="note"
-      rows={3}
-      placeholder="Add a note visible to the contractor..."
-      className={workspaceTextareaClass}
-    />
-
-    <div className="flex justify-end">
-      <SubmitButton
-        loadingText="Adding note..."
-        className={secondaryButtonClass}
-      >
-        Save shared note
-      </SubmitButton>
-    </div>
-  </form>
-
-  <Suspense fallback={<NarrativeNotesBodyFallback />}>
-    <DeferredSharedNotesBody
-      jobId={String(job.id)}
-      timelineJobIds={narrativeScopeJobIds}
-      hasDirectNarrativeChain={hasDirectNarrativeChain}
-      emptyStateClassName={workspaceEmptyStateClass}
-    />
-  </Suspense>
-            </div>
-          </details>
-        ) : null}
-
-      </div>
+          </div>
+        </section>      </div>
     </section>
   </div>
 

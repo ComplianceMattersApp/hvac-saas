@@ -7,6 +7,7 @@ type JobLocationPreviewProps = {
   className?: string;
   showAddressOverlay?: boolean;
   showAddressFooter?: boolean;
+  showActionsOnMobile?: boolean;
 };
 
 type StreetViewMetadataResponse = {
@@ -115,7 +116,7 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
           )}
         </a>
 
-        {props.showAddressOverlay && addressDisplay ? (
+        {props.showAddressOverlay && imageUrl && addressDisplay ? (
           <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-2.5 sm:p-3">
             <div className="flex items-center gap-2 rounded-xl border border-white/70 bg-slate-950/52 px-3 py-2 text-base font-semibold leading-6 text-white shadow-[0_14px_28px_-18px_rgba(15,23,42,0.75)] backdrop-blur-sm sm:px-3.5 sm:py-2.5 sm:text-lg lg:text-[1.15rem]">
               <svg
@@ -137,13 +138,13 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
         ) : null}
       </div>
 
-      <div className="mt-3 hidden flex-col gap-2 sm:flex sm:flex-row sm:items-stretch sm:justify-between">
+      <div className={props.showActionsOnMobile ? "mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between" : "mt-3 hidden flex-col gap-2 sm:flex sm:flex-row sm:items-stretch sm:justify-between"}>
         <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
           <a
             href={mapsDirectionsUrl}
             target="_blank"
             rel="noreferrer"
-            className="hidden min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 sm:inline-flex"
+            className={props.showActionsOnMobile ? "inline-flex min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50" : "hidden min-h-11 items-center justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 sm:inline-flex"}
           >
             Navigate
           </a>
@@ -157,7 +158,7 @@ export default async function JobLocationPreview(props: JobLocationPreviewProps)
           </a>
         </div>
 
-        {!props.showAddressOverlay && props.showAddressFooter ? (
+        {(!props.showAddressOverlay || !imageUrl) && props.showAddressFooter ? (
           <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-3.5 py-2.5 text-sm font-medium leading-6 text-slate-700 sm:max-w-[24rem] sm:text-right">
             {addressDisplay}
           </div>

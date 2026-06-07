@@ -31,7 +31,7 @@ describe("New job Step 5 simplification wiring", () => {
   it("keeps a compact add-work composer ahead of saved defaults", () => {
     expect(builderSource).toContain("Add Work");
     expect(builderSource.indexOf("Add Work")).toBeLessThan(
-      builderSource.indexOf("Saved work items"),
+      builderSource.indexOf("Browse saved work"),
     );
     expect(builderSource).toContain("Search Pricebook or type custom work...");
     expect(builderSource).toContain("disabled={!searchQuery}");
@@ -48,7 +48,7 @@ describe("New job Step 5 simplification wiring", () => {
 
   it("uses softened Pricebook wording", () => {
     expect(builderSource).toContain("Saved work item");
-    expect(builderSource).toContain("Saved work items");
+    expect(builderSource).toContain("Browse saved work");
   });
 
   it("retains quick choices internally for non-service scope paths and excludes generic maintenance", () => {
@@ -76,7 +76,7 @@ describe("New job Step 5 simplification wiring", () => {
   it("hides saved/default rows until search or browse", () => {
     expect(builderSource).toContain("showSavedDefaults");
     expect(builderSource).toContain("searchQuery.length > 0");
-    expect(builderSource).toContain("Saved work items");
+    expect(builderSource).toContain("Browse saved work");
     expect(builderSource).toContain("onToggle={(event) => setShowSavedDefaults");
   });
 

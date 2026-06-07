@@ -690,7 +690,7 @@ export default function VisitScopeBuilder({
                   onToggle={(event) => setShowSavedDefaults((event.currentTarget as HTMLDetailsElement).open)}
                 >
                   <summary className="cursor-pointer text-xs font-semibold uppercase tracking-[0.08em] text-slate-600">
-                    Saved work items
+                    Browse saved work
                   </summary>
                   <div className="mt-2 space-y-1.5">
                     {availablePricebookTemplates.slice(0, 6).map((item) => {
