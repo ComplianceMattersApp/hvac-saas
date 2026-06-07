@@ -1447,7 +1447,14 @@ Current Program Status Note (May 2026)
   - no queue rewrite
   - no payment/Stripe tenant execution/QBO/Estimates/Support/onboarding behavior changes
 - Planned pre-launch spine order is now resumed after this docs closeout; Support Console and Estimates production enablement remain parked behind their runbooks, tenant customer payments V1 is complete for current intended scope, deferred payment add-ons remain parked, QBO remains optional downstream/last-last, and controlled tester onboarding remains intentionally held until readiness work is acceptably complete and supportable.
-- Next recommended product lane is Owner Visibility / Business Pulse V1, followed by Customer Communication Polish V1.
+- Owner Visibility / Business Pulse V1 is closed for the current pass after Role-Aware Today Pulse V1 implementation and owner visual/mobile approval on `/today`.
+- Owner Visibility / Business Pulse score update: previous `7.1/10`, current `8.0/10` for controlled rollout readiness.
+- Role-aware `/today` pulse behavior is now explicit: Owner/Admin = Business Pulse, Billing = Money Attention, Office/Dispatcher = Ops Pressure, Tech = no company-wide business/money pulse.
+- Financial visibility remains role-gated; no payment/source-of-truth/Stripe behavior changed; mobile `/jobs/[id]` Field Mode was untouched.
+- Owner Pulse remaining improvements move to field-feedback-gated V2: money-at-risk clarity refinements, scope/range explanation when Today/Ops/Reports counts differ, return/callback pressure once lane matures, owner trend/completion views, and service-plan revenue/book-value clarity.
+- Next active candidate lane is Invoice Add-ons / Field Charge Guided Workflow Audit.
+- Customer Communication Polish V1 remains next after the invoice add-ons / field charge audit lane.
+- Deferred lanes remain parked unless explicitly reopened: native app-store wrapper, deeper offline, SMS/Twilio, QBO, customer portal, full support-system buildout, deeper Payments V2, and Service Plan billing/autopay/generated invoice expansion.
 - Controlled rollout feedback and support remain direct-to-owner for now; full support-system expansion stays deferred.
 - Contractor Report current-scope delivery is complete and accepted for current launch scope quality:
   - failed ECC contractor reports aggregate all failed completed ECC runs for the job

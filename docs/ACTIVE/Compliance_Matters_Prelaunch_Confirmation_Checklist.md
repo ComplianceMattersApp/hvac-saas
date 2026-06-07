@@ -529,7 +529,13 @@ If any item here conflicts with the active spine, the spine wins.
 - Tester remains in the wings intentionally and is not to be treated as a public launch trigger.
 - Support Console and Estimates production enablement remain parked behind their runbooks; tenant customer payments V1 is complete for current intended scope; the Payments V2 deferred register is parked; QBO remains optional downstream/last-last.
 - Resume broader launch-readiness sequencing after this docs closeout without treating tester pressure as a launch trigger.
-- Next recommended product lane is Owner Visibility / Business Pulse V1, followed by Customer Communication Polish V1.
+- Owner Visibility / Business Pulse V1 is closed for current pass after Role-Aware Today Pulse V1 and owner visual/mobile approval on `/today`.
+- Owner Visibility / Business Pulse score update: previous `7.1/10`, current `8.0/10` for controlled rollout readiness.
+- Role-aware `/today` pulse behavior is now explicit: Owner/Admin = Business Pulse, Billing = Money Attention, Office/Dispatcher = Ops Pressure, Tech = no company-wide business/money pulse.
+- Financial visibility remains role-gated. No payment/source-of-truth/Stripe behavior changed. Mobile `/jobs/[id]` Field Mode was untouched.
+- Remaining Owner Pulse improvements are field-feedback-gated V2 only: money-at-risk clarity refinements, scope/range explanation when Today/Ops/Reports counts differ, return/callback pressure when lane matures, owner trend/completion views, and service-plan revenue/book-value clarity.
+- Next active candidate lane is Invoice Add-ons / Field Charge Guided Workflow Audit.
+- Customer Communication Polish V1 remains next after invoice add-ons / field charge audit.
 - Controlled rollout support/feedback remains direct-to-owner for now; do not reopen the formal support-system lane in this pass.
 
 ### 2.3.7 Field-ready installable/PWA access readiness V1 (controlled rollout complete)
@@ -549,6 +555,7 @@ If any item here conflicts with the active spine, the spine wins.
 - Native app-store distribution expansion beyond this lane remains intentionally deferred unless explicitly reopened.
 - Deeper offline mode/service-worker caching remains intentionally deferred to a separate planned slice.
 - SMS/provider messaging, QBO, customer portal, full support system, and deeper Payments V2 remain deferred.
+- Service Plan billing/autopay/generated invoice expansion remains deferred unless explicitly reopened under existing model locks.
 
 ### 2.3.7.1 Field-ready installable/PWA access readiness V1B-1 — Proxy Verification + Portal Loading Polish (completed)
 - Confirmed: `proxy.ts` is the active and correct routing convention for this project under Next.js 16.

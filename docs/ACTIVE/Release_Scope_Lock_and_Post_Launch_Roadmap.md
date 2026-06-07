@@ -1306,8 +1306,9 @@ Recommended order after owner-release:
 7. QBO integration last-last (optional downstream accounting sync/export only).
 8. Product-mode configuration layer (settings/visibility/presets).
 9. Customer portal only if explicitly reopened.
-10. Owner Visibility / Business Pulse V1.
+10. Invoice Add-ons / Field Charge Guided Workflow Audit.
 11. Customer Communication Polish V1.
+12. Owner Visibility / Business Pulse V2 follow-ups (field-feedback gated only).
 
 Ordering rationale:
 - support safety first,
@@ -1329,11 +1330,18 @@ This is the current execution roadmap after evidence-based alignment with implem
    - First-owner provisioning remains disciplined dry-run/apply operation.
    - Expand tester/operator usage gradually with support-response monitoring.
 4. Pull next lane by operational signal, not by assumption.
-   - Priority order: Owner Visibility / Business Pulse V1 first, then Customer Communication Polish V1.
+   - Owner Visibility / Business Pulse V1 is closed for current pass after Role-Aware Today Pulse V1.
+   - Score update for Owner Visibility / Business Pulse: `7.1/10` -> `8.0/10`.
+   - Role-aware `/today` behavior now locks to: Owner/Admin = Business Pulse, Billing = Money Attention, Office/Dispatcher = Ops Pressure, Tech = no company-wide business/money pulse.
+   - Financial visibility remains role-gated; no payment/source-of-truth/Stripe behavior changed; mobile `/jobs/[id]` Field Mode was untouched.
+   - Next active candidate is Invoice Add-ons / Field Charge Guided Workflow Audit.
+   - Customer Communication Polish V1 stays immediately after invoice add-ons / field charge audit.
+   - Remaining Owner Pulse improvements are field-feedback-gated V2 only: money-at-risk clarity refinements, scope/range explanation when Today/Ops/Reports counts differ, return/callback pressure when lane matures, owner trend/completion views, and service-plan revenue/book-value clarity.
    - Keep Support V1 read-only console, estimates customer-facing expansion, Service Plans V2 improvements, and other deferred lanes parked unless owner evidence explicitly reorders them.
    - Payment execution is already in place for current V1 scope; future payment work is Payments V2 add-ons only.
 6. Keep long-tail items parked unless explicitly reopened.
    - Customer portal broad scope, QBO last-last, product-mode expansion, and SMS provider sending remain future decisions.
+   - Deferred lanes remain parked unless explicitly reopened: native app-store wrapper, deeper offline, SMS/Twilio, QBO, customer portal, full support-system buildout, deeper Payments V2, and Service Plan billing/autopay/generated invoice expansion.
 
 ---
 

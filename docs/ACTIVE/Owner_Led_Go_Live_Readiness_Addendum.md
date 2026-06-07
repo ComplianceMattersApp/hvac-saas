@@ -238,11 +238,19 @@ Likely future measurement surfaces:
 
 After this addendum, next work should be selected from controlled rollout follow-up lanes:
 
-1. Owner Visibility / Business Pulse V1
+1. Invoice Add-ons / Field Charge Guided Workflow Audit
 2. Customer Communication Polish V1
-3. Targeted performance improvements only if daily use exposes a specific issue
-4. Estimates / Quoting V1 only if owner evidence reorders priorities
-5. Recurring Services / Maintenance Agreements only if owner evidence reorders priorities
+3. Owner Visibility / Business Pulse V2 follow-ups (field-feedback gated only)
+4. Targeted performance improvements only if daily use exposes a specific issue
+5. Estimates / Quoting V1 only if owner evidence reorders priorities
+6. Recurring Services / Maintenance Agreements only if owner evidence reorders priorities
+
+Owner Visibility / Business Pulse V1 closeout note:
+- Closed for current pass after Role-Aware Today Pulse V1 implementation and owner visual/mobile approval on `/today`.
+- Score update: `7.1/10` -> `8.0/10` for controlled rollout readiness.
+- Role-aware pulse behavior now reflects: Owner/Admin = Business Pulse, Billing = Money Attention, Office/Dispatcher = Ops Pressure, Tech = no company-wide business/money pulse.
+- Financial visibility remains role-gated; no payment/source-of-truth/Stripe behavior changed; mobile `/jobs/[id]` Field Mode was untouched.
+- Remaining Owner Pulse improvements move to field-feedback-gated V2: money-at-risk clarity refinements, scope/range explanation when Today/Ops/Reports counts differ, return/callback pressure as lane matures, owner trend/completion views, and service-plan revenue/book-value clarity.
 
 Selection rule:
 - Choose one primary lane at a time.
@@ -253,6 +261,7 @@ Deferred planning continuity note:
 - Workflow Presets / Operational Flow Templates remains a deferred future lane only.
 - It is intended as milestone-driven operational guidance for repeatable multi-step flows and does not authorize scheduler automation, hidden lifecycle mutation, or workflow lock behavior in current go-live posture.
 - Canonical lane control/sequence is maintained in `Release_Scope_Lock_and_Post_Launch_Roadmap.md`, with boundary alignment mirrored in the Active Spine.
+- Deferred lanes remain parked unless explicitly reopened: native app-store wrapper, deeper offline, SMS/Twilio, QBO, customer portal, full support-system buildout, deeper Payments V2, and Service Plan billing/autopay/generated invoice expansion.
 
 ---
 
