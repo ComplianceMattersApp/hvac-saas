@@ -1459,6 +1459,8 @@ Current Program Status Note (May 2026)
 - Final non-card payment truth remains protected by Confirm Payment and authorized verification; reported field non-card payments remain pending workflow truth until verified.
 - Future capability work in this lane should target global/back-office authority drift only and must not roll back the intended field collection workflow.
 - Customer Communication Polish V1 remains next after the invoice add-ons / field charge audit lane.
+- Invoice Add-ons / Field Charge UX Clarity V1 is active as UI/copy guidance polish only: reinforce Work Item-first entry, clarify direct invoice Pricebook/manual fallback for cleanup/add-ons not captured as work, and clarify Create Add-On Invoice as separate linked invoice truth.
+- UX Clarity V1 non-change lock: no Field Billing authority change, no invoice/payment/Stripe/allocation truth-model change, no Confirm Payment boundary change, and no mobile `/jobs/[id]` Field Mode layout change.
 - Deferred lanes remain parked unless explicitly reopened: native app-store wrapper, deeper offline, SMS/Twilio, QBO, customer portal, full support-system buildout, deeper Payments V2, and Service Plan billing/autopay/generated invoice expansion.
 - Controlled rollout feedback and support remain direct-to-owner for now; full support-system expansion stays deferred.
 - Contractor Report current-scope delivery is complete and accepted for current launch scope quality:

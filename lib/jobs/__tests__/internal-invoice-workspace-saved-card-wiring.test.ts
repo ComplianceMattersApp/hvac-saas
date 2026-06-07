@@ -74,7 +74,13 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Reason for add-on invoice");
     expect(source).toContain("Customer added warranty, service plan, or additional work.");
     expect(source).toContain("original_internal_invoice_id");
-    expect(source).toContain("Use this when the customer adds work or a charge after this invoice was issued or paid. The original invoice stays unchanged.");
+    expect(source).toContain("Create a separate invoice linked to this job and original invoice. Use this when new billable work appears after the original invoice was issued or paid.");
+  });
+
+  it("keeps Work Item-first guidance and direct-invoice fallback guidance in the workspace copy", () => {
+    expect(source).toContain("Start with work performed. Use Work Items when the charge comes from completed job work, then review those as draft invoice charges.");
+    expect(source).toContain("Use direct invoice charges from Pricebook/manual only for billing cleanup or add-ons not captured in Work Items.");
+    expect(source).toContain("Start with Work Items for completed work. Use direct invoice charges when the billed item was not captured as a Work Item.");
   });
 
   it("uses shared short invoice reference helper in the primary header", () => {
@@ -114,7 +120,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("&& canCollectFieldPaymentAccess");
     expect(source).toContain("collectIssuedInvoiceCardPaymentFromForm");
     expect(source).toContain("Collect Payment");
-    expect(source).toContain("Card collection launches secure Stripe Checkout. Payment updates only after Stripe webhook confirmation.");
+    expect(source).toContain("Card payments open a secure checkout page. Once the payment is complete, this invoice updates automatically.");
     expect(source).toContain("Cash, check, and other collected payments are submitted for office confirmation before the invoice is marked paid.");
     expect(source).toContain("Card collection is not enabled for your role.");
     expect(source).toContain("Online payments are not ready.");

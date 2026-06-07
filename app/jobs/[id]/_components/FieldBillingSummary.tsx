@@ -259,7 +259,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
         </span>
         {hasDirectInvoiceAuthority ? (
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-800">
-            Use invoice workspace for billing actions.
+            Start with work performed, then use the invoice workspace for billing actions.
           </span>
         ) : hasProposalEntryAuthority ? (
           <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-1 text-blue-800">

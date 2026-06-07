@@ -847,7 +847,7 @@ export default async function InternalInvoiceWorkspacePage({
             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-emerald-900">Add-On Invoice</div>
             <h2 className="mt-1 text-lg font-semibold tracking-tight text-emerald-950">Create Add-On Invoice</h2>
             <p className="mt-2 text-sm leading-6 text-emerald-900">
-              Use this when the customer adds work or a charge after this invoice was issued or paid. The original invoice stays unchanged.
+              Create a separate invoice linked to this job and original invoice. Use this when new billable work appears after the original invoice was issued or paid.
             </p>
             <form action={createSupplementalInternalInvoiceFromForm} className="mt-3 space-y-3">
               <input type="hidden" name="job_id" value={jobId} />
@@ -878,7 +878,10 @@ export default async function InternalInvoiceWorkspacePage({
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Billing Start</div>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">No draft invoice yet</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Create a draft invoice to build billed charges from Work Items, Pricebook items, or custom charges.
+              Start with work performed. Use Work Items when the charge comes from completed job work, then review those as draft invoice charges.
+            </p>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              Use direct invoice charges from Pricebook/manual only for billing cleanup or add-ons not captured in Work Items.
             </p>
             {canCreateDraftInvoice ? (
               <form action={createInternalInvoiceDraftFromForm} className="mt-4">
@@ -905,7 +908,7 @@ export default async function InternalInvoiceWorkspacePage({
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Invoice Lines</div>
                   <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Charges</h2>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
-                    Invoice Charges are billed commercial scope. Work Items are operational scope and can be imported as draft charges.
+                    Start with Work Items for completed work. Use direct invoice charges when the billed item was not captured as a Work Item.
                   </p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">
@@ -1219,7 +1222,7 @@ export default async function InternalInvoiceWorkspacePage({
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Field Collection</div>
                 <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Collect Payment</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Card collection launches secure Stripe Checkout. Payment updates only after Stripe webhook confirmation.
+                  Card payments open a secure checkout page. Once the payment is complete, this invoice updates automatically.
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
                   Cash, check, and other collected payments are submitted for office confirmation before the invoice is marked paid.

@@ -338,9 +338,9 @@ export default function InternalInvoiceLineItemsTable({
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">Recommended Path: Build Invoice Charges from Work Items</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-sky-700">Recommended Path: Start with Work Performed</div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
-                  Start from the Work Items already captured for this visit. Imported items become draft charges for this invoice.
+                  Use Work Items when this charge comes from work completed on the job. These can become invoice charges when ready.
                 </div>
                 <div className="mt-1 text-xs leading-5 text-slate-500">
                   Work Item price carries into the draft charge when available. Review quantity and price before issuing.
@@ -402,7 +402,7 @@ export default function InternalInvoiceLineItemsTable({
                 className={primaryButtonClass}
                 disabled={selectedVisitScopeItemIds.length === 0}
               >
-                Add Selected Work Items
+                Add Work Performed
               </SubmitButton>
             </div>
           </form>
@@ -416,9 +416,9 @@ export default function InternalInvoiceLineItemsTable({
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Fallback Path: Add From Pricebook</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Fallback Path: Add Charge from Pricebook</div>
               <div className="mt-1 text-xs leading-5 text-slate-500">
-                Use Pricebook only when a billed charge was not already captured as a Work Item. Added rows are draft Invoice Charges for review before issue. Credits and negative adjustments remain deferred.
+                Use Pricebook when the billed item was not captured as work performed. Use direct invoice items for billing cleanup or add-ons that do not belong in Work Items.
               </div>
             </div>
           </div>
@@ -442,7 +442,7 @@ export default function InternalInvoiceLineItemsTable({
                 actionSlotClassName="md:self-end"
                 actionSlot={
                   <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
-                    Add Pricebook Item
+                    Add from Pricebook
                   </SubmitButton>
                 }
                 renderSelectedItem={(selectedPricebookItem) => (
@@ -667,7 +667,7 @@ export default function InternalInvoiceLineItemsTable({
             <input type="hidden" name="tab" value={tab} />
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">+ Add Invoice Charge</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add Charge</div>
               <button
                 type="button"
                 onClick={() => setIsAddFormOpen(false)}
@@ -728,9 +728,9 @@ export default function InternalInvoiceLineItemsTable({
             </div>
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
-              <div className="text-xs leading-5 text-slate-500">Use a manual charge only for billed exceptions not already covered by Work Items or Pricebook.</div>
+              <div className="text-xs leading-5 text-slate-500">Use manual charges for billing cleanup or add-ons that were not captured as Work Items.</div>
               <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
-                + Add Charge
+                Add Charge
               </SubmitButton>
             </div>
           </form>
@@ -738,15 +738,15 @@ export default function InternalInvoiceLineItemsTable({
           <div className="bg-slate-50/94 px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/82 px-4 py-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">+ Add Invoice Charge</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">Open a fresh charge row only for billed exceptions not already covered by Work Items or Pricebook.</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add Charge</div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">Open a direct invoice charge for billing cleanup or add-ons not captured as Work Items.</div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsAddFormOpen(true)}
                 className={primaryButtonClass}
               >
-                + Add Charge
+                Add Charge
               </button>
             </div>
           </div>

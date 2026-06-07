@@ -44,6 +44,12 @@ describe("internal invoice line items table capability wiring", () => {
     expect(invoicePageSource).toContain("expectedUnitPrice: sanitizedRow.expected_unit_price");
     expect(jobDetailPageSource).toContain("expectedUnitPrice: sanitizedRow.expected_unit_price ?? null");
     expect(source).toContain("expectedUnitPrice: number | null");
+    expect(source).toContain("Recommended Path: Start with Work Performed");
+    expect(source).toContain("Use Work Items when this charge comes from work completed on the job.");
+    expect(source).toContain("Fallback Path: Add Charge from Pricebook");
+    expect(source).toContain("Use direct invoice items for billing cleanup or add-ons that do not belong in Work Items.");
+    expect(source).toContain("Add from Pricebook");
+    expect(source).toContain("Use manual charges for billing cleanup or add-ons that were not captured as Work Items.");
     expect(source).toContain("Work Item price carries into the draft charge when available.");
     expect(source).toContain("Price {formatCurrencyFromAmount(item.expectedUnitPrice)}");
     expect(source).not.toContain("Imported Work Items start as draft Invoice Charges with Qty 1.00 and Unit Price $0.00.");

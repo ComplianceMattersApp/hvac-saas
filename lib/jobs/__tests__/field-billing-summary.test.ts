@@ -335,7 +335,7 @@ describe("FieldBillingSummary", () => {
       },
     });
 
-    expect(html).toContain("Use invoice workspace for billing actions.");
+    expect(html).toContain("Start with work performed, then use the invoice workspace for billing actions.");
     expect(html).toContain("Review Invoice");
     expect(html).not.toContain("Add proposed charge");
   });
@@ -352,7 +352,7 @@ describe("FieldBillingSummary", () => {
       },
     });
 
-    expect(html).toContain("Use invoice workspace for billing actions.");
+    expect(html).toContain("Start with work performed, then use the invoice workspace for billing actions.");
     expect(html).toContain("Review Invoice");
     expect(html).not.toContain("Add proposed charge");
     expect(html).not.toContain("Submit charge for office review");
@@ -364,7 +364,7 @@ describe("FieldBillingSummary", () => {
       invoice: null,
     });
 
-    expect(html).toContain("Use invoice workspace for billing actions.");
+    expect(html).toContain("Start with work performed, then use the invoice workspace for billing actions.");
     expect(html).toContain("Start Invoice");
     expect(html).not.toContain("Review Invoice");
   });
@@ -382,7 +382,7 @@ describe("FieldBillingSummary", () => {
       },
     });
 
-    expect(html).toContain("Use invoice workspace for billing actions.");
+    expect(html).toContain("Start with work performed, then use the invoice workspace for billing actions.");
     expect(html).not.toContain("Review Invoice");
     expect(html).not.toContain("Build Invoice");
     expect(html).not.toContain("Open Invoice Workspace");
