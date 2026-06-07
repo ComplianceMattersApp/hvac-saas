@@ -77,6 +77,7 @@ export default function VisitScopeJobDetailForm({
         initialItems={initialItems}
         jobType={jobType}
         pricebookTemplateItems={pricebookTemplateItems}
+        hideSummaryField
         hideInitialSelectedItems
         onSummaryChange={setSummary}
         onItemsChange={setItems}

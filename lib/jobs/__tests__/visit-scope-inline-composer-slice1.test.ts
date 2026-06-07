@@ -56,10 +56,14 @@ describe("visit scope inline composer slice 1", () => {
 
   it("lets job detail hide already-saved selected rows while preserving duplicate prevention", () => {
     expect(builderSource).toContain("hideInitialSelectedItems?: boolean");
+    expect(builderSource).toContain("hideSummaryField?: boolean");
+    expect(builderSource).toContain('{hideSummaryField ? (');
+    expect(builderSource).toContain('<input type="hidden" name={summaryName} value={summary} />');
     expect(builderSource).toContain("const initialItemFingerprints = useMemo(() => {");
     expect(builderSource).toContain("const visibleCompletedItems = hideInitialSelectedItems");
     expect(builderSource).toContain("completedItems.filter((item) => !initialItemFingerprints.has(scopeItemFingerprint(item)))");
     expect(builderSource).toContain("findExistingScopeItem(items, candidate)");
+    expect(jobDetailFormSource).toContain("hideSummaryField");
     expect(jobDetailFormSource).toContain("hideInitialSelectedItems");
     expect(jobDetailFormSource).toContain("Save additions and work updates.");
     expect(jobDetailFormSource).toContain("Save Work Updates");

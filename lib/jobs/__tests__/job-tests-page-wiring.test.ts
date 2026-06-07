@@ -85,6 +85,11 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("Visit Reason");
     expect(jobPageSource).toContain("const visitReasonText =");
     expect(jobPageSource).toContain("{visitReasonText}");
+    expect(jobPageSource).toContain('id="visit-reason-card"');
+    expect(jobPageSource).toContain('id="mobile-visit-reason-card"');
+    expect(jobPageSource).toContain("updateJobVisitScopeFromForm");
+    expect(jobPageSource).toContain('name="visit_scope_summary"');
+    expect(jobPageSource).toContain('name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit}');
     expect(jobPageSource).toContain("Customer Concern");
     expect(jobPageSource).toContain("Intake Notes");
     expect(jobPageSource).toContain("whitespace-pre-wrap break-words");

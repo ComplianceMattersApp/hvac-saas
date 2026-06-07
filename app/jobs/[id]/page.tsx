@@ -17,6 +17,7 @@ import {
   updateJobScheduleFromForm,
   advanceJobStatusFromForm,
   updateJobServiceContractFromForm,
+  updateJobVisitScopeFromForm,
   createNextServiceVisitFromForm,
   createCallbackVisitFromForm,
   completeDataEntryFromForm,
@@ -2692,6 +2693,7 @@ const fieldChargeProposalVisitScopeItems = visitScopeItems.map((item) => ({
   title: item.title,
   details: item.details,
 }));
+const visitScopeItemsJsonForInlineEdit = JSON.stringify(visitScopeItems);
   setPhaseValue("compositionPrep", Date.now() - compositionPrepStartedAt);
 const visitScopeCount = visitScopeItems.length;
 const hasVisitScopeDefined = Boolean(visitScopeSummary) || visitScopeCount > 0;
@@ -4393,8 +4395,41 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
 
             <div className="mt-4 space-y-3">
-              <div className="rounded-xl bg-slate-50 px-3 py-3">
-                <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
+              <div id="mobile-visit-reason-card" className="rounded-xl bg-slate-50 px-3 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
+                  {isInternalUser ? (
+                    <details className="group">
+                      <summary className="cursor-pointer list-none rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50">
+                        Edit
+                      </summary>
+                      <form action={updateJobVisitScopeFromForm} className="mt-2 min-w-[16rem] rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="tab" value={tab} />
+                        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-visit-reason-card`} />
+                        <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
+                        <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                          Visit Reason / Visit Title
+                        </label>
+                        <textarea
+                          name="visit_scope_summary"
+                          defaultValue={visitScopeSummary ?? ""}
+                          rows={3}
+                          maxLength={600}
+                          className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+                        />
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+                            Save
+                          </SubmitButton>
+                          <a href="#mobile-visit-reason-card" className="text-xs font-semibold text-slate-600 hover:text-slate-900">
+                            Cancel
+                          </a>
+                        </div>
+                      </form>
+                    </details>
+                  ) : null}
+                </div>
                 <div className="mt-1 whitespace-pre-wrap break-words text-lg font-semibold leading-7 text-slate-950">
                   {visitReasonText}
                 </div>
@@ -5424,7 +5459,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       </div>
 
-      <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/94 p-4`}>
+      <div id="visit-reason-card" className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/94 p-4`}>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
             <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -5432,14 +5467,47 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <span>Visit Reason</span>
             </div>
           </div>
-          {job.job_type === "service" ? (
-            <a
-              href="#visit-scope-section"
-              className="hidden shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white sm:inline-flex"
-            >
-              Work Items
-            </a>
-          ) : null}
+          <div className="flex flex-wrap items-center gap-2">
+            {isInternalUser ? (
+              <details className="group">
+                <summary className="cursor-pointer list-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white">
+                  Edit
+                </summary>
+                <form action={updateJobVisitScopeFromForm} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:w-[22rem]">
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="tab" value={tab} />
+                  <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#visit-reason-card`} />
+                  <input type="hidden" name="visit_scope_items_json" value={visitScopeItemsJsonForInlineEdit} />
+                  <label className="block text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Visit Reason / Visit Title
+                  </label>
+                  <textarea
+                    name="visit_scope_summary"
+                    defaultValue={visitScopeSummary ?? ""}
+                    rows={3}
+                    maxLength={600}
+                    className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 shadow-sm"
+                  />
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+                      Save
+                    </SubmitButton>
+                    <a href="#visit-reason-card" className="text-xs font-semibold text-slate-600 transition-colors hover:text-slate-900">
+                      Cancel
+                    </a>
+                  </div>
+                </form>
+              </details>
+            ) : null}
+            {job.job_type === "service" ? (
+              <a
+                href="#visit-scope-section"
+                className="hidden shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white sm:inline-flex"
+              >
+                Work Items
+              </a>
+            ) : null}
+          </div>
         </div>
 
         <div className="mt-3 space-y-3">
