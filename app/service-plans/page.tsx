@@ -55,6 +55,14 @@ function formatYmd(value: string | null) {
   }
 }
 
+function daysBetweenYmd(startYmd: string, endYmd: string | null) {
+  if (!endYmd) return null;
+  const start = Date.parse(`${startYmd}T00:00:00Z`);
+  const end = Date.parse(`${endYmd}T00:00:00Z`);
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return Math.floor((end - start) / 86_400_000);
+}
+
 function titleCase(value: string) {
   const cleaned = String(value ?? "").trim();
   if (!cleaned) return "-";
@@ -155,7 +163,7 @@ function buildCustomerPlanHref(row: ServicePlanDrilldownRow) {
   const agreementId = String(row.id ?? "").trim();
   const customerId = String(row.customer_id ?? "").trim();
   const hash = `maintenance-agreement-${agreementId}`;
-  return `/customers/${encodeURIComponent(customerId)}?maFocus=${encodeURIComponent(agreementId)}#${hash}`;
+  return `/customers/${encodeURIComponent(customerId)}?tab=service-plans&maFocus=${encodeURIComponent(agreementId)}#${hash}`;
 }
 
 export default async function ServicePlansPage({
@@ -313,6 +321,46 @@ export default async function ServicePlansPage({
     filter: selectedFilter,
     limit: 250,
   });
+  const overviewResult = selectedFilter === "all"
+    ? result
+    : await listMaintenanceAgreementDrilldownForAccount({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        today: null,
+        filter: "all",
+        limit: 250,
+      });
+  const overviewRows = overviewResult.rows;
+  const activePlanCount = overviewRows.filter((row) => row.status === "active").length;
+  const overduePlanCount = overviewRows.filter((row) => row.due_state === "overdue").length;
+  const dueTodayPlanCount = overviewRows.filter((row) => row.due_state === "due_today").length;
+  const dueNextSevenPlanCount = overviewRows.filter((row) => {
+    const daysUntil = daysBetweenYmd(overviewResult.as_of_date, row.next_due_date);
+    return daysUntil !== null && daysUntil >= 1 && daysUntil <= 7;
+  }).length;
+  const dueNextThirtyPlanCount = overviewRows.filter((row) => {
+    const daysUntil = daysBetweenYmd(overviewResult.as_of_date, row.next_due_date);
+    return daysUntil !== null && daysUntil >= 1 && daysUntil <= 30;
+  }).length;
+  const notScheduledPlanCount = overviewRows.filter((row) => row.due_state === "not_scheduled").length;
+  const countReviewPlanCount = overviewRows.filter((row) => row.visit_count_review.eligible_for_count_review_links > 0 || row.visit_count_review.not_eligible_links > 0).length;
+  const attentionRows = overviewRows.filter((row) => (
+    row.due_state === "overdue" ||
+    row.due_state === "due_today" ||
+    row.due_state === "not_scheduled" ||
+    row.visit_count_review.eligible_for_count_review_links > 0 ||
+    row.visit_count_review.not_eligible_links > 0
+  )).slice(0, 6);
+  const upcomingRows = overviewRows.filter((row) => row.due_state === "upcoming" && row.next_due_date).slice(0, 6);
+  const overviewCards = [
+    { label: "Active Plans", value: activePlanCount },
+    { label: "Overdue", value: overduePlanCount },
+    { label: "Due Today", value: dueTodayPlanCount },
+    { label: "Due Next 7 Days", value: dueNextSevenPlanCount },
+    { label: "Due Next 30 Days", value: dueNextThirtyPlanCount },
+    { label: "Needs Attention", value: notScheduledPlanCount + countReviewPlanCount },
+    { label: "Templates Active", value: activeTemplates.length },
+  ];
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-6 text-slate-900 sm:space-y-5 sm:px-6 lg:px-8">
@@ -327,10 +375,10 @@ export default async function ServicePlansPage({
             </Link>
             <h1 className="mt-1 text-[22px] font-semibold tracking-tight text-slate-950">Service Plans</h1>
             <p className="mt-1 text-sm text-slate-600">
-              Templates help you standardize Service Plans before assigning them to customers.
+              Track recurring service agreements, upcoming visits, and plan templates.
             </p>
             <p className="mt-1 text-xs text-slate-500">
-              Creating a template does not create a customer Service Plan, job, invoice, or payment.
+              Customer plans are managed from each customer record. Templates standardize future assignments.
             </p>
           </div>
           <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-right">
@@ -341,7 +389,7 @@ export default async function ServicePlansPage({
 
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs text-slate-600">
-            Existing customer Service Plans remain read-only on this page.
+            Review plan health here, then open the customer record when a plan needs direct management.
           </p>
           <a
             href="#create-template-form"
@@ -349,6 +397,73 @@ export default async function ServicePlansPage({
           >
             Create Template
           </a>
+        </div>
+
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7">
+          {overviewCards.map((card) => (
+            <div key={card.label} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500">{card.label}</div>
+              <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{card.value}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <section className="rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-amber-950">Plans Needing Attention</h2>
+                <p className="mt-1 text-xs text-amber-900/80">Overdue, due today, not scheduled, or waiting on count review.</p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-amber-900">{attentionRows.length}</span>
+            </div>
+            {attentionRows.length === 0 ? (
+              <p className="mt-3 text-sm text-amber-900/80">No plans need attention right now.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {attentionRows.map((row) => (
+                  <Link
+                    key={row.id}
+                    href={buildCustomerPlanHref(row)}
+                    className="block rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm transition-colors hover:border-amber-300 hover:bg-amber-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
+                  >
+                    <span className="font-semibold text-slate-950">{row.agreement_name}</span>
+                    <span className="mt-0.5 block text-xs text-slate-600">
+                      {row.customer_display_name} - {titleCase(row.due_state)} - {formatYmd(row.next_due_date)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="rounded-xl border border-blue-200 bg-blue-50/70 p-4">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-sm font-semibold text-blue-950">Upcoming Service Plans</h2>
+                <p className="mt-1 text-xs text-blue-900/80">A quick look at scheduled plans coming up next.</p>
+              </div>
+              <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-blue-900">{upcomingRows.length}</span>
+            </div>
+            {upcomingRows.length === 0 ? (
+              <p className="mt-3 text-sm text-blue-900/80">No upcoming plans are scheduled yet.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {upcomingRows.map((row) => (
+                  <Link
+                    key={row.id}
+                    href={buildCustomerPlanHref(row)}
+                    className="block rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm transition-colors hover:border-blue-300 hover:bg-blue-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300"
+                  >
+                    <span className="font-semibold text-slate-950">{row.agreement_name}</span>
+                    <span className="mt-0.5 block text-xs text-slate-600">
+                      {row.customer_display_name} - Next due {formatYmd(row.next_due_date)}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
 
         <div className="mt-3 flex flex-wrap gap-2">
@@ -372,7 +487,7 @@ export default async function ServicePlansPage({
         </div>
 
         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          Showing {result.rows.length} plan{result.rows.length === 1 ? "" : "s"}. This page is read-only.
+          Showing {result.rows.length} plan{result.rows.length === 1 ? "" : "s"}. Customer plans are managed from each customer record.
         </div>
       </section>
 
@@ -424,89 +539,94 @@ export default async function ServicePlansPage({
           </div>
         </div>
 
-        <form id="create-template-form" action={createTemplateFromForm} className="mt-4 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
-          <input type="hidden" name="return_filter" value={selectedFilter} />
-          <div className="text-sm font-semibold text-slate-900">Create Template</div>
-          <div className="grid gap-3 md:grid-cols-2">
-            <label className="text-sm text-slate-700">
-              Template Name
-              <input
-                name="template_name"
-                required
-                maxLength={160}
+        <details id="create-template-form" className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+          <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+            Create Template
+          </summary>
+          <form action={createTemplateFromForm} className="mt-4 space-y-3">
+            <input type="hidden" name="return_filter" value={selectedFilter} />
+            <div className="grid gap-3 md:grid-cols-2">
+              <label className="text-sm text-slate-700">
+                Template Name
+                <input
+                  name="template_name"
+                  required
+                  maxLength={160}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  placeholder="Spring AC tune-up standard"
+                />
+              </label>
+              <label className="text-sm text-slate-700">
+                Agreement Type
+                <select
+                  name="agreement_type"
+                  required
+                  defaultValue="service_plan"
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                >
+                  {MAINTENANCE_AGREEMENT_TYPES.map((value) => (
+                    <option key={value} value={value}>
+                      {titleCase(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm text-slate-700">
+                Frequency
+                <select
+                  name="frequency"
+                  required
+                  defaultValue="annual"
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                >
+                  {MAINTENANCE_AGREEMENT_FREQUENCIES.map((value) => (
+                    <option key={value} value={value}>
+                      {titleCase(value)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-sm text-slate-700">
+                Default Visit Scope Summary
+                <input
+                  name="default_visit_scope_summary"
+                  maxLength={2000}
+                  className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                  placeholder="Seasonal checklist and safety inspection"
+                />
+              </label>
+            </div>
+            <label className="block text-sm text-slate-700">
+              Default Work Items
+              <textarea
+                name="default_visit_scope_items_json"
+                rows={4}
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                defaultValue="[]"
+              />
+              <span className="mt-1 block text-xs text-slate-500">Optional default work items for future service visits.</span>
+            </label>
+            <label className="block text-sm text-slate-700">
+              Internal Notes Default
+              <textarea
+                name="internal_notes_default"
+                rows={3}
                 className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                placeholder="Spring AC tune-up standard"
               />
             </label>
-            <label className="text-sm text-slate-700">
-              Agreement Type
-              <select
-                name="agreement_type"
-                required
-                defaultValue="service_plan"
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-xs text-slate-500">
+                This only saves a reusable template and does not create customer records, jobs, invoices, or payments.
+              </p>
+              <button
+                type="submit"
+                className="inline-flex min-h-10 items-center rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,border-color,transform] hover:-translate-y-px hover:border-slate-700 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
               >
-                {MAINTENANCE_AGREEMENT_TYPES.map((value) => (
-                  <option key={value} value={value}>
-                    {titleCase(value)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm text-slate-700">
-              Frequency
-              <select
-                name="frequency"
-                required
-                defaultValue="annual"
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
-              >
-                {MAINTENANCE_AGREEMENT_FREQUENCIES.map((value) => (
-                  <option key={value} value={value}>
-                    {titleCase(value)}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-sm text-slate-700">
-              Default Visit Scope Summary
-              <input
-                name="default_visit_scope_summary"
-                maxLength={2000}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                placeholder="Seasonal checklist and safety inspection"
-              />
-            </label>
-          </div>
-          <label className="block text-sm text-slate-700">
-            Default Work Items (JSON array)
-            <textarea
-              name="default_visit_scope_items_json"
-              rows={4}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
-              defaultValue="[]"
-            />
-          </label>
-          <label className="block text-sm text-slate-700">
-            Internal Notes Default
-            <textarea
-              name="internal_notes_default"
-              rows={3}
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
-            />
-          </label>
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="text-xs text-slate-500">
-              This only saves a reusable template and does not create customer records, jobs, invoices, or payments.
-            </p>
-            <button
-              type="submit"
-              className="inline-flex min-h-10 items-center rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,border-color,transform] hover:-translate-y-px hover:border-slate-700 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-            >
-              Create Template
-            </button>
-          </div>
-        </form>
+                Create Template
+              </button>
+            </div>
+          </form>
+        </details>
 
         <div className="mt-4 space-y-3">
           <h3 className="text-sm font-semibold uppercase tracking-[0.08em] text-slate-600">Active Templates</h3>
@@ -586,13 +706,14 @@ export default async function ServicePlansPage({
                     </div>
 
                     <label className="block text-sm text-slate-700">
-                      Default Work Items (JSON array)
+                      Default Work Items
                       <textarea
                         name="default_visit_scope_items_json"
                         rows={4}
                         defaultValue={formatTemplateItems(template.default_visit_scope_items)}
                         className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
                       />
+                      <span className="mt-1 block text-xs text-slate-500">Optional default work items for future service visits.</span>
                     </label>
 
                     <label className="block text-sm text-slate-700">
@@ -676,6 +797,10 @@ export default async function ServicePlansPage({
         </section>
       ) : (
         <section className="overflow-hidden rounded-2xl border border-slate-300/80 bg-white shadow-[0_18px_34px_-30px_rgba(15,23,42,0.35)]">
+          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <h2 className="text-lg font-semibold tracking-tight text-slate-950">Customer Service Plans</h2>
+            <p className="mt-1 text-sm text-slate-600">Filter and review customer plans by status, due date, and count review state.</p>
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50">
@@ -709,13 +834,13 @@ export default async function ServicePlansPage({
                           href={buildCustomerPlanHref(row)}
                           className="inline-flex items-center rounded-full border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 transition-[background-color,border-color,color] hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                         >
-                          Manage on Customer
+                          Open Customer Plan
                         </Link>
                       </div>
                     </td>
                     <td className="px-4 py-3">
                       <Link
-                        href={`/customers/${row.customer_id}`}
+                        href={`/customers/${encodeURIComponent(row.customer_id)}?tab=service-plans`}
                         className="font-semibold text-slate-800 underline-offset-4 hover:text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                       >
                         {row.customer_display_name}

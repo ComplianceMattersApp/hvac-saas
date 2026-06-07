@@ -8,13 +8,20 @@ const servicePlansPageSource = readFileSync(
 );
 
 describe("service plans template management wiring", () => {
-  it("adds template management copy and keeps template create prominent", () => {
+  it("presents service plans as a landing page before template management", () => {
     expect(servicePlansPageSource).toContain(
-      "Templates help you standardize Service Plans before assigning them to customers.",
+      "Track recurring service agreements, upcoming visits, and plan templates.",
     );
     expect(servicePlansPageSource).toContain(
-      "Creating a template does not create a customer Service Plan, job, invoice, or payment.",
+      "Customer plans are managed from each customer record. Templates standardize future assignments.",
     );
+    expect(servicePlansPageSource).toContain("Plans Needing Attention");
+    expect(servicePlansPageSource).toContain("Upcoming Service Plans");
+    expect(servicePlansPageSource).toContain("Customer Service Plans");
+    expect(servicePlansPageSource).toContain("Active Plans");
+    expect(servicePlansPageSource).toContain("Due Next 7 Days");
+    expect(servicePlansPageSource).toContain("Due Next 30 Days");
+    expect(servicePlansPageSource).toContain("Templates Active");
     expect(servicePlansPageSource).toContain("Create Template");
     expect(servicePlansPageSource).toContain("Template Management");
   });
@@ -40,13 +47,39 @@ describe("service plans template management wiring", () => {
     expect(servicePlansPageSource).toContain("Active Templates");
     expect(servicePlansPageSource).toContain("Archived Templates");
     expect(servicePlansPageSource).toContain("<details");
+    expect(servicePlansPageSource).toContain('id="create-template-form"');
     expect(servicePlansPageSource).toContain("normalizeTemplateStatus(row.lifecycle_status) === \"active\"");
     expect(servicePlansPageSource).toContain("normalizeTemplateStatus(row.lifecycle_status) === \"archived\"");
+    expect(servicePlansPageSource).toContain("{activeTemplates.length} active / {archivedTemplates.length} archived");
   });
 
   it("keeps existing customer service plans visibility read-only", () => {
-    expect(servicePlansPageSource).toContain("Existing customer Service Plans remain read-only on this page.");
-    expect(servicePlansPageSource).toContain("This page is read-only.");
+    expect(servicePlansPageSource).toContain("Customer plans are managed from each customer record.");
+    expect(servicePlansPageSource).toContain("Showing {result.rows.length} plan");
+    expect(servicePlansPageSource).not.toContain("This page is read-only.");
+  });
+
+  it("uses user-friendly default work item copy without implementation wording", () => {
+    expect(servicePlansPageSource).toContain("Default Work Items");
+    expect(servicePlansPageSource).toContain("Optional default work items for future service visits.");
+    expect(servicePlansPageSource).not.toContain("Default Work Items (JSON array)");
+  });
+
+  it("links customer plan actions directly to the customer Service Plans tab", () => {
+    expect(servicePlansPageSource).toContain("?tab=service-plans&maFocus=");
+    expect(servicePlansPageSource).toContain("?tab=service-plans");
+    expect(servicePlansPageSource).toContain("Open Customer Plan");
+    expect(servicePlansPageSource).not.toContain("Manage on Customer");
+  });
+
+  it("keeps status and due filters available", () => {
+    expect(servicePlansPageSource).toContain('label: "All"');
+    expect(servicePlansPageSource).toContain('label: "Active"');
+    expect(servicePlansPageSource).toContain('label: "Overdue"');
+    expect(servicePlansPageSource).toContain('label: "Due Today"');
+    expect(servicePlansPageSource).toContain('label: "Due in 1-7 Days"');
+    expect(servicePlansPageSource).toContain('label: "Due in 8-30 Days"');
+    expect(servicePlansPageSource).toContain('label: "Not Scheduled"');
   });
 
   it("does not wire template actions into agreement creation or payment flows", () => {
