@@ -144,6 +144,8 @@ export type MaintenanceAgreementDrilldownRow = {
   status: string;
   agreement_type: string;
   frequency: string;
+  source_template_id: string | null;
+  source_template_name_snapshot: string | null;
   next_due_date: string | null;
   due_state: MaintenanceAgreementDueState;
   visit_count_review: MaintenanceAgreementVisitCountReviewSummary;
@@ -1041,6 +1043,8 @@ export async function listMaintenanceAgreementDrilldownForAccount(
         "status",
         "agreement_type",
         "frequency",
+        "source_template_id",
+        "source_template_name_snapshot",
         "next_due_date",
         "created_at",
       ].join(", "),
@@ -1060,6 +1064,8 @@ export async function listMaintenanceAgreementDrilldownForAccount(
     status?: string | null;
     agreement_type?: string | null;
     frequency?: string | null;
+    source_template_id?: string | null;
+    source_template_name_snapshot?: string | null;
     next_due_date?: string | null;
   }>;
 
@@ -1204,6 +1210,8 @@ export async function listMaintenanceAgreementDrilldownForAccount(
         status,
         agreement_type: toCleanString(row.agreement_type) || "maintenance",
         frequency: toCleanString(row.frequency) || "custom",
+        source_template_id: toCleanString(row.source_template_id) || null,
+        source_template_name_snapshot: toCleanString(row.source_template_name_snapshot) || null,
         next_due_date: nextDueDate,
         due_state: dueState,
         visit_count_review: summarizeMaintenanceAgreementVisitCountReviewRows(

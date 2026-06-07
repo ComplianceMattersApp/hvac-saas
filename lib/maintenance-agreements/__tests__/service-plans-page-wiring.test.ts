@@ -22,55 +22,26 @@ describe("service plans template management wiring", () => {
     expect(servicePlansPageSource).toContain("Due Next 7 Days");
     expect(servicePlansPageSource).toContain("Due Next 30 Days");
     expect(servicePlansPageSource).toContain("Templates Active");
-    expect(servicePlansPageSource).toContain("Create Template");
-    expect(servicePlansPageSource).toContain("Template Management");
+    expect(servicePlansPageSource).toContain("Manage Templates");
+    expect(servicePlansPageSource).not.toContain("Template Management");
   });
 
-  it("wires template read model and actions from slice B", () => {
+  it("uses template read model only for dashboard summaries", () => {
     expect(servicePlansPageSource).toContain("listMaintenanceAgreementTemplatesForAccount");
-    expect(servicePlansPageSource).toContain("createMaintenanceAgreementTemplate");
-    expect(servicePlansPageSource).toContain("updateMaintenanceAgreementTemplate");
-    expect(servicePlansPageSource).toContain("archiveMaintenanceAgreementTemplate");
-    expect(servicePlansPageSource).toContain("duplicateMaintenanceAgreementTemplate");
     expect(servicePlansPageSource).toContain("isTemplateStoreUnavailableError");
     expect(servicePlansPageSource).toContain("templateStoreUnavailable");
-    expect(servicePlansPageSource).toContain("createTemplateFromForm");
-    expect(servicePlansPageSource).toContain("updateTemplateFromForm");
-    expect(servicePlansPageSource).toContain("archiveTemplateFromForm");
-    expect(servicePlansPageSource).toContain("duplicateTemplateFromForm");
-    expect(servicePlansPageSource).toContain("template_duplicated");
-    expect(servicePlansPageSource).toContain("template_duplicate_failed");
-    expect(servicePlansPageSource).toContain("Duplicate Template");
+    expect(servicePlansPageSource).toContain("/service-plans/templates");
   });
 
-  it("keeps active templates primary and archived templates secondary", () => {
-    expect(servicePlansPageSource).toContain("Active Templates");
-    expect(servicePlansPageSource).toContain("Archived Templates");
-    expect(servicePlansPageSource).toContain("<details");
-    expect(servicePlansPageSource).toContain('id="create-template-form"');
-    expect(servicePlansPageSource).toContain("normalizeTemplateStatus(row.lifecycle_status) === \"active\"");
-    expect(servicePlansPageSource).toContain("normalizeTemplateStatus(row.lifecycle_status) === \"archived\"");
+  it("keeps compact template summary counts on dashboard", () => {
     expect(servicePlansPageSource).toContain("{activeTemplates.length} active / {archivedTemplates.length} archived");
+    expect(servicePlansPageSource).toContain("Setup and maintain reusable Service Plan templates in a dedicated workspace.");
   });
 
   it("keeps existing customer service plans visibility read-only", () => {
     expect(servicePlansPageSource).toContain("Customer plans are managed from each customer record.");
-    expect(servicePlansPageSource).toContain("Showing {visibleRows.length} plan");
+    expect(servicePlansPageSource).toContain("const showingLabel = visibleRows.length <= pageSize");
     expect(servicePlansPageSource).not.toContain("This page is read-only.");
-  });
-
-  it("uses simple Default Visit Work copy without advanced or JSON wording", () => {
-    expect(servicePlansPageSource).toContain("Default Visit Work");
-    expect(servicePlansPageSource).toContain("Describe the default work, checklist, or scope for future visits.");
-    expect(servicePlansPageSource).toContain("Example: Inspect system, replace filter, check refrigerant charge, clean condenser coil.");
-    expect(servicePlansPageSource).toContain("Leave blank if this template should not prefill visit work.");
-    expect(servicePlansPageSource).toContain("return \"\";");
-    expect(servicePlansPageSource).toContain("name=\"default_visit_scope_items_json\"");
-    expect(servicePlansPageSource).not.toContain("Advanced default work items");
-    expect(servicePlansPageSource).not.toContain("No default work items added yet.");
-    expect(servicePlansPageSource).not.toContain("Default Work Items");
-    expect(servicePlansPageSource).not.toContain("Default Work Items (JSON array)");
-    expect(servicePlansPageSource).not.toContain('defaultValue="[]"');
   });
 
   it("links customer plan actions directly to the customer Service Plans tab", () => {
@@ -104,12 +75,55 @@ describe("service plans template management wiring", () => {
     expect(servicePlansPageSource).toContain("Inactive {visibleInactiveCount}");
   });
 
-  it("preserves search state through filter links and template actions", () => {
+  it("renders service plan type cards with grouped counts and clear filter behavior", () => {
+    expect(servicePlansPageSource).toContain("Service Plan Types");
+    expect(servicePlansPageSource).toContain("Select a type to review matching customer plans.");
+    expect(servicePlansPageSource).toContain("divide-y divide-slate-200 overflow-hidden rounded-lg border border-slate-200");
+    expect(servicePlansPageSource).toContain("sm:grid-cols-[minmax(0,1fr)_auto_auto]");
+    expect(servicePlansPageSource).toContain("const planTypeGroups = Array.from");
+    expect(servicePlansPageSource).toContain("getPlanTypeGroup(row)");
+    expect(servicePlansPageSource).toContain("const agreementType = String(row.agreement_type ?? \"\").trim();");
+    expect(servicePlansPageSource).toContain("key: normalizeTypeKeyPart(agreementType) || \"other\"");
+    expect(servicePlansPageSource).toContain("label: titleCase(agreementType)");
+    expect(servicePlansPageSource).toContain("source_template_name_snapshot");
+    expect(servicePlansPageSource).toContain("source_template_id");
+    expect(servicePlansPageSource).toContain("group.active");
+    expect(servicePlansPageSource).toContain("group.dueSoon");
+    expect(servicePlansPageSource).toContain("group.overdue");
+    expect(servicePlansPageSource).toContain("group.needsAttention");
+    expect(servicePlansPageSource).toContain("{group.total} plan");
+    expect(servicePlansPageSource).toContain("group.needsAttention > 0");
+    expect(servicePlansPageSource).toContain("group.dueSoon > 0");
+    expect(servicePlansPageSource).toContain("group.overdue > 0");
+    expect(servicePlansPageSource).toContain("Clear Type");
+    expect(servicePlansPageSource).toContain("Showing type:");
+    expect(servicePlansPageSource).not.toContain("grid gap-3 md:grid-cols-2 xl:grid-cols-3");
+  });
+
+  it("preserves search and type state through filter links", () => {
     expect(servicePlansPageSource).toContain("q?: string;");
+    expect(servicePlansPageSource).toContain("typeKey?: string;");
+    expect(servicePlansPageSource).toContain("page?: number;");
     expect(servicePlansPageSource).toContain("if (q) params.set(\"q\", q);");
-    expect(servicePlansPageSource).toContain("href={buildServicePlansHref({ filter: filter.value, q: searchQuery })}");
-    expect(servicePlansPageSource).toContain("name=\"return_q\"");
-    expect(servicePlansPageSource).toContain("value={searchQuery}");
+    expect(servicePlansPageSource).toContain("if (typeKey) params.set(\"type\", typeKey);");
+    expect(servicePlansPageSource).toContain("href={buildServicePlansHref({ filter: filter.value, q: searchQuery, typeKey: activeTypeGroup?.key })}");
+    expect(servicePlansPageSource).toContain("href={buildServicePlansHref({ filter: selectedFilter, q: searchQuery, typeKey: group.key })}");
+    expect(servicePlansPageSource).toContain("defaultValue={searchQuery}");
+  });
+
+  it("keeps customer list controls with detail list and uses load-more display limits", () => {
+    const customerListIndex = servicePlansPageSource.indexOf("Customer Service Plans");
+    const templateIndex = servicePlansPageSource.indexOf("Manage Templates");
+    expect(customerListIndex).toBeGreaterThan(-1);
+    expect(templateIndex).toBeGreaterThan(customerListIndex);
+    expect(servicePlansPageSource).toContain("Detail view for the selected type, status, and search filters.");
+    expect(servicePlansPageSource).toContain("Search service plans");
+    expect(servicePlansPageSource).toContain("const pageSize = 25;");
+    expect(servicePlansPageSource).toContain("const pagedRows = visibleRows.slice(0, clampedVisibleCount);");
+    expect(servicePlansPageSource).toContain("const hasMoreRows = clampedVisibleCount < visibleRows.length;");
+    expect(servicePlansPageSource).toContain("Showing 1-${clampedVisibleCount} of ${visibleRows.length} plans");
+    expect(servicePlansPageSource).toContain("Load More");
+    expect(servicePlansPageSource).toContain("No service plans match this type and filter.");
   });
 
   it("does not wire template actions into agreement creation or payment flows", () => {
@@ -119,5 +133,6 @@ describe("service plans template management wiring", () => {
     expect(servicePlansPageSource.toLowerCase()).not.toContain("autopay");
     expect(servicePlansPageSource.toLowerCase()).not.toContain("stripe");
     expect(servicePlansPageSource).not.toContain("createNextServiceVisitFromForm");
+    expect(servicePlansPageSource).not.toContain("Confirm Payment");
   });
 });

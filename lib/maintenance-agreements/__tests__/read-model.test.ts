@@ -837,6 +837,8 @@ describe("maintenance agreement read model", () => {
           status: "active",
           next_due_date: "2026-05-11",
           agreement_name: "Bronze Plan",
+          source_template_id: "tpl-seasonal",
+          source_template_name_snapshot: "Seasonal Tune-Up",
         }),
         makeAgreement({ id: "d-2", account_owner_user_id: "other-owner", customer_id: "customer-2" }),
       ],
@@ -867,6 +869,8 @@ describe("maintenance agreement read model", () => {
       id: "d-1",
       customer_display_name: "Ava Stone",
       primary_location_display: "Main Home - 101 Pine St, Austin TX 78701",
+      source_template_id: "tpl-seasonal",
+      source_template_name_snapshot: "Seasonal Tune-Up",
       due_state: "overdue",
     });
     expect(calls).toContainEqual({
