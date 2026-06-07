@@ -90,6 +90,7 @@ type SupabaseFixtureParams = {
 };
 
 function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
+  const insertedInvoices: Array<Record<string, unknown>> = [];
   const insertedLineItems: Array<Record<string, unknown>> = [];
   const updatedLineItems: Array<Record<string, unknown>> = [];
   const deletedLineItemIds: string[] = [];
@@ -181,6 +182,25 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
 
       if (table === 'internal_invoices') {
         return {
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            const insertedInvoice = {
+              id: 'inv-created-1',
+              invoice_number: payload.invoice_number ?? 'INV-CREATED-1',
+              invoice_display_number: '1001',
+              status: payload.status ?? 'draft',
+              total_cents: payload.total_cents ?? 0,
+              ...payload,
+            };
+            insertedInvoices.push(insertedInvoice);
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({
+                  data: insertedInvoice,
+                  error: null,
+                })),
+              })),
+            };
+          }),
           update: vi.fn((payload: Record<string, unknown>) => {
             invoiceUpdates.push(payload);
             return {
@@ -209,7 +229,7 @@ function makeSupabaseFixture(params: SupabaseFixtureParams = {}) {
     }),
   };
 
-  return { supabase, insertedLineItems, updatedLineItems, deletedLineItemIds, invoiceUpdates };
+  return { supabase, insertedInvoices, insertedLineItems, updatedLineItems, deletedLineItemIds, invoiceUpdates };
 }
 
 function draftInvoice(overrides: Partial<Record<string, unknown>> = {}) {
@@ -257,6 +277,19 @@ function saveDraftFormData(overrides: Partial<Record<string, string>> = {}) {
   return formData;
 }
 
+function createDraftFormData(overrides: Partial<Record<string, string>> = {}) {
+  const formData = new FormData();
+  formData.set('job_id', 'job-1');
+  formData.set('tab', 'info');
+  formData.set('return_to', '/jobs/job-1/invoice#invoice-workspace');
+
+  for (const [key, value] of Object.entries(overrides)) {
+    if (value != null) formData.set(key, value);
+  }
+
+  return formData;
+}
+
 function pricebookLineFormData(overrides: Partial<Record<string, string>> = {}) {
   const formData = new FormData();
   formData.set('job_id', 'job-1');
@@ -296,6 +329,7 @@ describe('internal invoice line item pricebook plumbing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
+    vi.doUnmock('@/lib/auth/field-billing-access');
 
     resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
       authorized: true,
@@ -726,6 +760,99 @@ describe('internal invoice line item pricebook plumbing', () => {
     });
     expect(invoiceUpdates).toHaveLength(0);
     expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('auto-imports eligible priced work items when Build Invoice creates a draft', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const { supabase, insertedInvoices, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Replace capacitor',
+          details: 'Install 45/5 capacitor and verify startup',
+          kind: 'primary',
+          expected_unit_price: 189.5,
+        },
+      ],
+      capabilityKeys: ['field_billing_enabled'],
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(null);
+    requireInternalUserMock.mockResolvedValueOnce({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'technician',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { createInternalInvoiceDraftFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      createInternalInvoiceDraftFromForm(
+        createDraftFormData({ auto_import_visit_scope_items: '1' }),
+      ),
+    ).rejects.toThrow('REDIRECT:/jobs/job-1/invoice?banner=internal_invoice_draft_created#invoice-workspace');
+
+    expect(insertedInvoices).toHaveLength(1);
+    expect(insertedLineItems).toHaveLength(1);
+    expect(insertedLineItems[0]).toEqual(
+      expect.objectContaining({
+        invoice_id: 'inv-created-1',
+        source_kind: 'visit_scope',
+        source_visit_scope_item_id: selectedScopeId,
+        item_name_snapshot: 'Replace capacitor',
+        description_snapshot: 'Install 45/5 capacitor and verify startup',
+        quantity: '1.00',
+        unit_price: '189.50',
+        line_subtotal: '189.50',
+      }),
+    );
+    expect(invoiceUpdates).toHaveLength(1);
+    expect(invoiceUpdates[0].subtotal_cents).toBe(18950);
+    expect(invoiceUpdates[0].total_cents).toBe(18950);
+  });
+
+  it('auto-imports unpriced work items at zero dollars for draft review', async () => {
+    const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
+    const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({
+      visitScopeItems: [
+        {
+          id: selectedScopeId,
+          title: 'Inspect condensate drain',
+          details: 'Clear line and verify drainage',
+          kind: 'primary',
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(null);
+
+    const { createInternalInvoiceDraftFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      createInternalInvoiceDraftFromForm(
+        createDraftFormData({ auto_import_visit_scope_items: '1' }),
+      ),
+    ).rejects.toThrow('REDIRECT:/jobs/job-1/invoice?banner=internal_invoice_draft_created#invoice-workspace');
+
+    expect(insertedLineItems).toHaveLength(1);
+    expect(insertedLineItems[0]).toEqual(
+      expect.objectContaining({
+        source_kind: 'visit_scope',
+        source_visit_scope_item_id: selectedScopeId,
+        item_name_snapshot: 'Inspect condensate drain',
+        description_snapshot: 'Clear line and verify drainage',
+        quantity: '1.00',
+        unit_price: '0.00',
+        line_subtotal: '0.00',
+      }),
+    );
+    expect(invoiceUpdates).toHaveLength(1);
+    expect(invoiceUpdates[0].subtotal_cents).toBe(0);
+    expect(invoiceUpdates[0].total_cents).toBe(0);
   });
 
   it('adds selected visit scope items to draft invoice with frozen snapshots and provenance', async () => {

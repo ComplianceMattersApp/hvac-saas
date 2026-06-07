@@ -1083,6 +1083,112 @@ function hasDraftInvoiceCreateAccess(context: Awaited<ReturnType<typeof loadInte
   return resolveFieldChargeCapabilities(context).can_create_direct_invoice_draft;
 }
 
+function isAutoImportVisitScopeRequested(formData: FormData) {
+  return getTrimmedString(formData.get('auto_import_visit_scope_items')) === '1';
+}
+
+async function importEligibleVisitScopeItemsToDraftInvoice(params: {
+  context: Awaited<ReturnType<typeof loadInternalInvoiceContext>>;
+  invoice: {
+    id: string;
+    status: string;
+    line_items?: Array<{
+      source_kind?: string | null;
+      source_visit_scope_item_id?: string | null;
+    }> | null;
+  };
+}) {
+  const { context, invoice } = params;
+  if (!invoice?.id || String(invoice.status ?? '').trim().toLowerCase() !== 'draft') {
+    return { insertedCount: 0, subtotalCents: null as number | null };
+  }
+
+  const capabilities = resolveFieldChargeCapabilities(context);
+  if (!capabilities.can_convert_visit_scope_to_invoice_lines) {
+    return { insertedCount: 0, subtotalCents: null as number | null };
+  }
+
+  const { data: jobScopeRow, error: jobScopeErr } = await context.supabase
+    .from('jobs')
+    .select('id, visit_scope_items')
+    .eq('id', context.jobId)
+    .maybeSingle();
+
+  if (jobScopeErr) throw jobScopeErr;
+  if (!jobScopeRow?.id) {
+    return { insertedCount: 0, subtotalCents: null as number | null };
+  }
+
+  let scopeItems: ReturnType<typeof sanitizeVisitScopeItems> = [];
+  try {
+    scopeItems = sanitizeVisitScopeItems(jobScopeRow.visit_scope_items ?? []);
+  } catch {
+    return { insertedCount: 0, subtotalCents: null as number | null };
+  }
+
+  const existingScopeSourceIds = new Set(
+    (invoice.line_items ?? [])
+      .filter((lineItem) => lineItem.source_kind === 'visit_scope')
+      .map((lineItem) => sanitizeVisitScopeItemId(lineItem.source_visit_scope_item_id))
+      .filter(Boolean) as string[],
+  );
+
+  const eligibleScopeItems = scopeItems
+    .map((scopeItem) => {
+      const scopeItemId = sanitizeVisitScopeItemId(scopeItem.id);
+      if (!scopeItemId || existingScopeSourceIds.has(scopeItemId)) return null;
+      return { scopeItemId, scopeItem };
+    })
+    .filter(Boolean) as Array<{
+      scopeItemId: string;
+      scopeItem: ReturnType<typeof sanitizeVisitScopeItems>[number];
+    }>;
+
+  if (eligibleScopeItems.length === 0) {
+    return { insertedCount: 0, subtotalCents: null as number | null };
+  }
+
+  const nextSortOrder = (invoice.line_items?.length ?? 0) + 1;
+  const quantityHundredths = 100;
+  const payload = eligibleScopeItems.map(({ scopeItemId, scopeItem }, index) => {
+    const unitPriceCents = scopeItem.expected_unit_price == null
+      ? 0
+      : parseNonNegativeMoneyNumberToCents(scopeItem.expected_unit_price, 'Unit price');
+    const lineSubtotalCents = computeLineSubtotalCents(quantityHundredths, unitPriceCents);
+
+    return {
+      invoice_id: invoice.id,
+      sort_order: nextSortOrder + index,
+      source_kind: 'visit_scope',
+      source_visit_scope_item_id: scopeItemId,
+      item_name_snapshot: getTrimmedString(scopeItem.title),
+      description_snapshot: getOptionalText(scopeItem.details),
+      item_type_snapshot: 'service',
+      category_snapshot: null,
+      unit_label_snapshot: null,
+      quantity: formatScaledInt(quantityHundredths, 2),
+      unit_price: formatScaledInt(unitPriceCents, 2),
+      line_subtotal: formatScaledInt(lineSubtotalCents, 2),
+      created_by_user_id: context.userId,
+      updated_by_user_id: context.userId,
+    };
+  });
+
+  const { error: insertErr } = await context.supabase
+    .from('internal_invoice_line_items')
+    .insert(payload);
+
+  if (insertErr) throw insertErr;
+
+  const subtotalCents = await syncInvoiceTotalsFromLineItems({
+    supabase: context.supabase,
+    invoiceId: invoice.id,
+    userId: context.userId,
+  });
+
+  return { insertedCount: payload.length, subtotalCents };
+}
+
 async function logInvoiceEvent(params: {
   supabase: any;
   userId: string;
@@ -1247,6 +1353,17 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
     throw new Error('Invoice draft insert failed: missing invoice_display_number');
   }
 
+  const autoImportResult = isAutoImportVisitScopeRequested(formData)
+    ? await importEligibleVisitScopeItemsToDraftInvoice({
+        context,
+        invoice: {
+          id: String(data.id),
+          status: String(data.status),
+          line_items: [],
+        },
+      })
+    : { insertedCount: 0, subtotalCents: null as number | null };
+
   await logInvoiceEvent({
     supabase: context.supabase,
     userId: context.userId,
@@ -1256,8 +1373,11 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
       id: String(data.id),
       invoice_number: String(data.invoice_number),
       status: String(data.status),
-      total_cents: Number(data.total_cents ?? 0) || 0,
+      total_cents: autoImportResult.subtotalCents ?? (Number(data.total_cents ?? 0) || 0),
     },
+    extraMeta: autoImportResult.insertedCount > 0
+      ? { auto_imported_visit_scope_line_count: autoImportResult.insertedCount }
+      : undefined,
   });
 
   revalidatePath(`/jobs/${context.jobId}`);

@@ -3182,6 +3182,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="tab" value={tab} />
               <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+              <input type="hidden" name="auto_import_visit_scope_items" value={showReplacementInvoicePrompt ? "0" : "1"} />
               <SubmitButton loadingText="Creating..." className={hasVisitScopeDefined ? primaryButtonClass : secondaryButtonClass}>
                 {showReplacementInvoicePrompt ? "Create Replacement Invoice" : "Build Invoice"}
               </SubmitButton>
@@ -4133,6 +4134,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="tab" value={tab} />
                     <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                    <input type="hidden" name="auto_import_visit_scope_items" value="1" />
                     <SubmitButton loadingText="Starting..." className={mobileFieldActionClass}>
                       <span className="inline-flex items-center gap-2">
                         <ReceiptIcon className="h-4.5 w-4.5" />
@@ -4247,6 +4249,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                           <input type="hidden" name="job_id" value={job.id} />
                           <input type="hidden" name="tab" value={tab} />
                           <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                          <input type="hidden" name="auto_import_visit_scope_items" value="1" />
                           <SubmitButton loadingText="Starting..." className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100">
                             Build invoice
                           </SubmitButton>
@@ -4554,6 +4557,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                         <input type="hidden" name="job_id" value={job.id} />
                         <input type="hidden" name="tab" value={tab} />
                         <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                        <input type="hidden" name="auto_import_visit_scope_items" value="1" />
                         <SubmitButton loadingText="Starting..." className={mobileToolLinkClass}>
                           Build Invoice
                         </SubmitButton>
@@ -7072,6 +7076,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <input type="hidden" name="job_id" value={job.id} />
           <input type="hidden" name="tab" value={tab} />
           <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+          <input type="hidden" name="auto_import_visit_scope_items" value="1" />
           <SubmitButton loadingText="Starting..." className={darkButtonClass}>
             Build Invoice
           </SubmitButton>

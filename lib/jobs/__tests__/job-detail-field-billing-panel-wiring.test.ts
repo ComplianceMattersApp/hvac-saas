@@ -76,8 +76,15 @@ describe("job detail field billing panel wiring", () => {
     expect(noInvoicePanelSlice).toContain("createInternalInvoiceDraftFromForm");
     expect(noInvoicePanelSlice).toContain("return_to");
     expect(noInvoicePanelSlice).toContain("/invoice#invoice-workspace");
+    expect(noInvoicePanelSlice).toContain("auto_import_visit_scope_items");
     expect(noInvoicePanelSlice).toContain("Build Invoice");
     expect(noInvoicePanelSlice).not.toContain("Create Draft Invoice");
+  });
+
+  it("keeps existing draft invoices on the review path instead of creating duplicates", () => {
+    expect(source).toContain('internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review Invoice" : "Build Invoice") : "Open Invoice Workspace"');
+    expect(source).toContain('internalInvoice.status === "draft"');
+    expect(source).toContain("alreadyAdded: existingVisitScopeInvoiceSourceIds.has(persistedItemId)");
   });
 
   it("shows job-page Work Item pricing as invoice-ready context", () => {
