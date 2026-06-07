@@ -113,21 +113,24 @@ function normalizeTemplateStatus(value: string): MaintenanceAgreementTemplateLif
 }
 
 function formatTemplateItems(items: unknown[]) {
-  if (!Array.isArray(items) || items.length === 0) return "[]";
+  if (!Array.isArray(items) || items.length === 0) return "";
   return JSON.stringify(items, null, 2);
 }
 
 function buildServicePlansHref(options?: {
   filter?: string;
+  q?: string;
   banner?: string;
   message?: string;
 }) {
   const params = new URLSearchParams();
   const filter = String(options?.filter ?? "").trim();
+  const q = String(options?.q ?? "").trim();
   const banner = String(options?.banner ?? "").trim();
   const message = String(options?.message ?? "").trim();
 
   if (filter && filter !== "all") params.set("filter", filter);
+  if (q) params.set("q", q);
   if (banner) params.set("banner", banner);
   if (message) params.set("message", message);
 
@@ -191,6 +194,7 @@ export default async function ServicePlansPage({
   const sp = (await searchParams) ?? {};
   const rawFilter = Array.isArray(sp.filter) ? sp.filter[0] : sp.filter;
   const selectedFilter = isDrilldownFilter(rawFilter) ? rawFilter : "all";
+  const searchQuery = parseSingleQueryParam(sp.q);
   const banner = parseSingleQueryParam(sp.banner);
   const bannerMessage = parseSingleQueryParam(sp.message);
 
@@ -219,6 +223,7 @@ export default async function ServicePlansPage({
     "use server";
 
     const filter = String(formData.get("return_filter") ?? "").trim().toLowerCase();
+    const q = String(formData.get("return_q") ?? "").trim();
     const result = await createMaintenanceAgreementTemplate({
       templateName: String(formData.get("template_name") ?? ""),
       agreementType: String(formData.get("agreement_type") ?? ""),
@@ -232,6 +237,7 @@ export default async function ServicePlansPage({
       redirect(
         buildServicePlansHref({
           filter,
+          q,
           banner: "template_create_failed",
           message: result.error,
         }),
@@ -239,13 +245,14 @@ export default async function ServicePlansPage({
     }
 
     revalidatePath("/service-plans");
-    redirect(buildServicePlansHref({ filter, banner: "template_created" }));
+    redirect(buildServicePlansHref({ filter, q, banner: "template_created" }));
   }
 
   async function updateTemplateFromForm(formData: FormData) {
     "use server";
 
     const filter = String(formData.get("return_filter") ?? "").trim().toLowerCase();
+    const q = String(formData.get("return_q") ?? "").trim();
     const result = await updateMaintenanceAgreementTemplate({
       templateId: String(formData.get("template_id") ?? ""),
       templateName: String(formData.get("template_name") ?? ""),
@@ -260,6 +267,7 @@ export default async function ServicePlansPage({
       redirect(
         buildServicePlansHref({
           filter,
+          q,
           banner: "template_update_failed",
           message: result.error,
         }),
@@ -267,13 +275,14 @@ export default async function ServicePlansPage({
     }
 
     revalidatePath("/service-plans");
-    redirect(buildServicePlansHref({ filter, banner: "template_updated" }));
+    redirect(buildServicePlansHref({ filter, q, banner: "template_updated" }));
   }
 
   async function archiveTemplateFromForm(formData: FormData) {
     "use server";
 
     const filter = String(formData.get("return_filter") ?? "").trim().toLowerCase();
+    const q = String(formData.get("return_q") ?? "").trim();
     const result = await archiveMaintenanceAgreementTemplate({
       templateId: String(formData.get("template_id") ?? ""),
     });
@@ -282,6 +291,7 @@ export default async function ServicePlansPage({
       redirect(
         buildServicePlansHref({
           filter,
+          q,
           banner: "template_archive_failed",
           message: result.error,
         }),
@@ -289,13 +299,14 @@ export default async function ServicePlansPage({
     }
 
     revalidatePath("/service-plans");
-    redirect(buildServicePlansHref({ filter, banner: "template_archived" }));
+    redirect(buildServicePlansHref({ filter, q, banner: "template_archived" }));
   }
 
   async function duplicateTemplateFromForm(formData: FormData) {
     "use server";
 
     const filter = String(formData.get("return_filter") ?? "").trim().toLowerCase();
+    const q = String(formData.get("return_q") ?? "").trim();
     const result = await duplicateMaintenanceAgreementTemplate({
       templateId: String(formData.get("template_id") ?? ""),
     });
@@ -304,6 +315,7 @@ export default async function ServicePlansPage({
       redirect(
         buildServicePlansHref({
           filter,
+          q,
           banner: "template_duplicate_failed",
           message: result.error,
         }),
@@ -311,7 +323,7 @@ export default async function ServicePlansPage({
     }
 
     revalidatePath("/service-plans");
-    redirect(buildServicePlansHref({ filter, banner: "template_duplicated" }));
+    redirect(buildServicePlansHref({ filter, q, banner: "template_duplicated" }));
   }
 
   const result = await listMaintenanceAgreementDrilldownForAccount({
@@ -321,6 +333,17 @@ export default async function ServicePlansPage({
     filter: selectedFilter,
     limit: 250,
   });
+  const normalizedSearchQuery = searchQuery.toLowerCase();
+  const visibleRows = normalizedSearchQuery
+    ? result.rows.filter((row) => [
+        row.agreement_name,
+        row.customer_display_name,
+        row.primary_location_display,
+        row.status,
+        row.due_state,
+        row.next_due_date,
+      ].some((value) => String(value ?? "").toLowerCase().includes(normalizedSearchQuery)))
+    : result.rows;
   const overviewResult = selectedFilter === "all"
     ? result
     : await listMaintenanceAgreementDrilldownForAccount({
@@ -361,6 +384,19 @@ export default async function ServicePlansPage({
     { label: "Needs Attention", value: notScheduledPlanCount + countReviewPlanCount },
     { label: "Templates Active", value: activeTemplates.length },
   ];
+  const visibleNeedsAttentionCount = visibleRows.filter((row) => (
+    row.due_state === "overdue" ||
+    row.due_state === "due_today" ||
+    row.due_state === "not_scheduled" ||
+    row.visit_count_review.eligible_for_count_review_links > 0 ||
+    row.visit_count_review.not_eligible_links > 0
+  )).length;
+  const visibleDueSoonCount = visibleRows.filter((row) => {
+    const daysUntil = daysBetweenYmd(result.as_of_date, row.next_due_date);
+    return daysUntil !== null && daysUntil >= 1 && daysUntil <= 30;
+  }).length;
+  const visibleActiveCount = visibleRows.filter((row) => row.status === "active").length;
+  const visibleInactiveCount = visibleRows.length - visibleActiveCount;
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-6 text-slate-900 sm:space-y-5 sm:px-6 lg:px-8">
@@ -466,13 +502,42 @@ export default async function ServicePlansPage({
           </section>
         </div>
 
+        <form action="/service-plans" className="mt-4 grid gap-2 rounded-xl border border-slate-200 bg-white p-3 sm:grid-cols-[minmax(0,1fr)_auto]">
+          {selectedFilter !== "all" ? <input type="hidden" name="filter" value={selectedFilter} /> : null}
+          <label className="text-sm font-medium text-slate-700">
+            Search service plans
+            <input
+              name="q"
+              defaultValue={searchQuery}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+              placeholder="Customer, plan name, location, status, or due date"
+            />
+          </label>
+          <div className="flex items-end gap-2">
+            <button
+              type="submit"
+              className="inline-flex min-h-10 items-center rounded-lg border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,border-color,transform] hover:-translate-y-px hover:border-slate-700 hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              Search
+            </button>
+            {searchQuery ? (
+              <Link
+                href={buildServicePlansHref({ filter: selectedFilter })}
+                className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+              >
+                Clear
+              </Link>
+            ) : null}
+          </div>
+        </form>
+
         <div className="mt-3 flex flex-wrap gap-2">
           {FILTERS.map((filter) => {
             const active = filter.value === selectedFilter;
             return (
               <Link
                 key={filter.value}
-                href={filter.value === "all" ? "/service-plans" : `/service-plans?filter=${encodeURIComponent(filter.value)}`}
+                href={buildServicePlansHref({ filter: filter.value, q: searchQuery })}
                 className={`inline-flex items-center rounded-full border px-3 py-1 text-[12px] font-semibold transition-[background-color,border-color,color,transform] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${
                   active
                     ? "border-slate-800 bg-slate-800 text-white"
@@ -487,7 +552,7 @@ export default async function ServicePlansPage({
         </div>
 
         <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-          Showing {result.rows.length} plan{result.rows.length === 1 ? "" : "s"}. Customer plans are managed from each customer record.
+          Showing {visibleRows.length} plan{visibleRows.length === 1 ? "" : "s"}{searchQuery ? ` matching "${searchQuery}"` : ""}. Customer plans are managed from each customer record.
         </div>
       </section>
 
@@ -545,6 +610,7 @@ export default async function ServicePlansPage({
           </summary>
           <form action={createTemplateFromForm} className="mt-4 space-y-3">
             <input type="hidden" name="return_filter" value={selectedFilter} />
+            <input type="hidden" name="return_q" value={searchQuery} />
             <div className="grid gap-3 md:grid-cols-2">
               <label className="text-sm text-slate-700">
                 Template Name
@@ -597,14 +663,15 @@ export default async function ServicePlansPage({
               </label>
             </div>
             <label className="block text-sm text-slate-700">
-              Default Work Items
+              Default Visit Work
               <textarea
                 name="default_visit_scope_items_json"
                 rows={4}
-                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
-                defaultValue="[]"
+                className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                placeholder="Example: Inspect system, replace filter, check refrigerant charge, clean condenser coil."
               />
-              <span className="mt-1 block text-xs text-slate-500">Optional default work items for future service visits.</span>
+              <span className="mt-1 block text-xs text-slate-500">Describe the default work, checklist, or scope for future visits.</span>
+              <span className="mt-1 block text-xs text-slate-500">Leave blank if this template should not prefill visit work.</span>
             </label>
             <label className="block text-sm text-slate-700">
               Internal Notes Default
@@ -653,6 +720,7 @@ export default async function ServicePlansPage({
                   <form action={updateTemplateFromForm} className="space-y-3">
                     <input type="hidden" name="template_id" value={template.id} />
                     <input type="hidden" name="return_filter" value={selectedFilter} />
+                    <input type="hidden" name="return_q" value={searchQuery} />
                     <div className="grid gap-3 md:grid-cols-2">
                       <label className="text-sm text-slate-700">
                         Template Name
@@ -706,14 +774,16 @@ export default async function ServicePlansPage({
                     </div>
 
                     <label className="block text-sm text-slate-700">
-                      Default Work Items
+                      Default Visit Work
                       <textarea
                         name="default_visit_scope_items_json"
                         rows={4}
                         defaultValue={formatTemplateItems(template.default_visit_scope_items)}
-                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 font-mono text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-200"
+                        placeholder="Example: Inspect system, replace filter, check refrigerant charge, clean condenser coil."
                       />
-                      <span className="mt-1 block text-xs text-slate-500">Optional default work items for future service visits.</span>
+                      <span className="mt-1 block text-xs text-slate-500">Describe the default work, checklist, or scope for future visits.</span>
+                      <span className="mt-1 block text-xs text-slate-500">Leave blank if this template should not prefill visit work.</span>
                     </label>
 
                     <label className="block text-sm text-slate-700">
@@ -739,6 +809,7 @@ export default async function ServicePlansPage({
                   <form action={duplicateTemplateFromForm} className="mt-3 border-t border-slate-100 pt-3">
                     <input type="hidden" name="template_id" value={template.id} />
                     <input type="hidden" name="return_filter" value={selectedFilter} />
+                    <input type="hidden" name="return_q" value={searchQuery} />
                     <button
                       type="submit"
                       className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-[background-color,border-color] hover:border-slate-400 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
@@ -750,6 +821,7 @@ export default async function ServicePlansPage({
                   <form action={archiveTemplateFromForm} className="mt-3 border-t border-slate-100 pt-3">
                     <input type="hidden" name="template_id" value={template.id} />
                     <input type="hidden" name="return_filter" value={selectedFilter} />
+                    <input type="hidden" name="return_q" value={searchQuery} />
                     <button
                       type="submit"
                       className="inline-flex min-h-10 items-center rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2 text-sm font-semibold text-amber-900 transition-[background-color,border-color] hover:border-amber-400 hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
@@ -791,7 +863,7 @@ export default async function ServicePlansPage({
         </details>
       </section>
 
-      {result.rows.length === 0 ? (
+      {visibleRows.length === 0 ? (
         <section className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-6 py-10 text-center text-sm text-slate-600">
           No service plans match this filter.
         </section>
@@ -800,6 +872,12 @@ export default async function ServicePlansPage({
           <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
             <h2 className="text-lg font-semibold tracking-tight text-slate-950">Customer Service Plans</h2>
             <p className="mt-1 text-sm text-slate-600">Filter and review customer plans by status, due date, and count review state.</p>
+            <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-amber-100 px-2.5 py-1 text-amber-800">Needs Attention {visibleNeedsAttentionCount}</span>
+              <span className="rounded-full bg-blue-100 px-2.5 py-1 text-blue-800">Due Soon {visibleDueSoonCount}</span>
+              <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-emerald-800">Active {visibleActiveCount}</span>
+              <span className="rounded-full bg-slate-200 px-2.5 py-1 text-slate-700">Inactive {visibleInactiveCount}</span>
+            </div>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
@@ -815,7 +893,7 @@ export default async function ServicePlansPage({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {result.rows.map((row) => {
+                {visibleRows.map((row) => {
                   const countReviewBadges = getCountReviewBadges(row);
                   return (
                   <tr key={row.id} className="align-top">
