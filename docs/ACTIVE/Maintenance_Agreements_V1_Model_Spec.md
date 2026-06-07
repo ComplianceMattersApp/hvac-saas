@@ -4,6 +4,19 @@ Status: ACTIVE IMPLEMENTATION TRACKING SPEC
 Owner lane: Group 9A - Recurring Services / Maintenance Agreements  
 Scope: model guidance plus Group 9A-2 backend foundation closeout documentation. Backend foundation is committed in repo but is not production-active until migration apply is intentionally executed through the environment process.
 
+## Service Plans Command Center Cleanup Closeout Snapshot
+
+- `/service-plans` hierarchy is now command-center first: header/intro, compact health summary, compact Service Plan Types index, attention/upcoming panels, customer plan detail list, and compact template summary/actions.
+- Service Plan Types are rendered as a compact scalable index/list with counts and compact urgency indicators.
+- Customer plan detail list now uses load control (page size 25 plus count copy and Load More behavior when needed).
+- Full template management moved to `/service-plans/templates`.
+- Default Visit Work copy is now plain-language and flexible (no raw JSON language in normal UI).
+- Customer plan actions deep-link to the customer Service Plans tab with `maFocus` and agreement anchor.
+- Explicit non-actions/preserved boundaries: no service plan billing logic change, no visit generation change, no payment or invoice truth change, no Stripe/webhook change, no Confirm Payment change, no customer portal behavior change, no schema/migration change, and no role/capability change.
+- Status: field-feedback only.
+
+Cross-reference: full closeout detail is documented in `docs/ACTIVE/Service_Plans_Command_Center_Cleanup_Closeout.md`.
+
 ## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
 
 - Implementation is closed in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`) with push complete and clean post-push tree.

@@ -151,6 +151,15 @@ Group 9A planning source of truth is [Maintenance_Agreements_V1_Model_Spec.md](.
 Group 9A-9A model decisions are now documented there: future linkage should prefer separate `maintenance_agreement_visits`, counting should occur only after linked maintenance work is completed/closed as valid, V1 visit balance should be derived from counted links (not mutable remaining counters), `next_due_date` remains manual in current scope, and full ledger remains parked for V2.
 Group 9A-9E closeout is now recorded there: agreement default Work Items persist on create/update, `/jobs/new` Step 5 prefill includes summary + Work Items for service-plan-origin intake, and maintenance-agreement link creation now runs before `postCreate(...)` redirect so runtime link insertion is reachable.
 
+Service Plans command-center cleanup closeout snapshot:
+- `/service-plans` is now a command-center/landing page.
+- It includes health summary, compact Service Plan Types index, attention/upcoming panels, customer plan detail list with load control, and compact template summary.
+- Full Template Management moved to `/service-plans/templates`.
+- Default Visit Work copy is plain-language and flexible.
+- Customer plan links deep-link to customer Service Plans tab with `maFocus` and anchor.
+- No service plan billing, visit generation, payment, invoice, Stripe/webhook, Confirm Payment, customer portal, schema, or role/capability behavior changed.
+- Status: closed for current pass; field-feedback gated.
+
 **Financial Ledger / Payments Register V1 Model Lock & V1A/V1B Implementation:**
 The bookkeeping-ready payment register and allocation model is locked in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md). **Payments Register V1A/V1B are now implemented (commit `c9dc763`)**: read-only `/reports/payments` with Owner/Admin/Billing gating, recorded/failed separation, and method taxonomy (ACH hidden); filtered CSV export at `/reports/payments/export` with proper escaping and financial-export gating. Register reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, or Stripe/Supabase/prod changes. Future register work must separate Payment Register Entry, Payment Allocation, Invoice Payment Projection, and Failed Payment Attempt. Stripe remains processor truth for Stripe transactions; Compliance Matters remains tenant financial operating truth for all money received. ACH, QBO sync, refunds/disputes, platform fees, saved cards, full accounting ledger, customer portal self-service, and recurring billing execution remain deferred.
 **Financial Ledger / Payments Register V1 Model Lock & V1A/V1B/V1C Implementation:**
