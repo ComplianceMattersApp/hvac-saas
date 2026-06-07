@@ -6,7 +6,7 @@ import { type BillingMode, resolveBillingModeByAccountOwnerId } from "@/lib/busi
 import { resolveInternalInvoiceByJobId } from "@/lib/business/internal-invoice";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
-import { formatInvoiceDisplayReference, normalizeDisplayNumber } from "@/lib/utils/display-references";
+import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
 import PrintToolbar from "./PrintToolbar";
 
 function formatCurrencyFromCents(cents?: number | null) {
@@ -49,7 +49,17 @@ function formatBillingAddress(a: {
     a.billing_address_line1,
     a.billing_address_line2,
     [a.billing_city, a.billing_state, a.billing_zip].filter(Boolean).join(" "),
-  ].filter((value) => String(value ?? "").trim().length > 0);
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter((value) => value.length > 0);
+}
+
+function normalizeAddressForComparison(parts: string[]) {
+  return parts
+    .join(" ")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
 }
 
 export default async function InternalInvoicePrintPage({
@@ -142,17 +152,26 @@ export default async function InternalInvoicePrintPage({
   );
 
   const billingName = String(invoice.billing_name ?? "").trim() || customerName;
-  const billingContact = [invoice.billing_email, invoice.billing_phone].filter(Boolean).join(" / ");
+  const billingEmail = String(invoice.billing_email ?? "").trim();
+  const billingPhone = String(invoice.billing_phone ?? "").trim();
   const billingAddress = formatBillingAddress(invoice);
+  const serviceLocationParts = [
+    location?.address_line1,
+    location?.address_line2,
+    [location?.city, location?.state, location?.zip].filter(Boolean).join(" "),
+  ]
+    .map((value) => String(value ?? "").trim())
+    .filter((value) => value.length > 0);
+  const serviceLocationMatchesBilling =
+    billingAddress.length > 0 &&
+    serviceLocationParts.length > 0 &&
+    normalizeAddressForComparison(billingAddress) === normalizeAddressForComparison(serviceLocationParts);
   const hasLogo = String(tenantIdentity.logoUrl ?? "").trim().length > 0;
   const invoiceReference = formatInvoiceDisplayReference({
     invoiceDisplayNumber: invoice.invoice_display_number,
     invoiceNumber: invoice.invoice_number,
     invoiceId: invoice.id,
   });
-  const legacyInvoiceReference = normalizeDisplayNumber(invoice.invoice_display_number)
-    ? normalizeDisplayNumber(invoice.invoice_number)
-    : null;
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 bg-slate-50/40 p-4 text-slate-900 sm:p-6 print:max-w-none print:bg-white print:p-0">
@@ -160,26 +179,28 @@ export default async function InternalInvoicePrintPage({
 
       <section className="overflow-hidden rounded-2xl border border-slate-300/80 bg-white shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] print:rounded-none print:border-slate-300 print:shadow-none">
         <div className="border-b border-slate-200/90 bg-[linear-gradient(180deg,rgba(248,250,252,0.92),rgba(255,255,255,0.98))] px-6 py-5 print:px-4 print:py-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800">Invoice</div>
-          {hasLogo ? (
-            <img
-              src={String(tenantIdentity.logoUrl)}
-              alt=""
-              className="mt-2 block max-h-12 max-w-[180px] object-contain"
-            />
-          ) : (
-            <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{tenantIdentity.displayName}</div>
-          )}
+          <div className="flex items-start justify-between gap-6">
+            <div className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-800">Invoice</div>
+              <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950 print:text-2xl">{invoiceReference}</h1>
+              <p className="mt-2 text-sm text-slate-600">{job.title || "Service visit"}</p>
+            </div>
+            <div className="flex min-w-[9rem] shrink-0 justify-end text-right">
+              {hasLogo ? (
+                <img
+                  src={String(tenantIdentity.logoUrl)}
+                  alt={tenantIdentity.displayName}
+                  className="block max-h-16 max-w-[180px] object-contain"
+                />
+              ) : (
+                <div className="text-xl font-semibold tracking-tight text-slate-950">{tenantIdentity.displayName}</div>
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="px-6 py-5 print:px-4 print:py-4">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950 print:text-2xl">{invoiceReference}</h1>
-          {legacyInvoiceReference ? (
-            <p className="mt-1 text-xs font-medium tracking-[0.03em] text-slate-500">Legacy ref: {legacyInvoiceReference}</p>
-          ) : null}
-          <p className="mt-2 text-sm text-slate-600">{job.title || "Service visit"}</p>
-
-          <div className="mt-5 grid gap-4 md:grid-cols-2 print:grid-cols-2 print:gap-x-6">
+          <div className="grid gap-4 md:grid-cols-2 print:grid-cols-2 print:gap-x-6">
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 print:border-slate-300 print:bg-white">
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Summary</div>
               <dl className="mt-2 space-y-1.5 text-sm text-slate-700">
@@ -187,12 +208,6 @@ export default async function InternalInvoicePrintPage({
                   <dt>Invoice</dt>
                   <dd className="font-semibold text-slate-900">{invoiceReference}</dd>
                 </div>
-                {legacyInvoiceReference ? (
-                  <div className="flex items-center justify-between gap-4">
-                    <dt>Legacy ref</dt>
-                    <dd className="font-semibold text-slate-700">{legacyInvoiceReference}</dd>
-                  </div>
-                ) : null}
                 <div className="flex items-center justify-between gap-4">
                   <dt>Invoice Date</dt>
                   <dd className="font-semibold text-slate-900">{formatInvoiceDateMMDDYYYY(invoice.invoice_date)}</dd>
@@ -211,11 +226,19 @@ export default async function InternalInvoicePrintPage({
             <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 print:border-slate-300 print:bg-white">
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Billing Recipient</div>
               <div className="mt-2 text-sm font-semibold text-slate-950">{billingName}</div>
-              {billingContact ? <div className="mt-1 text-sm text-slate-600">{billingContact}</div> : null}
-              {billingAddress.length > 0 ? <div className="mt-1 text-sm text-slate-600">{billingAddress.join(", ")}</div> : null}
+              {billingEmail ? <div className="mt-1 text-sm text-slate-600">{billingEmail}</div> : null}
+              {billingPhone ? <div className="mt-1 text-sm text-slate-600">{billingPhone}</div> : null}
+              {billingAddress.length > 0 ? (
+                <div className="mt-2 space-y-0.5 text-sm text-slate-600">
+                  {billingAddress.map((line) => (
+                    <div key={line}>{line}</div>
+                  ))}
+                </div>
+              ) : null}
               {serviceLocationLabel ? (
                 <div className="mt-3 border-t border-slate-200 pt-2 text-sm text-slate-700 print:border-slate-300">
-                  <span className="font-semibold text-slate-900">Service Location:</span> {serviceLocationLabel}
+                  <span className="font-semibold text-slate-900">Service Location:</span>{" "}
+                  {serviceLocationMatchesBilling ? "Same as billing address" : serviceLocationLabel}
                 </div>
               ) : null}
             </div>
@@ -254,12 +277,6 @@ export default async function InternalInvoicePrintPage({
               <span>Total Due</span>
               <span>{formatCurrencyFromCents(invoice.total_cents)}</span>
             </div>
-          </div>
-
-          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm text-slate-700 print:border-slate-300 print:bg-white">
-            <p className="font-semibold text-slate-900">Payment + Billing Notice</p>
-            <p className="mt-1">Payment entries include manual records and Stripe-confirmed online payments captured via webhook.</p>
-            <p className="mt-1">Please contact {tenantIdentity.displayName} for billing questions or payment instructions.</p>
           </div>
 
           <div className="mt-4 border-t border-slate-200 pt-3 text-xs text-slate-500 print:border-slate-300">
