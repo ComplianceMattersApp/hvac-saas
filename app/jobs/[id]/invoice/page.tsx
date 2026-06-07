@@ -1533,32 +1533,6 @@ export default async function InternalInvoiceWorkspacePage({
               </section>
             ) : null}
 
-            <section className={`${panelClass} p-4 sm:p-5`}>
-              <details>
-                <summary className="cursor-pointer text-sm font-semibold text-slate-800">Audit / Technical Details</summary>
-                <div className="mt-3 space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 p-3 text-xs text-slate-700">
-                  <div className="font-semibold text-slate-900">Source-of-truth audit details remain available below.</div>
-                  {internalInvoicePaymentRows.slice(0, 5).map((payment) => (
-                    <div key={payment.id} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
-                      <div>Payment ID: {payment.id}</div>
-                      {payment.stripe_checkout_session_id ? <div>Checkout Session: {payment.stripe_checkout_session_id}</div> : null}
-                      {payment.stripe_payment_intent_id ? <div>Payment Intent: {payment.stripe_payment_intent_id}</div> : null}
-                      {payment.stripe_event_id ? <div>Stripe Event: {payment.stripe_event_id}</div> : null}
-                    </div>
-                  ))}
-                  {failedAutopayAttentionItems.slice(0, 5).map((item) => (
-                    <div key={item.attemptId} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2">
-                      <div>Failed Attempt: {item.attemptId}</div>
-                      {item.failureCode ? <div>Failure Code: {item.failureCode}</div> : null}
-                      {item.blockedReasonCode ? <div>Blocked Reason: {item.blockedReasonCode}</div> : null}
-                      {item.requiresActionType ? <div>Action Type: {item.requiresActionType}</div> : null}
-                    </div>
-                  ))}
-                  <div>Payment totals and paid status are derived from allocation-compatible payment truth.</div>
-                </div>
-              </details>
-            </section>
-
             {canManageFinancialInvoiceLifecycle ? (
             <section className={`${panelClass} p-4 sm:p-5`}>
               <details>

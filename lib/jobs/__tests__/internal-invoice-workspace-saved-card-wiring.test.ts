@@ -127,9 +127,14 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("issueInternalInvoiceFromForm");
     expect(source).toContain("sendInternalInvoiceEmailFromForm");
     expect(source).toContain("voidInternalInvoiceFromForm");
+    expect(source).toContain("Charges");
+    expect(source).toContain("Issue Readiness");
+    expect(source).toContain("Billing Recipient");
     expect(source).toContain("Payment Options");
     expect(source).toContain("Payment History");
-    expect(source).toContain("Audit / Technical Details");
+    expect(source).not.toContain("Audit / Technical Details");
+    expect(source).not.toContain("Source-of-truth audit details remain available below.");
+    expect(source).not.toContain("Payment totals and paid status are derived from allocation-compatible payment truth.");
     expect(source).not.toContain("Platform fee");
     expect(source).not.toContain("not enabled in this slice");
     expect(source).not.toContain("not enabled here yet");
