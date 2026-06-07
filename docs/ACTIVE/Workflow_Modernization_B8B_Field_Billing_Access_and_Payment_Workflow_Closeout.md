@@ -297,6 +297,16 @@ Known follow-ups after B8-B:
 - defer correction/void workflow until explicitly designed
 - defer refund/reversal/export expansion until explicitly designed
 
+### 14.1 Policy Lock (June 2026)
+
+Field Billing policy lock after undoing an over-conservative capability experiment:
+- `field_billing_enabled` remains intentionally allowed as a job-scoped field invoice/collection workflow authority.
+- The existing field workflow remains valid where current policy allows: field billing tools, job invoice draft creation/opening, Work Item/visit-scope/Pricebook/manual field charge actions, issue/send for field collection, card collection when enabled, and non-card report submission as pending confirmation.
+- Field Billing Enabled remains non-global authority and does not make a user Billing/Admin.
+- Field Billing Enabled does not automatically grant final non-card verification, payment register export, refunds/voids/platform settings authority, or company-wide financial authority.
+- Confirm Payment remains the boundary: non-card field reports are pending workflow truth until authorized verification creates final payment truth.
+- Future capability hardening should target global/back-office authority drift only and must not roll back the intended field collection workflow.
+
 ## 15. Next Phase Recommendation
 
 Recommended next phase: Work Items to Invoice Flow Simplification.

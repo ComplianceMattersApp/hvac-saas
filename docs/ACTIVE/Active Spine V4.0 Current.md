@@ -1453,6 +1453,11 @@ Current Program Status Note (May 2026)
 - Financial visibility remains role-gated; no payment/source-of-truth/Stripe behavior changed; mobile `/jobs/[id]` Field Mode was untouched.
 - Owner Pulse remaining improvements move to field-feedback-gated V2: money-at-risk clarity refinements, scope/range explanation when Today/Ops/Reports counts differ, return/callback pressure once lane matures, owner trend/completion views, and service-plan revenue/book-value clarity.
 - Next active candidate lane is Invoice Add-ons / Field Charge Guided Workflow Audit.
+- Field Billing policy lock (June 2026): `field_billing_enabled` remains an intentionally allowed job-scoped field invoice/collection workflow authority for approved internal users, not a global Billing/Admin role grant.
+- Field Billing Enabled may continue to support the existing field workflow path where current policy allows: field billing tool access, job invoice draft creation/opening, Work Item/visit-scope/Pricebook/manual field charge actions, issue/send for field collection, card collection when enabled, and non-card field report submission as pending confirmation.
+- Field Billing Enabled does not grant global financial authority: no automatic final non-card verification, no payment register export, no refunds/voids/platform settings authority, and no company-wide Billing/Admin powers.
+- Final non-card payment truth remains protected by Confirm Payment and authorized verification; reported field non-card payments remain pending workflow truth until verified.
+- Future capability work in this lane should target global/back-office authority drift only and must not roll back the intended field collection workflow.
 - Customer Communication Polish V1 remains next after the invoice add-ons / field charge audit lane.
 - Deferred lanes remain parked unless explicitly reopened: native app-store wrapper, deeper offline, SMS/Twilio, QBO, customer portal, full support-system buildout, deeper Payments V2, and Service Plan billing/autopay/generated invoice expansion.
 - Controlled rollout feedback and support remain direct-to-owner for now; full support-system expansion stays deferred.

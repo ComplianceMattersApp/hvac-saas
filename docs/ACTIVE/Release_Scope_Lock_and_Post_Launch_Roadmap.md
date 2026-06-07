@@ -1306,7 +1306,7 @@ Recommended order after owner-release:
 7. QBO integration last-last (optional downstream accounting sync/export only).
 8. Product-mode configuration layer (settings/visibility/presets).
 9. Customer portal only if explicitly reopened.
-10. Invoice Add-ons / Field Charge Guided Workflow Audit.
+10. Invoice Add-ons / Field Charge Guided Workflow Audit (policy lock: preserve intended job-scoped Field Billing invoice/collection workflow; constrain only global/back-office authority drift).
 11. Customer Communication Polish V1.
 12. Owner Visibility / Business Pulse V2 follow-ups (field-feedback gated only).
 
@@ -1335,6 +1335,10 @@ This is the current execution roadmap after evidence-based alignment with implem
    - Role-aware `/today` behavior now locks to: Owner/Admin = Business Pulse, Billing = Money Attention, Office/Dispatcher = Ops Pressure, Tech = no company-wide business/money pulse.
    - Financial visibility remains role-gated; no payment/source-of-truth/Stripe behavior changed; mobile `/jobs/[id]` Field Mode was untouched.
    - Next active candidate is Invoice Add-ons / Field Charge Guided Workflow Audit.
+   - Field Billing policy lock: `field_billing_enabled` remains intentionally allowed for the existing job-scoped field invoice/collection workflow and is not treated as a rollback target.
+   - Field Billing Enabled remains non-global authority: no automatic final non-card verification, no refund/void/export/platform-admin powers, and no company-wide Billing/Admin expansion.
+   - Confirm Payment boundary remains locked: field-reported non-card entries are pending workflow truth until authorized verification creates final payment truth.
+   - Future capability hardening in this lane should address global/back-office authority drift only, without removing intended field invoice/collection workflow abilities.
    - Customer Communication Polish V1 stays immediately after invoice add-ons / field charge audit.
    - Remaining Owner Pulse improvements are field-feedback-gated V2 only: money-at-risk clarity refinements, scope/range explanation when Today/Ops/Reports counts differ, return/callback pressure when lane matures, owner trend/completion views, and service-plan revenue/book-value clarity.
    - Keep Support V1 read-only console, estimates customer-facing expansion, Service Plans V2 improvements, and other deferred lanes parked unless owner evidence explicitly reorders them.
