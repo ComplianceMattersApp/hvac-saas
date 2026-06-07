@@ -194,7 +194,7 @@ describe("FieldBillingSummary", () => {
     expect(html).toContain("Supplemental invoices");
     expect(html).toContain("Each invoice keeps separate billed and payment truth.");
     expect(html).toContain("Invoice #2051");
-    expect(html).toContain("Invoice INV-SUPP-2");
+    expect(html).toContain("Invoice inv-supp");
     expect(html).toContain("Draft");
     expect(html).toContain("Issued");
     expect(html).toContain("Total $45.00");
@@ -211,7 +211,7 @@ describe("FieldBillingSummary", () => {
       invoice: {
         status: "issued",
         invoiceNumber: "INV-ISSUED-1",
-        invoiceDisplayNumber: "INV-2026-1",
+        invoiceDisplayNumber: "2052",
         totalCents: 25000,
         lineItemCount: 3,
       },
@@ -224,7 +224,8 @@ describe("FieldBillingSummary", () => {
 
     expect(html).toContain("Issued invoice.");
     expect(html).toContain("Open the invoice workspace for payment options when collection is available.");
-    expect(html).toContain("INV-2026-1");
+    expect(html).toContain("Invoice #2052");
+    expect(html).not.toContain("INV-2026-1");
     expect(html).toContain("$50.00");
     expect(html).toContain("$200.00");
   });
@@ -240,7 +241,7 @@ describe("FieldBillingSummary", () => {
       invoice: {
         status: "issued",
         invoiceNumber: "INV-ISSUED-2",
-        invoiceDisplayNumber: "INV-2026-2",
+        invoiceDisplayNumber: "2053",
         totalCents: 25000,
         lineItemCount: 3,
       },

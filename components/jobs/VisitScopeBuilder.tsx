@@ -34,6 +34,7 @@ type Props = {
   summaryName?: string;
   itemsName?: string;
   resetKey?: string | number;
+  hideInitialSelectedItems?: boolean;
   onSummaryChange?: (value: string) => void;
   onItemsChange?: (items: VisitScopeDraftItem[]) => void;
 };
@@ -140,6 +141,16 @@ function findExistingScopeItem(items: VisitScopeDraftItem[], candidate: ScopeCan
   });
 }
 
+function scopeItemFingerprint(item: Pick<VisitScopeDraftItem, "id" | "title" | "details" | "source_pricebook_item_id">) {
+  const itemId = sanitizeVisitScopeItemId(item.id);
+  if (itemId) return `id:${itemId}`;
+
+  const sourceId = sanitizeVisitScopeItemId(item.source_pricebook_item_id);
+  const title = normalizeScopeComparable(item.title);
+  const details = normalizeScopeComparable(item.details);
+  return `scope:${sourceId ?? ""}:${title}:${details}`;
+}
+
 function toDraftItems(
   items: VisitScopeItem[] | null | undefined,
   jobType: "ecc" | "service",
@@ -188,6 +199,7 @@ export default function VisitScopeBuilder({
   summaryName = "visit_scope_summary",
   itemsName = "visit_scope_items_json",
   resetKey,
+  hideInitialSelectedItems = false,
   onSummaryChange,
   onItemsChange,
 }: Props) {
@@ -298,7 +310,13 @@ export default function VisitScopeBuilder({
   const isVisitTypeSuggestionAdded = Boolean(
     visitTypeSuggestionCandidate && findExistingScopeItem(items, visitTypeSuggestionCandidate),
   );
-  const hasCompletedItems = completedItems.length > 0;
+  const initialItemFingerprints = useMemo(() => {
+    return new Set(toDraftItems(initialItems, jobType).map(scopeItemFingerprint));
+  }, [initialItems, jobType]);
+  const visibleCompletedItems = hideInitialSelectedItems
+    ? completedItems.filter((item) => !initialItemFingerprints.has(scopeItemFingerprint(item)))
+    : completedItems;
+  const hasVisibleCompletedItems = visibleCompletedItems.length > 0;
 
   useEffect(() => {
     const seededItems = toDraftItems(initialItems, jobType);
@@ -534,7 +552,9 @@ export default function VisitScopeBuilder({
               <div>
                 <p className="text-sm font-semibold text-slate-900">Add Work</p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {jobType === "service"
+                  {hideInitialSelectedItems
+                    ? "Search or add work here. Current saved Work Items stay in the list below."
+                    : jobType === "service"
                     ? "Search, tap, and edit selected work inline."
                     : "ECC test work is tracked separately. Add work items only if this visit includes additional service work."}
                 </p>
@@ -711,12 +731,12 @@ export default function VisitScopeBuilder({
             </div>
         </div>
 
-        {hasCompletedItems ? (
+        {hasVisibleCompletedItems ? (
           <div className="space-y-2.5">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
               Selected Work Items
             </p>
-            {completedItems.map((item) => {
+            {visibleCompletedItems.map((item) => {
               const sourceLabel = getScopeSourceLabel(item, visitTypeSuggestionCandidate);
               const detailsPreview = formatScopeDetailsPreview(item.details);
               const kindLabel =

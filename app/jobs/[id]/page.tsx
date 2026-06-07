@@ -43,7 +43,7 @@ import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-act
 import ServiceStatusActions from "./_components/ServiceStatusActions";
 import { displayDateLA, formatBusinessDateUS, formatDateOnlyDisplay, formatTimestampDateDisplayLA, formatTimestampDateTimeDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
-import { formatJobDisplayReference } from "@/lib/utils/display-references";
+import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
 import type { JobStatus } from "@/lib/types/job";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import UnscheduleButton from "./_components/UnscheduleButton";
@@ -2085,6 +2085,7 @@ export default async function JobDetailPage({
   const customerBilling = billingPartyReads.customerBilling;
   const fieldBillingInvoiceSnapshot = internalInvoiceTruth
     ? {
+        id: internalInvoiceTruth.id,
         status: internalInvoiceTruth.status as "draft" | "issued" | "void",
         invoiceNumber: internalInvoiceTruth.invoice_number,
         invoiceDisplayNumber: internalInvoiceTruth.invoice_display_number,
@@ -2094,6 +2095,7 @@ export default async function JobDetailPage({
     : null;
   const fieldBillingLatestVoidedInvoiceSnapshot = fieldBillingSummaryData.latestVoidedInternalInvoice
     ? {
+        id: fieldBillingSummaryData.latestVoidedInternalInvoice.id,
         status: "void" as const,
         invoiceNumber: fieldBillingSummaryData.latestVoidedInternalInvoice.invoice_number,
         invoiceDisplayNumber: fieldBillingSummaryData.latestVoidedInternalInvoice.invoice_display_number,
@@ -2700,6 +2702,11 @@ const visitScopeHeaderPreview = buildVisitScopeReadModel(visitScopeSummary, visi
 });
 const primaryVisitScopeItems = visitScopeItems.filter((item) => item.kind === "primary");
 const companionVisitScopeItems = visitScopeItems.filter((item) => item.kind === "companion_service");
+const visitScopeReadyTotalCents = visitScopeItems.reduce((sum, item) => {
+  const unitPrice = Number(item.expected_unit_price ?? 0);
+  if (!Number.isFinite(unitPrice) || unitPrice <= 0) return sum;
+  return sum + Math.round(unitPrice * 100);
+}, 0);
 const visitScopeLeadText = visitScopeSummary || visitScopeHeaderPreview.lead;
 const visitScopeBadgeItems = primaryVisitScopeItems.length > 0 ? primaryVisitScopeItems : visitScopeItems;
 const visitScopeBadgeItemCount = visitScopeBadgeItems.length;
@@ -2707,6 +2714,44 @@ const visitScopeBadgeFirstTitle = visitScopeBadgeItems[0]?.title ?? "";
 const visitScopeBadgeMainText = visitScopeBadgeItemCount > 0
   ? `${visitScopeBadgeItemCount} item${visitScopeBadgeItemCount === 1 ? "" : "s"} · ${visitScopeBadgeFirstTitle}${visitScopeBadgeItemCount > 1 ? ` + ${visitScopeBadgeItemCount - 1} more` : ""}`
   : "No work items yet";
+
+const jobPageInvoiceDisplayReference = internalInvoiceTruth
+  ? formatInvoiceDisplayReference({
+      invoiceDisplayNumber: internalInvoiceTruth.invoice_display_number,
+      invoiceNumber: internalInvoiceTruth.invoice_number,
+      invoiceId: internalInvoiceTruth.id,
+    })
+  : null;
+const jobPageInvoiceStateLabel = internalInvoiceTruth
+  ? internalInvoiceTruth.status === "draft"
+    ? "Draft Invoice"
+    : internalInvoiceTruth.status === "issued"
+      ? billingState.billedTruthSatisfied
+        ? "Paid Invoice"
+        : "Issued Invoice"
+      : "Invoice"
+  : hasVisitScopeDefined
+    ? "Ready to build invoice"
+    : "Add work items first";
+const jobPageInvoiceNextAction = !internalInvoiceTruth
+  ? "Build Invoice"
+  : internalInvoiceTruth.status === "draft"
+    ? "Review Invoice"
+    : billingState.billedTruthSatisfied
+      ? "View Invoice"
+      : "Collect Payment";
+const jobPageInvoiceSummaryText = internalInvoiceTruth
+  ? `${jobPageInvoiceDisplayReference} - ${internalInvoiceTruth.line_item_count} charge${internalInvoiceTruth.line_item_count === 1 ? "" : "s"} - ${formatCurrencyFromCents(internalInvoiceTruth.total_cents)}`
+  : hasVisitScopeDefined
+    ? `${visitScopeCount} work item${visitScopeCount === 1 ? "" : "s"} ready to price and review.`
+    : "Add work performed, then price it before building the invoice.";
+const showSeparateFieldBillingDetails =
+  showInternalInvoicePanel &&
+  (
+    !hasDirectInvoiceWorkflowAccess ||
+    fieldBillingSummaryData.fieldChargeProposals.length > 0 ||
+    fieldBillingSupplementalInvoiceSnapshots.length > 0
+  );
 
 const canShowReleaseAndReevaluate = [
   "pending_info",
@@ -3031,6 +3076,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           : "border-slate-200 bg-slate-50 text-slate-700";
     const fieldBillingInvoiceSnapshot = internalInvoice
       ? {
+          id: internalInvoice.id,
           status: internalInvoice.status as "draft" | "issued" | "void",
           invoiceNumber: internalInvoice.invoice_number,
           invoiceDisplayNumber: internalInvoice.invoice_display_number,
@@ -3040,6 +3086,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       : null;
     const fieldBillingLatestVoidedInvoiceSnapshot = latestVoidedInternalInvoice
       ? {
+          id: latestVoidedInternalInvoice.id,
           status: "void" as const,
           invoiceNumber: latestVoidedInternalInvoice.invoice_number,
           invoiceDisplayNumber: latestVoidedInternalInvoice.invoice_display_number,
@@ -3094,7 +3141,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           ? "border-rose-200 bg-rose-50 text-rose-700"
           : billingState.statusTone === "amber"
             ? "border-amber-200 bg-amber-50 text-amber-800"
-            : "border-slate-200 bg-slate-50 text-slate-700";
+          : "border-slate-200 bg-slate-50 text-slate-700";
+    const internalInvoiceDisplayReference = internalInvoice
+      ? formatInvoiceDisplayReference({
+          invoiceDisplayNumber: internalInvoice.invoice_display_number,
+          invoiceNumber: internalInvoice.invoice_number,
+          invoiceId: internalInvoice.id,
+        })
+      : "Not started";
 
     const issuedInvoiceStatusMessage =
       internalInvoice?.status === "issued"
@@ -3111,7 +3165,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice</div>
 
               <div className="mt-1 text-sm font-semibold text-slate-950">
-                {internalInvoice ? internalInvoice.invoice_number : "Not started"}
+                {internalInvoiceDisplayReference}
               </div>
             </div>
 
@@ -3239,8 +3293,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <div className={workspaceSoftCardClass}>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Number</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-950">{internalInvoice.invoice_number}</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-950">{internalInvoiceDisplayReference}</div>
                     </div>
                     <div className={workspaceSoftCardClass}>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Invoice Date</div>
@@ -4986,7 +5040,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
         <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-[0.1em] text-slate-500">
           <ToolIcon className="h-3.5 w-3.5" />
-          <span>Work Needed</span>
+          <span>Work & Invoice</span>
         </span>
         <span className="font-semibold text-slate-900">{visitScopeBadgeMainText}</span>
         <a
@@ -5443,7 +5497,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700"><ToolIcon className="h-3.5 w-3.5" />Work Needed</div>
+                <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700"><ToolIcon className="h-3.5 w-3.5" />Work & Invoice</div>
                 {job.job_type === "service" ? (
                   <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:inline-flex">
                     {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
@@ -5454,7 +5508,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
             <details className="group w-full">
               <summary className="inline-flex min-h-11 w-full cursor-pointer list-none items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:min-h-9 sm:w-auto sm:py-1.5 sm:text-xs">
-                {hasVisitScopeDefined ? "Edit Work Items" : "Add Work Items"}
+                {hasVisitScopeDefined ? "Add or Update Work" : "Add Work"}
               </summary>
 
               <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-3">
@@ -5471,6 +5525,49 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </details>
 
           </div>
+
+          {showInternalInvoicePanel ? (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-3.5 py-3">
+              <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,0.45fr)_auto] lg:items-center">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Work performed - price - invoice status</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-950">{jobPageInvoiceStateLabel}</div>
+                  <div className="mt-1 text-xs leading-5 text-slate-600">{jobPageInvoiceSummaryText}</div>
+                </div>
+                <div className="rounded-xl border border-white/80 bg-white/82 px-3 py-2">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Ready-to-invoice total</div>
+                  <div className="mt-0.5 text-sm font-semibold text-slate-950">{formatCurrencyFromCents(internalInvoiceTruth?.total_cents ?? visitScopeReadyTotalCents)}</div>
+                  <div className="mt-0.5 text-[11px] leading-4 text-slate-500">
+                    {internalInvoiceTruth ? "From invoice charges" : "From priced Work Items"}
+                  </div>
+                </div>
+                <div className="flex flex-col gap-2 lg:items-end">
+                  {hasDirectInvoiceWorkflowAccess ? (!internalInvoiceTruth ? (
+                    <form action={createInternalInvoiceDraftFromForm}>
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="tab" value={tab} />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                      <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+                      <SubmitButton loadingText="Starting..." className={darkButtonClass}>
+                        {jobPageInvoiceNextAction}
+                      </SubmitButton>
+                    </form>
+                  ) : (
+                    <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={darkButtonClass}>
+                      {jobPageInvoiceNextAction}
+                    </Link>
+                  )) : hasProposalEntryWorkflowAccess ? (
+                    <Link href="#field-billing-summary-title" className={darkButtonClass}>
+                      Add Proposed Charge
+                    </Link>
+                  ) : null}
+                  <div className="text-[11px] leading-4 text-slate-500 lg:text-right">
+                    Invoice workspace handles official review, issue, send, and collection.
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
 
           {hasVisitScopeDefined ? (
           <div className="rounded-2xl border border-slate-200/80 bg-white/94 px-4 py-3.5 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)]">
@@ -7036,7 +7133,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </details>
 
 
-{showInternalInvoicePanel ? (
+{showSeparateFieldBillingDetails ? (
   <div id="internal-invoice-panel" className="mt-6 scroll-mt-24 rounded-3xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] p-4 shadow-[0_20px_42px_-34px_rgba(15,23,42,0.32)] ring-1 ring-slate-200/70 sm:p-5">
     <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div>
@@ -7046,7 +7143,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
         <div className="mt-1 text-sm leading-6 text-slate-600">
           {internalInvoiceTruth
-            ? `${internalInvoiceTruth.invoice_number || "Invoice"} / ${internalInvoiceTruth.line_item_count} charge${internalInvoiceTruth.line_item_count === 1 ? "" : "s"} / ${formatCurrencyFromCents(internalInvoiceTruth.total_cents)}`
+            ? jobPageInvoiceSummaryText
             : "No draft invoice yet. Build charges in the Invoice Workspace when billing is ready."}
         </div>
       </div>

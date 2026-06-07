@@ -93,6 +93,7 @@ describe("New job Step 5 simplification wiring", () => {
     expect(builderSource).toContain("Custom work");
     expect(builderSource).toContain('completedItems.length === 1 ? "item" : "items"');
     expect(builderSource).toContain("Selected Work Items");
+    expect(builderSource).toContain("const visibleCompletedItems = hideInitialSelectedItems");
     expect(builderSource).toContain("rounded-xl border border-slate-200 bg-white px-3 py-2.5");
   });
 

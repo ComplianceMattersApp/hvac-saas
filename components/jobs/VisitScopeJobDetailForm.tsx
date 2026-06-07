@@ -77,6 +77,7 @@ export default function VisitScopeJobDetailForm({
         initialItems={initialItems}
         jobType={jobType}
         pricebookTemplateItems={pricebookTemplateItems}
+        hideInitialSelectedItems
         onSummaryChange={setSummary}
         onItemsChange={setItems}
       />
@@ -89,9 +90,9 @@ export default function VisitScopeJobDetailForm({
 
       {hasDraftContent || hadInitialContent ? (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-          <p className="text-xs font-medium text-slate-600">Confirm selected work items.</p>
+          <p className="text-xs font-medium text-slate-600">Save additions and work updates.</p>
           <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
-            Save Work Items
+            Save Work Updates
           </SubmitButton>
         </div>
       ) : (

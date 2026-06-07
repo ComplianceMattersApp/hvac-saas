@@ -12,6 +12,11 @@ const newJobFormSource = readFileSync(
   "utf8",
 );
 
+const jobDetailFormSource = readFileSync(
+  path.join(process.cwd(), "components", "jobs", "VisitScopeJobDetailForm.tsx"),
+  "utf8",
+);
+
 const jobActionsSource = readFileSync(
   path.join(process.cwd(), "lib", "actions", "job-actions.ts"),
   "utf8",
@@ -47,6 +52,17 @@ describe("visit scope inline composer slice 1", () => {
   it("keeps duplicate prevention checks intact", () => {
     expect(builderSource).toContain("findExistingScopeItem(items, candidate)");
     expect(builderSource).toContain("Already in current job scope");
+  });
+
+  it("lets job detail hide already-saved selected rows while preserving duplicate prevention", () => {
+    expect(builderSource).toContain("hideInitialSelectedItems?: boolean");
+    expect(builderSource).toContain("const initialItemFingerprints = useMemo(() => {");
+    expect(builderSource).toContain("const visibleCompletedItems = hideInitialSelectedItems");
+    expect(builderSource).toContain("completedItems.filter((item) => !initialItemFingerprints.has(scopeItemFingerprint(item)))");
+    expect(builderSource).toContain("findExistingScopeItem(items, candidate)");
+    expect(jobDetailFormSource).toContain("hideInitialSelectedItems");
+    expect(jobDetailFormSource).toContain("Save additions and work updates.");
+    expect(jobDetailFormSource).toContain("Save Work Updates");
   });
 
   it("keeps service-required behavior intact for jobs new", () => {

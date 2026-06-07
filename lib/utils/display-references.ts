@@ -57,10 +57,7 @@ export function formatInvoiceDisplayReference(params: {
   invoiceId: string | null | undefined;
 }): string {
   const display = normalizeDisplayNumber(params.invoiceDisplayNumber);
-  if (display) return `Invoice #${display}`;
-
-  const legacyInvoiceNumber = normalizeDisplayNumber(params.invoiceNumber);
-  if (legacyInvoiceNumber) return `Invoice ${legacyInvoiceNumber}`;
+  if (display && !/^INV-/i.test(display)) return `Invoice #${display}`;
 
   return `Invoice ${shortUuidReference(params.invoiceId)}`;
 }

@@ -33,14 +33,24 @@ describe("display-references helper", () => {
     ).toBe("Invoice #2001");
   });
 
-  it("invoice fallback uses legacy invoice_number when display number is missing", () => {
+  it("invoice fallback uses short UUID/reference when display number is missing", () => {
     expect(
       formatInvoiceDisplayReference({
         invoiceDisplayNumber: undefined,
         invoiceNumber: "INV-LEGACY-77",
         invoiceId: "4dd932ce-8ee9-4287-95c5-f9a48bfbbe37",
       })
-    ).toBe("Invoice INV-LEGACY-77");
+    ).toBe("Invoice 4dd932ce");
+  });
+
+  it("invoice display ignores legacy-shaped display numbers", () => {
+    expect(
+      formatInvoiceDisplayReference({
+        invoiceDisplayNumber: "INV-20260607-1F79D164",
+        invoiceNumber: "INV-LEGACY-77",
+        invoiceId: "4dd932ce-8ee9-4287-95c5-f9a48bfbbe37",
+      })
+    ).toBe("Invoice 4dd932ce");
   });
 
   it("invoice fallback uses short UUID/reference only when no display or legacy number exists", () => {

@@ -5,6 +5,7 @@ import type { FieldChargeProposalRecord } from "@/lib/business/field-charge-prop
 import SupplementalInvoiceFamilySection, {
   type SupplementalInvoiceFamilyItem,
 } from "./SupplementalInvoiceFamilySection";
+import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
 import {
   approveFieldChargeProposalForDraftInvoiceReviewForm,
   createFieldChargeProposalFromPricebookEntryForm,
@@ -13,6 +14,7 @@ import {
 } from "@/lib/actions/field-charge-proposal-actions";
 
 type FieldBillingInvoiceSnapshot = {
+  id?: string | null;
   status: "draft" | "issued" | "void";
   invoiceNumber?: string | null;
   invoiceDisplayNumber?: string | null;
@@ -65,7 +67,13 @@ function formatCurrencyFromCents(cents?: number | null) {
 }
 
 function formatInvoiceReference(invoice: FieldBillingInvoiceSnapshot | null | undefined) {
-  return String(invoice?.invoiceDisplayNumber ?? invoice?.invoiceNumber ?? "").trim() || "Not available";
+  if (!invoice) return "Not available";
+
+  return formatInvoiceDisplayReference({
+    invoiceDisplayNumber: invoice.invoiceDisplayNumber,
+    invoiceNumber: invoice.invoiceNumber,
+    invoiceId: invoice.id ?? null,
+  });
 }
 
 function formatProposalSourceKind(value: FieldChargeProposalRecord["source_kind"]) {
