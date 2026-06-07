@@ -6,6 +6,7 @@ import CalendarMonthGrid from './CalendarMonthGrid';
 import CalendarDispatchGrid from './CalendarDispatchGrid';
 import CalendarDragJobLink from './CalendarDragJobLink';
 import CalendarOpenJobButton from './CalendarOpenJobButton';
+import CalendarMobileListAnchor from './CalendarMobileListAnchor';
 import { CALENDAR_STATUS_LEGEND, calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
 import {
   CALENDAR_TECH_FILTER_UNASSIGNED,
@@ -332,16 +333,18 @@ function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | n
       : today;
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm shadow-slate-950/5 sm:w-auto">
-      <Link href={buildCalendarHref(view, prev, { tech })} className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
-        Previous
-      </Link>
-      <Link href={buildCalendarHref(view, todayTarget, { tech })} className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
-        Today
-      </Link>
-      <Link href={buildCalendarHref(view, next, { tech })} className="inline-flex min-h-10 flex-1 items-center justify-center rounded-md border border-transparent px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
-        Next
-      </Link>
+    <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+      <div className="flex min-w-0 flex-1 items-stretch rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5 sm:flex-none">
+        <Link href={buildCalendarHref(view, prev, { tech })} className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center rounded-l-md border-r border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
+          Previous
+        </Link>
+        <Link href={buildCalendarHref(view, todayTarget, { tech })} className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center border-r border-slate-200 bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
+          Today
+        </Link>
+        <Link href={buildCalendarHref(view, next, { tech })} className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
+          Next
+        </Link>
+      </div>
       {showDateJump ? (
         <form action="/calendar" method="get" className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 sm:ml-1 sm:w-auto">
           <input type="hidden" name="view" value={view} />
@@ -407,7 +410,7 @@ function AgendaList(props: {
   return (
     <div className="space-y-4">
       {sortedDates.map((dateKey) => (
-        <div key={dateKey} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/5">
+        <div key={dateKey} id={`calendar-list-date-${dateKey}`} data-calendar-list-date={dateKey} className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm shadow-slate-950/5">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-semibold text-slate-950">{formatDayDateHeader(dateKey)}</span>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
@@ -905,14 +908,6 @@ export async function CalendarView(props: Props) {
   const inspectorForcedClosed = inspectorStateRaw === '0' || inspectorStateRaw === 'closed';
   const inspectorOpen = inspectorForcedOpen || (Boolean(selectedJob) && !inspectorForcedClosed);
 
-  const inspectorToggleHref = buildCalendarHref(uiView, data.anchorDate, {
-    tech: activeTech,
-    job: selectedJobId || null,
-    block: selectedBlockId || null,
-    prefillDate,
-    inspector: inspectorOpen ? '0' : '1',
-  });
-
   const hideInspectorHref = buildCalendarHref(uiView, data.anchorDate, {
     tech: activeTech,
     job: selectedJobId || null,
@@ -1066,13 +1061,15 @@ export async function CalendarView(props: Props) {
           </div>
 
           <div className="flex flex-col gap-2.5 xl:items-end">
-            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1.5 sm:flex">
+            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1.5 sm:flex sm:gap-1.5">
               {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
                 <Link
                   key={viewValue}
                   href={buildCalendarHref(viewValue, targetDateForView(viewValue), { tech: activeTech, job: selectedJobId || null })}
-                  className={`inline-flex min-h-10 items-center justify-center rounded-md px-3 py-2 text-sm font-semibold transition ${
-                    uiView === viewValue ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-700 hover:bg-white hover:text-slate-900'
+                  className={`inline-flex min-h-10 items-center justify-center rounded-md border px-3 py-2 text-sm font-semibold transition ${
+                    uiView === viewValue
+                      ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
                   }`}
                 >
                   {viewValue.charAt(0).toUpperCase() + viewValue.slice(1)}
@@ -1080,13 +1077,6 @@ export async function CalendarView(props: Props) {
               ))}
             </div>
             <NavLinks view={uiView} date={data.anchorDate} tech={activeTech} />
-            <Link
-              href={inspectorToggleHref}
-              scroll={false}
-              className="inline-flex min-h-10 w-full items-center justify-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:w-auto"
-            >
-              {inspectorOpen ? 'Hide Inspector' : 'Show Inspector'}
-            </Link>
           </div>
         </div>
 
@@ -1426,6 +1416,12 @@ export async function CalendarView(props: Props) {
         <main className="order-1 min-w-0 space-y-4 xl:order-2">
           {uiView === 'list' ? (
             <section className="overflow-x-auto px-1">
+              <CalendarMobileListAnchor
+                rangeStartDate={monthStartDate}
+                rangeEndDate={monthEndDate}
+                currentDate={todayDate}
+                focusedDate={data.anchorDate}
+              />
               <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeTech} selectedBlockId={selectedBlockId} />
             </section>
           ) : uiView === 'month' ? (
