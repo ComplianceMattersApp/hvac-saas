@@ -193,7 +193,7 @@ describe("selectNextBestAction", () => {
 });
 
 describe("buildPriorityChips", () => {
-  it("hides zero-count chips and respects business pulse gating", () => {
+  it("returns no queue chips for tech role", () => {
     const chips = buildPriorityChips({
       productMode: "hybrid",
       role: "tech",
@@ -202,12 +202,7 @@ describe("buildPriorityChips", () => {
       openInvoiceCount: 4,
       canViewBusinessPulse: false,
     });
-
-    const keys = chips.map((c) => c.key);
-    expect(keys).toContain("need_scheduling");
-    expect(keys).toContain("exceptions");
-    expect(keys).toContain("service_plans_due");
-    expect(keys).not.toContain("open_invoices");
+    expect(chips).toEqual([]);
   });
 
   it("exposes open invoices chip for admin/billing", () => {
@@ -247,6 +242,31 @@ describe("buildPriorityChips", () => {
       primaryFocusKey: "open_invoices",
     });
     expect(chips.find((c) => c.key === "open_invoices")).toBeUndefined();
+  });
+
+  it("limits billing chips to billing-safe signals", () => {
+    const chips = buildPriorityChips({
+      productMode: "hybrid",
+      role: "billing",
+      priorityCounts: {
+        ...baseCounts,
+        needScheduling: 5,
+        failed: 2,
+        pendingInfo: 3,
+        closeoutReady: 2,
+      },
+      servicePlansOverdue: 4,
+      openInvoiceCount: 7,
+      canViewBusinessPulse: true,
+    });
+
+    const keys = chips.map((c) => c.key);
+    expect(keys).toContain("open_invoices");
+    expect(keys).toContain("closeout");
+    expect(keys).not.toContain("need_scheduling");
+    expect(keys).not.toContain("exceptions");
+    expect(keys).not.toContain("waiting");
+    expect(keys).not.toContain("service_plans_due");
   });
 
   it("adds without-tech chip when scheduled coverage is missing", () => {
@@ -383,6 +403,44 @@ describe("buildDailyBriefing", () => {
     expect(text).toContain("12 waiting to be scheduled");
     expect(text).toContain("4 ready for closeout");
   });
+
+  it("keeps technician briefing scoped to assigned route only", () => {
+    const text = buildDailyBriefing({
+      role: "tech",
+      todayJobsCount: 2,
+      priorityCounts: {
+        ...baseCounts,
+        scheduledToday: 2,
+        pendingInfo: 8,
+        needScheduling: 11,
+      },
+      openInvoiceCount: 5,
+      servicePlansOverdue: 3,
+      followUpsCount: 9,
+    });
+
+    expect(text).toContain("assigned route");
+    expect(text).not.toContain("scheduled");
+    expect(text).not.toContain("invoice");
+  });
+
+  it("keeps billing briefing focused on money/closeout", () => {
+    const text = buildDailyBriefing({
+      role: "billing",
+      todayJobsCount: 0,
+      priorityCounts: {
+        ...baseCounts,
+        needScheduling: 10,
+        closeoutReady: 4,
+      },
+      openInvoiceCount: 3,
+      servicePlansOverdue: 0,
+      followUpsCount: 0,
+    });
+
+    expect(text).toContain("open invoice");
+    expect(text).not.toContain("waiting to be scheduled");
+  });
 });
 
 describe("buildFollowUpGroups", () => {
@@ -505,6 +563,60 @@ describe("buildFollowUpGroups", () => {
     });
 
     expect(groups.find((g) => g.key === "service_plans")?.count).toBe(2);
+  });
+
+  it("returns no company follow-up groups for tech role", () => {
+    const groups = buildFollowUpGroups({
+      role: "tech",
+      followUps: [
+        {
+          key: "j1",
+          title: "Follow-up",
+          reason: "Needs scheduling",
+          concernKey: "scheduling",
+          href: "/jobs/j1?tab=ops",
+          scheduledDateDisplay: null,
+        },
+      ],
+      priorityCounts: { ...baseCounts, needScheduling: 9 },
+      servicePlansOverdue: 1,
+      openInvoiceCount: 3,
+      canViewBusinessPulse: false,
+    });
+
+    expect(groups).toEqual([]);
+  });
+
+  it("limits billing follow-up groups to closeout/payments", () => {
+    const groups = buildFollowUpGroups({
+      role: "billing",
+      followUps: [
+        {
+          key: "j1",
+          title: "Follow-up",
+          reason: "Pending info",
+          concernKey: "waiting",
+          href: "/jobs/j1?tab=ops",
+          scheduledDateDisplay: null,
+        },
+      ],
+      priorityCounts: {
+        ...baseCounts,
+        needScheduling: 5,
+        pendingInfo: 1,
+        closeoutReady: 2,
+      },
+      servicePlansOverdue: 2,
+      openInvoiceCount: 3,
+      canViewBusinessPulse: true,
+    });
+
+    const keys = groups.map((g) => g.key);
+    expect(keys).toContain("closeout");
+    expect(keys).toContain("payments");
+    expect(keys).not.toContain("scheduling");
+    expect(keys).not.toContain("waiting");
+    expect(keys).not.toContain("service_plans");
   });
 });
 

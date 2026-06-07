@@ -9,10 +9,11 @@ import { redirect } from "next/navigation";
 
 import {
   buildTodayReadModel,
-  type BusinessPulse,
   type FollowUpGroup,
   type NextBestAction,
   type PriorityChip,
+  type RoleAwarePulse,
+  type RoleAwarePulseTile,
   type ResumeRecentItem,
   type TeamCoverage,
   type TodayHeader,
@@ -73,9 +74,9 @@ export default async function TodayPage() {
           hasMore={model.resumeRecentHasMore}
         />
 
-        {model.businessPulse.visible ? (
-          <BusinessPulseSection
-            pulse={model.businessPulse}
+        {model.roleAwarePulse.visible ? (
+          <RoleAwarePulseSection
+            pulse={model.roleAwarePulse}
             collapsed
           />
         ) : null}
@@ -99,8 +100,8 @@ export default async function TodayPage() {
           </div>
 
           <div className="space-y-5">
-            {model.businessPulse.visible ? (
-              <BusinessPulseSection pulse={model.businessPulse} />
+            {model.roleAwarePulse.visible ? (
+              <RoleAwarePulseSection pulse={model.roleAwarePulse} />
             ) : null}
             {model.teamCoverage.visible ? (
               <TeamCoverageSection coverage={model.teamCoverage} />
@@ -635,31 +636,17 @@ function TeamCoverageSection({
 }
 
 // -----------------------------------------------------------------------------
-// Business Pulse
+// Role-Aware Pulse
 // -----------------------------------------------------------------------------
 
-function BusinessPulseSection({
+function RoleAwarePulseSection({
   pulse,
   collapsed = false,
 }: {
-  pulse: BusinessPulse;
+  pulse: RoleAwarePulse;
   collapsed?: boolean;
 }) {
-  const showFailedPayments = pulse.failedPaymentsOpenCount !== null;
-  const showServicePlans =
-    pulse.servicePlansActive !== null ||
-    pulse.servicePlansOverdue !== null ||
-    pulse.servicePlansDueIn7 !== null ||
-    pulse.servicePlansNotScheduled !== null;
-  const showInvoices = pulse.openInvoiceCount !== null;
-
-  const hasContent = showFailedPayments || showServicePlans || showInvoices;
-
-  const failedPaymentsAtRisk =
-    pulse.failedPaymentsBalanceAtRiskCents != null
-      ? formatCurrency(pulse.failedPaymentsBalanceAtRiskCents)
-      : null;
-  const failedPaymentsSub = `${failedPaymentsAtRisk ?? "$0"} at risk`;
+  const hasContent = pulse.tiles.length > 0;
 
   return (
     <section
@@ -668,110 +655,61 @@ function BusinessPulseSection({
       }`}
     >
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-        Business Attention
+        {pulse.mode === "business"
+          ? "Business Attention"
+          : pulse.mode === "money"
+          ? "Financial Attention"
+          : "Operations Attention"}
       </div>
       <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-        {collapsed ? "Money & service plan signals" : "Money & Service Plan Attention"}
+        {pulse.title}
       </h2>
+      <p className="mt-1 text-xs leading-5 text-slate-600">{pulse.subtitle}</p>
 
       {!hasContent ? (
-        <EmptyState message="No business pulse data available yet." />
+        <EmptyState message="No role-specific pulse items are active right now." />
       ) : (
         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-          {showFailedPayments ? (
-            <PulseTile
-              label="FAILED PAYMENTS"
-              value={String(pulse.failedPaymentsOpenCount ?? 0)}
-              sub={failedPaymentsSub}
-              href="/reports/failed-payments"
-              danger={(pulse.failedPaymentsOpenCount ?? 0) > 0}
-            />
-          ) : null}
-          {showInvoices ? (
-            <PulseTile
-              label="OPEN INVOICES"
-              value={String(pulse.openInvoiceCount ?? 0)}
-              sub={
-                pulse.openInvoiceBalanceCents != null
-                  ? formatCurrency(pulse.openInvoiceBalanceCents)
-                  : null
-              }
-              href="/reports/payments"
-            />
-          ) : null}
-          {pulse.servicePlansActive !== null ? (
-            <PulseTile
-              label="ACTIVE PLANS"
-              value={String(pulse.servicePlansActive)}
-              href="/service-plans"
-            />
-          ) : null}
-          {pulse.servicePlansOverdue !== null ? (
-            <PulseTile
-              label="PLANS OVERDUE"
-              value={String(pulse.servicePlansOverdue)}
-              href="/service-plans"
-              danger={pulse.servicePlansOverdue > 0}
-            />
-          ) : null}
-          {pulse.servicePlansDueIn7 !== null ? (
-            <PulseTile
-              label="DUE IN 7 DAYS"
-              value={String(pulse.servicePlansDueIn7)}
-              href="/service-plans"
-            />
-          ) : null}
-          {pulse.servicePlansNotScheduled !== null ? (
-            <PulseTile
-              label="PLANS NOT SCHEDULED"
-              value={String(pulse.servicePlansNotScheduled)}
-              href="/service-plans"
-            />
-          ) : null}
+          {pulse.tiles.map((tile) => (
+            <RoleAwarePulseTileCard key={tile.key} tile={tile} />
+          ))}
         </div>
       )}
     </section>
   );
 }
 
-function PulseTile({
-  label,
-  value,
-  sub,
-  href,
-  danger = false,
+function RoleAwarePulseTileCard({
+  tile,
 }: {
-  label: string;
-  value: string;
-  sub?: string | null;
-  href: string;
-  danger?: boolean;
+  tile: RoleAwarePulseTile;
 }) {
+  const toneClass =
+    tile.tone === "danger"
+      ? "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100"
+      : tile.tone === "warn"
+      ? "border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
+      : tile.tone === "info"
+      ? "border-blue-200 bg-blue-50 text-blue-900 hover:bg-blue-100"
+      : "border-slate-200 bg-slate-50/70 text-slate-900 hover:bg-white";
+
   return (
     <Link
-      href={href}
-      className={`block rounded-xl border px-3 py-2 transition-colors ${
-        danger
-          ? "border-rose-200 bg-rose-50 text-rose-900 hover:bg-rose-100"
-          : "border-slate-200 bg-slate-50/70 text-slate-900 hover:bg-white"
-      }`}
+      href={tile.href}
+      className={`block rounded-xl border px-3 py-2 transition-colors ${toneClass}`}
     >
       <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-current/70">
-        {label}
+        {tile.label}
       </div>
-      <div className="mt-1 text-lg font-semibold tabular-nums">{value}</div>
-      {sub ? <div className="mt-0.5 text-[11px] text-current/70">{sub}</div> : null}
+      <div className="mt-1 text-lg font-semibold tabular-nums">{tile.value}</div>
+      {tile.valueDetail ? (
+        <div className="mt-0.5 text-[11px] text-current/70">{tile.valueDetail}</div>
+      ) : null}
+      <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.06em] text-current/60">
+        {tile.context}
+      </div>
     </Link>
   );
-}
-
-function formatCurrency(cents: number): string {
-  const dollars = (Number.isFinite(cents) ? cents : 0) / 100;
-  return new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 0,
-  }).format(dollars);
 }
 
 // -----------------------------------------------------------------------------

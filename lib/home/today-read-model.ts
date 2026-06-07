@@ -18,6 +18,11 @@ import {
 } from "@/lib/auth/request-actor-context";
 import type { InternalRole, InternalUserRow } from "@/lib/auth/internal-user";
 import { canViewFinancialRegister } from "@/lib/auth/financial-access";
+import {
+  resolveFieldBillingCapabilities,
+} from "@/lib/auth/field-billing-access";
+import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
+import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 import { loadFailedPaymentReconciliationItems } from "@/lib/business/failed-payment-reconciliation-read-model";
 import {
   resolveProductModeForAccountOwnerId,
@@ -160,6 +165,33 @@ export type BusinessPulse = {
   unreadNotificationCount: number;
 };
 
+export type RoleAwarePulseMode = "business" | "money" | "ops";
+
+export type RoleAwarePulseTile = {
+  key:
+    | "open_invoices"
+    | "confirm_payments"
+    | "failed_attempts"
+    | "need_scheduling"
+    | "waiting"
+    | "closeout"
+    | "without_tech";
+  label: string;
+  value: number;
+  valueDetail: string | null;
+  href: string;
+  context: string;
+  tone: "neutral" | "warn" | "danger" | "info";
+};
+
+export type RoleAwarePulse = {
+  visible: boolean;
+  mode: RoleAwarePulseMode | null;
+  title: string;
+  subtitle: string;
+  tiles: RoleAwarePulseTile[];
+};
+
 export type TeamCoverageAssignment = {
   key: string;
   assigneeName: string;
@@ -212,6 +244,7 @@ export type TodayReadModel = {
   followUpGroups: FollowUpGroup[];
   teamCoverage: TeamCoverage;
   businessPulse: BusinessPulse;
+  roleAwarePulse: RoleAwarePulse;
   resumeRecentWork: ResumeRecentItem[];
   resumeRecentHasMore: boolean;
   showWelcomeModal: boolean;
@@ -1220,11 +1253,21 @@ export function buildDailyBriefing(params: {
   const closeoutReady = params.priorityCounts.closeoutReady ?? 0;
   const waiting = (params.priorityCounts.pendingInfo ?? 0) + (params.priorityCounts.onHold ?? 0);
 
-  if (params.role === "tech" && scheduled > 0) {
-    const later = waiting > 0
-      ? `${waiting} ${waiting === 1 ? "other item needs" : "other items need"} follow-up later.`
-      : "You are clear after today’s route.";
-    return `Your next job is ready. ${later}`;
+  if (params.role === "tech") {
+    if (scheduled > 0) {
+      return `Your assigned route is active with ${scheduled} ${scheduled === 1 ? "visit" : "visits"}.`;
+    }
+    return "Your assigned work queue is clear right now.";
+  }
+
+  if (params.role === "billing") {
+    if ((params.openInvoiceCount ?? 0) > 0) {
+      return `${params.openInvoiceCount} open ${params.openInvoiceCount === 1 ? "invoice is" : "invoices are"} awaiting payment follow-up.`;
+    }
+    if (closeoutReady > 0) {
+      return `${closeoutReady} ${closeoutReady === 1 ? "visit is" : "visits are"} waiting on closeout billing steps.`;
+    }
+    return "Money attention is clear right now.";
   }
 
   if (scheduled > 0 && needScheduling > 0 && closeoutReady > 0) {
@@ -1263,6 +1306,10 @@ export function buildFollowUpGroups(params: {
   openInvoiceCount: number | null;
   canViewBusinessPulse: boolean;
 }): FollowUpGroup[] {
+  if (params.role === "tech") {
+    return [];
+  }
+
   const schedulingItems = params.followUps.filter((item) => item.concernKey === "scheduling");
   const closeoutItems = params.followUps.filter((item) => item.concernKey === "closeout");
   const waitingItems = params.followUps.filter((item) => item.concernKey === "waiting");
@@ -1273,7 +1320,7 @@ export function buildFollowUpGroups(params: {
   const schedulingCount = params.priorityCounts.needScheduling ?? 0;
   const withoutTechCount = params.priorityCounts.scheduledTodayWithoutTech ?? 0;
 
-  if (withoutTechCount > 0) {
+  if (withoutTechCount > 0 && params.role !== "billing") {
     groups.push({
       key: "without_tech",
       label: "Without Tech",
@@ -1284,7 +1331,7 @@ export function buildFollowUpGroups(params: {
     });
   }
 
-  if (schedulingCount > 0 || schedulingItems.length > 0) {
+  if (params.role !== "billing" && (schedulingCount > 0 || schedulingItems.length > 0)) {
     groups.push({
       key: "scheduling",
       label: "Needs Scheduling",
@@ -1308,7 +1355,7 @@ export function buildFollowUpGroups(params: {
   }
 
   const waitingCount = (params.priorityCounts.pendingInfo ?? 0) + (params.priorityCounts.onHold ?? 0);
-  if (waitingCount > 0 || waitingItems.length > 0) {
+  if (params.role !== "billing" && (waitingCount > 0 || waitingItems.length > 0)) {
     groups.push({
       key: "waiting",
       label: "Waiting / Pending Info",
@@ -1320,7 +1367,7 @@ export function buildFollowUpGroups(params: {
   }
 
   const exceptionCount = params.priorityCounts.failed ?? 0;
-  if (exceptionCount > 0 || exceptionItems.length > 0) {
+  if (params.role !== "billing" && (exceptionCount > 0 || exceptionItems.length > 0)) {
     groups.push({
       key: "exceptions",
       label: "Exceptions",
@@ -1331,7 +1378,7 @@ export function buildFollowUpGroups(params: {
     });
   }
 
-  if ((params.servicePlansOverdue ?? 0) > 0 && params.role !== "tech") {
+  if ((params.servicePlansOverdue ?? 0) > 0 && params.role === "admin") {
     groups.push({
       key: "service_plans",
       label: "Service Plan Follow-Up",
@@ -1353,7 +1400,7 @@ export function buildFollowUpGroups(params: {
     });
   }
 
-  return groups.slice(0, params.role === "tech" ? 3 : 5);
+  return groups.slice(0, params.role === "billing" ? 3 : 5);
 }
 
 // -----------------------------------------------------------------------------
@@ -1369,6 +1416,10 @@ export function buildPriorityChips(params: {
   canViewBusinessPulse: boolean;
   primaryFocusKey?: NextBestAction["focusKey"];
 }): PriorityChip[] {
+  if (params.role === "tech") {
+    return [];
+  }
+
   const chips: PriorityChip[] = [];
   const focusKey = params.primaryFocusKey ?? null;
 
@@ -1379,7 +1430,7 @@ export function buildPriorityChips(params: {
     chips.push(chip);
   };
 
-  if ((params.priorityCounts.needScheduling ?? 0) > 0) {
+  if (params.role !== "billing" && (params.priorityCounts.needScheduling ?? 0) > 0) {
     pushChip({
       key: "need_scheduling",
       label: "Start Here: Scheduling",
@@ -1390,7 +1441,7 @@ export function buildPriorityChips(params: {
     });
   }
 
-  if ((params.priorityCounts.scheduledTodayWithoutTech ?? 0) > 0) {
+  if (params.role !== "billing" && (params.priorityCounts.scheduledTodayWithoutTech ?? 0) > 0) {
     pushChip({
       key: "without_tech",
       label: "Without Tech",
@@ -1401,7 +1452,7 @@ export function buildPriorityChips(params: {
     });
   }
 
-  if ((params.priorityCounts.failed ?? 0) > 0) {
+  if (params.role !== "billing" && (params.priorityCounts.failed ?? 0) > 0) {
     pushChip({
       key: "exceptions",
       label: "Needs Attention",
@@ -1412,7 +1463,7 @@ export function buildPriorityChips(params: {
     });
   }
 
-  if ((params.priorityCounts.pendingInfo ?? 0) > 0) {
+  if (params.role !== "billing" && (params.priorityCounts.pendingInfo ?? 0) > 0) {
     pushChip({
       key: "waiting",
       label: "Waiting on Info",
@@ -1423,7 +1474,7 @@ export function buildPriorityChips(params: {
     });
   }
 
-  if ((params.priorityCounts.onHold ?? 0) > 0) {
+  if (params.role !== "billing" && (params.priorityCounts.onHold ?? 0) > 0) {
     pushChip({
       key: "on_hold",
       label: "On Hold",
@@ -1446,6 +1497,7 @@ export function buildPriorityChips(params: {
   }
 
   if (
+    params.role === "admin" &&
     params.productMode !== "ecc_hers" &&
     (params.servicePlansOverdue ?? 0) > 0
   ) {
@@ -1471,6 +1523,176 @@ export function buildPriorityChips(params: {
   }
 
   return chips;
+}
+
+function buildRoleAwarePulse(params: {
+  role: InternalRole;
+  canViewBusinessPulse: boolean;
+  canViewConfirmPaymentAttention: boolean;
+  canViewFailedPaymentAttention: boolean;
+  priorityCounts: NextBestActionInputs["priorityCounts"];
+  openInvoiceCount: number | null;
+  openInvoiceBalanceCents: number | null;
+  confirmPaymentsOpenCount: number | null;
+  confirmPaymentsTotalReportedCents: number | null;
+  failedPaymentsOpenCount: number | null;
+  failedPaymentsBalanceAtRiskCents: number | null;
+}): RoleAwarePulse {
+  const waitingCount =
+    (params.priorityCounts.pendingInfo ?? 0) +
+    (params.priorityCounts.onHold ?? 0);
+
+  const tiles: RoleAwarePulseTile[] = [];
+
+  const pushTile = (tile: RoleAwarePulseTile) => {
+    tiles.push(tile);
+  };
+
+  const canViewOpsPressure = params.role === "admin" || params.role === "office";
+  const canViewMoneyAttention = params.canViewBusinessPulse;
+
+  if (canViewMoneyAttention) {
+    pushTile({
+      key: "open_invoices",
+      label: "OPEN INVOICES",
+      value: params.openInvoiceCount ?? 0,
+      valueDetail:
+        params.openInvoiceBalanceCents != null
+          ? formatCurrencyCents(params.openInvoiceBalanceCents)
+          : null,
+      href: "/reports/payments",
+      context: "Financial attention",
+      tone: "info",
+    });
+  }
+
+  if (params.canViewConfirmPaymentAttention) {
+    pushTile({
+      key: "confirm_payments",
+      label: "CONFIRM PAYMENTS",
+      value: params.confirmPaymentsOpenCount ?? 0,
+      valueDetail:
+        params.confirmPaymentsTotalReportedCents != null
+          ? `${formatCurrencyCents(params.confirmPaymentsTotalReportedCents)} reported`
+          : "Reported payment needs verification",
+      href: "/reports/payment-reconciliation",
+      context: "Reported, not collected truth",
+      tone: (params.confirmPaymentsOpenCount ?? 0) > 0 ? "warn" : "neutral",
+    });
+  }
+
+  if (params.canViewFailedPaymentAttention) {
+    pushTile({
+      key: "failed_attempts",
+      label: "FAILED ATTEMPTS",
+      value: params.failedPaymentsOpenCount ?? 0,
+      valueDetail:
+        params.failedPaymentsBalanceAtRiskCents != null
+          ? `${formatCurrencyCents(params.failedPaymentsBalanceAtRiskCents)} at risk`
+          : "Failed attempt attention",
+      href: "/reports/failed-payments",
+      context: "Failed attempt, not collected money",
+      tone: (params.failedPaymentsOpenCount ?? 0) > 0 ? "danger" : "neutral",
+    });
+  }
+
+  if (canViewOpsPressure) {
+    pushTile({
+      key: "need_scheduling",
+      label: "NEEDS SCHEDULING",
+      value: params.priorityCounts.needScheduling ?? 0,
+      valueDetail: null,
+      href: "/ops/call-list",
+      context: "Live queue",
+      tone: (params.priorityCounts.needScheduling ?? 0) > 0 ? "warn" : "neutral",
+    });
+    pushTile({
+      key: "waiting",
+      label: "WAITING / PENDING",
+      value: waitingCount,
+      valueDetail: null,
+      href: "/ops/queues/waiting",
+      context: "Office follow-up",
+      tone: waitingCount > 0 ? "warn" : "neutral",
+    });
+    pushTile({
+      key: "closeout",
+      label: "CLOSEOUT / INVOICE",
+      value: params.priorityCounts.closeoutReady ?? 0,
+      valueDetail: null,
+      href: "/ops/closeout-queue",
+      context: "Office follow-up",
+      tone: (params.priorityCounts.closeoutReady ?? 0) > 0 ? "info" : "neutral",
+    });
+    pushTile({
+      key: "without_tech",
+      label: "WITHOUT TECH",
+      value: params.priorityCounts.scheduledTodayWithoutTech ?? 0,
+      valueDetail: null,
+      href: "/ops/queues/without-tech",
+      context: "Dispatch coverage",
+      tone: (params.priorityCounts.scheduledTodayWithoutTech ?? 0) > 0 ? "warn" : "neutral",
+    });
+  }
+
+  if (params.role === "billing" && !canViewOpsPressure) {
+    pushTile({
+      key: "closeout",
+      label: "INVOICE / CLOSEOUT",
+      value: params.priorityCounts.closeoutReady ?? 0,
+      valueDetail: null,
+      href: "/ops/closeout-queue",
+      context: "Billing-ready office work",
+      tone: (params.priorityCounts.closeoutReady ?? 0) > 0 ? "info" : "neutral",
+    });
+  }
+
+  if (params.role === "admin") {
+    return {
+      visible: true,
+      mode: "business",
+      title: "Business Pulse",
+      subtitle: "Financial attention plus operational pressure.",
+      tiles,
+    };
+  }
+
+  if (params.role === "billing") {
+    return {
+      visible: true,
+      mode: "money",
+      title: "Money Attention",
+      subtitle: "Financial follow-up and verification pressure.",
+      tiles,
+    };
+  }
+
+  if (params.role === "office") {
+    return {
+      visible: true,
+      mode: "ops",
+      title: "Ops Pressure",
+      subtitle: "Dispatch and office follow-up pressure.",
+      tiles,
+    };
+  }
+
+  return {
+    visible: false,
+    mode: null,
+    title: "",
+    subtitle: "",
+    tiles: [],
+  };
+}
+
+function formatCurrencyCents(cents: number): string {
+  const dollars = (Number.isFinite(cents) ? cents : 0) / 100;
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(dollars);
 }
 
 // -----------------------------------------------------------------------------
@@ -1608,12 +1830,30 @@ async function buildTodayReadModelForInternalActor(
   const role = internalUser.role;
   const today = todayBusinessDateLA();
   const canViewBusinessPulse = canViewBusinessPulseForRole(role);
+  const explicitFieldBillingCapabilities = await localTimedPhase(
+    "fieldBillingExplicitCapabilitiesRead",
+    () =>
+      loadFieldBillingExplicitCapabilitiesForUser({
+        supabase,
+        accountOwnerUserId,
+        internalUserId: userId,
+      }),
+  );
+  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    actorUserId: userId,
+    internalUser,
+    resourceAccountOwnerUserId: accountOwnerUserId,
+    explicitCapabilities: explicitFieldBillingCapabilities,
+  });
   const canViewFailedPaymentAttention = canViewFinancialRegister({
     actorUserId: userId,
     internalUser,
     resourceAccountOwnerUserId: accountOwnerUserId,
   });
   const showWelcomeModal = !hasDismissedTodayWelcome(actor.user?.user_metadata ?? null);
+  const canViewConfirmPaymentAttention =
+    canViewFailedPaymentAttention ||
+    fieldBillingCapabilities.can_verify_non_card_collection;
 
   const productModePromise = localTimedPhase("concernReadProductMode", async () => {
     try {
@@ -1761,6 +2001,33 @@ async function buildTodayReadModelForInternalActor(
     }
   });
 
+  const confirmPaymentAttentionPromise = localTimedPhase("confirmPaymentAttentionRead", async () => {
+    if (!canViewConfirmPaymentAttention) {
+      return {
+        openCount: null,
+        totalReportedAmountCents: null,
+      };
+    }
+
+    try {
+      const result = await listFieldPaymentCollectionReportsForReconciliation({
+        admin: supabase,
+        accountOwnerUserId,
+        limit: 50,
+      });
+
+      return {
+        openCount: result.summary.openCount,
+        totalReportedAmountCents: result.summary.totalReportedAmountCents,
+      };
+    } catch {
+      return {
+        openCount: null,
+        totalReportedAmountCents: null,
+      };
+    }
+  });
+
   const [
     productMode,
     identity,
@@ -1775,6 +2042,7 @@ async function buildTodayReadModelForInternalActor(
     servicePlans,
     openInvoice,
     failedPaymentAttention,
+    confirmPaymentAttention,
   ] = await localTimedPhase("groupedParallelAwait", async () =>
     Promise.all([
       productModePromise,
@@ -1790,6 +2058,7 @@ async function buildTodayReadModelForInternalActor(
       servicePlansPromise,
       openInvoicePromise,
       failedPaymentAttentionPromise,
+      confirmPaymentAttentionPromise,
     ]),
   );
 
@@ -1865,6 +2134,22 @@ async function buildTodayReadModelForInternalActor(
     unreadNotificationCount: typeof unread === "number" ? unread : 0,
   };
 
+  const roleAwarePulse = buildRoleAwarePulse({
+    role,
+    canViewBusinessPulse,
+    canViewConfirmPaymentAttention,
+    canViewFailedPaymentAttention,
+    priorityCounts,
+    openInvoiceCount: openInvoice.count,
+    openInvoiceBalanceCents: openInvoice.balanceCents,
+    confirmPaymentsOpenCount: confirmPaymentAttention.openCount,
+    confirmPaymentsTotalReportedCents:
+      confirmPaymentAttention.totalReportedAmountCents,
+    failedPaymentsOpenCount: failedPaymentAttention.openCount,
+    failedPaymentsBalanceAtRiskCents:
+      failedPaymentAttention.totalBalanceDueCents,
+  });
+
   const showFieldActions = role === "tech";
   const todayLabel = role === "tech" ? "My Work" : "Today’s Work";
 
@@ -1890,6 +2175,7 @@ async function buildTodayReadModelForInternalActor(
     followUpGroups,
     teamCoverage,
     businessPulse,
+    roleAwarePulse,
     resumeRecentWork: recent.items,
     resumeRecentHasMore: recent.hasMore,
     showWelcomeModal,

@@ -13,29 +13,37 @@ const todayReadModelSource = readFileSync(
 );
 
 describe("today business attention wiring", () => {
-  it("imports and uses the failed payment reconciliation read model", () => {
+  it("imports and uses failed and confirm-payment read models", () => {
     expect(todayReadModelSource).toContain("loadFailedPaymentReconciliationItems");
+    expect(todayReadModelSource).toContain("listFieldPaymentCollectionReportsForReconciliation");
     expect(todayReadModelSource).toContain("failedPaymentAttentionPromise");
+    expect(todayReadModelSource).toContain("confirmPaymentAttentionPromise");
     expect(todayReadModelSource).toContain("failedPaymentsOpenCount");
   });
 
-  it("shows failed payment attention for financial access users and keeps non-financial users hidden", () => {
+  it("keeps financial tiles role-gated and allows explicit confirm-payment verifier access", () => {
     expect(todayReadModelSource).toContain("canViewFinancialRegister");
     expect(todayReadModelSource).toContain("canViewFailedPaymentAttention");
+    expect(todayReadModelSource).toContain("canViewConfirmPaymentAttention");
+    expect(todayReadModelSource).toContain("fieldBillingCapabilities.can_verify_non_card_collection");
     expect(todayReadModelSource).toContain("failedPaymentsOpenCount: canViewFailedPaymentAttention ? failedPaymentAttention.openCount : null");
-    expect(todayPageSource).toContain("const showFailedPayments = pulse.failedPaymentsOpenCount !== null");
+    expect(todayReadModelSource).toContain("confirmPaymentsOpenCount: confirmPaymentAttention.openCount");
   });
 
-  it("links failed payments to reports failed-payments queue", () => {
-    expect(todayPageSource).toContain("FAILED PAYMENTS");
-    expect(todayPageSource).toContain("/reports/failed-payments");
-    expect(todayPageSource).toContain("at risk");
+  it("links money attention tiles to trusted report surfaces", () => {
+    expect(todayReadModelSource).toContain("FAILED ATTEMPTS");
+    expect(todayReadModelSource).toContain("CONFIRM PAYMENTS");
+    expect(todayReadModelSource).toContain("OPEN INVOICES");
+    expect(todayReadModelSource).toContain("/reports/failed-payments");
+    expect(todayReadModelSource).toContain("/reports/payment-reconciliation");
+    expect(todayReadModelSource).toContain("/reports/payments");
   });
 
-  it("removes failed-payment workflow helper text from Today", () => {
-    expect(todayPageSource).not.toContain("Review failed payments before retrying or contacting customers.");
-    expect(todayPageSource).not.toContain("No open failed payments requiring attention.");
-    expect(todayPageSource).not.toContain("Failed payments are not collected payments.");
+  it("uses copy that distinguishes reported and failed attention from collected truth", () => {
+    expect(todayReadModelSource).toContain("Reported, not collected truth");
+    expect(todayReadModelSource).toContain("Failed attempt, not collected money");
+    expect(todayReadModelSource).toContain("reported");
+    expect(todayPageSource).toContain("tile.context");
   });
 
   it("does not expose retry, acknowledge, resolve, or customer-message actions", () => {
@@ -46,20 +54,16 @@ describe("today business attention wiring", () => {
     expect(todayPageSource).not.toContain("Send Email");
   });
 
-  it("keeps service plan attention linked to service plans", () => {
-    expect(todayPageSource).toContain("ACTIVE PLANS");
-    expect(todayPageSource).toContain("PLANS OVERDUE");
-    expect(todayPageSource).toContain("DUE IN 7 DAYS");
-    expect(todayPageSource).toContain("PLANS NOT SCHEDULED");
-    expect(todayPageSource).toContain("href=\"/service-plans\"");
-    expect(todayPageSource).not.toContain("Planning visibility only.");
-    expect(todayPageSource).not.toContain("Manage plans from Service Plans or the customer profile.");
+  it("renders role-aware pulse section titles", () => {
+    expect(todayPageSource).toContain('pulse.mode === "business"');
+    expect(todayReadModelSource).toContain("Business Pulse");
+    expect(todayReadModelSource).toContain("Money Attention");
+    expect(todayReadModelSource).toContain("Ops Pressure");
   });
 
-  it("keeps open invoice follow-up distinct and linked to payments report", () => {
-    expect(todayPageSource).toContain("OPEN INVOICES");
-    expect(todayPageSource).toContain("/reports/payments");
-    expect(todayReadModelSource).toContain('label: "Payment Follow-Up"');
+  it("keeps field technicians out of business-pressure chip/groups", () => {
+    expect(todayReadModelSource).toContain('if (params.role === "tech") {');
+    expect(todayReadModelSource).toContain("return [];");
   });
 
   it("does not call Stripe and does not mutate payment/invoice/allocation/visit/next_due truth", () => {
