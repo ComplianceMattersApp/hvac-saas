@@ -791,14 +791,14 @@ function CollapsibleHeader(props: {
           ▶
         </span>
         <div className={compactOnMobile ? "min-w-0 pt-0" : "min-w-0 pt-0.5"}>
-          <div className={compactOnMobile ? "inline-flex items-center gap-1.5 text-[13px] font-semibold tracking-[-0.015em] text-slate-950 sm:text-[14.5px]" : "inline-flex items-center gap-1.5 text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950"}>
-            {icon ? <span className={compactOnMobile ? "inline-flex h-4 w-4 items-center justify-center text-slate-500" : "inline-flex h-4.5 w-4.5 items-center justify-center text-slate-500"}>{icon}</span> : null}
+          <div className={compactOnMobile ? "header-title inline-flex items-center gap-1.5 text-[13px] font-semibold tracking-[-0.015em] text-slate-950 sm:text-[14.5px]" : "header-title inline-flex items-center gap-1.5 text-[14.5px] font-semibold tracking-[-0.02em] text-slate-950"}>
+            {icon ? <span className={compactOnMobile ? "header-icon-badge inline-flex h-4 w-4 items-center justify-center text-slate-500" : "header-icon-badge inline-flex h-4.5 w-4.5 items-center justify-center text-slate-500"}>{icon}</span> : null}
             <span>{title}</span>
           </div>
-          {subtitle ? <div className={compactOnMobile ? "mt-0.5 hidden max-w-[42rem] text-[11px] leading-[1.4] text-slate-500 sm:mt-1 sm:block sm:text-[11.5px] sm:leading-[1.45]" : "mt-1 max-w-[42rem] text-[11.5px] leading-[1.45] text-slate-500"}>{subtitle}</div> : null}
+          {subtitle ? <div className={compactOnMobile ? "header-subtitle mt-0.5 hidden max-w-[42rem] text-[11px] leading-[1.4] text-slate-500 sm:mt-1 sm:block sm:text-[11.5px] sm:leading-[1.45]" : "header-subtitle mt-1 max-w-[42rem] text-[11.5px] leading-[1.45] text-slate-500"}>{subtitle}</div> : null}
         </div>
       </div>
-      {meta ? <div className={metaClassName}>{meta}</div> : null}
+      {meta ? <div className={`header-meta ${metaClassName}`}>{meta}</div> : null}
     </div>
   );
 }
@@ -1021,12 +1021,12 @@ const workspaceDetailsClass =
   `${workspaceSectionClass} group text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] [&[open]_.disclosure-icon]:rotate-90`;
 const workspaceDetailsDividerClass = "mt-3 border-t border-slate-200/90 pt-4";
 const jobRecordsDetailsClass =
-  `${workspacePanelClass} group rounded-2xl p-2.5 text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] sm:rounded-3xl sm:p-5 [&[open]_.disclosure-icon]:rotate-90 [&[open]]:xl:col-span-2 [&[open]]:2xl:col-span-3`;
-const jobRecordsDetailsDividerClass = "mt-2 border-t border-slate-200/90 pt-2.5 sm:mt-3 sm:pt-4";
+  `${workspacePanelClass} group rounded-2xl border-slate-200/80 bg-white p-2.5 text-gray-900 ring-1 ring-blue-100/40 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200/80 hover:bg-white hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.3)] sm:rounded-2xl sm:p-4 [&[open]_.disclosure-icon]:rotate-90 [&[open]]:border-blue-200/80 [&[open]]:xl:col-span-2 [&[open]]:2xl:col-span-3`;
+const jobRecordsDetailsDividerClass = "mt-2 border-t border-slate-200/80 pt-2.5 sm:mt-3 sm:pt-4";
 const recordLauncherClass =
-  `${workspacePanelClass} group block rounded-2xl p-2.5 text-left text-gray-900 ring-1 ring-slate-200/60 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-slate-300/90 hover:bg-white hover:shadow-[0_20px_44px_-32px_rgba(15,23,42,0.34)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:rounded-3xl sm:p-5`;
+  `${workspacePanelClass} group block rounded-2xl border-slate-200/80 bg-white p-2.5 text-left text-gray-900 ring-1 ring-blue-100/40 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200/80 hover:bg-blue-50/20 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:rounded-2xl sm:p-4`;
 const recordPanelClass =
-  "scroll-mt-24 rounded-2xl border border-slate-300/80 bg-white/96 p-4 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/80 sm:rounded-3xl sm:p-5";
+  "scroll-mt-24 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.3)] ring-1 ring-blue-100/40 sm:rounded-2xl sm:p-5";
 const workspaceSoftCardClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
 const workspaceEmptyStateClass =
@@ -2915,6 +2915,13 @@ const fieldHeaderTitle =
     primarySiteAccessName,
     jobTitleText,
   ) ?? "Job Detail";
+const jobWorkbenchTitle = firstNonEmpty(jobTitleText, visitScopeLeadText, fieldHeaderTitle) ?? "Job Detail";
+const jobWorkbenchAccountLabel =
+  normalizeCompareText(fieldHeaderTitle) !== normalizeCompareText(jobWorkbenchTitle)
+    ? fieldHeaderTitle
+    : customerDisplayName !== "—"
+    ? customerDisplayName
+    : "";
 const jobHeaderReference = formatJobDisplayReference({
   jobDisplayNumber: (job as { job_display_number?: string | null }).job_display_number,
   jobId: job.id,
@@ -3826,15 +3833,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   };
 
   const mobileFieldActionClass =
-    "inline-flex min-h-14 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-[border-color,background-color,box-shadow,transform] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
+    "inline-flex min-h-14 items-center justify-center rounded-xl border border-slate-200/90 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_28px_-24px_rgba(15,23,42,0.3)] transition-[border-color,background-color,box-shadow,transform] hover:border-blue-200 hover:bg-blue-50/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
   const mobileDisabledActionClass =
     "inline-flex min-h-14 items-center justify-center rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-base font-semibold text-slate-400";
   const mobileSectionClass =
-    "rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]";
+    "rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)] ring-1 ring-blue-100/35";
   const mobileToolLinkClass =
-    "inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-900 transition-colors hover:bg-slate-50";
+    "inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-900 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.28)] transition-[border-color,background-color,box-shadow,transform] hover:border-blue-200 hover:bg-blue-50/35 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px]";
   const mobileMutedToolLinkClass =
-    "inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-500";
+    "inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-base font-semibold text-slate-600 shadow-[0_8px_18px_-24px_rgba(15,23,42,0.22)]";
   const mobileAttentionStripClass =
     "rounded-xl border-l-4 border-amber-400 bg-amber-50 px-3.5 py-2.5 text-base leading-6 text-amber-950";
   const mobileAttentionActionClass =
@@ -3885,44 +3892,64 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
-      <div className="block min-h-screen bg-slate-100 px-3 py-4 text-slate-950 lg:hidden">
+      <div className="block min-h-screen bg-slate-50 px-3 py-3.5 text-slate-950 lg:hidden">
         <div className="mx-auto max-w-lg space-y-4">
-          <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
+          <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_48px_-34px_rgba(15,23,42,0.36)] ring-1 ring-blue-100/35">
+            <div className="h-1 bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
+            <div className="px-4 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <h1 className="mt-1 break-words text-2xl font-semibold leading-tight text-slate-950">
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-800">
+                  <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0f1f35] text-blue-100">
+                    <ToolIcon className="h-3 w-3" />
+                  </span>
+                  <span>Job Workbench</span>
+                </div>
+                <h1 className="mt-2 break-words text-[1.35rem] font-semibold leading-tight text-[#0f1f35]">
+                  {jobWorkbenchTitle}
+                </h1>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold tracking-[0.06em] text-slate-700">
+                    {jobHeaderReference}
+                  </span>
+                  <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+                    {headerJobTypeLabel}
+                  </span>
+                </div>
+                {jobWorkbenchAccountLabel ? (
+                  <div className="mt-3 text-xs font-semibold text-slate-500">Customer / Account</div>
+                ) : null}
+                <div className="mt-1 break-words text-base font-semibold text-slate-950">
                   {mobileCustomerHref ? (
                     <Link
                       href={mobileCustomerHref}
                       className="inline-flex items-center gap-1.5 underline decoration-slate-300/90 underline-offset-4 transition-colors hover:text-blue-700 hover:decoration-blue-300"
                     >
-                      <span>{fieldHeaderTitle}</span>
+                      <span>{jobWorkbenchAccountLabel || fieldHeaderTitle}</span>
                       <ChevronRightIcon className="h-4 w-4 text-slate-500" />
                     </Link>
                   ) : (
-                    fieldHeaderTitle
+                    jobWorkbenchAccountLabel || fieldHeaderTitle
                   )}
-                </h1>
-                <div className="mt-2 inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold tracking-[0.06em] text-slate-700">
-                  {jobHeaderReference}
                 </div>
                 {serviceAddressDisplay !== "No address set" ? (
-                  <div className="mt-2 flex items-start gap-1.5 text-sm font-medium text-slate-700">
-                    <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                  <div className="mt-2 flex items-start gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-sm font-medium text-slate-700">
+                    <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
                     <span className="break-words">{serviceAddressDisplay}</span>
                   </div>
                 ) : null}
               </div>
             </div>
 
-            <div className="relative mt-4 grid grid-cols-2 items-start gap-3 overflow-visible border-t border-slate-200 pt-3">
-                <details id="mobile-when-panel" className="group relative self-start rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+            <div className="relative mt-3.5 grid grid-cols-2 items-stretch gap-2 overflow-visible border-t border-slate-200 pt-3">
+                <details id="mobile-when-panel" className="group relative self-start overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.24)]">
+                  <div className="absolute inset-x-0 top-0 h-[2px] bg-blue-600/70" />
                   <summary className="cursor-pointer list-none">
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-600">
+                        <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-900/70">
                           <ClockIcon className="h-4 w-4" />
-                          <span>When</span>
+                          <span>Schedule</span>
                         </div>
                         <div className="mt-1 text-base font-semibold">{appointmentDateLabel}</div>
                         <div className="text-sm text-slate-700">{appointmentTimeLabel}</div>
@@ -3996,11 +4023,26 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     </div>
                   </div>
                 </details>
-                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
-                  <div className="text-sm font-semibold text-slate-500">Work</div>
+                <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.24)]">
+                  <div className="absolute inset-x-0 top-0 h-[2px] bg-blue-600/70" />
+                  <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-900/70">
+                    <ToolIcon className="h-4 w-4" />
+                    <span>Work</span>
+                  </div>
                   <div className="mt-1 text-base font-semibold">{job.job_type === "service" ? "Service" : "ECC"}</div>
                   <div className="text-sm text-slate-600">{isFieldComplete ? "Field complete" : "Field active"}</div>
                 </div>
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
+                <div className="text-xs font-semibold text-blue-900/70">Workflow</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-950">{formatOpsStatusLabel(job.ops_status)}</div>
+              </div>
+              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
+                <div className="text-xs font-semibold text-blue-900/70">Field</div>
+                <div className={`mt-0.5 text-sm font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>{formatStatus(job.status)}</div>
+              </div>
+            </div>
             </div>
           </section>
 
@@ -4068,11 +4110,18 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <FlashBanner type="warning" message="This action needs attention. Review the details below." />
           ) : null}
 
-          <section className="rounded-2xl border border-blue-200 bg-white px-4 py-3.5 shadow-[0_16px_28px_-26px_rgba(29,78,216,0.24)]">
+          <section className="overflow-hidden rounded-2xl border border-blue-100 bg-white shadow-[0_18px_36px_-30px_rgba(29,78,216,0.32)]">
+            <div className="h-[3px] bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
+            <div className="px-4 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-lg font-semibold">Status &amp; Next Step</div>
-                <div className="mt-1 text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">Current Status</div>
+                <div className="inline-flex items-center gap-2 text-lg font-semibold text-[#0f1f35]">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#0f1f35] text-blue-100">
+                    <ChevronRightIcon className="h-4 w-4" />
+                  </span>
+                  <span>Next Field Action</span>
+                </div>
+                <div className="mt-1 text-xs font-semibold uppercase tracking-[0.1em] text-blue-900/55">Current Status</div>
                 <div className="mt-0.5 text-base font-semibold text-slate-800">{mobileCurrentStatusLabel}</div>
               </div>
             </div>
@@ -4095,17 +4144,37 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   </SubmitButton>
                 </form>
               ) : !isFieldComplete && !showFieldOutcomePanel ? (
-                <JobFieldActionButton
-                  jobId={job.id}
-                  currentStatus={job.status}
-                  tab={tab}
-                  hasFullSchedule={hasFullSchedule}
-                  variant="fieldMode"
-                />
+                <div className="space-y-2">
+                  <JobFieldActionButton
+                    jobId={job.id}
+                    currentStatus={job.status}
+                    tab={tab}
+                    hasFullSchedule={hasFullSchedule}
+                    variant="fieldMode"
+                  />
+                  {job.job_type === "ecc" ? (
+                    <Link
+                      href={`/jobs/${job.id}/tests`}
+                      className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
+                    >
+                      Open Tests Workspace
+                    </Link>
+                  ) : null}
+                </div>
               ) : isFieldComplete || job.status === "completed" ? (
-                <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-700 bg-emerald-700 px-5 py-2.5 text-base font-semibold text-white">
-                  Field Complete
-                </span>
+                <div className="space-y-2">
+                  <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-700 bg-emerald-700 px-5 py-2.5 text-base font-semibold text-white">
+                    Field Complete
+                  </span>
+                  {job.job_type === "ecc" ? (
+                    <Link
+                      href={`/jobs/${job.id}/tests`}
+                      className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
+                    >
+                      Open Tests Workspace
+                    </Link>
+                  ) : null}
+                </div>
               ) : null}
 
               {onTheWayUndoEligibility.eligible ? (
@@ -4120,6 +4189,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   </SubmitButton>
                 </form>
               ) : null}
+            </div>
             </div>
           </section>
 
@@ -4136,7 +4206,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           ) : null}
 
           <section className={mobileSectionClass}>
-            <div className="text-lg font-semibold">Field Actions</div>
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                <ToolIcon className="h-4 w-4" />
+              </span>
+              <div>
+                <div className="text-lg font-semibold text-[#0f1f35]">Quick Field Actions</div>
+                <div className="text-xs text-slate-500">Call, text, equipment, and billing shortcuts.</div>
+              </div>
+            </div>
             <div className="mt-3 grid grid-cols-2 gap-3">
               {mobileCallHref ? (
                 <a href={mobileCallHref} className={mobileFieldActionClass}>
@@ -4224,13 +4302,60 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
           </section>
 
-          <section className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
-            <div className="px-4 pb-3 pt-4">
-              <div className="inline-flex items-center gap-1.5 text-lg font-semibold">
-                <MapPinIcon className="h-5 w-5 text-slate-600" />
-                <span>Service Location</span>
+          <section className={mobileSectionClass}>
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#0f1f35] text-blue-100">
+                  <ToolIcon className="h-4 w-4" />
+                </span>
+                <div>
+                  <div className="text-lg font-semibold text-[#0f1f35]">Field Operations Board</div>
+                  <div className="text-xs text-slate-500">Customer, location, contact, and team context.</div>
+                </div>
               </div>
             </div>
+
+            <div className="space-y-3">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-3">
+                <div className="text-sm font-semibold text-[#0f1f35]">Customer / Account</div>
+                <div className="mt-1 break-words text-base font-semibold text-slate-950">
+                  {mobileCustomerHref ? (
+                    <Link href={mobileCustomerHref} className="underline-offset-2 hover:text-blue-800 hover:underline">
+                      {jobWorkbenchAccountLabel || fieldHeaderTitle}
+                    </Link>
+                  ) : (
+                    jobWorkbenchAccountLabel || fieldHeaderTitle
+                  )}
+                </div>
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {telLink ? (
+                    <a href={telLink} className={`${compactSecondaryButtonClass} min-h-10 text-sm`}>
+                      Call
+                    </a>
+                  ) : null}
+                  {customerPhone !== "—" ? (
+                    <a href={`sms:${accountPhoneDigits}`} className={`${compactSecondaryButtonClass} min-h-10 text-sm`}>
+                      Text
+                    </a>
+                  ) : null}
+                  {accountEmailLink ? (
+                    <a href={accountEmailLink} className={`${compactSecondaryButtonClass} min-h-10 text-sm`}>
+                      Email
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_14px_28px_-28px_rgba(15,23,42,0.26)]">
+                <div className="flex items-center gap-2 border-b border-slate-200/80 px-3 py-3">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                    <MapPinIcon className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-sm font-semibold text-[#0f1f35]">Service Location</div>
+                    <div className="text-xs text-slate-500">Address and map preview.</div>
+                  </div>
+                </div>
             <Suspense
               fallback={
                 <JobLocationPreviewFallback
@@ -4260,6 +4385,53 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 onPhaseTiming={recordBlockingPhase}
               />
             </Suspense>
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-3 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.24)]">
+                <div className="mb-2 flex items-center gap-2 border-b border-slate-200/70 pb-2">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                    <PhoneIcon className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-sm font-semibold text-[#0f1f35]">Contact Logging</div>
+                    <div className="text-xs text-slate-500">Log attempts only.</div>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-blue-100 bg-blue-50/35 px-3 py-2.5 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
+                  <ContactLoggingQuickActions
+                    jobId={String(job.id)}
+                    attemptCount={attemptCount}
+                    lastAttemptLabel={lastAttemptLabel}
+                    action={logCustomerContactAttemptFromForm}
+                    buttonClassName={`${mobileMutedToolLinkClass} w-full text-sm`}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-[#0f1f35]">Team Assignment</div>
+                    <div className="text-xs text-slate-500">Technicians assigned to the job.</div>
+                  </div>
+                  <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">
+                    {assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}
+                  </span>
+                </div>
+                {assignedTeam.length > 0 ? (
+                  <div className="mt-3 space-y-2">
+                    {assignedTeam.map((assignee) => (
+                      <div key={`mobile-board-${assignee.job_id}-${assignee.user_id}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800">
+                        {formatPersonNamePart(assignee.display_name)}
+                        {assignee.is_primary ? <span className="ml-2 text-xs text-slate-500">Primary</span> : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600">No team assigned yet.</div>
+                )}
+              </div>
+            </div>
           </section>
 
           {showMobileContractorContext ? (
@@ -4381,21 +4553,26 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
           <section id="mobile-work-scope" className={mobileSectionClass}>
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <div className="text-lg font-semibold">Work Scope</div>
-                <div className="mt-1 text-base text-slate-600">
+              <div className="flex items-start gap-2">
+                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                  <ToolIcon className="h-4 w-4" />
+                </span>
+                <div>
+                <div className="text-lg font-semibold text-[#0f1f35]">Work & Invoice</div>
+                <div className="mt-0.5 text-sm text-slate-600">
                   {visitScopeCount} item{visitScopeCount === 1 ? "" : "s"} added
+                </div>
                 </div>
               </div>
             </div>
 
             <div className="mt-4 space-y-3">
-              <div id="mobile-visit-reason-card" className="rounded-xl bg-slate-50 px-3 py-3">
+              <div id="mobile-visit-reason-card" className="rounded-xl border border-slate-200/80 bg-slate-50/75 px-3 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)]">
                 {isInternalUser ? (
                   <details className="group">
                     <summary className="cursor-pointer list-none">
                       <div className="flex items-start justify-between gap-3">
-                        <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
+                        <div className="text-sm font-semibold text-[#0f1f35]">Visit Reason</div>
                         <span className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors group-hover:bg-slate-50">
                           Edit
                         </span>
@@ -4427,9 +4604,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     </form>
                   </details>
                 ) : (
-                  <div className="text-sm font-semibold text-slate-500">Visit Reason</div>
+                  <div className="text-sm font-semibold text-[#0f1f35]">Visit Reason</div>
                 )}
-                <div className="mt-1 whitespace-pre-wrap break-words text-lg font-semibold leading-7 text-slate-950">
+                <div className="mt-1 whitespace-pre-wrap break-words text-base font-semibold leading-6 text-slate-950">
                   {visitReasonText}
                 </div>
               </div>
@@ -4437,7 +4614,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               {visitScopeItems.length > 0 ? (
                 <div className="space-y-2">
                   {visitScopeItems.map((item, index) => (
-                    <div key={`mobile-primary-${index}-${item.title}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                    <div key={`mobile-primary-${index}-${item.title}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.24)]">
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0 text-base font-semibold leading-6 text-slate-950">{item.title}</div>
                         {item.expected_unit_price !== null && item.expected_unit_price !== undefined ? (
@@ -4471,7 +4648,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               ) : null}
 
               {isInternalUser ? (
-                <details className="group rounded-xl border border-blue-200 bg-blue-50/60 px-3 py-3">
+                <details className="group rounded-xl border border-blue-200 bg-blue-50/60 px-3 py-3 shadow-[0_12px_26px_-26px_rgba(37,99,235,0.28)]">
                   <summary className="cursor-pointer list-none">
                     <div className="flex items-center justify-between gap-3">
                       <div>
@@ -4503,23 +4680,31 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
           <section id="mobile-notes-hub" className={mobileSectionClass}>
             <div className="flex items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-1.5 text-lg font-semibold">
-                <FolderIcon className="h-5 w-5 text-slate-600" />
-                <span>Notes & Attachments</span>
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+                  <FolderIcon className="h-4 w-4" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-lg font-semibold text-[#0f1f35]">Notes & Attachments</div>
+                  <div className="text-xs text-slate-500">Internal notes, shared notes, and files.</div>
+                </div>
               </div>
               <Link
                 href={`/jobs/${job.id}/attachments`}
-                className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
+                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-[0_8px_18px_-22px_rgba(15,23,42,0.24)] transition-colors hover:border-blue-200 hover:bg-blue-50/35"
               >
                 Attachments
               </Link>
             </div>
             <div className="mt-3 grid gap-3">
-              <details id="mobile-internal-notes" className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3" open={Boolean(internalNoteBannerMessage)}>
+              <details id="mobile-internal-notes" className="rounded-xl border border-slate-200/80 bg-slate-50/75 px-3 py-3 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.22)]" open={Boolean(internalNoteBannerMessage)}>
                 <summary className="cursor-pointer list-none">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="inline-flex items-center gap-1.5 text-base font-semibold text-slate-950"><LockIcon className="h-4 w-4 text-slate-600" />Internal Notes</div>
-                    <div className="text-sm font-semibold text-slate-500">{internalNotesMeta || "Team only"}</div>
+                    <div className="inline-flex items-center gap-2 text-base font-semibold text-slate-950">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white text-slate-600 ring-1 ring-slate-200"><LockIcon className="h-3.5 w-3.5" /></span>
+                      <span>Internal Notes</span>
+                    </div>
+                    <div className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{internalNotesMeta || "Team only"}</div>
                   </div>
                 </summary>
                 <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
@@ -4553,11 +4738,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               </details>
 
               {showSharedNotesCard ? (
-                <details id="mobile-shared-notes" className="rounded-2xl border border-slate-200 bg-white px-3 py-3" open={Boolean(sharedNoteBannerMessage)}>
+                <details id="mobile-shared-notes" className="rounded-xl border border-slate-200/80 bg-white px-3 py-3 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.22)]" open={Boolean(sharedNoteBannerMessage)}>
                   <summary className="cursor-pointer list-none">
                     <div className="flex items-center justify-between gap-3">
-                        <div className="inline-flex items-center gap-1.5 text-base font-semibold text-slate-950"><ChatIcon className="h-4 w-4 text-slate-600" />Shared Notes</div>
-                      <div className="text-sm font-semibold text-slate-500">{sharedNotesMeta || "Shared"}</div>
+                      <div className="inline-flex items-center gap-2 text-base font-semibold text-slate-950">
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100"><ChatIcon className="h-3.5 w-3.5" /></span>
+                        <span>Shared Notes</span>
+                      </div>
+                      <div className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">{sharedNotesMeta || "Shared"}</div>
                     </div>
                   </summary>
                   <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
@@ -4596,9 +4784,20 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
           </section>
 
-          <details id="mobile-tools" className="rounded-2xl border border-slate-300 bg-white px-4 py-4 shadow-[0_18px_34px_-30px_rgba(15,23,42,0.32)]">
-            <summary className="cursor-pointer list-none text-lg font-semibold text-slate-950">
-              More Details / Tools
+          <details id="mobile-tools" className="group rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)] ring-1 ring-blue-100/30">
+            <summary className="cursor-pointer list-none">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-700 ring-1 ring-slate-200">
+                    <SettingsIcon className="h-4 w-4" />
+                  </span>
+                  <div>
+                    <div className="text-lg font-semibold text-[#0f1f35]">More Details / Tools</div>
+                    <div className="text-xs text-slate-500">Admin tools, permits, history, and follow-up.</div>
+                  </div>
+                </div>
+                <ChevronRightIcon className="h-4 w-4 shrink-0 text-slate-500 transition-transform group-open:rotate-90" />
+              </div>
             </summary>
             <div className="mt-4 space-y-4 border-t border-slate-200 pt-4">
               <div className="space-y-2">
@@ -4779,21 +4978,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 </div>
               </details>
 
-              <details id="mobile-contact-logging" className="group">
-                <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
-                  <span className="inline-flex items-center gap-2"><PhoneIcon className="h-4.5 w-4.5" />Contact Logging</span>
-                </summary>
-                <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
-                  <ContactLoggingQuickActions
-                    jobId={String(job.id)}
-                    attemptCount={attemptCount}
-                    lastAttemptLabel={lastAttemptLabel}
-                    action={logCustomerContactAttemptFromForm}
-                    buttonClassName={`${mobileMutedToolLinkClass} w-full text-sm`}
-                  />
-                </div>
-              </details>
-
               {job.job_type !== "service" ? (
                 <TimedServiceStatusActions
                   jobId={job.id}
@@ -4900,28 +5084,38 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
       <div className="hidden space-y-5 lg:block">
 
-<section className={`${workspaceSectionClass} mb-6 overflow-hidden border-slate-300/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] shadow-[0_24px_58px_-38px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70`}>
-  <div className="mb-4 border-b border-slate-200/80 pb-4">
-    <div className="mt-1 flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-      <div className="min-w-0 max-w-3xl">
-        <div className="mb-2 hidden sm:inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-800">
-          Job Command Center
+<section className={`${workspaceSectionClass} relative mb-6 overflow-hidden border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] shadow-[0_26px_64px_-42px_rgba(15,23,42,0.44)] ring-1 ring-blue-100/70`}>
+  <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
+  <div className="mb-3 grid gap-4 border-b border-slate-200/80 pb-4 xl:grid-cols-[minmax(0,1fr)_minmax(21rem,0.38fr)] xl:items-start">
+    <div className="min-w-0">
+      <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-800">
+        <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0f1f35] text-blue-100">
+          <ToolIcon className="h-3 w-3" />
+        </span>
+        <span>Job Workbench</span>
+      </div>
+      <h1 className="max-w-5xl text-[clamp(1.3rem,1.75vw,1.75rem)] font-semibold leading-tight text-[#0f1f35]">
+        {jobWorkbenchTitle}
+      </h1>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold tracking-[0.06em] text-slate-700">
+          {jobHeaderReference}
         </div>
-        <h1 className="text-[clamp(1.35rem,2vw,1.85rem)] font-semibold tracking-[-0.02em] text-slate-950">
-          {fieldHeaderTitle}
-        </h1>
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold tracking-[0.06em] text-slate-700">
-            {jobHeaderReference}
-          </div>
-          <div className="inline-flex rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
-            {headerJobTypeLabel}
-          </div>
+        <div className="inline-flex rounded-full border border-slate-200/90 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+          {headerJobTypeLabel}
         </div>
       </div>
-      <div id="field-status-actions" className="flex w-full flex-col gap-2.5 xl:w-auto xl:min-w-[24rem] xl:items-end">
+    </div>
+    <div id="field-status-actions" className="relative flex w-full flex-col gap-2.5 overflow-hidden rounded-2xl border border-blue-100 bg-white p-3 shadow-[0_20px_40px_-31px_rgba(29,78,216,0.36)] xl:items-stretch">
+      <span className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
+      <div className="inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-900/55">
+        <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-[#0f1f35] text-blue-100">
+          <ChevronRightIcon className="h-3.5 w-3.5" />
+        </span>
+        <span>Primary Next Action</span>
+      </div>
         {!isFieldComplete && job.status !== "completed" && !showFieldOutcomePanel ? (
-          <div className="hidden w-full sm:flex xl:justify-end">
+          <div className="hidden w-full gap-2 sm:flex sm:items-stretch">
             <JobFieldActionButton
               jobId={job.id}
               currentStatus={job.status}
@@ -4929,14 +5123,32 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               hasFullSchedule={hasFullSchedule}
               variant="commandBar"
             />
+            {job.job_type === "ecc" ? (
+              <Link
+                href={`/jobs/${job.id}/tests`}
+                className={`${compactWorkspaceActionButtonClass} min-h-11 shrink-0 px-4 shadow-[0_12px_24px_-20px_rgba(15,31,53,0.35)]`}
+              >
+                Open Tests Workspace
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+        {job.job_type === "ecc" && (isFieldComplete || job.status === "completed" || showFieldOutcomePanel) ? (
+          <div className="hidden w-full sm:flex">
+            <Link
+              href={`/jobs/${job.id}/tests`}
+              className={`${compactWorkspaceActionButtonClass} min-h-11 w-full shadow-[0_12px_24px_-20px_rgba(15,31,53,0.35)]`}
+            >
+              Open Tests Workspace
+            </Link>
           </div>
         ) : null}
 
-        <div className="hidden w-full flex-wrap gap-2 sm:flex xl:justify-end">
+        <div className="hidden w-full flex-wrap gap-2 border-t border-slate-200/80 pt-2.5 sm:flex">
           <div className="flex flex-wrap gap-2">
             <Link
               href="/ops"
-              className={compactUtilityButtonClass}
+              className={`${compactUtilityButtonClass} shadow-[0_8px_18px_-18px_rgba(15,23,42,0.28)]`}
             >
               Back to Ops
             </Link>
@@ -4944,7 +5156,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             {job.customer_id ? (
               <Link
                 href={`/customers/${job.customer_id}`}
-                className={compactUtilityButtonClass}
+                className={`${compactUtilityButtonClass} shadow-[0_8px_18px_-18px_rgba(15,23,42,0.28)]`}
               >
                 Open Customer
               </Link>
@@ -4953,17 +5165,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             {createEstimateFromJobHref ? (
               <Link
                 href={createEstimateFromJobHref}
-                className={compactUtilityButtonClass}
+                className={`${compactUtilityButtonClass} shadow-[0_8px_18px_-18px_rgba(15,23,42,0.28)]`}
               >
                 Create Estimate
-              </Link>
-            ) : null}
-            {job.job_type === "ecc" ? (
-              <Link
-                href={`/jobs/${job.id}/tests`}
-                className={compactWorkspaceActionButtonClass}
-              >
-                Open Tests Workspace
               </Link>
             ) : null}
           </div>
@@ -4997,15 +5201,21 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             ) : null}
           </div>
         </details>
-      </div>
     </div>
   </div>
 
-  <div className="mb-4 rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.9),rgba(255,255,255,0.99))] px-3.5 py-3.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.68),0_18px_36px_-34px_rgba(15,23,42,0.32)] sm:px-4">
+  <div className="mb-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.95),rgba(255,255,255,0.99))] px-3.5 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.72),0_18px_36px_-34px_rgba(15,23,42,0.32)] sm:px-4">
+    <div className="mb-2 flex items-center gap-2">
+      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+        <ClockIcon className="h-3.5 w-3.5" />
+      </span>
+      <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]">Schedule & Workflow</span>
+    </div>
     <div className="grid gap-2 lg:grid-cols-3">
       {/* Appointment — full card on all breakpoints */}
-      <div className="rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Appointment</div>
+      <div className="relative overflow-hidden rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.3)]">
+        <span className="absolute inset-x-0 top-0 h-[2px] bg-blue-600/70" />
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55"><ClockIcon className="h-3.5 w-3.5 text-blue-700" />Appointment</div>
         <div className="mt-0.5 min-w-0 text-[1rem] font-semibold tracking-[-0.01em] text-slate-950">
           {appointmentDateLabel}
         </div>
@@ -5016,15 +5226,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       </div>
 
       {/* Workflow — full card on lg+; compressed chip on mobile */}
-      <div className="hidden rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5 lg:block">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Workflow</div>
+      <div className="relative hidden overflow-hidden rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.3)] lg:block">
+        <span className="absolute inset-x-0 top-0 h-[2px] bg-blue-600/70" />
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55"><SettingsIcon className="h-3.5 w-3.5 text-blue-700" />Workflow</div>
         <div
           className={`mt-0.5 inline-flex w-fit items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] ${
             ["invoice_required", "pending_info"].includes(String(job.ops_status ?? "").toLowerCase())
               ? "border-amber-300 bg-amber-100 text-amber-800"
               : String(job.ops_status ?? "").toLowerCase() === "pending_office_review"
               ? "border-red-200 bg-red-50 text-red-800"
-              : "border-slate-200 bg-slate-50 text-slate-900"
+              : "border-blue-100 bg-blue-50 text-blue-800"
           }`}
         >
           {formatOpsStatusLabel(job.ops_status)}
@@ -5052,8 +5263,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       </div>
 
       {/* Field — full card on lg+; compressed chip on mobile */}
-      <div className="hidden rounded-xl border border-slate-200/80 bg-white/86 px-3 py-2.5 lg:block">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">Field</div>
+      <div className="relative hidden overflow-hidden rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.3)] lg:block">
+        <span className="absolute inset-x-0 top-0 h-[2px] bg-blue-600/70" />
+        <div className="inline-flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55"><ClipboardIcon className="h-3.5 w-3.5 text-blue-700" />Field</div>
         <div className={`mt-0.5 text-sm font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>
           {formatStatus(job.status)}
         </div>
@@ -5065,28 +5277,28 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
     {/* Mobile-only: Workflow + Field chip summary row (hidden on lg+) */}
     <div className="mt-2 flex flex-wrap gap-2 lg:hidden">
-      <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/86 px-2.5 py-1 text-xs">
-        <SettingsIcon className="h-3.5 w-3.5 text-slate-400" />
-        <span className="font-semibold uppercase tracking-[0.08em] text-slate-400">Workflow</span>
+      <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-xs">
+        <SettingsIcon className="h-3.5 w-3.5 text-blue-700" />
+        <span className="font-semibold uppercase tracking-[0.08em] text-blue-900/55">Workflow</span>
         <span className="font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</span>
       </div>
-      <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white/86 px-2.5 py-1 text-xs">
-        <ClipboardIcon className="h-3.5 w-3.5 text-slate-400" />
-        <span className="font-semibold uppercase tracking-[0.08em] text-slate-400">Field</span>
+      <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-xs">
+        <ClipboardIcon className="h-3.5 w-3.5 text-blue-700" />
+        <span className="font-semibold uppercase tracking-[0.08em] text-blue-900/55">Field</span>
         <span className={`font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>{formatStatus(job.status)}</span>
       </div>
     </div>
 
     {job.job_type === "service" ? (
-      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-600">
-        <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-[0.1em] text-slate-500">
+      <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-blue-100 bg-blue-50/45 px-3 py-2 text-xs text-slate-600">
+        <span className="inline-flex items-center gap-1 font-semibold uppercase tracking-[0.1em] text-blue-800">
           <ToolIcon className="h-3.5 w-3.5" />
           <span>Work & Invoice</span>
         </span>
         <span className="font-semibold text-slate-900">{visitScopeBadgeMainText}</span>
         <a
           href="#visit-scope-section"
-          className="text-xs font-medium text-slate-500 underline-offset-2 transition-colors hover:text-slate-700 hover:underline"
+          className="text-xs font-semibold text-blue-700 underline-offset-2 transition-colors hover:text-blue-900 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
         >
           {hasVisitScopeDefined ? "View details" : "Add details"}
         </a>
@@ -5148,26 +5360,29 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     )}
   </div>
 
-  <div className="mb-3 mt-5 flex flex-wrap items-end justify-between gap-2 border-t border-slate-200/70 pt-5 sm:mt-0 sm:border-t-0 sm:pt-0">
-    <div>
-      <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+  <div className="mb-3 mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-slate-200/70 pt-4 sm:mt-0 sm:border-t-0 sm:pt-0">
+    <div className="flex items-center gap-2">
+      <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#0f1f35] text-blue-100">
         <ToolIcon className="h-3.5 w-3.5" />
+      </span>
+      <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]">
         <span>Field Operations Board</span>
       </div>
     </div>
-    <div className="inline-flex rounded-full border border-slate-200 bg-white/86 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-slate-500 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.1em]">
+    <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-blue-800 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.1em]">
       {equipmentCount} equipment / {assignedTeam.length} assigned
     </div>
   </div>
 
-  <div className="mb-4 grid items-start gap-4 xl:grid-cols-[minmax(300px,0.9fr)_minmax(420px,1.04fr)_minmax(360px,1.16fr)]">
+  <div className="mb-4 grid items-start gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/55 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] xl:grid-cols-[minmax(300px,0.9fr)_minmax(420px,1.04fr)_minmax(360px,1.16fr)]">
     {/* Left: customer / contact info */}
-    <div className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-3 sm:p-4`}>
-      <div className="hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 sm:block">
+    <div className={`${workspaceSubtleCardClass} relative overflow-hidden border-slate-200/70 bg-white p-3 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.28)] sm:p-4`}>
+      <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
+      <div className="hidden text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-900/55 sm:block">
         {(job.job_type ? String(job.job_type).toUpperCase() : "SERVICE")}
         {serviceCity ? ` • ${serviceCity}` : ""}
       </div>
-      <div className="mt-2 hidden items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 sm:inline-flex"><UserIcon className="h-3.5 w-3.5" />Responsible Account</div>
+      <div className="mt-2 hidden items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0f1f35] sm:inline-flex"><UserIcon className="h-3.5 w-3.5 text-blue-700" />Customer / Account</div>
 
       {job.customer_id ? (
         <Link
@@ -5181,8 +5396,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       )}
 
       <div className="mt-2.5 space-y-2 border-t border-slate-200/70 pt-2.5 text-sm sm:mt-3 sm:space-y-2.5 sm:pt-3">
-        <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Account Contact</div>
+        <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)] sm:px-3 sm:py-2.5">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">Account Contact</div>
           <div className="mt-1.5 space-y-2 text-sm text-slate-600">
             {customerPhone !== "—" ? (
               <div className="flex w-full items-center gap-1.5">
@@ -5220,8 +5435,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
 
         {showSiteAccessCard ? (
-          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Site / Access Contact</div>
+          <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)] sm:px-3 sm:py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">Site / Access Contact</div>
             {primarySiteAccessName ? (
               <div className="mt-1 font-semibold text-slate-900">{primarySiteAccessName}</div>
             ) : null}
@@ -5241,8 +5456,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
 
         {showCombinedContractorBillingCard ? (
-          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contractor / Billing</div>
+          <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)] sm:px-3 sm:py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">Contractor / Billing</div>
             <div className="mt-1 font-semibold text-slate-900">{billingRecipientDisplayName || contractorName}</div>
             <div className="mt-1 grid gap-x-4 gap-y-1 text-xs text-slate-600 sm:mt-1.5 sm:grid-cols-2">
               {billingRecipientPhone ? (
@@ -5265,8 +5480,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
 
         {showBillingRecipientCard && !showCombinedContractorBillingCard ? (
-          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Billing</div>
+          <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)] sm:px-3 sm:py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">Billing</div>
             {hasJobBillingRecipient ? (
               <>
                 {billingRecipientDisplayName ? (
@@ -5305,8 +5520,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
 
         {contractorId && !showCombinedContractorBillingCard ? (
-          <div className="rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Contractor</div>
+          <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)] sm:px-3 sm:py-2.5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">Contractor</div>
             <div className="mt-1 font-semibold text-slate-800">{contractorName}</div>
           </div>
         ) : null}
@@ -5332,21 +5547,46 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
       </div>
 
-      <ContactLoggingQuickActions
-        jobId={String(job.id)}
-        attemptCount={attemptCount}
-        lastAttemptLabel={lastAttemptLabel}
-        action={logCustomerContactAttemptFromForm}
-        buttonClassName={`${compactSecondaryButtonClass} inline-flex min-h-9 items-center justify-center w-full text-xs sm:w-auto`}
-      />
+      <div className="mt-3 rounded-xl border border-slate-200/80 bg-white px-3 py-3 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.26)]">
+        <div className="mb-2 flex items-center gap-2 border-b border-slate-200/70 pb-2">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+            <PhoneIcon className="h-3.5 w-3.5" />
+          </span>
+          <div>
+            <div className="text-sm font-semibold text-[#0f1f35]">Contact Logging</div>
+            <div className="text-xs text-slate-500">Customer account for this visit.</div>
+          </div>
+        </div>
+        <div className="rounded-lg border border-blue-100 bg-blue-50/35 px-3 py-2.5 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
+          <ContactLoggingQuickActions
+            jobId={String(job.id)}
+            attemptCount={attemptCount}
+            lastAttemptLabel={lastAttemptLabel}
+            action={logCustomerContactAttemptFromForm}
+            buttonClassName={`${compactSecondaryButtonClass} inline-flex min-h-9 items-center justify-center w-full text-xs sm:w-auto`}
+          />
+        </div>
+      </div>
 
-      <div id="assigned-team" className="mt-3 rounded-lg border border-slate-200/70 bg-white/80 px-2.5 py-2 sm:px-3 sm:py-2.5">
+      <div className="mt-4 border-t border-slate-200/80 pt-3">
+        <div className="mb-2 flex items-center gap-2">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-700 ring-1 ring-slate-200">
+            <UserIcon className="h-3.5 w-3.5" />
+          </span>
+          <div>
+            <div className="text-sm font-semibold text-[#0f1f35]">Team Assignment</div>
+            <div className="text-xs text-slate-500">Field ownership for this visit.</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="assigned-team" className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 sm:px-3 sm:py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500"><UserIcon className="h-3.5 w-3.5" />Assigned Team</div>
-            <div className="mt-1 text-sm text-slate-600">Field ownership for this visit.</div>
+            <div className="text-sm font-semibold text-slate-900">Assigned Team</div>
+            <div className="mt-0.5 text-xs text-slate-600">Technicians assigned to the job.</div>
           </div>
-          <div className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.06em] text-slate-500 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.08em]">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
+          <div className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9.5px] font-semibold text-slate-600 sm:px-2.5 sm:py-1 sm:text-[10px]">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
         </div>
         {assignedTeam.length > 0 ? (
           <div className="mt-3 flex min-w-0 flex-wrap gap-2">
@@ -5430,13 +5670,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
     {/* Center: destination panel */}
     <div className="space-y-4 sm:space-y-3">
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.28)]">
+      <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_44px_-32px_rgba(15,23,42,0.32)] ring-1 ring-blue-100/50">
+        <span className="absolute inset-x-0 top-0 z-10 h-[3px] bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
         <div className="absolute left-3 top-3 z-10">
-          <div className="rounded-full border border-white/70 bg-white/76 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.3)] backdrop-blur-sm">
+          <div className="rounded-full border border-blue-100/80 bg-white/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.3)] backdrop-blur-sm">
             Service Location
           </div>
         </div>
-        <div className="bg-slate-100 p-3">
+        <div className="bg-[linear-gradient(180deg,#f8fafc,#eef6ff)] p-3">
           <Suspense
             fallback={
               <JobLocationPreviewFallback
@@ -5465,18 +5706,19 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       </div>
 
-      <div id="visit-reason-card" className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/94 p-4`}>
+      <div id="visit-reason-card" className={`${workspaceSubtleCardClass} relative overflow-hidden border-slate-200/70 bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.24)]`}>
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              <ClipboardIcon className="h-3.5 w-3.5" />
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]">
+              <ClipboardIcon className="h-3.5 w-3.5 text-blue-700" />
               <span>Visit Reason</span>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             {isInternalUser ? (
               <details className="group">
-                <summary className="cursor-pointer list-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white">
+                <summary className="cursor-pointer list-none rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 shadow-[0_8px_18px_-18px_rgba(15,23,42,0.24)] transition-colors hover:border-blue-200 hover:bg-white hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
                   Edit
                 </summary>
                 <form action={updateJobVisitScopeFromForm} className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:w-[22rem]">
@@ -5508,7 +5750,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             {job.job_type === "service" ? (
               <a
                 href="#visit-scope-section"
-                className="hidden shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 transition-colors hover:bg-white sm:inline-flex"
+                className="hidden shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 shadow-[0_8px_18px_-18px_rgba(15,23,42,0.24)] transition-colors hover:border-blue-200 hover:bg-white hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:inline-flex"
               >
                 Work Items
               </a>
@@ -5517,13 +5759,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
 
         <div className="mt-3 space-y-3">
-          <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2.5 whitespace-pre-wrap break-words text-base leading-7 text-slate-900">
+          <div className="rounded-lg border border-blue-100 bg-blue-50/35 px-3 py-2.5 whitespace-pre-wrap break-words text-base leading-7 text-slate-900 shadow-[inset_3px_0_0_rgba(37,99,235,0.18)]">
             {visitReasonText}
           </div>
 
           {shouldShowCustomerConcern ? (
             <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">
                 Customer Concern
               </div>
               <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800">
@@ -5534,7 +5776,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
           {shouldShowIntakeNotes ? (
             <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">
                 Intake Notes
               </div>
               <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800">
@@ -5545,7 +5787,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
           {shouldShowWorkSummary ? (
             <div className="rounded-lg border border-slate-200/80 bg-white px-3 py-2.5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">
                 Work Summary
               </div>
               <div className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800">
@@ -5560,10 +5802,11 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
     {/* Visit scope workspace */}
     {isInternalUser ? (
-      <div id="visit-scope-section" className="scroll-mt-24 rounded-2xl border border-slate-200/80 bg-white/94 p-4 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)] xl:order-4 xl:col-span-3">
+      <div id="visit-scope-section" className="relative scroll-mt-24 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.26)] xl:order-4 xl:col-span-3">
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
         <div className="space-y-3">
           {job.job_type === "service" && visitScopeCount === 0 ? (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 shadow-[inset_3px_0_0_rgba(217,119,6,0.22)]">
               Add Work Items before closeout or billing.
             </div>
           ) : null}
@@ -5571,9 +5814,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700"><ToolIcon className="h-3.5 w-3.5" />Work & Invoice</div>
+                <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0f1f35]"><span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100"><ToolIcon className="h-3.5 w-3.5" /></span>Work & Invoice</div>
                 {job.job_type === "service" ? (
-                  <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600 sm:inline-flex">
+                  <span className="hidden rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-800 sm:inline-flex">
                     {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
                   </span>
                 ) : null}
@@ -5581,7 +5824,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
 
             <details className="group w-full">
-              <summary className="inline-flex min-h-11 w-full cursor-pointer list-none items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold uppercase tracking-[0.08em] text-slate-700 transition-colors hover:bg-slate-50 hover:text-slate-900 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:min-h-9 sm:w-auto sm:py-1.5 sm:text-xs">
+              <summary className="inline-flex min-h-11 w-full cursor-pointer list-none items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold uppercase tracking-[0.08em] text-slate-700 shadow-[0_10px_22px_-22px_rgba(15,23,42,0.28)] transition-colors hover:border-blue-200 hover:bg-blue-50/40 hover:text-blue-800 active:translate-y-[1px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:min-h-9 sm:w-auto sm:py-1.5 sm:text-xs">
                 {hasVisitScopeDefined ? "Add or Update Work" : "Add Work"}
               </summary>
 
@@ -5601,7 +5844,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           </div>
 
           {showInternalInvoicePanel ? (
-            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-3.5 py-3">
+            <div className="rounded-2xl border border-blue-100 bg-blue-50/60 px-3.5 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
               <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(13rem,0.45fr)_auto] lg:items-center">
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-700">Work performed - price - invoice status</div>
@@ -5644,14 +5887,14 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           ) : null}
 
           {hasVisitScopeDefined ? (
-          <div className="rounded-2xl border border-slate-200/80 bg-white/94 px-4 py-3.5 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)]">
+          <div className="rounded-2xl border border-slate-200/80 bg-white px-4 py-3.5 shadow-[0_14px_28px_-32px_rgba(15,23,42,0.24)]">
             <div className="space-y-3.5">
               {primaryVisitScopeItems.length > 0 ? (
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Work Items</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">Work Items</div>
                   <div className="mt-2 space-y-2.5">
                     {primaryVisitScopeItems.map((item, index) => (
-                      <div key={`primary-${index}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5">
+                      <div key={`primary-${index}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5 shadow-[inset_3px_0_0_rgba(37,99,235,0.12)]">
                         <div className="flex flex-wrap items-center gap-2">
                           <div className="text-sm font-semibold leading-5 text-slate-900">{item.title}</div>
                           {item.expected_unit_price !== null && item.expected_unit_price !== undefined ? (
@@ -5735,7 +5978,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
           </div>
           ) : (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
+            <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/35 px-3 py-2.5 text-xs text-blue-900">
               No work items added yet.
             </div>
           )}
@@ -5747,33 +5990,35 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     {/* Right: quick reference rail */}
     <div className="space-y-3 xl:order-3 xl:flex xl:h-full xl:self-stretch xl:flex-col xl:space-y-0 xl:gap-3">
       {job.job_type === "ecc" ? (
-        <div className={`${workspaceSubtleCardClass} border-slate-200/70 p-4 ${hasPermitDetails ? "bg-white/92" : "bg-slate-50/88"}`}>
+        <div className={`${workspaceSubtleCardClass} relative overflow-hidden border-slate-200/70 p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.24)] ${hasPermitDetails ? "bg-white" : "bg-slate-50/88"}`}>
+          <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
                 <div className="mb-3 flex items-start justify-between gap-3">
             <div>
-              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ClipboardIcon className="h-3.5 w-3.5" />Permit Quick Ref</div>
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]"><ClipboardIcon className="h-3.5 w-3.5 text-blue-700" />Permit Quick Ref</div>
               <div className="mt-1 text-sm text-slate-600">
                 Permit number
               </div>
             </div>
-            <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-800">
               ECC
             </span>
           </div>
 
-          <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-            <div className="text-[10px] uppercase tracking-[0.1em] text-slate-400">Number</div>
+          <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-blue-900/55">Number</div>
             <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
           </div>
         </div>
       ) : null}
 
-      <div id="internal-notes" className={`${workspaceSubtleCardClass} border-slate-200/70 bg-white/92 p-4 xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:justify-start`}>
+      <div id="internal-notes" className={`${workspaceSubtleCardClass} relative overflow-hidden border-slate-200/70 bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.24)] xl:flex xl:min-h-0 xl:flex-1 xl:flex-col xl:justify-start`}>
+        <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
         <div className="mb-2 flex items-start justify-between gap-3">
           <div>
-            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400"><ChatIcon className="h-3.5 w-3.5" />{rightRailNotesTitle}</div>
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]"><ChatIcon className="h-3.5 w-3.5 text-blue-700" />{rightRailNotesTitle}</div>
             <div className="mt-1 text-[15px] leading-6 text-slate-600">{rightRailNotesSubtitle}</div>
           </div>
-          <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+          <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-800">
             {rightRailNoteCount} notes
           </span>
         </div>
@@ -5781,25 +6026,25 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
           {latestJobNotesPreview.map((preview, index) => (
             <div
               key={`${preview.createdAt || "note"}-${preview.label}-${preview.text.slice(0, 40)}-${index}`}
-              className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-700"
+              className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-700 shadow-[inset_3px_0_0_rgba(37,99,235,0.12)]"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">{preview.label}</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-blue-900/55">{preview.label}</div>
               <div className="mt-0.5 break-words leading-6">{preview.text}</div>
             </div>
           ))}
           {!hasAnyRightRailNotes ? (
-            <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/80 px-3 py-2 text-xs text-slate-600">
+            <div className="rounded-lg border border-dashed border-blue-200 bg-blue-50/35 px-3 py-2 text-xs text-blue-900">
               {rightRailNotesEmptyText}
             </div>
           ) : null}
           {hasAnyRightRailNotes && rightRailNoteCount > latestJobNotesPreview.length ? (
-            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-xs text-slate-600">
+            <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-xs text-slate-600 shadow-[inset_3px_0_0_rgba(37,99,235,0.12)]">
               Showing latest {latestJobNotesPreview.length} of {rightRailNoteCount} notes.
             </div>
           ) : null}
         </div>
-        <details className="mt-3 rounded-xl border border-slate-200/80 bg-white/88 px-3 py-2.5">
-          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-800">
+        <details className="mt-3 rounded-xl border border-slate-200/80 bg-white/88 px-3 py-2.5 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.25)]">
+          <summary className="cursor-pointer list-none text-sm font-semibold text-slate-800 transition-colors hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200">
             View / Add Notes
           </summary>
           <div className="mt-3 space-y-3 border-t border-slate-200/80 pt-3">
@@ -7042,22 +7287,92 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </div>
       ) : null}
 
-    <section id="job-details-records" className="rounded-2xl border border-slate-300/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.99))] p-3.5 shadow-[0_22px_48px_-38px_rgba(15,23,42,0.34)] ring-1 ring-slate-200/70 sm:rounded-3xl sm:p-5">
-      <div className="mb-3 flex flex-col gap-1.5 border-b border-slate-200/80 pb-2.5 sm:mb-4 sm:gap-2 sm:pb-3 sm:flex-row sm:items-end sm:justify-between">
+    <section id="job-details-records" className="rounded-2xl border border-slate-200/80 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,0.99))] p-3.5 shadow-[0_20px_46px_-38px_rgba(15,23,42,0.32)] ring-1 ring-blue-100/50 sm:rounded-2xl sm:p-5">
+      <div className="mb-3 flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:mb-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500"><FolderIcon className="h-3.5 w-3.5" />Job Records</div>
+          <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0f1f35]">
+            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
+              <FolderIcon className="h-3.5 w-3.5" />
+            </span>
+            <span>Job Records</span>
+          </div>
           <div className="mt-0.5 text-lg font-semibold tracking-tight text-slate-950 sm:mt-1 sm:text-xl">Job Details & Records</div>
           <div className="mt-1 hidden text-base text-slate-600 sm:block">Details, status, equipment, attachments, follow-up, and history.</div>
         </div>
-        <div className="flex flex-wrap gap-1">
-          <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{noteCountSummary.timelineNoteEventCount} notes</span>
-          <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{serviceCaseVisitCount} visits</span>
-          {showEccSummaryCard ? <span className={`${infoChipClass} rounded-[7px] px-2 py-0.5 text-[11px] sm:rounded-md sm:px-2.5 sm:py-1 sm:text-xs`}>{eccRunCount} ECC runs</span> : null}
+        <div className="flex flex-wrap gap-1.5">
+          <span className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-800">{noteCountSummary.timelineNoteEventCount} notes</span>
+          <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">{serviceCaseVisitCount} visits</span>
+          {showEccSummaryCard ? <span className="inline-flex rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700">{eccRunCount} ECC runs</span> : null}
         </div>
       </div>
       <style>{`
         #job-record-detail-panel > [data-record-panel] { display: none; }
         #job-record-detail-panel > [data-record-panel]:target { display: block; }
+        #job-details-records [data-record-launcher],
+        #job-details-records details {
+          position: relative;
+          overflow: hidden;
+        }
+        #job-details-records [data-record-launcher]::before,
+        #job-details-records details::before {
+          content: "";
+          position: absolute;
+          inset: 0 auto 0 0;
+          width: 3px;
+          background: rgb(37 99 235 / 0.16);
+        }
+        #job-details-records [data-record-launcher]:hover::before,
+        #job-details-records details:hover::before,
+        #job-details-records details[open]::before {
+          background: rgb(37 99 235 / 0.36);
+        }
+        #job-details-records .header-icon-badge {
+          width: 1.875rem;
+          height: 1.875rem;
+          border-radius: 0.5rem;
+          border: 1px solid rgb(219 234 254);
+          background: rgb(239 246 255 / 0.82);
+          color: rgb(29 78 216);
+          box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.78);
+        }
+        #job-details-records .header-title {
+          gap: 0.625rem;
+          color: rgb(15 31 53);
+        }
+        #job-details-records .header-subtitle {
+          color: rgb(71 85 105);
+        }
+        #job-details-records .header-meta {
+          border-color: rgb(219 234 254);
+          background: rgb(239 246 255 / 0.75);
+          color: rgb(30 64 175);
+          letter-spacing: 0.04em;
+        }
+        #job-details-records .disclosure-icon {
+          border-color: rgb(226 232 240);
+          background: rgb(248 250 252 / 0.9);
+          color: rgb(100 116 139);
+        }
+        @media (max-width: 639px) {
+          #job-details-records [data-record-launcher],
+          #job-details-records details {
+            padding: 0.875rem;
+            border-radius: 1rem;
+            box-shadow: 0 14px 30px -28px rgb(15 23 42 / 0.32);
+          }
+          #job-details-records .header-subtitle {
+            display: block;
+            margin-top: 0.25rem;
+          }
+          #job-details-records .header-title {
+            font-size: 0.95rem;
+            line-height: 1.25rem;
+          }
+          #job-details-records .header-meta {
+            font-size: 0.68rem;
+            text-transform: none;
+          }
+        }
         #job-details-records:has(#edit-job:target) [data-record-launcher="edit-job"],
         #job-details-records:has(#job-status:target) [data-record-launcher="job-status"],
         #job-details-records:has(#job-record-equipment:target) [data-record-launcher="job-record-equipment"],
