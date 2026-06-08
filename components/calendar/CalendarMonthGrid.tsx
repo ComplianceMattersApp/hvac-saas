@@ -110,10 +110,10 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
   const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5">
+    <div className="rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_24px_52px_-30px_rgba(15,31,53,0.28)]">
       <div className="mb-3 grid grid-cols-7 gap-2">
         {weekdayLabels.map((label) => (
-          <div key={label} className="rounded-md bg-slate-50 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+          <div key={label} className="rounded-lg bg-slate-50/80 px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             {label}
           </div>
         ))}
@@ -169,20 +169,20 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                   { scroll: false },
                 );
               }}
-              className={`min-h-28 overflow-visible rounded-lg border p-3 transition ${
+              className={`min-h-28 overflow-visible rounded-xl border p-3 transition ${
                 isToday(day)
-                  ? 'border-blue-200 bg-blue-50/70'
+                  ? 'border-2 border-blue-400 bg-blue-50/90 shadow-[0_0_0_3px_rgba(59,130,246,0.12)]'
                   : isAdjacentMonthDay
-                  ? 'border-slate-200 bg-slate-50/70'
-                  : 'border-slate-200 bg-white'
-              } hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-sm ${isSelectedDate ? 'ring-2 ring-slate-800/35 border-slate-400 bg-slate-50/80 shadow-sm' : ''} ${dropTargetDate === ymd ? 'ring-2 ring-blue-400 border-blue-500 bg-blue-50/80' : ''}`}
+                  ? 'border-slate-200/70 bg-slate-50/60'
+                  : 'border-slate-200/80 bg-white'
+              } hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-sm ${isSelectedDate && !isToday(day) ? 'ring-2 ring-slate-800/35 border-slate-400 bg-slate-50/80 shadow-sm' : ''} ${dropTargetDate === ymd ? 'ring-2 ring-blue-400 border-blue-500 bg-blue-50/80' : ''}`}
             >
               <div className="mb-2 flex items-center justify-between">
                 <Link
                   href={buildCalendarHref('month', ymd, { tech, inspector: '1' })}
                   className={`rounded-full px-2.5 py-1 text-lg font-bold transition hover:bg-slate-100 ${
-                    isToday(day) ? 'bg-blue-600 text-white shadow-sm' : isAdjacentMonthDay ? 'text-slate-400' : 'text-slate-900'
-                  } ${isSelectedDate && !isToday(day) ? 'bg-slate-100 text-slate-900' : ''}`}
+                    isToday(day) ? 'bg-blue-600 text-white shadow-sm' : isAdjacentMonthDay ? 'text-slate-400' : 'text-[#0f1f35]'
+                  } ${isSelectedDate && !isToday(day) ? 'bg-slate-100 text-[#0f1f35]' : ''}`}
                 >
                   {format(day, 'd')}
                 </Link>
@@ -217,12 +217,12 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                           event.dataTransfer.setData('application/x-cm-job-id', job.id);
                           event.dataTransfer.effectAllowed = 'move';
                         }}
-                        className={`flex min-h-[36px] min-w-0 items-start gap-2 overflow-hidden rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm shadow-slate-950/5 transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
+                        className={`flex min-h-[36px] min-w-0 items-start gap-2 overflow-hidden rounded-xl border border-slate-200/80 bg-white px-2.5 py-1.5 text-xs shadow-[0_4px_12px_-8px_rgba(15,31,53,0.25)] transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
                         scroll={false}
                       >
                         <div className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-medium text-slate-900">{primaryLine}</div>
+                          <div className="truncate font-medium text-[#0f1f35]">{primaryLine}</div>
                           <div className="mt-0.5 truncate text-[10px] text-slate-500">{secondaryLine}</div>
                           {workContextLabel ? (
                             <div className="mt-0.5 truncate text-[10px] text-slate-500">Work: {workContextLabel}</div>
@@ -279,7 +279,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
 
                 {visibleBlockEvents.map((event) => (
                   <div key={event.id} className="group relative overflow-visible">
-                    <div className={`flex min-h-[28px] min-w-0 items-center gap-2 overflow-hidden rounded-lg border border-emerald-200 border-dashed bg-emerald-50/70 px-2.5 py-1.5 text-[11px] text-emerald-950 shadow-sm shadow-emerald-950/5 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}>
+                    <div className={`flex min-h-[28px] min-w-0 items-center gap-2 overflow-hidden rounded-xl border border-dashed border-emerald-200/80 bg-emerald-50/60 px-2.5 py-1.5 text-[11px] text-emerald-950 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}>
                       <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
                         Block
                       </span>
@@ -310,7 +310,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                 ))}
 
                 {hiddenEntryCount > 0 ? (
-                  <div className="mt-1 text-center text-[11px] font-medium text-slate-500">+{hiddenEntryCount} more</div>
+                  <div className="mt-1 text-center text-[11px] font-semibold text-slate-500">+{hiddenEntryCount} more</div>
                 ) : null}
               </div>
             </div>
