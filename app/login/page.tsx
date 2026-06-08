@@ -207,8 +207,8 @@ export default function LoginPage() {
 
   return (
     <AuthCommandCenterLayout
-      eyebrow="Operations Command Center"
-      headline="Run your day from one command center."
+      eyebrow="Field Operations Desk"
+      headline="Run your day, from dispatch to closeout."
       subhead="Compliance Matters brings service calls, dispatch, ECC testing, closeout, and follow-up into a single, organized view — built for teams that live in the field."
       highlights={[
         "Schedule and dispatch from one queue",

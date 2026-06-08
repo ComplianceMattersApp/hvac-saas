@@ -55,7 +55,7 @@ function ProductChoiceCard(props: ProductChoiceCardProps) {
 export function SignupProductChoiceLanding() {
   return (
     <AuthCommandCenterLayout
-      eyebrow="Operations Command Center"
+      eyebrow="Field Operations Desk"
       headline="Start a 14-day guided trial."
       subhead="Choose the path that fits your company. You can finish account setup on the next step — no payment details needed. Hybrid / All-in-One setup is handled manually by operator support when needed."
     >
