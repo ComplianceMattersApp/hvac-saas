@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { listFieldPaymentCollectionReportsForReconciliation } from "@/lib/business/field-payment-reconciliation-read-model";
 
@@ -62,6 +62,7 @@ type BuildState = {
   customers?: CustomerRow[];
   internalUsers?: InternalUserRow[];
   profiles?: ProfileRow[];
+  tableErrors?: Record<string, unknown>;
 };
 
 function makeReport(overrides: Partial<ReportRow> = {}): ReportRow {
@@ -157,6 +158,9 @@ function makeAdmin(state: BuildState = {}) {
     orderBy: { column: string; ascending: boolean } | null,
     limitValue: number | null,
   ) {
+    const tableError = state.tableErrors?.[table];
+    if (tableError) return { data: null, error: tableError };
+
     let rows = [...(tables[table] ?? [])];
 
     for (const filter of filters) {
@@ -213,7 +217,7 @@ function makeAdmin(state: BuildState = {}) {
           limitValue = value;
           return Promise.resolve(runSelect(table, filters, orderBy, limitValue));
         },
-        then(resolve: (value: { data: any[]; error: null }) => unknown, reject?: (reason?: unknown) => unknown) {
+        then(resolve: (value: { data: any[] | null; error: unknown }) => unknown, reject?: (reason?: unknown) => unknown) {
           return Promise.resolve(runSelect(table, filters, orderBy, limitValue)).then(resolve, reject);
         },
         insert() {
@@ -242,6 +246,10 @@ function makeAdmin(state: BuildState = {}) {
 }
 
 describe("listFieldPaymentCollectionReportsForReconciliation", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("lists reported field payment rows", async () => {
     const ctx = makeAdmin({
       reports: [makeReport({ status: "reported" })],
@@ -386,5 +394,64 @@ describe("listFieldPaymentCollectionReportsForReconciliation", () => {
     expect(ctx.touched.some((entry) => entry.op === "update")).toBe(false);
     expect(ctx.touched.some((entry) => entry.op === "upsert")).toBe(false);
     expect(ctx.touched.some((entry) => entry.op === "delete")).toBe(false);
+  });
+
+  it("returns an empty queue when the field payment reports table is missing from PostgREST schema cache", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const ctx = makeAdmin({
+      reports: [makeReport()],
+      tableErrors: {
+        field_payment_collection_reports: {
+          code: "PGRST205",
+          message: "Could not find the table 'public.field_payment_collection_reports' in the schema cache",
+        },
+      },
+    });
+
+    const result = await listFieldPaymentCollectionReportsForReconciliation({
+      admin: ctx.admin,
+      accountOwnerUserId: "owner-1",
+    });
+
+    expect(result.items).toEqual([]);
+    expect(result.summary).toEqual({
+      openCount: 0,
+      reportedCount: 0,
+      underReviewCount: 0,
+      needsCorrectionCount: 0,
+      totalReportedAmountCents: 0,
+      oldestReportedAt: null,
+      newestReportedAt: null,
+    });
+    expect(result.noPaymentRowWrites).toBe(true);
+    expect(result.noInvoiceMutations).toBe(true);
+    expect(ctx.touched.some((entry) => entry.table !== "field_payment_collection_reports")).toBe(false);
+    expect(ctx.touched.some((entry) => ["insert", "update", "upsert", "delete"].includes(entry.op))).toBe(false);
+    expect(warn).toHaveBeenCalledWith(
+      "Field payment reconciliation reports table is unavailable; returning empty reconciliation queue",
+      expect.objectContaining({
+        accountOwnerUserId: "owner-1",
+        error: "Could not find the table 'public.field_payment_collection_reports' in the schema cache",
+      }),
+    );
+  });
+
+  it("does not fail-soft unrelated field payment report read errors", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const ctx = makeAdmin({
+      tableErrors: {
+        field_payment_collection_reports: {
+          code: "42501",
+          message: "permission denied for table field_payment_collection_reports",
+        },
+      },
+    });
+
+    await expect(listFieldPaymentCollectionReportsForReconciliation({
+      admin: ctx.admin,
+      accountOwnerUserId: "owner-1",
+    })).rejects.toThrow("Failed to load field payment reconciliation reports: permission denied for table field_payment_collection_reports");
+
+    expect(warn).not.toHaveBeenCalled();
   });
 });

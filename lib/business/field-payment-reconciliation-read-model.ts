@@ -67,6 +67,19 @@ function clean(value: unknown) {
   return String(value ?? "").trim();
 }
 
+function isMissingFieldPaymentCollectionReportsError(error: unknown) {
+  const code = String((error as any)?.code ?? "").trim();
+  const message = String((error as any)?.message ?? error ?? "").toLowerCase();
+
+  if (code !== "42P01" && code !== "PGRST205") return false;
+  return message.includes("field_payment_collection_reports")
+    && (
+      message.includes("schema cache")
+      || message.includes("does not exist")
+      || message.includes("could not find the table")
+    );
+}
+
 function toNumber(value: unknown) {
   const parsed = Number(value ?? 0);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -245,6 +258,14 @@ export async function listFieldPaymentCollectionReportsForReconciliation(params:
     .limit(limit);
 
   if (reportsError) {
+    if (isMissingFieldPaymentCollectionReportsError(reportsError)) {
+      console.warn("Field payment reconciliation reports table is unavailable; returning empty reconciliation queue", {
+        accountOwnerUserId,
+        error: reportsError instanceof Error ? reportsError.message : String((reportsError as any)?.message ?? reportsError),
+      });
+      return emptyResult;
+    }
+
     throw new Error(`Failed to load field payment reconciliation reports: ${reportsError.message ?? "unknown error"}`);
   }
 

@@ -32,6 +32,19 @@ function cleanId(value: unknown) {
   return String(value ?? '').trim();
 }
 
+function isMissingInternalUserAccessCapabilitiesError(error: unknown) {
+  const code = String((error as any)?.code ?? '').trim();
+  const message = String((error as any)?.message ?? error ?? '').toLowerCase();
+
+  if (code !== '42P01' && code !== 'PGRST205') return false;
+  return message.includes('internal_user_access_capabilities')
+    && (
+      message.includes('schema cache')
+      || message.includes('does not exist')
+      || message.includes('could not find the table')
+    );
+}
+
 function mapCapabilityRows(rows: CapabilityRow[] | null | undefined): Partial<FieldBillingCapabilities> {
   const capabilities: Partial<FieldBillingCapabilities> = {};
 
@@ -64,6 +77,10 @@ export async function loadFieldBillingExplicitCapabilitiesForUser(params: {
     .eq('enabled', true);
 
   if (error) {
+    if (!isMissingInternalUserAccessCapabilitiesError(error)) {
+      throw error;
+    }
+
     console.warn('Failed to load internal user field billing capabilities', {
       accountOwnerUserId,
       internalUserId,
@@ -99,6 +116,10 @@ export async function loadFieldBillingCapabilityStatesForUsers(params: {
     : query);
 
   if (error) {
+    if (!isMissingInternalUserAccessCapabilitiesError(error)) {
+      throw error;
+    }
+
     console.warn('Failed to load internal user field billing capability states', {
       accountOwnerUserId,
       internalUserIds,

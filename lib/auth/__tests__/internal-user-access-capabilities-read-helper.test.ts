@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { canRecordInvoicePayment } from '@/lib/auth/financial-access';
 import { resolveFieldBillingCapabilities } from '@/lib/auth/field-billing-access';
-import { loadFieldBillingExplicitCapabilitiesForUser } from '@/lib/auth/internal-user-access-capabilities';
+import {
+  loadFieldBillingCapabilityStatesForUsers,
+  loadFieldBillingExplicitCapabilitiesForUser,
+} from '@/lib/auth/internal-user-access-capabilities';
 
 function makeSupabase(rows: Array<Record<string, unknown>>, queryError: unknown = null) {
   const filters: Array<[string, unknown]> = [];
@@ -13,9 +16,15 @@ function makeSupabase(rows: Array<Record<string, unknown>>, queryError: unknown 
       filters.push([column, value]);
       return query;
     }),
+    in: vi.fn((column: string, values: unknown[]) => {
+      filters.push([column, values]);
+      return query;
+    }),
     then: (resolve: (value: { data: Array<Record<string, unknown>> | null; error: unknown }) => unknown) => {
       const filteredRows = rows.filter((row) =>
-        filters.every(([column, value]) => row[column] === value),
+        filters.every(([column, value]) => Array.isArray(value)
+          ? value.includes(row[column])
+          : row[column] === value),
       );
       return Promise.resolve(resolve({ data: queryError ? null : filteredRows, error: queryError }));
     },
@@ -220,9 +229,12 @@ describe('loadFieldBillingExplicitCapabilitiesForUser', () => {
     expect(canRecordInvoicePayment(techParams(explicitCapabilities))).toBe(false);
   });
 
-  it('fails closed to empty capabilities and logs read failures', async () => {
+  it('fails closed to empty capabilities and logs when the capabilities table is missing', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const fixture = makeSupabase([], new Error('relation missing'));
+    const fixture = makeSupabase([], {
+      code: 'PGRST205',
+      message: "Could not find the table 'public.internal_user_access_capabilities' in the schema cache",
+    });
 
     await expect(loadFieldBillingExplicitCapabilitiesForUser({
       supabase: fixture.supabase,
@@ -235,7 +247,49 @@ describe('loadFieldBillingExplicitCapabilitiesForUser', () => {
       expect.objectContaining({
         accountOwnerUserId: 'owner-1',
         internalUserId: 'tech-1',
-        error: 'relation missing',
+        error: "Could not find the table 'public.internal_user_access_capabilities' in the schema cache",
+      }),
+    );
+  });
+
+  it('does not fail-soft unrelated explicit capability read failures', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fixture = makeSupabase([], {
+      code: '42501',
+      message: 'permission denied for table internal_user_access_capabilities',
+    });
+
+    await expect(loadFieldBillingExplicitCapabilitiesForUser({
+      supabase: fixture.supabase,
+      accountOwnerUserId: 'owner-1',
+      internalUserId: 'tech-1',
+    })).rejects.toMatchObject({
+      code: '42501',
+      message: 'permission denied for table internal_user_access_capabilities',
+    });
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('fails closed to empty capability states when the capabilities table is missing', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const fixture = makeSupabase([], {
+      code: '42P01',
+      message: 'relation "public.internal_user_access_capabilities" does not exist',
+    });
+
+    await expect(loadFieldBillingCapabilityStatesForUsers({
+      supabase: fixture.supabase,
+      accountOwnerUserId: 'owner-1',
+      internalUserIds: ['tech-1'],
+    })).resolves.toEqual({});
+
+    expect(warn).toHaveBeenCalledWith(
+      'Failed to load internal user field billing capability states',
+      expect.objectContaining({
+        accountOwnerUserId: 'owner-1',
+        internalUserIds: ['tech-1'],
+        error: 'relation "public.internal_user_access_capabilities" does not exist',
       }),
     );
   });
