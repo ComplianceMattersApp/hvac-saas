@@ -78,6 +78,7 @@ export type TodayJobSummary = {
 export type TodayHeader = {
   displayDate: string;
   accountDisplayName: string;
+  companyLogoUrl: string | null;
   greetingLine: string;
   roleLabel: string;
   productMode: ProductMode;
@@ -2111,6 +2112,7 @@ async function buildTodayReadModelForInternalActor(
     accountDisplayName:
       (identity?.displayName as string | undefined)?.trim() ||
       "Compliance Matters",
+    companyLogoUrl: identity?.logoUrl ?? null,
     greetingLine: buildTodayGreetingLine(actor.user),
     roleLabel: roleLabelFor(role, productMode),
     productMode,

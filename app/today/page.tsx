@@ -4,6 +4,7 @@
 // a shared read model. Mobile is a ranked vertical action stream; desktop is
 // a multi-panel launchpad.
 
+import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -29,6 +30,56 @@ export const metadata = {
   title: "Today",
   description: "Your role-aware Today launchpad — what to care about and do next.",
 };
+
+// -----------------------------------------------------------------------------
+// Shared local style constants (kept page-local on purpose — see Today visual
+// polish slice notes; not extracted into a shared component).
+// -----------------------------------------------------------------------------
+
+const CARD_SHELL =
+  "rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_22px_48px_-30px_rgba(15,31,53,0.32)] sm:p-5";
+const CARD_SHELL_PRIMARY =
+  "rounded-2xl border border-slate-200/70 bg-white p-5 shadow-[0_28px_60px_-30px_rgba(15,31,53,0.36)] sm:p-6";
+const SECTION_EYEBROW_TEXT = "text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80";
+const SECTION_HEADING_TEXT = "mt-0.5 text-base font-semibold tracking-tight text-[#0f1f35] sm:text-lg";
+const SECTION_HEADING_TEXT_LG = "mt-1 text-lg font-semibold tracking-tight text-[#0f1f35] sm:text-xl";
+const ROW_SHELL = "rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-[0_10px_24px_-20px_rgba(15,31,53,0.35)]";
+
+function SectionEyebrow({ label }: { label: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span className="h-3 w-1 rounded-full bg-gradient-to-b from-blue-500 to-blue-400/25" />
+      <span className={SECTION_EYEBROW_TEXT}>{label}</span>
+    </div>
+  );
+}
+
+function AccountBadge({
+  logoUrl,
+  initial,
+  accountDisplayName,
+}: {
+  logoUrl: string | null;
+  initial: string;
+  accountDisplayName: string;
+}) {
+  return (
+    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200/80 bg-slate-50 shadow-[0_10px_24px_-12px_rgba(15,31,53,0.45)]">
+      {logoUrl ? (
+        <Image
+          src={logoUrl}
+          alt={`${accountDisplayName} logo`}
+          width={40}
+          height={40}
+          className="h-full w-full object-contain"
+          unoptimized
+        />
+      ) : (
+        <span className="text-sm font-semibold text-slate-700">{initial}</span>
+      )}
+    </span>
+  );
+}
 
 export default async function TodayPage() {
   const result = await buildTodayReadModel();
@@ -83,10 +134,25 @@ export default async function TodayPage() {
       </div>
 
       {/* DESKTOP MULTI-PANEL LAUNCHPAD (hidden on mobile, visible on lg+) */}
-      <div className="hidden lg:block">
+      <div className="hidden lg:block lg:space-y-5">
+        {/* Hero surface — Next Best Action + Business Pulse presented as one
+            designed dashboard band, so the rail reads as connected rather
+            than a separate, unrelated card. */}
+        <div className="rounded-[28px] border border-blue-100/70 bg-gradient-to-br from-white via-white to-blue-50/50 p-2 shadow-[0_34px_72px_-38px_rgba(15,31,53,0.4)]">
+          <div className={`grid gap-2 ${model.roleAwarePulse.visible ? "lg:grid-cols-5 lg:items-stretch" : ""}`}>
+            <div className={model.roleAwarePulse.visible ? "lg:col-span-3 lg:flex lg:w-full" : ""}>
+              <NextBestActionCard action={model.nextBestAction} matchHeight={model.roleAwarePulse.visible} />
+            </div>
+            {model.roleAwarePulse.visible ? (
+              <div className="lg:col-span-2 lg:flex">
+                <RoleAwarePulseSection pulse={model.roleAwarePulse} connected />
+              </div>
+            ) : null}
+          </div>
+        </div>
+
         <div className="grid gap-5 lg:grid-cols-3">
           <div className="space-y-5 lg:col-span-2">
-            <NextBestActionCard action={model.nextBestAction} />
             {model.priorityChips.length > 0 ? (
               <PriorityChipsSection chips={model.priorityChips} desktop />
             ) : null}
@@ -95,14 +161,12 @@ export default async function TodayPage() {
               jobs={model.todayWork.jobs}
               showFieldActions={model.todayWork.showFieldActions}
               desktop
+              primary
             />
-            <FollowUpSection groups={model.followUpGroups} desktop />
+            <FollowUpSection groups={model.followUpGroups} desktop primary />
           </div>
 
           <div className="space-y-5">
-            {model.roleAwarePulse.visible ? (
-              <RoleAwarePulseSection pulse={model.roleAwarePulse} />
-            ) : null}
             {model.teamCoverage.visible ? (
               <TeamCoverageSection coverage={model.teamCoverage} />
             ) : null}
@@ -131,32 +195,34 @@ function HeaderSection({
   briefing: string;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
-            {header.accountDisplayName}
+    <section className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_24px_52px_-30px_rgba(15,31,53,0.34)]">
+      <div className="flex flex-col gap-3 p-3.5 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <AccountBadge
+            logoUrl={header.companyLogoUrl}
+            initial={header.accountDisplayName ? header.accountDisplayName.slice(0, 1).toUpperCase() : "A"}
+            accountDisplayName={header.accountDisplayName}
+          />
+          <div className="min-w-0">
+            <span className={SECTION_EYEBROW_TEXT}>{header.accountDisplayName}</span>
+            <h1 className="mt-0.5 text-xl font-semibold tracking-tight text-[#0f1f35] sm:text-[1.6rem]">
+              Today
+              <span className="ml-2 text-sm font-medium text-slate-500">· {header.greetingLine}</span>
+            </h1>
+            <p className="mt-0.5 text-xs leading-5 text-slate-500 sm:text-sm">
+              {header.displayDate} · {header.roleLabel}
+            </p>
           </div>
-          <h1 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[1.75rem]">
-            Today
-          </h1>
-          <p className="mt-1 text-sm font-medium leading-6 text-slate-800">{header.greetingLine}</p>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            {header.displayDate} · {header.roleLabel}
-          </p>
-          <p className="mt-2 max-w-3xl rounded-xl border border-blue-100 bg-blue-50/70 px-3 py-2 text-sm font-medium leading-6 text-slate-800">
-            {briefing}
-          </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2 sm:pl-3">
           {header.timeClockEnabled ? (
             <ClockChip state={header.clockState} />
           ) : null}
           {header.unreadNotificationCount > 0 ? (
             <Link
               href="/ops/notifications"
-              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 transition-colors hover:bg-blue-100"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 shadow-sm transition-colors hover:bg-blue-100"
             >
               <span>Notifications</span>
               <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-white px-1 text-[10px] font-semibold text-blue-700">
@@ -165,6 +231,11 @@ function HeaderSection({
             </Link>
           ) : null}
         </div>
+      </div>
+
+      <div className="flex items-center gap-2.5 border-t border-blue-100/70 bg-gradient-to-r from-blue-50/80 via-blue-50/30 to-transparent px-3.5 py-2.5 sm:px-4">
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+        <p className="text-sm font-medium leading-6 text-slate-800">{briefing}</p>
       </div>
     </section>
   );
@@ -201,36 +272,49 @@ function ClockChip({ state }: { state: TodayHeader["clockState"] }) {
 function NextBestActionCard({
   action,
   mobile = false,
+  matchHeight = false,
 }: {
   action: NextBestAction;
   mobile?: boolean;
+  matchHeight?: boolean;
 }) {
   const isEmpty = action.kind === "empty";
   return (
     <section
-      className={`rounded-2xl border p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5 ${
-        isEmpty
-          ? "border-slate-200 bg-slate-50"
-          : "border-blue-200 bg-gradient-to-br from-white via-white to-blue-50"
+      className={`relative overflow-hidden rounded-2xl border border-[#0f1f35] bg-gradient-to-br from-[#0f1f35] to-[#16263f] p-4 shadow-[0_30px_64px_-26px_rgba(8,15,30,0.55)] sm:p-5 ${
+        matchHeight ? "lg:flex lg:h-full lg:w-full lg:flex-col lg:justify-center" : ""
       }`}
     >
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-700">
-        Next Best Action
+      <div
+        className={`pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full bg-blue-500/20 blur-[90px] ${isEmpty ? "opacity-60" : ""}`}
+      />
+      <div
+        className={`pointer-events-none absolute -bottom-20 -left-12 h-48 w-48 rounded-full bg-blue-400/10 blur-[100px] ${
+          matchHeight ? "lg:block hidden" : "hidden"
+        }`}
+      />
+      <div className="relative">
+        <div className="flex items-center gap-2">
+          <span className="h-3 w-1 rounded-full bg-gradient-to-b from-blue-300 to-blue-400/30" />
+          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-200">
+            Next Best Action
+          </span>
+        </div>
+        <div className={`mt-2 ${mobile ? "text-xl" : "text-2xl lg:text-[1.7rem]"} font-semibold tracking-tight text-white`}>
+          {action.headline}
+        </div>
+        <p className="mt-2 text-sm leading-6 text-blue-100/75 lg:max-w-md">
+          Start with this. One clear move first, then work the queues below.
+        </p>
+        {action.detail ? (
+          <p className="mt-2 text-sm leading-6 text-blue-100/75 lg:max-w-md">{action.detail}</p>
+        ) : null}
       </div>
-      <div className={`mt-1.5 ${mobile ? "text-xl" : "text-2xl"} font-semibold tracking-tight text-slate-950`}>
-        {action.headline}
-      </div>
-      <p className="mt-1.5 text-sm leading-6 text-slate-600">
-        Start with this. One clear move first, then work the queues below.
-      </p>
-      {action.detail ? (
-        <p className="mt-1.5 text-sm leading-6 text-slate-600">{action.detail}</p>
-      ) : null}
 
-      <div className={`mt-4 ${mobile ? "grid grid-cols-1 gap-2" : "flex flex-wrap gap-2"}`}>
+      <div className={`relative ${mobile ? "mt-4" : "mt-5"} ${mobile ? "grid grid-cols-1 gap-2" : "flex flex-wrap gap-2"}`}>
         <Link
           href={action.primaryHref}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 active:translate-y-[0.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-[#0f1f35] shadow-[0_14px_30px_-14px_rgba(8,15,30,0.6)] transition hover:bg-blue-50 active:translate-y-[0.5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300/60"
         >
           {action.primaryLabel}
         </Link>
@@ -265,7 +349,7 @@ function TechQuickActions({ job, mobile }: { job: TodayJobSummary; mobile: boole
           href={item.href}
           target={item.label === "Navigate" ? "_blank" : undefined}
           rel={item.label === "Navigate" ? "noreferrer" : undefined}
-          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 active:translate-y-[0.5px]"
+          className="inline-flex min-h-11 items-center justify-center rounded-lg border border-white/25 bg-white/10 px-3 text-sm font-semibold text-white shadow-sm backdrop-blur-sm transition hover:bg-white/15 active:translate-y-[0.5px]"
         >
           {item.label}
         </a>
@@ -283,22 +367,20 @@ function TodayWorkSection({
   jobs,
   showFieldActions,
   desktop = false,
+  primary = false,
 }: {
   label: string;
   jobs: TodayJobSummary[];
   showFieldActions: boolean;
   desktop?: boolean;
+  primary?: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
+    <section className={primary ? CARD_SHELL_PRIMARY : CARD_SHELL}>
       <div className="flex items-end justify-between gap-3">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Today
-          </div>
-          <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-            {label}
-          </h2>
+          <SectionEyebrow label="Today" />
+          <h2 className={primary ? SECTION_HEADING_TEXT_LG : SECTION_HEADING_TEXT}>{label}</h2>
         </div>
         {desktop ? (
           <Link href="/ops/field" className="text-xs font-semibold text-blue-700 hover:underline">
@@ -311,9 +393,9 @@ function TodayWorkSection({
         <EmptyState message="No jobs scheduled for today." />
       ) : (
         <>
-          <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-100 bg-slate-50/40">
+          <ul className="mt-3 space-y-2">
             {jobs.map((job) => (
-              <li key={job.id} className="px-3 py-3">
+              <li key={job.id} className={ROW_SHELL}>
                 <TodayJobRow job={job} showFieldActions={showFieldActions} />
               </li>
             ))}
@@ -354,7 +436,7 @@ function TodayJobRow({
       <div className="min-w-0 space-y-1">
         <Link
           href={`/jobs/${job.id}?tab=ops`}
-          className="block truncate text-sm font-semibold tracking-tight text-slate-950 hover:text-blue-700"
+          className="block truncate text-sm font-semibold tracking-tight text-[#0f1f35] hover:text-blue-700"
         >
           {job.title}
         </Link>
@@ -363,9 +445,9 @@ function TodayJobRow({
           {address ? ` · ${address}` : ""}
         </div>
         <div className="flex flex-wrap gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-          <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5">{scheduleLabel}</span>
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{scheduleLabel}</span>
           {windowLabel ? (
-            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5">{windowLabel}</span>
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5">{windowLabel}</span>
           ) : null}
           {job.status ? (
             <span className="rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-blue-800">
@@ -378,7 +460,7 @@ function TodayJobRow({
       {showFieldActions ? (
         <Link
           href={`/jobs/${job.id}?tab=ops`}
-          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 text-xs font-semibold text-white shadow-sm transition hover:bg-slate-800"
+          className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg bg-[#0f1f35] px-3 text-xs font-semibold text-white shadow-[0_12px_26px_-14px_rgba(15,31,53,0.6)] transition hover:bg-[#16263f]"
         >
           Open Job
         </Link>
@@ -411,11 +493,9 @@ function PriorityChipsSection({
 }) {
   if (chips.length === 0) return null;
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-        Priority Queues
-      </div>
-      <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
+    <section className={CARD_SHELL}>
+      <SectionEyebrow label="Priority Queues" />
+      <h2 className={SECTION_HEADING_TEXT}>
         {desktop ? "Where to focus next" : "Tap to focus"}
       </h2>
       <div className="mt-3 flex flex-wrap gap-2">
@@ -423,7 +503,7 @@ function PriorityChipsSection({
           <Link
             key={chip.key}
             href={chip.href}
-            className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-sm transition-colors ${chipToneClass(chip)}`}
+            className={`inline-flex min-h-10 items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold shadow-[0_10px_22px_-18px_rgba(15,31,53,0.4)] transition-colors ${chipToneClass(chip)}`}
           >
             <span>{chip.label}</span>
             <span className="rounded-full bg-white/85 px-1.5 py-0.5 tabular-nums text-current">
@@ -477,20 +557,18 @@ function shouldShowReasonForGroup(groupKey: FollowUpGroup["key"], reason: string
 function FollowUpSection({
   groups,
   desktop = false,
+  primary = false,
 }: {
   groups: FollowUpGroup[];
   desktop?: boolean;
+  primary?: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
+    <section className={primary ? CARD_SHELL_PRIMARY : CARD_SHELL}>
       <div className="flex items-end justify-between gap-3">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Action Center
-          </div>
-          <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-            Work that needs a next step
-          </h2>
+          <SectionEyebrow label="Action Center" />
+          <h2 className={primary ? SECTION_HEADING_TEXT_LG : SECTION_HEADING_TEXT}>Work that needs a next step</h2>
         </div>
         {desktop ? (
           <Link href="/ops" className="text-xs font-semibold text-blue-700 hover:underline">
@@ -504,10 +582,10 @@ function FollowUpSection({
       ) : (
         <ul className="mt-3 space-y-2">
           {groups.map((group) => (
-            <li key={group.key} className="rounded-xl border border-slate-100 bg-slate-50/40 px-3 py-2">
+            <li key={group.key} className={ROW_SHELL}>
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-950">{group.label}</div>
-                <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                <div className="text-sm font-semibold text-[#0f1f35]">{group.label}</div>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                   {group.count}
                 </span>
               </div>
@@ -571,15 +649,11 @@ function TeamCoverageSection({
   mobile?: boolean;
 }) {
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
+    <section className={CARD_SHELL}>
       <div className="flex items-end justify-between gap-3">
         <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-            Team Coverage
-          </div>
-          <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-            Who’s assigned today
-          </h2>
+          <SectionEyebrow label="Team Coverage" />
+          <h2 className={SECTION_HEADING_TEXT}>Who's assigned today</h2>
           <p className="mt-1 text-xs text-slate-600">{coverage.summaryLabel}</p>
         </div>
         <Link href={coverage.href} className="text-xs font-semibold text-blue-700 hover:underline">
@@ -598,16 +672,16 @@ function TeamCoverageSection({
       ) : (
         <ul className="mt-3 space-y-2">
           {coverage.assignments.slice(0, mobile ? 3 : 5).map((row) => (
-            <li key={row.key} className="rounded-xl border border-slate-100 bg-slate-50/40 px-3 py-2">
+            <li key={row.key} className={ROW_SHELL}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-950">{row.assigneeName}</div>
+                  <div className="truncate text-sm font-semibold text-[#0f1f35]">{row.assigneeName}</div>
                   <Link href={row.href} className="mt-0.5 block truncate text-xs font-medium text-blue-700 hover:underline">
                     {row.jobTitle}
                   </Link>
                   <div className="mt-0.5 truncate text-xs text-slate-600">{row.customerLocationLabel}</div>
                 </div>
-                <span className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
                   {row.statusLabel}
                 </span>
               </div>
@@ -642,34 +716,35 @@ function TeamCoverageSection({
 function RoleAwarePulseSection({
   pulse,
   collapsed = false,
+  connected = false,
 }: {
   pulse: RoleAwarePulse;
   collapsed?: boolean;
+  connected?: boolean;
 }) {
   const hasContent = pulse.tiles.length > 0;
 
   return (
-    <section
-      className={`rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5 ${
-        collapsed ? "opacity-95" : ""
-      }`}
-    >
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-        {pulse.mode === "business"
-          ? "Business Attention"
-          : pulse.mode === "money"
-          ? "Financial Attention"
-          : "Operations Attention"}
-      </div>
-      <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-        {pulse.title}
-      </h2>
+    <section className={`relative overflow-hidden ${CARD_SHELL} ${collapsed ? "opacity-95" : ""} ${connected ? "lg:flex lg:h-full lg:flex-col" : ""}`}>
+      {connected ? (
+        <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-blue-600 via-blue-400 to-blue-300/40" />
+      ) : null}
+      <SectionEyebrow
+        label={
+          pulse.mode === "business"
+            ? "Business Attention"
+            : pulse.mode === "money"
+            ? "Financial Attention"
+            : "Operations Attention"
+        }
+      />
+      <h2 className={SECTION_HEADING_TEXT}>{pulse.title}</h2>
       <p className="mt-1 text-xs leading-5 text-slate-600">{pulse.subtitle}</p>
 
       {!hasContent ? (
         <EmptyState message="No role-specific pulse items are active right now." />
       ) : (
-        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div className={`mt-3 grid grid-cols-2 gap-2 ${connected ? "" : "sm:grid-cols-3"}`}>
           {pulse.tiles.map((tile) => (
             <RoleAwarePulseTileCard key={tile.key} tile={tile} />
           ))}
@@ -696,17 +771,16 @@ function RoleAwarePulseTileCard({
   return (
     <Link
       href={tile.href}
-      className={`block rounded-xl border px-3 py-2 transition-colors ${toneClass}`}
+      className={`flex items-center gap-2.5 rounded-xl border px-3 py-2 shadow-[0_10px_22px_-18px_rgba(15,31,53,0.4)] transition-colors ${toneClass}`}
     >
-      <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-current/70">
-        {tile.label}
-      </div>
-      <div className="mt-1 text-lg font-semibold tabular-nums">{tile.value}</div>
-      {tile.valueDetail ? (
-        <div className="mt-0.5 text-[11px] text-current/70">{tile.valueDetail}</div>
-      ) : null}
-      <div className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.06em] text-current/60">
-        {tile.context}
+      <div className="text-xl font-bold leading-none tabular-nums">{tile.value}</div>
+      <div className="min-w-0">
+        <div className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-current/70">
+          {tile.label}
+        </div>
+        <div className="truncate text-[10px] text-current/55">
+          {tile.valueDetail || tile.context}
+        </div>
       </div>
     </Link>
   );
@@ -726,24 +800,20 @@ function ResumeRecentSection({
   desktop?: boolean;
 }) {
   return (
-    <section id="resume-recent-work" className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.4)] sm:p-5">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-        Resume Recent Work
-      </div>
-      <h2 className="mt-0.5 text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
-        Jump back in
-      </h2>
+    <section id="resume-recent-work" className={CARD_SHELL}>
+      <SectionEyebrow label="Resume Recent Work" />
+      <h2 className={SECTION_HEADING_TEXT}>Jump back in</h2>
 
       {items.length === 0 ? (
         <EmptyState message="No recent activity yet." />
       ) : (
-        <ul className={`mt-3 space-y-2 ${desktop ? "" : ""}`}>
+        <ul className="mt-3 space-y-2">
           {items.map((item) => (
-            <li key={item.key} className="rounded-xl border border-slate-100 bg-slate-50/40 px-3 py-2">
+            <li key={item.key} className={ROW_SHELL}>
               <Link href={item.href} className="block group">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-950 group-hover:text-blue-700">
+                    <div className="truncate text-sm font-semibold text-[#0f1f35] group-hover:text-blue-700">
                       {item.title}
                     </div>
                     <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-600">
@@ -782,7 +852,8 @@ function ResumeRecentSection({
 
 function EmptyState({ message }: { message: string }) {
   return (
-    <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-3 py-3 text-sm text-slate-600">
+    <div className="mt-3 flex items-center gap-2.5 rounded-xl border border-slate-200/70 bg-slate-50/70 px-3 py-3 text-sm text-slate-600">
+      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400/50" />
       {message}
     </div>
   );
