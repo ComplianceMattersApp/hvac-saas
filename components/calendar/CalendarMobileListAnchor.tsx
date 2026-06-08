@@ -13,7 +13,7 @@ function inRange(date: string, startDate: string, endDate: string) {
   return date >= startDate && date <= endDate;
 }
 
-function findTargetDate(params: {
+export function resolveMobileListAnchorDate(params: {
   rangeStartDate: string;
   rangeEndDate: string;
   currentDate: string;
@@ -21,18 +21,30 @@ function findTargetDate(params: {
   availableDates: string[];
 }) {
   const { rangeStartDate, rangeEndDate, currentDate, focusedDate, availableDates } = params;
-  const available = new Set(availableDates);
+  const sortedDates = Array.from(
+    new Set(
+      availableDates
+        .map((date) => String(date ?? '').trim())
+        .filter(Boolean),
+    ),
+  ).sort();
 
-  if (inRange(currentDate, rangeStartDate, rangeEndDate) && available.has(currentDate)) {
-    return currentDate;
-  }
+  if (!sortedDates.length) return null;
 
   const normalizedFocused = String(focusedDate ?? '').trim();
-  if (normalizedFocused && available.has(normalizedFocused)) {
-    return normalizedFocused;
-  }
+  const targetDate = inRange(currentDate, rangeStartDate, rangeEndDate)
+    ? currentDate
+    : normalizedFocused && inRange(normalizedFocused, rangeStartDate, rangeEndDate)
+    ? normalizedFocused
+    : currentDate;
 
-  return availableDates[0] ?? null;
+  const exactMatch = sortedDates.find((date) => date === targetDate);
+  if (exactMatch) return exactMatch;
+
+  const nextAvailable = sortedDates.find((date) => date >= targetDate);
+  if (nextAvailable) return nextAvailable;
+
+  return sortedDates[sortedDates.length - 1] ?? null;
 }
 
 export default function CalendarMobileListAnchor({
@@ -55,7 +67,7 @@ export default function CalendarMobileListAnchor({
       .map((section) => String(section.dataset.calendarListDate ?? '').trim())
       .filter(Boolean);
 
-    const targetDate = findTargetDate({
+    const targetDate = resolveMobileListAnchorDate({
       rangeStartDate,
       rangeEndDate,
       currentDate,

@@ -43,8 +43,8 @@ describe("calendar action responsiveness", () => {
   });
 
   it("mobile calendar keeps controls accessible through progressive disclosure", () => {
-    expect(calendarViewSource).toContain("More controls");
-    expect(calendarViewSource).toContain("Filters + legend");
+    expect(calendarViewSource).toContain("Filters &amp; Status");
+    expect(calendarViewSource).toContain("Status legend");
     expect(calendarViewSource).toContain("Next dispatch action");
   });
 });

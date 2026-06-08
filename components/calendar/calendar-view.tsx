@@ -334,14 +334,14 @@ function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | n
 
   return (
     <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-      <div className="flex min-w-0 flex-1 items-stretch rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5 sm:flex-none">
-        <Link href={buildCalendarHref(view, prev, { tech })} className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center rounded-l-md border-r border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
+      <div className="grid min-w-0 flex-1 grid-cols-3 gap-1.5 rounded-xl border border-slate-200 bg-slate-50/90 p-1.5 shadow-sm shadow-slate-950/5 sm:flex sm:flex-none">
+        <Link href={buildCalendarHref(view, prev, { tech })} className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
           Previous
         </Link>
-        <Link href={buildCalendarHref(view, todayTarget, { tech })} className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center border-r border-slate-200 bg-slate-900 px-3 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
+        <Link href={buildCalendarHref(view, todayTarget, { tech })} className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm shadow-slate-950/10 transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
           Today
         </Link>
-        <Link href={buildCalendarHref(view, next, { tech })} className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center rounded-r-md bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
+        <Link href={buildCalendarHref(view, next, { tech })} className="inline-flex min-h-10 min-w-0 flex-1 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 sm:flex-none">
           Next
         </Link>
       </div>
@@ -1061,15 +1061,15 @@ export async function CalendarView(props: Props) {
           </div>
 
           <div className="flex flex-col gap-2.5 xl:items-end">
-            <div className="grid grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-50 p-1.5 sm:flex sm:gap-1.5">
+            <div className="grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-white p-2 shadow-sm shadow-slate-950/5 sm:flex">
               {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
                 <Link
                   key={viewValue}
                   href={buildCalendarHref(viewValue, targetDateForView(viewValue), { tech: activeTech, job: selectedJobId || null })}
-                  className={`inline-flex min-h-10 items-center justify-center rounded-md border px-3 py-2 text-sm font-semibold transition ${
+                  className={`inline-flex min-h-10 items-center justify-center rounded-lg border px-3 py-2 text-sm font-semibold shadow-sm shadow-slate-950/5 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${
                     uiView === viewValue
-                      ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900'
+                      ? 'border-slate-900 bg-slate-900 text-white shadow-slate-950/10'
+                      : 'border-slate-200 bg-slate-50/70 text-slate-700 hover:border-slate-300 hover:bg-white hover:text-slate-900'
                   }`}
                 >
                   {viewValue.charAt(0).toUpperCase() + viewValue.slice(1)}
@@ -1106,9 +1106,9 @@ export async function CalendarView(props: Props) {
 
         <details className="mt-3 rounded-lg border border-slate-200 bg-slate-50/80 px-3 py-3 shadow-sm shadow-slate-950/5 sm:hidden">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-800 [&::-webkit-details-marker]:hidden">
-            <span>More controls</span>
+            <span>Filters &amp; Status</span>
             <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
-              Filters + legend
+              Status legend
             </span>
           </summary>
 
