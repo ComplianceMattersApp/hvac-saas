@@ -134,6 +134,38 @@ type DispatchDateRange = {
   endDate: string;
 };
 
+type CalendarTimingDebugView = 'day' | 'week' | 'list' | 'month' | 'unknown';
+type CalendarTimingDebugTechFilter = 'all' | 'unassigned' | 'specific';
+
+function isCalendarTimingDebugEnabled() {
+  return String(process.env.CALENDAR_TIMING_DEBUG ?? '').trim().toLowerCase() === 'true';
+}
+
+function nowMs() {
+  return Date.now();
+}
+
+async function timeCalendarStep<T>(
+  enabled: boolean,
+  timings: Record<string, number>,
+  label: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  if (!enabled) return fn();
+  const startedAt = nowMs();
+  try {
+    return await fn();
+  } finally {
+    timings[label] = nowMs() - startedAt;
+  }
+}
+
+function normalizeTimingDebugView(view?: string | null): CalendarTimingDebugView {
+  const raw = String(view ?? '').trim().toLowerCase();
+  if (raw === 'day' || raw === 'week' || raw === 'list' || raw === 'month') return raw;
+  return 'unknown';
+}
+
 function laTodayYmd(now = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Los_Angeles',
@@ -382,9 +414,22 @@ export async function getDispatchCalendarData(params: {
   anchorDate?: string | null;
   rangeStartDate?: string | null;
   rangeEndDate?: string | null;
+  view?: string | null;
+  techFilterType?: CalendarTimingDebugTechFilter;
 }): Promise<DispatchCalendarData> {
-  const supabase = await createClient();
-  const { internalUser } = await requireInternalUser({ supabase });
+  const timingEnabled = isCalendarTimingDebugEnabled();
+  const totalStartedAt = timingEnabled ? nowMs() : 0;
+  const timings: Record<string, number> = {};
+
+  const { supabase, internalUser } = await timeCalendarStep(timingEnabled, timings, 'auth_internal_user_ms', async () => {
+    const scopedSupabase = await createClient();
+    const internalResult = await requireInternalUser({ supabase: scopedSupabase });
+    return {
+      supabase: scopedSupabase,
+      internalUser: internalResult.internalUser,
+    };
+  });
+
   const accountOwnerUserId = String(internalUser.account_owner_user_id ?? '').trim();
   if (!accountOwnerUserId) {
     throw new Error('NOT_AUTHORIZED');
@@ -430,33 +475,41 @@ export async function getDispatchCalendarData(params: {
     'deleted_at',
   ].join(', ');
 
-  const scopedCustomerIds = await loadScopedCustomerIds({
-    supabase,
-    accountOwnerUserId,
-  });
+  const scopedCustomerIds = await timeCalendarStep(timingEnabled, timings, 'scoped_customer_lookup_ms', () =>
+    loadScopedCustomerIds({
+      supabase,
+      accountOwnerUserId,
+    }),
+  );
 
   const [scheduledRangeRows, scheduledAttentionRows, unscheduledRows] = await Promise.all([
-    loadScopedDispatchJobRows({
-      supabase,
-      scopedCustomerIds,
-      baseSelect,
-      scheduledDateRange: dispatchRange,
-    }),
-    loadScopedDispatchJobRows({
-      supabase,
-      scopedCustomerIds,
-      baseSelect,
-      scheduledDateRange: {
-        startDate: dispatchAttentionWindowStart,
-        endDate: dispatchAttentionWindowEnd,
-      },
-    }),
-    loadScopedDispatchJobRows({
-      supabase,
-      scopedCustomerIds,
-      baseSelect,
-      unscheduledOnly: true,
-    }),
+    timeCalendarStep(timingEnabled, timings, 'scheduled_range_jobs_query_ms', () =>
+      loadScopedDispatchJobRows({
+        supabase,
+        scopedCustomerIds,
+        baseSelect,
+        scheduledDateRange: dispatchRange,
+      }),
+    ),
+    timeCalendarStep(timingEnabled, timings, 'attention_window_jobs_query_ms', () =>
+      loadScopedDispatchJobRows({
+        supabase,
+        scopedCustomerIds,
+        baseSelect,
+        scheduledDateRange: {
+          startDate: dispatchAttentionWindowStart,
+          endDate: dispatchAttentionWindowEnd,
+        },
+      }),
+    ),
+    timeCalendarStep(timingEnabled, timings, 'unscheduled_jobs_query_ms', () =>
+      loadScopedDispatchJobRows({
+        supabase,
+        scopedCustomerIds,
+        baseSelect,
+        unscheduledOnly: true,
+      }),
+    ),
   ]);
 
   function isOnHold(job: JobDispatchRow) {
@@ -527,19 +580,26 @@ export async function getDispatchCalendarData(params: {
         .filter(Boolean),
     ),
   );
-  const assignmentMap = await getActiveJobAssignmentDisplayMap({
-    supabase,
-    jobIds: allJobIds,
-  });
+  const assignmentMap = await timeCalendarStep(timingEnabled, timings, 'assignment_query_ms', () =>
+    getActiveJobAssignmentDisplayMap({
+      supabase,
+      jobIds: allJobIds,
+    }),
+  );
+  const assignmentRowCount = Object.values(assignmentMap).reduce((total, rows) => total + rows.length, 0);
 
   const latestEventByJob = new Map<string, { event_type: string | null; created_at: string | null }>();
+  let eventRowCount = 0;
   if (allJobIds.length) {
-    const { data: eventRows, error: eventErr } = await supabase
-      .from('job_events')
-      .select('job_id, event_type, created_at')
-      .in('job_id', allJobIds)
-      .order('created_at', { ascending: false });
+    const { data: eventRows, error: eventErr } = await timeCalendarStep(timingEnabled, timings, 'latest_job_events_query_ms', async () =>
+      await supabase
+        .from('job_events')
+        .select('job_id, event_type, created_at')
+        .in('job_id', allJobIds)
+        .order('created_at', { ascending: false }),
+    );
     if (eventErr) throw eventErr;
+    eventRowCount = (eventRows ?? []).length;
 
     for (const event of (eventRows ?? []) as JobEventRow[]) {
       const jobId = String(event?.job_id ?? '').trim();
@@ -585,10 +645,12 @@ export async function getDispatchCalendarData(params: {
     jobs: scheduledCalendarJobs,
   });
 
-  const assignableUsers = (await getAssignableInternalUsers({
-    supabase,
-    accountOwnerUserId,
-  })).map((user) => ({
+  const assignableUsers = (await timeCalendarStep(timingEnabled, timings, 'assignable_users_profile_resolution_ms', () =>
+    getAssignableInternalUsers({
+      supabase,
+      accountOwnerUserId,
+    }),
+  )).map((user) => ({
     user_id: String(user.user_id),
     display_name: String(user.display_name),
   }));
@@ -600,15 +662,17 @@ export async function getDispatchCalendarData(params: {
     const blockRangeStart = laDateTimeToUtcIso(dispatchRange.startDate, '00:00');
     const blockRangeEnd = laDateTimeToUtcIso(addDaysYmd(dispatchRange.endDate, 1), '00:00');
 
-    const { data: eventRows, error: eventErr } = await supabase
-      .from('calendar_events')
-      .select('id, title, description, status, internal_user_id, start_at, end_at, event_type')
-      .eq('owner_user_id', internalUser.account_owner_user_id)
-      .eq('event_type', 'block')
-      .in('internal_user_id', assignableUserIds)
-      .gte('start_at', blockRangeStart)
-      .lt('start_at', blockRangeEnd)
-      .order('start_at', { ascending: true });
+    const { data: eventRows, error: eventErr } = await timeCalendarStep(timingEnabled, timings, 'calendar_block_events_query_ms', async () =>
+      await supabase
+        .from('calendar_events')
+        .select('id, title, description, status, internal_user_id, start_at, end_at, event_type')
+        .eq('owner_user_id', internalUser.account_owner_user_id)
+        .eq('event_type', 'block')
+        .in('internal_user_id', assignableUserIds)
+        .gte('start_at', blockRangeStart)
+        .lt('start_at', blockRangeEnd)
+        .order('start_at', { ascending: true }),
+    );
 
     if (eventErr) throw eventErr;
 
@@ -640,6 +704,42 @@ export async function getDispatchCalendarData(params: {
         end_time: endTime,
       });
     }
+  }
+
+  if (timingEnabled) {
+    const totalMs = nowMs() - totalStartedAt;
+    console.log(JSON.stringify({
+      marker: 'calendar_timing_debug',
+      view: normalizeTimingDebugView(params.view),
+      mode,
+      tech_filter_type: params.techFilterType ?? 'all',
+      range: {
+        start: dispatchRange.startDate,
+        end: dispatchRange.endDate,
+      },
+      attention_range: {
+        start: dispatchAttentionWindowStart,
+        end: dispatchAttentionWindowEnd,
+      },
+      timings_ms: {
+        total_getDispatchCalendarData: totalMs,
+        ...timings,
+      },
+      counts: {
+        scoped_customer_count: scopedCustomerIds.length,
+        scheduled_range_query_rows: validScheduledRangeRows.length,
+        attention_window_query_rows: validScheduledAttentionRows.length,
+        unscheduled_query_rows: validUnscheduledRows.length,
+        final_collected_job_count: allJobIds.length,
+        final_scheduled_count: scheduledCalendarJobs.length,
+        final_attention_count: scheduledAttentionWindowJobs.length,
+        final_unscheduled_count: unscheduledActiveJobs.length,
+        final_assignment_row_count: assignmentRowCount,
+        final_event_row_count: eventRowCount,
+        final_block_event_count: calendarBlockEvents.length,
+        assignable_user_count: assignableUsers.length,
+      },
+    }));
   }
 
   return {

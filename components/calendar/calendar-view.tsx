@@ -837,6 +837,9 @@ export async function CalendarView(props: Props) {
   const uiView = normalizeView(props.view);
   const todayDate = todayYmdLA();
   const baseMode: DispatchViewMode = uiView === 'week' ? 'week' : 'day';
+  const activeTech = normalizeCalendarTechFilter(props.tech);
+  const activeTechnicianUserId = isSpecificTechnicianFilter(activeTech) ? activeTech : null;
+  const activeUnassignedFilter = isUnassignedTechFilter(activeTech);
   const anchorForRange = parseISO(normalizeYmd(props.date) ?? todayDate);
   const monthStartDate = formatDate(startOfMonth(anchorForRange), 'yyyy-MM-dd');
   const monthEndDate = formatDate(endOfMonth(anchorForRange), 'yyyy-MM-dd');
@@ -845,6 +848,8 @@ export async function CalendarView(props: Props) {
   const data = await getDispatchCalendarData({
     mode: baseMode,
     anchorDate: props.date,
+    view: uiView,
+    techFilterType: activeUnassignedFilter ? 'unassigned' : activeTechnicianUserId ? 'specific' : 'all',
     ...(uiView === 'month'
       ? {
           rangeStartDate: monthVisibleRange.startDate,
@@ -858,9 +863,6 @@ export async function CalendarView(props: Props) {
       : {}),
   });
 
-  const activeTech = normalizeCalendarTechFilter(props.tech);
-  const activeTechnicianUserId = isSpecificTechnicianFilter(activeTech) ? activeTech : null;
-  const activeUnassignedFilter = isUnassignedTechFilter(activeTech);
   const returnTo = buildReturnTo(uiView, data.anchorDate, activeTech);
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
