@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import { INITIAL_SELF_SERVE_ONBOARDING_STATE } from "@/lib/actions/self-serve-onboarding-state";
 import { submitSelfServeOnboardingForm } from "@/lib/actions/self-serve-onboarding-actions";
+import { AuthCommandCenterLayout } from "@/components/auth/AuthCommandCenterLayout";
 
 export type SignupProductIntent = "generic" | "service" | "ecc";
 
@@ -138,97 +139,30 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
   );
 
   return (
-    <div className="relative min-h-screen bg-slate-950 px-4 py-10 text-slate-100 sm:px-6 sm:py-14 lg:py-18">
-      <div className="pointer-events-none absolute inset-0 overflow-hidden">
-        <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-cyan-500/25 blur-3xl" />
-        <div className="absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-emerald-500/20 blur-3xl" />
-      </div>
-
-      <div className="relative mx-auto grid w-full max-w-6xl gap-6 lg:items-start lg:grid-cols-[1.05fr_0.95fr] lg:gap-10">
-        <section className="rounded-3xl border border-slate-800/80 bg-slate-900/70 p-6 shadow-2xl shadow-black/25 backdrop-blur sm:p-8 lg:p-10">
-          <div className="mb-4 flex items-center gap-3">
+    <AuthCommandCenterLayout
+      eyebrow={copy.eyebrow}
+      headline={copy.title}
+      subhead={copy.intro}
+      highlights={copy.cards.map((card) => card.title)}
+    >
+      <div className="space-y-5">
+        <div className="rounded-[28px] border border-white/10 bg-white p-7 shadow-[0_50px_100px_-30px_rgba(2,6,23,0.7)] sm:p-8">
+          <div className="flex items-center gap-3">
             <img
               src="/cm-logo.png"
               alt="Compliance Matters logo"
               width={40}
               height={40}
-              className="h-10 w-10 rounded-lg border border-slate-700/80 bg-slate-950/70 p-1"
+              className="h-10 w-10 rounded-xl border border-slate-200 shadow-sm"
             />
             <div>
-              <p className="text-xs font-semibold tracking-[0.14em] text-slate-300 uppercase">Compliance Matters</p>
-              <p className="text-xs text-slate-400">Operations onboarding</p>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Compliance Matters</p>
+              <h2 className="text-xl font-semibold tracking-tight text-slate-900">Create your account</h2>
             </div>
           </div>
+          <p className="mt-3 text-sm leading-relaxed text-slate-500">{copy.formIntro}</p>
 
-          <p className="inline-flex rounded-full border border-cyan-300/25 bg-cyan-400/10 px-3 py-1 text-xs font-medium tracking-[0.14em] text-cyan-200 uppercase">
-            {copy.eyebrow}
-          </p>
-
-          <h1 className="mt-5 font-serif text-3xl leading-tight tracking-tight text-white sm:text-4xl lg:text-5xl">
-            {copy.title}
-          </h1>
-
-          <p className="mt-4 max-w-xl text-sm leading-relaxed text-slate-200 sm:text-base">
-            {copy.intro}
-          </p>
-          <p className="mt-3 max-w-xl text-sm leading-relaxed text-slate-200 sm:text-base">
-            {copy.details}
-          </p>
-
-          <div className="mt-5 rounded-2xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm leading-6 text-slate-200">
-            {copy.trialGoal}
-          </div>
-
-          <div className="mt-4 rounded-2xl border border-slate-700/70 bg-slate-900/70 p-4 text-slate-200">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">{previewHeading}</p>
-              {productIntent !== "generic" ? (
-                <span className="text-[11px] text-slate-400">Success Guide</span>
-              ) : null}
-            </div>
-            <div className="mt-2 grid grid-cols-1 gap-2 text-sm leading-5 sm:grid-cols-2">
-              {previewItems.map((item) => (
-                <div key={item} className="rounded-lg border border-slate-700/70 bg-slate-950/60 px-3 py-2">
-                  {item}
-                </div>
-              ))}
-            </div>
-            {productIntent !== "generic" ? (
-              <p className="mt-2 text-xs leading-5 text-slate-400">Use Today/Ops each morning</p>
-            ) : null}
-          </div>
-
-          <div className="mt-6">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-cyan-200">Why teams use it</p>
-            <div className="mt-3 grid gap-3 md:grid-cols-2 lg:grid-cols-2">
-              {copy.cards.map((card, index) => (
-                <div
-                  key={card.title}
-                  className={`rounded-2xl border border-slate-700/70 bg-slate-900/70 p-5 text-slate-200 shadow-[0_16px_34px_-28px_rgba(15,23,42,0.6)] ${
-                    index === 2 ? "md:col-span-2" : ""
-                  }`}
-                >
-                  <div className="text-base font-semibold text-white">{card.title}</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-200">{card.copy}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div className="mt-3 rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
-            No payment details are needed to get started. You can review account and billing options after setup.
-          </div>
-
-          <div className="mt-3 rounded-xl border border-slate-700/70 bg-slate-900/70 px-4 py-3 text-sm text-slate-200">
-            Setup is owner-led, so you can ask practical questions about how your company actually works.
-          </div>
-        </section>
-
-        <section className="self-start rounded-3xl border border-slate-800 bg-white p-6 text-slate-900 shadow-2xl shadow-black/30 sm:p-8 lg:sticky lg:top-6 lg:min-h-[calc(100vh-3rem)]">
-          <h2 className="text-xl font-semibold tracking-tight text-slate-900">Create your account</h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-600">{copy.formIntro}</p>
-
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm">
+          <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm">
             <div className="font-semibold text-slate-900">What happens next</div>
             <div className="mt-3 grid gap-2 sm:grid-cols-3">
               {[
@@ -238,7 +172,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
               ].map((step, index) => (
                 <div key={step} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-900 text-[11px] text-white">
+                    <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-[11px] text-white">
                       {index + 1}
                     </span>
                     Step {index + 1}
@@ -264,7 +198,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
                 type="email"
                 required
                 autoComplete="email"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-400"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/70"
               />
               {state.fieldErrors?.email ? (
                 <p className="text-xs text-red-700">{state.fieldErrors.email}</p>
@@ -279,7 +213,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
                 id="owner_display_name"
                 name="owner_display_name"
                 required
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-400"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/70"
               />
               {state.fieldErrors?.ownerDisplayName ? (
                 <p className="text-xs text-red-700">{state.fieldErrors.ownerDisplayName}</p>
@@ -294,7 +228,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
                 id="business_display_name"
                 name="business_display_name"
                 required
-                className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-slate-400"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/70"
               />
               {state.fieldErrors?.businessDisplayName ? (
                 <p className="text-xs text-red-700">{state.fieldErrors.businessDisplayName}</p>
@@ -318,7 +252,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
             <button
               type="submit"
               disabled={isPending}
-              className="w-full rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60"
+              className="w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_18px_40px_-16px_rgba(37,99,235,0.65)] transition-all hover:from-blue-500 hover:to-cyan-400 disabled:cursor-not-allowed disabled:opacity-60"
             >
               {isPending ? "Submitting..." : "Send setup link"}
             </button>
@@ -327,8 +261,30 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
           <p className="mt-4 text-xs leading-relaxed text-slate-500">
             You will not need payment details for this step. After setup, you can review account options in your account.
           </p>
-        </section>
+        </div>
+
+        <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-200">{previewHeading}</p>
+            {productIntent !== "generic" ? <span className="text-[11px] text-slate-400">Success Guide</span> : null}
+          </div>
+          <div className="mt-3 grid grid-cols-1 gap-2 text-sm leading-5 text-slate-200 sm:grid-cols-2">
+            {previewItems.map((item) => (
+              <div key={item} className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2">
+                {item}
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs leading-5 text-slate-300">
+              {copy.trialGoal}
+            </p>
+            <p className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-xs leading-5 text-slate-300">
+              No payment details are needed to get started. You can review billing options after setup.
+            </p>
+          </div>
+        </div>
       </div>
-    </div>
+    </AuthCommandCenterLayout>
   );
 }
