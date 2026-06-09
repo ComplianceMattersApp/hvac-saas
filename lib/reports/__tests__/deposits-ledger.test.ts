@@ -259,13 +259,14 @@ describe("deposits ledger read model", () => {
     expect(view.warnings[0]).toMatch(/Multiple currencies/);
   });
 
-  it("does not add CSV, export, UI, or route wiring", () => {
+  it("does not add CSV, export, detail, or sync wiring", () => {
     const reportSource = fs.readFileSync(
       path.join(process.cwd(), "lib/reports/deposits-ledger.ts"),
       "utf8",
     );
 
     expect(reportSource).not.toMatch(/csv|export\s+route|revalidatePath|redirect\(/i);
-    expect(fs.existsSync(path.join(process.cwd(), "app/reports/deposits"))).toBe(false);
+    expect(fs.existsSync(path.join(process.cwd(), "app/reports/deposits/export"))).toBe(false);
+    expect(fs.existsSync(path.join(process.cwd(), "app/reports/deposits/[payoutId]"))).toBe(false);
   });
 });

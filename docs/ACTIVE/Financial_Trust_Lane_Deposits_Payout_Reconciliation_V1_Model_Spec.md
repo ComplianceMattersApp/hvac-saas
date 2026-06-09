@@ -4,6 +4,57 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Trust Lane / Deposits and Payout Reconciliation V1
 Scope: docs/model only. No product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, QBO behavior, production data, or customer-facing behavior is changed or authorized by this spec.
 
+## Phase E-B Closeout - Read-Only Deposits Report Page
+
+Phase E-B added the first read-only owner-facing deposits reconciliation surface:
+
+`app/reports/deposits/page.tsx`
+
+Focused page wiring test:
+
+`lib/reports/__tests__/deposits-page-wiring.test.ts`
+
+Locked result:
+
+- Route is `/reports/deposits`.
+- Route is direct-URL accessible only in this phase.
+- No main navigation, report-center tab, sidebar, or admin navigation link is added.
+- Page uses Phase E-A read model `getDepositsLedgerSummary`.
+- Page is server-side gated with the same Owner/Admin/Billing financial authority posture used by the Payments Register.
+- Dispatcher/technician/contractor/unauthenticated users remain blocked by the existing internal/financial gate posture.
+- Filters are GET/search-param only: date from, date to, payout status, and sync status.
+- Summary cards use the owner-facing rollup labels: `Gross Collected`, `Fees & Adjustments`, `Net Deposits`, `Pending Payouts`, and `Unmatched / Needs Review`.
+- Payout/deposit table groups existing settlement rows by payout/deposit group from the read model.
+- Empty state says no settlement data is synced yet and keeps Stripe Dashboard as fallback.
+- Mixed-currency warning is conservative and avoids presenting combined totals as authoritative.
+- Needs-review rows remain visible with labels such as `Needs Review`, `Unmatched`, `Pending Sync`, and `Sync Failed`.
+
+Non-wiring confirmation:
+
+- No CSV/export route is added.
+- No deposit detail route is added.
+- No sync button/control is added.
+- No manual/internal sync UI is added.
+- No Stripe API calls are added.
+- No sync helper is invoked.
+- No cron/scheduled job is added.
+- No webhook invokes this page/read model.
+- No checkout/session/payment-link behavior changes.
+- No Payments Register behavior changes.
+- No invoice action behavior changes.
+- Stripe Dashboard fallback copy remains visible until settlement sync/report/export/smoke phases are complete.
+
+Source-of-truth preservation:
+
+- `internal_invoice_payments` remains gross payment event truth.
+- `internal_invoice_payment_allocations` remains payment-to-invoice allocation truth.
+- `stripe_payment_settlements` remains Stripe fee/net/payout settlement truth only.
+- Deposits page does not mutate invoice paid/balance.
+- Deposits page does not mutate payment rows.
+- Deposits page does not mutate allocation rows.
+- Deposits page does not introduce QBO/general-ledger behavior.
+- Deposits page does not count settlement rows toward collected payment totals.
+
 ## Phase E-A Closeout - Deposits Read Model Foundation
 
 Phase E-A added a read-only deposits reconciliation read model:
@@ -758,6 +809,8 @@ Acceptance:
 - Owner/Admin/Billing access only
 - grouped payout summary
 - gross/fees-and-adjustments/net/pending/unmatched summary
+- Stripe Dashboard fallback copy visible
+- no nav link until explicitly released
 - no mutations
 
 ### Phase F - Deposit Detail
