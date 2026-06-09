@@ -129,6 +129,10 @@ type CustomerScopeRow = {
   id: string | null;
 };
 
+type InternalUserIdRow = {
+  user_id: string | null;
+};
+
 type DispatchDateRange = {
   startDate: string;
   endDate: string;
@@ -136,13 +140,15 @@ type DispatchDateRange = {
 
 export type DispatchCalendarBoardData = Omit<
   DispatchCalendarData,
-  'scheduledAttentionWindowJobs' | 'unassignedScheduledJobs'
+  'scheduledAttentionWindowJobs' | 'unassignedScheduledJobs' | 'assignableUsers'
 >;
 
 export type DispatchCalendarQueueData = Pick<
   DispatchCalendarData,
   'scheduledAttentionWindowJobs' | 'unassignedScheduledJobs'
 >;
+
+export type DispatchCalendarRosterData = Pick<DispatchCalendarData, 'assignableUsers'>;
 
 type CalendarTimingDebugView = 'day' | 'week' | 'list' | 'month' | 'unknown';
 type CalendarTimingDebugTechFilter = 'all' | 'unassigned' | 'specific';
@@ -362,6 +368,25 @@ async function loadScopedCustomerIds(params: {
 
   return (customerRows ?? [])
     .map((row: CustomerScopeRow) => String(row?.id ?? '').trim())
+    .filter(Boolean);
+}
+
+async function getActiveInternalUserIdsForCalendarBlocks(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+}): Promise<string[]> {
+  const { supabase, accountOwnerUserId } = params;
+
+  const { data: userRows, error: userErr } = await supabase
+    .from('internal_users')
+    .select('user_id')
+    .eq('account_owner_user_id', accountOwnerUserId)
+    .eq('is_active', true);
+
+  if (userErr) throw userErr;
+
+  return (userRows ?? [])
+    .map((row: InternalUserIdRow) => String(row?.user_id ?? '').trim())
     .filter(Boolean);
 }
 
@@ -995,17 +1020,23 @@ export async function getDispatchCalendarBoardData(params: DispatchCalendarLoadP
     jobs: scheduledCalendarJobs,
   });
 
-  const assignableUsers = (await timeCalendarStep(timingEnabled, timings, 'primary_assignable_users_profile_resolution_ms', () =>
-    getAssignableInternalUsers({
-      supabase: context.supabase,
-      accountOwnerUserId: context.accountOwnerUserId,
-    }),
-  )).map((user) => ({
-    user_id: String(user.user_id),
-    display_name: String(user.display_name),
-  }));
+  if (timingEnabled) {
+    timings.primary_assignable_users_query_ms = 0;
+    timings.primary_assignable_users_profile_resolution_ms = 0;
+  }
 
-  const assignableUserIds = assignableUsers.map((user) => user.user_id);
+  const activeInternalUserIdsForBlocks = await timeCalendarStep(
+    timingEnabled,
+    timings,
+    'primary_active_user_ids_for_blocks_query_ms',
+    () =>
+      getActiveInternalUserIdsForCalendarBlocks({
+        supabase: context.supabase,
+        accountOwnerUserId: context.accountOwnerUserId,
+      }),
+  );
+
+  const assignableUserIds = activeInternalUserIdsForBlocks;
   const calendarBlockEvents: DispatchCalendarBlockEvent[] = [];
 
   if (assignableUserIds.length) {
@@ -1078,7 +1109,8 @@ export async function getDispatchCalendarBoardData(params: DispatchCalendarLoadP
         primary_assignment_row_count: assignmentRowCount,
         primary_event_row_count: eventRowCount,
         primary_block_event_count: calendarBlockEvents.length,
-        assignable_user_count: assignableUsers.length,
+        primary_active_user_id_count: activeInternalUserIdsForBlocks.length,
+        primary_assignable_user_count: 0,
       },
     }));
   }
@@ -1101,6 +1133,56 @@ export async function getDispatchCalendarBoardData(params: DispatchCalendarLoadP
       days: weekDays,
     },
     calendarBlockEvents,
+  };
+}
+
+export async function getDispatchCalendarRosterData(params: DispatchCalendarLoadParams): Promise<DispatchCalendarRosterData> {
+  const timingEnabled = isCalendarTimingDebugEnabled();
+  const totalStartedAt = timingEnabled ? nowMs() : 0;
+  const timings: Record<string, number> = {};
+
+  const { supabase, internalUser } = await timeCalendarStep(timingEnabled, timings, 'secondary_roster_auth_internal_user_ms', async () => {
+    const scopedSupabase = await createClient();
+    const internalResult = await requireInternalUser({ supabase: scopedSupabase });
+    return {
+      supabase: scopedSupabase,
+      internalUser: internalResult.internalUser,
+    };
+  });
+
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? '').trim();
+  if (!accountOwnerUserId) {
+    throw new Error('NOT_AUTHORIZED');
+  }
+
+  const assignableUsers = (await timeCalendarStep(timingEnabled, timings, 'secondary_assignable_users_query_ms', () =>
+    getAssignableInternalUsers({
+      supabase,
+      accountOwnerUserId,
+    }),
+  )).map((user) => ({
+    user_id: String(user.user_id),
+    display_name: String(user.display_name),
+  }));
+
+  if (timingEnabled) {
+    console.log(JSON.stringify({
+      marker: 'calendar_timing_debug',
+      loader: 'secondary_roster',
+      view: normalizeTimingDebugView(params.view),
+      mode: params.mode === 'week' ? 'week' : 'day',
+      tech_filter_type: params.techFilterType ?? 'all',
+      timings_ms: {
+        total_secondary_roster_ms: nowMs() - totalStartedAt,
+        ...timings,
+      },
+      counts: {
+        secondary_assignable_user_count: assignableUsers.length,
+      },
+    }));
+  }
+
+  return {
     assignableUsers,
   };
 }

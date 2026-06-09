@@ -27,8 +27,10 @@ import { logCustomerContactAttemptFromForm } from '@/lib/actions/job-contact-act
 import {
   getDispatchCalendarBoardData,
   getDispatchCalendarQueueData,
+  getDispatchCalendarRosterData,
   type DispatchCalendarBlockEvent,
   type DispatchCalendarQueueData,
+  type DispatchCalendarRosterData,
   type DispatchJob,
   type DispatchViewMode,
 } from '@/lib/actions/calendar';
@@ -37,6 +39,8 @@ import { normalizeRetestLinkedJobTitle } from '@/lib/utils/job-title-display';
 import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
 
 type CalendarUIView = 'day' | 'week' | 'list' | 'month';
+
+type AssignableCalendarUser = { user_id: string; display_name: string };
 
 type Props = {
   view?: string;
@@ -520,7 +524,7 @@ function DetailPanel(props: {
   job: DispatchJob;
   returnTo: string;
   closeHref: string;
-  assignableUsers: Array<{ user_id: string; display_name: string }>;
+  assignableUsers: AssignableCalendarUser[];
   view: CalendarUIView;
   date: string;
   tech?: string | null;
@@ -1079,19 +1083,332 @@ function CalendarQueueInspectorFallback(props: { className?: string }) {
   );
 }
 
-async function CalendarQueueSelectedJobInspector(props: {
-  queuePromise: Promise<DispatchCalendarQueueData>;
-  selectedJobId: string;
+function CalendarRosterControlsFallback(props: { activeFilterLabel: string }) {
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Dispatch Focus</p>
+          <p className="mt-0.5 text-xs text-slate-500">Loading technician filters...</p>
+        </div>
+        <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+          {props.activeFilterLabel}
+        </div>
+      </div>
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <span className="h-9 w-28 rounded-full border border-slate-200 bg-white" />
+        <span className="h-9 w-24 rounded-full border border-slate-200 bg-white" />
+        <span className="h-9 w-32 rounded-full border border-slate-200 bg-white" />
+      </div>
+    </div>
+  );
+}
+
+async function CalendarDispatchFocusControls(props: {
+  rosterPromise: Promise<DispatchCalendarRosterData>;
+  uiView: CalendarUIView;
+  anchorDate: string;
+  activeTech?: string | null;
+  activeUnassignedFilter: boolean;
+  activeFilterLabel: string;
+}) {
+  const roster = await props.rosterPromise;
+  if (!roster.assignableUsers.length) return null;
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Dispatch Focus</p>
+          <p className="mt-0.5 text-xs text-slate-500">Filter the board without changing the schedule or assignments.</p>
+        </div>
+        <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+          {props.activeFilterLabel}
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
+        <Link
+          href={buildCalendarHref(props.uiView, props.anchorDate)}
+          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            !props.activeTech
+              ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+          }`}
+        >
+          All technicians
+        </Link>
+        <Link
+          href={buildCalendarHref(props.uiView, props.anchorDate, { tech: CALENDAR_TECH_FILTER_UNASSIGNED })}
+          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            props.activeUnassignedFilter
+              ? 'border-rose-800 bg-rose-700 text-white shadow-sm'
+              : 'border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50'
+          }`}
+        >
+          Unassigned
+        </Link>
+        {roster.assignableUsers.map((user) => (
+          <Link
+            key={user.user_id}
+            href={buildCalendarHref(props.uiView, props.anchorDate, { tech: user.user_id })}
+            className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              props.activeTech === user.user_id
+                ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            {user.display_name}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function CalendarBlockControlsFallback() {
+  return (
+    <div className="rounded-xl border border-slate-200/80 bg-white p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.28)]">
+      <div className="flex items-center gap-3">
+        <span className="h-9 w-9 rounded-md border border-slate-200 bg-slate-50" />
+        <div className="min-w-0 flex-1">
+          <div className="h-4 w-28 rounded bg-slate-100" />
+          <div className="mt-2 h-3 w-40 rounded bg-slate-100" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+async function CalendarBlockControls(props: {
+  rosterPromise: Promise<DispatchCalendarRosterData>;
+  selectedBlock: DispatchCalendarBlockEvent | null;
+  uiView: CalendarUIView;
+  anchorDate: string;
+  activeTech?: string | null;
+  activeTechnicianUserId?: string | null;
+}) {
+  const roster = await props.rosterPromise;
+  if (!roster.assignableUsers.length) return null;
+
+  if (props.selectedBlock) {
+    return (
+      <div className="rounded-xl border border-emerald-200/80 bg-white p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.24)]">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Edit Block</p>
+            <p className="mt-0.5 text-[11px] text-slate-500">Update the existing internal block and save your corrections.</p>
+          </div>
+          <Link
+            href={buildCalendarHref(props.uiView, props.anchorDate, { tech: props.activeTech })}
+            scroll={false}
+            className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition hover:bg-slate-100"
+          >
+            Close
+          </Link>
+        </div>
+        <div className="mt-3 border-t border-slate-200 pt-3">
+          <form action={updateCalendarBlockEventFromForm} className="grid gap-2">
+            <input type="hidden" name="event_id" value={props.selectedBlock.id} />
+            <input type="hidden" name="return_to" value={buildCalendarHref(props.uiView, props.anchorDate, { tech: props.activeTech })} />
+            <input
+              name="title"
+              defaultValue={props.selectedBlock.title}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
+              placeholder="Event name"
+              required
+            />
+            <select
+              name="internal_user_id"
+              defaultValue={props.selectedBlock.internal_user_id}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
+              required
+            >
+              {roster.assignableUsers.map((user) => (
+                <option key={`edit-block-user-${user.user_id}`} value={user.user_id}>
+                  {user.display_name}
+                </option>
+              ))}
+            </select>
+            <div className="grid gap-1.5 sm:grid-cols-2">
+              <input
+                type="date"
+                name="date"
+                defaultValue={props.selectedBlock.calendar_date}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 sm:col-span-2"
+                required
+              />
+              <input
+                type="time"
+                name="start_time"
+                defaultValue={props.selectedBlock.start_time}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
+                required
+              />
+              <input
+                type="time"
+                name="end_time"
+                defaultValue={props.selectedBlock.end_time}
+                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
+                required
+              />
+            </div>
+            <textarea
+              name="description"
+              rows={2}
+              defaultValue={props.selectedBlock.description ?? ''}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
+              placeholder="Optional details"
+            />
+            <SubmitButton className="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Saving...">
+              Save Block
+            </SubmitButton>
+          </form>
+          <details className="group mt-2 border-t border-slate-200 pt-2">
+            <summary className="flex cursor-pointer list-none items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-red-700 transition hover:bg-red-100 [&::-webkit-details-marker]:hidden">
+              Delete Block
+            </summary>
+            <div className="mt-2 rounded-xl border border-red-200 bg-red-50/80 p-3">
+              <p className="text-[12px] font-medium text-red-800">Delete this calendar block? This cannot be undone.</p>
+              <form action={deleteCalendarBlockEventFromForm} className="mt-2">
+                <input type="hidden" name="event_id" value={props.selectedBlock.id} />
+                <input type="hidden" name="return_to" value={buildCalendarHref(props.uiView, props.anchorDate, { tech: props.activeTech })} />
+                <SubmitButton className="w-full rounded-xl bg-red-600 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-red-700" loadingText="Deleting...">
+                  Confirm Delete
+                </SubmitButton>
+              </form>
+            </div>
+          </details>
+        </div>
+      </div>
+    );
+  }
+
+  if (props.uiView !== 'day' && props.uiView !== 'week' && props.uiView !== 'month') return null;
+
+  return (
+    <details id="calendar-add-block" className="group rounded-xl border border-slate-200/80 bg-white shadow-[0_12px_30px_-24px_rgba(15,31,53,0.28)]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border-l-4 border-l-emerald-500 px-3 py-3 text-left transition hover:border-slate-300 hover:bg-emerald-50/40 [&::-webkit-details-marker]:hidden">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700">
+            <CalendarPlus className="h-4 w-4" aria-hidden="true" />
+          </span>
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-slate-950">Add blocked time</p>
+            <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
+              {props.uiView === 'month'
+                ? 'Hold the selected day for travel, lunch, parts pickup, or office time.'
+                : 'Hold a schedule window for travel, lunch, parts pickup, or office time.'}
+            </p>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition group-open:bg-emerald-700">
+          <span className="group-open:hidden">Add</span>
+          <span className="hidden group-open:inline">Open</span>
+        </span>
+      </summary>
+      <div className="border-t border-slate-200 px-3 pb-3 pt-3">
+        <form action={createCalendarBlockEventFromForm} className="grid gap-2">
+          <input type="hidden" name="return_to" value={buildCalendarHref(props.uiView, props.anchorDate, { tech: props.activeTech })} />
+          <input
+            name="title"
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
+            placeholder="Event name"
+            required
+          />
+          <select
+            name="internal_user_id"
+            defaultValue={props.activeTechnicianUserId ?? ''}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
+            required
+          >
+            <option value="" disabled>
+              Select technician
+            </option>
+            {roster.assignableUsers.map((user) => (
+              <option key={`block-user-${user.user_id}`} value={user.user_id}>
+                {user.display_name}
+              </option>
+            ))}
+          </select>
+          <div className="grid gap-1.5 sm:grid-cols-2">
+            <input
+              type="date"
+              name="date"
+              defaultValue={props.anchorDate}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 sm:col-span-2"
+              required
+            />
+            <input
+              type="time"
+              name="start_time"
+              defaultValue="08:00"
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
+              required
+            />
+            <input
+              type="time"
+              name="end_time"
+              defaultValue="09:00"
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
+              required
+            />
+          </div>
+          <textarea
+            name="description"
+            rows={2}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
+            placeholder="Optional details"
+          />
+          <SubmitButton className="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Creating...">
+            Add Block
+          </SubmitButton>
+        </form>
+      </div>
+    </details>
+  );
+}
+
+async function CalendarSelectedJobInspector(props: {
+  rosterPromise: Promise<DispatchCalendarRosterData>;
+  job: DispatchJob;
   returnTo: string;
   closeHref: string;
-  assignableUsers: Array<{ user_id: string; display_name: string }>;
   view: CalendarUIView;
   date: string;
   tech?: string | null;
   prefillDate?: string | null;
   className?: string;
 }) {
-  const queue = await props.queuePromise;
+  const roster = await props.rosterPromise;
+  return (
+    <DetailPanel
+      job={props.job}
+      returnTo={props.returnTo}
+      closeHref={props.closeHref}
+      assignableUsers={roster.assignableUsers}
+      view={props.view}
+      date={props.date}
+      tech={props.tech}
+      prefillDate={props.prefillDate}
+      className={props.className}
+    />
+  );
+}
+
+async function CalendarQueueSelectedJobInspector(props: {
+  queuePromise: Promise<DispatchCalendarQueueData>;
+  rosterPromise: Promise<DispatchCalendarRosterData>;
+  selectedJobId: string;
+  returnTo: string;
+  closeHref: string;
+  view: CalendarUIView;
+  date: string;
+  tech?: string | null;
+  prefillDate?: string | null;
+  className?: string;
+}) {
+  const [queue, roster] = await Promise.all([props.queuePromise, props.rosterPromise]);
   const selectedJob =
     queue.unassignedScheduledJobs.find((job) => job.id === props.selectedJobId) ||
     queue.scheduledAttentionWindowJobs.find((job) => job.id === props.selectedJobId) ||
@@ -1104,7 +1421,7 @@ async function CalendarQueueSelectedJobInspector(props: {
       job={selectedJob}
       returnTo={props.returnTo}
       closeHref={props.closeHref}
-      assignableUsers={props.assignableUsers}
+      assignableUsers={roster.assignableUsers}
       view={props.view}
       date={props.date}
       tech={props.tech}
@@ -1145,6 +1462,7 @@ export async function CalendarView(props: Props) {
   } as const;
 
   const queuePromise = getDispatchCalendarQueueData(calendarLoadParams);
+  const rosterPromise = getDispatchCalendarRosterData(calendarLoadParams);
   const data = await getDispatchCalendarBoardData(calendarLoadParams);
 
   const returnTo = buildReturnTo(uiView, data.anchorDate, activeTech);
@@ -1252,56 +1570,6 @@ export async function CalendarView(props: Props) {
     ? 'Single technician'
     : 'All technicians';
 
-  const dispatchFocusControls = data.assignableUsers.length > 0 ? (
-    <div>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Dispatch Focus</p>
-          <p className="mt-0.5 text-xs text-slate-500">Filter the board without changing the schedule or assignments.</p>
-        </div>
-        <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-          {activeFilterLabel}
-        </div>
-      </div>
-
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
-        <Link
-          href={buildCalendarHref(uiView, data.anchorDate)}
-          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            !activeTech
-              ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-          }`}
-        >
-          All technicians
-        </Link>
-        <Link
-          href={buildCalendarHref(uiView, data.anchorDate, { tech: CALENDAR_TECH_FILTER_UNASSIGNED })}
-          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            activeUnassignedFilter
-              ? 'border-rose-800 bg-rose-700 text-white shadow-sm'
-              : 'border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50'
-          }`}
-        >
-          Unassigned
-        </Link>
-        {data.assignableUsers.map((user) => (
-          <Link
-            key={user.user_id}
-            href={buildCalendarHref(uiView, data.anchorDate, { tech: user.user_id })}
-            className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-              activeTech === user.user_id
-                ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-            }`}
-          >
-            {user.display_name}
-          </Link>
-        ))}
-      </div>
-    </div>
-  ) : null;
-
   const statusLegend = (
     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
       <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -1389,192 +1657,48 @@ export async function CalendarView(props: Props) {
             </summary>
 
             <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
-              {dispatchFocusControls}
-              <div className={dispatchFocusControls ? 'border-t border-slate-200 pt-3' : ''}>{statusLegend}</div>
+              <Suspense fallback={<CalendarRosterControlsFallback activeFilterLabel={activeFilterLabel} />}>
+                <CalendarDispatchFocusControls
+                  rosterPromise={rosterPromise}
+                  uiView={uiView}
+                  anchorDate={data.anchorDate}
+                  activeTech={activeTech}
+                  activeUnassignedFilter={activeUnassignedFilter}
+                  activeFilterLabel={activeFilterLabel}
+                />
+              </Suspense>
+              <div className="border-t border-slate-200 pt-3">{statusLegend}</div>
             </div>
           </details>
 
           <div className="mt-3 hidden rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-3 sm:block">
-            {dispatchFocusControls}
-            <div className={dispatchFocusControls ? 'mt-3 border-t border-slate-200 pt-3' : ''}>{statusLegend}</div>
+            <Suspense fallback={<CalendarRosterControlsFallback activeFilterLabel={activeFilterLabel} />}>
+              <CalendarDispatchFocusControls
+                rosterPromise={rosterPromise}
+                uiView={uiView}
+                anchorDate={data.anchorDate}
+                activeTech={activeTech}
+                activeUnassignedFilter={activeUnassignedFilter}
+                activeFilterLabel={activeFilterLabel}
+              />
+            </Suspense>
+            <div className="mt-3 border-t border-slate-200 pt-3">{statusLegend}</div>
           </div>
         </div>
       </div>
 
       <div className={`grid gap-5 ${showDesktopInspectorColumn ? 'xl:grid-cols-[280px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[280px_minmax(0,1fr)]'}`}>
         <aside className="order-2 space-y-4 xl:order-1">
-          {data.assignableUsers.length ? (
-            selectedBlock ? (
-              <div className="rounded-xl border border-emerald-200/80 bg-white p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.24)]">
-                <div className="flex items-start justify-between gap-2">
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">Edit Block</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">Update the existing internal block and save your corrections.</p>
-                  </div>
-                  <Link
-                    href={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })}
-                    scroll={false}
-                    className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition hover:bg-slate-100"
-                  >
-                    Close
-                  </Link>
-                </div>
-                <div className="mt-3 border-t border-slate-200 pt-3">
-                  <form action={updateCalendarBlockEventFromForm} className="grid gap-2">
-                    <input type="hidden" name="event_id" value={selectedBlock.id} />
-                    <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
-                    <input
-                      name="title"
-                      defaultValue={selectedBlock.title}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
-                      placeholder="Event name"
-                      required
-                    />
-                    <select
-                      name="internal_user_id"
-                      defaultValue={selectedBlock.internal_user_id}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
-                      required
-                    >
-                      {data.assignableUsers.map((user) => (
-                        <option key={`edit-block-user-${user.user_id}`} value={user.user_id}>
-                          {user.display_name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="grid gap-1.5 sm:grid-cols-2">
-                      <input
-                        type="date"
-                        name="date"
-                        defaultValue={selectedBlock.calendar_date}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 sm:col-span-2"
-                        required
-                      />
-                      <input
-                        type="time"
-                        name="start_time"
-                        defaultValue={selectedBlock.start_time}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
-                        required
-                      />
-                      <input
-                        type="time"
-                        name="end_time"
-                        defaultValue={selectedBlock.end_time}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
-                        required
-                      />
-                    </div>
-                    <textarea
-                      name="description"
-                      rows={2}
-                      defaultValue={selectedBlock.description ?? ''}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
-                      placeholder="Optional details"
-                    />
-                    <SubmitButton className="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Saving...">
-                      Save Block
-                    </SubmitButton>
-                  </form>
-                  <details className="group mt-2 border-t border-slate-200 pt-2">
-                    <summary className="flex cursor-pointer list-none items-center justify-center rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-red-700 transition hover:bg-red-100 [&::-webkit-details-marker]:hidden">
-                      Delete Block
-                    </summary>
-                    <div className="mt-2 rounded-xl border border-red-200 bg-red-50/80 p-3">
-                      <p className="text-[12px] font-medium text-red-800">Delete this calendar block? This cannot be undone.</p>
-                      <form action={deleteCalendarBlockEventFromForm} className="mt-2">
-                        <input type="hidden" name="event_id" value={selectedBlock.id} />
-                        <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
-                        <SubmitButton className="w-full rounded-xl bg-red-600 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-red-700" loadingText="Deleting...">
-                          Confirm Delete
-                        </SubmitButton>
-                      </form>
-                    </div>
-                  </details>
-                </div>
-              </div>
-            ) : (uiView === 'day' || uiView === 'week' || uiView === 'month') ? (
-              <details id="calendar-add-block" className="group rounded-xl border border-slate-200/80 bg-white shadow-[0_12px_30px_-24px_rgba(15,31,53,0.28)]">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border-l-4 border-l-emerald-500 px-3 py-3 text-left transition hover:border-slate-300 hover:bg-emerald-50/40 [&::-webkit-details-marker]:hidden">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-emerald-50 text-emerald-700">
-                      <CalendarPlus className="h-4 w-4" aria-hidden="true" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-950">Add blocked time</p>
-                      <p className="mt-0.5 text-[11px] leading-4 text-slate-500">
-                        {uiView === 'month'
-                          ? 'Hold the selected day for travel, lunch, parts pickup, or office time.'
-                          : 'Hold a schedule window for travel, lunch, parts pickup, or office time.'}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="shrink-0 rounded-md bg-slate-900 px-3 py-2 text-xs font-semibold text-white shadow-sm transition group-open:bg-emerald-700">
-                    <span className="group-open:hidden">Add</span>
-                    <span className="hidden group-open:inline">Open</span>
-                  </span>
-                </summary>
-                <div className="border-t border-slate-200 px-3 pb-3 pt-3">
-                  <form action={createCalendarBlockEventFromForm} className="grid gap-2">
-                    <input type="hidden" name="return_to" value={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech })} />
-                    <input
-                      name="title"
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
-                      placeholder="Event name"
-                      required
-                    />
-                    <select
-                      name="internal_user_id"
-                      defaultValue={activeTechnicianUserId ?? ''}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
-                      required
-                    >
-                      <option value="" disabled>
-                        Select technician
-                      </option>
-                      {data.assignableUsers.map((user) => (
-                        <option key={`block-user-${user.user_id}`} value={user.user_id}>
-                          {user.display_name}
-                        </option>
-                      ))}
-                    </select>
-                    <div className="grid gap-1.5 sm:grid-cols-2">
-                      <input
-                        type="date"
-                        name="date"
-                        defaultValue={data.anchorDate}
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 sm:col-span-2"
-                        required
-                      />
-                      <input
-                        type="time"
-                        name="start_time"
-                        defaultValue="08:00"
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
-                        required
-                      />
-                      <input
-                        type="time"
-                        name="end_time"
-                        defaultValue="09:00"
-                        className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900"
-                        required
-                      />
-                    </div>
-                    <textarea
-                      name="description"
-                      rows={2}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-[13px] text-slate-900 placeholder:text-slate-400"
-                      placeholder="Optional details"
-                    />
-                    <SubmitButton className="rounded-xl bg-emerald-600 px-3 py-2.5 text-xs font-semibold uppercase tracking-[0.12em] text-white transition hover:bg-emerald-700" loadingText="Creating...">
-                      Add Block
-                    </SubmitButton>
-                  </form>
-                </div>
-              </details>
-            ) : null
-          ) : null}
+          <Suspense fallback={<CalendarBlockControlsFallback />}>
+            <CalendarBlockControls
+              rosterPromise={rosterPromise}
+              selectedBlock={selectedBlock}
+              uiView={uiView}
+              anchorDate={data.anchorDate}
+              activeTech={activeTech}
+              activeTechnicianUserId={activeTechnicianUserId}
+            />
+          </Suspense>
 
           <Suspense fallback={<CalendarQueueSidebarFallback />}>
             <CalendarQueueSidebar queuePromise={queuePromise} uiView={uiView} anchorDate={data.anchorDate} activeTech={activeTech} />
@@ -1668,7 +1792,7 @@ export async function CalendarView(props: Props) {
               <CalendarDispatchGrid
                 jobs={filteredDayJobs}
                 blockEvents={techFilteredBlockEvents}
-                assignableUsers={data.assignableUsers}
+                assignableUsers={[]}
                 mode={baseMode}
                 date={data.day.date}
                 tech={activeTech}
@@ -1691,7 +1815,7 @@ export async function CalendarView(props: Props) {
                   <CalendarDispatchGrid
                     jobs={day.jobs}
                     blockEvents={techFilteredBlockEvents}
-                    assignableUsers={data.assignableUsers}
+                    assignableUsers={[]}
                     mode={baseMode}
                     date={day.date}
                     tech={activeTech}
@@ -1708,25 +1832,27 @@ export async function CalendarView(props: Props) {
         {showDesktopInspectorColumn ? (
           <aside className="order-3 hidden xl:block">
             {selectedJob ? (
-              <DetailPanel
-                job={selectedJob}
-                returnTo={returnTo}
-                closeHref={hideInspectorHref}
-                assignableUsers={data.assignableUsers}
-                view={uiView}
-                date={data.anchorDate}
-                tech={activeTech}
-                prefillDate={prefillDate}
-                className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
-              />
+              <Suspense fallback={<CalendarQueueInspectorFallback className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 shadow-lg shadow-slate-950/10" />}>
+                <CalendarSelectedJobInspector
+                  rosterPromise={rosterPromise}
+                  job={selectedJob}
+                  returnTo={returnTo}
+                  closeHref={hideInspectorHref}
+                  view={uiView}
+                  date={data.anchorDate}
+                  tech={activeTech}
+                  prefillDate={prefillDate}
+                  className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
+                />
+              </Suspense>
             ) : selectedJobId ? (
               <Suspense fallback={<CalendarQueueInspectorFallback className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 shadow-lg shadow-slate-950/10" />}>
                 <CalendarQueueSelectedJobInspector
                   queuePromise={queuePromise}
+                  rosterPromise={rosterPromise}
                   selectedJobId={selectedJobId}
                   returnTo={returnTo}
                   closeHref={hideInspectorHref}
-                  assignableUsers={data.assignableUsers}
                   view={uiView}
                   date={data.anchorDate}
                   tech={activeTech}
@@ -1755,25 +1881,27 @@ export async function CalendarView(props: Props) {
       {inspectorOpen && (selectedJob || selectedJobId) ? (
         <div className="fixed inset-0 z-50 bg-black/30 px-3 pb-4 pt-24 sm:px-4 sm:pb-5 sm:pt-28 xl:hidden">
           {selectedJob ? (
-            <DetailPanel
-              job={selectedJob}
-              returnTo={returnTo}
-              closeHref={hideInspectorHref}
-              assignableUsers={data.assignableUsers}
-              view={uiView}
-              date={data.anchorDate}
-              tech={activeTech}
-              prefillDate={prefillDate}
-              className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 shadow-xl shadow-slate-950/10"
-            />
+            <Suspense fallback={<CalendarQueueInspectorFallback className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 shadow-xl shadow-slate-950/10" />}>
+              <CalendarSelectedJobInspector
+                rosterPromise={rosterPromise}
+                job={selectedJob}
+                returnTo={returnTo}
+                closeHref={hideInspectorHref}
+                view={uiView}
+                date={data.anchorDate}
+                tech={activeTech}
+                prefillDate={prefillDate}
+                className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10"
+              />
+            </Suspense>
           ) : (
             <Suspense fallback={<CalendarQueueInspectorFallback className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 shadow-xl shadow-slate-950/10" />}>
               <CalendarQueueSelectedJobInspector
                 queuePromise={queuePromise}
+                rosterPromise={rosterPromise}
                 selectedJobId={selectedJobId}
                 returnTo={returnTo}
                 closeHref={hideInspectorHref}
-                assignableUsers={data.assignableUsers}
                 view={uiView}
                 date={data.anchorDate}
                 tech={activeTech}

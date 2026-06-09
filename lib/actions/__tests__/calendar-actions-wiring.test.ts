@@ -59,6 +59,11 @@ type JobEventRow = {
 
 function makeFixture() {
   const customers = [{ id: 'cust-1', owner_user_id: 'owner-1' }];
+  const internalUsers = [
+    { user_id: 'tech-1', account_owner_user_id: 'owner-1', is_active: true },
+    { user_id: 'tech-inactive', account_owner_user_id: 'owner-1', is_active: false },
+    { user_id: 'tech-other-account', account_owner_user_id: 'owner-2', is_active: true },
+  ];
 
   const jobs: JobRow[] = [
     {
@@ -239,11 +244,49 @@ function makeFixture() {
     return query;
   }
 
+  function internalUsersQuery() {
+    let accountOwnerFilter = '';
+    let isActiveFilter: boolean | null = null;
+    const query: any = {
+      select: vi.fn(() => query),
+      eq: vi.fn((column: string, value: unknown) => {
+        if (column === 'account_owner_user_id') accountOwnerFilter = String(value ?? '').trim();
+        if (column === 'is_active') isActiveFilter = Boolean(value);
+        return query;
+      }),
+      then: (onFulfilled: (value: { data: Array<{ user_id: string }>; error: null }) => unknown, onRejected?: (reason: unknown) => unknown) => {
+        const data = internalUsers
+          .filter((row) => row.account_owner_user_id === accountOwnerFilter)
+          .filter((row) => isActiveFilter === null || row.is_active === isActiveFilter)
+          .map((row) => ({ user_id: row.user_id }));
+        return Promise.resolve({ data, error: null }).then(onFulfilled, onRejected);
+      },
+    };
+    return query;
+  }
+
+  function calendarEventsQuery() {
+    const query: any = {
+      select: vi.fn(() => query),
+      eq: vi.fn(() => query),
+      in: vi.fn(() => query),
+      gte: vi.fn(() => query),
+      lt: vi.fn(() => query),
+      order: vi.fn(() => query),
+      then: (onFulfilled: (value: { data: never[]; error: null }) => unknown, onRejected?: (reason: unknown) => unknown) => {
+        return Promise.resolve({ data: [], error: null }).then(onFulfilled, onRejected);
+      },
+    };
+    return query;
+  }
+
   const supabase = {
     from(table: string) {
       if (table === 'customers') return customersQuery();
       if (table === 'jobs') return jobsQuery();
       if (table === 'job_events') return jobEventsQuery();
+      if (table === 'internal_users') return internalUsersQuery();
+      if (table === 'calendar_events') return calendarEventsQuery();
       throw new Error(`Unexpected table ${table}`);
     },
   };
@@ -266,7 +309,10 @@ describe('calendar action wiring', () => {
       },
     });
 
-    getAssignableInternalUsersMock.mockResolvedValue([]);
+    getAssignableInternalUsersMock.mockResolvedValue([
+      { user_id: 'tech-1', display_name: 'Tech One' },
+      { user_id: 'tech-2', display_name: 'Tech Two' },
+    ]);
 
     getActiveJobAssignmentDisplayMapMock.mockResolvedValue({
       'job-assigned-canonical': [
@@ -315,7 +361,7 @@ describe('calendar action wiring', () => {
   it('splits primary board data from secondary queue data', async () => {
     createClientMock.mockResolvedValue(makeFixture().supabase);
 
-    const { getDispatchCalendarBoardData, getDispatchCalendarQueueData } = await import('@/lib/actions/calendar-actions');
+    const { getDispatchCalendarBoardData, getDispatchCalendarQueueData, getDispatchCalendarRosterData } = await import('@/lib/actions/calendar-actions');
 
     const board = await getDispatchCalendarBoardData({
       mode: 'day',
@@ -325,15 +371,25 @@ describe('calendar action wiring', () => {
       mode: 'day',
       anchorDate: '2026-04-29',
     });
+    const roster = await getDispatchCalendarRosterData({
+      mode: 'day',
+      anchorDate: '2026-04-29',
+    });
 
     expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-unassigned-fallback']);
     expect(board.day.jobs.map((job) => job.latest_event_type)).toEqual([null, null]);
     expect('unassignedScheduledJobs' in board).toBe(false);
     expect('scheduledAttentionWindowJobs' in board).toBe(false);
+    expect('assignableUsers' in board).toBe(false);
     expect(queue.unassignedScheduledJobs.map((job) => job.id)).toEqual(['job-needs-scheduling']);
     expect(queue.scheduledAttentionWindowJobs.map((job) => job.id)).toEqual([
       'job-assigned-canonical',
       'job-unassigned-fallback',
     ]);
+    expect(roster.assignableUsers).toEqual([
+      { user_id: 'tech-1', display_name: 'Tech One' },
+      { user_id: 'tech-2', display_name: 'Tech Two' },
+    ]);
+    expect(getAssignableInternalUsersMock).toHaveBeenCalledTimes(1);
   });
 });
