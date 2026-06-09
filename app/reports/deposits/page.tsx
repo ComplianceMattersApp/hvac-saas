@@ -4,6 +4,7 @@ import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-
 import { requireFinancialRegisterAccessOrRedirect } from "@/lib/auth/financial-access";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { createClient } from "@/lib/supabase/server";
+import ReportCenterTabs from "@/components/reports/ReportCenterTabs";
 import {
   ReportFilterPanel,
   ReportPageHeader,
@@ -185,16 +186,18 @@ export default async function DepositsReportPage({
 
   return (
     <div className={reportPageClass}>
+      <ReportCenterTabs current="deposits" />
+
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
         title="Deposits"
-        description="Deposit reconciliation explains how Stripe-settled payments become bank deposits. Invoice paid/balance remains controlled by payment webhook and allocation truth."
-        countSummary={hasRows ? `Showing ${depositsLedger.rows.length} deposit groups` : "No settlement data synced yet"}
-        truthNote="Payments Register shows gross payment event truth. Deposits explain Stripe settlement and payout timing. Settlement rows do not change invoice paid/balance."
+        description="Track how online invoice payments become bank deposits, including fees, net deposits, payout timing, and exportable records."
+        countSummary={hasRows ? `Showing ${depositsLedger.rows.length} deposit groups` : "No deposits to review yet"}
+        truthNote="Deposits help you see how online payments turn into bank deposits, including Stripe fees, net amounts, and payout timing. Your invoices and payment records stay unchanged."
       />
 
-      <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-        Stripe Dashboard remains the fallback for fee, net, and payout verification until settlement sync and deposit reporting are smoke-tested.
+      <section className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
+        Deposits help you see how online payments turn into bank deposits, including Stripe fees, net amounts, and payout timing.
       </section>
 
       {depositsLedger.warnings.length > 0 ? (
@@ -261,31 +264,31 @@ export default async function DepositsReportPage({
         <ReportStatCard
           label="Gross Collected"
           value={totalsAreMixed ? "Review by currency" : formatUsdCents(summary.grossCollectedCents)}
-          helperText="Synced payment-kind settlement rows only."
+          helperText="Online payments included in this deposits report."
           tone="emerald"
         />
         <ReportStatCard
           label="Fees & Adjustments"
           value={totalsAreMixed ? "Review by currency" : formatUsdCents(summary.feesAndAdjustmentsCents)}
-          helperText="Stored Stripe fees, proven platform fees, and proven settlement adjustments."
+          helperText="Stripe fees, platform fees when present, and settlement adjustments."
           tone="blue"
         />
         <ReportStatCard
           label="Net Deposits"
           value={totalsAreMixed ? "Review by currency" : formatUsdCents(summary.netDepositsCents)}
-          helperText="Stored net settlement amounts. Gross Collected minus Fees & Adjustments equals Net Deposits."
+          helperText="Estimated amount moving toward bank deposit after fees and adjustments."
           tone="blue"
         />
         <ReportStatCard
           label="Pending Payouts"
           value={totalsAreMixed ? "Review by currency" : formatUsdCents(summary.pendingPayoutsCents)}
-          helperText="Synced net amounts not yet tied to a paid or complete payout."
+          helperText="Net amounts that have not been tied to a completed payout yet."
           tone="slate"
         />
         <ReportStatCard
           label="Unmatched / Needs Review"
           value={summary.unmatchedNeedsReviewCount}
-          helperText="Unmatched, failed, pending, or incomplete settlement rows remain visible for review."
+          helperText="Settlement rows that need review before they can be fully matched."
           tone={summary.unmatchedNeedsReviewCount > 0 ? "rose" : "slate"}
         />
       </ReportStatGrid>
@@ -309,9 +312,9 @@ export default async function DepositsReportPage({
               <tr>
                 <td colSpan={8} className="px-4 py-12 text-center text-sm text-slate-500">
                   <div className="mx-auto max-w-md space-y-2">
-                    <div className="font-semibold text-slate-700">No settlement data synced yet.</div>
+                    <div className="font-semibold text-slate-700">No deposits to review yet</div>
                     <div className="text-xs leading-5 text-slate-500">
-                      Stripe Dashboard remains the fallback until settlement sync is run and verified.
+                      Once online payments are settled, this report will show the fees, net deposit amount, and payout timing. Your invoices and payment records stay unchanged.
                     </div>
                   </div>
                 </td>

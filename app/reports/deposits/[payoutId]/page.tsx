@@ -117,9 +117,9 @@ export default async function DepositDetailPage({
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
         title="Deposit Detail"
-        description="This view explains the settlement rows behind a Stripe payout/deposit group. Invoice paid/balance remains controlled by payment webhook and allocation truth."
+        description="Review the online payments, fees, net amount, and payout timing behind this deposit group."
         countSummary={detail.found ? `${detail.rows.length} settlement rows in ${detail.payoutLabel}` : "Deposit group not found"}
-        truthNote="Payments Register shows gross payment event truth. Deposits explain Stripe settlement and payout timing. Settlement rows do not change invoice paid/balance."
+        truthNote="Deposits help explain how online payments become bank deposits. Your invoices and payment records stay unchanged."
       />
 
       <div className="flex flex-wrap gap-2">
@@ -134,8 +134,8 @@ export default async function DepositDetailPage({
         </Link>
       </div>
 
-      <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-        Stripe Dashboard remains the fallback for final fee, net, and payout verification until settlement reporting is smoke-tested.
+      <section className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm leading-6 text-blue-900">
+        This read-only detail view shows how fees and adjustments affect the net amount for this deposit group.
       </section>
 
       {pendingNoPayout ? (
@@ -160,19 +160,19 @@ export default async function DepositDetailPage({
             <ReportStatCard
               label="Gross Collected"
               value={totalsAreMixed ? "Review by currency" : formatUsdCents(detail.summary.grossCollectedCents)}
-              helperText="Synced payment-kind settlement rows only."
+              helperText="Online payments included in this deposit group."
               tone="emerald"
             />
             <ReportStatCard
               label="Fees & Adjustments"
               value={totalsAreMixed ? "Review by currency" : formatUsdCents(detail.summary.feesAndAdjustmentsCents)}
-              helperText="Stored Stripe fees, proven platform fees, and proven settlement adjustments."
+              helperText="Stripe fees, platform fees when present, and settlement adjustments."
               tone="blue"
             />
             <ReportStatCard
               label="Net Deposit"
               value={totalsAreMixed ? "Review by currency" : formatUsdCents(detail.summary.netDepositsCents)}
-              helperText="Gross Collected minus Fees & Adjustments equals Net Deposit."
+              helperText="Estimated amount moving toward bank deposit after fees and adjustments."
               tone="blue"
             />
             <ReportStatCard
@@ -184,7 +184,7 @@ export default async function DepositDetailPage({
             <ReportStatCard
               label="Unmatched / Needs Review"
               value={detail.summary.unmatchedNeedsReviewCount}
-              helperText="Unmatched, failed, pending, or incomplete settlement rows remain visible."
+              helperText="Settlement rows that need review before they can be fully matched."
               tone={detail.summary.unmatchedNeedsReviewCount > 0 ? "rose" : "slate"}
             />
           </ReportStatGrid>

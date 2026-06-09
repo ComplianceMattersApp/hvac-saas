@@ -23,7 +23,7 @@ describe("deposit detail page wiring", () => {
     expect(detailPageSource).toContain("payoutGroupId");
   });
 
-  it("renders required summary labels and conservative fallback copy", () => {
+  it("renders required summary labels and friendly boundary copy", () => {
     for (const label of [
       "Gross Collected",
       "Fees & Adjustments",
@@ -35,10 +35,14 @@ describe("deposit detail page wiring", () => {
     }
 
     expect(detailPageSource).toContain(
-      "Stripe Dashboard remains the fallback for final fee, net, and payout verification until settlement reporting is smoke-tested.",
+      "Review the online payments, fees, net amount, and payout timing behind this deposit group.",
     );
-    expect(detailPageSource).toContain("Payments Register shows gross payment event truth.");
-    expect(detailPageSource).toContain("Settlement rows do not change invoice paid/balance.");
+    expect(detailPageSource).toContain(
+      "Deposits help explain how online payments become bank deposits. Your invoices and payment records stay unchanged.",
+    );
+    expect(detailPageSource).toContain(
+      "This read-only detail view shows how fees and adjustments affect the net amount for this deposit group.",
+    );
   });
 
   it("keeps unmatched and pending groups visible and non-leaky", () => {
