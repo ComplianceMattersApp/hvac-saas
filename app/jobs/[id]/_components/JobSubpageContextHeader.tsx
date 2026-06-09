@@ -14,6 +14,8 @@ type JobSubpageContextHeaderProps = {
   opsStatusKey: string;
   backHref: string;
   backLabel?: string;
+  secondaryHref?: string;
+  secondaryLabel?: string;
   compactMobile?: boolean;
 };
 
@@ -59,6 +61,8 @@ export default function JobSubpageContextHeader({
   opsStatusKey,
   backHref,
   backLabel = "Back to Job",
+  secondaryHref,
+  secondaryLabel,
   compactMobile = false,
 }: JobSubpageContextHeaderProps) {
   return (
@@ -90,12 +94,22 @@ export default function JobSubpageContextHeader({
           <div className={`${compactMobile ? "hidden sm:block" : ""} text-sm text-slate-600`}>{appointmentLabel}</div>
         </div>
 
-        <Link
-          href={backHref}
-          className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50"
-        >
-          {backLabel}
-        </Link>
+        <div className={`grid w-full gap-2 ${secondaryHref ? "grid-cols-2" : "grid-cols-1"} sm:w-auto sm:grid-flow-col sm:auto-cols-max`}>
+          {secondaryHref ? (
+            <Link
+              href={secondaryHref}
+              className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+            >
+              {secondaryLabel ?? "Back"}
+            </Link>
+          ) : null}
+          <Link
+            href={backHref}
+            className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+          >
+            {backLabel}
+          </Link>
+        </div>
       </div>
     </section>
   );

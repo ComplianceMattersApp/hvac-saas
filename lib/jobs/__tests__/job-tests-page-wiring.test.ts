@@ -22,6 +22,11 @@ const ductLeakageEntryFieldsSource = readFileSync(
   "utf8",
 );
 
+const airflowEntryFieldsSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/AirflowEntryFields.tsx"),
+  "utf8",
+);
+
 describe("job tests page wiring", () => {
   it("exposes Duct Leakage exception options and keeps exception reason free-form", () => {
     expect(jobTestsPageSource).toContain('{ value: "asbestos", label: "Asbestos" }');
@@ -57,7 +62,38 @@ describe("job tests page wiring", () => {
     expect(ductBlock).not.toContain('data-duct-live-total');
     expect(ductBlock).not.toContain('Needs input - measured');
     expect(ductBlock).not.toContain('<script');
-    expect(jobTestsPageSource).toContain('className={isDuctLeakageFocused ? "hidden" : "order-last print:order-none"}');
+    expect(jobTestsPageSource).toContain('const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused;');
+    expect(jobTestsPageSource).toContain('className={isCompactTestWorkspace ? "hidden" : "order-last print:order-none"}');
+  });
+
+  it("keeps Airflow field-first layout with exception and inline results", () => {
+    const airflowIndex = jobTestsPageSource.indexOf('Airflow Results');
+    expect(airflowIndex).toBeGreaterThan(-1);
+
+    const airflowBlock = jobTestsPageSource.slice(
+      airflowIndex,
+      jobTestsPageSource.indexOf('            FAN WATT DRAW', airflowIndex),
+    );
+
+    expect(jobTestsPageSource).toContain('{ value: "best_obtainable", label: "Best Obtainable" }');
+    expect(jobTestsPageSource).toContain('{ value: "other", label: "Other" }');
+    expect(airflowEntryFieldsSource).toContain('name="airflow_exception"');
+    expect(airflowEntryFieldsSource).toContain('name="airflow_exception_reason"');
+    expect(airflowEntryFieldsSource).toContain('required');
+    expect(airflowBlock).toContain('AirflowEntryFields');
+    expect(jobTestsPageSource).toContain('secondaryHref={isCompactTestWorkspace ? (selectedSystemId ? withS(undefined, selectedSystemId) : baseHref) : undefined}');
+    expect(jobTestsPageSource).toContain('secondaryLabel={isCompactTestWorkspace ? "Back to Tests" : undefined}');
+    expect(airflowBlock).not.toContain('Back to Tests');
+    expect(airflowBlock.indexOf('AirflowEntryFields')).toBeLessThan(airflowBlock.indexOf('Test Setup'));
+    expect(airflowEntryFieldsSource.indexOf('Exception')).toBeLessThan(
+      airflowEntryFieldsSource.indexOf('Enter measured total airflow'),
+    );
+    expect(airflowEntryFieldsSource).toContain('Required');
+    expect(airflowBlock).not.toContain('EccLivePreview mode="airflow"');
+    expect(airflowBlock).not.toContain('Airflow Override Pass');
+    expect(airflowBlock).not.toContain('Needs input - measured');
+    expect(jobTestsPageSource).toContain('const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused;');
+    expect(jobTestsPageSource).toContain('className={`${isCompactTestWorkspace ? "hidden" : "space-y-3"} sm:hidden print:hidden`}');
   });
 });
 

@@ -2356,6 +2356,11 @@ const DUCT_LEAKAGE_EXCEPTION_LABELS: Record<string, string> = {
   other: "Other",
 };
 
+const AIRFLOW_EXCEPTION_LABELS: Record<string, string> = {
+  best_obtainable: "Best Obtainable",
+  other: "Other",
+};
+
 function resolveOverrideSelectionFromForm(formData: FormData) {
   const ductException = String(formData.get("duct_exception") || "").trim().toLowerCase();
   const ductExceptionLabel = DUCT_LEAKAGE_EXCEPTION_LABELS[ductException] ?? null;
@@ -2382,6 +2387,40 @@ function resolveOverrideSelectionFromForm(formData: FormData) {
     missingReason: overridePass !== null && !reasonRaw,
     ductExceptionSelected: false,
   };
+}
+
+function resolveAirflowExceptionSelectionFromForm(formData: FormData) {
+  const airflowException = String(formData.get("airflow_exception") || "").trim().toLowerCase();
+  const airflowExceptionLabel = AIRFLOW_EXCEPTION_LABELS[airflowException] ?? null;
+  const reasonRaw = String(formData.get("airflow_exception_reason") || "").trim();
+
+  if (!airflowExceptionLabel) {
+    return {
+      exceptionSelected: false,
+      overridePass: null as boolean | null,
+      overrideReason: null as string | null,
+      missingReason: false,
+    };
+  }
+
+  return {
+    exceptionSelected: true,
+    overridePass: true,
+    overrideReason: reasonRaw ? `${airflowExceptionLabel}: ${reasonRaw}` : null,
+    missingReason: !reasonRaw,
+  };
+}
+
+function ensureMeasuredAirflowPresentForCompletion(formData: FormData) {
+  const rawMeasuredAirflow = String(formData.get("measured_total_cfm") || "").trim();
+  if (!rawMeasuredAirflow) {
+    throw new Error("Enter the measured airflow result before completing this test.");
+  }
+
+  const measuredAirflow = Number(rawMeasuredAirflow);
+  if (!Number.isFinite(measuredAirflow)) {
+    throw new Error("Enter the measured airflow result before completing this test.");
+  }
 }
 
 function revalidateEccProjectionConsumers(jobId: string) {
@@ -5384,11 +5423,14 @@ export async function saveAirflowDataFromForm(formData: FormData) {
     computedPass = null;
   }
 
-  // NEW: airflow pass override
-  const airflowOverridePass = String(formData.get("airflow_override_pass") || "").trim() === "true";
-  const airflowOverrideReason = String(formData.get("airflow_override_reason") || "").trim();
+  const {
+    exceptionSelected: airflowExceptionSelected,
+    overridePass: airflowExceptionPass,
+    overrideReason: airflowExceptionReason,
+    missingReason: airflowExceptionMissingReason,
+  } = resolveAirflowExceptionSelectionFromForm(formData);
 
-  if (airflowOverridePass && !airflowOverrideReason) {
+  if (airflowExceptionMissingReason) {
     redirectToTests({
       jobId,
       testType: "airflow",
@@ -5405,8 +5447,8 @@ export async function saveAirflowDataFromForm(formData: FormData) {
     notes: String(formData.get("notes") || "").trim() || null,
 
     // breadcrumb for reporting/audit
-    airflow_override_applied: airflowOverridePass,
-    airflow_override_reason: airflowOverridePass ? airflowOverrideReason : null,
+    airflow_override_applied: airflowExceptionSelected,
+    airflow_override_reason: airflowExceptionReason,
   };
 
   const computed = {
@@ -5417,7 +5459,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
     warnings,
 
     // breadcrumb for reporting/audit
-    override_mode: airflowOverridePass ? "pass_override" : null,
+    override_mode: airflowExceptionSelected ? "field_exception" : null,
   };
 
   const supabase = await createClient();
@@ -5434,8 +5476,8 @@ export async function saveAirflowDataFromForm(formData: FormData) {
       data,
       computed,
       computed_pass: computedPass,
-      override_pass: airflowOverridePass ? true : null,
-      override_reason: airflowOverridePass ? airflowOverrideReason : null,
+      override_pass: airflowExceptionPass,
+      override_reason: airflowExceptionReason,
       updated_at: new Date().toISOString(),
     })
     .eq("id", testRunId)
@@ -6331,10 +6373,14 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
     computedPass = null;
   }
 
-  const airflowOverridePass = String(formData.get("airflow_override_pass") || "").trim() === "true";
-  const airflowOverrideReason = String(formData.get("airflow_override_reason") || "").trim();
+  const {
+    exceptionSelected: airflowExceptionSelected,
+    overridePass: airflowExceptionPass,
+    overrideReason: airflowExceptionReason,
+    missingReason: airflowExceptionMissingReason,
+  } = resolveAirflowExceptionSelectionFromForm(formData);
 
-  if (airflowOverridePass && !airflowOverrideReason) {
+  if (airflowExceptionMissingReason) {
     redirectToTests({
       jobId,
       testType: "airflow",
@@ -6343,14 +6389,18 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
     });
   }
 
+  if (!airflowExceptionSelected) {
+    ensureMeasuredAirflowPresentForCompletion(formData);
+  }
+
   const data = {
     measured_total_cfm: measuredTotalCfm,
     tonnage,
     cfm_per_ton_target: cfmPerTon,
     cfm_per_ton_required: cfmPerTon,
     notes: String(formData.get("notes") || "").trim() || null,
-    airflow_override_applied: airflowOverridePass,
-    airflow_override_reason: airflowOverridePass ? airflowOverrideReason : null,
+    airflow_override_applied: airflowExceptionSelected,
+    airflow_override_reason: airflowExceptionReason,
   };
 
   const computed = {
@@ -6359,7 +6409,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
     measured_total_cfm: measuredTotalCfm,
     failures,
     warnings,
-    override_mode: airflowOverridePass ? "pass_override" : null,
+    override_mode: airflowExceptionSelected ? "field_exception" : null,
   };
 
   const supabase = await createClient();
@@ -6406,8 +6456,8 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
       data,
       computed,
       computed_pass: computedPass,
-      override_pass: airflowOverridePass ? true : null,
-      override_reason: airflowOverridePass ? airflowOverrideReason : null,
+      override_pass: airflowExceptionPass,
+      override_reason: airflowExceptionReason,
       updated_at: new Date().toISOString(),
       is_completed: true,
       visit_id: visitId,
@@ -6419,7 +6469,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "airflow", systemId });
+  redirectToJobTestSection(jobId);
 }
 
 /** =========================

@@ -5,6 +5,7 @@ import { isDuctlessMiniSplitSystem, resolveEccScenario } from "@/lib/ecc/scenari
 import Link from "next/link";
 import PrintButton from "@/components/ui/PrintButton";
 import SubmitButton from "@/components/SubmitButton";
+import AirflowEntryFields from "@/components/jobs/AirflowEntryFields";
 import EccLivePreview from "@/components/jobs/EccLivePreview";
 import DuctLeakageEntryFields from "@/components/jobs/DuctLeakageEntryFields";
 import DuctLeakageMethodFields from "@/components/jobs/DuctLeakageMethodFields";
@@ -993,6 +994,8 @@ export default async function JobTestsPage({
       ? ""
       : focusedTypeRaw;
   const isDuctLeakageFocused = focusedType === "duct_leakage";
+  const isAirflowFocused = focusedType === "airflow";
+  const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused;
 
   let refrigerantEvidenceAttachments: Array<{
     id: string;
@@ -1398,6 +1401,43 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       : runDL?.computed_pass === false
       ? `Fail - measured ${ductMeasuredDisplay} / max ${ductMaxDisplay} CFM`
       : "";
+  const airflowExceptionOptions = [
+    { value: "best_obtainable", label: "Best Obtainable" },
+    { value: "other", label: "Other" },
+  ];
+  const airflowOverrideReasonRaw = String(runAF?.override_reason ?? "").trim();
+  const airflowSelectedException =
+    runAF?.override_pass === true
+      ? airflowExceptionOptions.find((option) =>
+          airflowOverrideReasonRaw === option.label || airflowOverrideReasonRaw.startsWith(`${option.label}:`),
+        ) ?? null
+      : null;
+  const airflowExceptionReasonDefault = airflowSelectedException
+    ? airflowOverrideReasonRaw.replace(new RegExp(`^${airflowSelectedException.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*`), "")
+    : "";
+  const airflowHasInlineResultStatus =
+    Boolean(airflowSelectedException) ||
+    runAF?.override_pass === true ||
+    runAF?.override_pass === false ||
+    runAF?.computed_pass === true ||
+    runAF?.computed_pass === false;
+  const airflowResultLabel = runAF
+    ? getEffectiveResultLabel(runAF)
+    : carriedForwardAF
+    ? `PASS (carried from parent${parentRunAF ? ` - ${getEffectiveResultLabel(parentRunAF)}` : ""})`
+    : "";
+  const airflowInlineResultText =
+    airflowSelectedException
+      ? `${airflowSelectedException.label} exception recorded`
+      : runAF?.override_pass === true
+      ? `Pass override - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
+      : runAF?.override_pass === false
+      ? `Fail - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
+      : runAF?.computed_pass === true
+      ? `Pass - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
+      : runAF?.computed_pass === false
+      ? `Fail - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
+      : "";
 
   const parentFailedComparisonRows = (baselineRequiredTests as EccTestType[])
     .map((testType) => ({
@@ -1408,7 +1448,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
   const showInlineAddAnotherTestCard =
     Boolean(selectedSystemId) &&
-    !isDuctLeakageFocused &&
+    !isCompactTestWorkspace &&
     selectedSystemStatusRows.length > 0 &&
     selectedSystemStatusRows.length % 2 === 1;
 
@@ -1570,10 +1610,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           fieldStatusKey={normalizedStatus}
           opsStatusKey={normalizedOpsStatus}
           backHref={`/jobs/${job.id}`}
+          secondaryHref={isCompactTestWorkspace ? (selectedSystemId ? withS(undefined, selectedSystemId) : baseHref) : undefined}
+          secondaryLabel={isCompactTestWorkspace ? "Back to Tests" : undefined}
           compactMobile
         />
 
-      <section className={`${isDuctLeakageFocused ? "hidden" : "space-y-3"} sm:hidden print:hidden`}>
+      <section className={`${isCompactTestWorkspace ? "hidden" : "space-y-3"} sm:hidden print:hidden`}>
         <div className="rounded-2xl border border-blue-200 bg-white px-4 py-3.5 shadow-[0_16px_28px_-26px_rgba(29,78,216,0.24)]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -1642,7 +1684,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           >
             Test Queue
           </Link>
-          {!isDuctLeakageFocused ? (
+          {!isCompactTestWorkspace ? (
             <label
               htmlFor="completion-report-toggle"
               className="inline-flex min-h-14 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-colors hover:bg-slate-50"
@@ -1718,7 +1760,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         </div>
 
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
-          {!isDuctLeakageFocused ? (
+          {!isCompactTestWorkspace ? (
             <>
               <label htmlFor="completion-report-toggle" className={eccSecondaryButtonClass}>
                 Completion Report
@@ -1734,7 +1776,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
       </div>
 
-      <div className={isDuctLeakageFocused ? "hidden" : "order-last print:order-none"}>
+      <div className={isCompactTestWorkspace ? "hidden" : "order-last print:order-none"}>
       <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
       <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
         Report tools are secondary during active field entry.
@@ -2155,11 +2197,13 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       </div>
       </div>
 
-      <section className={`${eccPanelClass} ${isDuctLeakageFocused ? "space-y-3" : "space-y-5"} print:hidden`}>
+      <section className={`${eccPanelClass} ${isCompactTestWorkspace ? "space-y-3" : "space-y-5"} print:hidden`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-          <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">{isDuctLeakageFocused ? "Duct Leakage Entry" : "Tests to Run"}</h2>
-          {!isDuctLeakageFocused ? (
+          <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">
+            {isDuctLeakageFocused ? "Duct Leakage Entry" : isAirflowFocused ? "Airflow Entry" : "Tests to Run"}
+          </h2>
+          {!isCompactTestWorkspace ? (
             <p className="text-sm leading-6 text-slate-600">
               Pick a system, enter readings, save drafts, then complete once verified.
             </p>
@@ -2171,7 +2215,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         </div>
 
         {/* System selector */}
-        {!isDuctLeakageFocused ? (
+        {!isCompactTestWorkspace ? (
         <div className={`${eccSoftPanelClass} hidden space-y-3 sm:block`}>
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -2294,7 +2338,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
 )}
 
-                    {selectedSystemId && !isDuctLeakageFocused ? (
+                    {selectedSystemId && !isCompactTestWorkspace ? (
           <div className="space-y-3 rounded-2xl border border-slate-200 bg-white px-3.5 py-3 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)] sm:space-y-4 sm:rounded-lg sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>
@@ -2556,7 +2600,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         ) : null}
 
                 {/* Add Test pill */}
-        {!isDuctLeakageFocused && !showInlineAddAnotherTestCard ? (
+        {!isCompactTestWorkspace && !showInlineAddAnotherTestCard ? (
           selectedSystemId ? (
             <Link
               href={focusedType === "custom" ? withS(undefined) : withS("custom")}
@@ -2914,70 +2958,18 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         {focusedType === "airflow" ? (
           <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-              <div>
-                <div className="font-medium">Airflow</div>
-                <div className="mt-1 text-sm">
-                  <span className="font-medium">Result:</span>{" "}
-                  {runAF
-                    ? getEffectiveResultLabel(runAF)
-                    : carriedForwardAF
-                    ? `PASS (carried from parent${parentRunAF ? ` · ${getEffectiveResultLabel(parentRunAF)}` : ""})`
-                    : "Not started"}
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">Airflow Results</h2>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                  <span className="font-medium text-slate-800">{selectedSystemName}</span>
+                  <span className="text-slate-300">/</span>
+                  <span>{fmtValue(defaultSystemTonnage, "ton")}</span>
                 </div>
               </div>
               <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
                 {runAF?.updated_at ? new Date(runAF.updated_at).toLocaleString() : null}
               </div>
             </div>
-
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
-              <div className="font-semibold text-slate-800">System Reference</div>
-              <div>{selectedSystemName}</div>
-              <div>Suggested tonnage: {fmtValue(defaultSystemTonnage, "ton")}</div>
-            </div>
-
-            {runAF ? (
-              <div
-                className={`rounded-2xl border px-4 py-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:hidden ${
-                  runAF.override_pass === true || runAF.computed_pass === true
-                    ? "border-emerald-200 bg-emerald-50/70"
-                    : runAF.override_pass === false || runAF.computed_pass === false
-                    ? "border-red-200 bg-red-50/70"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="flex min-w-0 items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className={eccUtilityLabelClass}>Focused Test</div>
-                    <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Airflow</div>
-                    <div className="mt-1 text-sm font-medium text-slate-700">{selectedSystemName}</div>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                      runAF.override_pass === true || runAF.computed_pass === true
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : runAF.override_pass === false || runAF.computed_pass === false
-                        ? "border-red-200 bg-red-50 text-red-800"
-                        : "border-slate-200 bg-slate-50 text-slate-700"
-                    }`}
-                  >
-                    {getEffectiveResultLabel(runAF)}
-                  </span>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Measured</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-950">{fmtValue(runAF.data?.measured_total_cfm)}</div>
-                    <div className="text-[10px] font-medium text-slate-500">CFM</div>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Required</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-950">{fmtValue(runAF.computed?.required_total_cfm)}</div>
-                    <div className="text-[10px] font-medium text-slate-500">CFM</div>
-                  </div>
-                </div>
-              </div>
-            ) : null}
 
             {!runAF ? (
               carriedForwardAF ? (
@@ -3010,41 +3002,18 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="test_run_id" value={runAF.id} />
                   <input type="hidden" name="project_type" value={job.project_type} />
 
-                  <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Measurement</div>
-                    <label className="flex items-center justify-between gap-2 text-sm font-medium" htmlFor={`af-meas-${runAF.id}`}>
-                      <span>Measured Total Airflow</span>
-                      <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">CFM</span>
-                    </label>
-                    <input
-                      id={`af-meas-${runAF.id}`}
-                      name="measured_total_cfm"
-                      type="number"
-                      step="1"
-                      className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-base sm:font-normal sm:tracking-normal"
-                      defaultValue={runAF.data?.measured_total_cfm ?? ""}
-                    />
-                    <div
-                      className={`rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${
-                        runAF.override_pass === true || runAF.computed_pass === true
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : runAF.override_pass === false || runAF.computed_pass === false
-                          ? "border-red-200 bg-red-50 text-red-800"
-                          : "border-slate-200 bg-slate-50 text-slate-700"
-                      }`}
-                    >
-                      {runAF.override_pass === true
-                        ? `Pass override - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
-                        : runAF.override_pass === false
-                        ? `Fail - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
-                        : runAF.computed_pass === true
-                        ? `Pass - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
-                        : runAF.computed_pass === false
-                        ? `Fail - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`
-                        : `Needs input - measured ${fmtValue(runAF.data?.measured_total_cfm)} / required ${fmtValue(runAF.computed?.required_total_cfm)} CFM`}
-                    </div>
-                  </div>
-
+                  <AirflowEntryFields
+                    exceptionOptions={airflowExceptionOptions}
+                    formId={airflowSaveFormId}
+                    initialExceptionReason={airflowExceptionReasonDefault}
+                    initialExceptionValue={airflowSelectedException?.value ?? ""}
+                    initialMeasuredCfm={runAF.data?.measured_total_cfm ?? ""}
+                    initialNotes={runAF.data?.notes ?? ""}
+                    initialResultText={airflowInlineResultText}
+                    initialStatusLabel={airflowHasInlineResultStatus ? airflowResultLabel : ""}
+                    projectType={job.project_type}
+                    runId={runAF.id}
+                  >
                   <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
                     <summary className="cursor-pointer list-none">
                       <div className="flex items-start justify-between gap-3">
@@ -3091,78 +3060,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </details>
 
-                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
-                          <div className="mt-1 text-sm font-medium text-slate-800">
-                            {runAF.override_pass === true
-                              ? String(runAF.override_reason ?? "").trim()
-                                ? "Override active"
-                                : "Override reason required"
-                              : "No override · Notes optional"}
-                          </div>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600">Show</span>
-                      </div>
-                    </summary>
-
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                      <div className="grid gap-1 sm:col-span-2">
-                        <label className="text-sm font-medium" htmlFor={`af-notes-${runAF.id}`}>
-                          Notes (optional)
-                        </label>
-                        <input
-                          id={`af-notes-${runAF.id}`}
-                          name="notes"
-                          className="w-full rounded-md border px-3 py-2"
-                          defaultValue={runAF.data?.notes ?? ""}
-                        />
-                      </div>
-
-                      <div className="grid gap-1">
-                        <label className="text-sm font-medium" htmlFor={`af-override-${runAF.id}`}>
-                          Airflow Override Pass
-                        </label>
-                        <select
-                          id={`af-override-${runAF.id}`}
-                          name="airflow_override_pass"
-                          className="w-full rounded-md border px-3 py-2"
-                          defaultValue={runAF.override_pass === true ? "true" : "false"}
-                        >
-                          <option value="false">No</option>
-                          <option value="true">Yes - Mark as Pass</option>
-                        </select>
-                      </div>
-
-                      <div className="grid gap-1 sm:col-span-2">
-                        <label className="text-sm font-medium" htmlFor={`af-override-reason-${runAF.id}`}>
-                          Override Reason
-                        </label>
-                        <textarea
-                          id={`af-override-reason-${runAF.id}`}
-                          name="airflow_override_reason"
-                          rows={3}
-                          className="w-full rounded-md border px-3 py-2"
-                          defaultValue={runAF.override_pass === true ? runAF.override_reason ?? "" : ""}
-                          placeholder="Required only when override pass is used"
-                        />
-                      </div>
-                    </div>
-                  </details>
+                  </AirflowEntryFields>
                 </form>
-
-                <EccLivePreview mode="airflow" formId={airflowSaveFormId} projectType={job.project_type} />
-
-                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
-                  <div className="mt-2 space-y-1">
-                    <div>Target Airflow: {fmtValue(runAF.data?.cfm_per_ton_required, "CFM/ton")}</div>
-                    <div>Required Total Airflow: {fmtValue(runAF.computed?.required_total_cfm, "CFM")}</div>
-                    <div>Measured Total Airflow: {fmtValue(runAF.data?.measured_total_cfm, "CFM")}</div>
-                  </div>
-                </details>
 
                 <div className={eccActionRowClass}>
                   <div className="mr-auto text-sm">

@@ -168,7 +168,7 @@ describe("ECC target override persistence", () => {
     expect(update?.payload.computed_pass).toBe(true);
   });
 
-  it("redirects with validation notice when airflow override is enabled without reason (save)", async () => {
+  it("redirects with validation notice when airflow exception is selected without reason (save)", async () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
@@ -179,8 +179,8 @@ describe("ECC target override persistence", () => {
     formData.set("project_type", "all_new");
     formData.set("tonnage", "2");
     formData.set("measured_total_cfm", "760");
-    formData.set("airflow_override_pass", "true");
-    formData.set("airflow_override_reason", "   ");
+    formData.set("airflow_exception", "best_obtainable");
+    formData.set("airflow_exception_reason", "   ");
 
     const { saveAirflowDataFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAirflowDataFromForm(formData)).rejects.toThrow(
@@ -190,7 +190,7 @@ describe("ECC target override persistence", () => {
     expect(captured.filter((entry) => entry.table === "ecc_test_runs" && entry.method === "update")).toHaveLength(0);
   });
 
-  it("redirects with validation notice when airflow override is enabled without reason (save and complete)", async () => {
+  it("redirects with validation notice when airflow exception is selected without reason (save and complete)", async () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
@@ -201,8 +201,8 @@ describe("ECC target override persistence", () => {
     formData.set("project_type", "all_new");
     formData.set("tonnage", "2");
     formData.set("measured_total_cfm", "760");
-    formData.set("airflow_override_pass", "true");
-    formData.set("airflow_override_reason", "");
+    formData.set("airflow_exception", "best_obtainable");
+    formData.set("airflow_exception_reason", "");
 
     const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAndCompleteAirflowFromForm(formData)).rejects.toThrow(
@@ -212,7 +212,7 @@ describe("ECC target override persistence", () => {
     expect(captured.filter((entry) => entry.table === "ecc_test_runs" && entry.method === "update")).toHaveLength(0);
   });
 
-  it("preserves successful airflow override complete behavior when reason is provided", async () => {
+  it("preserves successful airflow exception complete behavior when reason is provided", async () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
@@ -223,19 +223,18 @@ describe("ECC target override persistence", () => {
     formData.set("project_type", "all_new");
     formData.set("tonnage", "2");
     formData.set("measured_total_cfm", "760");
-    formData.set("airflow_override_pass", "true");
-    formData.set("airflow_override_reason", "Field verified airflow delivered despite instrumentation drift.");
+    formData.set("airflow_exception", "best_obtainable");
+    formData.set("airflow_exception_reason", "Field verified airflow delivered despite instrumentation drift.");
 
     const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
-    await expect(saveAndCompleteAirflowFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1",
-    );
+    await expect(saveAndCompleteAirflowFromForm(formData)).rejects.toThrow("REDIRECT:/jobs/job-1#field-status-actions");
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
     expect(update?.payload.override_pass).toBe(true);
     expect(update?.payload.override_reason).toBe(
-      "Field verified airflow delivered despite instrumentation drift.",
+      "Best Obtainable: Field verified airflow delivered despite instrumentation drift.",
     );
+    expect(update?.payload.computed.override_mode).toBe("field_exception");
     expect(update?.payload.is_completed).toBe(true);
   });
 
