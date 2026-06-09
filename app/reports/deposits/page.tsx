@@ -18,6 +18,7 @@ import {
   reportTableRowClass,
 } from "@/components/reports/ReportLedgerChrome";
 import {
+  depositDetailHrefForGroup,
   getDepositsLedgerSummary,
   type DepositsLedgerPayoutRow,
 } from "@/lib/reports/deposits-ledger";
@@ -267,7 +268,7 @@ export default async function DepositsReportPage({
         />
       </ReportStatGrid>
 
-      <ReportTableShell note="This read-only report groups existing settlement rows by payout identity. Deposit detail is a later phase.">
+      <ReportTableShell note="This read-only report groups existing settlement rows by payout identity. Open a group to inspect the included settlement rows.">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50/90">
             <tr className={reportTableHeadClass}>
@@ -299,7 +300,9 @@ export default async function DepositsReportPage({
                 return (
                   <tr key={row.groupKey} className={reportTableRowClass}>
                     <td className="px-3 py-3">
-                      <div className="font-medium text-slate-900">{row.payoutLabel}</div>
+                      <Link href={depositDetailHrefForGroup(row)} className="font-medium text-blue-700 hover:underline">
+                        {row.payoutLabel}
+                      </Link>
                       <div className="mt-1 font-mono text-[11px] text-slate-500">{row.groupKey}</div>
                     </td>
                     <td className="px-3 py-3 text-slate-700">{formatDate(row.payoutArrivalDate)}</td>

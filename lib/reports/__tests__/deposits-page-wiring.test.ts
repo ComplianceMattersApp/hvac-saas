@@ -58,12 +58,11 @@ describe("deposits report page wiring", () => {
     expect(depositsPageSource).toContain("Sync Failed");
   });
 
-  it("does not add sync helper, CSV/export, detail, or Stripe API wiring", () => {
+  it("links payout rows to read-only detail without adding sync helper, CSV/export, or Stripe API wiring", () => {
+    expect(depositsPageSource).toContain("depositDetailHrefForGroup");
     expect(depositsPageSource).not.toContain("syncStripePaymentSettlements");
     expect(depositsPageSource).not.toContain("syncStripePaymentSettlementForPayment");
     expect(depositsPageSource).not.toMatch(/Export CSV|\/reports\/deposits\/export/i);
-    expect(depositsPageSource).not.toContain("/reports/deposits/[payoutId]");
-    expect(depositsPageSource).not.toMatch(/href=\{`\/reports\/deposits\/\$\{/);
     expect(depositsPageSource).not.toMatch(/\bstripe\./);
   });
 });

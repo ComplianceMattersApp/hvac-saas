@@ -5,6 +5,9 @@ type StripePaymentSettlementRow = {
   id: string;
   account_owner_user_id: string;
   internal_invoice_payment_id: string | null;
+  stripe_charge_id?: string | null;
+  stripe_payment_intent_id?: string | null;
+  stripe_checkout_session_id?: string | null;
   stripe_balance_transaction_id: string | null;
   stripe_payout_id: string | null;
   settlement_kind: string | null;
@@ -74,6 +77,77 @@ export type GetDepositsLedgerSummaryParams = {
   supabase: any;
   accountOwnerUserId: string;
 } & DepositsLedgerFilters;
+
+type InternalInvoicePaymentContextRow = {
+  id: string;
+  invoice_id: string | null;
+  job_id: string | null;
+  paid_at: string | null;
+};
+
+type InternalInvoiceContextRow = {
+  id: string;
+  invoice_display_number?: string | null;
+  invoice_number: string | null;
+  customer_id: string | null;
+};
+
+type CustomerContextRow = {
+  id: string;
+  full_name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+};
+
+type JobContextRow = {
+  id: string;
+  job_display_number?: string | null;
+  title: string | null;
+};
+
+export type DepositDetailSettlementRow = {
+  settlementId: string;
+  internalInvoicePaymentId: string | null;
+  invoiceId: string | null;
+  invoiceLabel: string;
+  customerName: string;
+  jobId: string | null;
+  jobReference: string;
+  jobTitle: string;
+  grossCents: number;
+  feesAndAdjustmentsCents: number;
+  netCents: number;
+  currency: string;
+  paymentDate: string | null;
+  availableDate: string | null;
+  chargeId: string | null;
+  paymentIntentId: string | null;
+  balanceTransactionId: string | null;
+  settlementKind: string;
+  syncStatus: string;
+  needsReview: boolean;
+  needsReviewLabels: string[];
+};
+
+export type DepositDetailLedgerViewModel = {
+  groupKey: string;
+  payoutId: string | null;
+  payoutLabel: string;
+  payoutStatus: string | null;
+  payoutArrivalDate: string | null;
+  summary: DepositsLedgerSummary & {
+    paymentCount: number;
+  };
+  rows: DepositDetailSettlementRow[];
+  warnings: string[];
+  found: boolean;
+};
+
+export type GetDepositDetailLedgerParams = {
+  supabase: any;
+  accountOwnerUserId: string;
+  payoutGroupId: string;
+};
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -196,6 +270,29 @@ function payoutLabelForGroup(groupKey: string, payoutId: string | null) {
   return "Pending / No Payout";
 }
 
+export function depositDetailHrefForGroup(row: Pick<DepositsLedgerPayoutRow, "payoutId" | "groupKey">) {
+  const groupId = row.payoutId || row.groupKey;
+  return `/reports/deposits/${encodeURIComponent(groupId)}`;
+}
+
+function canonicalGroupId(value: unknown) {
+  const decoded = decodeURIComponent(clean(value));
+  if (!decoded) return "";
+  if (decoded === "pending:no-payout" || decoded === "unmatched") return decoded;
+  if (decoded.startsWith("payout:")) return decoded;
+  return `payout:${decoded}`;
+}
+
+function matchesDepositGroup(row: StripePaymentSettlementRow, canonicalGroup: string) {
+  if (!canonicalGroup) return false;
+  if (canonicalGroup === "unmatched") return groupKeyForRow(row) === "unmatched";
+  if (canonicalGroup === "pending:no-payout") return groupKeyForRow(row) === "pending:no-payout";
+  if (canonicalGroup.startsWith("payout:")) {
+    return clean(row.stripe_payout_id) === canonicalGroup.slice("payout:".length);
+  }
+  return false;
+}
+
 function addStatus(summary: Record<string, number>, status: string) {
   summary[status] = (summary[status] ?? 0) + 1;
 }
@@ -302,6 +399,240 @@ export function buildDepositsLedgerViewModel(rows: StripePaymentSettlementRow[])
     rows: groupedRows,
     perCurrencySummaries,
     warnings,
+  };
+}
+
+function displayInvoice(row: InternalInvoiceContextRow | null | undefined, invoiceId: string | null) {
+  const display = clean(row?.invoice_display_number) || clean(row?.invoice_number);
+  if (display) return display;
+  return invoiceId ? invoiceId.slice(0, 8) : "Unmatched Stripe item";
+}
+
+function displayCustomer(row: CustomerContextRow | null | undefined) {
+  const full = clean(row?.full_name);
+  if (full) return full;
+  const name = [clean(row?.first_name), clean(row?.last_name)].filter(Boolean).join(" ");
+  return name || "No local payment link";
+}
+
+function displayJobReference(row: JobContextRow | null | undefined, jobId: string | null) {
+  return clean(row?.job_display_number) || (jobId ? jobId.slice(0, 8) : "No local payment link");
+}
+
+function buildNeedsReviewLabels(row: StripePaymentSettlementRow) {
+  const labels: string[] = [];
+  const syncStatus = normalizeSyncStatus(row.sync_status);
+
+  if (isNeedsReview(row)) labels.push("Needs Review");
+  if (!clean(row.internal_invoice_payment_id) || normalizeSettlementKind(row.settlement_kind) === "unmatched" || syncStatus === "unmatched") {
+    labels.push("Unmatched");
+  }
+  if (syncStatus === "pending") labels.push("Pending Sync");
+  if (syncStatus === "failed") labels.push("Sync Failed");
+  if (syncStatus === "synced" && !clean(row.stripe_balance_transaction_id)) labels.push("Missing Balance Transaction");
+
+  return labels.length ? Array.from(new Set(labels)) : ["Clear"];
+}
+
+async function loadLocalDepositContexts(params: {
+  supabase: any;
+  paymentIds: string[];
+}) {
+  const paymentIds = Array.from(new Set(params.paymentIds.map(clean).filter(Boolean)));
+  const empty = {
+    paymentsById: new Map<string, InternalInvoicePaymentContextRow>(),
+    invoicesById: new Map<string, InternalInvoiceContextRow>(),
+    customersById: new Map<string, CustomerContextRow>(),
+    jobsById: new Map<string, JobContextRow>(),
+  };
+
+  if (paymentIds.length === 0) return empty;
+
+  const paymentsResult = await params.supabase
+    .from("internal_invoice_payments")
+    .select("id, invoice_id, job_id, paid_at")
+    .in("id", paymentIds);
+
+  if (paymentsResult.error) throw paymentsResult.error;
+
+  const payments = (paymentsResult.data ?? []) as InternalInvoicePaymentContextRow[];
+  const paymentsById = new Map<string, InternalInvoicePaymentContextRow>();
+  for (const payment of payments) {
+    const id = clean(payment.id);
+    if (id) paymentsById.set(id, payment);
+  }
+
+  const invoiceIds = Array.from(new Set(payments.map((row) => clean(row.invoice_id)).filter(Boolean)));
+  const jobIds = Array.from(new Set(payments.map((row) => clean(row.job_id)).filter(Boolean)));
+
+  const [invoiceResult, jobResult] = await Promise.all([
+    invoiceIds.length
+      ? params.supabase
+          .from("internal_invoices")
+          .select("id, invoice_display_number, invoice_number, customer_id")
+          .in("id", invoiceIds)
+      : Promise.resolve({ data: [], error: null }),
+    jobIds.length
+      ? params.supabase
+          .from("jobs")
+          .select("id, job_display_number, title")
+          .in("id", jobIds)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+
+  if (invoiceResult.error) throw invoiceResult.error;
+  if (jobResult.error) throw jobResult.error;
+
+  const invoices = (invoiceResult.data ?? []) as InternalInvoiceContextRow[];
+  const invoicesById = new Map<string, InternalInvoiceContextRow>();
+  for (const invoice of invoices) {
+    const id = clean(invoice.id);
+    if (id) invoicesById.set(id, invoice);
+  }
+
+  const customerIds = Array.from(new Set(invoices.map((row) => clean(row.customer_id)).filter(Boolean)));
+  const customerResult = customerIds.length
+    ? await params.supabase
+        .from("customers")
+        .select("id, full_name, first_name, last_name")
+        .in("id", customerIds)
+    : { data: [], error: null };
+
+  if (customerResult.error) throw customerResult.error;
+
+  const customersById = new Map<string, CustomerContextRow>();
+  for (const customer of (customerResult.data ?? []) as CustomerContextRow[]) {
+    const id = clean(customer.id);
+    if (id) customersById.set(id, customer);
+  }
+
+  const jobsById = new Map<string, JobContextRow>();
+  for (const job of (jobResult.data ?? []) as JobContextRow[]) {
+    const id = clean(job.id);
+    if (id) jobsById.set(id, job);
+  }
+
+  return { paymentsById, invoicesById, customersById, jobsById };
+}
+
+function buildDetailRows(params: {
+  settlementRows: StripePaymentSettlementRow[];
+  contexts: Awaited<ReturnType<typeof loadLocalDepositContexts>>;
+}) {
+  return params.settlementRows.map((row): DepositDetailSettlementRow => {
+    const paymentId = clean(row.internal_invoice_payment_id) || null;
+    const payment = paymentId ? params.contexts.paymentsById.get(paymentId) ?? null : null;
+    const invoiceId = clean(payment?.invoice_id) || null;
+    const invoice = invoiceId ? params.contexts.invoicesById.get(invoiceId) ?? null : null;
+    const customerId = clean(invoice?.customer_id) || null;
+    const customer = customerId ? params.contexts.customersById.get(customerId) ?? null : null;
+    const jobId = clean(payment?.job_id) || null;
+    const job = jobId ? params.contexts.jobsById.get(jobId) ?? null : null;
+
+    return {
+      settlementId: clean(row.id),
+      internalInvoicePaymentId: paymentId,
+      invoiceId,
+      invoiceLabel: displayInvoice(invoice, invoiceId),
+      customerName: customer ? displayCustomer(customer) : "No local payment link",
+      jobId,
+      jobReference: displayJobReference(job, jobId),
+      jobTitle: clean(job?.title) || "No local payment link",
+      grossCents: grossForRow(row),
+      feesAndAdjustmentsCents: feesAndAdjustmentsForRow(row),
+      netCents: netForRow(row),
+      currency: normalizeCurrency(row.currency),
+      paymentDate: dateKey(payment?.paid_at) ?? null,
+      availableDate: dateKey(row.available_on),
+      chargeId: clean(row.stripe_charge_id) || null,
+      paymentIntentId: clean(row.stripe_payment_intent_id) || null,
+      balanceTransactionId: clean(row.stripe_balance_transaction_id) || null,
+      settlementKind: normalizeSettlementKind(row.settlement_kind),
+      syncStatus: normalizeSyncStatus(row.sync_status),
+      needsReview: isNeedsReview(row),
+      needsReviewLabels: buildNeedsReviewLabels(row),
+    };
+  });
+}
+
+export async function getDepositDetailLedger(
+  params: GetDepositDetailLedgerParams,
+): Promise<DepositDetailLedgerViewModel> {
+  const accountOwnerUserId = clean(params.accountOwnerUserId);
+  if (!accountOwnerUserId) throw new Error("accountOwnerUserId is required.");
+
+  const canonicalGroup = canonicalGroupId(params.payoutGroupId);
+  if (!canonicalGroup) throw new Error("payoutGroupId is required.");
+
+  const { data, error } = await params.supabase
+    .from("stripe_payment_settlements")
+    .select(
+      [
+        "id",
+        "account_owner_user_id",
+        "internal_invoice_payment_id",
+        "stripe_charge_id",
+        "stripe_payment_intent_id",
+        "stripe_checkout_session_id",
+        "stripe_balance_transaction_id",
+        "stripe_payout_id",
+        "settlement_kind",
+        "gross_amount_cents",
+        "stripe_fee_cents",
+        "platform_fee_cents",
+        "net_amount_cents",
+        "currency",
+        "available_on",
+        "payout_arrival_date",
+        "payout_status",
+        "reporting_category",
+        "sync_status",
+        "sync_error",
+      ].join(", "),
+    )
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .order("available_on", { ascending: false, nullsFirst: false });
+
+  if (error) throw error;
+
+  const settlementRows = ((data ?? []) as StripePaymentSettlementRow[]).filter((row) => matchesDepositGroup(row, canonicalGroup));
+  const group = buildGroupRow(canonicalGroup, settlementRows);
+
+  if (settlementRows.length === 0) {
+    return {
+      groupKey: canonicalGroup,
+      payoutId: canonicalGroup.startsWith("payout:") ? canonicalGroup.slice("payout:".length) : null,
+      payoutLabel: payoutLabelForGroup(canonicalGroup, canonicalGroup.startsWith("payout:") ? canonicalGroup.slice("payout:".length) : null),
+      payoutStatus: null,
+      payoutArrivalDate: null,
+      summary: { ...buildZeroSummary("usd"), paymentCount: 0 },
+      rows: [],
+      warnings: [],
+      found: false,
+    };
+  }
+
+  const contexts = await loadLocalDepositContexts({
+    supabase: params.supabase,
+    paymentIds: settlementRows.map((row) => clean(row.internal_invoice_payment_id)).filter(Boolean),
+  });
+
+  const view = buildDepositsLedgerViewModel(settlementRows);
+  const detailRows = buildDetailRows({ settlementRows, contexts });
+
+  return {
+    groupKey: canonicalGroup,
+    payoutId: group.payoutId,
+    payoutLabel: group.payoutLabel,
+    payoutStatus: group.payoutStatus,
+    payoutArrivalDate: group.payoutArrivalDate,
+    summary: {
+      ...view.summary,
+      paymentCount: group.paymentCount,
+    },
+    rows: detailRows,
+    warnings: view.warnings,
+    found: true,
   };
 }
 

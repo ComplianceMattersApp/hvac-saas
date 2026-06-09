@@ -4,6 +4,62 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Trust Lane / Deposits and Payout Reconciliation V1
 Scope: docs/model only. No product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, QBO behavior, production data, or customer-facing behavior is changed or authorized by this spec.
 
+## Phase F Closeout - Deposit Detail Read-Only Drilldown
+
+Phase F added a read-only deposit/payout detail route:
+
+`app/reports/deposits/[payoutId]/page.tsx`
+
+Read model support remains in:
+
+`lib/reports/deposits-ledger.ts`
+
+Focused tests:
+
+- `lib/reports/__tests__/deposit-detail-page-wiring.test.ts`
+- `lib/reports/__tests__/deposits-ledger.test.ts`
+
+Locked result:
+
+- Detail route is `/reports/deposits/[payoutId]`.
+- Summary table rows in `/reports/deposits` link to the detail route.
+- Real Stripe payout groups use the real `stripe_payout_id` in the route.
+- Synthetic groups are safely encoded and supported, including `pending:no-payout` and `unmatched`.
+- Detail lookup is account-scoped by `account_owner_user_id`.
+- Detail view reads `stripe_payment_settlements` and enriches with local payment, invoice, customer, and job context where available.
+- Missing local context does not hide settlement rows.
+- Unmatched rows remain visible and marked for review.
+- Pending/no-payout group is clearly labeled as not yet implying a bank deposit.
+- Not-found state does not reveal whether a payout id exists in another tenant.
+- Summary cards use `Gross Collected`, `Fees & Adjustments`, `Net Deposit`, `Payments`, and `Unmatched / Needs Review`.
+
+Non-wiring confirmation:
+
+- No CSV/export route is added.
+- No sync button/control is added.
+- No manual/internal sync UI is added.
+- No Stripe API calls are added.
+- No settlement sync helper is invoked.
+- No refund/dispute/payment/correction action is added.
+- No cron/scheduled job is added.
+- No webhook invokes the detail route/read model.
+- No checkout/session/payment-link behavior changes.
+- No Payments Register behavior changes.
+- No invoice action behavior changes.
+- No main nav/sidebar/report-center link is added beyond direct payout row links from `/reports/deposits`.
+- Stripe Dashboard fallback copy remains visible.
+
+Source-of-truth preservation:
+
+- `internal_invoice_payments` remains gross payment event truth.
+- `internal_invoice_payment_allocations` remains payment-to-invoice allocation truth.
+- `stripe_payment_settlements` remains Stripe fee/net/payout settlement truth only.
+- Deposit detail does not mutate invoice paid/balance.
+- Deposit detail does not mutate payment rows.
+- Deposit detail does not mutate allocation rows.
+- Deposit detail does not introduce QBO/general-ledger behavior.
+- Deposit detail does not count settlement rows toward collected payment totals.
+
 ## Phase E-B Closeout - Read-Only Deposits Report Page
 
 Phase E-B added the first read-only owner-facing deposits reconciliation surface:

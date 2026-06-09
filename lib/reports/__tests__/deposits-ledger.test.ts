@@ -3,6 +3,8 @@ import fs from "fs";
 import path from "path";
 import {
   buildDepositsLedgerViewModel,
+  depositDetailHrefForGroup,
+  getDepositDetailLedger,
   getDepositsLedgerSummary,
 } from "@/lib/reports/deposits-ledger";
 
@@ -11,6 +13,9 @@ function settlement(overrides: Record<string, unknown> = {}) {
     id: "set_1",
     account_owner_user_id: "owner-1",
     internal_invoice_payment_id: "pay-1",
+    stripe_charge_id: "ch_123",
+    stripe_payment_intent_id: "pi_123",
+    stripe_checkout_session_id: "cs_123",
     stripe_balance_transaction_id: "txn_1",
     stripe_payout_id: "po_1",
     settlement_kind: "payment",
@@ -64,6 +69,71 @@ function makeSupabase(rows: any[]) {
       },
     };
     return q;
+  }
+
+  return {
+    calls,
+    client: {
+      from(table: string) {
+        calls.push({ table, op: "from" });
+        return query(table);
+      },
+    },
+  };
+}
+
+function makeDepositDetailSupabase(tables: Record<string, any[]>) {
+  const calls: Array<{ table: string; op: string; payload?: unknown }> = [];
+  type QueryFilter = { column: string; value: unknown; op: "eq" | "in" };
+
+  function query(table: string) {
+    let filters: QueryFilter[] = [];
+    const q: any = {
+      select(payload: unknown) {
+        calls.push({ table, op: "select", payload });
+        return q;
+      },
+      eq(column: string, value: unknown) {
+        calls.push({ table, op: `eq:${column}`, payload: value });
+        filters.push({ column, value, op: "eq" });
+        return q;
+      },
+      in(column: string, value: unknown[]) {
+        calls.push({ table, op: `in:${column}`, payload: value });
+        filters.push({ column, value, op: "in" });
+        return Promise.resolve({ data: applyFilters(tables[table] ?? [], filters), error: null });
+      },
+      order(column: string, payload: unknown) {
+        calls.push({ table, op: `order:${column}`, payload });
+        return Promise.resolve({ data: applyFilters(tables[table] ?? [], filters), error: null });
+      },
+      insert(payload: unknown) {
+        calls.push({ table, op: "insert", payload });
+        throw new Error("read model must not insert");
+      },
+      update(payload: unknown) {
+        calls.push({ table, op: "update", payload });
+        throw new Error("read model must not update");
+      },
+      upsert(payload: unknown) {
+        calls.push({ table, op: "upsert", payload });
+        throw new Error("read model must not upsert");
+      },
+      delete() {
+        calls.push({ table, op: "delete" });
+        throw new Error("read model must not delete");
+      },
+    };
+    return q;
+  }
+
+  function applyFilters(rows: any[], filtersToApply: QueryFilter[]) {
+    return rows.filter((row) =>
+      filtersToApply.every((filter) => {
+        if (filter.op === "eq") return row[filter.column] === filter.value;
+        return Array.isArray(filter.value) && filter.value.includes(row[filter.column]);
+      }),
+    );
   }
 
   return {
@@ -259,7 +329,7 @@ describe("deposits ledger read model", () => {
     expect(view.warnings[0]).toMatch(/Multiple currencies/);
   });
 
-  it("does not add CSV, export, detail, or sync wiring", () => {
+  it("does not add CSV, export, or sync wiring", () => {
     const reportSource = fs.readFileSync(
       path.join(process.cwd(), "lib/reports/deposits-ledger.ts"),
       "utf8",
@@ -267,6 +337,121 @@ describe("deposits ledger read model", () => {
 
     expect(reportSource).not.toMatch(/csv|export\s+route|revalidatePath|redirect\(/i);
     expect(fs.existsSync(path.join(process.cwd(), "app/reports/deposits/export"))).toBe(false);
-    expect(fs.existsSync(path.join(process.cwd(), "app/reports/deposits/[payoutId]"))).toBe(false);
+  });
+
+  it("builds stable detail links for real and synthetic payout groups", () => {
+    expect(depositDetailHrefForGroup({ payoutId: "po_123", groupKey: "payout:po_123" })).toBe("/reports/deposits/po_123");
+    expect(depositDetailHrefForGroup({ payoutId: null, groupKey: "pending:no-payout" })).toBe("/reports/deposits/pending%3Ano-payout");
+    expect(depositDetailHrefForGroup({ payoutId: null, groupKey: "unmatched" })).toBe("/reports/deposits/unmatched");
+  });
+
+  it("detail route scopes by account owner and renders real payout rows with local context", async () => {
+    const ctx = makeDepositDetailSupabase({
+      stripe_payment_settlements: [settlement({ id: "set_1", account_owner_user_id: "owner-1", stripe_payout_id: "po_1" })],
+      internal_invoice_payments: [{ id: "pay-1", invoice_id: "inv-1", job_id: "job-1", paid_at: "2026-06-10T00:00:00.000Z" }],
+      internal_invoices: [{ id: "inv-1", invoice_display_number: "INV-1001", invoice_number: "1001", customer_id: "cust-1" }],
+      customers: [{ id: "cust-1", full_name: "Ada Customer", first_name: null, last_name: null }],
+      jobs: [{ id: "job-1", job_display_number: "JOB-55", title: "Heat pump test" }],
+    });
+
+    const detail = await getDepositDetailLedger({
+      supabase: ctx.client,
+      accountOwnerUserId: "owner-1",
+      payoutGroupId: "po_1",
+    });
+
+    expect(detail.found).toBe(true);
+    expect(detail.payoutId).toBe("po_1");
+    expect(detail.rows[0]).toEqual(expect.objectContaining({
+      invoiceLabel: "INV-1001",
+      customerName: "Ada Customer",
+      jobReference: "JOB-55",
+      jobTitle: "Heat pump test",
+      chargeId: "ch_123",
+      paymentIntentId: "pi_123",
+      balanceTransactionId: "txn_1",
+    }));
+    expect(ctx.calls).toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: "stripe_payment_settlements", op: "eq:account_owner_user_id", payload: "owner-1" }),
+    ]));
+  });
+
+  it("detail route renders pending:no-payout synthetic group safely", async () => {
+    const ctx = makeDepositDetailSupabase({
+      stripe_payment_settlements: [settlement({ stripe_payout_id: null, payout_status: "pending" })],
+    });
+
+    const detail = await getDepositDetailLedger({
+      supabase: ctx.client,
+      accountOwnerUserId: "owner-1",
+      payoutGroupId: "pending:no-payout",
+    });
+
+    expect(detail.found).toBe(true);
+    expect(detail.groupKey).toBe("pending:no-payout");
+    expect(detail.payoutLabel).toBe("Pending / No Payout");
+    expect(detail.rows[0]?.needsReview).toBe(false);
+  });
+
+  it("detail route renders unmatched synthetic group and keeps rows visible", async () => {
+    const ctx = makeDepositDetailSupabase({
+      stripe_payment_settlements: [
+        settlement({
+          id: "set_unmatched",
+          internal_invoice_payment_id: null,
+          settlement_kind: "unmatched",
+          sync_status: "unmatched",
+          stripe_payout_id: null,
+        }),
+      ],
+    });
+
+    const detail = await getDepositDetailLedger({
+      supabase: ctx.client,
+      accountOwnerUserId: "owner-1",
+      payoutGroupId: "unmatched",
+    });
+
+    expect(detail.found).toBe(true);
+    expect(detail.rows[0]?.invoiceLabel).toBe("Unmatched Stripe item");
+    expect(detail.rows[0]?.customerName).toBe("No local payment link");
+    expect(detail.rows[0]?.needsReview).toBe(true);
+    expect(detail.rows[0]?.needsReviewLabels).toEqual(expect.arrayContaining(["Needs Review", "Unmatched"]));
+  });
+
+  it("missing local context does not hide the settlement row", async () => {
+    const ctx = makeDepositDetailSupabase({
+      stripe_payment_settlements: [settlement({ id: "set_missing_context", internal_invoice_payment_id: "pay-missing" })],
+      internal_invoice_payments: [],
+      internal_invoices: [],
+      customers: [],
+      jobs: [],
+    });
+
+    const detail = await getDepositDetailLedger({
+      supabase: ctx.client,
+      accountOwnerUserId: "owner-1",
+      payoutGroupId: "po_1",
+    });
+
+    expect(detail.rows).toHaveLength(1);
+    expect(detail.rows[0]?.invoiceLabel).toBe("Unmatched Stripe item");
+    expect(detail.rows[0]?.customerName).toBe("No local payment link");
+  });
+
+  it("not-found state does not leak cross-account payout existence", async () => {
+    const ctx = makeDepositDetailSupabase({
+      stripe_payment_settlements: [settlement({ account_owner_user_id: "owner-2", stripe_payout_id: "po_secret" })],
+    });
+
+    const detail = await getDepositDetailLedger({
+      supabase: ctx.client,
+      accountOwnerUserId: "owner-1",
+      payoutGroupId: "po_secret",
+    });
+
+    expect(detail.found).toBe(false);
+    expect(detail.rows).toEqual([]);
+    expect(detail.summary.grossCollectedCents).toBe(0);
   });
 });
