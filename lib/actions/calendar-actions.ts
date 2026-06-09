@@ -910,6 +910,7 @@ async function loadAssignmentsAndLatestEvents(params: {
   timings: Record<string, number>;
   assignmentTimingLabel: string;
   eventTimingLabel: string;
+  includeLatestEvents?: boolean;
 }) {
   const { supabase, jobIds, timingEnabled, timings, assignmentTimingLabel, eventTimingLabel } = params;
   const assignmentMap = await timeCalendarStep(timingEnabled, timings, assignmentTimingLabel, () =>
@@ -922,7 +923,7 @@ async function loadAssignmentsAndLatestEvents(params: {
 
   let eventRowCount = 0;
   let latestEventByJob = new Map<string, { event_type: string | null; created_at: string | null }>();
-  if (jobIds.length) {
+  if (params.includeLatestEvents !== false && jobIds.length) {
     const { data: eventRows, error: eventErr } = await timeCalendarStep(timingEnabled, timings, eventTimingLabel, async () =>
       await supabase
         .from('job_events')
@@ -933,6 +934,8 @@ async function loadAssignmentsAndLatestEvents(params: {
     if (eventErr) throw eventErr;
     eventRowCount = (eventRows ?? []).length;
     latestEventByJob = latestEventMapFromRows(eventRows as JobEventRow[]);
+  } else if (timingEnabled) {
+    timings[eventTimingLabel] = 0;
   }
 
   return {
@@ -971,6 +974,7 @@ export async function getDispatchCalendarBoardData(params: DispatchCalendarLoadP
     timings,
     assignmentTimingLabel: 'primary_assignment_query_ms',
     eventTimingLabel: 'primary_latest_job_events_query_ms',
+    includeLatestEvents: false,
   });
 
   const scheduledCalendarJobs = scheduledCalendarRows.map((row) =>

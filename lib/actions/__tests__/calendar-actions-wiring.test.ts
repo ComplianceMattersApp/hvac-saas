@@ -327,6 +327,7 @@ describe('calendar action wiring', () => {
     });
 
     expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-unassigned-fallback']);
+    expect(board.day.jobs.map((job) => job.latest_event_type)).toEqual([null, null]);
     expect('unassignedScheduledJobs' in board).toBe(false);
     expect('scheduledAttentionWindowJobs' in board).toBe(false);
     expect(queue.unassignedScheduledJobs.map((job) => job.id)).toEqual(['job-needs-scheduling']);
