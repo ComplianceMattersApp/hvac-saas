@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { Suspense } from 'react';
 import { CalendarPlus, X } from 'lucide-react';
 import { endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
@@ -23,7 +24,14 @@ import {
   updateJobScheduleFromForm,
 } from '@/lib/actions/job-actions';
 import { logCustomerContactAttemptFromForm } from '@/lib/actions/job-contact-actions';
-import { getDispatchCalendarData, type DispatchCalendarBlockEvent, type DispatchJob, type DispatchViewMode } from '@/lib/actions/calendar';
+import {
+  getDispatchCalendarBoardData,
+  getDispatchCalendarQueueData,
+  type DispatchCalendarBlockEvent,
+  type DispatchCalendarQueueData,
+  type DispatchJob,
+  type DispatchViewMode,
+} from '@/lib/actions/calendar';
 import { getMonthVisibleRange } from '@/lib/calendar/month-visible-range';
 import { normalizeRetestLinkedJobTitle } from '@/lib/utils/job-title-display';
 import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
@@ -844,6 +852,268 @@ function MonthInspectorDaySummary(props: {
   );
 }
 
+function CalendarQueueStatFallback() {
+  return (
+    <>
+      <div className="rounded-xl border border-rose-100 bg-rose-50/60 px-3.5 py-3">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-rose-300" />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-700/80">Needs Attention</p>
+        </div>
+        <div className="mt-2 h-8 w-14 rounded-md bg-white/80 shadow-inner" />
+      </div>
+      <div className="rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-3">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-slate-300" />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">Unscheduled</p>
+        </div>
+        <div className="mt-2 h-8 w-14 rounded-md bg-white shadow-inner" />
+      </div>
+    </>
+  );
+}
+
+async function CalendarQueueStats(props: {
+  queuePromise: Promise<DispatchCalendarQueueData>;
+  activeTech?: string | null;
+  noTechScheduledCount: number;
+}) {
+  const queue = await props.queuePromise;
+  const attentionWindowScheduledJobs = props.activeTech
+    ? filterJobsForTechnician(queue.scheduledAttentionWindowJobs, props.activeTech)
+    : queue.scheduledAttentionWindowJobs;
+  const hiddenScheduledJobs = attentionWindowScheduledJobs.filter((job) => !isDispatchVisibleForLayout(job));
+  const attentionCount = hiddenScheduledJobs.length + props.noTechScheduledCount;
+
+  return (
+    <>
+      <div className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-800">Needs Attention</p>
+        </div>
+        <p className="mt-1.5 text-3xl font-bold tabular-nums text-[#0f1f35]">{attentionCount}</p>
+      </div>
+      <div className="rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-3">
+        <div className="flex items-center gap-1.5">
+          <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Unscheduled</p>
+        </div>
+        <p className="mt-1.5 text-3xl font-bold tabular-nums text-[#0f1f35]">{queue.unassignedScheduledJobs.length}</p>
+      </div>
+    </>
+  );
+}
+
+function CalendarQueueSidebarFallback() {
+  return (
+    <>
+      <section className="rounded-xl border border-l-4 border-l-rose-300 border-rose-100 bg-rose-50/50 p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.2)]">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700/80">Scheduled Jobs Needing Attention</h3>
+        <p className="mt-1 text-[11px] text-rose-800/70">Loading attention queue...</p>
+        <div className="mt-3 space-y-2">
+          <div className="h-16 rounded-xl border border-rose-100 bg-white/80" />
+          <div className="h-16 rounded-xl border border-rose-100 bg-white/60" />
+        </div>
+      </section>
+      <section className="rounded-xl border border-l-4 border-l-[#0f1f35]/50 border-slate-200/80 bg-white p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.3)]">
+        <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Needs Scheduling</h3>
+        <p className="mt-1 text-[11px] text-slate-500">Loading scheduling queue...</p>
+        <div className="mt-3 space-y-2">
+          <div className="h-20 rounded-xl border border-slate-200/80 bg-slate-50" />
+          <div className="h-20 rounded-xl border border-slate-200/80 bg-slate-50/70" />
+        </div>
+      </section>
+    </>
+  );
+}
+
+async function CalendarQueueSidebar(props: {
+  queuePromise: Promise<DispatchCalendarQueueData>;
+  uiView: CalendarUIView;
+  anchorDate: string;
+  activeTech?: string | null;
+}) {
+  const queue = await props.queuePromise;
+  const attentionWindowScheduledJobs = props.activeTech
+    ? filterJobsForTechnician(queue.scheduledAttentionWindowJobs, props.activeTech)
+    : queue.scheduledAttentionWindowJobs;
+  const hiddenScheduledJobs = attentionWindowScheduledJobs
+    .filter((job) => !isDispatchVisibleForLayout(job))
+    .sort((a, b) => {
+      const dateA = String(a.scheduled_date ?? '');
+      const dateB = String(b.scheduled_date ?? '');
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return String(a.window_start ?? '').localeCompare(String(b.window_start ?? ''));
+    });
+  const unscheduledJobs = queue.unassignedScheduledJobs;
+
+  return (
+    <>
+      {hiddenScheduledJobs.length ? (
+        <section className="rounded-xl border border-l-4 border-l-rose-500 border-rose-200/80 bg-rose-50/70 p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.2)]">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-800">Scheduled Jobs Needing Attention</h3>
+              <p className="mt-0.5 text-[11px] text-rose-800/75">Scheduled but missing required info. Open each job before dispatching.</p>
+            </div>
+          </div>
+          <div className="max-h-[32vh] space-y-2 overflow-y-auto pr-1">
+            {hiddenScheduledJobs.map((job) => {
+              const issueSummary = dispatchVisibilityIssueLabels(job).join(' Â· ') || 'Needs review';
+              const lifecycle = getCalendarDisplayStatus(job);
+              const isCancelledJob = lifecycle === 'cancelled';
+
+              return (
+                <CalendarDragJobLink
+                  key={`hidden-scheduled-${job.id}`}
+                  href={buildCalendarHref(props.uiView, job.scheduled_date ?? props.anchorDate, { job: job.id, tech: props.activeTech })}
+                  title={calendarJobTooltip(job)}
+                  draggable={!isCancelledJob}
+                  jobId={job.id}
+                  windowStart={job.window_start}
+                  windowEnd={job.window_end}
+                  jobTitle={shortTitle(job)}
+                  jobCity={job.city}
+                  assigneeSummary={Array.isArray(job.assignments) ? job.assignments.map((a) => a.display_name).filter(Boolean).join(', ') : null}
+                  hasNoTechAssigned={!job.assignments || job.assignments.length === 0}
+                  scroll={false}
+                  className={`group block rounded-xl border border-rose-200/80 bg-white/90 px-3 py-3 transition ${isCancelledJob ? 'cursor-default opacity-80' : 'cursor-grab hover:-translate-y-px hover:border-rose-300 hover:bg-white hover:shadow-md active:cursor-grabbing active:opacity-85'}`}
+                >
+                  <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
+                  <p className="mt-0.5 truncate text-[11px] text-slate-600">{formatBusinessDateUS(job.scheduled_date ?? props.anchorDate)}</p>
+                  <p className="mt-1 truncate text-[11px] font-medium text-rose-900">{issueSummary}</p>
+                  <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-rose-700/90 group-hover:text-rose-800">
+                    {isCancelledJob
+                      ? 'Historical cancelled record'
+                      : props.uiView === 'list'
+                      ? 'Open to review'
+                      : 'Open to schedule'}
+                  </p>
+                </CalendarDragJobLink>
+              );
+            })}
+          </div>
+        </section>
+      ) : null}
+
+      <section className="rounded-xl border border-l-4 border-l-[#0f1f35] border-slate-200/80 bg-white p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.3)]">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div>
+            <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Needs Scheduling</h3>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              {'Open or drag a job to place it on the schedule.'}
+            </p>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+            {unscheduledJobs.length}
+          </span>
+        </div>
+        <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
+          {unscheduledJobs.length ? (
+            unscheduledJobs.map((job) => {
+              const cueLabels = unscheduledJobCueLabels(job);
+              const customerLabel = customerName(job);
+              const addressLine = customerAddressLine1(job);
+              const cityLabel = String(job.city ?? '').trim();
+
+              return (
+                <CalendarDragJobLink
+                  key={`unassigned-${job.id}`}
+                  href={buildCalendarHref(props.uiView, props.anchorDate, { job: job.id, tech: props.activeTech })}
+                  title={calendarJobTooltip(job)}
+                  draggable
+                  jobId={job.id}
+                  windowStart={job.window_start}
+                  windowEnd={job.window_end}
+                  jobTitle={shortTitle(job)}
+                  jobCity={job.city}
+                  assigneeSummary={null}
+                  hasNoTechAssigned={true}
+                  scroll={false}
+                  className="group block cursor-grab rounded-xl border border-slate-200/80 bg-white px-3 py-3 shadow-[0_8px_20px_-16px_rgba(15,31,53,0.28)] transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:cursor-grabbing active:opacity-85"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="min-w-0 truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
+                    {cueLabels.length ? (
+                      <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
+                        {cueLabels[0]}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1 truncate text-[11px] font-medium text-slate-700">{customerLabel}</p>
+                  <p className="truncate text-[11px] text-slate-600">{addressLine}</p>
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+                    {cityLabel ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 truncate">{cityLabel}</span> : null}
+                    {cueLabels.slice(1).map((label) => (
+                      <span key={`${job.id}-${label}`} className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 leading-none text-[9px] font-medium text-slate-600">
+                        {label}
+                      </span>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:text-slate-700">
+                    {'Open to schedule'}
+                  </p>
+                </CalendarDragJobLink>
+              );
+            })
+          ) : (
+            <div className="rounded-xl border border-dashed border-slate-300/80 bg-slate-50/70 px-3 py-6 text-center text-xs text-slate-500">No unscheduled jobs.</div>
+          )}
+        </div>
+      </section>
+    </>
+  );
+}
+
+function CalendarQueueInspectorFallback(props: { className?: string }) {
+  return (
+    <div className={`${props.className ?? ''} bg-white p-4`}>
+      <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Inspector</p>
+      <div className="mt-3 space-y-2">
+        <div className="h-4 w-2/3 rounded bg-slate-100" />
+        <div className="h-20 rounded-xl border border-slate-200 bg-slate-50" />
+        <div className="h-10 rounded-xl border border-slate-200 bg-slate-50" />
+      </div>
+    </div>
+  );
+}
+
+async function CalendarQueueSelectedJobInspector(props: {
+  queuePromise: Promise<DispatchCalendarQueueData>;
+  selectedJobId: string;
+  returnTo: string;
+  closeHref: string;
+  assignableUsers: Array<{ user_id: string; display_name: string }>;
+  view: CalendarUIView;
+  date: string;
+  tech?: string | null;
+  prefillDate?: string | null;
+  className?: string;
+}) {
+  const queue = await props.queuePromise;
+  const selectedJob =
+    queue.unassignedScheduledJobs.find((job) => job.id === props.selectedJobId) ||
+    queue.scheduledAttentionWindowJobs.find((job) => job.id === props.selectedJobId) ||
+    null;
+
+  if (!selectedJob) return null;
+
+  return (
+    <DetailPanel
+      job={selectedJob}
+      returnTo={props.returnTo}
+      closeHref={props.closeHref}
+      assignableUsers={props.assignableUsers}
+      view={props.view}
+      date={props.date}
+      tech={props.tech}
+      prefillDate={props.prefillDate}
+      className={props.className}
+    />
+  );
+}
+
 export async function CalendarView(props: Props) {
   const uiView = normalizeView(props.view);
   const todayDate = todayYmdLA();
@@ -856,7 +1126,7 @@ export async function CalendarView(props: Props) {
   const monthEndDate = formatDate(endOfMonth(anchorForRange), 'yyyy-MM-dd');
   const monthVisibleRange = getMonthVisibleRange(formatDate(anchorForRange, 'yyyy-MM-dd'));
 
-  const data = await getDispatchCalendarData({
+  const calendarLoadParams = {
     mode: baseMode,
     anchorDate: props.date,
     view: uiView,
@@ -872,7 +1142,10 @@ export async function CalendarView(props: Props) {
           rangeEndDate: monthEndDate,
         }
       : {}),
-  });
+  } as const;
+
+  const queuePromise = getDispatchCalendarQueueData(calendarLoadParams);
+  const data = await getDispatchCalendarBoardData(calendarLoadParams);
 
   const returnTo = buildReturnTo(uiView, data.anchorDate, activeTech);
   const banner = bannerMessage(props.banner);
@@ -913,7 +1186,6 @@ export async function CalendarView(props: Props) {
 
   const selectedJob =
     (selectedJobId ? canonicalDispatchJobsForRange.find((job) => job.id === selectedJobId) : null) ||
-    data.unassignedScheduledJobs.find((job) => job.id === selectedJobId) ||
     null;
 
   const inspectorStateRaw = String(props.inspector ?? '').trim().toLowerCase();
@@ -941,19 +1213,6 @@ export async function CalendarView(props: Props) {
     jobs: day.jobs.filter((job) => isDispatchVisibleForLayout(job)),
   }));
 
-  const attentionWindowScheduledJobs = activeTech
-    ? filterJobsForTechnician(data.scheduledAttentionWindowJobs, activeTech)
-    : data.scheduledAttentionWindowJobs;
-
-  const hiddenScheduledJobs = attentionWindowScheduledJobs
-    .filter((job) => !isDispatchVisibleForLayout(job))
-    .sort((a, b) => {
-      const dateA = String(a.scheduled_date ?? '');
-      const dateB = String(b.scheduled_date ?? '');
-      if (dateA !== dateB) return dateA.localeCompare(dateB);
-      return String(a.window_start ?? '').localeCompare(String(b.window_start ?? ''));
-    });
-
   // Tech filter — applied at the presentation layer only, no backend change.
   const filteredJobsByDay = consistentlyVisibleJobsByDay;
 
@@ -961,7 +1220,7 @@ export async function CalendarView(props: Props) {
   const filteredDayJobs = filteredJobsByDay.find((day) => day.date === data.day.date)?.jobs ?? [];
   const selectedDayJobs = techFilteredScheduledJobsByDay.find((day) => day.date === data.anchorDate)?.jobs ?? [];
   const mondayAnchorDate = startOfWeekMondayYmd(data.anchorDate);
-  const showDesktopInspectorColumn = inspectorOpen && (uiView === 'month' || Boolean(selectedJob));
+  const showDesktopInspectorColumn = inspectorOpen && (uiView === 'month' || Boolean(selectedJob) || Boolean(selectedJobId));
 
   const targetDateForView = (viewValue: CalendarUIView) => {
     if (viewValue === 'week' || viewValue === 'list') return mondayAnchorDate;
@@ -981,12 +1240,12 @@ export async function CalendarView(props: Props) {
     headerLabel = `Week view ${formatBusinessDateUS(data.week.startDate)} - ${formatBusinessDateUS(data.week.endDate)}`;
   }
 
-  const unscheduledJobs = data.unassignedScheduledJobs;
   const scheduledJobCount = filteredJobsForRange.length;
   const noTechScheduledCount = filteredJobsForRange.filter(
     (job) => job.scheduled_date && (!job.assignments || job.assignments.length === 0),
   ).length;
-  const attentionCount = hiddenScheduledJobs.length + noTechScheduledCount;
+  const hiddenScheduledJobs: DispatchJob[] = [];
+  const unscheduledJobs: DispatchJob[] = [];
   const activeFilterLabel = activeUnassignedFilter
     ? 'Unassigned scheduled jobs'
     : activeTechnicianUserId
@@ -1104,20 +1363,9 @@ export async function CalendarView(props: Props) {
               </div>
               <p className="mt-1.5 text-3xl font-bold tabular-nums text-[#0f1f35]">{scheduledJobCount}</p>
             </div>
-            <div className="rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-rose-500" />
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-rose-800">Needs Attention</p>
-              </div>
-              <p className="mt-1.5 text-3xl font-bold tabular-nums text-[#0f1f35]">{attentionCount}</p>
-            </div>
-            <div className="rounded-xl border border-slate-200/80 bg-slate-50 px-3.5 py-3">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 shrink-0 rounded-full bg-slate-400" />
-                <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">Unscheduled</p>
-              </div>
-              <p className="mt-1.5 text-3xl font-bold tabular-nums text-[#0f1f35]">{unscheduledJobs.length}</p>
-            </div>
+            <Suspense fallback={<CalendarQueueStatFallback />}>
+              <CalendarQueueStats queuePromise={queuePromise} activeTech={activeTech} noTechScheduledCount={noTechScheduledCount} />
+            </Suspense>
             <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3">
               <div className="flex items-center gap-1.5">
                 <span className="h-2 w-2 shrink-0 rounded-full bg-slate-300" />
@@ -1328,6 +1576,10 @@ export async function CalendarView(props: Props) {
             ) : null
           ) : null}
 
+          <Suspense fallback={<CalendarQueueSidebarFallback />}>
+            <CalendarQueueSidebar queuePromise={queuePromise} uiView={uiView} anchorDate={data.anchorDate} activeTech={activeTech} />
+          </Suspense>
+
           {hiddenScheduledJobs.length ? (
             <section className="rounded-xl border border-l-4 border-l-rose-500 border-rose-200/80 bg-rose-50/70 p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.2)]">
               <div className="mb-3 flex items-center justify-between gap-2">
@@ -1375,71 +1627,6 @@ export async function CalendarView(props: Props) {
             </section>
           ) : null}
 
-          <section className="rounded-xl border border-l-4 border-l-[#0f1f35] border-slate-200/80 bg-white p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.3)]">
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <div>
-              <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Needs Scheduling</h3>
-              <p className="mt-0.5 text-[11px] text-slate-500">
-                {'Open or drag a job to place it on the schedule.'}
-              </p>
-            </div>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600">
-              {unscheduledJobs.length}
-            </span>
-          </div>
-          <div className="max-h-[70vh] space-y-2 overflow-y-auto pr-1">
-            {unscheduledJobs.length ? (
-              unscheduledJobs.map((job) => {
-                const cueLabels = unscheduledJobCueLabels(job);
-                const customerLabel = customerName(job);
-                const addressLine = customerAddressLine1(job);
-                const cityLabel = String(job.city ?? '').trim();
-
-                return (
-                  <CalendarDragJobLink
-                    key={`unassigned-${job.id}`}
-                    href={buildCalendarHref(uiView, data.anchorDate, { job: job.id, tech: activeTech })}
-                    title={calendarJobTooltip(job)}
-                    draggable
-                    jobId={job.id}
-                    windowStart={job.window_start}
-                    windowEnd={job.window_end}
-                    jobTitle={shortTitle(job)}
-                    jobCity={job.city}
-                    assigneeSummary={null}
-                    hasNoTechAssigned={true}
-                    scroll={false}
-                    className="group block cursor-grab rounded-xl border border-slate-200/80 bg-white px-3 py-3 shadow-[0_8px_20px_-16px_rgba(15,31,53,0.28)] transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md active:cursor-grabbing active:opacity-85"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <p className="min-w-0 truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
-                      {cueLabels.length ? (
-                        <span className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
-                          {cueLabels[0]}
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="mt-1 truncate text-[11px] font-medium text-slate-700">{customerLabel}</p>
-                    <p className="truncate text-[11px] text-slate-600">{addressLine}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
-                      {cityLabel ? <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 truncate">{cityLabel}</span> : null}
-                      {cueLabels.slice(1).map((label) => (
-                        <span key={`${job.id}-${label}`} className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 leading-none text-[9px] font-medium text-slate-600">
-                          {label}
-                        </span>
-                      ))}
-                    </div>
-                    <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-slate-500 group-hover:text-slate-700">
-                      {'Open to schedule'}
-                    </p>
-                  </CalendarDragJobLink>
-                );
-              })
-            ) : (
-              <div className="rounded-xl border border-dashed border-slate-300/80 bg-slate-50/70 px-3 py-6 text-center text-xs text-slate-500">No unscheduled jobs.</div>
-            )}
-          </div>
-          </section>
         </aside>
 
         <main className="order-1 min-w-0 space-y-4 xl:order-2">
@@ -1532,6 +1719,21 @@ export async function CalendarView(props: Props) {
                 prefillDate={prefillDate}
                 className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
               />
+            ) : selectedJobId ? (
+              <Suspense fallback={<CalendarQueueInspectorFallback className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 shadow-lg shadow-slate-950/10" />}>
+                <CalendarQueueSelectedJobInspector
+                  queuePromise={queuePromise}
+                  selectedJobId={selectedJobId}
+                  returnTo={returnTo}
+                  closeHref={hideInspectorHref}
+                  assignableUsers={data.assignableUsers}
+                  view={uiView}
+                  date={data.anchorDate}
+                  tech={activeTech}
+                  prefillDate={prefillDate}
+                  className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
+                />
+              </Suspense>
             ) : uiView === 'month' ? (
               <div className="sticky top-24 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_20px_48px_-30px_rgba(15,31,53,0.3)]">
                 <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Inspector</p>
@@ -1550,19 +1752,36 @@ export async function CalendarView(props: Props) {
         ) : null}
       </div>
 
-      {selectedJob && inspectorOpen ? (
+      {inspectorOpen && (selectedJob || selectedJobId) ? (
         <div className="fixed inset-0 z-50 bg-black/30 px-3 pb-4 pt-24 sm:px-4 sm:pb-5 sm:pt-28 xl:hidden">
-          <DetailPanel
-            job={selectedJob}
-            returnTo={returnTo}
-            closeHref={hideInspectorHref}
-            assignableUsers={data.assignableUsers}
-            view={uiView}
-            date={data.anchorDate}
-            tech={activeTech}
-            prefillDate={prefillDate}
-            className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 shadow-xl shadow-slate-950/10"
-          />
+          {selectedJob ? (
+            <DetailPanel
+              job={selectedJob}
+              returnTo={returnTo}
+              closeHref={hideInspectorHref}
+              assignableUsers={data.assignableUsers}
+              view={uiView}
+              date={data.anchorDate}
+              tech={activeTech}
+              prefillDate={prefillDate}
+              className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 shadow-xl shadow-slate-950/10"
+            />
+          ) : (
+            <Suspense fallback={<CalendarQueueInspectorFallback className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 shadow-xl shadow-slate-950/10" />}>
+              <CalendarQueueSelectedJobInspector
+                queuePromise={queuePromise}
+                selectedJobId={selectedJobId}
+                returnTo={returnTo}
+                closeHref={hideInspectorHref}
+                assignableUsers={data.assignableUsers}
+                view={uiView}
+                date={data.anchorDate}
+                tech={activeTech}
+                prefillDate={prefillDate}
+                className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10"
+              />
+            </Suspense>
+          )}
         </div>
       ) : null}
     </div>

@@ -117,6 +117,32 @@ function makeFixture() {
       created_at: '2026-04-29T08:30:00.000Z',
       deleted_at: null,
     },
+    {
+      id: 'job-needs-scheduling',
+      customer_id: 'cust-1',
+      location_id: 'loc-3',
+      title: 'Needs Scheduling Visit',
+      job_type: 'service',
+      status: 'open',
+      ops_status: 'need_to_schedule',
+      parent_job_id: null,
+      scheduled_date: null,
+      window_start: null,
+      window_end: null,
+      city: 'Queue City',
+      customer_phone: '555-3000',
+      job_address: '333 Main St',
+      customer_first_name: 'Taylor',
+      customer_last_name: 'Nguyen',
+      contractor_id: null,
+      contractors: null,
+      customers: { phone: null },
+      locations: { city: null },
+      visit_scope_summary: null,
+      visit_scope_items: null,
+      created_at: '2026-04-29T09:30:00.000Z',
+      deleted_at: null,
+    },
   ];
 
   const jobEvents: JobEventRow[] = [
@@ -281,6 +307,30 @@ describe('calendar action wiring', () => {
     expect(unassigned?.assignments).toEqual([]);
 
     expect(result.scheduledAttentionWindowJobs.map((job) => job.id)).toEqual([
+      'job-assigned-canonical',
+      'job-unassigned-fallback',
+    ]);
+  });
+
+  it('splits primary board data from secondary queue data', async () => {
+    createClientMock.mockResolvedValue(makeFixture().supabase);
+
+    const { getDispatchCalendarBoardData, getDispatchCalendarQueueData } = await import('@/lib/actions/calendar-actions');
+
+    const board = await getDispatchCalendarBoardData({
+      mode: 'day',
+      anchorDate: '2026-04-29',
+    });
+    const queue = await getDispatchCalendarQueueData({
+      mode: 'day',
+      anchorDate: '2026-04-29',
+    });
+
+    expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-unassigned-fallback']);
+    expect('unassignedScheduledJobs' in board).toBe(false);
+    expect('scheduledAttentionWindowJobs' in board).toBe(false);
+    expect(queue.unassignedScheduledJobs.map((job) => job.id)).toEqual(['job-needs-scheduling']);
+    expect(queue.scheduledAttentionWindowJobs.map((job) => job.id)).toEqual([
       'job-assigned-canonical',
       'job-unassigned-fallback',
     ]);

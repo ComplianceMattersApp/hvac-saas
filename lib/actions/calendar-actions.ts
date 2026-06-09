@@ -134,6 +134,16 @@ type DispatchDateRange = {
   endDate: string;
 };
 
+export type DispatchCalendarBoardData = Omit<
+  DispatchCalendarData,
+  'scheduledAttentionWindowJobs' | 'unassignedScheduledJobs'
+>;
+
+export type DispatchCalendarQueueData = Pick<
+  DispatchCalendarData,
+  'scheduledAttentionWindowJobs' | 'unassignedScheduledJobs'
+>;
+
 type CalendarTimingDebugView = 'day' | 'week' | 'list' | 'month' | 'unknown';
 type CalendarTimingDebugTechFilter = 'all' | 'unassigned' | 'specific';
 
@@ -764,5 +774,437 @@ export async function getDispatchCalendarData(params: {
     unassignedScheduledJobs: unscheduledActiveJobs,
     calendarBlockEvents,
     assignableUsers,
+  };
+}
+
+type DispatchCalendarLoadParams = {
+  mode: DispatchViewMode;
+  anchorDate?: string | null;
+  rangeStartDate?: string | null;
+  rangeEndDate?: string | null;
+  view?: string | null;
+  techFilterType?: CalendarTimingDebugTechFilter;
+};
+
+async function loadCalendarContext(
+  params: DispatchCalendarLoadParams,
+  timingEnabled: boolean,
+  timings: Record<string, number>,
+) {
+  const { supabase, internalUser } = await timeCalendarStep(timingEnabled, timings, 'auth_internal_user_ms', async () => {
+    const scopedSupabase = await createClient();
+    const internalResult = await requireInternalUser({ supabase: scopedSupabase });
+    return {
+      supabase: scopedSupabase,
+      internalUser: internalResult.internalUser,
+    };
+  });
+
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? '').trim();
+  if (!accountOwnerUserId) {
+    throw new Error('NOT_AUTHORIZED');
+  }
+
+  const mode: DispatchViewMode = params.mode === 'week' ? 'week' : 'day';
+  const anchorDate = normalizeAnchorDate(params.anchorDate);
+  const dispatchAttentionWindowStart = addDaysYmd(anchorDate, -7);
+  const dispatchAttentionWindowEnd = addDaysYmd(anchorDate, 21);
+  const dispatchRange = resolveDispatchDateRange({
+    mode,
+    anchorDate,
+    rangeStartDate: params.rangeStartDate,
+    rangeEndDate: params.rangeEndDate,
+  });
+
+  const baseSelect = [
+    'id',
+    'customer_id',
+    'location_id',
+    'title',
+    'job_type',
+    'status',
+    'ops_status',
+    'parent_job_id',
+    'scheduled_date',
+    'window_start',
+    'window_end',
+    'city',
+    'customer_phone',
+    'job_address',
+    'customer_first_name',
+    'customer_last_name',
+    'contractor_id',
+    'contractors(name)',
+    'customers:customer_id(phone)',
+    'locations:location_id(city)',
+    'visit_scope_summary',
+    'visit_scope_items',
+    'created_at',
+    'deleted_at',
+  ].join(', ');
+
+  const scopedCustomerIds = await timeCalendarStep(timingEnabled, timings, 'scoped_customer_lookup_ms', () =>
+    loadScopedCustomerIds({
+      supabase,
+      accountOwnerUserId,
+    }),
+  );
+
+  return {
+    supabase,
+    internalUser,
+    accountOwnerUserId,
+    mode,
+    anchorDate,
+    dispatchAttentionWindowStart,
+    dispatchAttentionWindowEnd,
+    dispatchRange,
+    weekStart: startOfWeekYmd(anchorDate),
+    baseSelect,
+    scopedCustomerIds,
+  };
+}
+
+function isJobDispatchRow(row: any): row is JobDispatchRow {
+  return row && typeof row.id === 'string' && typeof row.status !== 'undefined' && typeof row.ops_status !== 'undefined';
+}
+
+function isOnHoldDispatchRow(job: JobDispatchRow) {
+  const ops = String(job.ops_status ?? '').toLowerCase();
+  const status = String(job.status ?? '').toLowerCase();
+  return ops === 'on_hold' || status === 'on_hold';
+}
+
+function isActiveDispatchRow(job: JobDispatchRow) {
+  const ops = String(job.ops_status ?? '').toLowerCase();
+  const status = String(job.status ?? '').toLowerCase();
+  if (isOnHoldDispatchRow(job)) return false;
+  if (ops === 'closed' || ops === 'cancelled') return false;
+  if (status === 'closed' || status === 'cancelled') return false;
+  return true;
+}
+
+function isCalendarScheduledDispatchRow(job: JobDispatchRow) {
+  if (!job.scheduled_date) return false;
+  if (isOnHoldDispatchRow(job)) return false;
+  return true;
+}
+
+function latestEventMapFromRows(eventRows: JobEventRow[] | null | undefined) {
+  const latestEventByJob = new Map<string, { event_type: string | null; created_at: string | null }>();
+  for (const event of (eventRows ?? []) as JobEventRow[]) {
+    const jobId = String(event?.job_id ?? '').trim();
+    if (!jobId || latestEventByJob.has(jobId)) continue;
+    latestEventByJob.set(jobId, {
+      event_type: event?.event_type ? String(event.event_type) : null,
+      created_at: event?.created_at ? String(event.created_at) : null,
+    });
+  }
+  return latestEventByJob;
+}
+
+async function loadAssignmentsAndLatestEvents(params: {
+  supabase: any;
+  jobIds: string[];
+  timingEnabled: boolean;
+  timings: Record<string, number>;
+  assignmentTimingLabel: string;
+  eventTimingLabel: string;
+}) {
+  const { supabase, jobIds, timingEnabled, timings, assignmentTimingLabel, eventTimingLabel } = params;
+  const assignmentMap = await timeCalendarStep(timingEnabled, timings, assignmentTimingLabel, () =>
+    getActiveJobAssignmentDisplayMap({
+      supabase,
+      jobIds,
+    }),
+  );
+  const assignmentRowCount = Object.values(assignmentMap).reduce((total, rows) => total + rows.length, 0);
+
+  let eventRowCount = 0;
+  let latestEventByJob = new Map<string, { event_type: string | null; created_at: string | null }>();
+  if (jobIds.length) {
+    const { data: eventRows, error: eventErr } = await timeCalendarStep(timingEnabled, timings, eventTimingLabel, async () =>
+      await supabase
+        .from('job_events')
+        .select('job_id, event_type, created_at')
+        .in('job_id', jobIds)
+        .order('created_at', { ascending: false }),
+    );
+    if (eventErr) throw eventErr;
+    eventRowCount = (eventRows ?? []).length;
+    latestEventByJob = latestEventMapFromRows(eventRows as JobEventRow[]);
+  }
+
+  return {
+    assignmentMap,
+    assignmentRowCount,
+    latestEventByJob,
+    eventRowCount,
+  };
+}
+
+export async function getDispatchCalendarBoardData(params: DispatchCalendarLoadParams): Promise<DispatchCalendarBoardData> {
+  const timingEnabled = isCalendarTimingDebugEnabled();
+  const totalStartedAt = timingEnabled ? nowMs() : 0;
+  const timings: Record<string, number> = {};
+  const context = await loadCalendarContext(params, timingEnabled, timings);
+
+  const scheduledRangeRows = await timeCalendarStep(timingEnabled, timings, 'primary_scheduled_range_jobs_query_ms', () =>
+    loadScopedDispatchJobRows({
+      supabase: context.supabase,
+      scopedCustomerIds: context.scopedCustomerIds,
+      baseSelect: context.baseSelect,
+      scheduledDateRange: context.dispatchRange,
+    }),
+  );
+
+  const validScheduledRangeRows = (scheduledRangeRows ?? []).filter(isJobDispatchRow) as JobDispatchRow[];
+  const scheduledCalendarRows = validScheduledRangeRows.filter((row) => isCalendarScheduledDispatchRow(row));
+  const primaryJobIds = Array.from(
+    new Set(scheduledCalendarRows.map((row) => String(row?.id ?? '').trim()).filter(Boolean)),
+  );
+
+  const { assignmentMap, assignmentRowCount, latestEventByJob, eventRowCount } = await loadAssignmentsAndLatestEvents({
+    supabase: context.supabase,
+    jobIds: primaryJobIds,
+    timingEnabled,
+    timings,
+    assignmentTimingLabel: 'primary_assignment_query_ms',
+    eventTimingLabel: 'primary_latest_job_events_query_ms',
+  });
+
+  const scheduledCalendarJobs = scheduledCalendarRows.map((row) =>
+    mergeJobRow({ row, assignmentMap, latestEventByJob }),
+  );
+
+  const dayJobs = scheduledCalendarJobs.filter((job) => String(job.scheduled_date) === context.anchorDate);
+  const weekEnd = addDaysYmd(context.weekStart, 6);
+  const weekDays = Array.from({ length: 7 }).map((_, index) => {
+    const date = addDaysYmd(context.weekStart, index);
+    const jobs = scheduledCalendarJobs.filter((job) => String(job.scheduled_date ?? '') === date);
+    return { date, jobs };
+  });
+
+  const rangeDays = buildRangeDays({
+    startDate: context.dispatchRange.startDate,
+    endDate: context.dispatchRange.endDate,
+    jobs: scheduledCalendarJobs,
+  });
+
+  const assignableUsers = (await timeCalendarStep(timingEnabled, timings, 'primary_assignable_users_profile_resolution_ms', () =>
+    getAssignableInternalUsers({
+      supabase: context.supabase,
+      accountOwnerUserId: context.accountOwnerUserId,
+    }),
+  )).map((user) => ({
+    user_id: String(user.user_id),
+    display_name: String(user.display_name),
+  }));
+
+  const assignableUserIds = assignableUsers.map((user) => user.user_id);
+  const calendarBlockEvents: DispatchCalendarBlockEvent[] = [];
+
+  if (assignableUserIds.length) {
+    const blockRangeStart = laDateTimeToUtcIso(context.dispatchRange.startDate, '00:00');
+    const blockRangeEnd = laDateTimeToUtcIso(addDaysYmd(context.dispatchRange.endDate, 1), '00:00');
+
+    const { data: eventRows, error: eventErr } = await timeCalendarStep(timingEnabled, timings, 'primary_calendar_block_events_query_ms', async () =>
+      await context.supabase
+        .from('calendar_events')
+        .select('id, title, description, status, internal_user_id, start_at, end_at, event_type')
+        .eq('owner_user_id', context.internalUser.account_owner_user_id)
+        .eq('event_type', 'block')
+        .in('internal_user_id', assignableUserIds)
+        .gte('start_at', blockRangeStart)
+        .lt('start_at', blockRangeEnd)
+        .order('start_at', { ascending: true }),
+    );
+
+    if (eventErr) throw eventErr;
+
+    for (const row of (eventRows ?? []) as CalendarEventRow[]) {
+      const id = String(row?.id ?? '').trim();
+      const internalUserId = String(row?.internal_user_id ?? '').trim();
+      const startAt = String(row?.start_at ?? '').trim();
+      const endAt = String(row?.end_at ?? '').trim();
+      if (!id || !internalUserId || !startAt || !endAt) continue;
+
+      const calendarDate = displayDateLA(startAt);
+      const endDate = displayDateLA(endAt);
+      const startTime = displayTimeLA(startAt);
+      const endTime = displayTimeLA(endAt);
+
+      if (!calendarDate || !startTime || !endTime) continue;
+      if (calendarDate !== endDate) continue;
+
+      calendarBlockEvents.push({
+        id,
+        title: String(row?.title ?? '').trim() || 'Blocked',
+        description: row?.description ? String(row.description).trim() || null : null,
+        status: row?.status ? String(row.status) : null,
+        internal_user_id: internalUserId,
+        start_at: startAt,
+        end_at: endAt,
+        calendar_date: calendarDate,
+        start_time: startTime,
+        end_time: endTime,
+      });
+    }
+  }
+
+  if (timingEnabled) {
+    console.log(JSON.stringify({
+      marker: 'calendar_timing_debug',
+      loader: 'primary_board',
+      view: normalizeTimingDebugView(params.view),
+      mode: context.mode,
+      tech_filter_type: params.techFilterType ?? 'all',
+      range: {
+        start: context.dispatchRange.startDate,
+        end: context.dispatchRange.endDate,
+      },
+      timings_ms: {
+        total_primary_board_ms: nowMs() - totalStartedAt,
+        ...timings,
+      },
+      counts: {
+        scoped_customer_count: context.scopedCustomerIds.length,
+        primary_scheduled_range_query_rows: validScheduledRangeRows.length,
+        primary_final_scheduled_count: scheduledCalendarJobs.length,
+        primary_assignment_row_count: assignmentRowCount,
+        primary_event_row_count: eventRowCount,
+        primary_block_event_count: calendarBlockEvents.length,
+        assignable_user_count: assignableUsers.length,
+      },
+    }));
+  }
+
+  return {
+    mode: context.mode,
+    anchorDate: context.anchorDate,
+    range: {
+      startDate: context.dispatchRange.startDate,
+      endDate: context.dispatchRange.endDate,
+      days: rangeDays,
+    },
+    day: {
+      date: context.anchorDate,
+      jobs: dayJobs,
+    },
+    week: {
+      startDate: context.weekStart,
+      endDate: weekEnd,
+      days: weekDays,
+    },
+    calendarBlockEvents,
+    assignableUsers,
+  };
+}
+
+export async function getDispatchCalendarQueueData(params: DispatchCalendarLoadParams): Promise<DispatchCalendarQueueData> {
+  const timingEnabled = isCalendarTimingDebugEnabled();
+  const totalStartedAt = timingEnabled ? nowMs() : 0;
+  const timings: Record<string, number> = {};
+  const context = await loadCalendarContext(params, timingEnabled, timings);
+
+  const [scheduledAttentionRows, unscheduledRows] = await Promise.all([
+    timeCalendarStep(timingEnabled, timings, 'queue_attention_window_jobs_query_ms', () =>
+      loadScopedDispatchJobRows({
+        supabase: context.supabase,
+        scopedCustomerIds: context.scopedCustomerIds,
+        baseSelect: context.baseSelect,
+        scheduledDateRange: {
+          startDate: context.dispatchAttentionWindowStart,
+          endDate: context.dispatchAttentionWindowEnd,
+        },
+      }),
+    ),
+    timeCalendarStep(timingEnabled, timings, 'queue_unscheduled_jobs_query_ms', () =>
+      loadScopedDispatchJobRows({
+        supabase: context.supabase,
+        scopedCustomerIds: context.scopedCustomerIds,
+        baseSelect: context.baseSelect,
+        unscheduledOnly: true,
+      }),
+    ),
+  ]);
+
+  const validScheduledAttentionRows = (scheduledAttentionRows ?? []).filter(isJobDispatchRow) as JobDispatchRow[];
+  const validUnscheduledRows = (unscheduledRows ?? []).filter(isJobDispatchRow) as JobDispatchRow[];
+  const validRows = [...validScheduledAttentionRows, ...validUnscheduledRows];
+  const activeRetestParentIds = new Set(
+    validRows
+      .filter((row) => isActiveDispatchRow(row) && !!String(row.parent_job_id ?? '').trim())
+      .map((row) => String(row.parent_job_id ?? '').trim())
+      .filter(Boolean),
+  );
+
+  const scheduledAttentionCalendarRows = validScheduledAttentionRows.filter((row) => isCalendarScheduledDispatchRow(row));
+  const unscheduledActiveRows = suppressRetestParentRows(
+    validUnscheduledRows.filter((row) => isActiveDispatchRow(row) && !row.scheduled_date),
+    activeRetestParentIds,
+  );
+
+  const queueJobIds = Array.from(
+    new Set(
+      [...scheduledAttentionCalendarRows, ...unscheduledActiveRows]
+        .map((row) => String(row?.id ?? '').trim())
+        .filter(Boolean),
+    ),
+  );
+
+  const { assignmentMap, assignmentRowCount, latestEventByJob, eventRowCount } = await loadAssignmentsAndLatestEvents({
+    supabase: context.supabase,
+    jobIds: queueJobIds,
+    timingEnabled,
+    timings,
+    assignmentTimingLabel: 'queue_assignment_query_ms',
+    eventTimingLabel: 'queue_latest_job_events_query_ms',
+  });
+
+  const scheduledAttentionJobs = scheduledAttentionCalendarRows.map((row) =>
+    mergeJobRow({ row, assignmentMap, latestEventByJob }),
+  );
+  const scheduledAttentionWindowJobs = scheduledAttentionJobs.filter((job) => {
+    const scheduledDate = String(job.scheduled_date ?? '').trim();
+    if (!scheduledDate) return false;
+    return scheduledDate >= context.dispatchAttentionWindowStart && scheduledDate <= context.dispatchAttentionWindowEnd;
+  });
+
+  const unscheduledActiveJobs = unscheduledActiveRows.map((row) =>
+    mergeJobRow({ row, assignmentMap, latestEventByJob }),
+  );
+
+  if (timingEnabled) {
+    console.log(JSON.stringify({
+      marker: 'calendar_timing_debug',
+      loader: 'secondary_queue',
+      view: normalizeTimingDebugView(params.view),
+      mode: context.mode,
+      tech_filter_type: params.techFilterType ?? 'all',
+      attention_range: {
+        start: context.dispatchAttentionWindowStart,
+        end: context.dispatchAttentionWindowEnd,
+      },
+      timings_ms: {
+        total_secondary_queue_ms: nowMs() - totalStartedAt,
+        ...timings,
+      },
+      counts: {
+        scoped_customer_count: context.scopedCustomerIds.length,
+        queue_attention_window_query_rows: validScheduledAttentionRows.length,
+        queue_unscheduled_query_rows: validUnscheduledRows.length,
+        queue_final_collected_job_count: queueJobIds.length,
+        queue_final_attention_count: scheduledAttentionWindowJobs.length,
+        queue_final_unscheduled_count: unscheduledActiveJobs.length,
+        queue_assignment_row_count: assignmentRowCount,
+        queue_event_row_count: eventRowCount,
+      },
+    }));
+  }
+
+  return {
+    scheduledAttentionWindowJobs,
+    unassignedScheduledJobs: unscheduledActiveJobs,
   };
 }
