@@ -4,6 +4,51 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Trust Lane / Deposits and Payout Reconciliation V1
 Scope: docs/model only. No product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, QBO behavior, production data, or customer-facing behavior is changed or authorized by this spec.
 
+## Phase C Closeout - Stripe Settlement Sync Helper
+
+Phase C added a dormant server-side helper:
+
+`lib/business/stripe-payment-settlements.ts`
+
+Test coverage:
+
+`lib/business/__tests__/stripe-payment-settlements.test.ts`
+
+Locked result:
+
+- Helper entrypoint is `syncStripePaymentSettlementForPayment`.
+- Helper is payment-row-driven for one known `internal_invoice_payments` row.
+- Helper fetches Stripe Charge, Balance Transaction, and optional Payout in tenant connected-account context using `stripeAccount`.
+- Helper upserts one `stripe_payment_settlements` row by `(stripe_connected_account_id, stripe_balance_transaction_id)`.
+- Helper records gross, Stripe fee, net, currency, availability date, reporting category, fee details, payout id/status/arrival date when available.
+- Helper sets `settlement_kind = payment` for successful charge settlement.
+- Helper does not infer or guess platform/application fee values; `platform_fee_cents` remains `0` unless a later phase adds reliable Stripe evidence.
+- Helper returns structured `synced`, `skipped`, or `failed` results with code, reason, settlement id, and platform-fee proof posture.
+- Helper safely skips manual/off-platform rows, missing charge ids, missing/not-ready connected accounts, and non-recorded payment statuses.
+- Helper failure is settlement-sync-only and does not change original payment truth.
+
+Non-wiring confirmation:
+
+- No UI route invokes this helper.
+- No report invokes this helper.
+- No cron/scheduled job invokes this helper.
+- No webhook invokes this helper.
+- No checkout/session/payment-link path invokes this helper.
+- No Payments Register path invokes this helper.
+- No invoice action invokes this helper.
+- No owner-facing behavior is exposed by this phase.
+- Stripe Dashboard remains fallback until later manual/internal sync, report, CSV, and smoke phases are complete.
+
+Source-of-truth preservation:
+
+- `internal_invoice_payments` remains gross payment event truth.
+- `internal_invoice_payment_allocations` remains payment-to-invoice allocation truth.
+- `stripe_payment_settlements` remains Stripe fee/net/payout settlement truth only.
+- Settlement sync does not mutate invoice paid/balance.
+- Settlement sync does not mutate payment rows.
+- Settlement sync does not mutate allocation rows.
+- Settlement rows do not count toward collected payment totals.
+
 ## Phase B Closeout - Stripe Payment Settlements Schema Foundation
 
 Phase B created dormant additive settlement schema foundation in migration:
