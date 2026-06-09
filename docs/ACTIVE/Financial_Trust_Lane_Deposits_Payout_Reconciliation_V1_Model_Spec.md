@@ -4,6 +4,31 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Trust Lane / Deposits and Payout Reconciliation V1
 Scope: docs/model only. No product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, QBO behavior, production data, or customer-facing behavior is changed or authorized by this spec.
 
+## Phase H-1A Note - Settlement Upsert Uniqueness Repair
+
+Sandbox Phase H-1 smoke found a settlement persistence blocker:
+
+- Dry-run correctly classified a known Stripe payment candidate as eligible.
+- Commit-mode sync failed with `settlement_upsert_failed` and a conflict-target inference error.
+- Root cause: helper upsert conflict target (`stripe_connected_account_id,stripe_balance_transaction_id`) could not be satisfied by the existing partial unique index posture.
+
+Repair migration added:
+
+`supabase/migrations/20260610123000_repair_stripe_payment_settlements_upsert_unique.sql`
+
+Repair intent:
+
+- Replace partial unique index `stripe_payment_settlements_balance_txn_unique` with a full unique index on `(stripe_connected_account_id, stripe_balance_transaction_id)`.
+- Preserve the intended uniqueness semantics while enabling PostgREST upsert conflict inference.
+- Keep no app INSERT/UPDATE/DELETE policy posture.
+- Keep settlement math unchanged.
+- Keep invoice/payment/allocation truth untouched.
+
+Operational boundary note:
+
+- No production apply is authorized in this note.
+- Phase H-1 sandbox smoke must be rerun after this repair migration is applied in sandbox.
+
 ## Phase G Closeout - Deposits CSV Exports
 
 Phase G added read-only bookkeeping CSV exports:

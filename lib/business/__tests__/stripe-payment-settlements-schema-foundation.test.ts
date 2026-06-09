@@ -9,7 +9,15 @@ const migrationPath = join(
   "20260610110000_stripe_payment_settlements_foundation.sql",
 );
 
+const repairMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "20260610123000_repair_stripe_payment_settlements_upsert_unique.sql",
+);
+
 const sql = readFileSync(migrationPath, "utf8");
+const repairSql = readFileSync(repairMigrationPath, "utf8");
 
 describe("stripe payment settlements schema foundation migration", () => {
   it("creates the dormant additive settlements table without mutating existing truth tables", () => {
@@ -134,5 +142,25 @@ describe("stripe payment settlements schema foundation migration", () => {
     expect(sql).not.toMatch(/\ballocation_status\b/i);
     expect(sql).not.toMatch(/\bqbo_/i);
     expect(sql).not.toMatch(/\bgeneral_ledger\b/i);
+  });
+});
+
+describe("stripe payment settlements upsert uniqueness repair migration", () => {
+  it("replaces the partial unique index with a full unique index for conflict inference", () => {
+    expect(repairSql).toContain("DROP INDEX IF EXISTS public.stripe_payment_settlements_balance_txn_unique");
+    expect(repairSql).toContain("CREATE UNIQUE INDEX IF NOT EXISTS stripe_payment_settlements_balance_txn_unique");
+    expect(repairSql).toContain(
+      "ON public.stripe_payment_settlements (stripe_connected_account_id, stripe_balance_transaction_id)",
+    );
+    expect(repairSql).not.toContain("WHERE stripe_balance_transaction_id IS NOT NULL");
+  });
+
+  it("remains repair-only and does not introduce truth-table mutation or write policies", () => {
+    expect(repairSql).not.toMatch(/ALTER\s+TABLE\s+public\.internal_invoice_payments/i);
+    expect(repairSql).not.toMatch(/ALTER\s+TABLE\s+public\.internal_invoice_payment_allocations/i);
+    expect(repairSql).not.toMatch(/ALTER\s+TABLE\s+public\.internal_invoices/i);
+    expect(repairSql).not.toMatch(/CREATE\s+POLICY\s+stripe_payment_settlements_.*insert/i);
+    expect(repairSql).not.toMatch(/CREATE\s+POLICY\s+stripe_payment_settlements_.*update/i);
+    expect(repairSql).not.toMatch(/CREATE\s+POLICY\s+stripe_payment_settlements_.*delete/i);
   });
 });
