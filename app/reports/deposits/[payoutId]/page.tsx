@@ -126,6 +126,12 @@ export default async function DepositDetailPage({
         <Link href="/reports/deposits" className={reportActionClass()}>
           Back to Deposits
         </Link>
+        <Link
+          href={`/reports/deposits/export/detail?payout_group_id=${encodeURIComponent(payoutGroupId)}`}
+          className={reportActionClass()}
+        >
+          Export Detail CSV
+        </Link>
       </div>
 
       <section className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">

@@ -50,10 +50,11 @@ describe("deposit detail page wiring", () => {
     expect(detailPageSource).toContain("needsReviewLabels");
   });
 
-  it("does not add sync, CSV/export, refund/dispute, payment, or Stripe API controls", () => {
+  it("allows read-only detail export without sync, refund/dispute, payment, or Stripe API controls", () => {
+    expect(detailPageSource).toContain("/reports/deposits/export/detail");
+    expect(detailPageSource).toContain("payout_group_id");
     expect(detailPageSource).not.toContain("syncStripePaymentSettlements");
     expect(detailPageSource).not.toContain("syncStripePaymentSettlementForPayment");
-    expect(detailPageSource).not.toMatch(/Export CSV|\/reports\/deposits\/export/i);
     expect(detailPageSource).not.toMatch(/<button[^>]*>(?:.|\n)*(Refund|Dispute|Record Payment|Correction)/i);
     expect(detailPageSource).not.toMatch(/href=.*(refund|dispute|record-payment|correction)/i);
     expect(detailPageSource).not.toMatch(/\bstripe\./);

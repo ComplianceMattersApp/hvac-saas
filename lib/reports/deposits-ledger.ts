@@ -107,6 +107,9 @@ type JobContextRow = {
 
 export type DepositDetailSettlementRow = {
   settlementId: string;
+  payoutId: string | null;
+  payoutStatus: string | null;
+  payoutArrivalDate: string | null;
   internalInvoicePaymentId: string | null;
   invoiceId: string | null;
   invoiceLabel: string;
@@ -116,15 +119,20 @@ export type DepositDetailSettlementRow = {
   jobTitle: string;
   grossCents: number;
   feesAndAdjustmentsCents: number;
+  stripeFeeCents: number;
+  platformFeeCents: number;
   netCents: number;
   currency: string;
   paymentDate: string | null;
   availableDate: string | null;
   chargeId: string | null;
   paymentIntentId: string | null;
+  checkoutSessionId: string | null;
   balanceTransactionId: string | null;
   settlementKind: string;
+  reportingCategory: string | null;
   syncStatus: string;
+  syncError: string | null;
   needsReview: boolean;
   needsReviewLabels: string[];
 };
@@ -148,6 +156,12 @@ export type GetDepositDetailLedgerParams = {
   accountOwnerUserId: string;
   payoutGroupId: string;
 };
+
+export type GetDepositDetailExportRowsParams = {
+  supabase: any;
+  accountOwnerUserId: string;
+  payoutGroupId?: string | null;
+} & DepositsLedgerFilters;
 
 function clean(value: unknown) {
   return String(value ?? "").trim();
@@ -245,6 +259,14 @@ function feesAndAdjustmentsForRow(row: StripePaymentSettlementRow) {
   // Non-payment settlement rows are already settlement truth. Negative net
   // amounts reduce deposits, positive net amounts increase them.
   return storedFees - cents(row.net_amount_cents);
+}
+
+function stripeFeeForRow(row: StripePaymentSettlementRow) {
+  return isIncludedInSettlementMath(row) ? cents(row.stripe_fee_cents) : 0;
+}
+
+function platformFeeForRow(row: StripePaymentSettlementRow) {
+  return isIncludedInSettlementMath(row) ? cents(row.platform_fee_cents) : 0;
 }
 
 function grossForRow(row: StripePaymentSettlementRow) {
@@ -531,6 +553,9 @@ function buildDetailRows(params: {
 
     return {
       settlementId: clean(row.id),
+      payoutId: clean(row.stripe_payout_id) || null,
+      payoutStatus: clean(row.payout_status) || null,
+      payoutArrivalDate: dateKey(row.payout_arrival_date),
       internalInvoicePaymentId: paymentId,
       invoiceId,
       invoiceLabel: displayInvoice(invoice, invoiceId),
@@ -540,31 +565,32 @@ function buildDetailRows(params: {
       jobTitle: clean(job?.title) || "No local payment link",
       grossCents: grossForRow(row),
       feesAndAdjustmentsCents: feesAndAdjustmentsForRow(row),
+      stripeFeeCents: stripeFeeForRow(row),
+      platformFeeCents: platformFeeForRow(row),
       netCents: netForRow(row),
       currency: normalizeCurrency(row.currency),
       paymentDate: dateKey(payment?.paid_at) ?? null,
       availableDate: dateKey(row.available_on),
       chargeId: clean(row.stripe_charge_id) || null,
       paymentIntentId: clean(row.stripe_payment_intent_id) || null,
+      checkoutSessionId: clean(row.stripe_checkout_session_id) || null,
       balanceTransactionId: clean(row.stripe_balance_transaction_id) || null,
       settlementKind: normalizeSettlementKind(row.settlement_kind),
+      reportingCategory: clean(row.reporting_category) || null,
       syncStatus: normalizeSyncStatus(row.sync_status),
+      syncError: clean(row.sync_error) || null,
       needsReview: isNeedsReview(row),
       needsReviewLabels: buildNeedsReviewLabels(row),
     };
   });
 }
 
-export async function getDepositDetailLedger(
-  params: GetDepositDetailLedgerParams,
-): Promise<DepositDetailLedgerViewModel> {
-  const accountOwnerUserId = clean(params.accountOwnerUserId);
-  if (!accountOwnerUserId) throw new Error("accountOwnerUserId is required.");
-
-  const canonicalGroup = canonicalGroupId(params.payoutGroupId);
-  if (!canonicalGroup) throw new Error("payoutGroupId is required.");
-
-  const { data, error } = await params.supabase
+async function loadSettlementRows(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  filters?: DepositsLedgerFilters;
+}) {
+  let query = params.supabase
     .from("stripe_payment_settlements")
     .select(
       [
@@ -590,12 +616,60 @@ export async function getDepositDetailLedger(
         "sync_error",
       ].join(", "),
     )
-    .eq("account_owner_user_id", accountOwnerUserId)
-    .order("available_on", { ascending: false, nullsFirst: false });
+    .eq("account_owner_user_id", params.accountOwnerUserId);
 
+  const filters = params.filters ?? {};
+  const payoutStatus = normalizePayoutStatus(filters.payoutStatus);
+  if (payoutStatus) query = query.eq("payout_status", payoutStatus);
+
+  const syncStatus = normalizeSyncStatus(filters.syncStatus);
+  if (clean(filters.syncStatus)) query = query.eq("sync_status", syncStatus);
+
+  const { data, error } = await query.order("payout_arrival_date", { ascending: false, nullsFirst: false });
   if (error) throw error;
 
-  const settlementRows = ((data ?? []) as StripePaymentSettlementRow[]).filter((row) => matchesDepositGroup(row, canonicalGroup));
+  return ((data ?? []) as StripePaymentSettlementRow[]).filter((row) => inDateRange(row, filters));
+}
+
+export async function getDepositDetailExportRows(
+  params: GetDepositDetailExportRowsParams,
+): Promise<DepositDetailSettlementRow[]> {
+  const accountOwnerUserId = clean(params.accountOwnerUserId);
+  if (!accountOwnerUserId) throw new Error("accountOwnerUserId is required.");
+
+  let settlementRows = await loadSettlementRows({
+    supabase: params.supabase,
+    accountOwnerUserId,
+    filters: params,
+  });
+
+  const group = clean(params.payoutGroupId);
+  if (group) {
+    const canonicalGroup = canonicalGroupId(group);
+    settlementRows = settlementRows.filter((row) => matchesDepositGroup(row, canonicalGroup));
+  }
+
+  const contexts = await loadLocalDepositContexts({
+    supabase: params.supabase,
+    paymentIds: settlementRows.map((row) => clean(row.internal_invoice_payment_id)).filter(Boolean),
+  });
+
+  return buildDetailRows({ settlementRows, contexts });
+}
+
+export async function getDepositDetailLedger(
+  params: GetDepositDetailLedgerParams,
+): Promise<DepositDetailLedgerViewModel> {
+  const accountOwnerUserId = clean(params.accountOwnerUserId);
+  if (!accountOwnerUserId) throw new Error("accountOwnerUserId is required.");
+
+  const canonicalGroup = canonicalGroupId(params.payoutGroupId);
+  if (!canonicalGroup) throw new Error("payoutGroupId is required.");
+
+  const settlementRows = (await loadSettlementRows({
+    supabase: params.supabase,
+    accountOwnerUserId,
+  })).filter((row) => matchesDepositGroup(row, canonicalGroup));
   const group = buildGroupRow(canonicalGroup, settlementRows);
 
   if (settlementRows.length === 0) {
@@ -634,6 +708,143 @@ export async function getDepositDetailLedger(
     warnings: view.warnings,
     found: true,
   };
+}
+
+function csvEscape(value: string) {
+  if (/[",\r\n]/.test(value)) {
+    return `"${value.replace(/"/g, '""')}"`;
+  }
+  return value;
+}
+
+function csvMoney(value: number) {
+  return ((Number(value ?? 0) || 0) / 100).toFixed(2);
+}
+
+function csvBool(value: boolean) {
+  return value ? "Yes" : "No";
+}
+
+function csvDate(value: string | null | undefined) {
+  return clean(value);
+}
+
+function csvLine(values: Array<string | number | boolean | null | undefined>) {
+  return values.map((value) => csvEscape(String(value ?? ""))).join(",");
+}
+
+export function buildDepositsSummaryCsv(rows: DepositsLedgerPayoutRow[]) {
+  const header = [
+    "Payout ID",
+    "Payout Label",
+    "Payout Status",
+    "Payout Arrival Date",
+    "Available Date / Date Range",
+    "Gross Collected",
+    "Fees & Adjustments",
+    "Net Deposit",
+    "Currency",
+    "Payment Count",
+    "Unmatched Count",
+    "Failed Sync Count",
+    "Pending Sync Count",
+    "Needs Review",
+    "Sync Status Summary",
+  ];
+
+  const lines = rows.map((row) => {
+    const availableFrom = csvDate(row.availableDateFrom);
+    const availableTo = csvDate(row.availableDateTo);
+    const availableRange = availableFrom && availableTo && availableFrom !== availableTo
+      ? `${availableFrom} - ${availableTo}`
+      : availableFrom || availableTo;
+    const syncSummary = Object.entries(row.syncStatusSummary)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([status, count]) => `${status}:${count}`)
+      .join(" | ");
+
+    return csvLine([
+      row.payoutId,
+      row.payoutLabel,
+      row.payoutStatus,
+      row.payoutArrivalDate,
+      availableRange,
+      csvMoney(row.grossCollectedCents),
+      csvMoney(row.feesAndAdjustmentsCents),
+      csvMoney(row.netDepositsCents),
+      row.currency,
+      row.paymentCount,
+      row.unmatchedCount,
+      row.failedSyncCount,
+      row.pendingSyncCount,
+      csvBool(row.needsReview),
+      syncSummary,
+    ]);
+  });
+
+  return [csvLine(header), ...lines].join("\r\n");
+}
+
+export function buildDepositsDetailCsv(rows: DepositDetailSettlementRow[]) {
+  const header = [
+    "Payout ID",
+    "Payout Status",
+    "Payout Arrival Date",
+    "Available Date",
+    "Payment ID",
+    "Invoice Number",
+    "Customer",
+    "Job Reference",
+    "Job Title",
+    "Gross Amount",
+    "Fees & Adjustments",
+    "Stripe Fee",
+    "Platform/Application Fee",
+    "Net Amount",
+    "Currency",
+    "Settlement Kind",
+    "Reporting Category",
+    "Charge ID",
+    "Payment Intent ID",
+    "Checkout Session ID",
+    "Balance Transaction ID",
+    "Notes / Reference",
+    "Unmatched Marker",
+    "Sync Status",
+    "Sync Error",
+  ];
+
+  const lines = rows.map((row) =>
+    csvLine([
+      row.payoutId,
+      row.payoutStatus,
+      row.payoutArrivalDate,
+      row.availableDate,
+      row.internalInvoicePaymentId,
+      row.invoiceLabel,
+      row.customerName,
+      row.jobReference,
+      row.jobTitle,
+      csvMoney(row.grossCents),
+      csvMoney(row.feesAndAdjustmentsCents),
+      csvMoney(row.stripeFeeCents),
+      csvMoney(row.platformFeeCents),
+      csvMoney(row.netCents),
+      row.currency,
+      row.settlementKind,
+      row.reportingCategory,
+      row.chargeId,
+      row.paymentIntentId,
+      row.checkoutSessionId,
+      row.balanceTransactionId,
+      row.needsReviewLabels.join(" | "),
+      csvBool(row.needsReview),
+      row.syncStatus,
+      row.syncError,
+    ]),
+  );
+
+  return [csvLine(header), ...lines].join("\r\n");
 }
 
 export async function getDepositsLedgerSummary(

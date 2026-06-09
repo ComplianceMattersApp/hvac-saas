@@ -64,6 +64,20 @@ function normalizeOption<T extends ReadonlyArray<{ value: string }>>(value: unkn
   return options.some((option) => option.value === normalized) ? normalized : "";
 }
 
+function buildExportSearch(filters: {
+  dateFrom: string;
+  dateTo: string;
+  payoutStatus: string;
+  syncStatus: string;
+}) {
+  const params = new URLSearchParams();
+  if (filters.dateFrom) params.set("from", filters.dateFrom);
+  if (filters.dateTo) params.set("to", filters.dateTo);
+  if (filters.payoutStatus) params.set("payout_status", filters.payoutStatus);
+  if (filters.syncStatus) params.set("sync_status", filters.syncStatus);
+  return params.toString();
+}
+
 function formatUsdCents(value: number) {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -166,6 +180,8 @@ export default async function DepositsReportPage({
   const hasRows = depositsLedger.rows.length > 0;
   const summary = depositsLedger.summary;
   const totalsAreMixed = summary.hasMultipleCurrencies;
+  const exportSearch = buildExportSearch(filters);
+  const exportSuffix = exportSearch ? `?${exportSearch}` : "";
 
   return (
     <div className={reportPageClass}>
@@ -230,6 +246,12 @@ export default async function DepositsReportPage({
             </button>
             <Link href="/reports/deposits" className={reportActionClass()}>
               Reset
+            </Link>
+            <Link href={`/reports/deposits/export/summary${exportSuffix}`} className={reportActionClass()}>
+              Export Summary CSV
+            </Link>
+            <Link href={`/reports/deposits/export/detail${exportSuffix}`} className={reportActionClass()}>
+              Export Detail CSV
             </Link>
           </div>
         </form>

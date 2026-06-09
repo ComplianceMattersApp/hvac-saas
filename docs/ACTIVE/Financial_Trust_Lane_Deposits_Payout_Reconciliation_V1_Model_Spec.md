@@ -4,6 +4,62 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Trust Lane / Deposits and Payout Reconciliation V1
 Scope: docs/model only. No product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, QBO behavior, production data, or customer-facing behavior is changed or authorized by this spec.
 
+## Phase G Closeout - Deposits CSV Exports
+
+Phase G added read-only bookkeeping CSV exports:
+
+`app/reports/deposits/export/summary/route.ts`
+
+`app/reports/deposits/export/detail/route.ts`
+
+Read model and CSV builder support remains in:
+
+`lib/reports/deposits-ledger.ts`
+
+Focused tests:
+
+- `lib/reports/__tests__/deposits-export.test.ts`
+- `lib/reports/__tests__/deposits-ledger.test.ts`
+- `lib/reports/__tests__/deposits-page-wiring.test.ts`
+- `lib/reports/__tests__/deposit-detail-page-wiring.test.ts`
+
+Locked result:
+
+- Summary CSV route is `/reports/deposits/export/summary`.
+- Detail CSV route is `/reports/deposits/export/detail`.
+- `/reports/deposits` exposes read-only summary and detail export links that preserve date, payout status, and sync status filters.
+- Deposit detail exposes a read-only detail export link scoped by `payout_group_id`.
+- Export responses are `text/csv`, `no-store`, and use stable date-stamped filenames.
+- Export access uses existing financial export authority posture.
+- Structural Owner, Admin, and Billing are allowed.
+- Dispatcher, technician, contractor/portal users, inactive internal users, and unauthenticated users are blocked.
+- Summary CSV includes payout id, payout label, payout status, payout arrival date, available date/date range, gross collected, fees and adjustments, net deposit, currency, payment count, unmatched count, failed sync count, pending sync count, needs-review marker, and sync status summary.
+- Detail CSV includes payout id/status/arrival date, available date, payment id, invoice number, customer, job reference/title, gross amount, fees and adjustments, Stripe fee, platform/application fee, net amount, currency, settlement kind, reporting category, charge id, payment intent id, checkout session id, balance transaction id, notes/reference, unmatched marker, sync status, and sync error.
+- Unmatched rows remain included and marked.
+- Mixed-currency output preserves row currency and flags mixed groups conservatively.
+- Fees & Adjustments total is included.
+- Stripe fee and platform/application fee remain separate detail fields.
+- Platform/application fees are not guessed.
+- Stripe Dashboard fallback remains visible until full smoke confirms report/export parity.
+
+Non-wiring confirmation:
+
+- No sync button/control is added.
+- No manual/internal sync UI is added.
+- No Stripe API calls are added.
+- No settlement sync helper is invoked.
+- No cron/scheduled job is added.
+- No webhook invokes export routes/read models.
+- No checkout/session/payment-link behavior changes.
+- No Payments Register behavior changes.
+- No invoice action behavior changes.
+- No invoice paid/balance mutation is added.
+- No payment row mutation is added.
+- No allocation row mutation is added.
+- No QBO/general-ledger behavior is added.
+- No refund/dispute/payment/correction action is added.
+- No main nav/sidebar/report-center link is added beyond the already scoped `/reports/deposits` and deposit detail surfaces.
+
 ## Phase F Closeout - Deposit Detail Read-Only Drilldown
 
 Phase F added a read-only deposit/payout detail route:

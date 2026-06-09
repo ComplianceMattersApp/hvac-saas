@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
-import fs from "fs";
-import path from "path";
 import {
+  buildDepositsDetailCsv,
   buildDepositsLedgerViewModel,
+  buildDepositsSummaryCsv,
   depositDetailHrefForGroup,
+  getDepositDetailExportRows,
   getDepositDetailLedger,
   getDepositsLedgerSummary,
 } from "@/lib/reports/deposits-ledger";
@@ -329,14 +330,116 @@ describe("deposits ledger read model", () => {
     expect(view.warnings[0]).toMatch(/Multiple currencies/);
   });
 
-  it("does not add CSV, export, or sync wiring", () => {
-    const reportSource = fs.readFileSync(
-      path.join(process.cwd(), "lib/reports/deposits-ledger.ts"),
-      "utf8",
-    );
+  it("builds bookkeeping summary CSV with stable headers, escaping, and mixed-currency markers", () => {
+    const view = buildDepositsLedgerViewModel([
+      settlement({
+        stripe_payout_id: "po_1",
+        payout_status: "paid",
+        gross_amount_cents: 50000,
+        stripe_fee_cents: 1500,
+        platform_fee_cents: 500,
+        net_amount_cents: 48000,
+      }),
+      settlement({
+        id: "set_2",
+        stripe_payout_id: "po_1",
+        payout_status: "paid",
+        currency: "cad",
+        gross_amount_cents: 10000,
+        stripe_fee_cents: 300,
+        platform_fee_cents: 0,
+        net_amount_cents: 9700,
+      }),
+      settlement({
+        id: "set_unmatched",
+        stripe_payout_id: null,
+        payout_status: "pending",
+        internal_invoice_payment_id: null,
+        settlement_kind: "unmatched",
+        sync_status: "unmatched",
+      }),
+    ]);
 
-    expect(reportSource).not.toMatch(/csv|export\s+route|revalidatePath|redirect\(/i);
-    expect(fs.existsSync(path.join(process.cwd(), "app/reports/deposits/export"))).toBe(false);
+    const csv = buildDepositsSummaryCsv(view.rows);
+
+    expect(csv.split("\r\n")[0]).toBe(
+      "Payout ID,Payout Label,Payout Status,Payout Arrival Date,Available Date / Date Range,Gross Collected,Fees & Adjustments,Net Deposit,Currency,Payment Count,Unmatched Count,Failed Sync Count,Pending Sync Count,Needs Review,Sync Status Summary",
+    );
+    expect(csv).toContain("po_1,po_1,paid,2026-06-12T00:00:00.000Z,2026-06-11T00:00:00.000Z,600.00,23.00,577.00,mixed,2,0,0,0,Yes,synced:2");
+    expect(csv).toContain(",Unmatched / Needs Review,pending,2026-06-12T00:00:00.000Z,2026-06-11T00:00:00.000Z,0.00,0.00,0.00,usd,0,1,0,0,Yes,unmatched:1");
+  });
+
+  it("builds bookkeeping detail CSV with Stripe identifiers, fee breakdown, unmatched markers, and escaping", () => {
+    const csv = buildDepositsDetailCsv([
+      {
+        settlementId: "set_1",
+        payoutId: "po_1",
+        payoutStatus: "paid",
+        payoutArrivalDate: "2026-06-12T00:00:00.000Z",
+        internalInvoicePaymentId: "pay-1",
+        invoiceId: "inv-1",
+        invoiceLabel: 'INV-1001, "Quoted"',
+        customerName: "Ada\nCustomer",
+        jobId: "job-1",
+        jobReference: "JOB-55",
+        jobTitle: "Heat pump test",
+        grossCents: 50000,
+        feesAndAdjustmentsCents: 2000,
+        stripeFeeCents: 1500,
+        platformFeeCents: 500,
+        netCents: 48000,
+        currency: "usd",
+        paymentDate: "2026-06-10T00:00:00.000Z",
+        availableDate: "2026-06-11T00:00:00.000Z",
+        chargeId: "ch_123",
+        paymentIntentId: "pi_123",
+        checkoutSessionId: "cs_123",
+        balanceTransactionId: "txn_1",
+        settlementKind: "payment",
+        reportingCategory: "charge",
+        syncStatus: "synced",
+        syncError: null,
+        needsReview: false,
+        needsReviewLabels: [],
+      },
+      {
+        settlementId: "set_unmatched",
+        payoutId: null,
+        payoutStatus: "pending",
+        payoutArrivalDate: null,
+        internalInvoicePaymentId: null,
+        invoiceId: null,
+        invoiceLabel: "Unmatched Stripe item",
+        customerName: "No local payment link",
+        jobId: null,
+        jobReference: "No local payment link",
+        jobTitle: "No local payment link",
+        grossCents: 0,
+        feesAndAdjustmentsCents: 0,
+        stripeFeeCents: 0,
+        platformFeeCents: 0,
+        netCents: 0,
+        currency: "usd",
+        paymentDate: null,
+        availableDate: "2026-06-11T00:00:00.000Z",
+        chargeId: null,
+        paymentIntentId: null,
+        checkoutSessionId: null,
+        balanceTransactionId: null,
+        settlementKind: "unmatched",
+        reportingCategory: null,
+        syncStatus: "unmatched",
+        syncError: "missing local payment",
+        needsReview: true,
+        needsReviewLabels: ["Needs Review", "Unmatched"],
+      },
+    ]);
+
+    expect(csv.split("\r\n")[0]).toBe(
+      "Payout ID,Payout Status,Payout Arrival Date,Available Date,Payment ID,Invoice Number,Customer,Job Reference,Job Title,Gross Amount,Fees & Adjustments,Stripe Fee,Platform/Application Fee,Net Amount,Currency,Settlement Kind,Reporting Category,Charge ID,Payment Intent ID,Checkout Session ID,Balance Transaction ID,Notes / Reference,Unmatched Marker,Sync Status,Sync Error",
+    );
+    expect(csv).toContain('pay-1,"INV-1001, ""Quoted""","Ada\nCustomer",JOB-55,Heat pump test,500.00,20.00,15.00,5.00,480.00,usd,payment,charge,ch_123,pi_123,cs_123,txn_1,,No,synced,');
+    expect(csv).toContain("Unmatched Stripe item,No local payment link,No local payment link,No local payment link,0.00,0.00,0.00,0.00,0.00,usd,unmatched,,,,,,Needs Review | Unmatched,Yes,unmatched,missing local payment");
   });
 
   it("builds stable detail links for real and synthetic payout groups", () => {
@@ -417,6 +520,59 @@ describe("deposits ledger read model", () => {
     expect(detail.rows[0]?.customerName).toBe("No local payment link");
     expect(detail.rows[0]?.needsReview).toBe(true);
     expect(detail.rows[0]?.needsReviewLabels).toEqual(expect.arrayContaining(["Needs Review", "Unmatched"]));
+  });
+
+  it("detail export preserves filters, optional payout group, and stored fee breakdown without guessing platform fees", async () => {
+    const ctx = makeDepositDetailSupabase({
+      stripe_payment_settlements: [
+        settlement({
+          id: "included",
+          stripe_payout_id: "po_1",
+          payout_status: "paid",
+          sync_status: "synced",
+          platform_fee_cents: null,
+        }),
+        settlement({
+          id: "other_payout",
+          stripe_payout_id: "po_2",
+          payout_status: "paid",
+          sync_status: "synced",
+        }),
+        settlement({
+          id: "failed",
+          stripe_payout_id: "po_1",
+          payout_status: "paid",
+          sync_status: "failed",
+        }),
+      ],
+      internal_invoice_payments: [{ id: "pay-1", invoice_id: "inv-1", job_id: "job-1", paid_at: "2026-06-10T00:00:00.000Z" }],
+      internal_invoices: [{ id: "inv-1", invoice_display_number: "INV-1001", invoice_number: "1001", customer_id: "cust-1" }],
+      customers: [{ id: "cust-1", full_name: "Ada Customer", first_name: null, last_name: null }],
+      jobs: [{ id: "job-1", job_display_number: "JOB-55", title: "Heat pump test" }],
+    });
+
+    const rows = await getDepositDetailExportRows({
+      supabase: ctx.client,
+      accountOwnerUserId: "owner-1",
+      payoutGroupId: "po_1",
+      payoutStatus: "paid",
+      syncStatus: "synced",
+    });
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toEqual(expect.objectContaining({
+      payoutId: "po_1",
+      invoiceLabel: "INV-1001",
+      stripeFeeCents: 1500,
+      platformFeeCents: 0,
+      feesAndAdjustmentsCents: 1500,
+      syncStatus: "synced",
+    }));
+    expect(ctx.calls).toEqual(expect.arrayContaining([
+      expect.objectContaining({ table: "stripe_payment_settlements", op: "eq:account_owner_user_id", payload: "owner-1" }),
+      expect.objectContaining({ table: "stripe_payment_settlements", op: "eq:payout_status", payload: "paid" }),
+      expect.objectContaining({ table: "stripe_payment_settlements", op: "eq:sync_status", payload: "synced" }),
+    ]));
   });
 
   it("missing local context does not hide the settlement row", async () => {
