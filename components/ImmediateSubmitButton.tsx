@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import { useEffect, useState, type ButtonHTMLAttributes, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 
 type ImmediateSubmitButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
@@ -20,6 +20,16 @@ export default function ImmediateSubmitButton({
   const [submitted, setSubmitted] = useState(false);
   const isPending = pending || submitted;
   const isDisabled = isPending || Boolean(disabled);
+
+  useEffect(() => {
+    if (!submitted || pending) return;
+
+    const timeout = window.setTimeout(() => {
+      setSubmitted(false);
+    }, 1500);
+
+    return () => window.clearTimeout(timeout);
+  }, [pending, submitted]);
 
   return (
     <button

@@ -64,6 +64,7 @@ vi.mock("@/lib/maintenance-agreements/agreement-actions", () => ({
 
 type FixtureConfig = {
   updatedDataEntryCompletedAt?: string;
+  jobEventInsertError?: Error;
 };
 
 function makeServiceCloseoutSupabaseFixture(config: FixtureConfig = {}) {
@@ -99,7 +100,7 @@ function makeServiceCloseoutSupabaseFixture(config: FixtureConfig = {}) {
         return {
           insert: vi.fn(async (payload: Record<string, unknown>) => {
             jobEvents.push(payload);
-            return { error: null };
+            return { error: config.jobEventInsertError ?? null };
           }),
         };
       }
@@ -182,6 +183,59 @@ describe("markInvoiceSent - canonical external billing completion contract", () 
         actingUserId: "internal-user-1",
       }),
     );
+  });
+
+  it("still redirects after service completion when event logging fails", async () => {
+    const fixture = makeServiceCloseoutSupabaseFixture({
+      jobEventInsertError: new Error("timeline insert failed"),
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({
+      id: "job-1",
+      job_type: "service",
+      ops_status: "scheduled",
+      status: "in_process",
+      field_complete: false,
+      service_case_id: "case-1",
+      service_visit_outcome: null,
+    });
+
+    const { markServiceComplete } = await import("@/lib/actions/service-actions");
+
+    await expect(markServiceComplete("job-1")).rejects.toThrow("banner=service_closeout_saved");
+
+    expect(fixture.jobUpdates).toHaveLength(1);
+    expect(fixture.jobUpdates[0]).toEqual(
+      expect.objectContaining({
+        status: "completed",
+        field_complete: true,
+        ops_status: "invoice_required",
+      }),
+    );
+  });
+
+  it("still redirects after service completion when service-case reconciliation fails", async () => {
+    const fixture = makeServiceCloseoutSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+    reconcileServiceCaseStatusAfterJobChangeMock.mockRejectedValueOnce(
+      new Error("reconciliation failed"),
+    );
+    loadScopedInternalJobForMutationMock.mockResolvedValue({
+      id: "job-1",
+      job_type: "service",
+      ops_status: "scheduled",
+      status: "in_process",
+      field_complete: false,
+      service_case_id: "case-1",
+      service_visit_outcome: null,
+    });
+
+    const { markServiceComplete } = await import("@/lib/actions/service-actions");
+
+    await expect(markServiceComplete("job-1")).rejects.toThrow("banner=service_closeout_saved");
+
+    expect(fixture.jobUpdates).toHaveLength(1);
+    expect(fixture.jobEvents.length).toBeGreaterThan(0);
   });
 
   it("marks external billing complete, keeps closeout projection flow, and logs canonical event copy", async () => {

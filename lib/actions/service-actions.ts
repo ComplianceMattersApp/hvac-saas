@@ -189,17 +189,24 @@ export async function markServiceComplete(jobIdOrFormData: string | FormData, re
     });
   }
 
-  await reconcileServiceCaseStatusAfterJobChange({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-    serviceCaseId: job.service_case_id,
-    triggerJobId: jobId,
-    resolutionSummary:
-      String(job.service_visit_outcome ?? "").trim().toLowerCase() === "resolved"
-        ? "Service visit marked resolved"
-        : null,
-    source: "mark_service_complete",
-  });
+  try {
+    await reconcileServiceCaseStatusAfterJobChange({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      serviceCaseId: job.service_case_id,
+      triggerJobId: jobId,
+      resolutionSummary:
+        String(job.service_visit_outcome ?? "").trim().toLowerCase() === "resolved"
+          ? "Service visit marked resolved"
+          : null,
+      source: "mark_service_complete",
+    });
+  } catch (error) {
+    console.error("[SERVICE_CLOSEOUT_RECONCILIATION_BEST_EFFORT_FAILED]", {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   const eventMeta = buildMovementEventMeta({
     from: beforeStatus,
@@ -208,32 +215,42 @@ export async function markServiceComplete(jobIdOrFormData: string | FormData, re
     sourceAction: "mark_service_complete",
   });
 
-  // Emit job_completed only if not already completed
-  if (beforeStatus !== "completed") {
-    await supabase.from("job_events").insert({
+  try {
+    // Emit job_completed only if not already completed
+    if (beforeStatus !== "completed") {
+      const { error: completedEventErr } = await supabase.from("job_events").insert({
+        job_id: jobId,
+        event_type: "job_completed",
+        meta: { ...eventMeta, actor_user_id: actingUserId },
+        user_id: actingUserId,
+      });
+      if (completedEventErr) throw new Error(completedEventErr.message);
+    }
+
+    // Emit ops_update for the service closeout transition
+    const { error: opsEventErr } = await supabase.from("job_events").insert({
       job_id: jobId,
-      event_type: "job_completed",
-      meta: { ...eventMeta, actor_user_id: actingUserId },
+      event_type: "ops_update",
+      message: "Service work marked complete - invoice required",
+      meta: {
+        changes: [
+          { field: "status", from: beforeStatus, to: "completed" },
+          { field: "field_complete", from: beforeFieldComplete, to: true },
+          { field: "ops_status", from: beforeOps, to: "invoice_required" },
+        ],
+        source: "service_closeout_action",
+        actor_user_id: actingUserId,
+      },
       user_id: actingUserId,
     });
-  }
 
-  // Emit ops_update for the service closeout transition
-  await supabase.from("job_events").insert({
-    job_id: jobId,
-    event_type: "ops_update",
-    message: "Service work marked complete — invoice required",
-    meta: {
-      changes: [
-        { field: "status", from: beforeStatus, to: "completed" },
-        { field: "field_complete", from: beforeFieldComplete, to: true },
-        { field: "ops_status", from: beforeOps, to: "invoice_required" },
-      ],
-      source: "service_closeout_action",
-      actor_user_id: actingUserId,
-    },
-    user_id: actingUserId,
-  });
+    if (opsEventErr) throw new Error(opsEventErr.message);
+  } catch (error) {
+    console.error("[SERVICE_CLOSEOUT_EVENT_BEST_EFFORT_FAILED]", {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
@@ -325,29 +342,43 @@ export async function markInvoiceSent(jobIdOrFormData: string | FormData, return
   }
 
   if (changeSet.length > 0) {
-    const { error: eventErr } = await supabase.from("job_events").insert({
-      job_id: jobId,
-      event_type: "ops_update",
-      message: "External billing marked complete",
-      meta: {
-        changes: changeSet,
-        source: "service_invoice_sent_action",
-        actor_user_id: actingUserId,
-      },
-      user_id: actingUserId,
-    });
+    try {
+      const { error: eventErr } = await supabase.from("job_events").insert({
+        job_id: jobId,
+        event_type: "ops_update",
+        message: "External billing marked complete",
+        meta: {
+          changes: changeSet,
+          source: "service_invoice_sent_action",
+          actor_user_id: actingUserId,
+        },
+        user_id: actingUserId,
+      });
 
-    if (eventErr) throw new Error(eventErr.message);
+      if (eventErr) throw new Error(eventErr.message);
+    } catch (error) {
+      console.error("[SERVICE_INVOICE_EVENT_BEST_EFFORT_FAILED]", {
+        jobId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   if (job.job_type === "service") {
-    await reconcileServiceCaseStatusAfterJobChange({
-      supabase,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-      serviceCaseId: job.service_case_id,
-      triggerJobId: jobId,
-      source: "mark_invoice_sent",
-    });
+    try {
+      await reconcileServiceCaseStatusAfterJobChange({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        serviceCaseId: job.service_case_id,
+        triggerJobId: jobId,
+        source: "mark_invoice_sent",
+      });
+    } catch (error) {
+      console.error("[SERVICE_INVOICE_RECONCILIATION_BEST_EFFORT_FAILED]", {
+        jobId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   }
 
   revalidatePath(`/jobs/${jobId}`);
