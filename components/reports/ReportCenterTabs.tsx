@@ -13,12 +13,13 @@ type Props = {
     | "deposits"
     | "failed-payments"
     | "payment-reconciliation";
+  showDeposits?: boolean;
 };
 
 const baseClass =
   "inline-flex items-center rounded-xl border px-3.5 py-2 text-sm font-semibold transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
 
-export default function ReportCenterTabs({ current }: Props) {
+export default function ReportCenterTabs({ current, showDeposits = false }: Props) {
   return (
     <div className="flex flex-wrap gap-2 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-1.5 shadow-[0_14px_28px_-30px_rgba(15,23,42,0.3)]">
       <Link
@@ -91,18 +92,20 @@ export default function ReportCenterTabs({ current }: Props) {
       >
         Payments Register
       </Link>
-      <Link
-        href="/reports/deposits"
-        title="Review Stripe settlement fees, net deposits, payout timing, and CSV exports."
-        aria-label="Deposits - Review Stripe settlement fees, net deposits, payout timing, and CSV exports."
-        className={`${baseClass} ${
-          current === "deposits"
-            ? "border-slate-900 bg-slate-900 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.45)]"
-            : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900"
-        }`}
-      >
-        Deposits
-      </Link>
+      {showDeposits ? (
+        <Link
+          href="/reports/deposits"
+          title="Review Stripe fees, net deposits, payout timing, and CSV exports."
+          aria-label="Deposits - Review Stripe fees, net deposits, payout timing, and CSV exports."
+          className={`${baseClass} ${
+            current === "deposits"
+              ? "border-slate-900 bg-slate-900 text-white shadow-[0_10px_20px_-16px_rgba(15,23,42,0.45)]"
+              : "border-transparent bg-transparent text-slate-600 hover:border-slate-200 hover:bg-white hover:text-slate-900"
+          }`}
+        >
+          Deposits
+        </Link>
+      ) : null}
       <Link
         href="/reports/payment-reconciliation"
         className={`${baseClass} ${

@@ -13,7 +13,7 @@ describe("deposit detail page wiring", () => {
     expect(detailPageSource).toContain("requireFinancialRegisterAccessOrRedirect");
     expect(detailPageSource).toContain('redirect("/login")');
     expect(detailPageSource).toContain('redirect("/portal")');
-    expect(detailPageSource).toContain('redirectTo: "/reports/invoices?banner=not_authorized"');
+    expect(detailPageSource).toContain('redirectTo: "/reports/dashboard?banner=not_authorized"');
   });
 
   it("calls the detail read model with account scope and decoded payout group id", () => {

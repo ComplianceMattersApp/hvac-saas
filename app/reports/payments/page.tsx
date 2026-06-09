@@ -139,7 +139,7 @@ export default async function PaymentsRegisterPage({
         truthNote="Current source of truth is internal_invoice_payments. This slice is read-only and does not add payment mutations or allocation behavior."
       />
 
-      <ReportCenterTabs current="payments" />
+      <ReportCenterTabs current="payments" showDeposits />
 
       <section className="rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-600">
         Payments Register shows collected payment truth. Confirm Payment shows reported payments awaiting verification. Failed Payments shows failed attempts needing review.

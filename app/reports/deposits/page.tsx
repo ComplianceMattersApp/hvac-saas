@@ -152,7 +152,7 @@ export default async function DepositsReportPage({
     actorUserId: user.id,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
-    redirectTo: "/reports/invoices?banner=not_authorized",
+    redirectTo: "/reports/dashboard?banner=not_authorized",
   });
 
   const resolvedSearchParams = (searchParams ? await searchParams : {}) ?? {};
@@ -186,7 +186,7 @@ export default async function DepositsReportPage({
 
   return (
     <div className={reportPageClass}>
-      <ReportCenterTabs current="deposits" />
+      <ReportCenterTabs current="deposits" showDeposits />
 
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}

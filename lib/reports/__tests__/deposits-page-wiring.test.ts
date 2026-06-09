@@ -13,7 +13,7 @@ describe("deposits report page wiring", () => {
     expect(depositsPageSource).toContain("requireFinancialRegisterAccessOrRedirect");
     expect(depositsPageSource).toContain('redirect("/login")');
     expect(depositsPageSource).toContain('redirect("/portal")');
-    expect(depositsPageSource).toContain('redirectTo: "/reports/invoices?banner=not_authorized"');
+    expect(depositsPageSource).toContain('redirectTo: "/reports/dashboard?banner=not_authorized"');
   });
 
   it("calls the deposits read model with account scope and GET filters", () => {

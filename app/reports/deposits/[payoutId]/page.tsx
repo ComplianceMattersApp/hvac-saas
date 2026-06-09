@@ -91,7 +91,7 @@ export default async function DepositDetailPage({
     actorUserId: user.id,
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
-    redirectTo: "/reports/invoices?banner=not_authorized",
+    redirectTo: "/reports/dashboard?banner=not_authorized",
   });
 
   const resolvedParams = await params;

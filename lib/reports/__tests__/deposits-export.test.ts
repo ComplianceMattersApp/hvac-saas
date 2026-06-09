@@ -172,7 +172,7 @@ describe("deposits export routes financial access", () => {
     const response = (await GET(buildSummaryRequest())) as Response;
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/reports/invoices?banner=not_authorized");
+    expect(response.headers.get("location")).toContain("/reports/dashboard?banner=not_authorized");
     expect(getDepositsLedgerSummaryMock).not.toHaveBeenCalled();
   });
 
@@ -191,7 +191,7 @@ describe("deposits export routes financial access", () => {
     const response = (await GET(buildDetailRequest())) as Response;
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toContain("/reports/invoices?banner=not_authorized");
+    expect(response.headers.get("location")).toContain("/reports/dashboard?banner=not_authorized");
     expect(getDepositDetailExportRowsMock).not.toHaveBeenCalled();
   });
 

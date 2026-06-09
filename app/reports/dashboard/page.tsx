@@ -14,6 +14,7 @@ import {
 import ReportCenterTabs from "@/components/reports/ReportCenterTabs";
 import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
+import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import {
   REPORT_CENTER_KPI_GRANULARITY_OPTIONS,
@@ -500,6 +501,11 @@ export default async function ReportCenterDashboardPage({
   const continuityExportHref = buildContinuityExportHref(filters);
   const techWorkloadExportHref = buildTechWorkloadExportHref(filters);
   const classes = densityClasses(viewState.density);
+  const canViewDepositsReport = canViewFinancialRegister({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   return (
     <div className={`mx-auto max-w-[1680px] ${classes.sectionGap} px-3 py-4 text-slate-900 sm:px-5`}>
@@ -522,7 +528,7 @@ export default async function ReportCenterDashboardPage({
         </div>
       </header>
 
-      <ReportCenterTabs current="dashboard" />
+      <ReportCenterTabs current="dashboard" showDeposits={canViewDepositsReport} />
 
       <section className={`rounded-lg border border-slate-200 bg-white ${classes.section} shadow-sm shadow-slate-950/5`}>
         <form action="/reports/dashboard" method="get" className="flex flex-col gap-3">
@@ -746,15 +752,17 @@ export default async function ReportCenterDashboardPage({
                     Review collected payment records, methods, invoice matching, and CSV exports.
                   </p>
                 </Link>
-                <Link
-                  href="/reports/deposits"
-                  className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                >
-                  <div className="text-sm font-semibold text-slate-950">Deposits</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Review Stripe fees, net deposits, payout timing, and CSV exports.
-                  </p>
-                </Link>
+                {canViewDepositsReport ? (
+                  <Link
+                    href="/reports/deposits"
+                    className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                  >
+                    <div className="text-sm font-semibold text-slate-950">Deposits</div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Review Stripe fees, net deposits, payout timing, and CSV exports.
+                    </p>
+                  </Link>
+                ) : null}
               </div>
               <div className="mt-4 grid gap-4 lg:grid-cols-2">
                 {dashboard.invoiceVisibility.cards.map((card) => (

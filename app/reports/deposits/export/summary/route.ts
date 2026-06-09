@@ -52,7 +52,7 @@ async function resolveDepositsExportAccess(request: NextRequest) {
     internalUser,
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
     requestUrl: request.url,
-    unauthorizedRedirectPath: "/reports/invoices?banner=not_authorized",
+    unauthorizedRedirectPath: "/reports/dashboard?banner=not_authorized",
   });
 
   if (financialAccessResponse) {
