@@ -124,6 +124,9 @@ const SIGNUP_COPY: Record<
   },
 };
 
+const SIGNUP_FIELD_CLASS =
+  "w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-900 shadow-sm transition-all placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/70 focus:ring-offset-2 focus:ring-offset-white [&:-webkit-autofill]:[box-shadow:inset_0_0_0_1000px_#ffffff] [&:-webkit-autofill]:[-webkit-text-fill-color:#0f172a] [&:-webkit-autofill]:[caret-color:#0f172a]";
+
 export function SignupContent({ productIntent = "generic" }: SignupContentProps) {
   const copy = SIGNUP_COPY[productIntent] ?? SIGNUP_COPY.generic;
   const previewItems = PRODUCT_PREVIEW_ITEMS[productIntent] ?? PRODUCT_PREVIEW_ITEMS.generic;
@@ -198,7 +201,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
                 type="email"
                 required
                 autoComplete="email"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/70"
+                className={SIGNUP_FIELD_CLASS}
               />
               {state.fieldErrors?.email ? (
                 <p className="text-xs text-red-700">{state.fieldErrors.email}</p>
@@ -213,7 +216,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
                 id="owner_display_name"
                 name="owner_display_name"
                 required
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/70"
+                className={SIGNUP_FIELD_CLASS}
               />
               {state.fieldErrors?.ownerDisplayName ? (
                 <p className="text-xs text-red-700">{state.fieldErrors.ownerDisplayName}</p>
@@ -228,7 +231,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
                 id="business_display_name"
                 name="business_display_name"
                 required
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/70"
+                className={SIGNUP_FIELD_CLASS}
               />
               {state.fieldErrors?.businessDisplayName ? (
                 <p className="text-xs text-red-700">{state.fieldErrors.businessDisplayName}</p>
