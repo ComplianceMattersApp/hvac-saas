@@ -480,6 +480,7 @@ Do not expose Deposits / Payout Reconciliation as owner-facing production truth 
 - additive settlement schema is reviewed and applied safely
 - RLS/account scoping is validated
 - connected account readiness is complete for the target tenant
+- End-to-End Money Movement Verification gate passes
 - settlement sync succeeds in sandbox
 - at least one successful payment can be traced from invoice gross payment to balance transaction to payout
 - CSV export matches Stripe Dashboard for at least one payout
@@ -489,6 +490,44 @@ Do not expose Deposits / Payout Reconciliation as owner-facing production truth 
 - no QBO/general-ledger behavior is introduced
 - support/operator runbook exists for Stripe Dashboard fallback and sync-failed handling
 - rollback plan is clear: hide report/sync controls while preserving settlement rows
+
+## End-to-End Money Movement Verification Gate
+
+Owner-facing deposit reconciliation is not complete until this gate passes.
+
+This gate verifies reporting accuracy and actual tenant payout correctness. It must prove the full chain from issued invoice to Stripe connected-account charge, local gross payment truth, settlement sync, payout status, and bank deposit confirmation when available.
+
+Required state labels:
+
+- Invoice Paid
+- Settlement Synced
+- Payout Pending
+- Payout Paid
+- Bank Confirmed
+
+Required smoke proof:
+
+1. Issued invoice is paid through Stripe.
+2. Stripe charge is created in the tenant connected-account context.
+3. Webhook records gross payment truth in Compliance Matters.
+4. Invoice paid/balance updates only from existing webhook/payment truth.
+5. Payments Register shows the gross collected payment.
+6. Settlement sync captures balance transaction, fees, net, payout id, payout status, and arrival date.
+7. Deposits report matches Stripe Dashboard.
+8. Deposit Detail links payout back to invoice/customer/job/payment.
+9. CSV export matches Stripe Dashboard.
+10. Tenant payout status is paid, or pending with accurate arrival date.
+11. When available, tenant bank deposit matches the reported net payout.
+12. Settlement sync does not mutate invoice/payment/allocation truth.
+
+Gate outcome rules:
+
+- `Invoice Paid` means the invoice paid/balance projection changed only through existing webhook/payment/allocation truth.
+- `Settlement Synced` means Stripe balance transaction, fees, net, and payout metadata were captured into settlement truth.
+- `Payout Pending` means Stripe payout is not paid yet, but payout id/status and expected arrival date match Stripe Dashboard.
+- `Payout Paid` means Stripe payout status is paid and report/CSV/detail agree with Stripe Dashboard.
+- `Bank Confirmed` means the tenant bank deposit, when available, matches the reported net payout.
+- If bank confirmation is not yet available, owner-facing completion remains gated unless the release decision explicitly accepts `Payout Pending` or `Payout Paid` as a temporary operational state with Stripe Dashboard fallback.
 
 ## Explicit Non-Actions
 
@@ -608,14 +647,18 @@ Smoke checklist:
 
 1. Create issued invoice.
 2. Pay through Stripe connected account.
-3. Verify invoice paid/balance updates from existing webhook only.
-4. Verify Payments Register gross payment.
-5. Run settlement sync.
-6. Verify settlement row.
-7. Verify Deposits report gross/fee/net.
-8. Verify detail drilldown.
-9. Export CSV and compare to Stripe Dashboard.
-10. Confirm no invoice/payment/allocation truth distortion.
+3. Verify Stripe charge is created in the tenant connected-account context.
+4. Verify webhook records gross payment truth in Compliance Matters.
+5. Verify `Invoice Paid`: invoice paid/balance updates only from existing webhook/payment truth.
+6. Verify Payments Register shows the gross collected payment.
+7. Run settlement sync.
+8. Verify `Settlement Synced`: settlement row includes balance transaction, fees, net, payout id, payout status, and arrival date where available.
+9. Verify Deposits report gross/fee/net/payout data matches Stripe Dashboard.
+10. Verify Deposit Detail links payout back to invoice/customer/job/payment.
+11. Export CSV and compare to Stripe Dashboard.
+12. Verify `Payout Pending` or `Payout Paid`: tenant payout status is paid, or pending with accurate arrival date.
+13. Verify `Bank Confirmed` when available: tenant bank deposit matches reported net payout.
+14. Confirm no settlement sync mutation of invoice/payment/allocation truth.
 
 ## Acceptance Criteria For V1
 
