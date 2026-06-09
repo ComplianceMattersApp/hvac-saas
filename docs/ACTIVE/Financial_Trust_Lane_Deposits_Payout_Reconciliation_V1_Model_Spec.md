@@ -4,6 +4,58 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Trust Lane / Deposits and Payout Reconciliation V1
 Scope: docs/model only. No product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, QBO behavior, production data, or customer-facing behavior is changed or authorized by this spec.
 
+## Phase D Closeout - Manual / Internal Settlement Sync Runner
+
+Phase D added a dormant internal/manual sync runner:
+
+`lib/actions/stripe-settlement-sync-actions.ts`
+
+Test coverage:
+
+`lib/actions/__tests__/stripe-settlement-sync-actions.test.ts`
+
+Locked result:
+
+- Runner entrypoint is `syncStripePaymentSettlementsForAccount`.
+- Form wrapper entrypoint is `syncStripePaymentSettlementsForAccountFromForm`.
+- Execution requires authenticated internal financial authority scoped to the requested account owner.
+- Explicit `accountOwnerUserId` scope is required.
+- Date range is required.
+- Optional local payment id and Stripe charge id filters are supported.
+- Dry-run is the default posture.
+- Dry-run does not call Stripe and does not write settlement rows.
+- Commit mode must be explicit through the form wrapper.
+- Commit mode delegates Stripe reads and settlement writes to the Phase C helper only.
+- Candidate selection is scoped to `internal_invoice_payments` for one account/date range.
+- Candidate rows are classified locally as eligible or skipped before helper execution.
+- Skips include non-Stripe payment, non-recorded payment, missing charge id, outside date range, missing connected account, connected account not ready, already synced, and dry-run only.
+- Per-row helper failure does not abort the remaining batch.
+- Returned details are intentionally limited to local payment id, invoice number when cheaply available, charge id, status/code/reason, and settlement id.
+
+Non-wiring confirmation:
+
+- No owner-facing Deposits report is added.
+- No `/reports/deposits` route is added.
+- No deposit detail route is added.
+- No CSV/export is added.
+- No cron/scheduled job invokes the runner.
+- No webhook invokes the runner.
+- No checkout/session/payment-link path invokes the runner.
+- No Payments Register behavior is changed.
+- No invoice action behavior is changed.
+- Stripe Dashboard remains fallback until report/export/smoke phases are complete.
+
+Source-of-truth preservation:
+
+- `internal_invoice_payments` remains gross payment event truth.
+- `internal_invoice_payment_allocations` remains payment-to-invoice allocation truth.
+- `stripe_payment_settlements` remains Stripe fee/net/payout settlement truth only.
+- Runner does not mutate invoice paid/balance.
+- Runner does not mutate payment rows.
+- Runner does not mutate allocation rows.
+- Runner does not introduce QBO/general-ledger behavior.
+- Settlement rows do not count toward collected payment totals.
+
 ## Phase C Closeout - Stripe Settlement Sync Helper
 
 Phase C added a dormant server-side helper:
