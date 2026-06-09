@@ -27,6 +27,16 @@ const airflowEntryFieldsSource = readFileSync(
   "utf8",
 );
 
+const refrigerantChargeExceptionFieldsSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/RefrigerantChargeExceptionFields.tsx"),
+  "utf8",
+);
+
+const refrigerantChargeInlinePreviewSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/RefrigerantChargeInlinePreview.tsx"),
+  "utf8",
+);
+
 describe("job tests page wiring", () => {
   it("exposes Duct Leakage exception options and keeps exception reason free-form", () => {
     expect(jobTestsPageSource).toContain('{ value: "asbestos", label: "Asbestos" }');
@@ -62,7 +72,7 @@ describe("job tests page wiring", () => {
     expect(ductBlock).not.toContain('data-duct-live-total');
     expect(ductBlock).not.toContain('Needs input - measured');
     expect(ductBlock).not.toContain('<script');
-    expect(jobTestsPageSource).toContain('const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused;');
+    expect(jobTestsPageSource).toContain('const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;');
     expect(jobTestsPageSource).toContain('className={isCompactTestWorkspace ? "hidden" : "order-last print:order-none"}');
   });
 
@@ -92,8 +102,58 @@ describe("job tests page wiring", () => {
     expect(airflowBlock).not.toContain('EccLivePreview mode="airflow"');
     expect(airflowBlock).not.toContain('Airflow Override Pass');
     expect(airflowBlock).not.toContain('Needs input - measured');
-    expect(jobTestsPageSource).toContain('const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused;');
+    expect(jobTestsPageSource).toContain('const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;');
     expect(jobTestsPageSource).toContain('className={`${isCompactTestWorkspace ? "hidden" : "space-y-3"} sm:hidden print:hidden`}');
+  });
+
+  it("keeps Refrigerant Charge as a vertical field-entry workspace", () => {
+    const refrigerantIndex = jobTestsPageSource.indexOf('Refrigerant Charge Results');
+    expect(refrigerantIndex).toBeGreaterThan(-1);
+
+    const refrigerantBlock = jobTestsPageSource.slice(
+      refrigerantIndex,
+      jobTestsPageSource.indexOf('      </section>', refrigerantIndex),
+    );
+
+    expect(jobTestsPageSource).toContain('const isRefrigerantChargeFocused = focusedType === "refrigerant_charge";');
+    expect(refrigerantBlock).toContain('Enter readings top to bottom in field order.');
+    expect(refrigerantBlock).toContain('RefrigerantChargeExceptionFields');
+    expect(refrigerantBlock).toContain('RefrigerantChargeInlinePreview formId={rcSaveFormId} kind="subcool"');
+    expect(refrigerantBlock).toContain('RefrigerantChargeInlinePreview formId={rcSaveFormId} kind="superheat"');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('name="rc_exception"');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('No exception');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('Package unit');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('Conditions not met / weather');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('Photo Taken');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('name="rc_photo_taken"');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('name="rc_override_details"');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('required');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('showEvidence ? children : null');
+    expect(refrigerantChargeInlinePreviewSource).toContain('const SUBCOOL_TOLERANCE_F = 3');
+    expect(refrigerantChargeInlinePreviewSource).toContain('const SUPERHEAT_MAX_F = 25');
+    expect(refrigerantChargeInlinePreviewSource).toContain('condenserSat - liquidLineTemp');
+    expect(refrigerantChargeInlinePreviewSource).toContain('suctionTemp - evaporatorSat');
+    expect(refrigerantChargeInlinePreviewSource).toContain('Math.abs(measured - targetSubcool) <= SUBCOOL_TOLERANCE_F');
+    expect(refrigerantChargeInlinePreviewSource).toContain('measured < SUPERHEAT_MAX_F');
+    expect(refrigerantBlock).toContain('Lowest Return Air Dry Bulb');
+    expect(refrigerantBlock).toContain('Condenser Air Entering DB');
+    expect(refrigerantBlock).toContain('Liquid Line Temp');
+    expect(refrigerantBlock).toContain('Liquid Line Pressure');
+    expect(refrigerantBlock).toContain('Condenser Saturation Temp');
+    expect(refrigerantBlock).toContain('Target Subcool');
+    expect(refrigerantBlock).toContain('Suction Line Temp');
+    expect(refrigerantBlock).toContain('Suction Line Pressure');
+    expect(refrigerantBlock).toContain('Evaporator Saturation Temp');
+    expect(refrigerantChargeInlinePreviewSource).toContain('Measured Subcool');
+    expect(refrigerantChargeInlinePreviewSource).toContain('Measured Superheat');
+    expect(refrigerantBlock).toContain('Photo Taken records the field attestation.');
+    expect(refrigerantBlock).toContain('Attach refrigerant charge photo');
+    expect(refrigerantBlock).not.toContain('Photo / Notes');
+    expect(refrigerantBlock).not.toContain('Photo Taken - user attests gauge photo was captured');
+    expect(refrigerantBlock).not.toContain('EccLivePreview mode="refrigerant_charge"');
+    expect(refrigerantBlock).not.toContain('className="mt-3 grid grid-cols-2 gap-2 text-center"');
+    expect(refrigerantBlock).not.toContain('className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"');
+    expect(refrigerantBlock).not.toContain('id={`out-${runRC.id}`}');
   });
 });
 

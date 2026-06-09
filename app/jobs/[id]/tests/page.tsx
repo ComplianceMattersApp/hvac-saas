@@ -9,6 +9,8 @@ import AirflowEntryFields from "@/components/jobs/AirflowEntryFields";
 import EccLivePreview from "@/components/jobs/EccLivePreview";
 import DuctLeakageEntryFields from "@/components/jobs/DuctLeakageEntryFields";
 import DuctLeakageMethodFields from "@/components/jobs/DuctLeakageMethodFields";
+import RefrigerantChargeExceptionFields from "@/components/jobs/RefrigerantChargeExceptionFields";
+import RefrigerantChargeInlinePreview from "@/components/jobs/RefrigerantChargeInlinePreview";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import {
   isInternalAccessError,
@@ -995,7 +997,8 @@ export default async function JobTestsPage({
       : focusedTypeRaw;
   const isDuctLeakageFocused = focusedType === "duct_leakage";
   const isAirflowFocused = focusedType === "airflow";
-  const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused;
+  const isRefrigerantChargeFocused = focusedType === "refrigerant_charge";
+  const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;
 
   let refrigerantEvidenceAttachments: Array<{
     id: string;
@@ -3014,7 +3017,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     projectType={job.project_type}
                     runId={runAF.id}
                   >
-                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                  <details open className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
                     <summary className="cursor-pointer list-none">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -3191,7 +3194,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="test_run_id" value={runFan.id} />
 
                   <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Measurement</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Results</div>
+                    <p className="text-sm text-slate-600">Enter readings top to bottom in field order.</p>
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`fan-watts-${runFan.id}`}>
                         Actual Tested Watts
@@ -3228,20 +3232,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </div>
 
-                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                  <details open className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
                     <summary className="cursor-pointer list-none">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Charge Readings</div>
                           <div className="mt-1 text-sm font-medium text-slate-800">
                             {fmtValue(runFan.data?.required_fan_efficacy_w_per_cfm ?? 0.45)} W/CFM · {fmtValue(runFan.data?.actual_tested_airflow_cfm ?? defaultFanActualAirflowCfm, "CFM")}
                           </div>
                         </div>
-                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                        <span className="text-xs font-semibold text-slate-600">Open</span>
                       </div>
                     </summary>
 
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="mt-3 grid gap-3">
 
                       <div className="grid gap-1">
                         <label className="text-sm font-medium" htmlFor={`fan-airflow-${runFan.id}`}>
@@ -3310,7 +3314,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
                           <div className="mt-1 text-sm font-medium text-slate-800">No override flow · Notes optional</div>
                         </div>
-                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                        <span className="text-xs font-semibold text-slate-600">Open</span>
                       </div>
                     </summary>
                     <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -3474,7 +3478,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="test_run_id" value={runFilter.id} />
 
                   <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Measurement</div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Results</div>
+                    <p className="text-sm text-slate-600">Enter readings top to bottom in field order.</p>
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`filter-airflow-${runFilter.id}`}>
                         Design Airflow CFM
@@ -3510,7 +3515,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     </div>
                   </div>
 
-                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+                  <details open className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
                     <summary className="cursor-pointer list-none">
                       <div className="flex items-start justify-between gap-3">
                         <div>
@@ -3633,7 +3638,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
                           <div className="mt-1 text-sm font-medium text-slate-800">No override flow · Notes optional</div>
                         </div>
-                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                        <span className="text-xs font-semibold text-slate-600">Open</span>
                       </div>
                     </summary>
                     <div className="mt-3 grid gap-1 sm:col-span-2">
@@ -4379,7 +4384,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <div className={eccWorkspaceCardClass}>
             <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <div className="font-medium">Refrigerant Charge</div>
+                <h2 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">Refrigerant Charge Results</h2>
                 <div className="mt-1 text-sm">
                   <span className="font-medium">Result:</span>{" "}
                   {runRC
@@ -4394,54 +4399,22 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
             </div>
 
-            <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
+            <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
+              <summary className="cursor-pointer list-none">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
+                    <div className="mt-1 text-sm font-medium text-slate-800">{selectedSystemName}</div>
+                  </div>
+                  <span className="text-xs font-semibold text-slate-600">Show</span>
+                </div>
+              </summary>
+              <div className="mt-3 grid gap-2 text-sm text-slate-700">
               <div className="font-semibold text-slate-800">System Reference</div>
               <div>{selectedSystemName}</div>
               <div>Refrigerant type on run: {fallbackText(runRC?.data?.refrigerant_type)}</div>
-            </div>
-
-            {runRC ? (
-              <div
-                className={`rounded-2xl border px-4 py-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:hidden ${
-                  runRC.override_pass === true || runRC.computed_pass === true
-                    ? "border-emerald-200 bg-emerald-50/70"
-                    : runRC.override_pass === false || runRC.computed_pass === false
-                    ? "border-red-200 bg-red-50/70"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="flex min-w-0 items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className={eccUtilityLabelClass}>Focused Test</div>
-                    <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Refrigerant Charge</div>
-                    <div className="mt-1 text-sm font-medium text-slate-700">{selectedSystemName}</div>
-                  </div>
-                  <span
-                    className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${
-                      runRC.override_pass === true || runRC.computed_pass === true
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : runRC.override_pass === false || runRC.computed_pass === false
-                        ? "border-red-200 bg-red-50 text-red-800"
-                        : "border-slate-200 bg-slate-50 text-slate-700"
-                    }`}
-                  >
-                    {getEffectiveResultLabel(runRC)}
-                  </span>
-                </div>
-                <div className="mt-3 grid grid-cols-2 gap-2 text-center">
-                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Subcool</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-950">{fmtValue(runRC.computed?.measured_subcool_f)}</div>
-                    <div className="text-[10px] font-medium text-slate-500">deg F</div>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-white/80 px-2 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">Superheat</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-950">{fmtValue(runRC.computed?.measured_superheat_f)}</div>
-                    <div className="text-[10px] font-medium text-slate-500">deg F</div>
-                  </div>
-                </div>
               </div>
-            ) : null}
+            </details>
 
             {!runRC ? (
               carriedForwardRC ? (
@@ -4473,9 +4446,93 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="system_id" value={selectedSystemId} />
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runRC.id} />
+                  <RefrigerantChargeExceptionFields
+                    initialExceptionReason={runRC.data?.charge_exempt_details ?? ""}
+                    initialExceptionValue={
+                      runRC.data?.verification_method === "photo_taken"
+                        ? "photo_taken"
+                        : runRC.data?.charge_exempt_reason ?? ""
+                    }
+                    runId={runRC.id}
+                  >
+                    <div className="rounded-xl border border-blue-100 bg-white/80 px-3 py-3 text-xs text-blue-800">
+                      <div className="font-medium text-blue-900">
+                        Photo Taken records the field attestation. Attach the photo to the job for supporting evidence.
+                      </div>
+                      <div className="mt-2">
+                        <Link
+                          href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
+                          className={eccSecondaryButtonClass}
+                        >
+                          Attach refrigerant charge photo
+                        </Link>
+                      </div>
+                    </div>
 
-                  <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Measurement</div>
+                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700">
+                      <div className="font-medium text-slate-900">Refrigerant Charge Photo Evidence</div>
+                      <div className="mt-1 text-slate-600">
+                        Photo evidence supports the field record. It does not automatically verify numeric pass/fail.
+                      </div>
+
+                      {refrigerantEvidenceAttachments.length ? (
+                        <div className="mt-2 space-y-2">
+                          {refrigerantEvidenceAttachments.slice(0, 3).map((attachment) => (
+                            <div
+                              key={attachment.id}
+                              className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2"
+                            >
+                              <div className="font-medium text-emerald-900">Refrigerant charge photo attached</div>
+                              <div className="mt-1 break-all text-emerald-800">{attachment.fileName}</div>
+                              <div className="mt-1 text-emerald-700">
+                                Uploaded{" "}
+                                {attachment.uploadedAt
+                                  ? new Date(attachment.uploadedAt).toLocaleString()
+                                  : "(date unavailable)"}
+                              </div>
+                              {attachment.caption ? (
+                                <div className="mt-1 text-emerald-700">{attachment.caption}</div>
+                              ) : null}
+                              {attachment.signedUrl ? (
+                                <a
+                                  href={attachment.signedUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="mt-2 inline-flex min-h-9 items-center justify-center rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+                                >
+                                  Open attachment
+                                </a>
+                              ) : null}
+                            </div>
+                          ))}
+
+                          {refrigerantEvidenceAttachments.length > 3 ? (
+                            <div className="text-slate-600">
+                              +{refrigerantEvidenceAttachments.length - 3} more refrigerant charge evidence file(s) in Attachments.
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : (
+                        <div className="mt-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-slate-600">
+                          No refrigerant charge photo attached yet.
+                        </div>
+                      )}
+
+                      <div className="mt-2">
+                        <Link
+                          href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
+                          className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                        >
+                          View refrigerant charge photo attachments
+                        </Link>
+                      </div>
+                    </div>
+                  </RefrigerantChargeExceptionFields>
+                  <input type="hidden" name="outdoor_temp_f" value={runRC.data?.outdoor_temp_f ?? ""} />
+
+                  <div className="grid gap-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Results</div>
+                    <p className="text-sm text-slate-600">Enter readings top to bottom in field order.</p>
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`lrdb-${runRC.id}`}>
                         Lowest Return Air Dry Bulb (°F)
@@ -4501,20 +4558,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         step="0.1"
                         className="w-full rounded-md border px-3 py-2"
                         defaultValue={runRC.data?.condenser_air_entering_db_f ?? ""}
-                      />
-                    </div>
-
-                    <div className="grid gap-1">
-                      <label className="text-sm font-medium" htmlFor={`out-${runRC.id}`}>
-                        Outdoor Temp (°F)
-                      </label>
-                      <input
-                        id={`out-${runRC.id}`}
-                        name="outdoor_temp_f"
-                        type="number"
-                        step="0.1"
-                        className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-base sm:font-normal sm:tracking-normal"
-                        defaultValue={runRC.data?.outdoor_temp_f ?? ""}
                       />
                     </div>
 
@@ -4564,41 +4607,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         defaultValue={runRC.data?.liquid_line_pressure_psig ?? ""}
                       />
                     </div>
-                    <div
-                      className={`sm:col-span-2 rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${
-                        runRC.override_pass === true || runRC.computed_pass === true
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : runRC.override_pass === false || runRC.computed_pass === false
-                          ? "border-red-200 bg-red-50 text-red-800"
-                          : "border-slate-200 bg-slate-50 text-slate-700"
-                      }`}
-                    >
-                      {runRC.override_pass === true
-                        ? "Pass override active"
-                        : runRC.override_pass === false
-                        ? "Fail override active"
-                        : runRC.computed_pass === true
-                        ? "Pass"
-                        : runRC.computed_pass === false
-                        ? "Fail"
-                        : "Needs input"}
-                    </div>
                   </div>
 
-                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Test Setup</div>
-                          <div className="mt-1 text-sm font-medium text-slate-800">
-                            {fallbackText(runRC.data?.refrigerant_type)} · Target subcool {fmtValue(runRC.data?.target_subcool_f, "deg F")}
-                          </div>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600">Show</span>
-                      </div>
-                    </summary>
-
-                    <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="contents">
+                    <div className="mt-3 grid gap-3">
 
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`tcsat-${runRC.id}`}>
@@ -4628,6 +4640,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         defaultValue={runRC.data?.target_subcool_f ?? ""}
                       />
                     </div>
+
+                    <RefrigerantChargeInlinePreview formId={rcSaveFormId} kind="subcool" />
 
                     <div className="grid gap-1">
                       <label className="text-sm font-medium" htmlFor={`suctt-${runRC.id}`}>
@@ -4671,7 +4685,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       />
                     </div>
 
-                    <div className="flex items-center gap-2 sm:col-span-2">
+                    <RefrigerantChargeInlinePreview formId={rcSaveFormId} kind="superheat" />
+
+                    <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
                       <input
                         id={`fd-${runRC.id}`}
                         name="filter_drier_installed"
@@ -4682,202 +4698,39 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         Filter drier installed
                       </label>
                     </div>
-                    </div>
-                  </details>
 
-                  <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-lg sm:shadow-none">
-                    <summary className="cursor-pointer list-none">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
-                          <div className="mt-1 text-sm font-medium text-slate-800">
-                            {runRC.data?.verification_method === "photo_taken"
-                              ? "Photo attestation active"
-                              : runRC.data?.charge_exempt_reason
-                              ? "Exemption selected"
-                              : "No override · Notes optional"}
-                          </div>
-                        </div>
-                        <span className="text-xs font-semibold text-slate-600">Show</span>
+                    <div
+                      className={`rounded-xl border px-3 py-2 text-sm font-semibold ${
+                        runRC.override_pass === true || runRC.computed_pass === true
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : runRC.override_pass === false || runRC.computed_pass === false
+                          ? "border-red-200 bg-red-50 text-red-800"
+                          : runRC.computed?.status === "photo_evidence"
+                          ? "border-blue-200 bg-blue-50 text-blue-800"
+                          : "border-slate-200 bg-slate-50 text-slate-700"
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <span>{getEffectiveResultLabel(runRC)}</span>
+                        <span className="text-xs font-medium">Status: {fallbackText(runRC.computed?.status)}</span>
                       </div>
-                    </summary>
-
-                    <div className="mt-3 space-y-2">
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          name="rc_photo_taken"
-                          defaultChecked={runRC.data?.verification_method === "photo_taken"}
-                        />
-                        Photo Taken - user attests gauge photo was captured
-                      </label>
-
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          name="rc_exempt_package_unit"
-                          defaultChecked={runRC.data?.charge_exempt_reason === "package_unit"}
-                        />
-                        Package unit - charge verification not required
-                      </label>
-
-                      <label className="flex items-center gap-2 text-sm">
-                        <input
-                          type="checkbox"
-                          name="rc_exempt_conditions"
-                          defaultChecked={runRC.data?.charge_exempt_reason === "conditions_not_met"}
-                        />
-                        Conditions not met / weather - override charge verification
-                      </label>
-
-                      <div className="grid gap-1">
-                        <label className="block text-xs font-medium text-slate-700">Notes/details (optional)</label>
-                        <input
-                          name="rc_override_details"
-                          className="w-full rounded-md border px-3 py-2 text-sm"
-                          defaultValue={runRC.data?.charge_exempt_details ?? ""}
-                          placeholder='Example: "Photo shows both gauges stable" or "Outdoor temp 48°F"'
-                        />
-                      </div>
-                    </div>
-                  </details>
-
-                </form>
-
-                <EccLivePreview mode="refrigerant_charge" formId={rcSaveFormId} projectType={job.project_type} />
-
-                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                  <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
-                  <div className="mt-2 space-y-2">
-                    <div>Overall Result: {getEffectiveResultLabel(runRC)}</div>
-                    {runRC.data?.verification_method === "photo_taken" ? (
-                      <>
-                        <div className="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">
-                          <div className="font-medium">Photo Taken</div>
-                          <div className="mt-1 text-xs">User confirmed gauge photo was captured. Numeric readings not entered.</div>
-                          {runRC.data?.photo_taken_timestamp && (
-                            <div className="mt-1 text-xs">
-                              Attested: {new Date(runRC.data.photo_taken_timestamp).toLocaleString()}
-                            </div>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div>Measured Subcool: {fmtValue(runRC.computed?.measured_subcool_f, "°F")}</div>
-                        <div>Measured Superheat: {fmtValue(runRC.computed?.measured_superheat_f, "°F")}</div>
-                      </>
-                    )}
-                    <div>Status: {fallbackText(runRC.computed?.status)}</div>
-                    {getComputedFailures(runRC).length > 0 ? (
-                      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
-                        <div className="font-medium">Why overall result is failing</div>
-                        <ul className="mt-1 list-disc pl-5">
+                      {getComputedFailures(runRC).length > 0 ? (
+                        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs font-medium">
                           {getComputedFailures(runRC).map((failure) => (
                             <li key={failure}>{failure}</li>
                           ))}
                         </ul>
-                        {hasFilterDrierFailure(runRC) && refrigerantNumericChecksPassing(runRC) ? (
-                          <div className="mt-2">
-                            Subcool and superheat are passing. Overall result still fails until Filter drier installed is confirmed.
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : null}
-                  </div>
-                </details>
-
-                <details className="rounded-md border p-3 mt-3 sm:col-span-2 space-y-2">
-                  <summary className="cursor-pointer font-semibold text-slate-900">Evidence / Attachments</summary>
-
-                  <div className="mt-2 rounded-md border border-blue-100 bg-blue-50/80 px-3 py-3 text-xs text-blue-800">
-                    <div className="font-medium text-blue-900">
-                      Photo Taken records the field attestation. Attach the photo to the job for supporting evidence.
+                      ) : null}
+                      {hasFilterDrierFailure(runRC) && refrigerantNumericChecksPassing(runRC) ? (
+                        <div className="mt-2 text-xs font-medium">
+                          Subcool and superheat are passing. Overall result still fails until Filter drier installed is confirmed.
+                        </div>
+                      ) : null}
                     </div>
-                    <div className="mt-2">
-                      <Link
-                        href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
-                        className={eccSecondaryButtonClass}
-                      >
-                        Attach refrigerant charge photo
-                      </Link>
                     </div>
                   </div>
 
-                  <div className="rounded-md border border-blue-100 bg-blue-50/80 px-3 py-3 text-xs text-blue-800">
-                    <div className="font-medium text-blue-900">
-                      Photo Taken records the field attestation. Attach the photo to the job for supporting evidence.
-                    </div>
-                    <div className="mt-2">
-                      <Link
-                        href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
-                        className={eccSecondaryButtonClass}
-                      >
-                        Attach refrigerant charge photo
-                      </Link>
-                    </div>
-                  </div>
-
-                  <div className="rounded-md border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700">
-                    <div className="font-medium text-slate-900">Refrigerant Charge Photo Evidence</div>
-                    <div className="mt-1 text-slate-600">
-                      Photo evidence supports the field record. It does not automatically verify numeric pass/fail.
-                    </div>
-
-                    {refrigerantEvidenceAttachments.length ? (
-                      <div className="mt-2 space-y-2">
-                        {refrigerantEvidenceAttachments.slice(0, 3).map((attachment) => (
-                          <div
-                            key={attachment.id}
-                            className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2"
-                          >
-                            <div className="font-medium text-emerald-900">Refrigerant charge photo attached</div>
-                            <div className="mt-1 break-all text-emerald-800">{attachment.fileName}</div>
-                            <div className="mt-1 text-emerald-700">
-                              Uploaded{" "}
-                              {attachment.uploadedAt
-                                ? new Date(attachment.uploadedAt).toLocaleString()
-                                : "(date unavailable)"}
-                            </div>
-                            {attachment.caption ? (
-                              <div className="mt-1 text-emerald-700">{attachment.caption}</div>
-                            ) : null}
-                            {attachment.signedUrl ? (
-                              <a
-                                href={attachment.signedUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="mt-2 inline-flex min-h-9 items-center justify-center rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
-                              >
-                                Open attachment
-                              </a>
-                            ) : null}
-                          </div>
-                        ))}
-
-                        {refrigerantEvidenceAttachments.length > 3 ? (
-                          <div className="text-slate-600">
-                            +{refrigerantEvidenceAttachments.length - 3} more refrigerant charge evidence file(s) in Attachments.
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <div className="mt-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-slate-600">
-                        No refrigerant charge photo attached yet.
-                      </div>
-                    )}
-
-                    <div className="mt-2">
-                      <Link
-                        href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
-                        className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                      >
-                        View refrigerant charge photo attachments
-                      </Link>
-                    </div>
-                  </div>
-
-                </details>
+                </form>
 
                 <div className={eccActionRowClass}>
                   <div className="mr-auto text-sm">

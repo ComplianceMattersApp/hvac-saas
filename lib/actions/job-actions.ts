@@ -5151,7 +5151,8 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
   const photoTaken = formData.get("rc_photo_taken") === "on";
   const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
   const exemptConditions = formData.get("rc_exempt_conditions") === "on";
-  const overrideDetails = String(formData.get("rc_override_details") || "").trim() || null;
+  const overrideDetails =
+    String(formData.get("rc_override_details") || formData.get("rc_photo_details") || "").trim() || null;
 
   // If both checked, treat as package unit (and record a warning)
   const isChargeExempt = exemptPackageUnit || exemptConditions;
@@ -5177,7 +5178,14 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
 
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
-
+  if (isChargeExempt && !overrideDetails) {
+    const systemIdFromForm = String(formData.get("system_id") || "").trim();
+    const q = new URLSearchParams();
+    q.set("t", "refrigerant_charge");
+    if (systemIdFromForm) q.set("s", systemIdFromForm);
+    q.set("notice", "override_reason_required");
+    redirect(`/jobs/${jobId}/tests?${q.toString()}`);
+  }
   const num = (key: string) => {
     const raw = String(formData.get(key) || "").trim();
     if (!raw) return null;
@@ -5392,7 +5400,6 @@ export async function saveAirflowDataFromForm(formData: FormData) {
 
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
-
   const num = (key: string) => {
     const raw = String(formData.get(key) || "").trim();
     if (!raw) return null;
@@ -6497,7 +6504,8 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
   const photoTaken = formData.get("rc_photo_taken") === "on";
   const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
   const exemptConditions = formData.get("rc_exempt_conditions") === "on";
-  const overrideDetails = String(formData.get("rc_override_details") || "").trim() || null;
+  const overrideDetails =
+    String(formData.get("rc_override_details") || formData.get("rc_photo_details") || "").trim() || null;
 
   const isChargeExempt = exemptPackageUnit || exemptConditions;
 
@@ -6519,6 +6527,15 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
           ? `${chargeOverrideReasonText}: ${overrideDetails}`
           : chargeOverrideReasonText)
       : null;
+
+  if (isChargeExempt && !overrideDetails) {
+    const q = new URLSearchParams();
+    q.set("t", "refrigerant_charge");
+    const systemIdFromForm = String(formData.get("system_id") || "").trim();
+    if (systemIdFromForm) q.set("s", systemIdFromForm);
+    q.set("notice", "override_reason_required");
+    redirect(`/jobs/${jobId}/tests?${q.toString()}`);
+  }
 
   const data = {
     lowest_return_air_db_f: num("lowest_return_air_db_f"),
@@ -6720,7 +6737,7 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
+  redirectToJobTestSection(jobId);
 }
 
 

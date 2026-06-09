@@ -142,6 +142,13 @@ function buildPackageUnitExemption(): FormData {
   fd.set("test_run_id", "run-1");
   fd.set("system_id", "sys-1");
   fd.set("rc_exempt_package_unit", "on");
+  fd.set("rc_override_details", "Package unit verified in field.");
+  return fd;
+}
+
+function buildPackageUnitExemptionWithoutReason(): FormData {
+  const fd = buildPackageUnitExemption();
+  fd.set("rc_override_details", "   ");
   return fd;
 }
 
@@ -356,6 +363,18 @@ describe("saveRefrigerantChargeDataFromForm — existing exemption path still wo
     // exemption does not set verification_method
     expect(update!.payload.data.verification_method).toBeNull();
   });
+
+  it("package unit exemption: reason is required before save", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveRefrigerantChargeDataFromForm(buildPackageUnitExemptionWithoutReason())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=override_reason_required",
+    );
+
+    expect(captured.filter((c) => c.table === "ecc_test_runs" && c.method === "update")).toHaveLength(0);
+  });
 });
 
 describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", () => {
@@ -393,7 +412,7 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
 
     const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation())).rejects.toThrow(
-      "REDIRECT:"
+      "REDIRECT:/jobs/job-1#field-status-actions"
     );
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
@@ -415,5 +434,17 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     );
 
     expect(evaluateEccOpsStatusMock).toHaveBeenCalledWith("job-1");
+  });
+
+  it("Complete Test with package unit exemption: reason is required", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAndCompleteRefrigerantChargeFromForm(buildPackageUnitExemptionWithoutReason())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=override_reason_required",
+    );
+
+    expect(captured.filter((c) => c.table === "ecc_test_runs" && c.method === "update")).toHaveLength(0);
   });
 });
