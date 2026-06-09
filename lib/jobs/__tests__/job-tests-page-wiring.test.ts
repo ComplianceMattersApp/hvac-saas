@@ -73,7 +73,7 @@ describe("job tests page wiring", () => {
     expect(ductBlock).not.toContain('Needs input - measured');
     expect(ductBlock).not.toContain('<script');
     expect(jobTestsPageSource).toContain('const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;');
-    expect(jobTestsPageSource).toContain('className={isCompactTestWorkspace ? "hidden" : "order-last print:order-none"}');
+    expect(jobTestsPageSource).toContain('className={isCompletionReportFocused ? "space-y-4 print:space-y-0" : isCompactTestWorkspace ? "hidden" : "order-last print:order-none"}');
   });
 
   it("keeps Airflow field-first layout with exception and inline results", () => {
@@ -103,7 +103,7 @@ describe("job tests page wiring", () => {
     expect(airflowBlock).not.toContain('Airflow Override Pass');
     expect(airflowBlock).not.toContain('Needs input - measured');
     expect(jobTestsPageSource).toContain('const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;');
-    expect(jobTestsPageSource).toContain('className={`${isCompactTestWorkspace ? "hidden" : "space-y-3"} sm:hidden print:hidden`}');
+    expect(jobTestsPageSource).toContain('className={`${isCompactTestWorkspace || isCompletionReportFocused ? "hidden" : "space-y-3"} sm:hidden print:hidden`}');
   });
 
   it("keeps Refrigerant Charge as a vertical field-entry workspace", () => {
@@ -154,6 +154,19 @@ describe("job tests page wiring", () => {
     expect(refrigerantBlock).not.toContain('className="mt-3 grid grid-cols-2 gap-2 text-center"');
     expect(refrigerantBlock).not.toContain('className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"');
     expect(refrigerantBlock).not.toContain('id={`out-${runRC.id}`}');
+  });
+
+  it("opens Completion Report as a report-first print view", () => {
+    expect(jobTestsPageSource).toContain('const isCompletionReportFocused = focused === "completion_report";');
+    expect(jobTestsPageSource).toContain('!isCompletionReportFocused ? (');
+    expect(jobTestsPageSource).toContain('isCompactTestWorkspace || isCompletionReportFocused ? "hidden" : "space-y-3"');
+    expect(jobTestsPageSource).toContain('href={withS("completion_report", selectedSystemId)}');
+    expect(jobTestsPageSource).toContain('isCompletionReportFocused ? "space-y-4 print:space-y-0"');
+    expect(jobTestsPageSource).toContain('Completion Report');
+    expect(jobTestsPageSource).toContain('label="Print"');
+    expect(jobTestsPageSource).toContain('label="Download"');
+    expect(jobTestsPageSource).toContain('isCompletionReportFocused ? "block space-y-4 print:block print:space-y-0"');
+    expect(jobTestsPageSource).toContain('isCompletionReportFocused ? "hidden" : eccPanelClass');
   });
 });
 

@@ -998,6 +998,7 @@ export default async function JobTestsPage({
   const isDuctLeakageFocused = focusedType === "duct_leakage";
   const isAirflowFocused = focusedType === "airflow";
   const isRefrigerantChargeFocused = focusedType === "refrigerant_charge";
+  const isCompletionReportFocused = focused === "completion_report";
   const isCompactTestWorkspace = isDuctLeakageFocused || isAirflowFocused || isRefrigerantChargeFocused;
 
   let refrigerantEvidenceAttachments: Array<{
@@ -1600,6 +1601,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             </div>
           </div>
         )}
+        {!isCompletionReportFocused ? (
         <JobSubpageContextHeader
           workspaceLabel="Job Subpage"
           workspaceTitle="Tests Workspace"
@@ -1617,8 +1619,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           secondaryLabel={isCompactTestWorkspace ? "Back to Tests" : undefined}
           compactMobile
         />
+        ) : null}
 
-      <section className={`${isCompactTestWorkspace ? "hidden" : "space-y-3"} sm:hidden print:hidden`}>
+      <section className={`${isCompactTestWorkspace || isCompletionReportFocused ? "hidden" : "space-y-3"} sm:hidden print:hidden`}>
         <div className="rounded-2xl border border-blue-200 bg-white px-4 py-3.5 shadow-[0_16px_28px_-26px_rgba(29,78,216,0.24)]">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -1688,12 +1691,12 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             Test Queue
           </Link>
           {!isCompactTestWorkspace ? (
-            <label
-              htmlFor="completion-report-toggle"
+            <Link
+              href={withS("completion_report", selectedSystemId)}
               className="inline-flex min-h-14 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-colors hover:bg-slate-50"
             >
               Report
-            </label>
+            </Link>
           ) : null}
           <details className="group rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)]">
             <summary className="flex min-h-14 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">
@@ -1725,7 +1728,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         </div>
       </section>
 
-      <div className="hidden rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:block sm:p-5 print:hidden">
+      <div className={`${isCompletionReportFocused ? "hidden" : "hidden rounded-lg border border-slate-200 bg-white p-4 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.36)] sm:block sm:p-5 print:hidden"}`}>
       <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-sm text-slate-600">
@@ -1765,9 +1768,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         <div className="flex w-full flex-col items-stretch gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
           {!isCompactTestWorkspace ? (
             <>
-              <label htmlFor="completion-report-toggle" className={eccSecondaryButtonClass}>
+              <Link href={withS("completion_report", selectedSystemId)} className={eccSecondaryButtonClass}>
                 Completion Report
-              </label>
+              </Link>
               <PrintButton className={eccSecondaryButtonClass} />
             </>
           ) : null}
@@ -1779,16 +1782,32 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
       </div>
 
-      <div className={isCompactTestWorkspace ? "hidden" : "order-last print:order-none"}>
+      <div className={isCompletionReportFocused ? "space-y-4 print:space-y-0" : isCompactTestWorkspace ? "hidden" : "order-last print:order-none"}>
       <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
+      {isCompletionReportFocused ? (
+      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] sm:flex-row sm:items-center sm:justify-between print:hidden">
+        <div>
+          <h1 className="text-lg font-bold text-slate-950">Completion Report</h1>
+          <p className="text-sm text-slate-600">Print-ready ECC report for {customerName}.</p>
+        </div>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Link href={selectedSystemId ? withS(undefined, selectedSystemId) : baseHref} className={eccSecondaryButtonClass}>
+            Back
+          </Link>
+          <PrintButton className={eccSecondaryButtonClass} label="Print" />
+          <PrintButton className={eccSecondaryButtonClass} label="Download" />
+        </div>
+      </div>
+      ) : (
       <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
         Report tools are secondary during active field entry.
         <label htmlFor="completion-report-toggle" className="ml-1 cursor-pointer font-medium text-slate-900 underline">
           Expand report
         </label>
       </div>
+      )}
 
-      <div className="hidden space-y-4 peer-checked:block print:block">
+      <div className={isCompletionReportFocused ? "block space-y-4 print:block print:space-y-0" : "hidden space-y-4 peer-checked:block print:block"}>
       <div className="hidden border-b border-slate-400 pb-2 print:block">
         <h1 className="text-lg font-bold text-slate-950">{internalBusinessDisplayName} Test Results</h1>
       </div>
@@ -2200,7 +2219,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       </div>
       </div>
 
-      <section className={`${eccPanelClass} ${isCompactTestWorkspace ? "space-y-3" : "space-y-5"} print:hidden`}>
+      <section className={`${isCompletionReportFocused ? "hidden" : eccPanelClass} ${isCompactTestWorkspace ? "space-y-3" : "space-y-5"} print:hidden`}>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
           <h2 className="text-lg font-semibold tracking-[-0.01em] text-slate-950">
