@@ -5,6 +5,18 @@ Mode: Documentation/planning only
 Authority: Subordinate to Active Spine and existing ACTIVE runbooks/roadmaps  
 Date: 2026-05-08
 
+## Payments / Deposits Reporting Foundation Closeout
+
+- Status: CLOSED for current reporting foundation.
+- Local payment-return/update issue was confirmed as local Stripe CLI webhook forwarding not running, not a core payment bug.
+- With webhook forwarding running locally, Checkout payment confirmation works through verified webhook handling as designed.
+- Checkout complete now uses `Payment submitted` copy, returns to invoice/job with refresh-aware payment-return state, and no longer exposes a separate refresh link.
+- Webhook-confirmed `internal_invoice_payments` plus allocation truth remain the only source for invoice paid/balance updates.
+- Deposits reporting foundation is complete: settlement schema foundation, settlement upsert uniqueness repair, production migration apply/verification, read-only Deposits report, payout/detail drilldown, summary/detail CSV exports, report dashboard discoverability for financial users, and owner-facing copy polish.
+- Access posture is locked: Owner/Admin/Billing can discover and open Deposits; Technician/Dispatcher do not see the Deposits entry where role context is available and remain blocked on direct URL access.
+- No sync controls are exposed in the UI, and reports/deposits adds no Stripe calls, payment links, invoice/payment/allocation mutation, settlement mutation, QBO behavior, refunds, disputes, or calculation changes.
+- Remaining future gate is controlled production money-flow proof: one real/live paid invoice or existing paid production invoice, one scoped settlement sync, Stripe Dashboard gross/fee/net comparison, Deposits report/detail/CSV verification, and payout/bank deposit confirmation when available. This is a future evidence gate, not an unresolved blocker to the current reporting foundation.
+
 ## ECC/Test Workflow Maturity Closeout
 
 - Status: CLOSED — implemented, smoked by owner, and ready as current ECC field-entry standard.
@@ -30,7 +42,7 @@ Date: 2026-05-08
 - No invoice paid/balance distortion was introduced.
 - Failed payments remain non-collected.
 - No visit or next-due-date mutation was introduced.
-- Deferred lanes remain unchanged: refunds/disputes deferred, ACH deferred, customer payment success redirect polish deferred.
+- Deferred lanes remain unchanged: refunds/disputes deferred and ACH deferred. Customer payment success redirect polish is complete for the current Checkout return screen; webhook confirmation remains the source of payment truth.
 - Next roadmap UX sequencing remains: invoice page UX cleanup next, customer page IA/UX cleanup follows.
 - Safety constraints satisfied for this closeout: no production Stripe action and no schema change.
 
@@ -1551,7 +1563,7 @@ Active planned groups in priority sequence:
 | 8 | Support / Owner Operations | Planned |
 | 9A | Recurring Services / Maintenance Agreements | Group 9A-2/3/4/5B/6/7B/8B/9A/9B/9C/9E/10B/10C closeout is documented, including manual `Mark Visit Counted` implementation (`1b69336`) and always-visible placement fix (`2ae1a4b`); boundaries remain no automatic counting/no due-date advancement/no invoice-payment behavior; production remains gated by intentional migration/flag enablement - see [Maintenance_Agreements_V1_Model_Spec.md](./Maintenance_Agreements_V1_Model_Spec.md) |
 | 9B | SMS / On-My-Way Messaging | Planned |
-| 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Current V1 intended scope complete; Payments V2 deferred register parked |
+| 9C | Tenant Customer Payments / Stripe Customer Payment Execution | Current V1 intended scope complete; Payments / Deposits reporting foundation closed; future controlled production money-flow smoke remains a gated evidence step; Payments V2 deferred register parked |
 | 9D | Customer Portal | Planned |
 | 9E | QBO / Accounting Sync | Last-last; optional downstream only |
 

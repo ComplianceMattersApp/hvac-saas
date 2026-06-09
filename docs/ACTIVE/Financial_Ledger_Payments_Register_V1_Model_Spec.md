@@ -9,6 +9,9 @@ Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, produc
 - Deposits / Payout Reconciliation V1 is documented in [Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md](./Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md).
 - Payments Register remains gross payment event truth over `internal_invoice_payments`.
 - `stripe_payment_settlements` is a separate additive settlement layer for Stripe fee/net/payout reconciliation and must not count toward collected totals or mutate invoice paid/balance.
+- Payments / Deposits reporting foundation is closed for current scope: production settlement migrations are applied and verified, Deposits report/detail/CSV exports are available to Owner/Admin/Billing users, Dispatcher/Technician access is hidden or blocked, and the future controlled production money-flow smoke remains a later evidence gate rather than an unresolved blocker.
+- Local Checkout testing note: invoice payment confirmation requires Stripe CLI forwarding with `stripe listen --forward-to localhost:3000/api/stripe/webhook`; `.env.local STRIPE_WEBHOOK_SECRET` must match the listener `whsec_...`, and the dev server must be restarted after changing `.env.local`.
+- Checkout complete page copy now presents `Payment submitted` and returns users through refresh-aware invoice/job links, but webhook confirmation remains the only writer of Stripe-collected payment truth.
 
 ## Phase 6J-A Note (Platform Application Fee Foundation)
 
@@ -28,7 +31,7 @@ Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, produc
 - Collected-money projection lock remains unchanged: invoice paid/balance truth remains gross-payment-derived with no paid/balance distortion.
 - Failed-payment lock remains unchanged: failed rows remain non-collected and must not inflate collected totals.
 - Operational lock remains unchanged: no visit mutation and no next-due-date mutation.
-- Deferred lock remains unchanged: refunds/disputes deferred, ACH deferred, customer payment success redirect polish deferred.
+- Deferred lock remains unchanged: refunds/disputes deferred and ACH deferred. Customer payment success redirect polish is complete for the current Checkout return screen; webhook confirmation remains payment truth.
 - Current UX sequencing note: invoice page UX cleanup is next lane; customer page IA/UX cleanup follows.
 - Closeout constraints remain satisfied: no production Stripe action and no schema change.
 

@@ -24,7 +24,7 @@
 - Projection lock remains unchanged: no invoice paid/balance distortion was introduced.
 - Operational lock remains unchanged: no `maintenance_agreement_visits` mutation and no `maintenance_agreements.next_due_date` mutation.
 - Failed-payment truth remains unchanged: failed attempts remain non-collected.
-- Deferred lanes remain unchanged: refunds/disputes deferred, ACH deferred, customer payment success redirect polish deferred.
+- Deferred lanes remain unchanged: refunds/disputes deferred and ACH deferred. Customer payment success redirect polish is complete for the current Checkout return screen; webhook confirmation remains payment truth.
 - Next roadmap UX lane: invoice page UX cleanup.
 - Follow-on UX lane: customer page IA/UX cleanup after invoice page cleanup.
 - Safety/infra lock for this closeout: no production Stripe action and no schema change.

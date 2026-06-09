@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import {
   isInternalAccessError,
   requireInternalRole,
@@ -54,12 +55,12 @@ function FieldBillingAccessControls(params: {
               <h3 className="text-sm font-semibold text-slate-950">Field Billing Access</h3>
               <p className="text-xs leading-5 text-slate-600">These permissions do not change the user's role.</p>
             </div>
-            <button
-              type="submit"
+            <ImmediateSubmitButton
+              pendingText="Saving..."
               className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
             >
               Save Field Billing Access
-            </button>
+            </ImmediateSubmitButton>
           </div>
 
           <div className="mt-4 space-y-3">
@@ -348,12 +349,12 @@ export default async function AdminInternalUsersPage({
             Review your team list, then confirm team setup. Do this early so customer and job work can move without delays.
           </p>
           <form action={confirmTeamSetupFromForm} className="mt-3">
-            <button
-              type="submit"
+            <ImmediateSubmitButton
+              pendingText="Confirming..."
               className="inline-flex items-center rounded-lg bg-amber-900 px-3.5 py-2 text-sm font-semibold text-white shadow-sm transition-[background-color,box-shadow,transform] hover:bg-amber-800 active:translate-y-[0.5px]"
             >
               Confirm team setup
-            </button>
+            </ImmediateSubmitButton>
           </form>
         </div>
       ) : null}
@@ -396,12 +397,12 @@ export default async function AdminInternalUsersPage({
             <option value="billing">Billing / AR</option>
             <option value="technician">Technician</option>
           </select>
-          <button
-            type="submit"
+          <ImmediateSubmitButton
+            pendingText="Sending invite..."
             className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
           >
             Send Invite
-          </button>
+          </ImmediateSubmitButton>
         </form>
       </div>
       </div>
@@ -478,13 +479,13 @@ export default async function AdminInternalUsersPage({
                         />
                         <span className="whitespace-nowrap">Track time</span>
                       </label>
-                      <button
-                        type="submit"
+                      <ImmediateSubmitButton
+                        pendingText="Updating..."
                         disabled={!row.is_active}
                         className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         Update
-                      </button>
+                      </ImmediateSubmitButton>
                     </form>
 
                     <form action={updateInternalUserRoleFromForm} className="flex items-center gap-2">
@@ -499,33 +500,34 @@ export default async function AdminInternalUsersPage({
                         <option value="billing">Billing / AR</option>
                         <option value="tech">Technician</option>
                       </select>
-                      <button
+                      <ImmediateSubmitButton
                         type="submit"
+                        pendingText="Updating..."
                         className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                       >
                         Update Role
-                      </button>
+                      </ImmediateSubmitButton>
                     </form>
 
                     {row.is_active ? (
                       <form action={deactivateInternalUserFromForm}>
                         <input type="hidden" name="user_id" value={row.user_id} />
-                        <button
-                          type="submit"
+                        <ImmediateSubmitButton
+                          pendingText="Pausing..."
                           className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
                         >
                           Pause Team Access
-                        </button>
+                        </ImmediateSubmitButton>
                       </form>
                     ) : (
                       <form action={activateInternalUserFromForm}>
                         <input type="hidden" name="user_id" value={row.user_id} />
-                        <button
-                          type="submit"
+                        <ImmediateSubmitButton
+                          pendingText="Restoring..."
                           className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
                         >
                           Restore Team Access
-                        </button>
+                        </ImmediateSubmitButton>
                       </form>
                     )}
 

@@ -4,6 +4,43 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Trust Lane / Deposits and Payout Reconciliation V1
 Scope: docs/model only. No product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, QBO behavior, production data, or customer-facing behavior is changed or authorized by this spec.
 
+## Final Closeout - Payments / Deposits Reporting Foundation
+
+Status: CLOSED FOR CURRENT FOUNDATION.
+
+Closed/confirmed:
+
+- Local invoice payment return/update issue was diagnosed as local Stripe CLI webhook forwarding not running, not a core payment bug.
+- With local Stripe CLI forwarding running, Checkout payment confirmation works as designed through webhook confirmation.
+- Local Checkout testing requires `stripe listen --forward-to localhost:3000/api/stripe/webhook`.
+- Local `.env.local STRIPE_WEBHOOK_SECRET` must match the listener `whsec_...`, and the dev server must be restarted after changing `.env.local`.
+- Production webhooks are handled by Stripe delivery to deployed `/api/stripe/webhook`; the local listener note is only for local development.
+- Checkout complete now uses owner-friendly `Payment submitted` language.
+- `Return to invoice` and `Back to job` carry refresh/payment-return state.
+- The separate refresh link was removed because the main return actions now carry the useful refresh context.
+- Webhook-confirmed payment truth remains the only source for invoice paid/balance updates.
+- Settlement table foundation and settlement upsert uniqueness repair are complete.
+- Sandbox settlement sync proved the gross, Stripe fee, and net settlement path without mutating invoice/payment/allocation truth.
+- Production migrations for the settlement foundation and upsert uniqueness repair were applied and verified.
+- `stripe_payment_settlements` exists in production with RLS and SELECT-only app policy posture verified.
+- PostgREST visibility for the settlement table was verified.
+- Deposits report, deposit detail, and summary/detail CSV exports exist.
+- Reports dashboard exposes a visible `Deposits` card for financial users.
+- Owner/Admin/Billing can discover and open Deposits.
+- Technician/Dispatcher users do not see the Deposits report entry where role context is available and remain blocked on direct access.
+- Unauthorized direct access redirects cleanly to the reports dashboard with a not-authorized banner.
+- Deposits page copy is owner-facing and explains Stripe fees, net deposits, payout timing, and CSV exports without implying invoice truth changes.
+- Date filters, apply/reset filters, summary CSV, and detail CSV passed production smoke.
+- No sync controls are exposed in the UI.
+- No Stripe API calls are made from report/deposit pages or exports.
+- No invoice, payment, allocation, or settlement mutation path was added from reports/deposits.
+- Settlement rows explain Stripe fee/net/payout timing only; they do not change invoice paid/balance truth.
+
+Remaining future gate, not a blocker to this foundation closeout:
+
+- A controlled production money-flow smoke remains a later explicit gate: one real/live paid invoice or existing paid production invoice, one settlement sync, Stripe Dashboard gross/fee/net comparison, Deposits report/detail/CSV verification, and payout/bank deposit confirmation when available.
+- That future smoke must remain controlled and explicit. It is not part of this closeout and does not authorize production sync controls, broad tenant sync, payment links, charges, refunds, disputes, or invoice/payment/allocation mutation.
+
 ## Phase H-1A Note - Settlement Upsert Uniqueness Repair
 
 Sandbox Phase H-1 smoke found a settlement persistence blocker:
@@ -380,7 +417,7 @@ Schema posture:
 - Settlement kind is constrained to `payment`, `refund`, `dispute`, `adjustment`, `application_fee`, `payout_adjustment`, and `unmatched`.
 - Sync status is constrained to `pending`, `synced`, `skipped`, `unmatched`, and `failed`.
 - Currency is constrained to lowercase three-letter ISO-style values.
-- Balance transaction identity is idempotent through a partial unique index on `(stripe_connected_account_id, stripe_balance_transaction_id)`.
+- Balance transaction identity is idempotent through the repaired full unique index on `(stripe_connected_account_id, stripe_balance_transaction_id)`.
 - RLS is enabled with account-scoped SELECT for authenticated internal users.
 - No DELETE policy exists.
 - No app INSERT/UPDATE policies exist in this first posture; future sync writes must be explicit server-side service/admin paths.
@@ -392,13 +429,13 @@ Validation for closeout:
 
 ## Readiness Verdict
 
-GO WITH LIMITATIONS.
+FOUNDATION CLOSED; FUTURE MONEY-FLOW GATE REMAINS.
 
-Gross payment tracking is usable, but owner-grade bank deposit and Stripe payout reconciliation is missing.
+Gross payment tracking remains usable and webhook-confirmed. Owner-facing Deposits reporting foundation now exists for Stripe fee, net, payout timing, detail drilldown, and CSV export over settlement truth.
 
-Current payment reporting can show collected invoice payment truth from `internal_invoice_payments`. Failed payments are separated. Reversed rows are excluded from collected totals. The Payments Register CSV is useful for operational review, but it is not bookkeeping-complete because it does not include Stripe fee, net, balance transaction, payout, or arrival-date detail.
+Current Payments Register reporting continues to show collected invoice payment truth from `internal_invoice_payments`. Failed payments are separated. Reversed rows are excluded from collected totals. Deposits reporting is the separate read-only settlement layer for Stripe fee/net/payout explanation.
 
-The current app cannot fully explain why a `$500.00` collected invoice payment becomes a `$490.00` bank deposit. Until this V1 layer is live and smoke-tested, Stripe Dashboard remains the fallback for bank deposit explanation.
+The current app can explain synced Stripe settlement rows in owner-facing terms. Stripe Dashboard remains the operational comparison source for controlled money-flow smoke and for any future sync-failed or bank-confirmation investigation.
 
 ## Cross-References
 
@@ -789,27 +826,33 @@ Manual/internal sync controls should be more restrictive at first:
 
 Settlement row reads must remain account scoped. Settlement writes should be service/admin-only in first posture.
 
-## Production Gates
+## Production / Future Money-Flow Gate
 
-Do not expose Deposits / Payout Reconciliation as owner-facing production truth until:
+The Deposits reporting foundation is production-applied and smoke-tested for safe empty/report/export behavior. The following items are no longer blockers for report discoverability:
 
 - additive settlement schema is reviewed and applied safely
 - RLS/account scoping is validated
 - connected account readiness is complete for the target tenant
-- End-to-End Money Movement Verification gate passes
 - settlement sync succeeds in sandbox
-- at least one successful payment can be traced from invoice gross payment to balance transaction to payout
-- CSV export matches Stripe Dashboard for at least one payout
 - failed/unmatched sync states are visible
 - no invoice paid/balance mutation occurs from settlement sync
 - no payment/allocation mutation occurs from settlement sync
 - no QBO/general-ledger behavior is introduced
-- support/operator runbook exists for Stripe Dashboard fallback and sync-failed handling
-- rollback plan is clear: hide report/sync controls while preserving settlement rows
+
+Future controlled production money-flow smoke remains separately gated:
+
+- one real/live paid invoice or existing paid production invoice
+- one explicit settlement sync for the scoped payment/account only
+- trace invoice gross payment to balance transaction, fees, net, payout identity/status, and arrival date where available
+- compare Deposits report/detail/CSV against Stripe Dashboard gross, fees, and net
+- confirm payout/bank deposit when available
+- confirm again that settlement sync does not mutate invoice/payment/allocation truth
+
+This future gate is not an unresolved blocker to the foundation closeout. It is the next evidence step before treating a live money-flow sample as reconciled end to end.
 
 ## End-to-End Money Movement Verification Gate
 
-Owner-facing deposit reconciliation is not complete until this gate passes.
+Owner-facing deposit reconciliation foundation is complete. A live money-flow sample is not complete until this gate passes.
 
 This gate verifies reporting accuracy and actual tenant payout correctness. It must prove the full chain from issued invoice to Stripe connected-account charge, local gross payment truth, settlement sync, payout status, and bank deposit confirmation when available.
 
@@ -1024,4 +1067,4 @@ This Phase A document is docs-only.
 
 It does not change product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, or QBO behavior.
 
-Stripe Dashboard remains the operational fallback for fee/net/payout explanation until the V1 settlement layer is implemented, smoke-tested, and explicitly released.
+Stripe Dashboard remains the operational comparison source for controlled money-flow smoke, sync-failed investigation, and payout/bank confirmation when needed.

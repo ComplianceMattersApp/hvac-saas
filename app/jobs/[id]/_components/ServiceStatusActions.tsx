@@ -2,7 +2,7 @@
 
 import type { BillingMode } from "@/lib/business/internal-business-profile";
 import { markServiceComplete, markInvoiceSent } from "@/lib/actions/service-actions";
-import SubmitButton from "@/components/SubmitButton";
+import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 
 function LineIcon(props: { children: React.ReactNode; className?: string }) {
   return (
@@ -86,22 +86,22 @@ export default function ServiceStatusActions({
 
       <div className={`mt-4 grid grid-cols-1 gap-2 ${isInternalInvoicing ? "" : "sm:grid-cols-2"}`}>
         <form action={completeAction}>
-          <SubmitButton
-            loadingText="Marking complete..."
+          <ImmediateSubmitButton
+            pendingText="Marking complete..."
             className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50"
           >
             Mark Service Complete → Invoice Required
-          </SubmitButton>
+          </ImmediateSubmitButton>
         </form>
 
         {!isInternalInvoicing ? (
           <form action={invoiceSentAction}>
-            <SubmitButton
-              loadingText="Marking..."
+            <ImmediateSubmitButton
+              pendingText="Marking..."
               className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-black px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-gray-800"
             >
               Mark External Billing Complete → Closed
-            </SubmitButton>
+            </ImmediateSubmitButton>
           </form>
         ) : null}
 

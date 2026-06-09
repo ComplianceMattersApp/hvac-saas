@@ -32,7 +32,7 @@
 - Invoice/payment truth lock remains unchanged: gross payment truth is preserved with no invoice paid/balance distortion.
 - Failed-payment handling lock remains unchanged: failed attempts remain non-collected.
 - Operational lock remains unchanged: no visit mutation and no next-due-date mutation.
-- Deferred lock remains unchanged: refunds/disputes deferred, ACH deferred, customer payment success redirect polish deferred.
+- Deferred lock remains unchanged: refunds/disputes deferred and ACH deferred. Customer payment success redirect polish is complete for the current Checkout return screen; webhook confirmation remains payment truth.
 - Next UX sequencing remains explicit: invoice page UX cleanup next, customer page IA/UX cleanup after invoice page.
 - Closeout constraints remain satisfied: no production Stripe action and no schema change.
 

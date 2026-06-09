@@ -1,6 +1,7 @@
 "use client";
 
 import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 
 type JobFieldActionButtonProps = {
@@ -14,13 +15,16 @@ type JobFieldActionButtonProps = {
 function FieldActionSubmitButton({
   label,
   pendingLabel,
+  submitted,
   variant = "default",
 }: {
   label: string;
   pendingLabel: string;
+  submitted: boolean;
   variant?: "default" | "fieldMode" | "commandBar";
 }) {
   const { pending } = useFormStatus();
+  const isPending = pending || submitted;
   const className =
     variant === "fieldMode"
       ? "inline-flex min-h-14 w-full items-center justify-center whitespace-nowrap rounded-xl border border-blue-700 bg-blue-700 px-5 py-3 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-[background-color,box-shadow,transform] hover:bg-blue-800 hover:shadow-[0_20px_36px_-22px_rgba(29,78,216,0.56)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 active:translate-y-[0.5px] disabled:cursor-not-allowed disabled:opacity-60"
@@ -31,10 +35,22 @@ function FieldActionSubmitButton({
   return (
     <button
       type="submit"
-      disabled={pending}
+      disabled={isPending}
+      aria-busy={isPending}
+      aria-live="polite"
       className={className}
     >
-      {pending ? pendingLabel : label}
+      {isPending ? (
+        <span className="inline-flex items-center justify-center gap-2">
+          <span
+            aria-hidden="true"
+            className="h-4 w-4 animate-spin rounded-full border-2 border-current border-r-transparent"
+          />
+          <span>{pendingLabel}</span>
+        </span>
+      ) : (
+        label
+      )}
     </button>
   );
 }
@@ -46,6 +62,7 @@ export function JobFieldActionButton({
   hasFullSchedule,
   variant = "default",
 }: JobFieldActionButtonProps) {
+  const [submitted, setSubmitted] = useState(false);
   const isDone = ["completed", "failed", "cancelled"].includes(currentStatus);
 
   const label =
@@ -79,8 +96,16 @@ export function JobFieldActionButton({
       className={variant === "fieldMode" ? "w-full" : variant === "commandBar" ? "w-auto flex-none" : "min-w-[9.5rem] flex-1 sm:w-auto sm:min-w-0 sm:flex-none"}
       action={advanceJobStatusFromForm}
       onSubmit={(e) => {
+        if (submitted) {
+          e.preventDefault();
+          return;
+        }
+
         const needsScheduleConfirm = currentStatus === "open" && !hasFullSchedule;
-        if (!needsScheduleConfirm) return;
+        if (!needsScheduleConfirm) {
+          setSubmitted(true);
+          return;
+        }
 
         const confirmed = window.confirm(
           "This job is missing a full schedule. Press OK to auto-fill today with a 2-hour window starting now and continue to On the way."
@@ -97,6 +122,7 @@ export function JobFieldActionButton({
         ) as HTMLInputElement | null;
 
         if (hidden) hidden.value = "1";
+        setSubmitted(true);
       }}
     >
       <input type="hidden" name="job_id" value={jobId} />
@@ -104,7 +130,7 @@ export function JobFieldActionButton({
       <input type="hidden" name="tab" value={tab} />
       <input type="hidden" name="auto_schedule_confirmed" value="0" />
 
-      <FieldActionSubmitButton label={label} pendingLabel={pendingLabel} variant={variant} />
+      <FieldActionSubmitButton label={label} pendingLabel={pendingLabel} submitted={submitted} variant={variant} />
     </form>
   );
 }

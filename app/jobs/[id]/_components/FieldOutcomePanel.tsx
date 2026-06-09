@@ -1,4 +1,4 @@
-import SubmitButton from "@/components/SubmitButton";
+import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
 import {
   markJobApprovalNeededFromForm,
@@ -32,12 +32,12 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
         <input type="hidden" name="job_id" value={props.jobId} />
         <input type="hidden" name="current_status" value={props.currentStatus} />
         <input type="hidden" name="tab" value={props.tab} />
-        <SubmitButton
-          loadingText="Completing..."
+        <ImmediateSubmitButton
+          pendingText="Completing..."
           className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800 sm:w-auto sm:px-4"
         >
           Confirm Work Completed
-        </SubmitButton>
+        </ImmediateSubmitButton>
       </form>
 
       <details className="mt-3 w-full rounded-xl border border-amber-200/80 bg-amber-50/40 p-3">
@@ -72,12 +72,12 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
               placeholder="What part or issue is needed?"
             />
             <div className="mt-2 flex items-center">
-              <SubmitButton
-                loadingText="Saving..."
+              <ImmediateSubmitButton
+                pendingText="Saving..."
                 className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
               >
                 Submit Parts Needed
-              </SubmitButton>
+              </ImmediateSubmitButton>
             </div>
           </form>
 
@@ -99,12 +99,12 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
               placeholder="Example: customer approval for repair, owner approval for added work"
             />
             <div className="mt-2 flex items-center">
-              <SubmitButton
-                loadingText="Saving..."
+              <ImmediateSubmitButton
+                pendingText="Saving..."
                 className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
               >
                 Submit Approval Needed
-              </SubmitButton>
+              </ImmediateSubmitButton>
             </div>
           </form>
 
@@ -127,12 +127,12 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
               placeholder="Example: customer not home, no access, unsafe condition, missing information"
             />
             <div className="mt-2 flex items-center">
-              <SubmitButton
-                loadingText="Saving..."
+              <ImmediateSubmitButton
+                pendingText="Saving..."
                 className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
               >
                 Submit Unable to Complete
-              </SubmitButton>
+              </ImmediateSubmitButton>
             </div>
           </form>
 
@@ -156,12 +156,12 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
                 placeholder="Example: original issue resolved, but separate airflow issue found in upstairs zone"
               />
               <div className="mt-2 flex items-center">
-                <SubmitButton
-                  loadingText="Saving..."
+                <ImmediateSubmitButton
+                  pendingText="Saving..."
                   className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 transition-colors hover:bg-amber-100 sm:w-auto"
                 >
                   Submit Different Issue Found
-                </SubmitButton>
+                </ImmediateSubmitButton>
               </div>
             </form>
           ) : null}
