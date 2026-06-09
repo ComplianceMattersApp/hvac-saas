@@ -1648,7 +1648,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             </div>
             <div className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5">
               <div className="text-base font-semibold text-sky-950">{selectedNotStartedCount}</div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-700">New</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-700">Not Started</div>
             </div>
           </div>
 
@@ -1684,47 +1684,40 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           >
             Equipment
           </Link>
-          <Link
-            href={selectedSystemId ? withS(undefined, selectedSystemId) : `/jobs/${job.id}/tests`}
-            className="inline-flex min-h-14 items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-colors hover:bg-slate-50"
-          >
-            Test Queue
-          </Link>
           {!isCompactTestWorkspace ? (
             <Link
               href={withS("completion_report", selectedSystemId)}
               className="inline-flex min-h-14 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-colors hover:bg-slate-50"
             >
-              Report
+              Completion Report
             </Link>
           ) : null}
-          <details className="group rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)]">
-            <summary className="flex min-h-14 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">
-              Systems
-            </summary>
-            <div className="mt-3 grid gap-2 border-t border-slate-200 pt-3">
-              {systems.length ? (
-                systems.map((sys: any) => {
-                  const isActive = String(sys.id) === String(selectedSystemId);
-                  return (
-                    <Link
-                      key={sys.id}
-                      href={withS(focusedType || undefined, String(sys.id))}
-                      className={`rounded-lg border px-3 py-2 text-sm font-semibold ${
-                        isActive
-                          ? "border-slate-900 bg-slate-900 text-white"
-                          : "border-slate-200 bg-slate-50 text-slate-800"
-                      }`}
-                    >
-                      {sys.name}
-                    </Link>
-                  );
-                })
-              ) : (
-                <div className="text-sm text-slate-600">No systems yet.</div>
-              )}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3 shadow-[0_14px_26px_-28px_rgba(15,23,42,0.28)]">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">System Label</div>
+          {systems.length > 1 ? (
+            <div className="mt-2 flex gap-2 overflow-x-auto pb-1">
+              {systems.map((sys: any) => {
+                const isActive = String(sys.id) === String(selectedSystemId);
+                return (
+                  <Link
+                    key={sys.id}
+                    href={withS(focusedType || undefined, String(sys.id))}
+                    className={`inline-flex min-h-10 shrink-0 items-center rounded-full border px-3 py-2 text-sm font-semibold ${
+                      isActive
+                        ? "border-slate-900 bg-slate-900 text-white shadow-sm"
+                        : "border-slate-200 bg-slate-50 text-slate-800"
+                    }`}
+                  >
+                    {sys.name}
+                  </Link>
+                );
+              })}
             </div>
-          </details>
+          ) : (
+            <div className="mt-1 text-sm font-semibold text-slate-950">{selectedSystemName}</div>
+          )}
         </div>
       </section>
 
@@ -1798,14 +1791,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <PrintButton className={eccSecondaryButtonClass} label="Download" />
         </div>
       </div>
-      ) : (
-      <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
-        Report tools are secondary during active field entry.
-        <label htmlFor="completion-report-toggle" className="ml-1 cursor-pointer font-medium text-slate-900 underline">
-          Expand report
-        </label>
-      </div>
-      )}
+      ) : null}
 
       <div className={isCompletionReportFocused ? "block space-y-4 print:block print:space-y-0" : "hidden space-y-4 peer-checked:block print:block"}>
       <div className="hidden border-b border-slate-400 pb-2 print:block">

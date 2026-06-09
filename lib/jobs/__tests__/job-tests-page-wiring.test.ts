@@ -168,6 +168,20 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain('isCompletionReportFocused ? "block space-y-4 print:block print:space-y-0"');
     expect(jobTestsPageSource).toContain('isCompletionReportFocused ? "hidden" : eccPanelClass');
   });
+
+  it("keeps the mobile test hub matrix focused on actions and visible system chips", () => {
+    expect(jobTestsPageSource).not.toContain('Test Queue');
+    expect(jobTestsPageSource).not.toContain('<summary className="flex min-h-14 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">\n              Systems');
+    expect(jobTestsPageSource).toContain('Completion Report');
+    expect(jobTestsPageSource).toContain('systems.length > 1 ? (');
+    expect(jobTestsPageSource).toContain('System Label');
+    expect(jobTestsPageSource).toContain('className="mt-2 flex gap-2 overflow-x-auto pb-1"');
+    expect(jobTestsPageSource).toContain('inline-flex min-h-10 shrink-0 items-center rounded-full');
+    expect(jobTestsPageSource).toContain('href={withS(focusedType || undefined, String(sys.id))}');
+    expect(jobTestsPageSource).toContain('<div className="mt-1 text-sm font-semibold text-slate-950">{selectedSystemName}</div>');
+    expect(jobTestsPageSource).not.toContain('Report tools are secondary during active field entry.');
+    expect(jobTestsPageSource).not.toContain('Expand report');
+  });
 });
 
 describe("job detail field operations board layout", () => {
