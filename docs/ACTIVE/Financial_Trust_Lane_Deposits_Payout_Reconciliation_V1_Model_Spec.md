@@ -399,19 +399,26 @@ Report posture:
 Summary cards:
 
 - Gross Collected
-- Stripe Fees
-- Platform Fees
+- Fees & Adjustments
 - Net Deposits
 - Pending Payouts
-- Adjustments / Unmatched
+- Unmatched / Needs Review
+
+Owner-facing deposit dashboards should favor a simple gross-to-net explanation:
+Gross Collected minus Fees & Adjustments equals Net Deposits.
+
+The underlying settlement table may retain separate Stripe fee, platform/application fee, fee detail, settlement kind, and reporting category fields for audit, detail drilldown, and CSV export. The combined Fees & Adjustments value is derived display truth only. It does not alter settlement truth, payment truth, invoice truth, allocation truth, or collected totals.
+
+Fees & Adjustments may include only proven Stripe fees, proven platform/application fees, and proven adjustment/refund/dispute/payout adjustment amounts already represented in settlement data. Platform/application fee must never be guessed.
 
 Table columns:
 
 - payout date
 - payout id
 - gross amount
-- Stripe fees
-- platform fees
+- fees & adjustments
+- Stripe fees, available in drilldown/export where proven
+- platform/application fees, available in drilldown/export where proven
 - net amount
 - payout status
 - arrival date
@@ -436,8 +443,10 @@ Detail view should show included settlement rows:
 - job/test reference
 - job title
 - gross amount
+- total fees & adjustments
 - Stripe fee
-- platform fee
+- platform/application fee where proven
+- adjustment amount where applicable
 - net amount
 - currency
 - charge id
@@ -453,6 +462,8 @@ Detail view should show included settlement rows:
 
 Unmatched Stripe items must be visible as unmatched, not hidden or forced into invoice/payment truth.
 
+Detail views preserve the fee and adjustment breakdown behind the owner-facing rollup. Platform/application fee remains a proven settlement field only and must never be inferred.
+
 ## CSV Export Shape
 
 V1 should include two exports:
@@ -467,8 +478,10 @@ Deposit Summary CSV fields:
 - payout arrival date
 - payout available/created date where applicable
 - gross amount
+- total fees & adjustments
 - Stripe fees
-- platform fees
+- platform/application fees where proven
+- adjustment amount
 - net amount
 - currency
 - payment count
@@ -487,8 +500,10 @@ Deposit Detail CSV fields:
 - job reference
 - job title
 - gross amount
+- total fees & adjustments
 - Stripe fee
-- platform fee
+- platform/application fee where proven
+- adjustment amount
 - net amount
 - currency
 - charge id
@@ -502,6 +517,8 @@ Deposit Detail CSV fields:
 - sync error where present
 
 CSV export must be bookkeeping-oriented and must include stable Stripe identifiers.
+
+Exports must preserve the breakdown behind the owner-facing Fees & Adjustments rollup, including total fees and adjustments, Stripe fee, platform/application fee where proven, adjustment amount or unmatched marker where applicable, and net amount.
 
 ## Access Control
 
@@ -666,7 +683,7 @@ Acceptance:
 
 - Owner/Admin/Billing access only
 - grouped payout summary
-- gross/fee/net/pending/unmatched summary
+- gross/fees-and-adjustments/net/pending/unmatched summary
 - no mutations
 
 ### Phase F - Deposit Detail
@@ -688,7 +705,8 @@ Acceptance:
 
 - bookkeeping fields included
 - Stripe identifiers included
-- gross/fee/net included
+- gross/fees-and-adjustments/net included
+- Stripe fee and platform/application fee breakdown included where proven
 - unmatched/sync status included
 
 ### Phase H - Sandbox / Live Smoke
@@ -719,8 +737,10 @@ A tenant owner can reconcile a collected Stripe payment to a bank deposit.
 Minimum proof:
 
 - App shows gross invoice payment amount.
-- App shows Stripe fee.
-- App shows platform/application fee when represented in settlement data.
+- App shows owner-facing Fees & Adjustments as the combined proven rollup.
+- Detail and CSV views show Stripe fee.
+- Detail and CSV views show platform/application fee when represented in settlement data.
+- Detail and CSV views show adjustment amount or unmatched marker where applicable.
 - App shows net amount.
 - App shows balance transaction id.
 - App shows payout id.
@@ -732,7 +752,7 @@ Minimum proof:
 
 Example target explanation:
 
-`$500.00` gross collected payment minus `$10.00` combined Stripe/platform settlement costs equals `$490.00` net deposited, tied to Stripe balance transaction and payout identity.
+`$500.00` Gross Collected minus `$10.00` Fees & Adjustments equals `$490.00` Net Deposits, tied to Stripe balance transaction and payout identity.
 
 ## Non-Implementation Confirmation
 
