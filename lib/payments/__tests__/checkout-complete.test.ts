@@ -16,19 +16,15 @@ describe("checkout complete view model", () => {
       isInternalUser: true,
     });
 
-    expect(viewModel.heading).toBe("Payment checkout complete");
-    expect(viewModel.body).toBe(
-      "Thank you. Your payment was submitted in Stripe Checkout. Invoice balance updates after Stripe confirms processing.",
-    );
+    expect(viewModel.heading).toBe("Payment submitted");
+    expect(viewModel.body).toBe("Stripe is confirming the payment now. This usually updates in a moment.");
+    expect(viewModel.secondaryBody).toBe("Return to the invoice or job to see the latest payment status.");
     expect(viewModel.actions.map((action) => action.label)).toEqual(["Return to invoice", "Back to job"]);
     expect(viewModel.actions[0].href).toBe(
       "/jobs/12345678-1234-4234-9234-1234567890ab/invoice?payment_return=success",
     );
     expect(viewModel.actions[1].href).toBe(
       "/jobs/12345678-1234-4234-9234-1234567890ab?tab=ops&payment_return=success",
-    );
-    expect(viewModel.refreshHref).toBe(
-      "/jobs/12345678-1234-4234-9234-1234567890ab/invoice?payment_return=success",
     );
   });
 
@@ -62,20 +58,28 @@ describe("checkout complete view model", () => {
         variant: "primary",
       },
     ]);
-    expect(viewModel.refreshHref).toBeNull();
+    expect(viewModel.secondaryBody).toBe("Return to the invoice or job to see the latest payment status.");
   });
 });
 
 describe("checkout complete page wiring", () => {
   it("renders internal return actions and does not wire payment truth writes", () => {
     expect(pageSource).toContain("resolveCheckoutCompleteViewModel");
-    expect(pageSource).toContain("Refresh payment status");
+    expect(pageSource).toContain("secondaryBody");
+    expect(pageSource).not.toContain("Refresh payment status");
     expect(helperSource).toContain("Return to invoice");
     expect(helperSource).toContain("Back to job");
     expect(helperSource).toContain("Team sign in");
-    expect(helperSource).toContain("Invoice balance updates after Stripe confirms processing.");
+    expect(helperSource).toContain("Stripe is confirming the payment now. This usually updates in a moment.");
+    expect(helperSource).toContain("Return to the invoice or job to see the latest payment status.");
+    expect(helperSource).not.toContain("internal_invoice_payments");
+    expect(helperSource).not.toContain("internal_invoice_payment_allocations");
+    expect(helperSource).not.toContain("internal_invoices");
+    expect(helperSource).not.toMatch(/\bstripe\./);
     expect(pageSource).not.toContain("recordInternalInvoicePaymentFromForm");
     expect(pageSource).not.toContain("internal_invoice_payments");
     expect(pageSource).not.toContain("internal_invoice_payment_allocations");
+    expect(pageSource).not.toContain("internal_invoices");
+    expect(pageSource).not.toMatch(/\bstripe\./);
   });
 });

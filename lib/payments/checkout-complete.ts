@@ -9,8 +9,8 @@ export type CheckoutCompleteAction = {
 export type CheckoutCompleteViewModel = {
   heading: string;
   body: string;
+  secondaryBody: string | null;
   actions: CheckoutCompleteAction[];
-  refreshHref: string | null;
 };
 
 function isUuid(value: string) {
@@ -41,23 +41,26 @@ export function resolveCheckoutCompleteViewModel(params: {
   const hasInvoiceContext = isUuid(invoiceId);
   const hasInternalContext = params.isInternalUser && (hasJobContext || hasInvoiceContext);
 
-  const heading = status === "cancelled" ? "Payment checkout cancelled" : "Payment checkout complete";
+  const heading = status === "cancelled" ? "Payment checkout cancelled" : "Payment submitted";
   const body =
     status === "cancelled"
       ? "No payment was submitted. You can close this page or return to the invoice link when you are ready."
-      : "Thank you. Your payment was submitted in Stripe Checkout. Invoice balance updates after Stripe confirms processing.";
+      : "Stripe is confirming the payment now. This usually updates in a moment.";
+  const secondaryBody =
+    status === "cancelled"
+      ? null
+      : "Return to the invoice or job to see the latest payment status.";
 
   if (!hasInternalContext) {
     return {
       heading,
       body,
+      secondaryBody,
       actions: [{ label: "Team sign in", href: "/login", variant: "primary" }],
-      refreshHref: null,
     };
   }
 
   const actions: CheckoutCompleteAction[] = [];
-  let refreshHref: string | null = null;
 
   if (hasJobContext) {
     actions.push({
@@ -70,15 +73,13 @@ export function resolveCheckoutCompleteViewModel(params: {
       href: `/jobs/${jobId}?tab=ops&payment_return=${status}`,
       variant: "secondary",
     });
-    refreshHref = `/jobs/${jobId}/invoice?payment_return=${status}`;
   } else if (hasInvoiceContext) {
     actions.push({
       label: "Return to invoice",
       href: `/reports/invoices?payment_return=${status}`,
       variant: "primary",
     });
-    refreshHref = `/reports/invoices?payment_return=${status}`;
   }
 
-  return { heading, body, actions, refreshHref };
+  return { heading, body, secondaryBody, actions };
 }

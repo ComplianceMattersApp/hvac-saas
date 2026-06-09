@@ -30,10 +30,8 @@ export default async function CheckoutCompletePage({
         </div>
         <h1 className="mt-4 text-2xl font-semibold tracking-tight text-slate-950">{viewModel.heading}</h1>
         <p className="mt-3 text-sm leading-6 text-slate-600">{viewModel.body}</p>
-        {viewModel.refreshHref ? (
-          <p className="mt-3 text-sm leading-6 text-slate-600">
-            If the invoice still shows unpaid, refresh the invoice after Stripe processing completes.
-          </p>
+        {viewModel.secondaryBody ? (
+          <p className="mt-3 text-sm leading-6 text-slate-600">{viewModel.secondaryBody}</p>
         ) : null}
 
         <div className="mt-6 flex flex-wrap gap-2">
@@ -51,17 +49,6 @@ export default async function CheckoutCompletePage({
             </Link>
           ))}
         </div>
-
-        {viewModel.refreshHref ? (
-          <div className="mt-4">
-            <Link
-              href={viewModel.refreshHref}
-              className="text-sm font-medium text-slate-700 underline decoration-slate-300 underline-offset-4 hover:text-slate-950"
-            >
-              Refresh payment status
-            </Link>
-          </div>
-        ) : null}
       </div>
     </div>
   );
