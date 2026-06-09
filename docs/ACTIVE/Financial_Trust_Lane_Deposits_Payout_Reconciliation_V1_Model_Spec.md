@@ -4,6 +4,48 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Trust Lane / Deposits and Payout Reconciliation V1
 Scope: docs/model only. No product code, schema, migrations, Stripe behavior, reports, env, RLS, payments, invoices, allocations, QBO behavior, production data, or customer-facing behavior is changed or authorized by this spec.
 
+## Phase B Closeout - Stripe Payment Settlements Schema Foundation
+
+Phase B created dormant additive settlement schema foundation in migration:
+
+`supabase/migrations/20260610110000_stripe_payment_settlements_foundation.sql`
+
+Created table:
+
+`public.stripe_payment_settlements`
+
+Locked result:
+
+- `stripe_payment_settlements` is additive Stripe fee/net/payout reconciliation truth only.
+- `internal_invoice_payments` remains gross payment event truth.
+- `internal_invoice_payment_allocations` remains payment-to-invoice allocation truth.
+- Invoice paid/balance projection is unchanged.
+- Payments Register behavior is unchanged.
+- Stripe checkout/session behavior is unchanged.
+- Stripe webhook behavior is unchanged.
+- QBO/general-ledger behavior is unchanged.
+- Refund/dispute/adjustment mutation workflows remain deferred.
+- No backfill rows are created by the migration.
+- No settlement rows are written by this phase.
+- Owner-facing Deposits report remains gated until sync/report phases and sandbox smoke are complete.
+
+Schema posture:
+
+- Account-scoped owner identity uses `account_owner_user_id uuid NOT NULL REFERENCES auth.users(id)`.
+- Local payment linkage uses nullable `internal_invoice_payment_id` so unmatched Stripe settlement items can remain visible without being forced into invoice/payment truth.
+- Settlement kind is constrained to `payment`, `refund`, `dispute`, `adjustment`, `application_fee`, `payout_adjustment`, and `unmatched`.
+- Sync status is constrained to `pending`, `synced`, `skipped`, `unmatched`, and `failed`.
+- Currency is constrained to lowercase three-letter ISO-style values.
+- Balance transaction identity is idempotent through a partial unique index on `(stripe_connected_account_id, stripe_balance_transaction_id)`.
+- RLS is enabled with account-scoped SELECT for authenticated internal users.
+- No DELETE policy exists.
+- No app INSERT/UPDATE policies exist in this first posture; future sync writes must be explicit server-side service/admin paths.
+
+Validation for closeout:
+
+- focused schema migration test added at `lib/business/__tests__/stripe-payment-settlements-schema-foundation.test.ts`
+- required validation commands for this phase: focused schema test, relevant payment/register/allocation regression tests if touched by harness, `npx.cmd tsc --noEmit`, and `git diff --check`
+
 ## Readiness Verdict
 
 GO WITH LIMITATIONS.

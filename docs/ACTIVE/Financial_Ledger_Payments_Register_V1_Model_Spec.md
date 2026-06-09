@@ -4,6 +4,12 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Ledger / Payments Register V1
 Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, production, recurring billing, platform fee, or ACH UI work is authorized by this spec.
 
+## Financial Trust Lane Settlement Boundary Note
+
+- Deposits / Payout Reconciliation V1 is documented in [Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md](./Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md).
+- Payments Register remains gross payment event truth over `internal_invoice_payments`.
+- `stripe_payment_settlements` is a separate additive settlement layer for Stripe fee/net/payout reconciliation and must not count toward collected totals or mutate invoice paid/balance.
+
 ## Phase 6J-A Note (Platform Application Fee Foundation)
 
 - A foundation helper now locks default platform application fee math to `25` basis points (`0.25%`) with explicit skip guards and rounding behavior.
