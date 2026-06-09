@@ -5,6 +5,17 @@ Mode: Documentation/planning only
 Authority: Subordinate to Active Spine and existing ACTIVE runbooks/roadmaps  
 Date: 2026-05-08
 
+## ECC/Test Workflow Maturity Closeout
+
+- Status: CLOSED — implemented, smoked by owner, and ready as current ECC field-entry standard.
+- Focused closeout: [ECC_Test_Workflow_Maturity_Closeout.md](./ECC_Test_Workflow_Maturity_Closeout.md).
+- Completed current-scope maturity pass for Duct Leakage, Airflow, Refrigerant Charge, Completion Report, and the main ECC test hub/matrix.
+- Current ECC test-entry standard is now field-first and mobile-friendly: clear test title, Exception first, reason required only when exception is selected, setup/context collapsed by default, one compact Results area, inline live calculated feedback, no duplicate dashboard/result cards, no side-by-side mobile field entry, and Complete Test returning to the job detail test section.
+- Completion Report is now treated as a print-first report surface, with Print, Back, and Download controls preserved while workspace/test-entry clutter is suppressed.
+- Main ECC test hub/matrix is simplified: redundant Test Queue button removed, Report renamed to Completion Report, Equipment preserved, and multi-system switching surfaced as direct chips.
+- Guardrails remained intact: no schema/RLS changes, no payment/Stripe/QBO/SMS/provider changes, no invoice/payment/cert closeout truth changes, no ECC evaluator/formula changes, no customer portal behavior, no photo/attachment enforcement, and no broader service workflow change.
+- Known model note: exception handling uses existing override/exception-compatible plumbing rather than a dedicated ECC exception truth model; a dedicated truth model remains future optional work only if field use requires deeper reporting/audit semantics.
+
 ## Phase 6J-E2 Closeout (Platform Application Fee Lane, Docs-Only)
 
 - Platform application fee lane is closed for current intended scope.
