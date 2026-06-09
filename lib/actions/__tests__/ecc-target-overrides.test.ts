@@ -302,7 +302,7 @@ describe("ECC target override persistence", () => {
 
     const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAndCompleteDuctLeakageFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+      "REDIRECT:/jobs/job-1#field-status-actions",
     );
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");

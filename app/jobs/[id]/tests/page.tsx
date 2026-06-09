@@ -6,6 +6,7 @@ import Link from "next/link";
 import PrintButton from "@/components/ui/PrintButton";
 import SubmitButton from "@/components/SubmitButton";
 import EccLivePreview from "@/components/jobs/EccLivePreview";
+import DuctLeakageEntryFields from "@/components/jobs/DuctLeakageEntryFields";
 import DuctLeakageMethodFields from "@/components/jobs/DuctLeakageMethodFields";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import {
@@ -1346,10 +1347,32 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     (String(job.project_type ?? "").trim().toLowerCase() === "alteration" ? 10 : 5);
   const ductComputedFailures = Array.isArray(runDL?.computed?.failures) ? runDL.computed.failures : [];
   const ductComputedWarnings = Array.isArray(runDL?.computed?.warnings) ? runDL.computed.warnings : [];
+  const ductActualLeakagePercentDisplay =
+    typeof runDL?.data?.measured_duct_leakage_cfm === "number" &&
+    typeof runDL?.computed?.base_airflow_cfm === "number" &&
+    runDL.computed.base_airflow_cfm > 0
+      ? (runDL.data.measured_duct_leakage_cfm / runDL.computed.base_airflow_cfm) * 100
+      : null;
   const ductMethodLabel = defaultDuctAirflowMethod === "heating" ? "Heating Method" : "Cooling Method";
   const ductSetupSummary = `${ductTargetDisplay}% · ${ductMethodLabel} · ${
     isHeatOnlySystem ? fmtValue(defaultHeatingCapacityKbtu, "KBTU/h") : fmtValue(defaultSystemTonnage, "ton")
   }`;
+  const ductExceptionOptions = [
+    { value: "asbestos", label: "Asbestos" },
+    { value: "smoke_test", label: "Smoke Test" },
+    { value: "under_40_ft_ducting", label: "< 40' of ducting" },
+    { value: "other", label: "Other" },
+  ];
+  const ductOverrideReasonRaw = String(runDL?.override_reason ?? "").trim();
+  const ductSelectedException =
+    runDL?.override_pass === true
+      ? ductExceptionOptions.find((option) =>
+          ductOverrideReasonRaw === option.label || ductOverrideReasonRaw.startsWith(`${option.label}:`),
+        ) ?? null
+      : null;
+  const ductExceptionReasonDefault = ductSelectedException
+    ? ductOverrideReasonRaw.replace(new RegExp(`^${ductSelectedException.label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*`), "")
+    : "";
   const ductOverrideActive = runDL?.override_pass === true || runDL?.override_pass === false;
   const ductOverrideReasonPresent = Boolean(String(runDL?.override_reason ?? "").trim());
   const ductReviewSummary = ductOverrideActive
@@ -1357,8 +1380,16 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       ? "Override active"
       : "Override reason required"
     : "No override · Notes optional";
+  const ductHasInlineResultStatus =
+    Boolean(ductSelectedException) ||
+    runDL?.override_pass === true ||
+    runDL?.override_pass === false ||
+    runDL?.computed_pass === true ||
+    runDL?.computed_pass === false;
   const ductInlineResultText =
-    runDL?.override_pass === true
+    ductSelectedException
+      ? `${ductSelectedException.label} exception recorded`
+      : runDL?.override_pass === true
       ? `Pass override - measured ${ductMeasuredDisplay} / max ${ductMaxDisplay} CFM`
       : runDL?.override_pass === false
       ? `Fail override - measured ${ductMeasuredDisplay} / max ${ductMaxDisplay} CFM`
@@ -1366,7 +1397,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
       ? `Pass - measured ${ductMeasuredDisplay} / max ${ductMaxDisplay} CFM`
       : runDL?.computed_pass === false
       ? `Fail - measured ${ductMeasuredDisplay} / max ${ductMaxDisplay} CFM`
-      : `Needs input - measured ${ductMeasuredDisplay} / max ${ductMaxDisplay} CFM`;
+      : "";
 
   const parentFailedComparisonRows = (baselineRequiredTests as EccTestType[])
     .map((testType) => ({
@@ -1611,12 +1642,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           >
             Test Queue
           </Link>
-          <label
-            htmlFor="completion-report-toggle"
-            className="inline-flex min-h-14 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-colors hover:bg-slate-50"
-          >
-            Report
-          </label>
+          {!isDuctLeakageFocused ? (
+            <label
+              htmlFor="completion-report-toggle"
+              className="inline-flex min-h-14 cursor-pointer items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-semibold text-slate-950 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)] transition-colors hover:bg-slate-50"
+            >
+              Report
+            </label>
+          ) : null}
           <details className="group rounded-xl border border-slate-300 bg-white px-4 py-3 shadow-[0_14px_26px_-22px_rgba(15,23,42,0.32)]">
             <summary className="flex min-h-14 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">
               Systems
@@ -1701,7 +1734,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
       </div>
 
-      <div className="order-last print:order-none">
+      <div className={isDuctLeakageFocused ? "hidden" : "order-last print:order-none"}>
       <input id="completion-report-toggle" type="checkbox" className="peer sr-only" />
       <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-[0_14px_30px_-30px_rgba(15,23,42,0.32)] print:hidden">
         Report tools are secondary during active field entry.
@@ -2613,7 +2646,27 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             ========================= */}
         {focusedType === "duct_leakage" ? (
           <div className="min-w-0 space-y-3 sm:rounded-lg sm:border sm:border-slate-200 sm:bg-white sm:p-5 sm:shadow-[0_18px_38px_-32px_rgba(15,23,42,0.32)]">
-            <div className={`rounded-2xl border px-4 py-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:hidden ${ductResultCardTone}`}>
+            <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="min-w-0">
+                <h2 className="text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">Duct Leakage Results</h2>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+                  <span className="font-medium text-slate-800">{selectedSystemName}</span>
+                  <span className="text-slate-300">/</span>
+                  <span>
+                    {isHeatOnlySystem
+                      ? `Heating input ${fmtValue(defaultHeatingCapacityKbtu, "KBTU/h")}`
+                      : `Tonnage ${fmtValue(defaultSystemTonnage, "ton")}`}
+                  </span>
+                </div>
+              </div>
+              {runDL?.updated_at ? (
+                <div className="min-h-5 shrink-0 text-xs text-muted-foreground sm:text-right">
+                  {new Date(runDL.updated_at).toLocaleString()}
+                </div>
+              ) : null}
+            </div>
+
+            <div className={`hidden rounded-2xl border px-4 py-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] ${ductResultCardTone}`}>
               <div className="flex min-w-0 items-start justify-between gap-3">
                 <div className="min-w-0">
                   <div className={eccUtilityLabelClass}>Focused Test</div>
@@ -2669,7 +2722,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </span>
               </div>
             </div>
-            <div className="hidden min-w-0 flex-col gap-2 sm:flex sm:flex-row sm:items-start sm:justify-between">
+            <div className="hidden min-w-0 flex-col gap-2">
               <div>
                 <div className={eccUtilityLabelClass}>Focused Test</div>
                 <div className="mt-1 text-base font-semibold text-slate-950">Duct Leakage</div>
@@ -2687,7 +2740,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
             </div>
 
-            <div className="hidden flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700 sm:flex">
+            <div className="hidden flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-700">
               <span className="font-semibold text-slate-900">{selectedSystemName}</span>
               <span className="text-slate-400">/</span>
               <span>
@@ -2728,32 +2781,20 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="test_run_id" value={runDL.id} />
                   <input type="hidden" name="project_type" value={job.project_type} />
+                  <DuctLeakageEntryFields
+                    exceptionOptions={ductExceptionOptions}
+                    formId={ductSaveFormId}
+                    initialExceptionReason={ductExceptionReasonDefault}
+                    initialExceptionValue={ductSelectedException?.value ?? ""}
+                    initialMeasuredCfm={runDL.data?.measured_duct_leakage_cfm ?? ""}
+                    initialNotes={runDL.data?.notes ?? ""}
+                    initialResultText={ductInlineResultText}
+                    initialStatusLabel={ductHasInlineResultStatus ? ductResultLabel : ""}
+                    projectType={job.project_type}
+                    runId={runDL.id}
+                  >
 
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    <div className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none">
-                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 sm:hidden">Measurement</div>
-                      <label className="flex items-center justify-between gap-2 text-sm font-medium" htmlFor={`dl-meas-${runDL.id}`}>
-                        <span>Measured Duct Leakage</span>
-                        <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                          CFM
-                        </span>
-                      </label>
-                      <input
-                        id={`dl-meas-${runDL.id}`}
-                        name="measured_duct_leakage_cfm"
-                        type="number"
-                        step="1"
-                        required
-                        className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-base sm:font-normal sm:tracking-normal"
-                        defaultValue={runDL.data?.measured_duct_leakage_cfm ?? ""}
-                        placeholder="Required for result"
-                      />
-                      <div className={`mt-1 rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${ductResultTone}`}>
-                        {ductInlineResultText}
-                      </div>
-                    </div>
-
-                    <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:col-span-2">
+                    <details className="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.22)] sm:col-span-2 sm:p-4">
                       <summary className="cursor-pointer list-none">
                         <div className="flex items-start justify-between gap-3">
                           <div>
@@ -2798,68 +2839,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       </div>
                     </details>
 
-                    <details className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_14px_28px_-26px_rgba(15,23,42,0.32)] sm:col-span-2">
-                      <summary className="cursor-pointer list-none">
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Review / Override</div>
-                            <div className="mt-1 text-sm font-medium text-slate-800">{ductReviewSummary}</div>
-                          </div>
-                          <span className="text-xs font-semibold text-slate-600">Show</span>
-                        </div>
-                      </summary>
-
-                      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                        <div className="grid gap-1 sm:col-span-2">
-                          <label className="text-sm font-medium" htmlFor={`dl-notes-${runDL.id}`}>
-                            Notes (optional)
-                          </label>
-                          <input
-                            id={`dl-notes-${runDL.id}`}
-                            name="notes"
-                            className="w-full rounded-md border px-3 py-2"
-                            defaultValue={runDL.data?.notes ?? ""}
-                          />
-                        </div>
-
-                        <div className="grid gap-1">
-                          <label className="text-sm font-medium" htmlFor={`ovr-${runDL.id}`}>
-                            Manual Override
-                          </label>
-                          <select
-                            id={`ovr-${runDL.id}`}
-                            name="override"
-                            className="w-full rounded-md border px-3 py-2"
-                            defaultValue={
-                              runDL.override_pass === true ? "pass" : runDL.override_pass === false ? "fail" : "none"
-                            }
-                          >
-                            <option value="none">None</option>
-                          <option value="pass">Smoke Test</option>
-                          <option value="fail">Asbestos</option>
-                          </select>
-                        </div>
-
-                        <div className="grid gap-1">
-                          <label className="text-sm font-medium" htmlFor={`ovr-reason-${runDL.id}`}>
-                            Override Reason
-                          </label>
-                          <input
-                            id={`ovr-reason-${runDL.id}`}
-                            name="override_reason"
-                            className="w-full rounded-md border px-3 py-2"
-                            defaultValue={runDL.override_reason ?? ""}
-                            placeholder="Explain override"
-                            autoComplete="off"
-                          />
-                          <div className="text-xs text-slate-600">Required when override is set.</div>
-                        </div>
-                      </div>
-                    </details>
-                  </div>
+                  </DuctLeakageEntryFields>
                 </form>
 
-                <details className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
+                <details className="hidden rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-muted-foreground">
                   <summary className="cursor-pointer font-semibold text-slate-900">Calculated / Result</summary>
                   <div className="mt-2 space-y-1">
                     <div>
@@ -2923,20 +2906,6 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </>
             )}
           </div>
-        ) : null}
-
-        {selectedSystemId && isDuctLeakageFocused ? (
-          <details className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
-            <summary className="cursor-pointer font-semibold text-slate-900">Tools</summary>
-            <div className="mt-2 grid gap-2 sm:flex sm:flex-wrap">
-              <Link href={`/jobs/${job.id}/info?f=equipment`} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-800">
-                Equipment
-              </Link>
-              <Link href={withS(undefined, selectedSystemId)} className="font-semibold text-slate-900 underline">
-                Open full queue
-              </Link>
-            </div>
-          </details>
         ) : null}
 
         {/* =========================

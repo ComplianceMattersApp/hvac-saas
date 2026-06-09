@@ -17,12 +17,47 @@ const jobLocationPreviewSource = readFileSync(
   "utf8",
 );
 
+const ductLeakageEntryFieldsSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/DuctLeakageEntryFields.tsx"),
+  "utf8",
+);
+
 describe("job tests page wiring", () => {
-  it("exposes Asbestos as a manual override option and keeps override reason free-form", () => {
-    expect(jobTestsPageSource).toContain('<option value="pass">Smoke Test</option>');
-    expect(jobTestsPageSource).toContain('<option value="fail">Asbestos</option>');
-    expect(jobTestsPageSource).toContain('autoComplete="off"');
+  it("exposes Duct Leakage exception options and keeps exception reason free-form", () => {
+    expect(jobTestsPageSource).toContain('{ value: "asbestos", label: "Asbestos" }');
+    expect(jobTestsPageSource).toContain('{ value: "smoke_test", label: "Smoke Test" }');
+    expect(jobTestsPageSource).toContain('{ value: "under_40_ft_ducting", label: "< 40\' of ducting" }');
+    expect(jobTestsPageSource).toContain('{ value: "other", label: "Other" }');
+    expect(ductLeakageEntryFieldsSource).toContain('name="duct_exception"');
+    expect(ductLeakageEntryFieldsSource).toContain('name="override_reason"');
+    expect(ductLeakageEntryFieldsSource).toContain('required');
+    expect(jobTestsPageSource).not.toContain('<option value="fail">Asbestos</option>');
+    expect(ductLeakageEntryFieldsSource).toContain('autoComplete="off"');
     expect(jobTestsPageSource).not.toContain('<datalist id={`ovr-reason-list-${runDL.id}`}>');
+  });
+
+  it("keeps Duct Leakage field-first layout without the extra calculated card", () => {
+    const ductIndex = jobTestsPageSource.indexOf('Duct Leakage Results');
+    expect(ductIndex).toBeGreaterThan(-1);
+
+    const ductBlock = jobTestsPageSource.slice(
+      ductIndex,
+      jobTestsPageSource.indexOf('            AIRFLOW', ductIndex),
+    );
+
+    expect(ductBlock).toContain('DuctLeakageEntryFields');
+    expect(ductBlock.indexOf('DuctLeakageEntryFields')).toBeLessThan(ductBlock.indexOf('Test Setup'));
+    expect(ductLeakageEntryFieldsSource).toContain('Exception');
+    const resultsEntryIndex = ductLeakageEntryFieldsSource.indexOf('Enter the measured duct leakage result');
+    expect(resultsEntryIndex).toBeGreaterThan(-1);
+    expect(ductLeakageEntryFieldsSource.indexOf('Exception')).toBeLessThan(resultsEntryIndex);
+    expect(ductLeakageEntryFieldsSource).toContain('Total Leakage %');
+    expect(ductBlock).toContain('DuctLeakageEntryFields');
+    expect(ductBlock).not.toContain('data-duct-exception-select');
+    expect(ductBlock).not.toContain('data-duct-live-total');
+    expect(ductBlock).not.toContain('Needs input - measured');
+    expect(ductBlock).not.toContain('<script');
+    expect(jobTestsPageSource).toContain('className={isDuctLeakageFocused ? "hidden" : "order-last print:order-none"}');
   });
 });
 

@@ -2345,7 +2345,30 @@ function redirectToTests(opts: {
   redirect(qs ? `/jobs/${jobId}/tests?${qs}` : `/jobs/${jobId}/tests`);
 }
 
+function redirectToJobTestSection(jobId: string) {
+  redirect(`/jobs/${jobId}#field-status-actions`);
+}
+
+const DUCT_LEAKAGE_EXCEPTION_LABELS: Record<string, string> = {
+  asbestos: "Asbestos",
+  smoke_test: "Smoke Test",
+  under_40_ft_ducting: "< 40' of ducting",
+  other: "Other",
+};
+
 function resolveOverrideSelectionFromForm(formData: FormData) {
+  const ductException = String(formData.get("duct_exception") || "").trim().toLowerCase();
+  const ductExceptionLabel = DUCT_LEAKAGE_EXCEPTION_LABELS[ductException] ?? null;
+  if (ductExceptionLabel) {
+    const reasonRaw = String(formData.get("override_reason") || "").trim();
+    return {
+      overridePass: true,
+      overrideReason: reasonRaw ? `${ductExceptionLabel}: ${reasonRaw}` : null,
+      missingReason: !reasonRaw,
+      ductExceptionSelected: true,
+    };
+  }
+
   const override = String(formData.get("override") || "none").trim().toLowerCase();
   const reasonRaw = String(formData.get("override_reason") || "").trim();
 
@@ -2357,6 +2380,7 @@ function resolveOverrideSelectionFromForm(formData: FormData) {
     overridePass,
     overrideReason: overridePass !== null ? reasonRaw : null,
     missingReason: overridePass !== null && !reasonRaw,
+    ductExceptionSelected: false,
   };
 }
 
@@ -6185,10 +6209,8 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
   if (!jobId) throw new Error("Missing job_id");
   if (!testRunId) throw new Error("Missing test_run_id");
 
-  ensureMeasuredDuctLeakagePresentForCompletion(formData);
-
   const { data, computed, computedPass } = computeDuctLeakagePayload(formData, projectType);
-  const { overridePass, overrideReason, missingReason } = resolveOverrideSelectionFromForm(formData);
+  const { overridePass, overrideReason, missingReason, ductExceptionSelected } = resolveOverrideSelectionFromForm(formData);
 
   if (missingReason) {
     redirectToTests({
@@ -6197,6 +6219,10 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
       systemId: systemIdFromForm,
       notice: "override_reason_required",
     });
+  }
+
+  if (!ductExceptionSelected) {
+    ensureMeasuredDuctLeakagePresentForCompletion(formData);
   }
 
   const supabase = await createClient();
@@ -6256,7 +6282,7 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "duct_leakage", systemId });
+  redirectToJobTestSection(jobId);
 }
 
 /** =========================
