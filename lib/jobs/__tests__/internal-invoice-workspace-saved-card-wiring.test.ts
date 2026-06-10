@@ -85,7 +85,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).not.toContain("Use direct invoice charges when the billed item was not captured as a Work Item.");
   });
 
-  it("uses shared short invoice reference helper in the primary header", () => {
+  it("uses shared short invoice reference helper in the primary header and billing details", () => {
     expect(source).toContain('import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";');
     expect(source).toContain("const invoiceHeaderReference = invoice");
     expect(source).toContain("formatInvoiceDisplayReference({");
@@ -93,13 +93,16 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("invoiceNumber: invoice.invoice_number");
     expect(source).toContain("invoiceId: invoice.id");
     expect(source).toContain("{invoiceHeaderReference}");
+    expect(source).toContain('name="invoice_number" value={invoice.invoice_number}');
+    expect(source).toContain("{invoiceHeaderReference}");
+    expect(source).not.toContain('defaultValue={invoice.invoice_number}');
     expect(source).not.toContain("Invoice ${invoice.invoice_number}");
   });
 
-  it("keeps legacy invoice number as secondary audit text", () => {
-    expect(source).toContain("const legacyInvoiceReference = invoice");
-    expect(source).toContain("Legacy ref:");
-    expect(source).toContain("String(invoice.invoice_number ?? \"\").trim() || null");
+  it("does not render legacy invoice references in the normal invoice workspace", () => {
+    expect(source).not.toContain("const legacyInvoiceReference = invoice");
+    expect(source).not.toContain("Legacy ref:");
+    expect(source).not.toContain("String(invoice.invoice_number ?? \"\").trim() || null");
   });
 
   it("uses explicit billing-recipient address rendering in the workspace billing panel", () => {

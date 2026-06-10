@@ -375,10 +375,13 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     );
     const firstEmailPayload = sendEmailMock.mock.calls[0]?.[0] as { html?: string; text?: string } | undefined;
     expect(firstEmailPayload?.html).toContain('Pay Invoice');
-    expect(firstEmailPayload?.html).toContain('Legacy ref: INV-1');
+    expect(firstEmailPayload?.html).toContain('Invoice #2001');
+    expect(firstEmailPayload?.html).not.toContain('Legacy ref:');
+    expect(firstEmailPayload?.html).not.toContain('INV-1');
     expect(firstEmailPayload?.text).toContain('Pay Invoice:');
     expect(firstEmailPayload?.text).toContain('Invoice: Invoice #2001');
-    expect(firstEmailPayload?.text).toContain('Legacy ref: INV-1');
+    expect(firstEmailPayload?.text).not.toContain('Legacy ref:');
+    expect(firstEmailPayload?.text).not.toContain('INV-1');
     expect(
       fixture.writes.some((write) => write.table === 'internal_invoice_payments'),
     ).toBe(false);

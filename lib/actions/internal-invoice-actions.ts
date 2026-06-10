@@ -41,7 +41,7 @@ import { escapeHtml } from '@/lib/email/layout';
 import { sendEmail } from '@/lib/email/sendEmail';
 import { resolveNotificationAccountOwnerUserId } from '@/lib/notifications/account-owner';
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/visit-scope';
-import { formatInvoiceDisplayReference, normalizeDisplayNumber } from '@/lib/utils/display-references';
+import { formatInvoiceDisplayReference } from '@/lib/utils/display-references';
 
 function getTrimmedString(value: FormDataEntryValue | null | undefined) {
   return String(value ?? '').trim();
@@ -723,10 +723,6 @@ function buildInternalInvoiceEmailBody(args: {
     invoiceId: args.invoice.id,
   });
   const invoiceReference = escapeHtml(invoiceReferenceText);
-  const legacyInvoiceReference = normalizeDisplayNumber(args.invoice.invoice_display_number)
-    ? normalizeDisplayNumber(args.invoice.invoice_number)
-    : null;
-  const legacyInvoiceReferenceEscaped = legacyInvoiceReference ? escapeHtml(legacyInvoiceReference) : null;
   const invoiceDate = escapeHtml(invoiceDateDisplay);
   const serviceLocation = escapeHtml(String(args.serviceLocation ?? '').trim());
   const total = escapeHtml(totalDisplay);
@@ -765,7 +761,6 @@ function buildInternalInvoiceEmailBody(args: {
               <tr>
                 <td style="padding: 18px 20px 0 20px;">
                   <h1 style="margin: 0; font-size: 24px; line-height: 1.25; color: #0f172a;">${invoiceReference}</h1>
-                  ${legacyInvoiceReferenceEscaped ? `<p style="margin: 6px 0 0 0; font-size: 12px; line-height: 1.5; color: #64748b;">Legacy ref: ${legacyInvoiceReferenceEscaped}</p>` : ''}
                   <p style="margin: 10px 0 0 0; font-size: 15px; line-height: 1.6; color: #334155;">Hi ${escapeHtml(recipientName)},</p>
                   <p style="margin: 2px 0 0 0; font-size: 15px; line-height: 1.6; color: #334155;">Your invoice for ${escapeHtml(jobContext)} is ready.</p>
                 </td>
@@ -780,7 +775,6 @@ function buildInternalInvoiceEmailBody(args: {
                       <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Invoice #</td>
                       <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${invoiceReference}</td>
                     </tr>
-                    ${legacyInvoiceReferenceEscaped ? `<tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Legacy ref</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #334155; font-weight: 600;">${legacyInvoiceReferenceEscaped}</td></tr>` : ''}
                     <tr>
                       <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Invoice Date</td>
                       <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${invoiceDate}</td>
@@ -850,9 +844,6 @@ function buildInternalInvoiceEmailText(args: {
     invoiceNumber: args.invoice.invoice_number,
     invoiceId: args.invoice.id,
   });
-  const legacyInvoiceReference = normalizeDisplayNumber(args.invoice.invoice_display_number)
-    ? normalizeDisplayNumber(args.invoice.invoice_number)
-    : null;
   const invoiceDate = formatInvoiceDateForDisplay(args.invoice.invoice_date);
   const recipientName = String(args.greetingName ?? args.invoice.billing_name ?? '').trim() || 'there';
   const jobTitle = normalizeJobContextForSentence(args.jobTitle);
@@ -884,7 +875,6 @@ function buildInternalInvoiceEmailText(args: {
     '',
     'INVOICE SUMMARY',
     `Invoice: ${invoiceReference}`,
-    ...(legacyInvoiceReference ? [`Legacy ref: ${legacyInvoiceReference}`] : []),
     `Invoice Date: ${invoiceDate}`,
     ...(serviceLocation ? [`Service Location: ${serviceLocation}`] : []),
     'Status: Issued',

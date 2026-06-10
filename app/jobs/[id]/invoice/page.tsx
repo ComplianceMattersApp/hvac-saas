@@ -748,9 +748,6 @@ export default async function InternalInvoiceWorkspacePage({
         invoiceId: invoice.id,
       })
     : "Start Internal Invoice";
-  const legacyInvoiceReference = invoice
-    ? String(invoice.invoice_number ?? "").trim() || null
-    : null;
   const supplementalReasonLabel = formatSupplementalReasonLabel(invoice?.supplemental_reason);
 
   return (
@@ -764,11 +761,6 @@ export default async function InternalInvoiceWorkspacePage({
             <h1 className="mt-3 text-[clamp(1.45rem,2.2vw,2rem)] font-semibold tracking-[-0.02em] text-slate-950">
               {invoiceHeaderReference}
             </h1>
-            {legacyInvoiceReference ? (
-              <div className="mt-1 text-xs font-medium tracking-[0.03em] text-slate-500">
-                Legacy ref: {legacyInvoiceReference}
-              </div>
-            ) : null}
             <div className="mt-1 text-sm leading-6 text-slate-600">
               {job.title || "Job"} / {customerName}{locationLabel ? ` / ${locationLabel}` : ""}
             </div>
@@ -1426,9 +1418,12 @@ export default async function InternalInvoiceWorkspacePage({
                     <input type="hidden" name="job_id" value={jobId} />
                     <input type="hidden" name="invoice_id" value={invoice.id} />
                     <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="invoice_number" value={invoice.invoice_number} />
                     <div>
                       <label className={labelClass}>Invoice #</label>
-                      <input name="invoice_number" defaultValue={invoice.invoice_number} className={inputClass} required />
+                      <div className="flex min-h-11 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-800">
+                        {invoiceHeaderReference}
+                      </div>
                     </div>
                     <div>
                       <label className={labelClass}>Billing Name</label>
