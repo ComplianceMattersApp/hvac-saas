@@ -27,6 +27,7 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('import FieldOutcomePanel from "./_components/FieldOutcomePanel";');
     expect(jobDetailSource).toContain('<FieldOutcomePanel');
     expect(jobDetailSource).toContain('anchorId="field-outcome"');
+    expect(jobDetailSource).toContain('className="hidden w-full sm:block"');
     expect(jobDetailSource).toContain("jobId={String(job.id)}");
     expect(jobDetailSource).toContain("showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}");
   });
@@ -72,8 +73,9 @@ describe("job detail field outcome panel wiring", () => {
   it("renders compact exception routing instead of the full textarea stack by default", () => {
     expect(panelSource).toContain('import FieldExceptionRoutingPicker from "./FieldExceptionRoutingPicker";');
     expect(panelSource).toContain("<FieldExceptionRoutingPicker");
-    expect(panelSource).toContain("Need a field exception?");
-    expect(panelSource).toContain("Route active field work to office/dispatch only if this visit cannot be completed.");
+    expect(panelSource).not.toContain("Need a field exception?");
+    expect(panelSource).not.toContain("Route active field work to office/dispatch only if this visit cannot be completed.");
+    expect(panelSource).not.toContain("rounded-2xl");
     expect(panelSource).not.toContain("<textarea");
     expect(panelSource).not.toContain("form action={markJobPartsNeededFromForm}");
     expect(exceptionPickerSource).toContain('"use client";');
@@ -130,8 +132,9 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).not.toContain("return_needed");
   });
 
-  it("keeps ECC guardrail and section guidance copy", () => {
-    expect(panelSource).toContain("ECC guardrail: Failed/retest outcomes come from ECC test completion.");
+  it("removes the standalone exception card and ECC guardrail copy", () => {
+    expect(panelSource).not.toContain("ECC guardrail: Failed/retest outcomes come from ECC test completion.");
+    expect(panelSource).not.toContain("props.isEccJob ? (");
   });
 
   it("keeps open and on-the-way flow on existing start actions", () => {

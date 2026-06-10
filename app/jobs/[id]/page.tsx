@@ -4185,6 +4185,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     hasFullSchedule={hasFullSchedule}
                     variant="fieldMode"
                   />
+                  {showFieldOutcomePanel ? (
+                    <FieldOutcomePanel
+                      anchorId="field-outcome"
+                      jobId={String(job.id)}
+                      currentStatus={String(job.status ?? "")}
+                      tab={tab}
+                      isEccJob={job.job_type === "ecc"}
+                      showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}
+                    />
+                  ) : null}
                   {job.job_type === "ecc" ? (
                     <Link
                       href={`/jobs/${job.id}/tests`}
@@ -4225,18 +4235,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </div>
             </div>
           </section>
-
-          {showFieldOutcomePanel ? (
-            <FieldOutcomePanel
-              anchorId="field-outcome"
-              jobId={String(job.id)}
-              currentStatus={String(job.status ?? "")}
-              tab={tab}
-              isEccJob={job.job_type === "ecc"}
-              showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}
-              className="mt-4"
-            />
-          ) : null}
 
           <section className={mobileSectionClass}>
             <div className="flex items-center gap-2">
@@ -5175,6 +5173,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             ) : null}
           </div>
         ) : null}
+        {showFieldOutcomePanel ? (
+          <FieldOutcomePanel
+            jobId={String(job.id)}
+            currentStatus={String(job.status ?? "")}
+            tab={tab}
+            isEccJob={job.job_type === "ecc"}
+            showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}
+            className="hidden w-full sm:block"
+          />
+        ) : null}
         {isFieldComplete || job.status === "completed" ? (
           <div className="hidden w-full sm:flex">
             <span className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-900">
@@ -5354,16 +5362,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       </div>
     ) : null}
 
-    {showFieldOutcomePanel ? (
-      <FieldOutcomePanel
-        jobId={String(job.id)}
-        currentStatus={String(job.status ?? "")}
-        tab={tab}
-        isEccJob={job.job_type === "ecc"}
-        showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}
-        className="mt-3"
-      />
-    ) : null}
   </div>
 
   <div className="mb-4 grid gap-2 sm:hidden">
