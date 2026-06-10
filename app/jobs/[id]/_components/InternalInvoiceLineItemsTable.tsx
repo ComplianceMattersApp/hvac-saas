@@ -178,7 +178,6 @@ export default function InternalInvoiceLineItemsTable({
   capabilities,
   lineItems,
   totalCents,
-  addLineItemAction,
   addPricebookLineItemAction,
   addVisitScopeLineItemsAction,
   updateLineItemAction,
@@ -198,7 +197,6 @@ export default function InternalInvoiceLineItemsTable({
   const [selectedVisitScopeItemIds, setSelectedVisitScopeItemIds] = useState<string[]>([]);
   const canAddPricebookLine = capabilities.can_select_pricebook_invoice_lines;
   const canAddVisitScopeLine = capabilities.can_convert_visit_scope_to_invoice_lines;
-  const canAddManualLine = capabilities.can_add_manual_invoice_line;
   const canEditDescription = capabilities.can_edit_invoice_line_description;
   const canEditQuantity = capabilities.can_edit_invoice_line_quantity;
   const canEditPrice = capabilities.can_edit_invoice_line_price;
@@ -207,7 +205,6 @@ export default function InternalInvoiceLineItemsTable({
   const canMutateDraftLines =
     canAddPricebookLine
     || canAddVisitScopeLine
-    || canAddManualLine
     || canEditAnyLine
     || canRemoveLine;
   const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded);
@@ -260,7 +257,10 @@ export default function InternalInvoiceLineItemsTable({
       action: addPricebookLineItemAction,
       successFallback: 'Pricebook service/charge added.',
       errorFallback: 'Could not add Pricebook service/charge.',
-      onSuccess: () => setSelectedPricebookItemId(''),
+      onSuccess: () => {
+        setSelectedPricebookItemId('');
+        setIsAddFormOpen(false);
+      },
     });
   }
 
@@ -280,16 +280,6 @@ export default function InternalInvoiceLineItemsTable({
       action: updateLineItemAction,
       successFallback: 'Invoice charge saved.',
       errorFallback: 'Could not save invoice charge.',
-    });
-  }
-
-  async function handleAddManualLineItem(formData: FormData) {
-    await runInlineMutation({
-      formData,
-      action: addLineItemAction,
-      successFallback: 'Invoice charge added.',
-      errorFallback: 'Could not add invoice charge.',
-      onSuccess: () => setIsAddFormOpen(false),
     });
   }
 
@@ -397,74 +387,6 @@ export default function InternalInvoiceLineItemsTable({
               </SubmitButton>
             </div>
           </form>
-        ) : null}
-
-        {canAddPricebookLine ? (
-        <form action={handleAddPricebook} className="bg-white/92 px-5 py-5">
-          <input type="hidden" name="job_id" value={jobId} />
-          <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
-          <input type="hidden" name="tab" value={tab} />
-
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-            <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add Another Charge</div>
-              <div className="mt-1 text-xs leading-5 text-slate-500">
-                Use this for fees, add-ons, or anything that is not already listed on the invoice.
-              </div>
-            </div>
-          </div>
-
-          {pricebookPickerItems.length > 0 ? (
-            <>
-              <PricebookLineEntryFields
-                items={pricebookPickerItems}
-                selectedItemId={selectedPricebookItemId}
-                onSelectedItemIdChange={setSelectedPricebookItemId}
-                itemFieldName="pricebook_item_id"
-                quantityFieldName="quantity"
-                itemLabel="Charge"
-                quantityLabel="Quantity"
-                itemSelectId="invoice_pricebook_item_id"
-                quantityInputId="invoice_pricebook_quantity"
-                includeEmptyOption
-                emptyOptionLabel="Select a charge..."
-                labelClassName={workspaceFieldLabelClass}
-                inputClassName={workspaceInputClass}
-                quantityDefaultValue="1.00"
-                gridClassName="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(6.25rem,0.74fr)_auto] md:items-end"
-                actionSlotClassName="md:self-end"
-                actionSlot={
-                  <SubmitButton
-                    loadingText="Adding..."
-                    className={primaryButtonClass}
-                    disabled={!selectedPricebookItemId}
-                  >
-                    Add Charge
-                  </SubmitButton>
-                }
-                renderSelectedItem={(selectedPricebookItem) => (
-                  <div className="mt-4 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
-                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
-                      <span>{formatInternalInvoiceItemType(selectedPricebookItem.item_type)}</span>
-                      {selectedPricebookItem.category ? <span>• {selectedPricebookItem.category}</span> : null}
-                      {selectedPricebookItem.unit_label ? <span>• Unit: {selectedPricebookItem.unit_label}</span> : null}
-                    </div>
-                    <div className="mt-2 text-sm font-semibold text-slate-900">
-                      Default Unit Price: {formatCurrencyFromAmount(selectedPricebookItem.default_unit_price)}
-                    </div>
-                    {selectedPricebookItem.default_description ? (
-                      <div className="mt-1 text-sm leading-6 text-slate-600">{selectedPricebookItem.default_description}</div>
-                    ) : null}
-                  </div>
-                )}
-              />
-            </>
-          ) : (
-            <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm leading-6 text-amber-900">
-              No active non-credit Pricebook items are available for draft invoice adds yet.
-            </div>
-          )}
-        </form>
         ) : null}
 
         {lineItems.map((lineItem, index) => {
@@ -657,86 +579,86 @@ export default function InternalInvoiceLineItemsTable({
           );
         })}
 
-        {canAddManualLine && isAddFormOpen ? (
-          <form action={handleAddManualLineItem} className="bg-slate-50/94 px-5 py-5">
+        {canAddPricebookLine && isAddFormOpen ? (
+          <form action={handleAddPricebook} className="bg-slate-50/94 px-5 py-5">
             <input type="hidden" name="job_id" value={jobId} />
             <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
             <input type="hidden" name="tab" value={tab} />
 
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add Charge</div>
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add another charge</div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">
+                  Use this for fees, add-ons, or anything not already listed on the invoice.
+                </div>
+              </div>
               <button
                 type="button"
-                onClick={() => setIsAddFormOpen(false)}
+                onClick={() => {
+                  setIsAddFormOpen(false);
+                  setSelectedPricebookItemId('');
+                }}
                 className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition-[background-color,border-color,transform] hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
               >
                 Cancel
               </button>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(8.5rem,0.9fr)_minmax(6.25rem,0.74fr)_minmax(7.25rem,0.84fr)_minmax(8rem,0.9fr)] md:items-start">
-              <div>
-                <label className={workspaceFieldLabelClass}>Item Name</label>
-                <input
-                  name="item_name_snapshot"
-                  className={workspaceInputClass}
-                  placeholder="Diagnostic visit"
-                  required
-                />
+            {pricebookPickerItems.length > 0 ? (
+              <PricebookLineEntryFields
+                items={pricebookPickerItems}
+                selectedItemId={selectedPricebookItemId}
+                onSelectedItemIdChange={setSelectedPricebookItemId}
+                itemFieldName="pricebook_item_id"
+                quantityFieldName="quantity"
+                itemLabel="Charge"
+                quantityLabel="Quantity"
+                itemSelectId="invoice_pricebook_item_id"
+                quantityInputId="invoice_pricebook_quantity"
+                includeEmptyOption
+                emptyOptionLabel="Select a charge..."
+                labelClassName={workspaceFieldLabelClass}
+                inputClassName={workspaceInputClass}
+                quantityDefaultValue="1.00"
+                gridClassName="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(6.25rem,0.74fr)_auto] md:items-end"
+                actionSlotClassName="md:self-end"
+                actionSlot={
+                  <SubmitButton
+                    loadingText="Adding..."
+                    className={primaryButtonClass}
+                    disabled={!selectedPricebookItemId}
+                  >
+                    Add Charge
+                  </SubmitButton>
+                }
+                renderSelectedItem={(selectedPricebookItem) => (
+                  <div className="mt-4 rounded-xl border border-slate-200/80 bg-white/82 px-4 py-3 text-sm text-slate-700">
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      <span>{formatInternalInvoiceItemType(selectedPricebookItem.item_type)}</span>
+                      {selectedPricebookItem.category ? <span>{selectedPricebookItem.category}</span> : null}
+                      {selectedPricebookItem.unit_label ? <span>Unit: {selectedPricebookItem.unit_label}</span> : null}
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-900">
+                      Default Unit Price: {formatCurrencyFromAmount(selectedPricebookItem.default_unit_price)}
+                    </div>
+                    {selectedPricebookItem.default_description ? (
+                      <div className="mt-1 text-sm leading-6 text-slate-600">{selectedPricebookItem.default_description}</div>
+                    ) : null}
+                  </div>
+                )}
+              />
+            ) : (
+              <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm leading-6 text-amber-900">
+                No active non-credit Pricebook items are available for draft invoice adds yet.
               </div>
-
-              <div>
-                <label className={workspaceFieldLabelClass}>Type</label>
-                <select name="item_type_snapshot" defaultValue="service" className={workspaceInputClass}>
-                  <option value="service">Service</option>
-                  <option value="material">Material</option>
-                  <option value="diagnostic">Diagnostic</option>
-                  <option value="adjustment">Adjustment</option>
-                  <option value="other">Other</option>
-                </select>
-              </div>
-
-              <div>
-                <label className={workspaceFieldLabelClass}>Quantity</label>
-                <input name="quantity" inputMode="decimal" defaultValue="1.00" className={workspaceInputClass} disabled={!canEditQuantity} required />
-              </div>
-
-              <div>
-                <label className={workspaceFieldLabelClass}>Unit Price</label>
-                <input name="unit_price" inputMode="decimal" defaultValue="0.00" className={workspaceInputClass} disabled={!canEditPrice} required />
-              </div>
-
-              <div>
-                <label className={workspaceFieldLabelClass}>Subtotal</label>
-                <div className="flex min-h-11 items-center rounded-lg border border-dashed border-slate-300 bg-white px-3.5 text-sm text-slate-500">
-                  Saves after add
-                </div>
-              </div>
-
-              <div className="md:col-span-5">
-                <label className={workspaceFieldLabelClass}>Description / Work Instruction</label>
-                <textarea
-                  name="description_snapshot"
-                  className={`${workspaceInputClass} min-h-[5.5rem]`}
-                  disabled={!canEditDescription}
-                  placeholder="Optional charge detail or technician-facing work detail"
-                />
-              </div>
-            </div>
-
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
-              <div className="text-xs leading-5 text-slate-500">Use manual charges for billing cleanup or add-ons that were not captured as Work Items.</div>
-              <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
-                Add Charge
-              </SubmitButton>
-            </div>
+            )}
           </form>
-        ) : canAddManualLine ? (
+        ) : canAddPricebookLine ? (
           <div className="bg-slate-50/94 px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200/80 bg-white/82 px-4 py-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add Charge</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">Open a direct invoice charge for billing cleanup or add-ons not captured as Work Items.</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add another charge</div>
+                <div className="mt-1 text-xs leading-5 text-slate-500">Use this for fees, add-ons, or anything not already listed on the invoice.</div>
               </div>
               <button
                 type="button"
