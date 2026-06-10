@@ -50,9 +50,15 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
         <button
           type="button"
           onClick={() => setIsOpen(true)}
-          className="inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300 sm:w-auto"
+          className="flex min-h-12 w-full items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50/80 px-3 py-2.5 text-left transition-colors hover:bg-amber-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
         >
-          Can&apos;t finish today?
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-amber-950">Can&apos;t finish today?</span>
+            <span className="mt-0.5 block text-xs leading-5 text-amber-900/90">
+              Send this visit to office/dispatch for parts, approval, or review.
+            </span>
+          </span>
+          <span className="shrink-0 text-xs font-semibold text-amber-900">Choose reason -&gt;</span>
         </button>
       ) : (
         <div className="rounded-xl border border-amber-200/80 bg-amber-50/60 p-3">

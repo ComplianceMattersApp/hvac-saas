@@ -81,6 +81,9 @@ describe("job detail field outcome panel wiring", () => {
     expect(exceptionPickerSource).toContain('"use client";');
     expect(exceptionPickerSource).toContain("const [isOpen, setIsOpen] = useState(false);");
     expect(exceptionPickerSource).toContain("Can&apos;t finish today?");
+    expect(exceptionPickerSource).toContain("Send this visit to office/dispatch for parts, approval, or review.");
+    expect(exceptionPickerSource).toContain("Choose reason -&gt;");
+    expect(exceptionPickerSource).toContain("w-full items-center justify-between");
     expect(exceptionPickerSource).toContain("What is blocking completion?");
     expect(exceptionPickerSource).toContain("Need Parts");
     expect(exceptionPickerSource).toContain("Need Approval");
