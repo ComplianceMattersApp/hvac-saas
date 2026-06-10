@@ -261,6 +261,14 @@ describe("focused queue display labels", () => {
     });
 
     expect(getWaitingQueueDisplay({
+      ops_status: "pending_info",
+      pending_info_reason: "Materials Needed: Need 45/5 capacitor",
+    })).toEqual({
+      label: "Materials Needed",
+      reason: "Need 45/5 capacitor",
+    });
+
+    expect(getWaitingQueueDisplay({
       ops_status: "waiting",
     })).toEqual({
       label: "Waiting on Information",
@@ -311,6 +319,21 @@ describe("focused queue display labels", () => {
       ops_status: "pending_info",
       pending_info_reason: "Need updated T24",
     })).toBe("Waiting on Information: Need updated T24");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Materials Needed: Need 45/5 capacitor",
+    })).toBe("Materials Needed: Need 45/5 capacitor");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Approval Needed: Customer must approve added work",
+    })).toBe("Approval Needed: Customer must approve added work");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Other: Customer asked us to pause until Friday",
+    })).toBe("Other: Customer asked us to pause until Friday");
 
     expect(getOpsQueueCardStatusReason({
       ops_status: "pending_info",

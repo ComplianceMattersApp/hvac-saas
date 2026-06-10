@@ -80,6 +80,26 @@ describe("ops waiting-state helpers", () => {
     });
   });
 
+  it("parses service field follow-up reasons for active waiting-state banners", () => {
+    expect(parseWaitingStateReason("Materials Needed: condenser fan motor")).toMatchObject({
+      blockerType: "waiting_on_part",
+      blockerLabel: "Waiting on part",
+      blockerReason: "condenser fan motor",
+    });
+
+    expect(parseWaitingStateReason("Approval Needed: customer reviewing repair")).toMatchObject({
+      blockerType: "waiting_on_customer_approval",
+      blockerLabel: "Waiting on customer approval",
+      blockerReason: "customer reviewing repair",
+    });
+
+    expect(parseWaitingStateReason("Other: office review needed")).toMatchObject({
+      blockerType: "waiting_on_information",
+      blockerLabel: "Waiting on information",
+      blockerReason: "office review needed",
+    });
+  });
+
   it("maps clear-action labels for all interrupt states", () => {
     expect(getInterruptClearActionLabel("pending_info")).toBe("Mark Info Received");
     expect(getInterruptClearActionLabel("on_hold")).toBe("Resume Job");

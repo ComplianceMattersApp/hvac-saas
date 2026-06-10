@@ -1729,16 +1729,7 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "pending_info" || status === "pending_info") {
-    const waitingState = getActiveWaitingState({
-      ops_status: j?.ops_status ?? null,
-      pending_info_reason: j?.pending_info_reason ?? null,
-      on_hold_reason: j?.on_hold_reason ?? null,
-    });
-    if (waitingState?.status === "pending_info") {
-      return `Waiting — ${waitingState.blockerReason}`;
-    }
-    const pendingInfoReason = pendingInfoBannerText(j);
-    return pendingInfoReason ? `Pending info — ${pendingInfoReason}` : "";
+    return getOpsQueueCardStatusReason(j);
   }
 
   if (status === "pending_office_review") {
@@ -1746,7 +1737,7 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "failed" || status === "failed") {
-    return primaryFailureReasonByJob.get(jobId) ?? "Failed — awaiting correction or retest";
+    return getOpsQueueCardStatusReason(j);
   }
 
   if (activeBucket === "retest_needed" || status === "retest_needed") {
@@ -1757,18 +1748,7 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "on_hold" || status === "on_hold") {
-    const waitingState = getActiveWaitingState({
-      ops_status: j?.ops_status ?? null,
-      pending_info_reason: j?.pending_info_reason ?? null,
-      on_hold_reason: j?.on_hold_reason ?? null,
-    });
-    if (waitingState?.status === "on_hold") {
-      return `Waiting — ${waitingState.blockerReason}`;
-    }
-    const onHoldReason = onHoldBannerText(j);
-    return onHoldReason
-      ? `On hold — ${onHoldReason}`
-      : "";
+    return getOpsQueueCardStatusReason(j);
   }
 
   if (status === "need_to_schedule") {
@@ -2621,6 +2601,22 @@ function displayOpsCardTitle(value: unknown) {
   return normalizeRetestLinkedJobTitle(value) || "Job";
 }
 
+function splitQueueStatusReasonDisplay(display: string): { label: string; message: string } {
+  const text = String(display ?? "").trim();
+  if (!text) return { label: "Operational Update", message: "" };
+
+  const separatorIndex = text.indexOf(":");
+  if (separatorIndex < 0) return { label: text, message: "" };
+
+  const label = text.slice(0, separatorIndex).trim();
+  const message = text.slice(separatorIndex + 1).trim();
+
+  return {
+    label: label || "Operational Update",
+    message,
+  };
+}
+
 function contractorResponseBadgeLabelForJob(jobId: string) {
   const unreadNotification = latestUnreadContractorUpdateNotificationByJob.get(jobId);
   const unreadType = String(unreadNotification?.notification_type ?? "").trim().toLowerCase();
@@ -2724,6 +2720,8 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         scheduledRetest: !!scheduledRetestLabel,
       });
   const noteText = String(note ?? "").trim();
+  const queueStatusReasonDisplay = getOpsQueueCardStatusReason(j);
+  const queueStatusReasonParts = splitQueueStatusReasonDisplay(queueStatusReasonDisplay);
   const nextStepNorm = nextStep.toLowerCase();
   const hasMeaningfulStatusBanner = isFailedFamily || showPendingInfoBanner || showOnHoldBanner;
   const showNextStepSection = !hasMeaningfulStatusBanner || isPendingOfficeReview || pendingInfoSignal;
@@ -2790,8 +2788,8 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         labelTone: "text-amber-700",
         bodyTone: "text-amber-900",
         supportTone: "text-amber-900/80",
-        label: `${waitingState?.status === "pending_info" ? "Waiting" : "Pending Info"}${statusAgeSuffix}`,
-        message: pendingInfoContext,
+        label: `${queueStatusReasonParts.label}${statusAgeSuffix}`,
+        message: queueStatusReasonParts.message || pendingInfoContext,
         support: "",
       }
     : showOnHoldBanner
@@ -2800,8 +2798,8 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         labelTone: "text-slate-600",
         bodyTone: "text-slate-800",
         supportTone: "text-slate-700/80",
-        label: waitingState?.status === "on_hold" ? "Waiting" : "On Hold",
-        message: onHoldContext,
+        label: queueStatusReasonParts.label,
+        message: queueStatusReasonParts.message || onHoldContext,
         support: "",
       }
     : null;

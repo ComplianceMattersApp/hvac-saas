@@ -135,6 +135,21 @@ export function getWaitingQueueDisplay(job: Pick<FocusedQueueJob, "ops_status" |
   label: string;
   reason: string;
 } {
+  const pendingReason = String(job?.pending_info_reason ?? "").trim();
+  const holdReason = String(job?.on_hold_reason ?? "").trim();
+  const rawReason = pendingReason || holdReason;
+  const status = normalize(job?.ops_status);
+  const serviceFollowUpReason = status === "pending_info"
+    ? parseServiceFieldFollowUpReason(pendingReason)
+    : null;
+
+  if (serviceFollowUpReason) {
+    return {
+      label: serviceFollowUpReason.label,
+      reason: serviceFollowUpReason.reason || serviceFollowUpReason.display,
+    };
+  }
+
   const waitingState = getActiveWaitingState({
     ops_status: job?.ops_status ?? null,
     pending_info_reason: job?.pending_info_reason ?? null,
@@ -147,11 +162,6 @@ export function getWaitingQueueDisplay(job: Pick<FocusedQueueJob, "ops_status" |
       reason: waitingState.blockerReason,
     };
   }
-
-  const pendingReason = String(job?.pending_info_reason ?? "").trim();
-  const holdReason = String(job?.on_hold_reason ?? "").trim();
-  const rawReason = pendingReason || holdReason;
-  const status = normalize(job?.ops_status);
 
   if (rawReason) {
     return {
@@ -222,6 +232,25 @@ function normalizeDisplayText(value: unknown): string {
     .trim();
 }
 
+function parseServiceFieldFollowUpReason(value: unknown): { label: string; reason: string; display: string } | null {
+  const text = cleanReason(value);
+  if (!text) return null;
+
+  for (const label of ["Materials Needed", "Approval Needed", "Other"]) {
+    const prefix = `${label}:`;
+    if (!text.toLowerCase().startsWith(prefix.toLowerCase())) continue;
+
+    const reason = text.slice(prefix.length).trim();
+    return {
+      label,
+      reason,
+      display: reason ? `${label}: ${reason}` : label,
+    };
+  }
+
+  return null;
+}
+
 function isDuplicateStatusReason(label: string, reason: string): boolean {
   const normalizedLabel = normalizeDisplayText(label);
   const normalizedReason = normalizeDisplayText(reason);
@@ -259,6 +288,9 @@ export function getOpsQueueCardStatusReason(
   const lifecycle = normalize(job?.status);
 
   if (status === "pending_info" || status === "waiting") {
+    const serviceFollowUpReason = parseServiceFieldFollowUpReason(job?.pending_info_reason);
+    if (serviceFollowUpReason) return serviceFollowUpReason.display;
+
     const waitingDisplay = getWaitingQueueDisplay(job);
     const label = waitingDisplay.label === "Unable to Complete / Waiting on Information"
       ? "Waiting on Information"

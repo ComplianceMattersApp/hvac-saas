@@ -103,7 +103,9 @@ const WAITING_STATE_LABELS: Record<WaitingStateType, string> = {
 };
 
 const WAITING_STATE_LEGACY_LABEL_ALIASES: Partial<Record<WaitingStateType, readonly string[]>> = {
-  waiting_on_customer_approval: ["Waiting on approval"],
+  waiting_on_part: ["Materials Needed"],
+  waiting_on_customer_approval: ["Waiting on approval", "Approval Needed"],
+  waiting_on_information: ["Other"],
 };
 
 type ActiveWaitingStatus = "pending_info" | "on_hold";
