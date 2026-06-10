@@ -5145,7 +5145,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </span>
           </div>
         ) : null}
-        {job.job_type === "ecc" && (isFieldComplete || job.status === "completed" || showFieldOutcomePanel) ? (
+        {job.job_type === "ecc" && (isFieldComplete || job.status === "completed") ? (
           <div className="hidden w-full sm:flex">
             <Link
               href={`/jobs/${job.id}/tests`}

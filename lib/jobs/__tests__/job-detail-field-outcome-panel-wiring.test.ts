@@ -31,7 +31,7 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("key={`${preview.createdAt || \"note\"}-${preview.label}-${preview.text.slice(0, 40)}-${index}`}");
   });
 
-  it("shows the active panel only for in-process not-yet-field-complete jobs", () => {
+  it("shows the exception panel only for in-process not-yet-field-complete jobs", () => {
     expect(jobDetailSource).toContain("const isJobArchived = Boolean(job.deleted_at) || normalizedOpsStatus === \"archived\";");
     expect(jobDetailSource).toContain('const isJobClosed = normalizedOpsStatus === "closed";');
     expect(jobDetailSource).toContain('const isJobCancelled = normalizedJobStatus === "cancelled";');
@@ -40,6 +40,17 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("const showFieldOutcomePanel =");
     expect(jobDetailSource).toContain("!isFieldComplete &&");
     expect(jobDetailSource).toContain('normalizedJobStatus === "in_process";');
+    expect(jobDetailSource).toContain("{showFieldOutcomePanel ? (");
+    expect(jobDetailSource).toContain("Field work complete - ready for closeout.");
+    expect(jobDetailSource).toContain("Field work complete - invoice/certs can be handled as needed.");
+  });
+
+  it("suppresses duplicate ECC tests workspace shortcuts while the primary in-process action row is visible", () => {
+    expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
+    expect(jobDetailSource).toContain('href={`/jobs/${job.id}/tests`}');
+    expect(jobDetailSource).toContain("Open Tests Workspace");
+    expect(jobDetailSource).toContain('job.job_type === "ecc" && (isFieldComplete || job.status === "completed") ? (');
+    expect(jobDetailSource).not.toContain("|| showFieldOutcomePanel) ? (");
   });
 
   it("keeps completion on the primary action and leaves the outcome panel for exceptions only", () => {
@@ -73,6 +84,9 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).toContain("Can&apos;t finish today?");
     expect(panelSource).toContain("Route active field work to office/dispatch when the visit cannot be completed.");
     expect(panelSource).toContain("Need parts, approval, or unable to complete?");
+    expect(panelSource).toContain("Choose an exception path if this visit cannot be finished today.");
+    expect(panelSource).not.toContain("<details");
+    expect(panelSource).not.toContain("<summary");
     expect(panelSource).toContain("Need approval?");
     expect(panelSource).toContain("Unable to complete?");
     expect(panelSource).toContain("Send this visit to office/dispatch as Waiting on Part.");
