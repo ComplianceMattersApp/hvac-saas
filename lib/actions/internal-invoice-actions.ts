@@ -684,6 +684,7 @@ function buildInternalInvoiceEmailBody(args: {
   greetingName: string | null;
   jobTitle: string | null;
   serviceLocation: string | null;
+  customerName: string | null;
 }) {
   const lineItems = args.invoice.line_items ?? [];
   const totalDisplay = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
@@ -697,10 +698,14 @@ function buildInternalInvoiceEmailBody(args: {
     supportPhone: args.supportPhone,
   });
   const invoiceDateDisplay = formatInvoiceDateForDisplay(args.invoice.invoice_date);
+  const serviceLocationText = String(args.serviceLocation ?? '').trim() || 'Service location unavailable';
+  const customerNameText = String(args.customerName ?? '').trim() || 'Customer unavailable';
   const lineItemsHtml = lineItems
     .map((lineItem) => {
       const name = escapeHtml(String(lineItem.item_name_snapshot ?? '').trim() || 'Line item');
       const description = escapeHtml(String(lineItem.description_snapshot ?? '').trim());
+      const serviceLocation = escapeHtml(serviceLocationText);
+      const customerName = escapeHtml(customerNameText);
       const quantity = escapeHtml(String(lineItem.quantity ?? '0'));
       const unitPrice = escapeHtml(formatCurrencyFromCents(Math.round(Number(lineItem.unit_price ?? 0) * 100)));
       const subtotal = escapeHtml(formatCurrencyFromCents(Math.round(Number(lineItem.line_subtotal ?? 0) * 100)));
@@ -711,6 +716,8 @@ function buildInternalInvoiceEmailBody(args: {
             <div style="font-weight: 600; color: #111827;">${name}</div>
             ${description ? `<div style="margin-top: 4px; color: #4b5563; font-size: 13px;">${description}</div>` : ''}
           </td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; vertical-align: top;">${serviceLocation}</td>
+          <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; vertical-align: top;">${customerName}</td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; text-align: right; white-space: nowrap;">${quantity}</td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; text-align: right; white-space: nowrap;">${unitPrice}</td>
           <td style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; color: #111827; text-align: right; white-space: nowrap;">${subtotal}</td>
@@ -724,7 +731,6 @@ function buildInternalInvoiceEmailBody(args: {
   });
   const invoiceReference = escapeHtml(invoiceReferenceText);
   const invoiceDate = escapeHtml(invoiceDateDisplay);
-  const serviceLocation = escapeHtml(String(args.serviceLocation ?? '').trim());
   const total = escapeHtml(totalDisplay);
   const notes = escapeHtml(String(args.invoice.notes ?? '').trim());
   const paymentUrl = String(args.paymentUrl ?? '').trim();
@@ -779,7 +785,6 @@ function buildInternalInvoiceEmailBody(args: {
                       <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Invoice Date</td>
                       <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${invoiceDate}</td>
                     </tr>
-                    ${serviceLocation ? `<tr><td style="padding: 8px 12px; font-size: 13px; color: #475569;">Service Location</td><td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">${serviceLocation}</td></tr>` : ''}
                     <tr>
                       <td style="padding: 8px 12px; font-size: 13px; color: #475569;">Status</td>
                       <td align="right" style="padding: 8px 12px; font-size: 13px; color: #0f172a; font-weight: 600;">Issued</td>
@@ -797,15 +802,17 @@ function buildInternalInvoiceEmailBody(args: {
                     <thead>
                       <tr style="background: #f1f5f9;">
                         <th align="left" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Description</th>
+                        <th align="left" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Service Location</th>
+                        <th align="left" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Customer</th>
                         <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Qty</th>
                         <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Unit Price</th>
                         <th align="right" style="padding: 10px 12px; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: #334155;">Subtotal</th>
                       </tr>
                     </thead>
                     <tbody>
-                      ${lineItemsHtml || `<tr><td colspan="4" style="padding: 12px; color: #475569;">No billed line items were recorded.</td></tr>`}
+                      ${lineItemsHtml || `<tr><td colspan="6" style="padding: 12px; color: #475569;">No billed line items were recorded.</td></tr>`}
                       <tr>
-                        <td colspan="3" align="right" style="padding: 10px 12px; border-top: 1px solid #dbe4f0; font-size: 13px; color: #334155; font-weight: 700;">Total</td>
+                        <td colspan="5" align="right" style="padding: 10px 12px; border-top: 1px solid #dbe4f0; font-size: 13px; color: #334155; font-weight: 700;">Total</td>
                         <td align="right" style="padding: 10px 12px; border-top: 1px solid #dbe4f0; font-size: 14px; color: #0f172a; font-weight: 800;">${total}</td>
                       </tr>
                     </tbody>
@@ -838,6 +845,7 @@ function buildInternalInvoiceEmailText(args: {
   greetingName: string | null;
   jobTitle: string | null;
   serviceLocation: string | null;
+  customerName: string | null;
 }) {
   const invoiceReference = formatInvoiceDisplayReference({
     invoiceDisplayNumber: args.invoice.invoice_display_number,
@@ -847,7 +855,8 @@ function buildInternalInvoiceEmailText(args: {
   const invoiceDate = formatInvoiceDateForDisplay(args.invoice.invoice_date);
   const recipientName = String(args.greetingName ?? args.invoice.billing_name ?? '').trim() || 'there';
   const jobTitle = normalizeJobContextForSentence(args.jobTitle);
-  const serviceLocation = String(args.serviceLocation ?? '').trim();
+  const serviceLocation = String(args.serviceLocation ?? '').trim() || 'Service location unavailable';
+  const customerName = String(args.customerName ?? '').trim() || 'Customer unavailable';
   const total = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
   const paymentUrl = String(args.paymentUrl ?? '').trim();
   const contactLine = buildContactLine({
@@ -862,7 +871,7 @@ function buildInternalInvoiceEmailText(args: {
       const quantity = String(lineItem.quantity ?? '0').trim() || '0';
       const unitPrice = formatCurrencyFromCents(Math.round(Number(lineItem.unit_price ?? 0) * 100));
       const subtotal = formatCurrencyFromCents(Math.round(Number(lineItem.line_subtotal ?? 0) * 100));
-      return `${index + 1}. ${itemName} | Qty: ${quantity} | Unit: ${unitPrice} | Subtotal: ${subtotal}`;
+      return `${index + 1}. ${itemName} | Service Location: ${serviceLocation} | Customer: ${customerName} | Qty: ${quantity} | Unit: ${unitPrice} | Subtotal: ${subtotal}`;
     })
     .join('\n');
 
@@ -876,7 +885,6 @@ function buildInternalInvoiceEmailText(args: {
     'INVOICE SUMMARY',
     `Invoice: ${invoiceReference}`,
     `Invoice Date: ${invoiceDate}`,
-    ...(serviceLocation ? [`Service Location: ${serviceLocation}`] : []),
     'Status: Issued',
     `Total: ${total}`,
     ...(paymentUrl
@@ -2481,6 +2489,11 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     accountOwnerUserId: context.internalUser.account_owner_user_id,
     locationId: context.job.location_id,
   });
+  const serviceCustomerName = [context.job.customer_first_name, context.job.customer_last_name]
+    .map((value: unknown) => String(value ?? '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim() || null;
   const shouldLookupContractorGreetingName =
     !getTrimmedString(context.invoice.billing_name)
     && String(context.job.billing_recipient ?? '').trim().toLowerCase() === 'contractor'
@@ -2520,6 +2533,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     greetingName,
     jobTitle: context.job.title ?? null,
     serviceLocation: serviceLocation || null,
+    customerName: serviceCustomerName,
   });
   const textBody = buildInternalInvoiceEmailText({
     businessName: tenantIdentity.displayName,
@@ -2530,6 +2544,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     greetingName,
     jobTitle: context.job.title ?? null,
     serviceLocation: serviceLocation || null,
+    customerName: serviceCustomerName,
   });
 
   const queuedDelivery = await insertInternalInvoiceEmailNotification({

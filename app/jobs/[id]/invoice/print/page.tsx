@@ -10,7 +10,6 @@ import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
 import {
   formatInvoiceBillingAddressLines,
   formatServiceLocationAddressLines,
-  invoiceServiceLocationMatchesBillingAddress,
 } from "@/lib/business/internal-invoice-address-rendering";
 import PrintToolbar from "./PrintToolbar";
 
@@ -134,11 +133,6 @@ export default async function InternalInvoicePrintPage({
   const billingEmail = String(invoice.billing_email ?? "").trim();
   const billingPhone = String(invoice.billing_phone ?? "").trim();
   const billingAddress = formatInvoiceBillingAddressLines(invoice, (job as any).billing_recipient);
-  const serviceLocationMatchesBilling = invoiceServiceLocationMatchesBillingAddress({
-    billingRecipient: (job as any).billing_recipient,
-    billingAddressLines: billingAddress,
-    serviceLocationLines: serviceLocationParts,
-  });
   const hasLogo = String(tenantIdentity.logoUrl ?? "").trim().length > 0;
   const invoiceReference = formatInvoiceDisplayReference({
     invoiceDisplayNumber: invoice.invoice_display_number,
@@ -208,18 +202,17 @@ export default async function InternalInvoicePrintPage({
                   ))}
                 </div>
               ) : null}
-              {serviceLocationLabel ? (
-                <div className="mt-3 border-t border-slate-200 pt-2 text-sm text-slate-700 print:border-slate-300">
-                  <span className="font-semibold text-slate-900">Service Location:</span>{" "}
-                  {serviceLocationMatchesBilling ? "Same as billing address" : serviceLocationLabel}
-                </div>
-              ) : null}
+              <div className="mt-3 border-t border-slate-200 pt-2 text-sm text-slate-700 print:border-slate-300">
+                Service details are listed by line item below.
+              </div>
             </div>
           </div>
 
           <div className="mt-5 overflow-hidden rounded-xl border border-slate-200 print:rounded-none print:border-slate-300">
-            <div className="grid grid-cols-[minmax(0,2.2fr)_minmax(5rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)] gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 print:border-slate-300 print:bg-white">
+            <div className="grid grid-cols-[minmax(0,1.65fr)_minmax(0,1.35fr)_minmax(0,0.9fr)_minmax(4.5rem,0.5fr)_minmax(6.5rem,0.65fr)_minmax(6.5rem,0.65fr)] gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-500 print:border-slate-300 print:bg-white">
               <div>Description</div>
+              <div>Service Location</div>
+              <div>Customer</div>
               <div className="text-right">Qty</div>
               <div className="text-right">Unit Price</div>
               <div className="text-right">Subtotal</div>
@@ -231,7 +224,7 @@ export default async function InternalInvoicePrintPage({
                 {invoice.line_items.map((lineItem) => (
                   <div
                     key={lineItem.id}
-                    className="grid break-inside-avoid grid-cols-[minmax(0,2.2fr)_minmax(5rem,0.7fr)_minmax(7rem,0.8fr)_minmax(7rem,0.8fr)] gap-3 bg-white px-4 py-3 text-sm"
+                    className="grid break-inside-avoid grid-cols-[minmax(0,1.65fr)_minmax(0,1.35fr)_minmax(0,0.9fr)_minmax(4.5rem,0.5fr)_minmax(6.5rem,0.65fr)_minmax(6.5rem,0.65fr)] gap-3 bg-white px-4 py-3 text-sm"
                   >
                     <div>
                       <div className="font-semibold text-slate-900">{lineItem.item_name_snapshot}</div>
@@ -239,6 +232,8 @@ export default async function InternalInvoicePrintPage({
                         <div className="mt-0.5 text-xs leading-5 text-slate-600">{lineItem.description_snapshot}</div>
                       ) : null}
                     </div>
+                    <div className="text-slate-700">{serviceLocationLabel || "Service location unavailable"}</div>
+                    <div className="text-slate-700">{customerName}</div>
                     <div className="text-right text-slate-700">{Number(lineItem.quantity ?? 0).toFixed(2)}</div>
                     <div className="text-right text-slate-700">{formatCurrencyFromAmount(lineItem.unit_price)}</div>
                     <div className="text-right font-semibold text-slate-900">{formatCurrencyFromAmount(lineItem.line_subtotal)}</div>

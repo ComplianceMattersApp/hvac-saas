@@ -42,24 +42,37 @@ describe("internal invoice print reference wiring", () => {
     expect(source).not.toContain('join(" / ")');
   });
 
-  it("avoids duplicating the same billing and service address while still labeling different service locations", () => {
+  it("keeps billing recipient separate from line-level service details", () => {
     expect(source).toContain('from "@/lib/business/internal-invoice-address-rendering";');
     expect(source).toContain("formatInvoiceBillingAddressLines(invoice, (job as any).billing_recipient)");
-    expect(source).toContain("invoiceServiceLocationMatchesBillingAddress({");
-    expect(source).toContain("billingRecipient: (job as any).billing_recipient");
-    expect(source).toContain('Service Location:</span>{" "}');
-    expect(source).toContain('serviceLocationMatchesBilling ? "Same as billing address" : serviceLocationLabel');
+    expect(source).toContain("formatServiceLocationAddressLines(location)");
+    expect(source).toContain("Service details are listed by line item below.");
+    expect(source).not.toContain("invoiceServiceLocationMatchesBillingAddress");
+    expect(source).not.toContain("Same as billing address");
+    expect(source).not.toContain('Service Location:</span>{" "}');
+  });
+
+  it("renders line items with service location and customer context", () => {
+    expect(source).toContain("Description");
+    expect(source).toContain("Service Location");
+    expect(source).toContain("Customer");
+    expect(source).toContain("Qty");
+    expect(source).toContain("Unit Price");
+    expect(source).toContain("Subtotal");
+    expect(source).toContain('{serviceLocationLabel || "Service location unavailable"}');
+    expect(source).toContain("{customerName}");
   });
 
   it("removes internal payment notice language while keeping line items and total blocks", () => {
     expect(source).toContain("No billed line items were recorded.");
     expect(source).toContain("Description");
+    expect(source).toContain("Service Location");
+    expect(source).toContain("Customer");
     expect(source).toContain("Qty");
     expect(source).toContain("Unit Price");
     expect(source).toContain("Subtotal");
     expect(source).toContain("Total Due");
     expect(source).toContain("Billing Recipient");
-    expect(source).toContain("Service Location:");
     expect(source).not.toContain("Payment + Billing Notice");
     expect(source).not.toContain("manual records");
     expect(source).not.toContain("Stripe-confirmed online payments");

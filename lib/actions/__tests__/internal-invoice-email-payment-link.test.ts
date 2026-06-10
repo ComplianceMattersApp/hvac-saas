@@ -376,10 +376,18 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     const firstEmailPayload = sendEmailMock.mock.calls[0]?.[0] as { html?: string; text?: string } | undefined;
     expect(firstEmailPayload?.html).toContain('Pay Invoice');
     expect(firstEmailPayload?.html).toContain('Invoice #2001');
+    expect(firstEmailPayload?.html).toContain('Service Location');
+    expect(firstEmailPayload?.html).toContain('Customer');
+    expect(firstEmailPayload?.html).toContain('123 Main, Stockton CA 95212');
+    expect(firstEmailPayload?.html).toContain('Alex Tenant');
+    expect(firstEmailPayload?.html).not.toContain('<td style="padding: 8px 12px; font-size: 13px; color: #475569;">Service Location</td>');
     expect(firstEmailPayload?.html).not.toContain('Legacy ref:');
     expect(firstEmailPayload?.html).not.toContain('INV-1');
     expect(firstEmailPayload?.text).toContain('Pay Invoice:');
     expect(firstEmailPayload?.text).toContain('Invoice: Invoice #2001');
+    expect(firstEmailPayload?.text).toContain('Service Location: 123 Main, Stockton CA 95212');
+    expect(firstEmailPayload?.text).toContain('Customer: Alex Tenant');
+    expect(firstEmailPayload?.text).not.toContain('\nService Location: 123 Main, Stockton CA 95212\nStatus: Issued');
     expect(firstEmailPayload?.text).not.toContain('Legacy ref:');
     expect(firstEmailPayload?.text).not.toContain('INV-1');
     expect(
@@ -418,8 +426,14 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
 
     const email = sentEmailPayload();
     expect(email?.html).toContain('Hi Angkor Heating &amp; Air,');
+    expect(email?.html).toContain('Service Location');
+    expect(email?.html).toContain('Customer');
+    expect(email?.html).toContain('123 Main, Stockton CA 95212');
+    expect(email?.html).toContain('Harper Homeowner');
     expect(email?.html).not.toContain('Hi Harper Homeowner,');
     expect(email?.text).toContain('Hi Angkor Heating & Air,');
+    expect(email?.text).toContain('Service Location: 123 Main, Stockton CA 95212');
+    expect(email?.text).toContain('Customer: Harper Homeowner');
     expect(email?.text).not.toContain('Hi Harper Homeowner,');
     expect(
       fixture.writes.some((write) => write.table === 'internal_invoice_payments'),
