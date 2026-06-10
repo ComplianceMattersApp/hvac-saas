@@ -3417,7 +3417,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
       event_type: "ops_update",
       meta: {
         source: "job_detail",
-        message: "Waiting state resumed through next service visit",
+        message: "Follow-up continued through linked return visit",
         blocker_action: "updated",
         blocker_type: activeWaitingState.blockerType,
         blocker_reason: activeWaitingState.blockerReason,

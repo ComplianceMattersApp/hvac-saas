@@ -9,6 +9,7 @@ import {
   getWaitingQueueDisplay,
   getWaitingQueueRecommendedNextStep,
 } from "@/lib/ops/focused-queues";
+import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
 import { buildOpsStatusEnteredAtByJob, resolveLifecycleAging } from "@/lib/utils/lifecycle-aging";
 
 const waitingSelect =
@@ -55,6 +56,17 @@ export default async function OpsWaitingQueuePage() {
   const enteredAtByJob = buildOpsStatusEnteredAtByJob(
     (statusEvents ?? []) as Array<{ job_id?: unknown; created_at?: unknown; meta?: unknown }>,
   );
+  const progressEventsByJob = new Map<string, Array<{ created_at?: string | null; meta?: unknown }>>();
+  for (const event of statusEvents ?? []) {
+    const eventJobId = String((event as any)?.job_id ?? "").trim();
+    if (!eventJobId) continue;
+    const rows = progressEventsByJob.get(eventJobId) ?? [];
+    rows.push({
+      created_at: String((event as any)?.created_at ?? "").trim() || null,
+      meta: (event as any)?.meta ?? null,
+    });
+    progressEventsByJob.set(eventJobId, rows);
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -97,6 +109,10 @@ export default async function OpsWaitingQueuePage() {
             const jobId = String(job?.id ?? "");
             const waitingDisplay = getWaitingQueueDisplay(job);
             const nextStep = getWaitingQueueRecommendedNextStep(job);
+            const followUpProgress = buildServiceFollowUpProgressState({
+              pendingInfoReason: job?.pending_info_reason ?? null,
+              events: progressEventsByJob.get(jobId) ?? [],
+            });
 
             return (
               <li
@@ -124,9 +140,16 @@ export default async function OpsWaitingQueuePage() {
                           stateEnteredAtByStatus: enteredAtByJob.get(jobId) ?? null,
                         }).label ?? "-"}
                       </span>
+                      {followUpProgress.progressLabel ? (
+                        <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 font-semibold text-blue-800">
+                          {followUpProgress.progressLabel}
+                        </span>
+                      ) : null}
                     </div>
                     <div className="mt-2 text-xs text-slate-600">Reason: {waitingDisplay.reason}</div>
-                    <div className="mt-1 text-xs text-slate-500">Next step: {nextStep}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Next step: {followUpProgress.nextActionLabel ?? followUpProgress.returnPromptLabel ?? nextStep}
+                    </div>
                   </div>
 
                   <div className="flex shrink-0 gap-2">

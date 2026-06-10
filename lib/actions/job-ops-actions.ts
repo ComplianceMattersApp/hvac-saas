@@ -36,6 +36,13 @@ import { buildMovementEventMeta } from "@/lib/actions/job-event-meta";
 import { applyExternalBillingCompletionMutation } from "@/lib/actions/external-billing-completion";
 import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import {
+  buildServiceFollowUpProgressState,
+  formatServiceFollowUpProgressLabel,
+  parseServiceFollowUpReason,
+  type ServiceFollowUpProgress,
+  type ServiceFollowUpReasonFamily,
+} from "@/lib/jobs/service-follow-up-progress";
+import {
   extractFailureDetails,
   extractFailureReasons,
   finalRunPass,
@@ -147,6 +154,16 @@ async function reconcileHeldServiceFollowUpCaseBestEffort(params: {
     });
   }
 }
+
+type ServiceFollowUpProgressAction = {
+  progress: ServiceFollowUpProgress;
+  expectedFamily: ServiceFollowUpReasonFamily;
+  sourceAction: string;
+  successBanner: string;
+  invalidFamilyBanner: string;
+  nextActionNote: string;
+  eventMessage: string;
+};
 
 async function requireInternalOpsAccessOrRedirect(
   supabase: any,
@@ -1874,6 +1891,187 @@ export async function releaseAndReevaluateFromForm(formData: FormData): Promise<
       fallbackPath: `/jobs/${jobId}?tab=ops`,
     }),
   );
+}
+
+async function markServiceFollowUpProgressFromForm(
+  formData: FormData,
+  action: ServiceFollowUpProgressAction,
+): Promise<void> {
+  const supabase = await createClient();
+  const jobId = String(formData.get("job_id") ?? "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const progressNote = String(formData.get("progress_note") || "").trim();
+  const followUpDate = String(formData.get("follow_up_date") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+
+  const redirectToFollowUp = (banner: string): never =>
+    redirect(
+      buildJobOpsRedirectPath({
+        jobId,
+        returnToRaw,
+        fallbackPath: `/jobs/${jobId}?tab=ops#next-service-action`,
+        banner,
+      }),
+    );
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+
+  const { data: beforeJob, error: beforeErr } = await supabase
+    .from("jobs")
+    .select(
+      "id, status, job_type, ops_status, field_complete, pending_info_reason, on_hold_reason, next_action_note, follow_up_date"
+    )
+    .eq("id", jobId)
+    .eq("account_owner_user_id", authz.internalUser.account_owner_user_id)
+    .single();
+
+  if (beforeErr) throw new Error(beforeErr.message);
+  if (!beforeJob?.id) throw new Error("Job not found");
+
+  const parsedReason = parseServiceFollowUpReason(beforeJob.pending_info_reason ?? null);
+  const isCompletedServiceFollowUp =
+    String(beforeJob.job_type ?? "").trim().toLowerCase() === "service" &&
+    String(beforeJob.status ?? "").trim().toLowerCase() === "completed" &&
+    Boolean(beforeJob.field_complete) &&
+    String(beforeJob.ops_status ?? "").trim().toLowerCase() === "pending_info" &&
+    Boolean(parsedReason);
+
+  if (!isCompletedServiceFollowUp || !parsedReason) {
+    redirectToFollowUp("service_follow_up_progress_invalid_state");
+  }
+  const serviceFollowUpReason = parsedReason as NonNullable<typeof parsedReason>;
+
+  if (serviceFollowUpReason.family !== action.expectedFamily) {
+    redirectToFollowUp(action.invalidFamilyBanner);
+  }
+
+  const { data: progressEvents, error: progressEventsErr } = await supabase
+    .from("job_events")
+    .select("created_at, meta")
+    .eq("job_id", jobId)
+    .eq("event_type", "ops_update")
+    .order("created_at", { ascending: true });
+
+  if (progressEventsErr) throw new Error(progressEventsErr.message);
+
+  const currentProgress = buildServiceFollowUpProgressState({
+    pendingInfoReason: beforeJob.pending_info_reason ?? null,
+    events: (progressEvents ?? []) as Array<{ created_at?: string | null; meta?: unknown }>,
+  }).progress;
+
+  if (currentProgress === action.progress) {
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/ops`);
+    redirectToFollowUp("service_follow_up_progress_already_saved");
+  }
+
+  const afterNextActionNote = action.nextActionNote;
+  const afterFollowUpDate = followUpDate || (beforeJob.follow_up_date ?? null);
+  const progressLabel = formatServiceFollowUpProgressLabel(action.progress);
+
+  const before: OpsSnapshot = {
+    ops_status: beforeJob.ops_status ?? null,
+    pending_info_reason: beforeJob.pending_info_reason ?? null,
+    on_hold_reason: beforeJob.on_hold_reason ?? null,
+    follow_up_date: beforeJob.follow_up_date ?? null,
+    next_action_note: beforeJob.next_action_note ?? null,
+    action_required_by: null,
+  };
+  const after: OpsSnapshot = {
+    ...before,
+    follow_up_date: afterFollowUpDate,
+    next_action_note: afterNextActionNote,
+  };
+
+  const changes = buildOpsChanges(before, after);
+  if (changes.length > 0) {
+    const { error: updateErr } = await supabase
+      .from("jobs")
+      .update({
+        next_action_note: afterNextActionNote,
+        follow_up_date: afterFollowUpDate,
+      })
+      .eq("id", jobId)
+      .eq("account_owner_user_id", authz.internalUser.account_owner_user_id);
+
+    if (updateErr) throw new Error(updateErr.message);
+  }
+
+  const { error: eventErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "ops_update",
+    message: action.eventMessage,
+    meta: {
+      timeline_v: 1,
+      event_family: "service_follow_up_progress",
+      source: "job_detail",
+      source_action: action.sourceAction,
+      actor_user_id: authz.userId,
+      service_follow_up_progress: action.progress,
+      service_follow_up_progress_label: progressLabel,
+      previous_service_follow_up_progress: currentProgress,
+      follow_up_reason_family: serviceFollowUpReason.family,
+      follow_up_reason_label: serviceFollowUpReason.label,
+      follow_up_reason: serviceFollowUpReason.reason,
+      pending_info_reason: beforeJob.pending_info_reason ?? null,
+      ...(progressNote ? { note: progressNote } : {}),
+      ...(followUpDate ? { follow_up_date: followUpDate } : {}),
+      changes,
+    },
+    user_id: authz.userId,
+  });
+
+  if (eventErr) throw new Error(eventErr.message);
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
+  redirectToFollowUp(action.successBanner);
+}
+
+export async function markServicePartOrderedFromForm(formData: FormData): Promise<void> {
+  await markServiceFollowUpProgressFromForm(formData, {
+    progress: "part_ordered",
+    expectedFamily: "materials_needed",
+    sourceAction: "markServicePartOrderedFromForm",
+    successBanner: "service_part_ordered_saved",
+    invalidFamilyBanner: "service_part_ordered_wrong_follow_up",
+    nextActionNote: "Part ordered. Mark part arrived when it is available.",
+    eventMessage: "Service follow-up marked part ordered",
+  });
+}
+
+export async function markServicePartArrivedFromForm(formData: FormData): Promise<void> {
+  await markServiceFollowUpProgressFromForm(formData, {
+    progress: "part_arrived",
+    expectedFamily: "materials_needed",
+    sourceAction: "markServicePartArrivedFromForm",
+    successBanner: "service_part_arrived_saved",
+    invalidFamilyBanner: "service_part_arrived_wrong_follow_up",
+    nextActionNote: "Part arrived. Create a linked return visit when ready.",
+    eventMessage: "Service follow-up marked part arrived",
+  });
+}
+
+export async function markServiceApprovalReceivedFromForm(formData: FormData): Promise<void> {
+  await markServiceFollowUpProgressFromForm(formData, {
+    progress: "approval_received",
+    expectedFamily: "approval_needed",
+    sourceAction: "markServiceApprovalReceivedFromForm",
+    successBanner: "service_approval_received_saved",
+    invalidFamilyBanner: "service_approval_received_wrong_follow_up",
+    nextActionNote: "Approval received. Create a linked return visit when ready.",
+    eventMessage: "Service follow-up marked approval received",
+  });
 }
 
 export async function updateJobOpsFromForm(formData: FormData): Promise<void> {

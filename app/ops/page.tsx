@@ -60,6 +60,9 @@ import {
 } from "@/lib/ops/recent-attempt-display";
 import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
 import { formatAssignmentSummaryForJob, getOpsQueueCardStatusReason } from "@/lib/ops/focused-queues";
+import {
+  buildServiceFollowUpProgressState,
+} from "@/lib/jobs/service-follow-up-progress";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -489,6 +492,15 @@ function subtractBusinessDays(date: Date, days: number) {
   // Initialize lifecycle maps before any workspace preview rendering to avoid TDZ crashes.
   let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
   let latestFailedRunByJob = new Map<string, any>();
+  let serviceFollowUpProgressLabelByJob = new Map<string, string>();
+
+  function withServiceFollowUpProgress(job: any) {
+    const jobId = String(job?.id ?? "").trim();
+    const progressLabel = jobId ? serviceFollowUpProgressLabelByJob.get(jobId) ?? null : null;
+    return progressLabel
+      ? { ...job, service_follow_up_progress_label: progressLabel }
+      : job;
+  }
 
   function workspaceAgeLabel(job: any) {
     const jobId = String(job?.id ?? "").trim();
@@ -515,7 +527,7 @@ function subtractBusinessDays(date: Date, days: number) {
       return "Scheduled field work";
     }
     if (queueKey === "without_tech") return "Scheduled without active tech assignment";
-    return getOpsQueueCardStatusReason(job);
+    return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
   }
 
   const wsStartTodayUtc = startOfTodayUtcIsoLA();
@@ -1729,7 +1741,7 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "pending_info" || status === "pending_info") {
-    return getOpsQueueCardStatusReason(j);
+    return getOpsQueueCardStatusReason(withServiceFollowUpProgress(j));
   }
 
   if (status === "pending_office_review") {
@@ -1737,7 +1749,7 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "failed" || status === "failed") {
-    return getOpsQueueCardStatusReason(j);
+    return getOpsQueueCardStatusReason(withServiceFollowUpProgress(j));
   }
 
   if (activeBucket === "retest_needed" || status === "retest_needed") {
@@ -1748,7 +1760,7 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (activeBucket === "on_hold" || status === "on_hold") {
-    return getOpsQueueCardStatusReason(j);
+    return getOpsQueueCardStatusReason(withServiceFollowUpProgress(j));
   }
 
   if (status === "need_to_schedule") {
@@ -2048,6 +2060,29 @@ for (const ev of pendingInfoTransitionEvents ?? []) {
 
   const createdAt = String((ev as any)?.created_at ?? "").trim();
   if (createdAt) pendingInfoSetAtByJob.set(jobId, createdAt);
+}
+
+const serviceFollowUpEventsByJob = new Map<string, Array<{ created_at?: string | null; meta?: unknown }>>();
+for (const ev of pendingInfoTransitionEvents ?? []) {
+  const jobId = String((ev as any)?.job_id ?? "").trim();
+  if (!jobId) continue;
+  const rows = serviceFollowUpEventsByJob.get(jobId) ?? [];
+  rows.push({
+    created_at: String((ev as any)?.created_at ?? "").trim() || null,
+    meta: (ev as any)?.meta ?? null,
+  });
+  serviceFollowUpEventsByJob.set(jobId, rows);
+}
+
+serviceFollowUpProgressLabelByJob = new Map<string, string>();
+for (const job of uniqueAllOpenOpsJobs) {
+  const jobId = String((job as any)?.id ?? "").trim();
+  if (!jobId) continue;
+  const progressLabel = buildServiceFollowUpProgressState({
+    pendingInfoReason: (job as any)?.pending_info_reason ?? null,
+    events: serviceFollowUpEventsByJob.get(jobId) ?? [],
+  }).progressLabel;
+  if (progressLabel) serviceFollowUpProgressLabelByJob.set(jobId, progressLabel);
 }
 
 function assignmentSummaryForJob(jobId: string) {
@@ -2720,7 +2755,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         scheduledRetest: !!scheduledRetestLabel,
       });
   const noteText = String(note ?? "").trim();
-  const queueStatusReasonDisplay = getOpsQueueCardStatusReason(j);
+  const queueStatusReasonDisplay = getOpsQueueCardStatusReason(withServiceFollowUpProgress(j));
   const queueStatusReasonParts = splitQueueStatusReasonDisplay(queueStatusReasonDisplay);
   const nextStepNorm = nextStep.toLowerCase();
   const hasMeaningfulStatusBanner = isFailedFamily || showPendingInfoBanner || showOnHoldBanner;
@@ -3288,7 +3323,7 @@ function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
     return "Scheduled field work";
   }
   if (queueKey === "without_tech") return "Scheduled without active tech assignment";
-  return getOpsQueueCardStatusReason(job);
+  return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
 }
 
 function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {

@@ -143,6 +143,17 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("const isServiceFieldFollowUpPendingInfo =");
     expect(jobDetailSource).toContain("/^(Materials Needed|Approval Needed|Other):/i.test(pendingInfoReasonText)");
     expect(jobDetailSource).toContain("const canShowReleaseAndReevaluate = !isServiceFieldFollowUpPendingInfo && [");
+    expect(jobDetailSource).toContain("buildServiceFollowUpProgressState");
+    expect(jobDetailSource).toContain("serviceFollowUpProgressEventsPromise");
+    expect(jobDetailSource).toContain("markServicePartOrderedFromForm");
+    expect(jobDetailSource).toContain("markServicePartArrivedFromForm");
+    expect(jobDetailSource).toContain("markServiceApprovalReceivedFromForm");
+    expect(jobDetailSource).toContain("Progress: {serviceFollowUpProgressState.progressLabel}");
+    expect(jobDetailSource).toContain("Mark Part Ordered");
+    expect(jobDetailSource).toContain("Mark Part Arrived");
+    expect(jobDetailSource).toContain("Mark Approval Received");
+    expect(jobDetailSource).toContain("serviceFollowUpProgressState.returnPromptLabel");
+    expect(jobDetailSource).not.toContain("Ready to resume this service visit?");
   });
 
   it("removes the standalone exception card and ECC guardrail copy", () => {

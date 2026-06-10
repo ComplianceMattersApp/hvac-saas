@@ -147,7 +147,17 @@ function buildDifferentIssueFoundFormData(note: string) {
   return formData;
 }
 
-function makeSupabaseForPartsNeeded(beforeJob: PartsNeededJob) {
+function buildServiceFollowUpProgressFormData() {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("return_to", "/jobs/job-1?tab=ops#next-service-action");
+  return formData;
+}
+
+function makeSupabaseForPartsNeeded(
+  beforeJob: PartsNeededJob,
+  progressEvents: Array<{ created_at?: string | null; meta?: unknown }> = [],
+) {
   const jobUpdates: Record<string, unknown>[] = [];
   const jobEvents: Record<string, unknown>[] = [];
   const jobUpdateEqFilters: Array<[string, unknown]> = [];
@@ -197,12 +207,16 @@ function makeSupabaseForPartsNeeded(beforeJob: PartsNeededJob) {
       }
 
       if (table === "job_events") {
-        return {
+        const query: any = {
           insert: vi.fn(async (payload: Record<string, unknown>) => {
             jobEvents.push(payload);
             return { error: null };
           }),
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          order: vi.fn(async () => ({ data: progressEvents, error: null })),
         };
+        return query;
       }
 
       throw new Error(`Unexpected table: ${table}`);
@@ -360,6 +374,162 @@ describe("markJobPartsNeededFromForm", () => {
     await expect(
       markJobPartsNeededFromForm(buildPartsNeededFormData("   ")),
     ).rejects.toThrow("banner=parts_needed_note_required");
+
+    expect(jobUpdates).toHaveLength(0);
+    expect(jobEvents).toHaveLength(0);
+  });
+});
+
+describe("service follow-up progress actions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.resetModules();
+
+    requireInternalUserMock.mockResolvedValue({
+      userId: "internal-user-1",
+      internalUser: {
+        user_id: "internal-user-1",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+    resolveOperationalMutationEntitlementAccessMock.mockResolvedValue({
+      authorized: true,
+      reason: "allowed_active",
+    });
+  });
+
+  it("marks materials-needed follow-up as part ordered without overwriting original reason", async () => {
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "completed",
+      job_type: "service",
+      ops_status: "pending_info",
+      field_complete: true,
+      field_complete_at: "2026-06-10T10:00:00.000Z",
+      pending_info_reason: "Materials Needed: Need 45/5 capacitor",
+      on_hold_reason: null,
+      next_action_note: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markServicePartOrderedFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markServicePartOrderedFromForm(buildServiceFollowUpProgressFormData()),
+    ).rejects.toThrow("banner=service_part_ordered_saved");
+
+    expect(jobUpdates).toEqual([
+      {
+        next_action_note: "Part ordered. Mark part arrived when it is available.",
+        follow_up_date: null,
+      },
+    ]);
+    expect(jobUpdateEqFilters).toEqual([
+      ["id", "job-1"],
+      ["account_owner_user_id", "owner-1"],
+    ]);
+    expect(jobEvents).toHaveLength(1);
+    expect(jobEvents[0]).toMatchObject({
+      event_type: "ops_update",
+      meta: {
+        service_follow_up_progress: "part_ordered",
+        previous_service_follow_up_progress: null,
+        pending_info_reason: "Materials Needed: Need 45/5 capacitor",
+        follow_up_reason_family: "materials_needed",
+      },
+    });
+  });
+
+  it("marks part arrived and carries previous progress from job events", async () => {
+    const { supabase, jobEvents } = makeSupabaseForPartsNeeded(
+      {
+        id: "job-1",
+        status: "completed",
+        job_type: "service",
+        ops_status: "pending_info",
+        field_complete: true,
+        field_complete_at: "2026-06-10T10:00:00.000Z",
+        pending_info_reason: "Materials Needed: Need 45/5 capacitor",
+        on_hold_reason: null,
+        next_action_note: "Part ordered. Mark part arrived when it is available.",
+      },
+      [
+        {
+          created_at: "2026-06-10T11:00:00.000Z",
+          meta: { service_follow_up_progress: "part_ordered" },
+        },
+      ],
+    );
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markServicePartArrivedFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markServicePartArrivedFromForm(buildServiceFollowUpProgressFormData()),
+    ).rejects.toThrow("banner=service_part_arrived_saved");
+
+    expect(jobEvents[0]).toMatchObject({
+      event_type: "ops_update",
+      meta: {
+        service_follow_up_progress: "part_arrived",
+        previous_service_follow_up_progress: "part_ordered",
+        pending_info_reason: "Materials Needed: Need 45/5 capacitor",
+      },
+    });
+  });
+
+  it("marks approval-needed follow-up as approval received", async () => {
+    const { supabase, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "completed",
+      job_type: "service",
+      ops_status: "pending_info",
+      field_complete: true,
+      field_complete_at: "2026-06-10T10:00:00.000Z",
+      pending_info_reason: "Approval Needed: Customer must approve compressor",
+      on_hold_reason: null,
+      next_action_note: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markServiceApprovalReceivedFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markServiceApprovalReceivedFromForm(buildServiceFollowUpProgressFormData()),
+    ).rejects.toThrow("banner=service_approval_received_saved");
+
+    expect(jobEvents[0]).toMatchObject({
+      event_type: "ops_update",
+      meta: {
+        service_follow_up_progress: "approval_received",
+        pending_info_reason: "Approval Needed: Customer must approve compressor",
+        follow_up_reason_family: "approval_needed",
+      },
+    });
+  });
+
+  it("blocks part ordered on approval-needed follow-up without writes", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+      id: "job-1",
+      status: "completed",
+      job_type: "service",
+      ops_status: "pending_info",
+      field_complete: true,
+      field_complete_at: "2026-06-10T10:00:00.000Z",
+      pending_info_reason: "Approval Needed: Customer must approve compressor",
+      on_hold_reason: null,
+      next_action_note: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+
+    const { markServicePartOrderedFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(
+      markServicePartOrderedFromForm(buildServiceFollowUpProgressFormData()),
+    ).rejects.toThrow("banner=service_part_ordered_wrong_follow_up");
 
     expect(jobUpdates).toHaveLength(0);
     expect(jobEvents).toHaveLength(0);

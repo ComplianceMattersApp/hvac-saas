@@ -33,6 +33,9 @@ import {
   updateJobOpsFromForm,
   updateJobOpsDetailsFromForm,
   releaseAndReevaluateFromForm,
+  markServicePartOrderedFromForm,
+  markServicePartArrivedFromForm,
+  markServiceApprovalReceivedFromForm,
   markJobFieldCompleteFromForm,
   markCertsCompleteFromForm,
   markInvoiceCompleteFromForm,
@@ -61,6 +64,7 @@ import {
 } from "@/lib/business/internal-business-profile";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { buildJobBillingStateReadModel } from "@/lib/business/job-billing-state";
+import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
 import {
   resolveInternalInvoiceEmailDeliveries,
   type InternalInvoiceEmailDeliveryRecord,
@@ -1731,6 +1735,33 @@ export default async function JobDetailPage({
     }),
   );
 
+  const serviceFollowUpProgressEventsPromise = timedPhase("serviceFollowUpProgressEvents", async () => {
+    const pendingReason = String((job as any).pending_info_reason ?? "").trim();
+    const isServiceFollowUp =
+      String(job.job_type ?? "").trim().toLowerCase() === "service" &&
+      String(job.ops_status ?? "").trim().toLowerCase() === "pending_info" &&
+      /^(Materials Needed|Approval Needed|Other):/i.test(pendingReason);
+
+    if (!isServiceFollowUp) {
+      return [] as Array<{ created_at?: string | null; meta?: unknown }>;
+    }
+
+    const { data: rows, error: rowsErr } = await supabase
+      .from("job_events")
+      .select("created_at, meta")
+      .eq("job_id", String(job.id ?? jobId))
+      .eq("event_type", "ops_update")
+      .order("created_at", { ascending: true })
+      .limit(100);
+
+    if (rowsErr) return [] as Array<{ created_at?: string | null; meta?: unknown }>;
+
+    return (rows ?? []).map((row: any) => ({
+      created_at: String(row?.created_at ?? "").trim() || null,
+      meta: row?.meta ?? null,
+    }));
+  });
+
   const customerAttemptSummaryPromise = timedPhase("customerAttemptSummary", async () => {
     try {
       const [attemptCountRes, latestAttemptRes] = await Promise.all([
@@ -2092,6 +2123,7 @@ export default async function JobDetailPage({
     jobRoleContacts,
     customerAttemptSummary,
     fieldBillingSummaryData,
+    serviceFollowUpProgressEvents,
   ] = await Promise.all([
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
@@ -2106,6 +2138,7 @@ export default async function JobDetailPage({
     jobRoleContactsPromise,
     customerAttemptSummaryPromise,
     fieldBillingSummaryDataPromise,
+    serviceFollowUpProgressEventsPromise,
   ]);
 
   const contractorBilling = billingPartyReads.contractorBilling;
@@ -2792,6 +2825,10 @@ const isServiceFieldFollowUpPendingInfo =
   isFieldComplete &&
   currentOpsStatus === "pending_info" &&
   /^(Materials Needed|Approval Needed|Other):/i.test(pendingInfoReasonText);
+const serviceFollowUpProgressState = buildServiceFollowUpProgressState({
+  pendingInfoReason: pendingInfoReasonText,
+  events: serviceFollowUpProgressEvents,
+});
 const canShowReleaseAndReevaluate = !isServiceFieldFollowUpPendingInfo && [
   "pending_info",
   "on_hold",
@@ -5191,7 +5228,56 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             className="hidden w-full sm:block"
           />
         ) : null}
-        {isFieldComplete || job.status === "completed" ? (
+        {isServiceFieldFollowUpPendingInfo && serviceFollowUpProgressState.reason ? (
+          <div
+            id="next-service-action"
+            className="hidden w-full rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2.5 text-sm sm:block"
+          >
+            <div className="font-semibold text-amber-950">
+              {serviceFollowUpProgressState.reason.display}
+            </div>
+            {serviceFollowUpProgressState.progressLabel ? (
+              <div className="mt-2 inline-flex rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-900">
+                Progress: {serviceFollowUpProgressState.progressLabel}
+              </div>
+            ) : null}
+            <div className="mt-2 text-xs leading-5 text-amber-900/90">
+              {serviceFollowUpProgressState.returnPromptLabel ?? "Keep the original follow-up reason visible while office progress is tracked here."}
+            </div>
+            {serviceFollowUpProgressState.nextActionLabel ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {serviceFollowUpProgressState.nextActionLabel === "Mark Part Ordered" ? (
+                  <form action={markServicePartOrderedFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                      Mark Part Ordered
+                    </SubmitButton>
+                  </form>
+                ) : null}
+                {serviceFollowUpProgressState.nextActionLabel === "Mark Part Arrived" ? (
+                  <form action={markServicePartArrivedFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                      Mark Part Arrived
+                    </SubmitButton>
+                  </form>
+                ) : null}
+                {serviceFollowUpProgressState.nextActionLabel === "Mark Approval Received" ? (
+                  <form action={markServiceApprovalReceivedFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                      Mark Approval Received
+                    </SubmitButton>
+                  </form>
+                ) : null}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {(isFieldComplete || job.status === "completed") && !isServiceFieldFollowUpPendingInfo ? (
           <div className="hidden w-full sm:flex">
             <span className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-900">
               Field work complete - invoice/certs can be handled as needed.
@@ -6136,7 +6222,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
   </div>
 
-  {isInternalUser && job.job_type === "service" ? (
+  {isInternalUser && job.job_type === "service" && !isServiceFieldFollowUpPendingInfo ? (
     <div id="next-service-action" className="mt-4 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)] sm:mt-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
@@ -6151,9 +6237,56 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         ) : null}
       </div>
 
+      {isServiceFieldFollowUpPendingInfo && serviceFollowUpProgressState.reason ? (
+        <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3">
+          <div className="text-sm font-semibold text-amber-950">
+            {serviceFollowUpProgressState.reason.display}
+          </div>
+          {serviceFollowUpProgressState.progressLabel ? (
+            <div className="mt-2 inline-flex rounded-full border border-amber-300 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-amber-900">
+              Progress: {serviceFollowUpProgressState.progressLabel}
+            </div>
+          ) : null}
+          <div className="mt-2 text-xs leading-5 text-amber-900/90">
+            {serviceFollowUpProgressState.returnPromptLabel ?? "Keep the original follow-up reason visible while office progress is tracked here."}
+          </div>
+          {serviceFollowUpProgressState.nextActionLabel ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {serviceFollowUpProgressState.nextActionLabel === "Mark Part Ordered" ? (
+                <form action={markServicePartOrderedFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+                  <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                    Mark Part Ordered
+                  </SubmitButton>
+                </form>
+              ) : null}
+              {serviceFollowUpProgressState.nextActionLabel === "Mark Part Arrived" ? (
+                <form action={markServicePartArrivedFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+                  <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                    Mark Part Arrived
+                  </SubmitButton>
+                </form>
+              ) : null}
+              {serviceFollowUpProgressState.nextActionLabel === "Mark Approval Received" ? (
+                <form action={markServiceApprovalReceivedFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+                  <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                    Mark Approval Received
+                  </SubmitButton>
+                </form>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {canShowWaitingReleaseQuickAction ? (
         <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3">
-          <div className="text-sm font-semibold text-amber-900">Ready to resume this service visit?</div>
+          <div className="text-sm font-semibold text-amber-900">Ready to continue this work?</div>
           <p className="mt-1 text-xs leading-5 text-amber-900/90">
             Use this when the part, approval, access, or missing information is no longer blocking the job.
           </p>

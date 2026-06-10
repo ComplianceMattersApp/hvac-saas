@@ -37,6 +37,8 @@ export type FocusedQueueJob = {
   updated_at?: string | null;
   account_owner_user_id?: string | null;
   field_complete?: boolean | null;
+  service_follow_up_progress?: string | null;
+  service_follow_up_progress_label?: string | null;
 };
 
 type AssignmentDisplayInput = WithoutTechAssignmentInput & {
@@ -282,14 +284,19 @@ function isGenericAssignmentFallbackLabel(value: unknown): boolean {
 }
 
 export function getOpsQueueCardStatusReason(
-  job: Pick<FocusedQueueJob, "status" | "ops_status" | "pending_info_reason" | "on_hold_reason">,
+  job: Pick<FocusedQueueJob, "status" | "ops_status" | "pending_info_reason" | "on_hold_reason" | "service_follow_up_progress_label">,
 ): string {
   const status = normalize(job?.ops_status);
   const lifecycle = normalize(job?.status);
+  const progressLabel = cleanReason(job?.service_follow_up_progress_label);
 
   if (status === "pending_info" || status === "waiting") {
     const serviceFollowUpReason = parseServiceFieldFollowUpReason(job?.pending_info_reason);
-    if (serviceFollowUpReason) return serviceFollowUpReason.display;
+    if (serviceFollowUpReason) {
+      return progressLabel
+        ? `${serviceFollowUpReason.display} • Progress: ${progressLabel}`
+        : serviceFollowUpReason.display;
+    }
 
     const waitingDisplay = getWaitingQueueDisplay(job);
     const label = waitingDisplay.label === "Unable to Complete / Waiting on Information"

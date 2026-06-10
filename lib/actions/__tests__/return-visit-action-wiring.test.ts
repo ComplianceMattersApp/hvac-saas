@@ -54,6 +54,8 @@ describe("return visit action wiring", () => {
     expect(actionBlock).toContain('event_type: "created_from_service_visit"');
     expect(actionBlock).toContain('visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit"');
     expect(actionBlock).toContain("child_service_visit_type: childVisitType");
+    expect(actionBlock).toContain("Follow-up continued through linked return visit");
+    expect(actionBlock).not.toContain("Waiting state resumed through next service visit");
   });
 
   it("does not add callback creation wiring in return-visit action surfaces", () => {

@@ -323,6 +323,12 @@ describe("focused queue display labels", () => {
     expect(getOpsQueueCardStatusReason({
       ops_status: "pending_info",
       pending_info_reason: "Materials Needed: Need 45/5 capacitor",
+      service_follow_up_progress_label: "Part Ordered",
+    })).toBe("Materials Needed: Need 45/5 capacitor • Progress: Part Ordered");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Materials Needed: Need 45/5 capacitor",
     })).toBe("Materials Needed: Need 45/5 capacitor");
 
     expect(getOpsQueueCardStatusReason({
@@ -433,6 +439,8 @@ describe("focused ops queue pages", () => {
   it("waiting and exception pages use focused queue display labels", () => {
     expect(waitingQueuePageSource).toContain("getWaitingQueueDisplay");
     expect(waitingQueuePageSource).toContain("getWaitingQueueRecommendedNextStep");
+    expect(waitingQueuePageSource).toContain("buildServiceFollowUpProgressState");
+    expect(waitingQueuePageSource).toContain("followUpProgress.progressLabel");
     expect(waitingQueuePageSource).toContain("Next step:");
     expect(waitingQueuePageSource).toContain("#next-service-action");
     expect(waitingQueuePageSource).toContain("Create Return Visit");
