@@ -12,6 +12,11 @@ const panelSource = readFileSync(
   "utf8",
 );
 
+const fieldActionButtonSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/JobFieldActionButton.tsx"),
+  "utf8",
+);
+
 describe("job detail field outcome panel wiring", () => {
   it("wires the compact panel near field action areas", () => {
     expect(jobDetailSource).toContain('import FieldOutcomePanel from "./_components/FieldOutcomePanel";');
@@ -37,13 +42,22 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('normalizedJobStatus === "in_process";');
   });
 
-  it("wires work_completed, parts_needed, approval_needed, and unable_to_complete submit behavior", () => {
-    expect(panelSource).toContain('import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";');
+  it("keeps completion on the primary action and leaves the outcome panel for exceptions only", () => {
+    expect(fieldActionButtonSource).toContain("Complete Field Work");
+    expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
+    expect(jobDetailSource).toContain("Field work complete - ready for closeout.");
+    expect(jobDetailSource).toContain("Field work complete - invoice/certs can be handled as needed.");
+    expect(panelSource).not.toContain('import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";');
+    expect(panelSource).not.toContain("form action={advanceJobStatusFromForm}");
+    expect(panelSource).not.toContain("Confirm Work Completed");
+    expect(panelSource).not.toContain("Confirm field work complete");
+  });
+
+  it("wires parts_needed, approval_needed, and unable_to_complete submit behavior", () => {
     expect(panelSource).toContain('from "@/lib/actions/job-ops-actions";');
     expect(panelSource).toContain("markJobPartsNeededFromForm");
     expect(panelSource).toContain("markJobApprovalNeededFromForm");
     expect(panelSource).toContain("markJobUnableToCompleteFromForm");
-    expect(panelSource).toContain("form action={advanceJobStatusFromForm}");
     expect(panelSource).toContain("form action={markJobPartsNeededFromForm}");
     expect(panelSource).toContain("form action={markJobApprovalNeededFromForm}");
     expect(panelSource).toContain("form action={markJobUnableToCompleteFromForm}");
@@ -56,9 +70,8 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).toContain("markJobDifferentIssueFoundFromForm");
     expect(panelSource).toContain("form action={markJobDifferentIssueFoundFromForm}");
     expect(panelSource).toContain("name=\"different_issue_note\"");
-    expect(panelSource).toContain("Confirm field work complete");
-    expect(panelSource).toContain("Ready to finish this visit? This moves the job to closeout for invoice/certs as needed.");
     expect(panelSource).toContain("Can&apos;t finish today?");
+    expect(panelSource).toContain("Route active field work to office/dispatch when the visit cannot be completed.");
     expect(panelSource).toContain("Need parts, approval, or unable to complete?");
     expect(panelSource).toContain("Need approval?");
     expect(panelSource).toContain("Unable to complete?");
@@ -74,7 +87,6 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).toContain("Submit Approval Needed");
     expect(panelSource).toContain("Submit Unable to Complete");
     expect(panelSource).toContain("Submit Different Issue Found");
-    expect(panelSource).toContain("Confirm Work Completed");
   });
 
   it("gates Different Issue Found to callback/revisit-only rendering", () => {
@@ -91,8 +103,14 @@ describe("job detail field outcome panel wiring", () => {
   });
 
   it("keeps open and on-the-way flow on existing start actions", () => {
-    expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" && !showFieldOutcomePanel');
-    expect(jobDetailSource).toContain('!isFieldComplete && !showFieldOutcomePanel ? (');
+    expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
+    expect(jobDetailSource).toContain(') : !isFieldComplete ? (');
     expect(jobDetailSource).toContain(') : isFieldComplete || job.status === "completed" ? (');
+  });
+
+  it("uses lifecycle copy for active workflow chip instead of showing stale scheduled copy", () => {
+    expect(jobDetailSource).toContain("const workflowChipLabel =");
+    expect(jobDetailSource).toContain('normalizedJobStatus === "in_process" && !isFieldComplete');
+    expect(jobDetailSource).toContain('{workflowChipLabel}');
   });
 });

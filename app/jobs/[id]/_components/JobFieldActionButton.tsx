@@ -81,7 +81,7 @@ export function JobFieldActionButton({
       : currentStatus === "on_the_way"
       ? "Mark In Progress"
       : currentStatus === "in_process"
-      ? "Mark Job Complete"
+      ? "Complete Field Work"
       : "—";
 
   const pendingLabel =

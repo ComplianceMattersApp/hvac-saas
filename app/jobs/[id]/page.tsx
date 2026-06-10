@@ -2486,6 +2486,10 @@ const callbackIntakeHistoricalAnchorEligible =
 const normalizedServiceVisitType = String(job.service_visit_type ?? "").trim().toLowerCase();
 const showDifferentIssueFoundOutcome =
   normalizedServiceVisitType === "callback" || normalizedServiceVisitType === "return_visit";
+const workflowChipLabel =
+  normalizedJobStatus === "in_process" && !isFieldComplete
+    ? "In Process"
+    : formatOpsStatusLabel(job.ops_status);
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
@@ -4144,7 +4148,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     Mark Field Complete
                   </SubmitButton>
                 </form>
-              ) : !isFieldComplete && !showFieldOutcomePanel ? (
+              ) : !isFieldComplete ? (
                 <div className="space-y-2">
                   <JobFieldActionButton
                     jobId={job.id}
@@ -4164,8 +4168,8 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 </div>
               ) : isFieldComplete || job.status === "completed" ? (
                 <div className="space-y-2">
-                  <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-700 bg-emerald-700 px-5 py-2.5 text-base font-semibold text-white">
-                    Field Complete
+                  <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-center text-base font-semibold text-emerald-900">
+                    Field work complete - ready for closeout.
                   </span>
                   {job.job_type === "ecc" ? (
                     <Link
@@ -5115,7 +5119,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </span>
         <span>Primary Next Action</span>
       </div>
-        {!isFieldComplete && job.status !== "completed" && !showFieldOutcomePanel ? (
+        {!isFieldComplete && job.status !== "completed" ? (
           <div className="hidden w-full gap-2 sm:flex sm:items-stretch">
             <JobFieldActionButton
               jobId={job.id}
@@ -5132,6 +5136,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 Open Tests Workspace
               </Link>
             ) : null}
+          </div>
+        ) : null}
+        {isFieldComplete || job.status === "completed" ? (
+          <div className="hidden w-full sm:flex">
+            <span className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-900">
+              Field work complete - invoice/certs can be handled as needed.
+            </span>
           </div>
         ) : null}
         {job.job_type === "ecc" && (isFieldComplete || job.status === "completed" || showFieldOutcomePanel) ? (
@@ -5239,7 +5250,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               : "border-blue-100 bg-blue-50 text-blue-800"
           }`}
         >
-          {formatOpsStatusLabel(job.ops_status)}
+          {workflowChipLabel}
         </div>
         <div className="mt-3 flex w-full flex-col items-start gap-2">
           {onTheWayUndoEligibility.eligible ? (

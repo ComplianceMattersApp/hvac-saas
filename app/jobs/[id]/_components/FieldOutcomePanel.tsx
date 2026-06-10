@@ -1,5 +1,4 @@
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
-import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
 import {
   markJobApprovalNeededFromForm,
   markJobDifferentIssueFoundFromForm,
@@ -23,22 +22,10 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
       id={props.anchorId}
       className={`rounded-2xl border border-slate-200/90 bg-white px-4 py-3.5 shadow-[0_12px_28px_-24px_rgba(15,23,42,0.26)] sm:max-w-xl ${props.className ?? ""}`.trim()}
     >
-      <div className="text-base font-semibold text-slate-900">Confirm field work complete</div>
+      <div className="text-base font-semibold text-slate-900">Can&apos;t finish today?</div>
       <p className="mt-1 text-xs leading-5 text-slate-600">
-        Ready to finish this visit? This moves the job to closeout for invoice/certs as needed.
+        Route active field work to office/dispatch when the visit cannot be completed.
       </p>
-
-      <form action={advanceJobStatusFromForm} className="mt-3 flex items-center">
-        <input type="hidden" name="job_id" value={props.jobId} />
-        <input type="hidden" name="current_status" value={props.currentStatus} />
-        <input type="hidden" name="tab" value={props.tab} />
-        <ImmediateSubmitButton
-          pendingText="Completing..."
-          className="inline-flex min-h-10 w-full items-center justify-center rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800 sm:w-auto sm:px-4"
-        >
-          Confirm Work Completed
-        </ImmediateSubmitButton>
-      </form>
 
       <details className="mt-3 w-full rounded-xl border border-amber-200/80 bg-amber-50/40 p-3">
         <summary className="list-none cursor-pointer">
