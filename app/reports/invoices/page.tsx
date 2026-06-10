@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import SubmitButton from "@/components/SubmitButton";
+import { sendInternalInvoiceEmailFromForm } from "@/lib/actions/internal-invoice-actions";
+import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
 import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { resolveBillingModeByAccountOwnerId, resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
@@ -36,6 +39,26 @@ export const metadata = {
   description: "Internal billed-truth invoices report",
 };
 
+function firstSearchValue(value: string | string[] | undefined) {
+  if (Array.isArray(value)) return value[0] ?? "";
+  return value ?? "";
+}
+
+function bannerMessage(value?: string | null) {
+  const key = String(value ?? "").trim().toLowerCase();
+  const messages: Record<string, { tone: "success" | "warning"; message: string }> = {
+    internal_invoice_email_sent: { tone: "success", message: "Invoice email sent." },
+    internal_invoice_email_resent: { tone: "success", message: "Invoice email resent." },
+    internal_invoice_email_failed: { tone: "warning", message: "Invoice email failed to send. Check email provider configuration and try again." },
+    internal_invoice_send_recipient_required: { tone: "warning", message: "Billing recipient email is required before sending." },
+    internal_invoice_send_recipient_invalid: { tone: "warning", message: "Enter a valid billing recipient email before sending." },
+    internal_invoice_send_requires_issued: { tone: "warning", message: "Issue the invoice before sending it." },
+    internal_invoice_missing: { tone: "warning", message: "Invoice was not found." },
+    not_authorized: { tone: "warning", message: "You do not have invoice send authority." },
+  };
+  return messages[key] ?? null;
+}
+
 export default async function InvoiceLedgerPage({
   searchParams,
 }: {
@@ -64,6 +87,7 @@ export default async function InvoiceLedgerPage({
   }
 
   const resolvedSearchParams = (searchParams ? await searchParams : {}) ?? {};
+  const banner = bannerMessage(firstSearchValue(resolvedSearchParams.banner));
   const filters = parseInvoiceLedgerFilters(resolvedSearchParams);
   const [internalBusinessIdentity, billingMode] = await Promise.all([
     resolveInternalBusinessIdentityByAccountOwnerId({
@@ -98,6 +122,12 @@ export default async function InvoiceLedgerPage({
   const draftVisible = ledger.rows.filter((row) => row.invoiceStatusLabel.toLowerCase() === "draft").length;
   const balanceVisible = ledger.rows.filter((row) => row.balanceDueDisplay !== "$0").length;
   const paidVisible = ledger.rows.filter((row) => row.paymentStatusLabel.toLowerCase() === "paid").length;
+  const canSendInvoiceLifecycle = canManageInvoiceLifecycle({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
+  const reportReturnTo = `/reports/invoices?${buildInvoiceLedgerSearchParams(filters).toString()}`;
 
   return (
     <div className={reportPageClass}>
@@ -111,6 +141,18 @@ export default async function InvoiceLedgerPage({
       />
 
       <ReportCenterTabs current="invoices" />
+
+      {banner ? (
+        <div
+          className={`rounded-lg border px-4 py-3 text-sm font-semibold shadow-sm shadow-slate-950/5 ${
+            banner.tone === "success"
+              ? "border-emerald-200 bg-emerald-50 text-emerald-900"
+              : "border-amber-200 bg-amber-50 text-amber-900"
+          }`}
+        >
+          {banner.message}
+        </div>
+      ) : null}
 
       {!usesInternalInvoicing ? (
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm shadow-slate-950/5">
@@ -253,12 +295,13 @@ export default async function InvoiceLedgerPage({
                     <th className="px-3 py-3">Payment Status</th>
                     <th className="px-3 py-3">Last Payment</th>
                     <th className="px-3 py-3">Payment Count</th>
+                    <th className="px-3 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ledger.rows.length === 0 ? (
                     <tr>
-                      <td colSpan={21} className="px-4 py-12 text-center text-sm text-slate-500">
+                      <td colSpan={22} className="px-4 py-12 text-center text-sm text-slate-500">
                         <div className="mx-auto max-w-md space-y-2">
                           <div className="font-semibold text-slate-700">No invoices match the current filters</div>
                           <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing one of the invoice filters.</div>
@@ -303,6 +346,27 @@ export default async function InvoiceLedgerPage({
                         <td className="px-3 py-3 text-slate-700">{row.paymentStatusLabel}</td>
                         <td className="px-3 py-3 text-slate-700">{row.lastPaymentDateDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.paymentCountDisplay}</td>
+                        <td className="px-3 py-3">
+                          {canSendInvoiceLifecycle && row.invoiceStatus === "issued" && row.jobId && row.recipientEmail ? (
+                            <form action={sendInternalInvoiceEmailFromForm} className="min-w-[8rem]">
+                              <input type="hidden" name="job_id" value={row.jobId} />
+                              <input type="hidden" name="invoice_id" value={row.invoiceId} />
+                              <input type="hidden" name="tab" value="info" />
+                              <input type="hidden" name="recipient_email" value={row.recipientEmail} />
+                              <input type="hidden" name="return_to" value={reportReturnTo} />
+                              <SubmitButton
+                                loadingText="Sending..."
+                                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                              >
+                                {row.communicationStateLabel === "Sent" || row.communicationStateLabel === "Resent" ? "Resend" : "Send"}
+                              </SubmitButton>
+                            </form>
+                          ) : row.invoiceStatus === "issued" && !row.recipientEmail ? (
+                            <span className="text-xs leading-5 text-amber-700">Add recipient</span>
+                          ) : (
+                            <span className="text-xs text-slate-400">-</span>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}

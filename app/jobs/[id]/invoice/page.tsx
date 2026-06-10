@@ -211,6 +211,8 @@ function bannerMessage(value?: string | null) {
     internal_invoice_email_failed: "Invoice email failed to send.",
     internal_invoice_send_recipient_required: "Billing recipient email is required before sending.",
     internal_invoice_send_recipient_invalid: "Enter a valid billing recipient email before sending.",
+    internal_invoice_send_requires_issued: "Issue the invoice before sending it.",
+    not_authorized: "You do not have invoice send authority.",
     internal_invoice_payment_recorded: "Tracking-only payment recorded.",
     internal_invoice_payment_overpay_denied: "Payment amount cannot exceed the remaining balance.",
     internal_invoice_payment_reversed: "Recorded payment reversed from Compliance Matters totals.",

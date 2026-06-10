@@ -78,11 +78,11 @@ function buildInternalInvoiceReturnHref(jobId: string, tab: string, banner: stri
 
   try {
     const parsed = new URL(raw, 'https://app.local');
-    const allowedPaths = new Set([`/jobs/${jobId}`, `/jobs/${jobId}/invoice`]);
+    const allowedPaths = new Set([`/jobs/${jobId}`, `/jobs/${jobId}/invoice`, '/reports/invoices']);
     if (!allowedPaths.has(parsed.pathname)) return fallback;
 
     parsed.searchParams.set('banner', banner);
-    if (!parsed.hash) {
+    if (!parsed.hash && parsed.pathname !== '/reports/invoices') {
       parsed.hash = parsed.pathname.endsWith('/invoice') ? 'invoice-workspace' : INTERNAL_INVOICE_PANEL_HASH;
     }
 
@@ -2554,6 +2554,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     revalidatePath(`/jobs/${context.jobId}/invoice`);
     revalidatePath('/jobs');
     revalidatePath('/ops');
+    revalidatePath('/reports/invoices');
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_email_failed', context.returnTo));
   }
 
@@ -2580,5 +2581,6 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
   revalidatePath(`/jobs/${context.jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
+  revalidatePath('/reports/invoices');
   redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, attemptKind === 'resent' ? 'internal_invoice_email_resent' : 'internal_invoice_email_sent', context.returnTo));
 }

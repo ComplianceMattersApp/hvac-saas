@@ -3612,6 +3612,9 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                         <>
                           <form action={sendInternalInvoiceEmailFromForm} className="mt-3 space-y-3">
                             <input type="hidden" name="job_id" value={job.id} />
+                            {internalInvoiceTruth?.id ? (
+                              <input type="hidden" name="invoice_id" value={internalInvoiceTruth.id} />
+                            ) : null}
                             <input type="hidden" name="tab" value={tab} />
 
                             <div>

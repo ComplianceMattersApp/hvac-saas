@@ -184,6 +184,78 @@ describe("Invoice Ledger Collected Payment Reporting", () => {
     expect(row.paymentCountDisplay).toBe("2");
   });
 
+  it("surfaces latest invoice email send status and last communication from notification history", async () => {
+    const supabase = makeSupabaseMock({
+      invoices: [
+        {
+          id: "inv-1",
+          job_id: "job-1",
+          customer_id: "cust-1",
+          location_id: null,
+          service_case_id: null,
+          invoice_number: "INV-001",
+          invoice_display_number: "2001",
+          status: "issued",
+          invoice_date: "2026-04-20",
+          issued_at: "2026-04-20T10:00:00Z",
+          voided_at: null,
+          source_type: "job",
+          subtotal_cents: 15000,
+          total_cents: 20000,
+          billing_name: "Acme",
+          billing_email: "billing@example.com",
+          billing_address_line1: null,
+          billing_city: null,
+          billing_state: null,
+          billing_zip: null,
+          created_at: "2026-04-20T09:00:00Z",
+        },
+      ],
+      jobs: [
+        {
+          id: "job-1",
+          title: "Service Call",
+          contractor_id: null,
+          customer_first_name: "Amy",
+          customer_last_name: "Owner",
+          job_address: "",
+          city: "",
+          contractors: null,
+        },
+      ],
+      customers: [{ id: "cust-1", full_name: "Acme Customer", first_name: null, last_name: null }],
+      locations: [],
+      notifications: [
+        {
+          job_id: "job-1",
+          payload: {
+            invoice_id: "inv-1",
+            recipient_email: "billing@example.com",
+            attempt_kind: "resent",
+          },
+          status: "sent",
+          sent_at: "2026-04-25T15:45:17.346+00:00",
+          created_at: "2026-04-25T15:45:00.000Z",
+        },
+      ],
+      payments: [],
+    });
+
+    const ledger = await listInvoiceLedgerRows({
+      supabase,
+      accountOwnerUserId,
+      filters,
+      limit: 250,
+    });
+
+    expect(ledger.rows).toHaveLength(1);
+    expect(ledger.rows[0].jobId).toBe("job-1");
+    expect(ledger.rows[0].invoiceStatus).toBe("issued");
+    expect(ledger.rows[0].recipientEmail).toBe("billing@example.com");
+    expect(ledger.rows[0].communicationStateLabel).toBe("Resent");
+    expect(ledger.rows[0].lastCommunicationDateDisplay).toBe("04-25-2026");
+  });
+
   it("buildInvoiceLedgerCsv keeps payment columns in expected order and uses production row values", async () => {
     const supabase = makeSupabaseMock({
       invoices: [

@@ -7,6 +7,7 @@ const loadScopedInternalJobForMutationMock = vi.fn();
 const resolveBillingModeByAccountOwnerIdMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const resolveInternalInvoiceByJobIdMock = vi.fn();
+const resolveInternalInvoiceByIdMock = vi.fn();
 const resolveOperationalTenantIdentityMock = vi.fn();
 const sendEmailMock = vi.fn();
 const resolveNotificationAccountOwnerUserIdMock = vi.fn();
@@ -50,7 +51,12 @@ vi.mock('@/lib/business/platform-entitlement', () => ({
 
 vi.mock('@/lib/business/internal-invoice', () => ({
   resolveInternalInvoiceByJobId: (...args: unknown[]) => resolveInternalInvoiceByJobIdMock(...args),
+  resolveInternalInvoiceById: (...args: unknown[]) => resolveInternalInvoiceByIdMock(...args),
   normalizeInternalInvoiceItemType: (value: unknown) => value,
+}));
+
+vi.mock('@/lib/auth/internal-user-access-capabilities', () => ({
+  loadFieldBillingExplicitCapabilitiesForUser: vi.fn(async () => ({})),
 }));
 
 vi.mock('@/lib/email/operational-tenant-branding', () => ({
@@ -250,7 +256,7 @@ function makeSupabaseFixture() {
     }),
   };
 
-  return { supabase, writes };
+  return { supabase, writes, notificationRows };
 }
 
 function buildInvoice(overrides: Partial<Record<string, unknown>> = {}) {
@@ -302,6 +308,7 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
       reason: 'allowed_active',
     });
     resolveInternalInvoiceByJobIdMock.mockResolvedValue(buildInvoice());
+    resolveInternalInvoiceByIdMock.mockResolvedValue(buildInvoice());
     resolveOperationalTenantIdentityMock.mockResolvedValue({
       displayName: 'Compliance Matters',
       logoUrl: null,
@@ -377,12 +384,12 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     );
   });
 
-  it('falls back to legacy invoice number reference when display number is missing', async () => {
+  it('falls back to stable invoice id reference when display number is missing', async () => {
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
-    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
-      buildInvoice({ invoice_display_number: null, invoice_number: 'INV-LEGACY-77' }),
-    );
+    const legacyInvoice = buildInvoice({ invoice_display_number: null, invoice_number: 'INV-LEGACY-77' });
+    resolveInternalInvoiceByJobIdMock.mockResolvedValue(legacyInvoice);
+    resolveInternalInvoiceByIdMock.mockResolvedValue(legacyInvoice);
 
     const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
 
@@ -390,15 +397,21 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
       'banner=internal_invoice_email_sent',
     );
 
+    expect(resolveInternalInvoiceByJobIdMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId: 'job-1',
+      }),
+    );
+    expect(resolveInternalInvoiceByIdMock).not.toHaveBeenCalled();
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
-        subject: expect.stringContaining('Invoice INV-LEGACY-77'),
+        subject: expect.stringContaining('Invoice inv-1'),
       }),
     );
     const fallbackEmailPayload = sendEmailMock.mock.calls[0]?.[0] as { html?: string; text?: string } | undefined;
-    expect(fallbackEmailPayload?.html).toContain('Invoice INV-LEGACY-77');
+    expect(fallbackEmailPayload?.html).toContain('Invoice inv-1');
     expect(fallbackEmailPayload?.html).not.toContain('Legacy ref:');
-    expect(fallbackEmailPayload?.text).toContain('Invoice: Invoice INV-LEGACY-77');
+    expect(fallbackEmailPayload?.text).toContain('Invoice: Invoice inv-1');
     expect(fallbackEmailPayload?.text).not.toContain('Legacy ref:');
   });
 
@@ -418,6 +431,62 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     expect(sendEmailMock).toHaveBeenCalledWith(
       expect.objectContaining({
         html: expect.not.stringContaining('Pay Invoice'),
+      }),
+    );
+  });
+
+  it('returns to invoice report with sent banner and records sent communication history', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      sendInternalInvoiceEmailFromForm(
+        buildFormData({
+          invoice_id: 'inv-1',
+          return_to: '/reports/invoices?status=issued&communication_state=none',
+        }),
+      ),
+    ).rejects.toThrow('/reports/invoices?status=issued&communication_state=none&banner=internal_invoice_email_sent');
+
+    expect(sendEmailMock).toHaveBeenCalledTimes(1);
+    expect(fixture.notificationRows).toHaveLength(1);
+    expect(fixture.notificationRows[0]?.status).toBe('sent');
+    expect(fixture.notificationRows[0]?.sent_at).toEqual(expect.any(String));
+    expect(fixture.notificationRows[0]?.payload).toEqual(
+      expect.objectContaining({
+        invoice_id: 'inv-1',
+        recipient_email: 'billing@example.com',
+        attempt_kind: 'sent',
+      }),
+    );
+    expect(revalidatePathMock).toHaveBeenCalledWith('/reports/invoices');
+  });
+
+  it('provider failure returns visible failure and does not create false sent history', async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+    sendEmailMock.mockRejectedValueOnce(new Error('Resend API key is not configured'));
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      sendInternalInvoiceEmailFromForm(
+        buildFormData({
+          invoice_id: 'inv-1',
+          return_to: '/reports/invoices',
+        }),
+      ),
+    ).rejects.toThrow('/reports/invoices?banner=internal_invoice_email_failed');
+
+    expect(fixture.notificationRows).toHaveLength(1);
+    expect(fixture.notificationRows[0]?.status).toBe('failed');
+    expect(fixture.notificationRows[0]?.sent_at).toBeNull();
+    expect(fixture.notificationRows[0]?.payload).toEqual(
+      expect.objectContaining({
+        invoice_id: 'inv-1',
+        error_detail: 'Resend API key is not configured',
       }),
     );
   });

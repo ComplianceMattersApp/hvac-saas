@@ -62,7 +62,9 @@ export type InvoiceLedgerFilterOptions = {
 
 export type InvoiceLedgerRow = {
   invoiceId: string;
+  jobId: string;
   invoiceNumber: string;
+  invoiceStatus: string;
   invoiceStatusLabel: string;
   sourceTypeLabel: string;
   customerDisplay: string;
@@ -74,6 +76,7 @@ export type InvoiceLedgerRow = {
   invoiceDateDisplay: string;
   issuedDateDisplay: string;
   lastCommunicationDateDisplay: string;
+  recipientEmail: string | null;
   recipientDisplay: string;
   communicationStateLabel: string;
   subtotalDisplay: string;
@@ -675,11 +678,13 @@ export async function listInvoiceLedgerRows(params: {
 
     return {
       invoiceId,
+      jobId,
       invoiceNumber: preferredInvoiceReference({
         invoiceDisplayNumber: invoice.invoice_display_number,
         invoiceNumber: invoice.invoice_number,
         invoiceId,
       }),
+      invoiceStatus: String(invoice.status ?? "").trim().toLowerCase(),
       invoiceStatusLabel: formatInvoiceStatusLabel(invoice.status),
       sourceTypeLabel: formatSourceTypeLabel(invoice.source_type),
       customerDisplay,
@@ -694,6 +699,7 @@ export async function listInvoiceLedgerRows(params: {
       invoiceDateDisplay: formatTimestampDisplay(invoice.invoice_date),
       issuedDateDisplay: formatTimestampDisplay(invoice.issued_at),
       lastCommunicationDateDisplay: formatTimestampDisplay(deliveryMoment(delivery)),
+      recipientEmail: delivery?.recipientEmail || String(invoice.billing_email ?? "").trim().toLowerCase() || null,
       recipientDisplay: delivery?.recipientEmail || String(invoice.billing_email ?? "").trim() || "-",
       communicationStateLabel: formatCommunicationStateLabel(delivery),
       subtotalDisplay: formatCurrencyCents(invoice.subtotal_cents),
