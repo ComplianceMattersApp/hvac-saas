@@ -17,6 +17,7 @@ import {
   getActiveWaitingState,
   type WaitingStateType,
 } from "@/lib/utils/ops-status";
+import { formatPersonNamePart } from "@/lib/utils/identity-display";
 
 export type FocusedQueueJob = {
   id: string;
@@ -40,6 +41,10 @@ export type FocusedQueueJob = {
 
 type AssignmentDisplayInput = WithoutTechAssignmentInput & {
   is_primary?: boolean;
+};
+
+type AssignmentSummaryInput = {
+  display_name?: string | null;
 };
 
 const WAITING_QUEUE_LABELS_BY_REASON: Record<WaitingStateType, string> = {
@@ -196,6 +201,116 @@ export function getWaitingQueueRecommendedNextStep(
 export function getExceptionQueueDisplayLabel(job: Pick<FocusedQueueJob, "ops_status">): string {
   const status = normalize(job?.ops_status);
   return EXCEPTION_QUEUE_LABELS_BY_STATUS[status] ?? formatOpsStatusLabel(status);
+}
+
+function cleanReason(value: unknown): string {
+  return String(value ?? "").trim();
+}
+
+function sentenceCaseReason(value: string): string {
+  const cleaned = cleanReason(value);
+  if (!cleaned) return "";
+  return cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
+}
+
+function normalizeDisplayText(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isDuplicateStatusReason(label: string, reason: string): boolean {
+  const normalizedLabel = normalizeDisplayText(label);
+  const normalizedReason = normalizeDisplayText(reason);
+  if (!normalizedLabel || !normalizedReason) return false;
+  if (normalizedLabel === normalizedReason) return true;
+
+  if (normalizedLabel === "approval needed") {
+    return normalizedReason === "waiting on customer approval" || normalizedReason === "waiting on approval";
+  }
+
+  if (normalizedLabel === "waiting on information") {
+    return normalizedReason === "unable to complete waiting on information"
+      || normalizedReason === "waiting on information"
+      || normalizedReason === "waiting on info";
+  }
+
+  return false;
+}
+
+function isGenericAssignmentFallbackLabel(value: unknown): boolean {
+  const normalized = normalizeDisplayText(value);
+  return normalized === "service account"
+    || normalized === "business account"
+    || normalized === "account"
+    || normalized === "account owner"
+    || normalized === "owner account"
+    || normalized === "unknown user"
+    || normalized === "user";
+}
+
+export function getOpsQueueCardStatusReason(
+  job: Pick<FocusedQueueJob, "status" | "ops_status" | "pending_info_reason" | "on_hold_reason">,
+): string {
+  const status = normalize(job?.ops_status);
+  const lifecycle = normalize(job?.status);
+
+  if (status === "pending_info" || status === "waiting") {
+    const waitingDisplay = getWaitingQueueDisplay(job);
+    const label = waitingDisplay.label === "Unable to Complete / Waiting on Information"
+      ? "Waiting on Information"
+      : waitingDisplay.label;
+    const reason = cleanReason(waitingDisplay.reason);
+    if (!reason || reason === "Dependency pending") return label || "Need Info";
+    if (isDuplicateStatusReason(label, reason)) return label || "Need Info";
+    return `${label || "Need Info"}: ${reason}`;
+  }
+
+  if (status === "on_hold") {
+    const waitingDisplay = getWaitingQueueDisplay(job);
+    const explicitReason = cleanReason(job?.on_hold_reason) || cleanReason(job?.pending_info_reason);
+    const reason = explicitReason || cleanReason(waitingDisplay.reason);
+    return reason && (explicitReason || reason !== "Dependency pending") ? `On Hold: ${reason}` : "On Hold";
+  }
+
+  if (status === "failed") {
+    const reason = cleanReason(job?.pending_info_reason) || cleanReason(job?.on_hold_reason);
+    return reason ? `Failed: ${sentenceCaseReason(reason.replace(/^failed\s*[-:]\s*/i, ""))}` : "Failed";
+  }
+
+  if (status === "retest_needed") return "Retest Needed";
+  if (status === "pending_office_review") return "Office Review Needed";
+  if (status === "problem") return "Operational Issue";
+  if (status === "paperwork_required") return "Closeout: Paperwork Required";
+  if (status === "invoice_required") return "Closeout: Invoice Required";
+  if (status === "closed") return "Closeout Complete";
+  if (status === "need_to_schedule") return "Awaiting Scheduling";
+  if (status === "scheduled") return "Scheduled Field Work";
+  if (lifecycle === "on_the_way") return "On the Way";
+  if (lifecycle === "in_progress") return "In Progress";
+
+  const reason = cleanReason(job?.pending_info_reason) || cleanReason(job?.on_hold_reason);
+  if (reason) return reason;
+  return status ? formatOpsStatusLabel(status) : "Operational Update";
+}
+
+export function formatAssignmentSummaryForJob(
+  jobId: string,
+  assignmentDisplayMap: Record<string, AssignmentSummaryInput[] | undefined>,
+): string {
+  const assignments = (assignmentDisplayMap[jobId] ?? []).filter(
+    (assignment) => !isGenericAssignmentFallbackLabel(assignment?.display_name),
+  );
+  if (!assignments.length) return "Unassigned";
+
+  const [primaryAssignee, ...overflow] = assignments;
+  const primaryAssigneeName = formatPersonNamePart(primaryAssignee?.display_name);
+  return overflow.length > 0
+    ? `${primaryAssigneeName} +${overflow.length}`
+    : primaryAssigneeName;
 }
 
 export function customerLocationLabel(job: FocusedQueueJob): string {

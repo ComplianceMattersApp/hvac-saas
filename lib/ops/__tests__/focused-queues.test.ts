@@ -8,7 +8,9 @@ import {
   buildExceptionQueueRows,
   buildWaitingQueueRows,
   buildWithoutTechQueueRows,
+  formatAssignmentSummaryForJob,
   getExceptionQueueDisplayLabel,
+  getOpsQueueCardStatusReason,
   getWaitingQueueDisplay,
   getWaitingQueueRecommendedNextStep,
 } from "@/lib/ops/focused-queues";
@@ -38,6 +40,11 @@ const withoutTechQueuePageSource = readFileSync(
 
 const opsFieldPageSource = readFileSync(
   resolve(__dirname, "../../../app/ops/field/page.tsx"),
+  "utf-8",
+);
+
+const opsPageSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/page.tsx"),
   "utf-8",
 );
 
@@ -297,6 +304,87 @@ describe("focused queue display labels", () => {
       "on_hold",
       "waiting",
     ]);
+  });
+
+  it("formats Operations Workspace queue card status/reason without raw ops_status keys", () => {
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Need updated T24",
+    })).toBe("Waiting on Information: Need updated T24");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on part",
+    })).toBe("Waiting on Part");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on part: Capacitor needed",
+    })).toBe("Waiting on Part: Capacitor needed");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on customer approval: Customer needs to approve compressor",
+    })).toBe("Approval Needed: Customer needs to approve compressor");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Waiting on information: Need updated T24",
+    })).toBe("Waiting on Information: Need updated T24");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "on_hold",
+      on_hold_reason: "Dependency pending",
+    })).toBe("On Hold: Dependency pending");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "failed",
+      pending_info_reason: "Failed - needs review/correction",
+    })).toBe("Failed: Needs review/correction");
+
+    expect(getOpsQueueCardStatusReason({ ops_status: "paperwork_required" })).toBe("Closeout: Paperwork Required");
+    expect(getOpsQueueCardStatusReason({ ops_status: "invoice_required" })).toBe("Closeout: Invoice Required");
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "custom_status",
+      pending_info_reason: "Needs coordinator review",
+    })).toBe("Needs coordinator review");
+  });
+
+  it("Operations Workspace cards use formatted status/reason copy instead of raw Ops Status", () => {
+    expect(opsPageSource).toContain("getOpsQueueCardStatusReason");
+    expect(opsPageSource).toContain("Status/Reason:");
+    expect(opsPageSource).not.toContain("Ops Status:");
+  });
+
+  it("formats Operations Workspace assignment summaries without closing over render-order state", () => {
+    expect(formatAssignmentSummaryForJob("job-1", {})).toBe("Unassigned");
+    expect(formatAssignmentSummaryForJob("job-1", {
+      "job-1": [{ display_name: "jane TECH" }],
+    })).toBe("Jane Tech");
+    expect(formatAssignmentSummaryForJob("job-1", {
+      "job-1": [
+        { display_name: "jane TECH" },
+        { display_name: "sam helper" },
+        { display_name: "alex helper" },
+      ],
+    })).toBe("Jane Tech +2");
+    expect(formatAssignmentSummaryForJob("job-1", {
+      "job-1": [{ display_name: "Service Account" }],
+    })).toBe("Unassigned");
+    expect(formatAssignmentSummaryForJob("job-1", {
+      "job-1": [
+        { display_name: "Service Account" },
+        { display_name: "alex TECH" },
+      ],
+    })).toBe("Alex Tech");
+  });
+
+  it("early Operations Workspace preview cards use an initialized preview assignment map", () => {
+    expect(opsPageSource).toContain("selectedPreviewAssignmentDisplayMap");
+    expect(opsPageSource).toContain(
+      "formatAssignmentSummaryForJob(String(job?.id ?? \"\"), selectedPreviewAssignmentDisplayMap)",
+    );
+    expect(opsPageSource).toContain("return formatAssignmentSummaryForJob(jobId, activeAssignmentDisplayMap);");
   });
 });
 

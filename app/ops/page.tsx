@@ -59,6 +59,7 @@ import {
   resolveRecentAttemptDisplay,
 } from "@/lib/ops/recent-attempt-display";
 import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
+import { formatAssignmentSummaryForJob, getOpsQueueCardStatusReason } from "@/lib/ops/focused-queues";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -505,7 +506,6 @@ function subtractBusinessDays(date: Date, days: number) {
   }
 
   function wsStatusReason(job: any, queueKey: string) {
-    const status = String(job?.ops_status ?? "").toLowerCase();
     const lifecycle = String(job?.status ?? "").toLowerCase();
 
     if (queueKey === "need_to_schedule") return "Awaiting scheduling";
@@ -515,26 +515,7 @@ function subtractBusinessDays(date: Date, days: number) {
       return "Scheduled field work";
     }
     if (queueKey === "without_tech") return "Scheduled without active tech assignment";
-    if (queueKey === "waiting") {
-      const waitingState = getActiveWaitingState({
-        ops_status: job?.ops_status ?? null,
-        pending_info_reason: job?.pending_info_reason ?? null,
-        on_hold_reason: job?.on_hold_reason ?? null,
-      });
-      return waitingState?.blockerReason || String(job?.pending_info_reason ?? "").trim() || "Dependency pending";
-    }
-    if (queueKey === "exceptions") {
-      if (status === "failed") return "Failed - needs review/correction";
-      if (status === "retest_needed") return "Retest needed";
-      if (status === "pending_office_review") return "Pending office review";
-      return "Exception requires follow-up";
-    }
-    if (queueKey === "closeout") {
-      if (status === "invoice_required") return "Invoice required";
-      if (status === "paperwork_required") return "Paperwork required";
-      return "Closeout follow-up";
-    }
-    return "Operational update";
+    return getOpsQueueCardStatusReason(job);
   }
 
   const wsStartTodayUtc = startOfTodayUtcIsoLA();
@@ -808,6 +789,16 @@ function subtractBusinessDays(date: Date, days: number) {
       console.log(`[ops:totalBeforeRender] ${Date.now() - _t_total}ms`);
     }
 
+    const selectedPreviewJobIds = selectedPreviewRows
+      .map((job: any) => String(job?.id ?? "").trim())
+      .filter(Boolean);
+    const selectedPreviewAssignmentDisplayMap = selectedPreviewJobIds.length
+      ? await getActiveJobAssignmentDisplayMap({
+          supabase,
+          jobIds: selectedPreviewJobIds,
+        })
+      : {};
+
     const operationalTenantIdentity = await operationalTenantIdentityPromise;
     const focusedQueueHref = `/ops${buildQueryString({
       bucket,
@@ -949,7 +940,8 @@ function subtractBusinessDays(date: Date, days: number) {
                           : workspaceAgeLabel(job)}
                       </div>
                       <div>
-                        <span className="font-medium text-slate-500">Ops Status:</span> {String(job?.ops_status ?? "-")}
+                        <span className="font-medium text-slate-500">Assignment:</span>{" "}
+                        {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
                       </div>
                     </div>
                   </div>
@@ -2079,14 +2071,7 @@ for (const ev of pendingInfoTransitionEvents ?? []) {
 }
 
 function assignmentSummaryForJob(jobId: string) {
-  const assignments = activeAssignmentDisplayMap[jobId] ?? [];
-  if (!assignments.length) return "Unassigned";
-
-  const [primaryAssignee, ...overflow] = assignments;
-  const primaryAssigneeName = formatPersonNamePart(primaryAssignee.display_name);
-  return overflow.length > 0
-    ? `${primaryAssigneeName} +${overflow.length}`
-    : primaryAssigneeName;
+  return formatAssignmentSummaryForJob(jobId, activeAssignmentDisplayMap);
 }
 
 const signalEvents = signalRes.data ?? [];
@@ -3305,10 +3290,7 @@ function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
     return "Scheduled field work";
   }
   if (queueKey === "without_tech") return "Scheduled without active tech assignment";
-  if (queueKey === "waiting") return queueReason(job, "pending_info") || "Waiting on info or hold release";
-  if (queueKey === "exceptions") return queueReason(job, "attention") || "Needs exception review";
-  if (queueKey === "closeout") return closeoutLabel(job);
-  return "Operational update";
+  return getOpsQueueCardStatusReason(job);
 }
 
 function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {
