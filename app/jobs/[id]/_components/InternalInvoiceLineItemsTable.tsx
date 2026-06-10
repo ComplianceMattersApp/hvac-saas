@@ -194,9 +194,7 @@ export default function InternalInvoiceLineItemsTable({
   const [expandedAdditionalRowId, setExpandedAdditionalRowId] = useState<string | null>(null);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
   const [feedback, setFeedback] = useState<InlineFeedback | null>(null);
-  const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>(
-    pricebookPickerItems[0]?.id ?? '',
-  );
+  const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>('');
   const [selectedVisitScopeItemIds, setSelectedVisitScopeItemIds] = useState<string[]>([]);
   const canAddPricebookLine = capabilities.can_select_pricebook_invoice_lines;
   const canAddVisitScopeLine = capabilities.can_convert_visit_scope_to_invoice_lines;
@@ -262,6 +260,7 @@ export default function InternalInvoiceLineItemsTable({
       action: addPricebookLineItemAction,
       successFallback: 'Pricebook service/charge added.',
       errorFallback: 'Could not add Pricebook service/charge.',
+      onSuccess: () => setSelectedPricebookItemId(''),
     });
   }
 
@@ -427,13 +426,19 @@ export default function InternalInvoiceLineItemsTable({
                 quantityLabel="Quantity"
                 itemSelectId="invoice_pricebook_item_id"
                 quantityInputId="invoice_pricebook_quantity"
+                includeEmptyOption
+                emptyOptionLabel="Select a charge..."
                 labelClassName={workspaceFieldLabelClass}
                 inputClassName={workspaceInputClass}
                 quantityDefaultValue="1.00"
                 gridClassName="grid gap-4 md:grid-cols-[minmax(0,2.35fr)_minmax(6.25rem,0.74fr)_auto] md:items-end"
                 actionSlotClassName="md:self-end"
                 actionSlot={
-                  <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
+                  <SubmitButton
+                    loadingText="Adding..."
+                    className={primaryButtonClass}
+                    disabled={!selectedPricebookItemId}
+                  >
                     Add Charge
                   </SubmitButton>
                 }

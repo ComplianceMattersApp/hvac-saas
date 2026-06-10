@@ -54,6 +54,11 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source).toContain("Add Another Charge");
     expect(source).toContain("Use this for fees, add-ons, or anything that is not already listed on the invoice.");
     expect(source).toContain('itemLabel="Charge"');
+    expect(source).toContain("const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>('');");
+    expect(source).toContain("includeEmptyOption");
+    expect(source).toContain('emptyOptionLabel="Select a charge..."');
+    expect(source).toContain("disabled={!selectedPricebookItemId}");
+    expect(source).toContain("onSuccess: () => setSelectedPricebookItemId('')");
     expect(source).toContain("Add Charge");
     expect(source).not.toContain("Fallback Path: Add Charge from Pricebook");
     expect(source).not.toContain("Pricebook Service / Charge");
@@ -74,6 +79,8 @@ describe("internal invoice line items table capability wiring", () => {
     expect(pricebookFormSlice).toContain('itemFieldName="pricebook_item_id"');
     expect(pricebookFormSlice).toContain('quantityFieldName="quantity"');
     expect(pricebookFormSlice).toContain('quantityLabel="Quantity"');
+    expect(pricebookFormSlice).toContain("includeEmptyOption");
+    expect(pricebookFormSlice).toContain('emptyOptionLabel="Select a charge..."');
     expect(pricebookFormSlice).toContain("Add Charge");
   });
 });
