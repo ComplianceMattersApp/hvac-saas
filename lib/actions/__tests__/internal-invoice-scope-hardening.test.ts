@@ -480,4 +480,15 @@ describe('internal invoice mutation same-account hardening', () => {
     expect(draftCreateSlice).not.toContain('requireInvoiceLifecycleAccessOrRedirect');
     expect(supplementalCreateSlice).toContain('requireInvoiceLifecycleAccessOrRedirect');
   });
+
+  it('keeps invoice draft billing address explicit-only and avoids service-location fallback', () => {
+    const draftCreateIndex = internalInvoiceActionsSource.indexOf('export async function createInternalInvoiceDraftFromForm');
+    const draftCreateSlice = internalInvoiceActionsSource.slice(draftCreateIndex, draftCreateIndex + 5000);
+
+    expect(draftCreateSlice).toContain("const billingRecipientMode = String(context.job.billing_recipient ?? '').trim().toLowerCase();");
+    expect(draftCreateSlice).toContain("if (billingRecipientMode !== 'contractor')");
+    expect(draftCreateSlice).toContain("draftBilling.billing_address_line1 = firstNonEmpty(billing.billing_address_line1);");
+    expect(draftCreateSlice).not.toContain("locationBilling?.address_line1");
+    expect(draftCreateSlice).not.toContain("jobBilling.billing_address_line1");
+  });
 });

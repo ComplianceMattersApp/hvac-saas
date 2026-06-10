@@ -73,6 +73,7 @@ import {
 import { formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
+import { formatInvoiceBillingAddressLines } from "@/lib/business/internal-invoice-address-rendering";
 import { resolveInvoicePaymentLinkUiState } from "./invoice-payment-link-ui";
 
 type SearchParams = Record<string, string | string[] | undefined>;
@@ -180,20 +181,6 @@ function isStripeSourcedPayment(payment: InternalInvoicePaymentRow) {
     String(payment.stripe_checkout_session_id ?? "").trim().length > 0 ||
     String(payment.stripe_payment_intent_id ?? "").trim().length > 0
   );
-}
-
-function formatBillingAddress(a: {
-  billing_address_line1?: string | null;
-  billing_address_line2?: string | null;
-  billing_city?: string | null;
-  billing_state?: string | null;
-  billing_zip?: string | null;
-}) {
-  return [
-    a.billing_address_line1,
-    a.billing_address_line2,
-    [a.billing_city, a.billing_state, a.billing_zip].filter(Boolean).join(" "),
-  ].filter((value) => String(value ?? "").trim().length > 0);
 }
 
 function bannerMessage(value?: string | null) {
@@ -422,6 +409,7 @@ export default async function InternalInvoiceWorkspacePage({
       customer_id,
       location_id,
       service_case_id,
+      billing_recipient,
       customer_first_name,
       customer_last_name,
       customer_email,
@@ -565,7 +553,9 @@ export default async function InternalInvoiceWorkspacePage({
     [location?.city, location?.state, location?.zip].filter(Boolean).join(" "),
   ].filter(Boolean).join(", ");
   const lineItemCount = invoice?.line_items?.length ?? 0;
-  const billingAddress = invoice ? formatBillingAddress(invoice) : [];
+  const billingAddress = invoice
+    ? formatInvoiceBillingAddressLines(invoice, (job as any).billing_recipient)
+    : [];
   const recipientReady = Boolean(String(invoice?.billing_name ?? "").trim());
   const chargesReady = lineItemCount > 0;
   const totalReady = Number(invoice?.total_cents ?? 0) > 0;

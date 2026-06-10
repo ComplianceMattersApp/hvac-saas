@@ -7,6 +7,11 @@ import { resolveInternalInvoiceByJobId } from "@/lib/business/internal-invoice";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
+import {
+  formatInvoiceBillingAddressLines,
+  formatServiceLocationAddressLines,
+  invoiceServiceLocationMatchesBillingAddress,
+} from "@/lib/business/internal-invoice-address-rendering";
 import PrintToolbar from "./PrintToolbar";
 
 function formatCurrencyFromCents(cents?: number | null) {
@@ -36,30 +41,6 @@ function formatInvoiceStatus(status?: string | null) {
   if (normalized === "issued") return "Issued";
   if (normalized === "void") return "Void";
   return "Draft";
-}
-
-function formatBillingAddress(a: {
-  billing_address_line1?: string | null;
-  billing_address_line2?: string | null;
-  billing_city?: string | null;
-  billing_state?: string | null;
-  billing_zip?: string | null;
-}) {
-  return [
-    a.billing_address_line1,
-    a.billing_address_line2,
-    [a.billing_city, a.billing_state, a.billing_zip].filter(Boolean).join(" "),
-  ]
-    .map((value) => String(value ?? "").trim())
-    .filter((value) => value.length > 0);
-}
-
-function normalizeAddressForComparison(parts: string[]) {
-  return parts
-    .join(" ")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, " ")
-    .trim();
 }
 
 export default async function InternalInvoicePrintPage({
@@ -114,6 +95,7 @@ export default async function InternalInvoicePrintPage({
       status,
       customer_first_name,
       customer_last_name,
+      billing_recipient,
       location_id,
       locations:location_id (
         address_line1,
@@ -141,11 +123,8 @@ export default async function InternalInvoicePrintPage({
     ? (job as any).locations.find(Boolean)
     : (job as any).locations;
 
-  const serviceLocationLabel = [
-    location?.address_line1,
-    location?.address_line2,
-    [location?.city, location?.state, location?.zip].filter(Boolean).join(" "),
-  ].filter(Boolean).join(", ");
+  const serviceLocationParts = formatServiceLocationAddressLines(location);
+  const serviceLocationLabel = serviceLocationParts.join(", ");
 
   const customerName = formatPersonNamePart(
     [job.customer_first_name, job.customer_last_name].filter(Boolean).join(" ") || "Customer",
@@ -154,18 +133,12 @@ export default async function InternalInvoicePrintPage({
   const billingName = String(invoice.billing_name ?? "").trim() || customerName;
   const billingEmail = String(invoice.billing_email ?? "").trim();
   const billingPhone = String(invoice.billing_phone ?? "").trim();
-  const billingAddress = formatBillingAddress(invoice);
-  const serviceLocationParts = [
-    location?.address_line1,
-    location?.address_line2,
-    [location?.city, location?.state, location?.zip].filter(Boolean).join(" "),
-  ]
-    .map((value) => String(value ?? "").trim())
-    .filter((value) => value.length > 0);
-  const serviceLocationMatchesBilling =
-    billingAddress.length > 0 &&
-    serviceLocationParts.length > 0 &&
-    normalizeAddressForComparison(billingAddress) === normalizeAddressForComparison(serviceLocationParts);
+  const billingAddress = formatInvoiceBillingAddressLines(invoice, (job as any).billing_recipient);
+  const serviceLocationMatchesBilling = invoiceServiceLocationMatchesBillingAddress({
+    billingRecipient: (job as any).billing_recipient,
+    billingAddressLines: billingAddress,
+    serviceLocationLines: serviceLocationParts,
+  });
   const hasLogo = String(tenantIdentity.logoUrl ?? "").trim().length > 0;
   const invoiceReference = formatInvoiceDisplayReference({
     invoiceDisplayNumber: invoice.invoice_display_number,

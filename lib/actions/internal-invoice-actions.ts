@@ -263,11 +263,9 @@ async function loadCanonicalDraftBillingSources(params: {
   const adminSupabase = createAdminClient();
   const customerId = String(params.job?.customer_id ?? '').trim();
   const contractorId = String(params.job?.contractor_id ?? '').trim();
-  const locationId = String(params.job?.location_id ?? '').trim();
 
   let customerBilling: any = null;
   let contractorBilling: any = null;
-  let locationBilling: any = null;
 
   if (customerId) {
     const { data, error } = await adminSupabase
@@ -299,19 +297,7 @@ async function loadCanonicalDraftBillingSources(params: {
     contractorBilling = data ?? null;
   }
 
-  if (locationId) {
-    const { data, error } = await adminSupabase
-      .from('locations')
-      .select('owner_user_id, address_line1, address_line2, city, state, zip, postal_code')
-      .eq('id', locationId)
-      .eq('owner_user_id', params.internalUser.account_owner_user_id)
-      .maybeSingle();
-
-    if (error) throw error;
-    locationBilling = data ?? null;
-  }
-
-  return { customerBilling, contractorBilling, locationBilling };
+  return { customerBilling, contractorBilling };
 }
 
 async function recomputeOpsAfterInvoiceMutation(params: {
@@ -627,6 +613,67 @@ async function loadInternalInvoiceContext(formData: FormData) {
 type InternalInvoiceEmailDeliveryStatus = 'queued' | 'sent' | 'failed';
 type InternalInvoiceEmailAttemptKind = 'sent' | 'resent';
 
+function resolveInternalInvoiceGreetingName(args: {
+  invoice: Pick<InternalInvoiceRecord, 'billing_name'>;
+  job: {
+    billing_recipient?: unknown;
+    billing_name?: unknown;
+    customer_first_name?: unknown;
+    customer_last_name?: unknown;
+  };
+  contractorDisplayName?: string | null;
+}) {
+  const invoiceBillingName = getTrimmedString(args.invoice.billing_name);
+  if (invoiceBillingName) return invoiceBillingName;
+
+  const billingRecipient = String(args.job.billing_recipient ?? '').trim().toLowerCase();
+  const jobBillingName = String(args.job.billing_name ?? '').trim();
+  if (jobBillingName && billingRecipient !== 'customer') return jobBillingName;
+
+  if (billingRecipient === 'contractor') {
+    return args.contractorDisplayName || null;
+  }
+
+  const jobCustomerName = [args.job.customer_first_name, args.job.customer_last_name]
+    .map((value) => String(value ?? '').trim())
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
+  if (billingRecipient === 'customer') {
+    return jobBillingName || jobCustomerName || null;
+  }
+
+  return jobCustomerName || null;
+}
+
+async function resolveContractorGreetingNameForInvoiceEmail(args: {
+  supabase: any;
+  accountOwnerUserId: string;
+  contractorId: unknown;
+}) {
+  const contractorId = String(args.contractorId ?? '').trim();
+  if (!contractorId) return null;
+
+  const { data, error } = await args.supabase
+    .from('contractors')
+    .select('billing_name, name')
+    .eq('id', contractorId)
+    .eq('owner_user_id', args.accountOwnerUserId)
+    .maybeSingle();
+
+  if (error) {
+    console.warn('Invoice email contractor greeting lookup failed', {
+      accountOwnerUserId: args.accountOwnerUserId,
+      contractorId,
+      message: error instanceof Error ? error.message : String((error as any)?.message ?? error),
+    });
+    return null;
+  }
+
+  return firstNonEmpty(data?.billing_name, data?.name);
+}
+
 function buildInternalInvoiceEmailBody(args: {
   businessName: string;
   companyLogoUrl: string | null;
@@ -634,7 +681,7 @@ function buildInternalInvoiceEmailBody(args: {
   supportPhone: string | null;
   paymentUrl: string | null;
   invoice: InternalInvoiceRecord;
-  customerName: string | null;
+  greetingName: string | null;
   jobTitle: string | null;
   serviceLocation: string | null;
 }) {
@@ -642,7 +689,7 @@ function buildInternalInvoiceEmailBody(args: {
   const totalDisplay = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
   const safeLogoUrl = resolveSafeEmailLogoUrl(args.companyLogoUrl);
   const companyName = String(args.businessName ?? '').trim() || 'Compliance Matters';
-  const recipientName = String(args.customerName ?? args.invoice.billing_name ?? '').trim() || 'Customer';
+  const recipientName = String(args.greetingName ?? args.invoice.billing_name ?? '').trim() || 'there';
   const jobContext = normalizeJobContextForSentence(args.jobTitle);
   const contactLine = buildContactLine({
     businessName: companyName,
@@ -794,7 +841,7 @@ function buildInternalInvoiceEmailText(args: {
   supportPhone: string | null;
   paymentUrl: string | null;
   invoice: InternalInvoiceRecord;
-  customerName: string | null;
+  greetingName: string | null;
   jobTitle: string | null;
   serviceLocation: string | null;
 }) {
@@ -807,7 +854,7 @@ function buildInternalInvoiceEmailText(args: {
     ? normalizeDisplayNumber(args.invoice.invoice_number)
     : null;
   const invoiceDate = formatInvoiceDateForDisplay(args.invoice.invoice_date);
-  const recipientName = String(args.customerName ?? args.invoice.billing_name ?? '').trim() || 'Customer';
+  const recipientName = String(args.greetingName ?? args.invoice.billing_name ?? '').trim() || 'there';
   const jobTitle = normalizeJobContextForSentence(args.jobTitle);
   const serviceLocation = String(args.serviceLocation ?? '').trim();
   const total = formatCurrencyFromCents(Number(args.invoice.total_cents ?? 0));
@@ -1239,7 +1286,7 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
     redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_draft_exists', context.returnTo));
   }
 
-  const { customerBilling, contractorBilling, locationBilling } = await loadCanonicalDraftBillingSources({
+  const { customerBilling, contractorBilling } = await loadCanonicalDraftBillingSources({
     internalUser: context.internalUser,
     job: context.job,
   });
@@ -1279,43 +1326,20 @@ export async function createInternalInvoiceDraftFromForm(formData: FormData) {
       contractorBilling?.billing_phone,
       jobBilling.billing_phone,
     ),
-    billing_address_line1: firstNonEmpty(
-      billing.billing_address_line1,
-      jobBilling.billing_address_line1,
-      customerBilling?.billing_address_line1,
-      contractorBilling?.billing_address_line1,
-      locationBilling?.address_line1,
-    ),
-    billing_address_line2: firstNonEmpty(
-      billing.billing_address_line2,
-      jobBilling.billing_address_line2,
-      customerBilling?.billing_address_line2,
-      contractorBilling?.billing_address_line2,
-      locationBilling?.address_line2,
-    ),
-    billing_city: firstNonEmpty(
-      billing.billing_city,
-      jobBilling.billing_city,
-      customerBilling?.billing_city,
-      contractorBilling?.billing_city,
-      locationBilling?.city,
-    ),
-    billing_state: firstNonEmpty(
-      billing.billing_state,
-      jobBilling.billing_state,
-      customerBilling?.billing_state,
-      contractorBilling?.billing_state,
-      locationBilling?.state,
-    ),
-    billing_zip: firstNonEmpty(
-      billing.billing_zip,
-      jobBilling.billing_zip,
-      customerBilling?.billing_zip,
-      contractorBilling?.billing_zip,
-      locationBilling?.zip,
-      locationBilling?.postal_code,
-    ),
+    billing_address_line1: null as string | null,
+    billing_address_line2: null as string | null,
+    billing_city: null as string | null,
+    billing_state: null as string | null,
+    billing_zip: null as string | null,
   };
+  const billingRecipientMode = String(context.job.billing_recipient ?? '').trim().toLowerCase();
+  if (billingRecipientMode !== 'contractor') {
+    draftBilling.billing_address_line1 = firstNonEmpty(billing.billing_address_line1);
+    draftBilling.billing_address_line2 = firstNonEmpty(billing.billing_address_line2);
+    draftBilling.billing_city = firstNonEmpty(billing.billing_city);
+    draftBilling.billing_state = firstNonEmpty(billing.billing_state);
+    draftBilling.billing_zip = firstNonEmpty(billing.billing_zip);
+  }
 
   const draftPayload = {
     account_owner_user_id: context.internalUser.account_owner_user_id,
@@ -2467,10 +2491,22 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     accountOwnerUserId: context.internalUser.account_owner_user_id,
     locationId: context.job.location_id,
   });
-  const customerName = [context.job.customer_first_name, context.job.customer_last_name]
-    .map((value) => getOptionalText(value))
-    .filter(Boolean)
-    .join(' ');
+  const shouldLookupContractorGreetingName =
+    !getTrimmedString(context.invoice.billing_name)
+    && String(context.job.billing_recipient ?? '').trim().toLowerCase() === 'contractor'
+    && !String(context.job.billing_name ?? '').trim();
+  const contractorDisplayName = shouldLookupContractorGreetingName
+    ? await resolveContractorGreetingNameForInvoiceEmail({
+        supabase: context.supabase,
+        accountOwnerUserId: context.internalUser.account_owner_user_id,
+        contractorId: context.job.contractor_id,
+      })
+    : null;
+  const greetingName = resolveInternalInvoiceGreetingName({
+    invoice: context.invoice,
+    job: context.job,
+    contractorDisplayName,
+  });
   const paymentUrl = await resolveInvoicePaymentLinkForEmail({
     supabase: context.supabase,
     accountOwnerUserId: context.internalUser.account_owner_user_id,
@@ -2491,7 +2527,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     supportPhone: tenantIdentity.supportPhone,
     paymentUrl,
     invoice: context.invoice,
-    customerName: customerName || context.invoice.billing_name || null,
+    greetingName,
     jobTitle: context.job.title ?? null,
     serviceLocation: serviceLocation || null,
   });
@@ -2501,7 +2537,7 @@ export async function sendInternalInvoiceEmailFromForm(formData: FormData) {
     supportPhone: tenantIdentity.supportPhone,
     paymentUrl,
     invoice: context.invoice,
-    customerName: customerName || context.invoice.billing_name || null,
+    greetingName,
     jobTitle: context.job.title ?? null,
     serviceLocation: serviceLocation || null,
   });

@@ -100,6 +100,13 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("String(invoice.invoice_number ?? \"\").trim() || null");
   });
 
+  it("uses explicit billing-recipient address rendering in the workspace billing panel", () => {
+    expect(source).toContain('import { formatInvoiceBillingAddressLines } from "@/lib/business/internal-invoice-address-rendering";');
+    expect(source).toContain("billing_recipient,");
+    expect(source).toContain("formatInvoiceBillingAddressLines(invoice, (job as any).billing_recipient)");
+    expect(source).not.toContain("function formatBillingAddress");
+  });
+
   it("wires manual saved-card charge action and one-time copy", () => {
     expect(source).toContain("chargeSavedCardForIssuedInvoiceFromForm");
     expect(source).toContain("Charge saved card");

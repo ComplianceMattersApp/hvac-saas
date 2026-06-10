@@ -115,7 +115,7 @@ function buildFormData(overrides: Partial<Record<string, string>> = {}) {
   return formData;
 }
 
-function makeSupabaseFixture() {
+function makeSupabaseFixture(overrides: { job?: Record<string, unknown>; contractor?: Record<string, unknown> | null } = {}) {
   const notificationRows: Array<any> = [];
   const writes: Array<{ table: string; op: string; patch?: Record<string, unknown> }> = [];
 
@@ -219,6 +219,7 @@ function makeSupabaseFixture() {
             billing_city: 'Stockton',
             billing_state: 'CA',
             billing_zip: '95212',
+            ...overrides.job,
           },
           error: null,
         })),
@@ -247,16 +248,40 @@ function makeSupabaseFixture() {
     }),
   };
 
+  const contractorsApi = {
+    select: vi.fn(() => {
+      const chain: any = {
+        eq: vi.fn(() => chain),
+        maybeSingle: vi.fn(async () => ({
+          data: overrides.contractor === null
+            ? null
+            : {
+                billing_name: 'Angkor Heating & Air',
+                name: 'Angkor Heating & Air',
+                ...overrides.contractor,
+              },
+          error: null,
+        })),
+      };
+      return chain;
+    }),
+  };
+
   const supabase = {
     from: vi.fn((table: string) => {
       if (table === 'jobs') return jobsApi;
       if (table === 'notifications') return notificationsApi;
       if (table === 'locations') return locationsApi;
+      if (table === 'contractors') return contractorsApi;
       throw new Error(`Unexpected table ${table}`);
     }),
   };
 
   return { supabase, writes, notificationRows };
+}
+
+function sentEmailPayload() {
+  return sendEmailMock.mock.calls[0]?.[0] as { html?: string; text?: string; subject?: string } | undefined;
 }
 
 function buildInvoice(overrides: Partial<Record<string, unknown>> = {}) {
@@ -360,6 +385,158 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     expect(
       fixture.writes.some((write) => write.table === 'internal_invoices'),
     ).toBe(false);
+  });
+
+  it('greets contractor-billed ECC invoices with the invoice bill-to company instead of the homeowner', async () => {
+    const fixture = makeSupabaseFixture({
+      job: {
+        title: 'ECC Alteration Test',
+        job_type: 'ecc',
+        contractor_id: 'contractor-1',
+        billing_recipient: 'contractor',
+        customer_first_name: 'Harper',
+        customer_last_name: 'Homeowner',
+        billing_name: 'Angkor Heating & Air',
+      },
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValue(
+      buildInvoice({
+        billing_name: 'Angkor Heating & Air',
+        billing_email: 'billing@angkor.example',
+      }),
+    );
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(sendInternalInvoiceEmailFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_email_sent',
+    );
+
+    const email = sentEmailPayload();
+    expect(email?.html).toContain('Hi Angkor Heating &amp; Air,');
+    expect(email?.html).not.toContain('Hi Harper Homeowner,');
+    expect(email?.text).toContain('Hi Angkor Heating & Air,');
+    expect(email?.text).not.toContain('Hi Harper Homeowner,');
+    expect(
+      fixture.writes.some((write) => write.table === 'internal_invoice_payments'),
+    ).toBe(false);
+  });
+
+  it('greets homeowner-billed invoices with the customer bill-to name', async () => {
+    const fixture = makeSupabaseFixture({
+      job: {
+        billing_recipient: 'customer',
+        customer_first_name: 'Alex',
+        customer_last_name: 'Tenant',
+        billing_name: 'Alex Tenant',
+      },
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValue(
+      buildInvoice({
+        billing_name: 'Alex Tenant',
+      }),
+    );
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(sendInternalInvoiceEmailFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_email_sent',
+    );
+
+    const email = sentEmailPayload();
+    expect(email?.html).toContain('Hi Alex Tenant,');
+    expect(email?.text).toContain('Hi Alex Tenant,');
+  });
+
+  it('falls back to contractor company name for contractor-billed invoices when invoice billing name is missing', async () => {
+    const fixture = makeSupabaseFixture({
+      job: {
+        billing_recipient: 'contractor',
+        contractor_id: 'contractor-1',
+        billing_name: null,
+        customer_first_name: 'Harper',
+        customer_last_name: 'Homeowner',
+      },
+      contractor: {
+        billing_name: null,
+        name: 'Angkor Heating & Air',
+      },
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValue(
+      buildInvoice({
+        billing_name: null,
+      }),
+    );
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(sendInternalInvoiceEmailFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_email_sent',
+    );
+
+    const email = sentEmailPayload();
+    expect(email?.html).toContain('Hi Angkor Heating &amp; Air,');
+    expect(email?.html).not.toContain('Hi Harper Homeowner,');
+    expect(email?.text).toContain('Hi Angkor Heating & Air,');
+  });
+
+  it('greets responsible-account invoices with the invoice billing recipient', async () => {
+    const fixture = makeSupabaseFixture({
+      job: {
+        billing_recipient: 'other',
+        customer_first_name: 'Service',
+        customer_last_name: 'Occupant',
+        billing_name: 'Property Manager LLC',
+      },
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValue(
+      buildInvoice({
+        billing_name: 'Property Manager LLC',
+      }),
+    );
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(sendInternalInvoiceEmailFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_email_sent',
+    );
+
+    const email = sentEmailPayload();
+    expect(email?.html).toContain('Hi Property Manager LLC,');
+    expect(email?.html).not.toContain('Hi Service Occupant,');
+    expect(email?.text).toContain('Hi Property Manager LLC,');
+    expect(email?.text).not.toContain('Hi Service Occupant,');
+  });
+
+  it('uses a safe generic greeting when no bill-to display name exists', async () => {
+    const fixture = makeSupabaseFixture({
+      job: {
+        billing_recipient: 'contractor',
+        customer_first_name: null,
+        customer_last_name: null,
+        billing_name: null,
+      },
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValue(
+      buildInvoice({
+        billing_name: null,
+      }),
+    );
+
+    const { sendInternalInvoiceEmailFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(sendInternalInvoiceEmailFromForm(buildFormData())).rejects.toThrow(
+      'banner=internal_invoice_email_sent',
+    );
+
+    const email = sentEmailPayload();
+    expect(email?.html).toContain('Hi there,');
+    expect(email?.text).toContain('Hi there,');
   });
 
   it('sends without payment link when checkout helper reports zero balance', async () => {

@@ -43,8 +43,10 @@ describe("internal invoice print reference wiring", () => {
   });
 
   it("avoids duplicating the same billing and service address while still labeling different service locations", () => {
-    expect(source).toContain("function normalizeAddressForComparison");
-    expect(source).toContain("const serviceLocationMatchesBilling =");
+    expect(source).toContain('from "@/lib/business/internal-invoice-address-rendering";');
+    expect(source).toContain("formatInvoiceBillingAddressLines(invoice, (job as any).billing_recipient)");
+    expect(source).toContain("invoiceServiceLocationMatchesBillingAddress({");
+    expect(source).toContain("billingRecipient: (job as any).billing_recipient");
     expect(source).toContain('Service Location:</span>{" "}');
     expect(source).toContain('serviceLocationMatchesBilling ? "Same as billing address" : serviceLocationLabel');
   });
