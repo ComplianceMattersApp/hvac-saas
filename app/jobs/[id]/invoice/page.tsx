@@ -870,10 +870,10 @@ export default async function InternalInvoiceWorkspacePage({
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Billing Start</div>
             <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">No draft invoice yet</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Start with work performed. Use Work Items when the charge comes from completed job work, then review those as draft invoice charges.
+              Start from the work already completed, then add any extra fees or add-ons as needed.
             </p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Use direct invoice charges from Pricebook/manual only for billing cleanup or add-ons not captured in Work Items.
+              Existing invoice charges stay on the draft while you add anything else that belongs on this bill.
             </p>
             {canCreateDraftInvoice ? (
               <form action={createInternalInvoiceDraftFromForm} className="mt-4">
@@ -900,7 +900,7 @@ export default async function InternalInvoiceWorkspacePage({
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Invoice Lines</div>
                   <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Charges</h2>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
-                    Start with Work Items for completed work. Use direct invoice charges when the billed item was not captured as a Work Item.
+                    Review the current charges, then add another charge for fees, add-ons, or anything not already listed on the invoice.
                   </p>
                 </div>
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900">

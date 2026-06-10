@@ -329,7 +329,7 @@ export default function InternalInvoiceLineItemsTable({
       ) : null}
 
       <div className="divide-y divide-slate-200/80">
-        {canAddVisitScopeLine && visitScopePickerItems.length > 0 ? (
+        {canAddVisitScopeLine && eligibleVisitScopeItems.length > 0 ? (
           <form action={handleAddVisitScope} className="bg-sky-50/50 px-5 py-5">
             <input type="hidden" name="job_id" value={jobId} />
             <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
@@ -349,12 +349,12 @@ export default function InternalInvoiceLineItemsTable({
             </div>
 
             <div className="space-y-2">
-              {visitScopePickerItems.map((item) => {
+              {eligibleVisitScopeItems.map((item) => {
                 const isChecked = selectedVisitScopeItemIds.includes(item.id);
                 return (
                   <label
                     key={item.id}
-                    className={`block rounded-xl border px-3.5 py-3 ${item.alreadyAdded ? 'border-slate-200 bg-slate-50/80' : 'border-slate-200 bg-white'}`}
+                    className="block rounded-xl border border-slate-200 bg-white px-3.5 py-3"
                   >
                     <div className="flex items-start gap-3">
                       <input
@@ -362,9 +362,8 @@ export default function InternalInvoiceLineItemsTable({
                         name="visit_scope_item_ids"
                         value={item.id}
                         checked={isChecked}
-                        disabled={item.alreadyAdded}
                         onChange={() => toggleVisitScopeItem(item.id)}
-                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="mt-0.5 h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -372,11 +371,6 @@ export default function InternalInvoiceLineItemsTable({
                           <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-500">
                             {item.kind === 'companion_service' ? 'Companion Service' : 'Primary'}
                           </span>
-                          {item.alreadyAdded ? (
-                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-700">
-                              Already added
-                            </span>
-                          ) : null}
                           <span className="rounded-full border border-sky-200 bg-sky-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-sky-700">
                             Price {formatCurrencyFromAmount(item.expectedUnitPrice)}
                           </span>
@@ -393,9 +387,7 @@ export default function InternalInvoiceLineItemsTable({
 
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-slate-200/70 pt-3.5">
               <div className="text-xs text-slate-500">
-                {eligibleVisitScopeItems.length === 0
-                  ? 'All available Work Items are already on this draft invoice.'
-                  : 'Select one or more Work Items to add as draft charges.'}
+                Select one or more Work Items to add as draft charges.
               </div>
               <SubmitButton
                 loadingText="Adding..."
@@ -416,9 +408,9 @@ export default function InternalInvoiceLineItemsTable({
 
           <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Fallback Path: Add Charge from Pricebook</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Add Another Charge</div>
               <div className="mt-1 text-xs leading-5 text-slate-500">
-                Use Pricebook when the billed item was not captured as work performed. Use direct invoice items for billing cleanup or add-ons that do not belong in Work Items.
+                Use this for fees, add-ons, or anything that is not already listed on the invoice.
               </div>
             </div>
           </div>
@@ -431,7 +423,7 @@ export default function InternalInvoiceLineItemsTable({
                 onSelectedItemIdChange={setSelectedPricebookItemId}
                 itemFieldName="pricebook_item_id"
                 quantityFieldName="quantity"
-                itemLabel="Pricebook Service / Charge"
+                itemLabel="Charge"
                 quantityLabel="Quantity"
                 itemSelectId="invoice_pricebook_item_id"
                 quantityInputId="invoice_pricebook_quantity"
@@ -442,7 +434,7 @@ export default function InternalInvoiceLineItemsTable({
                 actionSlotClassName="md:self-end"
                 actionSlot={
                   <SubmitButton loadingText="Adding..." className={primaryButtonClass}>
-                    Add from Pricebook
+                    Add Charge
                   </SubmitButton>
                 }
                 renderSelectedItem={(selectedPricebookItem) => (

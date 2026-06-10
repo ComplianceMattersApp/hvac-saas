@@ -77,10 +77,12 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Create a separate invoice linked to this job and original invoice. Use this when new billable work appears after the original invoice was issued or paid.");
   });
 
-  it("keeps Work Item-first guidance and direct-invoice fallback guidance in the workspace copy", () => {
-    expect(source).toContain("Start with work performed. Use Work Items when the charge comes from completed job work, then review those as draft invoice charges.");
-    expect(source).toContain("Use direct invoice charges from Pricebook/manual only for billing cleanup or add-ons not captured in Work Items.");
-    expect(source).toContain("Start with Work Items for completed work. Use direct invoice charges when the billed item was not captured as a Work Item.");
+  it("keeps invoice builder guidance in plain billing language", () => {
+    expect(source).toContain("Start from the work already completed, then add any extra fees or add-ons as needed.");
+    expect(source).toContain("Existing invoice charges stay on the draft while you add anything else that belongs on this bill.");
+    expect(source).toContain("Review the current charges, then add another charge for fees, add-ons, or anything not already listed on the invoice.");
+    expect(source).not.toContain("Use direct invoice charges from Pricebook/manual only for billing cleanup or add-ons not captured in Work Items.");
+    expect(source).not.toContain("Use direct invoice charges when the billed item was not captured as a Work Item.");
   });
 
   it("uses shared short invoice reference helper in the primary header", () => {

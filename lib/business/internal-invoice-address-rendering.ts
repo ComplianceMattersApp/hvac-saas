@@ -32,10 +32,8 @@ export function isContractorBillingRecipient(value: unknown) {
 
 export function formatInvoiceBillingAddressLines(
   invoice: InvoiceBillingAddressFields,
-  billingRecipient: unknown,
+  _billingRecipient: unknown,
 ) {
-  if (isContractorBillingRecipient(billingRecipient)) return [];
-
   return [
     invoice.billing_address_line1,
     invoice.billing_address_line2,
@@ -60,7 +58,6 @@ export function invoiceServiceLocationMatchesBillingAddress(params: {
   billingAddressLines: string[];
   serviceLocationLines: string[];
 }) {
-  if (isContractorBillingRecipient(params.billingRecipient)) return false;
   if (params.billingAddressLines.length === 0 || params.serviceLocationLines.length === 0) return false;
 
   return (
