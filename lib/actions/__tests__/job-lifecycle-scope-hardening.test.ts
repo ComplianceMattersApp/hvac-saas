@@ -231,9 +231,14 @@ function makeSchedulePreservationFixture(beforeOverrides: Record<string, unknown
   return { supabase, jobsUpdates, jobEvents };
 }
 
-function makeAdvanceToCompletedServiceFixture() {
+function makeAdvanceToCompletedServiceFixture(config: {
+  coreUpdateError?: Error;
+  linkedRetestReadError?: Error;
+  jobEventInsertError?: Error;
+} = {}) {
   const jobEvents: Record<string, unknown>[] = [];
   const jobsUpdates: Record<string, unknown>[] = [];
+  let coreUpdateSucceeded = false;
 
   const jobRecord: Record<string, unknown> = {
     id: "job-1",
@@ -255,7 +260,7 @@ function makeAdvanceToCompletedServiceFixture() {
     from(table: string) {
       if (table === "jobs") {
         return {
-          select: vi.fn((_columns: string) => {
+          select: vi.fn((columns: string) => {
             const builder: any = {
               _id: "",
               eq: vi.fn((column: string, value: unknown) => {
@@ -270,7 +275,12 @@ function makeAdvanceToCompletedServiceFixture() {
               })),
               maybeSingle: vi.fn(async () => ({
                 data: builder._id === "job-1" ? { ...jobRecord } : null,
-                error: null,
+                error:
+                  coreUpdateSucceeded &&
+                  columns === "parent_job_id" &&
+                  builder._id === "job-1"
+                    ? config.linkedRetestReadError ?? null
+                    : null,
               })),
             };
 
@@ -278,12 +288,18 @@ function makeAdvanceToCompletedServiceFixture() {
           }),
           update: vi.fn((payload: Record<string, unknown>) => {
             jobsUpdates.push(payload);
-            Object.assign(jobRecord, payload);
+            if (!config.coreUpdateError) {
+              Object.assign(jobRecord, payload);
+              coreUpdateSucceeded = true;
+            }
 
             const chain: any = {
               eq: vi.fn(() => chain),
               select: vi.fn(() => ({
-                maybeSingle: vi.fn(async () => ({ data: { id: "job-1" }, error: null })),
+                maybeSingle: vi.fn(async () => ({
+                  data: config.coreUpdateError ? null : { id: "job-1" },
+                  error: config.coreUpdateError ?? null,
+                })),
               })),
               is: vi.fn(() => chain),
               not: vi.fn(() => chain),
@@ -310,7 +326,10 @@ function makeAdvanceToCompletedServiceFixture() {
         return {
           insert: vi.fn((payload: Record<string, unknown>) => {
             jobEvents.push(payload);
-            const response = { data: { id: `evt-${jobEvents.length}` }, error: null };
+            const response = {
+              data: config.jobEventInsertError ? null : { id: `evt-${jobEvents.length}` },
+              error: config.jobEventInsertError ?? null,
+            };
             return {
               select: vi.fn(() => ({
                 single: vi.fn(async () => response),
@@ -653,6 +672,76 @@ describe("internal same-account lifecycle scheduling hardening", () => {
         actingUserId: "internal-user-1",
       }),
     );
+  });
+
+  it("redirects success after completion when post-update linked retest lookup fails", async () => {
+    const { supabase, jobsUpdates, jobEvents } = makeAdvanceToCompletedServiceFixture({
+      linkedRetestReadError: new Error("linked retest read failed"),
+    });
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { advanceJobStatusFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(advanceJobStatusFromForm(buildJobOnlyFormData())).rejects.toThrow(
+      "banner=status_updated",
+    );
+
+    expect(jobsUpdates).toContainEqual(
+      expect.objectContaining({
+        status: "completed",
+        field_complete: true,
+        ops_status: "invoice_required",
+      }),
+    );
+    expect(jobEvents.length).toBeGreaterThan(0);
+  });
+
+  it("redirects success after completion when lifecycle event logging fails", async () => {
+    const { supabase, jobsUpdates, jobEvents } = makeAdvanceToCompletedServiceFixture({
+      jobEventInsertError: new Error("event insert failed"),
+    });
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { advanceJobStatusFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(advanceJobStatusFromForm(buildJobOnlyFormData())).rejects.toThrow(
+      "banner=status_updated",
+    );
+
+    expect(jobsUpdates).toContainEqual(
+      expect.objectContaining({
+        status: "completed",
+        field_complete: true,
+        ops_status: "invoice_required",
+      }),
+    );
+    expect(jobEvents.length).toBeGreaterThan(0);
+  });
+
+  it("redirects with a safe warning when the core completion update is blocked", async () => {
+    const { supabase, jobsUpdates, jobEvents } = makeAdvanceToCompletedServiceFixture({
+      coreUpdateError: new Error("update blocked"),
+    });
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { advanceJobStatusFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(advanceJobStatusFromForm(buildJobOnlyFormData())).rejects.toThrow(
+      "banner=status_update_failed",
+    );
+
+    expect(jobsUpdates).toContainEqual(
+      expect.objectContaining({
+        status: "completed",
+        field_complete: true,
+        ops_status: "invoice_required",
+      }),
+    );
+    expect(jobEvents).toHaveLength(0);
+    expect(autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock).not.toHaveBeenCalled();
   });
 
   it("allows same-account internal revertOnTheWayFromForm past scope preflight", async () => {

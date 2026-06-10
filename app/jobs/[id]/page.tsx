@@ -4106,6 +4106,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             "internal_invoice_issue_blocked",
             "internal_invoice_issue_incomplete",
             "on_the_way_revert_unavailable",
+            "status_update_failed",
           ].includes(String(banner ?? "")) ? (
             <FlashBanner type="warning" message="This action needs attention. Review the details below." />
           ) : null}
@@ -6311,6 +6312,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <FlashBanner
           type="warning"
           message="This was already processed."
+        />
+      )}
+
+      {banner === "status_update_failed" && (
+        <FlashBanner
+          type="warning"
+          message="We could not update this job status. Refresh and try again."
         />
       )}
 

@@ -9171,7 +9171,17 @@ export async function advanceJobStatusFromForm(formData: FormData) {
           .maybeSingle(),
     );
 
-    if (updErr) throw updErr;
+    if (updErr) {
+      console.error("[ADVANCE_STATUS_CORE_UPDATE_FAILED]", {
+        jobId: id,
+        current,
+        next,
+        branch: "on_the_way_stamp",
+        error: updErr.message,
+      });
+      _ftEmit("guard:status_update_failed", buildJobRedirect({ banner: "status_update_failed" }));
+      redirect(buildJobRedirect({ banner: "status_update_failed" }));
+    }
 
     console.log("[ADVANCE_STATUS_UPDATED]", { jobId: id, branch: "on_the_way_stamp", applied: !!onTheWayApplied?.id, returnedId: onTheWayApplied?.id ?? null });
     _ftCompletePhase("statusWrite");
@@ -9327,7 +9337,17 @@ export async function advanceJobStatusFromForm(formData: FormData) {
           .maybeSingle(),
     );
 
-    if (updErr) throw updErr;
+    if (updErr) {
+      console.error("[ADVANCE_STATUS_CORE_UPDATE_FAILED]", {
+        jobId: id,
+        current,
+        next,
+        branch: "else",
+        error: updErr.message,
+      });
+      _ftEmit("guard:status_update_failed", buildJobRedirect({ banner: "status_update_failed" }));
+      redirect(buildJobRedirect({ banner: "status_update_failed" }));
+    }
 
     console.log("[ADVANCE_STATUS_UPDATED]", { jobId: id, branch: "else", applied: !!transitionApplied?.id, returnedId: transitionApplied?.id ?? null });
     _ftCompletePhase("statusWrite");
@@ -9362,29 +9382,46 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       }
     }
 
-    // Diagnostic re-read: confirm DB write persisted before post-update work.
-    const { data: rereadElse } = await _ftTimeSubphase(
-      "eventBreadcrumb.diagnosticJobReread",
-      async () => supabase.from("jobs").select("status").eq("id", id).single(),
-    );
-    console.log("[ADVANCE_STATUS_REREAD]", { jobId: id, branch: "else", status_after_update: rereadElse?.status ?? null });
+    try {
+      // Diagnostic re-read: confirm DB write persisted before post-update work.
+      const { data: rereadElse, error: rereadElseErr } = await _ftTimeSubphase(
+        "eventBreadcrumb.diagnosticJobReread",
+        async () => supabase.from("jobs").select("status").eq("id", id).single(),
+      );
+      if (rereadElseErr) throw rereadElseErr;
+      console.log("[ADVANCE_STATUS_REREAD]", { jobId: id, branch: "else", status_after_update: rereadElse?.status ?? null });
+    } catch (error) {
+      console.error("[ADVANCE_STATUS_POST_UPDATE_REREAD_FAILED]", {
+        jobId: id,
+        current,
+        next,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     // ECC canonical resolution:
     // once the field lifecycle is marked complete, derive ops_status from ecc_test_runs
     if (next === "completed") {
-      const { data: jt2, error: jt2Err } = await supabase
-        .from("jobs")
-        .select("job_type")
-        .eq("id", id)
-        .single();
+      try {
+        const { data: jt2, error: jt2Err } = await supabase
+          .from("jobs")
+          .select("job_type")
+          .eq("id", id)
+          .single();
 
-      if (jt2Err) throw jt2Err;
+        if (jt2Err) throw jt2Err;
 
-      if ((jt2?.job_type ?? "").toLowerCase() === "ecc") {
-        await evaluateEccOpsStatus(id, {
-          timing: _ftEnabled
-            ? (name, elapsedMs) => _ftRecordSubphase(`eccEvaluation.${name}`, elapsedMs)
-            : undefined,
+        if ((jt2?.job_type ?? "").toLowerCase() === "ecc") {
+          await evaluateEccOpsStatus(id, {
+            timing: _ftEnabled
+              ? (name, elapsedMs) => _ftRecordSubphase(`eccEvaluation.${name}`, elapsedMs)
+              : undefined,
+          });
+        }
+      } catch (error) {
+        console.error("[ADVANCE_STATUS_ECC_EVALUATION_BEST_EFFORT_FAILED]", {
+          jobId: id,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
     }
@@ -9565,19 +9602,26 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     // Retest-specific lifecycle breadcrumb:
     // if this job is a linked retest child and it enters in_process,
     // log retest_started on BOTH the child and the parent.
-    const { data: linkedJob, error: linkedErr } = await _ftTimeSubphase(
-      "eventBreadcrumb.linkedRetestRead",
-      async () =>
-        supabase
-          .from("jobs")
-          .select("parent_job_id")
-          .eq("id", id)
-          .maybeSingle(),
-    );
+    let parentJobId = "";
+    try {
+      const { data: linkedJob, error: linkedErr } = await _ftTimeSubphase(
+        "eventBreadcrumb.linkedRetestRead",
+        async () =>
+          supabase
+            .from("jobs")
+            .select("parent_job_id")
+            .eq("id", id)
+            .maybeSingle(),
+      );
 
-    if (linkedErr) throw linkedErr;
-
-    const parentJobId = String(linkedJob?.parent_job_id ?? "").trim();
+      if (linkedErr) throw linkedErr;
+      parentJobId = String(linkedJob?.parent_job_id ?? "").trim();
+    } catch (error) {
+      console.error("[ADVANCE_STATUS_LINKED_RETEST_READ_BEST_EFFORT_FAILED]", {
+        jobId: id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     if (parentJobId && next === "in_process") {
       try {
