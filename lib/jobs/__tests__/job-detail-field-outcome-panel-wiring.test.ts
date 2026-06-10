@@ -17,6 +17,11 @@ const fieldActionButtonSource = readFileSync(
   "utf8",
 );
 
+const exceptionPickerSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/FieldExceptionRoutingPicker.tsx"),
+  "utf8",
+);
+
 describe("job detail field outcome panel wiring", () => {
   it("wires the compact panel near field action areas", () => {
     expect(jobDetailSource).toContain('import FieldOutcomePanel from "./_components/FieldOutcomePanel";');
@@ -64,51 +69,64 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).not.toContain("Confirm field work complete");
   });
 
+  it("renders compact exception routing instead of the full textarea stack by default", () => {
+    expect(panelSource).toContain('import FieldExceptionRoutingPicker from "./FieldExceptionRoutingPicker";');
+    expect(panelSource).toContain("<FieldExceptionRoutingPicker");
+    expect(panelSource).toContain("Need a field exception?");
+    expect(panelSource).toContain("Route active field work to office/dispatch only if this visit cannot be completed.");
+    expect(panelSource).not.toContain("<textarea");
+    expect(panelSource).not.toContain("form action={markJobPartsNeededFromForm}");
+    expect(exceptionPickerSource).toContain('"use client";');
+    expect(exceptionPickerSource).toContain("const [isOpen, setIsOpen] = useState(false);");
+    expect(exceptionPickerSource).toContain("Can&apos;t finish today?");
+    expect(exceptionPickerSource).toContain("What is blocking completion?");
+    expect(exceptionPickerSource).toContain("Need Parts");
+    expect(exceptionPickerSource).toContain("Need Approval");
+    expect(exceptionPickerSource).toContain("Unable to Complete");
+    expect(exceptionPickerSource).toContain("Back");
+    expect(exceptionPickerSource).toContain("Cancel");
+  });
+
   it("wires parts_needed, approval_needed, and unable_to_complete submit behavior", () => {
     expect(panelSource).toContain('from "@/lib/actions/job-ops-actions";');
     expect(panelSource).toContain("markJobPartsNeededFromForm");
     expect(panelSource).toContain("markJobApprovalNeededFromForm");
     expect(panelSource).toContain("markJobUnableToCompleteFromForm");
-    expect(panelSource).toContain("form action={markJobPartsNeededFromForm}");
-    expect(panelSource).toContain("form action={markJobApprovalNeededFromForm}");
-    expect(panelSource).toContain("form action={markJobUnableToCompleteFromForm}");
-    expect(panelSource).toContain("name=\"job_id\"");
-    expect(panelSource).toContain("name=\"current_status\"");
-    expect(panelSource).toContain("name=\"tab\"");
-    expect(panelSource).toContain("name=\"parts_note\"");
-    expect(panelSource).toContain("name=\"approval_note\"");
-    expect(panelSource).toContain("name=\"unable_note\"");
+    expect(panelSource).toContain("partsNeededAction={markJobPartsNeededFromForm}");
+    expect(panelSource).toContain("approvalNeededAction={markJobApprovalNeededFromForm}");
+    expect(panelSource).toContain("unableToCompleteAction={markJobUnableToCompleteFromForm}");
+    expect(exceptionPickerSource).toContain("form action={props.partsNeededAction}");
+    expect(exceptionPickerSource).toContain("form action={props.approvalNeededAction}");
+    expect(exceptionPickerSource).toContain("form action={props.unableToCompleteAction}");
+    expect(exceptionPickerSource).toContain("name=\"job_id\"");
+    expect(exceptionPickerSource).toContain("name=\"current_status\"");
+    expect(exceptionPickerSource).toContain("name=\"tab\"");
+    expect(exceptionPickerSource).toContain("name=\"parts_note\"");
+    expect(exceptionPickerSource).toContain("name=\"approval_note\"");
+    expect(exceptionPickerSource).toContain("name=\"unable_note\"");
     expect(panelSource).toContain("markJobDifferentIssueFoundFromForm");
-    expect(panelSource).toContain("form action={markJobDifferentIssueFoundFromForm}");
-    expect(panelSource).toContain("name=\"different_issue_note\"");
-    expect(panelSource).toContain("Can&apos;t finish today?");
-    expect(panelSource).toContain("Route active field work to office/dispatch when the visit cannot be completed.");
-    expect(panelSource).toContain("Need parts, approval, or unable to complete?");
-    expect(panelSource).toContain("Choose an exception path if this visit cannot be finished today.");
-    expect(panelSource).not.toContain("<details");
-    expect(panelSource).not.toContain("<summary");
-    expect(panelSource).toContain("Need approval?");
-    expect(panelSource).toContain("Unable to complete?");
-    expect(panelSource).toContain("Send this visit to office/dispatch as Waiting on Part.");
-    expect(panelSource).toContain("Send this visit to office/dispatch as Approval Needed.");
-    expect(panelSource).toContain("Send this visit to office/dispatch for review.");
-    expect(panelSource).toContain("Why couldn&apos;t the visit be completed?");
-    expect(panelSource).toContain("placeholder=\"What part or issue is needed?\"");
-    expect(panelSource).toContain("placeholder=\"Example: customer approval for repair, owner approval for added work\"");
-    expect(panelSource).toContain("placeholder=\"Example: customer not home, no access, unsafe condition, missing information\"");
-    expect(panelSource).toContain("placeholder=\"Example: original issue resolved, but separate airflow issue found in upstairs zone\"");
-    expect(panelSource).toContain("Submit Parts Needed");
-    expect(panelSource).toContain("Submit Approval Needed");
-    expect(panelSource).toContain("Submit Unable to Complete");
-    expect(panelSource).toContain("Submit Different Issue Found");
+    expect(panelSource).toContain("differentIssueFoundAction={markJobDifferentIssueFoundFromForm}");
+    expect(exceptionPickerSource).toContain("form action={props.differentIssueFoundAction}");
+    expect(exceptionPickerSource).toContain("name=\"different_issue_note\"");
+    expect(exceptionPickerSource).toContain("Send this visit to office/dispatch as Waiting on Part.");
+    expect(exceptionPickerSource).toContain("Send this visit to office/dispatch as Approval Needed.");
+    expect(exceptionPickerSource).toContain("Send this visit to office/dispatch for review.");
+    expect(exceptionPickerSource).toContain("placeholder=\"What part or issue is needed?\"");
+    expect(exceptionPickerSource).toContain("placeholder=\"Example: customer approval for repair, owner approval for added work\"");
+    expect(exceptionPickerSource).toContain("placeholder=\"Example: customer not home, no access, unsafe condition, missing information\"");
+    expect(exceptionPickerSource).toContain("placeholder=\"Example: original issue resolved, but separate airflow issue found in upstairs zone\"");
+    expect(exceptionPickerSource).toContain("Submit Parts Needed");
+    expect(exceptionPickerSource).toContain("Submit Approval Needed");
+    expect(exceptionPickerSource).toContain("Submit Unable to Complete");
+    expect(exceptionPickerSource).toContain("Submit Different Issue Found");
   });
 
   it("gates Different Issue Found to callback/revisit-only rendering", () => {
     expect(panelSource).not.toContain("route.code === \"work_completed\"");
     expect(panelSource).not.toContain('type="button"');
     expect(panelSource).not.toContain("Only Work Completed is wired in this slice. Other outcomes remain unwired until future slices.");
-    expect(panelSource).toContain("props.showDifferentIssueFoundOutcome ? (");
-    expect(panelSource).toContain("Callback/revisit-only: send this visit to office review without creating a new visit.");
+    expect(exceptionPickerSource).toContain("props.showDifferentIssueFoundOutcome ? (");
+    expect(exceptionPickerSource).toContain("Callback/revisit-only: send this visit to office review without creating a new visit.");
     expect(panelSource).not.toContain("return_needed");
   });
 
@@ -126,5 +144,16 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("const workflowChipLabel =");
     expect(jobDetailSource).toContain('normalizedJobStatus === "in_process" && !isFieldComplete');
     expect(jobDetailSource).toContain('{workflowChipLabel}');
+  });
+
+  it("renders completion blocker banners in the primary action region without lower duplicates", () => {
+    expect(jobDetailSource).toContain("const completionActionAttentionBanner =");
+    expect(jobDetailSource).toContain('title: "One step missing"');
+    expect(jobDetailSource).toContain('title: "Could not complete field work"');
+    expect(jobDetailSource).toContain('data-completion-action-banner="true"');
+    expect(jobDetailSource).toContain('<div id="field-status-actions"');
+    expect(jobDetailSource).not.toContain("{showEccNotice && (");
+    expect(jobDetailSource).not.toContain('{banner === "status_update_failed" && (');
+    expect(jobDetailSource).not.toContain('showEccNotice || sp?.schedule_required === "1"');
   });
 });

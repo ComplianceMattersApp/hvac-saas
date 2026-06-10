@@ -1275,6 +1275,25 @@ export default async function JobDetailPage({
   };
 
   const showEccNotice = notice === "ecc_test_required";
+  const completionActionAttentionBanner =
+    showEccNotice
+      ? {
+          title: "One step missing",
+          message: (
+            <>
+              This is an <span className="font-semibold">ECC</span> job. Go to the{" "}
+              <span className="font-semibold">Tests</span> tab and complete at least{" "}
+              <span className="font-semibold">one ECC test run</span> before marking{" "}
+              <span className="font-semibold">Field Work Complete</span>.
+            </>
+          ),
+        }
+      : banner === "status_update_failed"
+      ? {
+          title: "Could not complete field work",
+          message: <>We could not update this job status. Refresh and try again.</>,
+        }
+      : null;
 
   const supabase = await timedPhase("createClient", () => createClient());
 
@@ -4110,7 +4129,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             "internal_invoice_issue_blocked",
             "internal_invoice_issue_incomplete",
             "on_the_way_revert_unavailable",
-            "status_update_failed",
           ].includes(String(banner ?? "")) ? (
             <FlashBanner type="warning" message="This action needs attention. Review the details below." />
           ) : null}
@@ -4134,6 +4152,16 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             {isFieldComplete || job.status === "completed" ? (
               <div className="mt-1 text-base text-slate-600">
                 {isFieldComplete ? "Field work is complete." : "Finish field closeout."}
+              </div>
+            ) : null}
+
+            {completionActionAttentionBanner ? (
+              <div
+                data-completion-action-banner="true"
+                className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-900"
+              >
+                <div className="font-semibold">{completionActionAttentionBanner.title}</div>
+                <div className="mt-1">{completionActionAttentionBanner.message}</div>
               </div>
             ) : null}
 
@@ -4446,7 +4474,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             </section>
           ) : null}
 
-          {(showEccNotice || sp?.schedule_required === "1" || activeWaitingState || showExternalDataEntryPrompt || showInternalInvoicingPlaceholder || showMobileInvoiceOpenAttention || markVisitCountedLinkId || suggestedNextDueProjection || isCloseoutPending) ? (
+          {(sp?.schedule_required === "1" || activeWaitingState || showExternalDataEntryPrompt || showInternalInvoicingPlaceholder || showMobileInvoiceOpenAttention || markVisitCountedLinkId || suggestedNextDueProjection || isCloseoutPending) ? (
             <section className="space-y-2">
 
                 {showExternalDataEntryPrompt ? (
@@ -5119,6 +5147,15 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         </span>
         <span>Primary Next Action</span>
       </div>
+        {completionActionAttentionBanner ? (
+          <div
+            data-completion-action-banner="true"
+            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-900"
+          >
+            <div className="font-semibold">{completionActionAttentionBanner.title}</div>
+            <div className="mt-1">{completionActionAttentionBanner.message}</div>
+          </div>
+        ) : null}
         {!isFieldComplete && job.status !== "completed" ? (
           <div className="hidden w-full gap-2 sm:flex sm:items-stretch">
             <JobFieldActionButton
@@ -6243,19 +6280,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   </div>
 )}
 
-      {/* ✅ Friendly guard-rail message (shows after redirect) */}
-      {showEccNotice && (
-        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-          <div className="font-semibold">One step missing</div>
-          <div className="mt-1">
-            This is an <span className="font-semibold">ECC</span> job. Go to the{" "}
-            <span className="font-semibold">Tests</span> tab and complete at least{" "}
-            <span className="font-semibold">one ECC test run</span> before marking{" "}
-            <span className="font-semibold">Field Work Complete</span>.
-          </div>
-        </div>
-      )}
-
       {banner === "job_created" && (
         <FlashBanner
           type="success"
@@ -6323,13 +6347,6 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <FlashBanner
           type="warning"
           message="This was already processed."
-        />
-      )}
-
-      {banner === "status_update_failed" && (
-        <FlashBanner
-          type="warning"
-          message="We could not update this job status. Refresh and try again."
         />
       )}
 
