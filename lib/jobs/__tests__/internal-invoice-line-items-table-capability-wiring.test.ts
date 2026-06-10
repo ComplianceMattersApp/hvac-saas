@@ -71,7 +71,7 @@ describe("internal invoice line items table capability wiring", () => {
   it("renders the single add-charge flow below existing invoice lines", () => {
     const linesIndex = source.indexOf("{lineItems.map((lineItem, index) => {");
     const addPricebookFormIndex = source.indexOf("action={handleAddPricebook}");
-    const addChargeEntryIndex = source.indexOf("onClick={() => setIsAddFormOpen(true)}");
+    const addChargeEntryIndex = source.lastIndexOf("onClick={() => setIsAddFormOpen(true)}");
     const runningTotalIndex = source.indexOf("Running Total");
 
     expect(linesIndex).toBeGreaterThan(-1);
@@ -79,6 +79,27 @@ describe("internal invoice line items table capability wiring", () => {
     expect(addChargeEntryIndex).toBeGreaterThan(linesIndex);
     expect(runningTotalIndex).toBeGreaterThan(addChargeEntryIndex);
     expect(source.indexOf("action={handleAddPricebook}")).toBe(source.lastIndexOf("action={handleAddPricebook}"));
+  });
+
+  it("renders a compact zero-dollar decision rail above charges without adding outcome actions", () => {
+    const zeroRailIndex = source.indexOf("$0.00 invoice - choose how to handle it");
+    const headerIndex = source.indexOf("Invoice Charge");
+    const bottomAddFormIndex = source.indexOf("action={handleAddPricebook}");
+
+    expect(source).toContain("Number(totalCents ?? 0) === 0");
+    expect(zeroRailIndex).toBeGreaterThan(-1);
+    expect(zeroRailIndex).toBeLessThan(headerIndex);
+    expect(zeroRailIndex).toBeLessThan(bottomAddFormIndex);
+    expect(source).toContain("Add a charge if this is missing billing. Use No Charge for estimates, warranty, or courtesy work. Use Externally Billed for QuickBooks or off-platform billing.");
+    expect(source).toContain("Mark No Charge");
+    expect(source).toContain("Externally Billed");
+    expect(source).toContain("Send $0 Invoice");
+    expect(source).toContain("No Charge needs an approved invoice outcome model before it can be saved.");
+    expect(source).toContain("Externally Billed needs an approved invoice outcome model before it can be saved.");
+    expect(source).toContain("Sending a no-payment-due invoice needs an approved zero-dollar send outcome model.");
+    expect(source).not.toContain("markNoCharge");
+    expect(source).not.toContain("externallyBilled");
+    expect(source).not.toContain("sendZeroDollarInvoice");
   });
 
   it("keeps Add Charge wired to the existing pricebook invoice action fields", () => {
