@@ -94,6 +94,60 @@ function hasExplicitOnHold(snapshot: Pick<OpsSnapshot, "ops_status" | "on_hold_r
   );
 }
 
+function formatServiceFieldFollowUpReason(label: "Materials Needed" | "Approval Needed" | "Other", reason: string) {
+  return `${label}: ${reason}`;
+}
+
+async function persistServiceFieldFollowUpCompletion(params: {
+  supabase: any;
+  jobId: string;
+  accountOwnerUserId: string;
+  completedAt: string;
+  pendingInfoReason: string;
+}) {
+  const { data: updatedJob, error: updateErr } = await params.supabase
+    .from("jobs")
+    .update({
+      status: "completed",
+      field_complete: true,
+      field_complete_at: params.completedAt,
+      ops_status: "pending_info",
+      pending_info_reason: params.pendingInfoReason,
+      on_hold_reason: null,
+    })
+    .eq("id", params.jobId)
+    .eq("account_owner_user_id", params.accountOwnerUserId)
+    .select("id, status, ops_status, field_complete, field_complete_at, pending_info_reason, on_hold_reason")
+    .single();
+
+  if (updateErr) throw new Error(updateErr.message);
+  if (!updatedJob?.id) throw new Error("Job follow-up update did not persist");
+
+  return updatedJob;
+}
+
+async function reconcileHeldServiceFollowUpCaseBestEffort(params: {
+  supabase: any;
+  accountOwnerUserId: string;
+  serviceCaseId?: string | null;
+  jobId: string;
+}) {
+  try {
+    await reconcileServiceCaseStatusAfterJobChange({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+      serviceCaseId: params.serviceCaseId,
+      triggerJobId: params.jobId,
+      source: "field_held_follow_up",
+    });
+  } catch (error) {
+    console.error("[FIELD_HELD_FOLLOW_UP_SERVICE_CASE_RECONCILIATION_BEST_EFFORT_FAILED]", {
+      jobId: params.jobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+}
+
 async function requireInternalOpsAccessOrRedirect(
   supabase: any,
   userId: string,
@@ -2075,7 +2129,7 @@ export async function markJobPartsNeededFromForm(formData: FormData): Promise<vo
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, ops_status, field_complete, field_complete_at, pending_info_reason, on_hold_reason"
+      "id, status, ops_status, field_complete, field_complete_at, pending_info_reason, on_hold_reason, service_case_id"
     )
     .eq("id", jobId)
     .single();
@@ -2094,7 +2148,7 @@ export async function markJobPartsNeededFromForm(formData: FormData): Promise<vo
   }
 
   const completedAt = new Date().toISOString();
-  const waitingReason = formatWaitingStateReason("waiting_on_part", partsNote);
+  const waitingReason = formatServiceFieldFollowUpReason("Materials Needed", partsNote);
   const hadActiveWaitingState = Boolean(
     getActiveWaitingState({
       ops_status: beforeJob.ops_status ?? null,
@@ -2103,19 +2157,13 @@ export async function markJobPartsNeededFromForm(formData: FormData): Promise<vo
     }),
   );
 
-  const { error: updateErr } = await supabase
-    .from("jobs")
-    .update({
-      status: "completed",
-      field_complete: true,
-      field_complete_at: completedAt,
-      ops_status: "pending_info",
-      pending_info_reason: waitingReason,
-      on_hold_reason: null,
-    })
-    .eq("id", jobId);
-
-  if (updateErr) throw new Error(updateErr.message);
+  await persistServiceFieldFollowUpCompletion({
+    supabase,
+    jobId,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+    completedAt,
+    pendingInfoReason: waitingReason,
+  });
 
   let assignmentId: string | null = null;
   if (actingUserId) {
@@ -2161,7 +2209,7 @@ export async function markJobPartsNeededFromForm(formData: FormData): Promise<vo
       source: "field_outcome_panel",
       source_action: "markJobPartsNeededFromForm",
       blocker_action: hadActiveWaitingState ? "updated" : "set",
-      blocker_type: "waiting_on_part",
+      blocker_type: "materials_needed",
       blocker_reason: partsNote,
       reason: partsNote,
       previous: {
@@ -2196,6 +2244,13 @@ export async function markJobPartsNeededFromForm(formData: FormData): Promise<vo
   });
 
   if (opsEventErr) throw new Error(opsEventErr.message);
+
+  await reconcileHeldServiceFollowUpCaseBestEffort({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+    serviceCaseId: beforeJob.service_case_id ?? null,
+    jobId,
+  });
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
@@ -2244,7 +2299,7 @@ export async function markJobApprovalNeededFromForm(formData: FormData): Promise
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, ops_status, field_complete, field_complete_at, pending_info_reason, on_hold_reason"
+      "id, status, ops_status, field_complete, field_complete_at, pending_info_reason, on_hold_reason, service_case_id"
     )
     .eq("id", jobId)
     .single();
@@ -2263,7 +2318,7 @@ export async function markJobApprovalNeededFromForm(formData: FormData): Promise
   }
 
   const completedAt = new Date().toISOString();
-  const waitingReason = formatWaitingStateReason("waiting_on_customer_approval", approvalNote);
+  const waitingReason = formatServiceFieldFollowUpReason("Approval Needed", approvalNote);
   const hadActiveWaitingState = Boolean(
     getActiveWaitingState({
       ops_status: beforeJob.ops_status ?? null,
@@ -2272,19 +2327,13 @@ export async function markJobApprovalNeededFromForm(formData: FormData): Promise
     }),
   );
 
-  const { error: updateErr } = await supabase
-    .from("jobs")
-    .update({
-      status: "completed",
-      field_complete: true,
-      field_complete_at: completedAt,
-      ops_status: "pending_info",
-      pending_info_reason: waitingReason,
-      on_hold_reason: null,
-    })
-    .eq("id", jobId);
-
-  if (updateErr) throw new Error(updateErr.message);
+  await persistServiceFieldFollowUpCompletion({
+    supabase,
+    jobId,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+    completedAt,
+    pendingInfoReason: waitingReason,
+  });
 
   let assignmentId: string | null = null;
   if (actingUserId) {
@@ -2330,7 +2379,7 @@ export async function markJobApprovalNeededFromForm(formData: FormData): Promise
       source: "field_outcome_panel",
       source_action: "markJobApprovalNeededFromForm",
       blocker_action: hadActiveWaitingState ? "updated" : "set",
-      blocker_type: "waiting_on_customer_approval",
+      blocker_type: "approval_needed",
       blocker_reason: approvalNote,
       reason: approvalNote,
       previous: {
@@ -2365,6 +2414,13 @@ export async function markJobApprovalNeededFromForm(formData: FormData): Promise
   });
 
   if (opsEventErr) throw new Error(opsEventErr.message);
+
+  await reconcileHeldServiceFollowUpCaseBestEffort({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+    serviceCaseId: beforeJob.service_case_id ?? null,
+    jobId,
+  });
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
@@ -2413,7 +2469,7 @@ export async function markJobUnableToCompleteFromForm(formData: FormData): Promi
   const { data: beforeJob, error: beforeErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, ops_status, field_complete, field_complete_at, pending_info_reason, on_hold_reason"
+      "id, status, ops_status, field_complete, field_complete_at, pending_info_reason, on_hold_reason, service_case_id"
     )
     .eq("id", jobId)
     .single();
@@ -2432,7 +2488,7 @@ export async function markJobUnableToCompleteFromForm(formData: FormData): Promi
   }
 
   const completedAt = new Date().toISOString();
-  const waitingReason = formatWaitingStateReason("waiting_on_information", unableNote);
+  const waitingReason = formatServiceFieldFollowUpReason("Other", unableNote);
   const hadActiveWaitingState = Boolean(
     getActiveWaitingState({
       ops_status: beforeJob.ops_status ?? null,
@@ -2441,19 +2497,13 @@ export async function markJobUnableToCompleteFromForm(formData: FormData): Promi
     }),
   );
 
-  const { error: updateErr } = await supabase
-    .from("jobs")
-    .update({
-      status: "completed",
-      field_complete: true,
-      field_complete_at: completedAt,
-      ops_status: "pending_info",
-      pending_info_reason: waitingReason,
-      on_hold_reason: null,
-    })
-    .eq("id", jobId);
-
-  if (updateErr) throw new Error(updateErr.message);
+  await persistServiceFieldFollowUpCompletion({
+    supabase,
+    jobId,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+    completedAt,
+    pendingInfoReason: waitingReason,
+  });
 
   let assignmentId: string | null = null;
   if (actingUserId) {
@@ -2499,7 +2549,7 @@ export async function markJobUnableToCompleteFromForm(formData: FormData): Promi
       source: "field_outcome_panel",
       source_action: "markJobUnableToCompleteFromForm",
       blocker_action: hadActiveWaitingState ? "updated" : "set",
-      blocker_type: "waiting_on_information",
+      blocker_type: "other",
       blocker_reason: unableNote,
       reason: unableNote,
       previous: {
@@ -2534,6 +2584,13 @@ export async function markJobUnableToCompleteFromForm(formData: FormData): Promi
   });
 
   if (opsEventErr) throw new Error(opsEventErr.message);
+
+  await reconcileHeldServiceFollowUpCaseBestEffort({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+    serviceCaseId: beforeJob.service_case_id ?? null,
+    jobId,
+  });
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);

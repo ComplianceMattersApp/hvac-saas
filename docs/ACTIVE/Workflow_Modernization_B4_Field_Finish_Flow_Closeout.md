@@ -135,6 +135,20 @@ Deferred after B4 closeout:
 - field payment and office verification
 - performance triage for job detail load/status advance if it reproduces outside test-server conditions
 
+## 10A. Service Field Follow-Up Slice 1A Model Lock
+
+Slice 1A narrows the service-side `Can't finish today?` flow. The field-facing reasons are:
+- Materials Needed
+- Approval Needed
+- Other
+
+All three reasons require a free-form note. Submitting any of these outcomes completes today's field visit (`status = completed`, `field_complete = true`, `field_complete_at = now`) and keeps the unresolved issue visible to Ops/follow-up with `ops_status = pending_info`, `on_hold_reason = null`, and front-facing reason text:
+- `Materials Needed: [reason]`
+- `Approval Needed: [reason]`
+- `Other: [reason]`
+
+The service case/history remains open when the job is linked to an active service case. Continuation happens through a future linked return job, not by resuming the same historical visit. Billing, no-charge, invoice, payment, ECC, portal, and schema truth are separate and unchanged by this slice.
+
 ## 11. Future Recommended Next Lanes
 
 Recommended follow-on lanes:

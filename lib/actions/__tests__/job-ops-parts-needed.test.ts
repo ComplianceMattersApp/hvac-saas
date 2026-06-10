@@ -5,6 +5,7 @@ const requireInternalUserMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const reconcileServiceCaseStatusAfterJobChangeMock = vi.fn(async (_args: unknown) => undefined);
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -86,7 +87,8 @@ vi.mock("@/lib/actions/external-billing-completion", () => ({
 }));
 
 vi.mock("@/lib/actions/service-case-reconciliation", () => ({
-  reconcileServiceCaseStatusAfterJobChange: vi.fn(async () => undefined),
+  reconcileServiceCaseStatusAfterJobChange: (args: unknown) =>
+    reconcileServiceCaseStatusAfterJobChangeMock(args),
 }));
 
 vi.mock("@/lib/portal/resolveContractorIssues", () => ({
@@ -106,6 +108,7 @@ type PartsNeededJob = {
   pending_info_reason: string | null;
   on_hold_reason: string | null;
   next_action_note?: string | null;
+  service_case_id?: string | null;
 };
 
 function buildPartsNeededFormData(note: string) {
@@ -147,6 +150,7 @@ function buildDifferentIssueFoundFormData(note: string) {
 function makeSupabaseForPartsNeeded(beforeJob: PartsNeededJob) {
   const jobUpdates: Record<string, unknown>[] = [];
   const jobEvents: Record<string, unknown>[] = [];
+  const jobUpdateEqFilters: Array<[string, unknown]> = [];
 
   const supabase = {
     auth: {
@@ -163,9 +167,21 @@ function makeSupabaseForPartsNeeded(beforeJob: PartsNeededJob) {
           single: vi.fn(async () => ({ data: beforeJob, error: null })),
           update: vi.fn((payload: Record<string, unknown>) => {
             jobUpdates.push(payload);
-            return {
-              eq: vi.fn(async () => ({ error: null })),
+            const updateQuery: any = {
+              eq: vi.fn((column: string, value: unknown) => {
+                jobUpdateEqFilters.push([column, value]);
+                return updateQuery;
+              }),
+              select: vi.fn(() => updateQuery),
+              single: vi.fn(async () => ({
+                data: {
+                  ...beforeJob,
+                  ...payload,
+                },
+                error: null,
+              })),
             };
+            return updateQuery;
           }),
         };
         return query;
@@ -193,7 +209,7 @@ function makeSupabaseForPartsNeeded(beforeJob: PartsNeededJob) {
     },
   };
 
-  return { supabase, jobUpdates, jobEvents };
+  return { supabase, jobUpdates, jobUpdateEqFilters, jobEvents };
 }
 
 describe("markJobPartsNeededFromForm", () => {
@@ -217,8 +233,8 @@ describe("markJobPartsNeededFromForm", () => {
     });
   });
 
-  it("marks in-process visit complete and routes parts-needed to waiting_on_part", async () => {
-    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+  it("marks in-process visit complete and routes materials-needed to held follow-up", async () => {
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
       id: "job-1",
       status: "in_process",
       ops_status: "scheduled",
@@ -226,6 +242,7 @@ describe("markJobPartsNeededFromForm", () => {
       field_complete_at: null,
       pending_info_reason: null,
       on_hold_reason: null,
+      service_case_id: "case-1",
     });
     createClientMock.mockResolvedValue(supabase);
 
@@ -241,10 +258,14 @@ describe("markJobPartsNeededFromForm", () => {
         status: "completed",
         field_complete: true,
         ops_status: "pending_info",
-        pending_info_reason: "Waiting on part: Need condenser fan motor",
+        pending_info_reason: "Materials Needed: Need condenser fan motor",
         on_hold_reason: null,
       }),
     );
+    expect(jobUpdateEqFilters).toEqual([
+      ["id", "job-1"],
+      ["account_owner_user_id", "owner-1"],
+    ]);
 
     expect(jobEvents).toHaveLength(2);
     expect(jobEvents[0]).toEqual(
@@ -259,26 +280,33 @@ describe("markJobPartsNeededFromForm", () => {
         user_id: "internal-user-1",
         meta: expect.objectContaining({
           event_family: "ops_blocker",
-          blocker_type: "waiting_on_part",
+          blocker_type: "materials_needed",
           blocker_reason: "Need condenser fan motor",
           source_action: "markJobPartsNeededFromForm",
           next: expect.objectContaining({
             ops_status: "pending_info",
-            pending_info_reason: "Waiting on part: Need condenser fan motor",
+            pending_info_reason: "Materials Needed: Need condenser fan motor",
           }),
         }),
+      }),
+    );
+    expect(reconcileServiceCaseStatusAfterJobChangeMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        serviceCaseId: "case-1",
+        triggerJobId: "job-1",
+        source: "field_held_follow_up",
       }),
     );
   });
 
   it("rejects parts-needed transition when job is already field complete", async () => {
-    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
       id: "job-1",
       status: "in_process",
       ops_status: "pending_info",
       field_complete: true,
       field_complete_at: "2026-06-04T01:02:03.000Z",
-      pending_info_reason: "Waiting on part: Existing blocker",
+      pending_info_reason: "Materials Needed: Existing blocker",
       on_hold_reason: null,
     });
     createClientMock.mockResolvedValue(supabase);
@@ -294,7 +322,7 @@ describe("markJobPartsNeededFromForm", () => {
   });
 
   it("rejects parts-needed transition when job is not in_process", async () => {
-    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
       id: "job-1",
       status: "open",
       ops_status: "scheduled",
@@ -316,7 +344,7 @@ describe("markJobPartsNeededFromForm", () => {
   });
 
   it("requires a short parts note", async () => {
-    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
       id: "job-1",
       status: "in_process",
       ops_status: "scheduled",
@@ -359,8 +387,8 @@ describe("markJobApprovalNeededFromForm", () => {
     });
   });
 
-  it("marks in-process visit complete and routes approval-needed to waiting_on_customer_approval", async () => {
-    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+  it("marks in-process visit complete and routes approval-needed to held follow-up", async () => {
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
       id: "job-1",
       status: "in_process",
       ops_status: "scheduled",
@@ -385,10 +413,14 @@ describe("markJobApprovalNeededFromForm", () => {
         status: "completed",
         field_complete: true,
         ops_status: "pending_info",
-        pending_info_reason: "Waiting on customer approval: Customer approval required before proceeding",
+        pending_info_reason: "Approval Needed: Customer approval required before proceeding",
         on_hold_reason: null,
       }),
     );
+    expect(jobUpdateEqFilters).toEqual([
+      ["id", "job-1"],
+      ["account_owner_user_id", "owner-1"],
+    ]);
 
     expect(jobEvents).toHaveLength(2);
     expect(jobEvents[0]).toEqual(
@@ -403,12 +435,12 @@ describe("markJobApprovalNeededFromForm", () => {
         user_id: "internal-user-1",
         meta: expect.objectContaining({
           event_family: "ops_blocker",
-          blocker_type: "waiting_on_customer_approval",
+          blocker_type: "approval_needed",
           blocker_reason: "Customer approval required before proceeding",
           source_action: "markJobApprovalNeededFromForm",
           next: expect.objectContaining({
             ops_status: "pending_info",
-            pending_info_reason: "Waiting on customer approval: Customer approval required before proceeding",
+            pending_info_reason: "Approval Needed: Customer approval required before proceeding",
           }),
         }),
       }),
@@ -416,13 +448,13 @@ describe("markJobApprovalNeededFromForm", () => {
   });
 
   it("rejects approval-needed transition when job is already field complete", async () => {
-    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
       id: "job-1",
       status: "in_process",
       ops_status: "pending_info",
       field_complete: true,
       field_complete_at: "2026-06-04T01:02:03.000Z",
-      pending_info_reason: "Waiting on customer approval: Existing blocker",
+      pending_info_reason: "Approval Needed: Existing blocker",
       on_hold_reason: null,
     });
     createClientMock.mockResolvedValue(supabase);
@@ -438,7 +470,7 @@ describe("markJobApprovalNeededFromForm", () => {
   });
 
   it("rejects approval-needed transition when job is not in_process", async () => {
-    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
       id: "job-1",
       status: "open",
       ops_status: "scheduled",
@@ -460,7 +492,7 @@ describe("markJobApprovalNeededFromForm", () => {
   });
 
   it("requires a short approval note", async () => {
-    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
       id: "job-1",
       status: "in_process",
       ops_status: "scheduled",
@@ -503,8 +535,8 @@ describe("markJobUnableToCompleteFromForm", () => {
     });
   });
 
-  it("marks in-process visit complete and routes unable-to-complete to waiting_on_information", async () => {
-    const { supabase, jobUpdates, jobEvents } = makeSupabaseForPartsNeeded({
+  it("marks in-process visit complete and routes other reason to held follow-up", async () => {
+    const { supabase, jobUpdates, jobUpdateEqFilters, jobEvents } = makeSupabaseForPartsNeeded({
       id: "job-1",
       status: "in_process",
       ops_status: "scheduled",
@@ -529,10 +561,14 @@ describe("markJobUnableToCompleteFromForm", () => {
         status: "completed",
         field_complete: true,
         ops_status: "pending_info",
-        pending_info_reason: "Waiting on information: Customer not home and no access to equipment room",
+        pending_info_reason: "Other: Customer not home and no access to equipment room",
         on_hold_reason: null,
       }),
     );
+    expect(jobUpdateEqFilters).toEqual([
+      ["id", "job-1"],
+      ["account_owner_user_id", "owner-1"],
+    ]);
 
     expect(jobEvents).toHaveLength(2);
     expect(jobEvents[0]).toEqual(
@@ -547,12 +583,12 @@ describe("markJobUnableToCompleteFromForm", () => {
         user_id: "internal-user-1",
         meta: expect.objectContaining({
           event_family: "ops_blocker",
-          blocker_type: "waiting_on_information",
+          blocker_type: "other",
           blocker_reason: "Customer not home and no access to equipment room",
           source_action: "markJobUnableToCompleteFromForm",
           next: expect.objectContaining({
             ops_status: "pending_info",
-            pending_info_reason: "Waiting on information: Customer not home and no access to equipment room",
+            pending_info_reason: "Other: Customer not home and no access to equipment room",
           }),
         }),
       }),
@@ -566,7 +602,7 @@ describe("markJobUnableToCompleteFromForm", () => {
       ops_status: "pending_info",
       field_complete: true,
       field_complete_at: "2026-06-04T01:02:03.000Z",
-      pending_info_reason: "Waiting on information: Existing blocker",
+      pending_info_reason: "Other: Existing blocker",
       on_hold_reason: null,
     });
     createClientMock.mockResolvedValue(supabase);

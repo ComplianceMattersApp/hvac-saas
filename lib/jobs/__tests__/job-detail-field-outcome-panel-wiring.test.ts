@@ -85,9 +85,12 @@ describe("job detail field outcome panel wiring", () => {
     expect(exceptionPickerSource).toContain("Choose reason -&gt;");
     expect(exceptionPickerSource).toContain("w-full items-center justify-between");
     expect(exceptionPickerSource).toContain("What is blocking completion?");
-    expect(exceptionPickerSource).toContain("Need Parts");
-    expect(exceptionPickerSource).toContain("Need Approval");
-    expect(exceptionPickerSource).toContain("Unable to Complete");
+    expect(exceptionPickerSource).toContain("Materials Needed");
+    expect(exceptionPickerSource).toContain("Approval Needed");
+    expect(exceptionPickerSource).toContain("Other");
+    expect(exceptionPickerSource).not.toContain("Need Parts");
+    expect(exceptionPickerSource).not.toContain("Need Approval");
+    expect(exceptionPickerSource).not.toContain("Unable to Complete");
     expect(exceptionPickerSource).toContain("Back");
     expect(exceptionPickerSource).toContain("Cancel");
   });
@@ -111,28 +114,35 @@ describe("job detail field outcome panel wiring", () => {
     expect(exceptionPickerSource).toContain("name=\"unable_note\"");
     expect(panelSource).toContain("markJobDifferentIssueFoundFromForm");
     expect(panelSource).toContain("differentIssueFoundAction={markJobDifferentIssueFoundFromForm}");
-    expect(exceptionPickerSource).toContain("form action={props.differentIssueFoundAction}");
-    expect(exceptionPickerSource).toContain("name=\"different_issue_note\"");
-    expect(exceptionPickerSource).toContain("Send this visit to office/dispatch as Waiting on Part.");
-    expect(exceptionPickerSource).toContain("Send this visit to office/dispatch as Approval Needed.");
-    expect(exceptionPickerSource).toContain("Send this visit to office/dispatch for review.");
-    expect(exceptionPickerSource).toContain("placeholder=\"What part or issue is needed?\"");
+    expect(exceptionPickerSource).not.toContain("form action={props.differentIssueFoundAction}");
+    expect(exceptionPickerSource).not.toContain("name=\"different_issue_note\"");
+    expect(exceptionPickerSource).toContain("Complete today&apos;s visit and hold follow-up for materials.");
+    expect(exceptionPickerSource).toContain("Complete today&apos;s visit and hold follow-up for approval.");
+    expect(exceptionPickerSource).toContain("Complete today&apos;s visit and hold follow-up for office review.");
+    expect(exceptionPickerSource).toContain("placeholder=\"What materials are needed?\"");
     expect(exceptionPickerSource).toContain("placeholder=\"Example: customer approval for repair, owner approval for added work\"");
-    expect(exceptionPickerSource).toContain("placeholder=\"Example: customer not home, no access, unsafe condition, missing information\"");
-    expect(exceptionPickerSource).toContain("placeholder=\"Example: original issue resolved, but separate airflow issue found in upstairs zone\"");
-    expect(exceptionPickerSource).toContain("Submit Parts Needed");
-    expect(exceptionPickerSource).toContain("Submit Approval Needed");
-    expect(exceptionPickerSource).toContain("Submit Unable to Complete");
-    expect(exceptionPickerSource).toContain("Submit Different Issue Found");
+    expect(exceptionPickerSource).toContain("placeholder=\"Why does office or dispatch need to follow up?\"");
+    expect(exceptionPickerSource).toContain("Complete Visit & Hold for Follow-Up");
+    expect(exceptionPickerSource).not.toContain("Submit Parts Needed");
+    expect(exceptionPickerSource).not.toContain("Submit Approval Needed");
+    expect(exceptionPickerSource).not.toContain("Submit Unable to Complete");
+    expect(exceptionPickerSource).not.toContain("Submit Different Issue Found");
   });
 
-  it("gates Different Issue Found to callback/revisit-only rendering", () => {
+  it("keeps Different Issue Found out of the first service field follow-up picker", () => {
     expect(panelSource).not.toContain("route.code === \"work_completed\"");
     expect(panelSource).not.toContain('type="button"');
     expect(panelSource).not.toContain("Only Work Completed is wired in this slice. Other outcomes remain unwired until future slices.");
-    expect(exceptionPickerSource).toContain("props.showDifferentIssueFoundOutcome ? (");
-    expect(exceptionPickerSource).toContain("Callback/revisit-only: send this visit to office review without creating a new visit.");
+    expect(exceptionPickerSource).not.toContain("props.showDifferentIssueFoundOutcome ? (");
+    expect(exceptionPickerSource).not.toContain("Callback/revisit-only: send this visit to office review without creating a new visit.");
+    expect(exceptionPickerSource).not.toContain("Different Issue Found");
     expect(panelSource).not.toContain("return_needed");
+  });
+
+  it("suppresses same-visit resume controls for completed service follow-up holds", () => {
+    expect(jobDetailSource).toContain("const isServiceFieldFollowUpPendingInfo =");
+    expect(jobDetailSource).toContain("/^(Materials Needed|Approval Needed|Other):/i.test(pendingInfoReasonText)");
+    expect(jobDetailSource).toContain("const canShowReleaseAndReevaluate = !isServiceFieldFollowUpPendingInfo && [");
   });
 
   it("removes the standalone exception card and ECC guardrail copy", () => {

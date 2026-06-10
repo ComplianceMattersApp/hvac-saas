@@ -2785,17 +2785,22 @@ const showSeparateFieldBillingDetails =
     fieldBillingSupplementalInvoiceSnapshots.length > 0
   );
 
-const canShowReleaseAndReevaluate = [
+const currentOpsStatus = String(job.ops_status ?? "").toLowerCase();
+const pendingInfoReasonText = String((job as any).pending_info_reason ?? "").trim();
+const isServiceFieldFollowUpPendingInfo =
+  String(job.job_type ?? "").trim().toLowerCase() === "service" &&
+  isFieldComplete &&
+  currentOpsStatus === "pending_info" &&
+  /^(Materials Needed|Approval Needed|Other):/i.test(pendingInfoReasonText);
+const canShowReleaseAndReevaluate = !isServiceFieldFollowUpPendingInfo && [
   "pending_info",
   "on_hold",
   "failed",
   "retest_needed",
   "paperwork_required",
   "invoice_required",
-].includes(String(job.ops_status ?? "").toLowerCase());
+].includes(currentOpsStatus);
 
-const currentOpsStatus = String(job.ops_status ?? "").toLowerCase();
-const pendingInfoReasonText = String((job as any).pending_info_reason ?? "").trim();
 const onHoldReasonText = String((job as any).on_hold_reason ?? "").trim();
 const explicitPendingInfoActive = currentOpsStatus === "pending_info";
 const onHoldActive = currentOpsStatus === "on_hold";

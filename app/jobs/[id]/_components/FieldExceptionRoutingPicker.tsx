@@ -4,7 +4,7 @@ import { useState } from "react";
 
 import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 
-type ExceptionReason = "parts" | "approval" | "unable" | "different";
+type ExceptionReason = "parts" | "approval" | "unable";
 type ServerFormAction = (formData: FormData) => void | Promise<void>;
 
 type FieldExceptionRoutingPickerProps = {
@@ -70,19 +70,14 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
               </div>
               <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 <button type="button" onClick={() => setSelectedReason("parts")} className={choiceButtonClass}>
-                  Need Parts
+                  Materials Needed
                 </button>
                 <button type="button" onClick={() => setSelectedReason("approval")} className={choiceButtonClass}>
-                  Need Approval
+                  Approval Needed
                 </button>
                 <button type="button" onClick={() => setSelectedReason("unable")} className={choiceButtonClass}>
-                  Unable to Complete
+                  Other
                 </button>
-                {props.showDifferentIssueFoundOutcome ? (
-                  <button type="button" onClick={() => setSelectedReason("different")} className={choiceButtonClass}>
-                    Different Issue Found
-                  </button>
-                ) : null}
               </div>
               <button type="button" onClick={closePanel} className={`${secondaryButtonClass} mt-3`}>
                 Cancel
@@ -94,8 +89,8 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
             <form action={props.partsNeededAction} className="space-y-3">
               {commonInputs}
               <div>
-                <p className="text-sm font-semibold text-amber-950">Need Parts</p>
-                <p className="mt-1 text-xs leading-5 text-amber-900/90">Send this visit to office/dispatch as Waiting on Part.</p>
+                <p className="text-sm font-semibold text-amber-950">Materials Needed</p>
+                <p className="mt-1 text-xs leading-5 text-amber-900/90">Complete today&apos;s visit and hold follow-up for materials.</p>
               </div>
               <textarea
                 id={`parts-note-${props.jobId}`}
@@ -104,11 +99,11 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
                 rows={3}
                 maxLength={280}
                 className="w-full rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-amber-200"
-                placeholder="What part or issue is needed?"
+                placeholder="What materials are needed?"
               />
               <div className="flex flex-col gap-2 sm:flex-row">
                 <ImmediateSubmitButton pendingText="Saving..." className={submitButtonClass}>
-                  Submit Parts Needed
+                  Complete Visit & Hold for Follow-Up
                 </ImmediateSubmitButton>
                 <button type="button" onClick={() => setSelectedReason(null)} className={secondaryButtonClass}>
                   Back
@@ -124,8 +119,8 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
             <form action={props.approvalNeededAction} className="space-y-3">
               {commonInputs}
               <div>
-                <p className="text-sm font-semibold text-amber-950">Need Approval</p>
-                <p className="mt-1 text-xs leading-5 text-amber-900/90">Send this visit to office/dispatch as Approval Needed.</p>
+                <p className="text-sm font-semibold text-amber-950">Approval Needed</p>
+                <p className="mt-1 text-xs leading-5 text-amber-900/90">Complete today&apos;s visit and hold follow-up for approval.</p>
               </div>
               <textarea
                 id={`approval-note-${props.jobId}`}
@@ -138,7 +133,7 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
               />
               <div className="flex flex-col gap-2 sm:flex-row">
                 <ImmediateSubmitButton pendingText="Saving..." className={submitButtonClass}>
-                  Submit Approval Needed
+                  Complete Visit & Hold for Follow-Up
                 </ImmediateSubmitButton>
                 <button type="button" onClick={() => setSelectedReason(null)} className={secondaryButtonClass}>
                   Back
@@ -154,8 +149,8 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
             <form action={props.unableToCompleteAction} className="space-y-3">
               {commonInputs}
               <div>
-                <p className="text-sm font-semibold text-amber-950">Unable to Complete</p>
-                <p className="mt-1 text-xs leading-5 text-amber-900/90">Send this visit to office/dispatch for review.</p>
+                <p className="text-sm font-semibold text-amber-950">Other</p>
+                <p className="mt-1 text-xs leading-5 text-amber-900/90">Complete today&apos;s visit and hold follow-up for office review.</p>
               </div>
               <textarea
                 id={`unable-note-${props.jobId}`}
@@ -164,11 +159,11 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
                 rows={3}
                 maxLength={280}
                 className="w-full rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-amber-200"
-                placeholder="Example: customer not home, no access, unsafe condition, missing information"
+                placeholder="Why does office or dispatch need to follow up?"
               />
               <div className="flex flex-col gap-2 sm:flex-row">
                 <ImmediateSubmitButton pendingText="Saving..." className={submitButtonClass}>
-                  Submit Unable to Complete
+                  Complete Visit & Hold for Follow-Up
                 </ImmediateSubmitButton>
                 <button type="button" onClick={() => setSelectedReason(null)} className={secondaryButtonClass}>
                   Back
@@ -180,37 +175,6 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
             </form>
           ) : null}
 
-          {selectedReason === "different" && props.showDifferentIssueFoundOutcome ? (
-            <form action={props.differentIssueFoundAction} className="space-y-3">
-              {commonInputs}
-              <div>
-                <p className="text-sm font-semibold text-amber-950">Different Issue Found</p>
-                <p className="mt-1 text-xs leading-5 text-amber-900/90">
-                  Callback/revisit-only: send this visit to office review without creating a new visit.
-                </p>
-              </div>
-              <textarea
-                id={`different-issue-note-${props.jobId}`}
-                name="different_issue_note"
-                required
-                rows={3}
-                maxLength={280}
-                className="w-full rounded-lg border border-amber-200 bg-white px-2.5 py-2 text-sm text-slate-900 shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-amber-200"
-                placeholder="Example: original issue resolved, but separate airflow issue found in upstairs zone"
-              />
-              <div className="flex flex-col gap-2 sm:flex-row">
-                <ImmediateSubmitButton pendingText="Saving..." className={submitButtonClass}>
-                  Submit Different Issue Found
-                </ImmediateSubmitButton>
-                <button type="button" onClick={() => setSelectedReason(null)} className={secondaryButtonClass}>
-                  Back
-                </button>
-                <button type="button" onClick={closePanel} className={secondaryButtonClass}>
-                  Cancel
-                </button>
-              </div>
-            </form>
-          ) : null}
         </div>
       )}
     </div>

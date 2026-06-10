@@ -28,10 +28,10 @@ describe("field outcome routing contract", () => {
 
     expect(labels).toEqual({
       work_completed: "Work Completed",
-      parts_needed: "Parts Needed",
+      parts_needed: "Materials Needed",
       approval_needed: "Approval Needed",
       access_issue: "Access Issue",
-      unable_to_complete: "Unable to Complete",
+      unable_to_complete: "Other",
       return_needed: "Return Needed",
       different_issue_found: "Different Issue Found",
     });
@@ -83,6 +83,12 @@ describe("field outcome routing contract", () => {
     expect(defaultCodes).not.toContain("access_issue");
     expect(defaultCodes).not.toContain("return_needed");
     expect(defaultCodes).not.toContain("different_issue_found");
+  });
+
+  it("requires a note for all service field follow-up outcomes", () => {
+    expect(getFieldOutcomeRoute("parts_needed")?.requiresShortReason).toBe(true);
+    expect(getFieldOutcomeRoute("approval_needed")?.requiresShortReason).toBe(true);
+    expect(getFieldOutcomeRoute("unable_to_complete")?.requiresShortReason).toBe(true);
   });
 
   it("marks access issue and return needed as non-default closeout options", () => {
