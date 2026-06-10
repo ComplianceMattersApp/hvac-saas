@@ -39,6 +39,7 @@ export type FocusedQueueJob = {
   field_complete?: boolean | null;
   service_follow_up_progress?: string | null;
   service_follow_up_progress_label?: string | null;
+  service_follow_up_continued?: boolean | null;
 };
 
 type AssignmentDisplayInput = WithoutTechAssignmentInput & {
@@ -82,6 +83,7 @@ export function buildWaitingQueueRows(jobs: FocusedQueueJob[]): FocusedQueueJob[
   return (Array.isArray(jobs) ? jobs : [])
     .filter((job) => {
       if (!String(job?.id ?? "").trim()) return false;
+      if (job?.service_follow_up_continued) return false;
       return isWaitingQueueStatus(job?.ops_status);
     })
     .sort(compareByCreatedAtOldest);

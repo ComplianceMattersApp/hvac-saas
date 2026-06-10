@@ -493,13 +493,18 @@ function subtractBusinessDays(date: Date, days: number) {
   let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
   let latestFailedRunByJob = new Map<string, any>();
   let serviceFollowUpProgressLabelByJob = new Map<string, string>();
+  let continuedServiceFollowUpParentIds = new Set<string>();
 
   function withServiceFollowUpProgress(job: any) {
     const jobId = String(job?.id ?? "").trim();
     const progressLabel = jobId ? serviceFollowUpProgressLabelByJob.get(jobId) ?? null : null;
-    return progressLabel
-      ? { ...job, service_follow_up_progress_label: progressLabel }
-      : job;
+    const continued = jobId ? continuedServiceFollowUpParentIds.has(jobId) : false;
+    if (!progressLabel && !continued) return job;
+    return {
+      ...job,
+      service_follow_up_progress_label: progressLabel,
+      service_follow_up_continued: continued,
+    };
   }
 
   function workspaceAgeLabel(job: any) {
@@ -2075,14 +2080,17 @@ for (const ev of pendingInfoTransitionEvents ?? []) {
 }
 
 serviceFollowUpProgressLabelByJob = new Map<string, string>();
+continuedServiceFollowUpParentIds = new Set<string>();
 for (const job of uniqueAllOpenOpsJobs) {
   const jobId = String((job as any)?.id ?? "").trim();
   if (!jobId) continue;
-  const progressLabel = buildServiceFollowUpProgressState({
+  const followUpState = buildServiceFollowUpProgressState({
     pendingInfoReason: (job as any)?.pending_info_reason ?? null,
     events: serviceFollowUpEventsByJob.get(jobId) ?? [],
-  }).progressLabel;
+  });
+  const progressLabel = followUpState.progressLabel;
   if (progressLabel) serviceFollowUpProgressLabelByJob.set(jobId, progressLabel);
+  if (followUpState.continuedThroughChildJobId) continuedServiceFollowUpParentIds.add(jobId);
 }
 
 function assignmentSummaryForJob(jobId: string) {
@@ -2209,6 +2217,9 @@ const contractorUpdatesCount = unreadContractorAwarenessNotifications.length;
 const newWorkRequestCount = unreadNewWorkRequestAwarenessNotifications.length;
 
 let signalFilteredBucketJobs = [...(filteredBucketJobs ?? [])];
+signalFilteredBucketJobs = signalFilteredBucketJobs.filter(
+  (j: any) => !continuedServiceFollowUpParentIds.has(String(j?.id ?? "").trim()),
+);
 
 if (signal === "retest_ready") {
   signalFilteredBucketJobs = signalFilteredBucketJobs.filter((j: any) => {
@@ -3224,6 +3235,8 @@ const withoutTechPreviewJobs = (scheduledWithoutTechSnapshot.preview ?? [])
 
 const waitingPreviewJobs = prioritizeActionableJobs(
   uniqueAllOpenOpsJobs.filter((job: any) => {
+    const jobId = String(job?.id ?? "").trim();
+    if (continuedServiceFollowUpParentIds.has(jobId)) return false;
     const waitingState = getActiveWaitingState({
       ops_status: job?.ops_status ?? null,
       pending_info_reason: job?.pending_info_reason ?? null,

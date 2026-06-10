@@ -31,7 +31,8 @@ describe("return visit action wiring", () => {
     const actionBlock = extractCreateNextVisitActionBlock();
 
     expect(actionBlock).toContain('const visitIntentRaw = String(formData.get("visit_intent") || "").trim().toLowerCase();');
-    expect(actionBlock).toContain('const isExplicitReturnVisitIntent = visitIntentRaw === "return_visit";');
+    expect(actionBlock).toContain('const isAddToSchedulingQueueBridge =');
+    expect(actionBlock).toContain('const isExplicitReturnVisitIntent = visitIntentRaw === "return_visit" || isAddToSchedulingQueueBridge;');
     expect(actionBlock).toContain('const childVisitType = isExplicitReturnVisitIntent');
     expect(actionBlock).toContain('? "return_visit"');
     expect(actionBlock).toContain('normalizeServiceVisitType(String(sourceJob.service_visit_type ?? "").trim()) ?? "return_visit";');
@@ -41,6 +42,7 @@ describe("return visit action wiring", () => {
     const actionBlock = extractCreateNextVisitActionBlock();
 
     expect(actionBlock).toContain('service_case_id: serviceCaseId');
+    expect(actionBlock).toContain('parent_job_id: sourceJobId');
     expect(actionBlock).toContain('scheduled_date: null');
     expect(actionBlock).toContain('status: "open"');
     expect(actionBlock).toContain('ops_status: "need_to_schedule"');
@@ -52,10 +54,13 @@ describe("return visit action wiring", () => {
 
     expect(actionBlock).toContain('event_type: "service_next_visit_created"');
     expect(actionBlock).toContain('event_type: "created_from_service_visit"');
+    expect(actionBlock).toContain('follow_up_bridge_action: "add_to_scheduling_queue"');
+    expect(actionBlock).toContain("continued_through_child_job_id: created.id");
     expect(actionBlock).toContain('visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit"');
     expect(actionBlock).toContain("child_service_visit_type: childVisitType");
     expect(actionBlock).toContain("Follow-up continued through linked return visit");
     expect(actionBlock).not.toContain("Waiting state resumed through next service visit");
+    expect(actionBlock).not.toContain("resumed_through_child_job_id");
   });
 
   it("does not add callback creation wiring in return-visit action surfaces", () => {
@@ -70,13 +75,17 @@ describe("return visit action wiring", () => {
 describe("office return visit entry points", () => {
   it("uses explicit office-facing return visit copy on job detail", () => {
     expect(jobPageSource).toContain("Create Return Visit");
+    expect(jobPageSource).toContain("serviceFollowUpProgressState.bridgeActionLabel");
+    expect(jobPageSource).toContain('name="return_creation_mode" value="needs_scheduling"');
+    expect(jobPageSource).toContain('name="follow_up_bridge_action" value="add_to_scheduling_queue"');
     expect(jobPageSource).toContain("Use when the original job is not finished yet and another visit is needed to complete it.");
     expect(jobPageSource).toContain("Examples: waiting on a part, customer approval, or more time needed to complete the same job.");
     expect(jobPageSource).toContain('id="next-service-action"');
   });
 
   it("adds optional waiting deep-link into the job detail return-visit section", () => {
-    expect(waitingQueuePageSource).toContain("Create Return Visit");
+    expect(waitingQueuePageSource).toContain('followUpProgress.bridgeActionLabel ?? "Create Return Visit"');
+    expect(waitingQueuePageSource).toContain("followUpProgress.bridgeActionLabel");
     expect(waitingQueuePageSource).toContain("#next-service-action");
   });
 });

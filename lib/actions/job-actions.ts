@@ -97,6 +97,7 @@ import {
   sanitizeVisitScopeSummary,
   type VisitScopeItem,
 } from "@/lib/jobs/visit-scope";
+import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
 import { listScopedContractorsForJobDetail } from "@/lib/actions/internal-job-detail-read-boundary";
 import { getActiveWaitingState } from "@/lib/utils/ops-status";
 
@@ -3245,7 +3246,12 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
   const tabRaw = String(formData.get("tab") || "").trim();
   const returnToRaw = String(formData.get("return_to") || "").trim();
   const visitIntentRaw = String(formData.get("visit_intent") || "").trim().toLowerCase();
-  const nextVisitReasonRaw = String(formData.get("next_visit_reason") || "").trim();
+  const bridgeModeRaw = String(formData.get("return_creation_mode") || "").trim().toLowerCase();
+  const bridgeActionRaw = String(formData.get("follow_up_bridge_action") || "").trim().toLowerCase();
+  const isAddToSchedulingQueueBridge =
+    bridgeModeRaw === "needs_scheduling" ||
+    bridgeActionRaw === "add_to_scheduling_queue";
+  let nextVisitReasonRaw = String(formData.get("next_visit_reason") || "").trim();
 
   if (!sourceJobId) throw new Error("Missing job_id");
 
@@ -3262,19 +3268,10 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
-  if (!nextVisitReasonRaw) {
-    redirectToJobWithBanner({
-      jobId: sourceJobId,
-      banner: "next_service_visit_reason_required",
-      tabRaw,
-      returnToRaw,
-    });
-  }
-
   const { data: sourceJob, error: sourceJobErr } = await supabase
     .from("jobs")
     .select(
-      "id, job_type, title, customer_id, location_id, contractor_id, customer_first_name, customer_last_name, customer_email, customer_phone, job_address, city, service_case_id, service_visit_type, ops_status, pending_info_reason, on_hold_reason, action_required_by, follow_up_date, next_action_note",
+      "id, job_type, status, field_complete, title, customer_id, location_id, contractor_id, customer_first_name, customer_last_name, customer_email, customer_phone, job_address, city, service_case_id, service_visit_type, ops_status, pending_info_reason, on_hold_reason, action_required_by, follow_up_date, next_action_note",
     )
     .eq("id", sourceJobId)
     .maybeSingle();
@@ -3301,6 +3298,49 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     return;
   }
 
+  const { data: followUpProgressEvents, error: followUpProgressEventsErr } = await supabase
+    .from("job_events")
+    .select("created_at, meta")
+    .eq("job_id", sourceJobId)
+    .eq("event_type", "ops_update")
+    .order("created_at", { ascending: true });
+
+  if (followUpProgressEventsErr) throw followUpProgressEventsErr;
+
+  const serviceFollowUpProgressState = buildServiceFollowUpProgressState({
+    pendingInfoReason: (sourceJob as any).pending_info_reason ?? null,
+    events: (followUpProgressEvents ?? []) as Array<{ created_at?: string | null; meta?: unknown }>,
+  });
+
+  if (isAddToSchedulingQueueBridge) {
+    const isCompletedServiceFollowUp =
+      String(sourceJob.status ?? "").trim().toLowerCase() === "completed" &&
+      Boolean((sourceJob as any).field_complete) &&
+      String(sourceJob.ops_status ?? "").trim().toLowerCase() === "pending_info" &&
+      Boolean(serviceFollowUpProgressState.reason);
+
+    if (!isCompletedServiceFollowUp || !serviceFollowUpProgressState.bridgeActionLabel) {
+      redirectToJobWithBanner({
+        jobId: sourceJobId,
+        banner: "next_service_visit_not_ready",
+        tabRaw,
+        returnToRaw,
+      });
+      return;
+    }
+
+    nextVisitReasonRaw = nextVisitReasonRaw || serviceFollowUpProgressState.reason?.display || "";
+  }
+
+  if (!nextVisitReasonRaw) {
+    redirectToJobWithBanner({
+      jobId: sourceJobId,
+      banner: "next_service_visit_reason_required",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
   const customerId = String(sourceJob.customer_id ?? "").trim();
   const locationId = String(sourceJob.location_id ?? "").trim();
 
@@ -3318,7 +3358,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     String(sourceJob.service_case_id ?? "").trim() ||
     (await ensureServiceCaseForJob({ supabase, jobId: sourceJobId }));
 
-  const isExplicitReturnVisitIntent = visitIntentRaw === "return_visit";
+  const isExplicitReturnVisitIntent = visitIntentRaw === "return_visit" || isAddToSchedulingQueueBridge;
 
   const childTitle = isExplicitReturnVisitIntent
     ? `Return Visit: ${nextVisitReasonRaw}`.slice(0, 220)
@@ -3335,6 +3375,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
 
   const created = await createJob(
     {
+      parent_job_id: sourceJobId,
       job_type: "service",
       service_case_id: serviceCaseId,
       service_visit_type: childVisitType,
@@ -3378,13 +3419,21 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     supabase,
     jobId: sourceJobId,
     event_type: "service_next_visit_created",
-    meta: {
-      source_job_id: sourceJobId,
-      child_job_id: created.id,
-      service_case_id: serviceCaseId,
-      next_visit_reason: nextVisitReasonRaw,
-      visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit",
-      child_service_visit_type: childVisitType,
+      meta: {
+        source_job_id: sourceJobId,
+        child_job_id: created.id,
+        service_case_id: serviceCaseId,
+        next_visit_reason: nextVisitReasonRaw,
+        ...(isAddToSchedulingQueueBridge
+          ? {
+              follow_up_bridge_action: "add_to_scheduling_queue",
+              source_follow_up_reason: serviceFollowUpProgressState.reason?.display ?? null,
+              source_follow_up_progress: serviceFollowUpProgressState.progress,
+              source_follow_up_progress_label: serviceFollowUpProgressState.progressLabel,
+            }
+          : {}),
+        visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit",
+        child_service_visit_type: childVisitType,
       ...(activeWaitingState
         ? {
             waiting_state_type: activeWaitingState.blockerType,
@@ -3399,13 +3448,22 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     supabase,
     jobId: created.id,
     event_type: "created_from_service_visit",
-    meta: {
-      source_job_id: sourceJobId,
-      child_job_id: created.id,
-      service_case_id: serviceCaseId,
-      next_visit_reason: nextVisitReasonRaw,
-      visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit",
-      child_service_visit_type: childVisitType,
+      meta: {
+        source_job_id: sourceJobId,
+        child_job_id: created.id,
+        service_case_id: serviceCaseId,
+        next_visit_reason: nextVisitReasonRaw,
+        parent_job_id: sourceJobId,
+        ...(isAddToSchedulingQueueBridge
+          ? {
+              follow_up_bridge_action: "add_to_scheduling_queue",
+              source_follow_up_reason: serviceFollowUpProgressState.reason?.display ?? null,
+              source_follow_up_progress: serviceFollowUpProgressState.progress,
+              source_follow_up_progress_label: serviceFollowUpProgressState.progressLabel,
+            }
+          : {}),
+        visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit",
+        child_service_visit_type: childVisitType,
     },
     userId: actingUserId,
   });
@@ -3418,10 +3476,15 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
       meta: {
         source: "job_detail",
         message: "Follow-up continued through linked return visit",
+        follow_up_bridge_action: isAddToSchedulingQueueBridge ? "add_to_scheduling_queue" : "create_return_visit",
         blocker_action: "updated",
         blocker_type: activeWaitingState.blockerType,
         blocker_reason: activeWaitingState.blockerReason,
-        resumed_through_child_job_id: created.id,
+        continued_through_child_job_id: created.id,
+        service_case_id: serviceCaseId,
+        source_follow_up_reason: serviceFollowUpProgressState.reason?.display ?? null,
+        source_follow_up_progress: serviceFollowUpProgressState.progress,
+        source_follow_up_progress_label: serviceFollowUpProgressState.progressLabel,
         ...(String((sourceJob as any).action_required_by ?? "").trim()
           ? { action_required_by: String((sourceJob as any).action_required_by).trim() }
           : {}),

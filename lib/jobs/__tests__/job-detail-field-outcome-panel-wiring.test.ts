@@ -152,6 +152,9 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("Mark Part Ordered");
     expect(jobDetailSource).toContain("Mark Part Arrived");
     expect(jobDetailSource).toContain("Mark Approval Received");
+    expect(jobDetailSource).toContain("serviceFollowUpProgressState.bridgeActionLabel");
+    expect(jobDetailSource).toContain('name="return_creation_mode" value="needs_scheduling"');
+    expect(jobDetailSource).toContain('name="follow_up_bridge_action" value="add_to_scheduling_queue"');
     expect(jobDetailSource).toContain("serviceFollowUpProgressState.returnPromptLabel");
     expect(jobDetailSource).not.toContain("Ready to resume this service visit?");
   });

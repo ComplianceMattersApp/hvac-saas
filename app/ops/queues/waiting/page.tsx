@@ -39,8 +39,8 @@ export default async function OpsWaitingQueuePage() {
 
   if (error) throw error;
 
-  const rows = buildWaitingQueueRows((data ?? []) as any[]);
-  const rowJobIds = rows.map((job: any) => String(job?.id ?? "").trim()).filter(Boolean);
+  const candidateRows = buildWaitingQueueRows((data ?? []) as any[]);
+  const rowJobIds = candidateRows.map((job: any) => String(job?.id ?? "").trim()).filter(Boolean);
 
   const { data: statusEvents, error: statusEventsError } = rowJobIds.length
     ? await supabase
@@ -67,6 +67,17 @@ export default async function OpsWaitingQueuePage() {
     });
     progressEventsByJob.set(eventJobId, rows);
   }
+  const rows = buildWaitingQueueRows(candidateRows.map((job: any) => {
+    const jobId = String(job?.id ?? "").trim();
+    const followUpState = buildServiceFollowUpProgressState({
+      pendingInfoReason: job?.pending_info_reason ?? null,
+      events: progressEventsByJob.get(jobId) ?? [],
+    });
+    return {
+      ...job,
+      service_follow_up_continued: Boolean(followUpState.continuedThroughChildJobId),
+    };
+  }));
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-6 text-slate-900 sm:px-6 lg:px-8">
@@ -108,11 +119,15 @@ export default async function OpsWaitingQueuePage() {
           {rows.map((job: any) => {
             const jobId = String(job?.id ?? "");
             const waitingDisplay = getWaitingQueueDisplay(job);
-            const nextStep = getWaitingQueueRecommendedNextStep(job);
             const followUpProgress = buildServiceFollowUpProgressState({
               pendingInfoReason: job?.pending_info_reason ?? null,
               events: progressEventsByJob.get(jobId) ?? [],
             });
+            const nextStep =
+              followUpProgress.bridgeActionLabel ??
+              followUpProgress.nextActionLabel ??
+              followUpProgress.returnPromptLabel ??
+              getWaitingQueueRecommendedNextStep(job);
 
             return (
               <li
@@ -148,7 +163,7 @@ export default async function OpsWaitingQueuePage() {
                     </div>
                     <div className="mt-2 text-xs text-slate-600">Reason: {waitingDisplay.reason}</div>
                     <div className="mt-1 text-xs text-slate-500">
-                      Next step: {followUpProgress.nextActionLabel ?? followUpProgress.returnPromptLabel ?? nextStep}
+                      Next step: {nextStep}
                     </div>
                   </div>
 
@@ -163,7 +178,7 @@ export default async function OpsWaitingQueuePage() {
                       href={`/jobs/${jobId}?tab=ops#next-service-action`}
                       className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
                     >
-                      Create Return Visit
+                      {followUpProgress.bridgeActionLabel ?? "Create Return Visit"}
                     </Link>
                   </div>
                 </div>

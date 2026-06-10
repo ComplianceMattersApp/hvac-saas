@@ -63,6 +63,26 @@ describe("focused ops queue filtering", () => {
     expect(rows.map((row) => row.id)).toEqual(["j1", "j2", "j3"]);
   });
 
+  it("suppresses service follow-up parents already continued through a linked child", () => {
+    const rows = buildWaitingQueueRows([
+      {
+        id: "parent-1",
+        ops_status: "pending_info",
+        pending_info_reason: "Materials Needed: Need 45/5 capacitor",
+        service_follow_up_continued: true,
+        created_at: "2026-01-01T00:00:00.000Z",
+      },
+      {
+        id: "parent-2",
+        ops_status: "pending_info",
+        pending_info_reason: "Approval Needed: Waiting on approval",
+        created_at: "2026-01-02T00:00:00.000Z",
+      },
+    ]);
+
+    expect(rows.map((row) => row.id)).toEqual(["parent-2"]);
+  });
+
   it("exceptions queue includes failed/retest/review/problem states", () => {
     const rows = buildExceptionQueueRows([
       { id: "j1", ops_status: "failed", created_at: "2026-01-01T00:00:00.000Z" },

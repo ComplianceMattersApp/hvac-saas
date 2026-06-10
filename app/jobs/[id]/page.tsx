@@ -5231,7 +5231,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {isServiceFieldFollowUpPendingInfo && serviceFollowUpProgressState.reason ? (
           <div
             id="next-service-action"
-            className="hidden w-full rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2.5 text-sm sm:block"
+            className="w-full rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2.5 text-sm"
           >
             <div className="font-semibold text-amber-950">
               {serviceFollowUpProgressState.reason.display}
@@ -5274,6 +5274,20 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   </form>
                 ) : null}
               </div>
+            ) : null}
+            {serviceFollowUpProgressState.bridgeActionLabel ? (
+              <form action={createNextServiceVisitFromForm} className="mt-3 flex flex-wrap gap-2">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="tab" value={tab} />
+                <input type="hidden" name="visit_intent" value="return_visit" />
+                <input type="hidden" name="return_creation_mode" value="needs_scheduling" />
+                <input type="hidden" name="follow_up_bridge_action" value="add_to_scheduling_queue" />
+                <input type="hidden" name="next_visit_reason" value={serviceFollowUpProgressState.reason.display} />
+                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+                <SubmitButton loadingText="Adding..." className={`${darkButtonClass} w-full sm:w-auto`}>
+                  {serviceFollowUpProgressState.bridgeActionLabel}
+                </SubmitButton>
+              </form>
             ) : null}
           </div>
         ) : null}

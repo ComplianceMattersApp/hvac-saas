@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildServiceFollowUpProgressState,
   deriveLatestServiceFollowUpProgress,
+  getServiceFollowUpContinuedChildJobId,
   parseServiceFollowUpReason,
 } from "@/lib/jobs/service-follow-up-progress";
 
@@ -74,8 +75,41 @@ describe("service follow-up progress", () => {
       progress: "approval_received",
       progressLabel: "Approval Received",
       nextActionLabel: null,
+      bridgeActionLabel: "Add to Scheduling Queue",
       returnPromptLabel: "Create a linked return visit when ready",
     });
+  });
+
+  it("enables scheduling queue bridge only for ready structured follow-ups", () => {
+    expect(buildServiceFollowUpProgressState({
+      pendingInfoReason: "Materials Needed: Need 45/5 capacitor",
+      events: [
+        {
+          created_at: "2026-06-10T10:00:00.000Z",
+          meta: { service_follow_up_progress: "part_ordered" },
+        },
+      ],
+    }).bridgeActionLabel).toBeNull();
+
+    expect(buildServiceFollowUpProgressState({
+      pendingInfoReason: "Materials Needed: Need 45/5 capacitor",
+      events: [
+        {
+          created_at: "2026-06-10T11:00:00.000Z",
+          meta: { service_follow_up_progress: "part_arrived" },
+        },
+      ],
+    }).bridgeActionLabel).toBe("Add to Scheduling Queue");
+
+    expect(buildServiceFollowUpProgressState({
+      pendingInfoReason: "Approval Needed: Customer approved",
+      events: [
+        {
+          created_at: "2026-06-10T11:00:00.000Z",
+          meta: { service_follow_up_progress: "approval_received" },
+        },
+      ],
+    }).bridgeActionLabel).toBe("Add to Scheduling Queue");
   });
 
   it("keeps Other broad without adding complex Slice 2A progression", () => {
@@ -86,7 +120,36 @@ describe("service follow-up progress", () => {
       reason: { family: "other" },
       progress: null,
       nextActionLabel: null,
+      bridgeActionLabel: "Add to Scheduling Queue",
       returnPromptLabel: "Review follow-up and create a linked return visit when ready",
+    });
+  });
+
+  it("detects follow-up continuation through linked child return job", () => {
+    const events = [
+      {
+        created_at: "2026-06-10T10:00:00.000Z",
+        meta: {
+          follow_up_bridge_action: "add_to_scheduling_queue",
+          continued_through_child_job_id: "child-1",
+        },
+      },
+    ];
+
+    expect(getServiceFollowUpContinuedChildJobId(events)).toBe("child-1");
+    expect(buildServiceFollowUpProgressState({
+      pendingInfoReason: "Materials Needed: Need 45/5 capacitor",
+      events: [
+        {
+          created_at: "2026-06-10T09:00:00.000Z",
+          meta: { service_follow_up_progress: "part_arrived" },
+        },
+        ...events,
+      ],
+    })).toMatchObject({
+      continuedThroughChildJobId: "child-1",
+      bridgeActionLabel: null,
+      returnPromptLabel: "Linked return job added to scheduling queue",
     });
   });
 });
