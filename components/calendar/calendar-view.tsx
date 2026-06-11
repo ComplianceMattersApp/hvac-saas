@@ -1685,7 +1685,7 @@ export async function CalendarView(props: Props) {
       </div>
 
       <div className={`grid gap-5 ${showDesktopInspectorColumn ? 'xl:grid-cols-[280px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[280px_minmax(0,1fr)]'}`}>
-        <aside className="order-2 space-y-4 xl:order-1">
+        <aside className="order-2 space-y-4 xl:sticky xl:top-24 xl:order-1 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto xl:pr-1">
           <Suspense fallback={<CalendarBlockControlsFallback />}>
             <CalendarBlockControls
               rosterPromise={rosterPromise}

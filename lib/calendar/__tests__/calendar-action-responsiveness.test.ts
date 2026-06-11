@@ -55,4 +55,10 @@ describe("calendar action responsiveness", () => {
     expect(calendarViewSource).toContain('name="date"');
     expect(calendarViewSource).toContain("Jump to");
   });
+
+  it("keeps the desktop planner queue sticky while the calendar scrolls", () => {
+    expect(calendarViewSource).toContain("xl:sticky xl:top-24 xl:order-1 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto");
+    expect(calendarViewSource).toContain("<CalendarQueueSidebar queuePromise={queuePromise}");
+    expect(calendarViewSource).toContain("Open or drag a job to place it on the schedule.");
+  });
 });
