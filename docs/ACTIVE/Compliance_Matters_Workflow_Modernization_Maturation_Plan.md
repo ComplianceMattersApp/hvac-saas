@@ -118,6 +118,21 @@ Important distinction:
 
 Admin/Owner can see both.
 
+### 4.5 ECC guided workflow separation
+
+ECC guided workflow is locked separately in `docs/ACTIVE/ECC_Guided_Workflow_Separation_Model_Lock.md`.
+
+Service follow-up and ECC workflow must not be blended:
+
+- Service uses Materials Needed / Approval Needed / Other.
+- Service continuation happens through linked return visits.
+- Parent service visits become historical/continued after child continuation exists.
+- ECC uses Permit Needed, Failed / Correction Required, Corrections Submitted / Under Review, Retest Ready, linked retest jobs, ECC handoff, and cert closeout blockers.
+- ECC retests are not service return visits.
+- ECC failed state comes from ECC test truth, not broad service exception routing.
+- Invoice/payment/no-charge truth is separate from ECC cert closeout truth.
+- Invoice send may remain allowed while Permit Needed, Failed / Correction Required, Corrections Submitted / Under Review, or Retest Ready blocks cert closeout.
+
 ---
 
 ## 5. Core workflow language
@@ -747,4 +762,3 @@ Not authorized by this document alone:
 - no role/permission implementation
 - no queue/status behavior changes
 - no broad refactor without audit output and explicit approval
-

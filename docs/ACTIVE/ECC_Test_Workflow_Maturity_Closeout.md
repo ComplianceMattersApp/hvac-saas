@@ -8,6 +8,19 @@ The ECC/Test workflow cleanup is complete for the current intended scope. This p
 
 This pass represents a maturity-level increase for the ECC/HERS side of Compliance Matters. The ECC test workflow now feels purpose-built for raters in the field instead of adapted from a broader service workflow, while preserving the existing ECC truth model.
 
+## Guided Workflow Separation Lock
+
+The next ECC workflow maturity layer is locked in `ECC_Guided_Workflow_Separation_Model_Lock.md`.
+
+This closeout remains the source for ECC field-entry/test workspace standards. The guided workflow lock is the source for ECC blocker, failed/correction, retest, handoff, portal-display, and cert-closeout separation.
+
+Key boundary:
+
+- Service follow-up uses Materials Needed / Approval Needed / Other and linked return visits.
+- ECC uses Permit Needed, Failed / Correction Required, Corrections Submitted / Under Review, Retest Ready, linked retest jobs, ECC handoff, and cert closeout blockers.
+- ECC must not reuse service follow-up labels or service continuation rules.
+- Invoice/payment/no-charge truth remains separate from ECC cert closeout truth.
+
 ## Completed Scope
 
 ### Duct Leakage
