@@ -2556,6 +2556,9 @@ const isEccPermitNeededActive = isEccPermitNeededBlocker({
   ops_status: job.ops_status,
   pending_info_reason: (job as any).pending_info_reason ?? null,
 });
+const hasActionHeavyPrimaryNextAction =
+  isEccPermitNeededActive ||
+  (isServiceFieldFollowUpPendingInfo && Boolean(serviceFollowUpProgressState.reason));
 
 const billingState = buildJobBillingStateReadModel({
   billingMode,
@@ -4271,6 +4274,201 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     </Link>
                   ) : null}
                 </div>
+              ) : isEccPermitNeededActive ? (
+                <div
+                  id="mobile-ecc-permit-needed-action"
+                  className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/90 px-3.5 py-3 text-sm text-amber-950"
+                >
+                  <div>
+                    <div className="font-semibold">Permit Needed</div>
+                    <p className="mt-1 text-sm leading-6 text-amber-900/90">
+                      Add the permit number to continue cert closeout. Invoice work remains separate.
+                    </p>
+                  </div>
+                  <details className="group rounded-xl border border-amber-200 bg-white/90 p-3.5 shadow-sm">
+                    <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-slate-900">
+                      <span>Permit Available</span>
+                      <span className="text-sm font-medium text-slate-500 group-open:hidden">Add permit</span>
+                      <span className="hidden text-sm font-medium text-slate-500 group-open:inline">Close</span>
+                    </summary>
+                    <form action={markEccPermitAvailableFromForm} className="mt-3 space-y-3.5">
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-ecc-permit-needed-action`} />
+                      <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                        Permit Number
+                        <input
+                          type="text"
+                          name="permit_number"
+                          required
+                          maxLength={80}
+                          defaultValue={job.permit_number ?? ""}
+                          className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm"
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                        Jurisdiction
+                        <input
+                          type="text"
+                          name="jurisdiction"
+                          maxLength={120}
+                          defaultValue={job.jurisdiction ?? ""}
+                          className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm"
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                        Permit Date
+                        <input
+                          type="date"
+                          name="permit_date"
+                          defaultValue={job.permit_date ?? ""}
+                          className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm"
+                        />
+                      </label>
+                      <div className="border-t border-slate-100 pt-3">
+                        <SubmitButton loadingText="Saving..." className={`${darkButtonClass} min-h-12 w-full`}>
+                          Save Permit
+                        </SubmitButton>
+                      </div>
+                    </form>
+                  </details>
+                  <Link
+                    href={`/jobs/${job.id}/tests`}
+                    className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
+                  >
+                    Open Tests Workspace
+                  </Link>
+                </div>
+              ) : isHistoricalServiceFollowUpContinued && serviceFollowUpProgressState.reason ? (
+                <div
+                  id="mobile-next-service-action"
+                  className="space-y-3 rounded-xl border border-emerald-200 bg-emerald-50/85 px-3.5 py-3 text-sm text-emerald-950"
+                >
+                  <div className="font-semibold">Follow-up continued through linked return visit</div>
+                  <div className="text-sm leading-6 text-emerald-900/90">
+                    Outcome: {serviceFollowUpProgressState.reason.label}. Reason: {serviceFollowUpProgressState.reason.reason || serviceFollowUpProgressState.reason.display}
+                  </div>
+                  {serviceFollowUpProgressState.progressLabel ? (
+                    <div className="inline-flex w-fit rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-emerald-900">
+                      Progress: {serviceFollowUpProgressState.progressLabel}
+                    </div>
+                  ) : null}
+                  {serviceFollowUpProgressState.continuedThroughChildJobId ? (
+                    <Link
+                      href={`/jobs/${serviceFollowUpProgressState.continuedThroughChildJobId}?tab=ops`}
+                      className={`${secondaryButtonClass} min-h-12 w-full`}
+                    >
+                      Open Linked Return Visit
+                    </Link>
+                  ) : null}
+                </div>
+              ) : isServiceFieldFollowUpPendingInfo && serviceFollowUpProgressState.reason ? (
+                <div
+                  id="mobile-next-service-action"
+                  className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm"
+                >
+                  <div className="font-semibold text-amber-950">{serviceFollowUpProgressState.reason.display}</div>
+                  {serviceFollowUpProgressState.progressLabel ? (
+                    <div className="inline-flex w-fit rounded-full border border-amber-300 bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.08em] text-amber-900">
+                      Progress: {serviceFollowUpProgressState.progressLabel}
+                    </div>
+                  ) : null}
+                  <div className="text-sm leading-6 text-amber-900/90">
+                    {serviceFollowUpProgressState.returnPromptLabel ?? "Keep the original follow-up reason visible while office progress is tracked here."}
+                  </div>
+                  {serviceFollowUpProgressState.nextActionLabel ? (
+                    <div className="space-y-2">
+                      {serviceFollowUpProgressState.nextActionLabel === "Mark Part Ordered" ? (
+                        <form action={markServicePartOrderedFromForm}>
+                          <input type="hidden" name="job_id" value={job.id} />
+                          <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-next-service-action`} />
+                          <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} min-h-12 w-full`}>
+                            Mark Part Ordered
+                          </SubmitButton>
+                        </form>
+                      ) : null}
+                      {serviceFollowUpProgressState.nextActionLabel === "Mark Part Arrived" ? (
+                        <form action={markServicePartArrivedFromForm}>
+                          <input type="hidden" name="job_id" value={job.id} />
+                          <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-next-service-action`} />
+                          <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} min-h-12 w-full`}>
+                            Mark Part Arrived
+                          </SubmitButton>
+                        </form>
+                      ) : null}
+                      {serviceFollowUpProgressState.nextActionLabel === "Mark Approval Received" ? (
+                        <form action={markServiceApprovalReceivedFromForm}>
+                          <input type="hidden" name="job_id" value={job.id} />
+                          <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-next-service-action`} />
+                          <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} min-h-12 w-full`}>
+                            Mark Approval Received
+                          </SubmitButton>
+                        </form>
+                      ) : null}
+                    </div>
+                  ) : null}
+                  {serviceFollowUpProgressState.bridgeActionLabel ? (
+                    <div className="space-y-3">
+                      <form action={createNextServiceVisitFromForm}>
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="tab" value={tab} />
+                        <input type="hidden" name="visit_intent" value="return_visit" />
+                        <input type="hidden" name="return_creation_mode" value="needs_scheduling" />
+                        <input type="hidden" name="follow_up_bridge_action" value="add_to_scheduling_queue" />
+                        <input type="hidden" name="next_visit_reason" value={serviceFollowUpProgressState.reason.display} />
+                        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-next-service-action`} />
+                        <SubmitButton loadingText="Adding..." className={`${darkButtonClass} min-h-12 w-full`}>
+                          {serviceFollowUpProgressState.bridgeActionLabel}
+                        </SubmitButton>
+                      </form>
+                      <details className="group rounded-xl border border-slate-200 bg-white/90 p-3.5 shadow-sm">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-base font-semibold text-slate-900">
+                          <span>Schedule Return Visit Now</span>
+                          <span className="text-sm font-medium text-slate-500 group-open:hidden">Choose date</span>
+                          <span className="hidden text-sm font-medium text-slate-500 group-open:inline">Close</span>
+                        </summary>
+                        <form action={createNextServiceVisitFromForm} className="mt-3 space-y-3.5">
+                          <input type="hidden" name="job_id" value={job.id} />
+                          <input type="hidden" name="tab" value={tab} />
+                          <input type="hidden" name="visit_intent" value="return_visit" />
+                          <input type="hidden" name="return_creation_mode" value="schedule_now" />
+                          <input type="hidden" name="follow_up_bridge_action" value="schedule_return_now" />
+                          <input type="hidden" name="next_visit_reason" value={serviceFollowUpProgressState.reason.display} />
+                          <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-next-service-action`} />
+                          <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                            Date
+                            <input
+                              type="date"
+                              name="scheduled_date"
+                              required
+                              className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm"
+                            />
+                          </label>
+                          <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                            Start
+                            <input
+                              type="time"
+                              name="window_start"
+                              className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm"
+                            />
+                          </label>
+                          <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                            End
+                            <input
+                              type="time"
+                              name="window_end"
+                              className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm"
+                            />
+                          </label>
+                          <div className="border-t border-slate-100 pt-3">
+                            <SubmitButton loadingText="Scheduling..." className={`${secondaryButtonClass} min-h-12 w-full`}>
+                              Schedule Return Visit Now
+                            </SubmitButton>
+                          </div>
+                        </form>
+                      </details>
+                    </div>
+                  ) : null}
+                </div>
               ) : isFieldComplete || job.status === "completed" ? (
                 <div className="space-y-2">
                   <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-center text-base font-semibold text-emerald-900">
@@ -5184,7 +5382,13 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
 
 <section className={`${workspaceSectionClass} relative mb-6 overflow-hidden border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] shadow-[0_26px_64px_-42px_rgba(15,23,42,0.44)] ring-1 ring-blue-100/70`}>
   <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
-  <div className="mb-3 grid gap-4 border-b border-slate-200/80 pb-4 xl:grid-cols-[minmax(0,1fr)_minmax(21rem,0.38fr)] xl:items-start">
+  <div
+    className={`mb-3 grid gap-4 border-b border-slate-200/80 pb-4 xl:items-start ${
+      hasActionHeavyPrimaryNextAction
+        ? "xl:grid-cols-[minmax(0,0.8fr)_minmax(32rem,0.72fr)] 2xl:grid-cols-[minmax(0,0.9fr)_minmax(38rem,0.72fr)]"
+        : "xl:grid-cols-[minmax(0,1fr)_minmax(21rem,0.38fr)]"
+    }`}
+  >
     <div className="min-w-0">
       <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-800">
         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-[#0f1f35] text-blue-100">
@@ -5253,54 +5457,58 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {isEccPermitNeededActive ? (
           <div
             id="ecc-permit-needed-action"
-            className="w-full rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2.5 text-sm text-amber-950"
+            className="w-full rounded-xl border border-amber-200 bg-amber-50/90 px-3.5 py-3 text-sm text-amber-950"
           >
-            <div className="font-semibold">Permit Needed</div>
+            <div className="text-sm font-semibold">Permit Needed</div>
             <p className="mt-1 text-xs leading-5 text-amber-900/90">
-              Add the permit number to continue cert closeout. Invoice and payment work remain separate.
+              Add the permit number to continue cert closeout. Invoice work remains separate.
             </p>
-            <details className="group mt-3 rounded-lg border border-amber-200 bg-white/85 p-3">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-900">
-                <span>Permit Available</span>
+            <details className="group mt-3 rounded-xl border border-amber-200 bg-white/90 p-3.5 shadow-sm">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-900">
+                <span className="min-w-0">Permit Available</span>
                 <span className="text-xs font-medium text-slate-500 group-open:hidden">Add permit</span>
                 <span className="hidden text-xs font-medium text-slate-500 group-open:inline">Close</span>
               </summary>
-              <form action={markEccPermitAvailableFromForm} className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto] sm:items-end">
+              <form action={markEccPermitAvailableFromForm} className="mt-3 space-y-3.5">
                 <input type="hidden" name="job_id" value={job.id} />
                 <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#ecc-permit-needed-action`} />
-                <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                  Permit Number
-                  <input
-                    type="text"
-                    name="permit_number"
-                    required
-                    maxLength={80}
-                    defaultValue={job.permit_number ?? ""}
-                    className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
-                  />
-                </label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                  Jurisdiction
-                  <input
-                    type="text"
-                    name="jurisdiction"
-                    maxLength={120}
-                    defaultValue={job.jurisdiction ?? ""}
-                    className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
-                  />
-                </label>
-                <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                  Permit Date
-                  <input
-                    type="date"
-                    name="permit_date"
-                    defaultValue={job.permit_date ?? ""}
-                    className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
-                  />
-                </label>
-                <SubmitButton loadingText="Saving..." className={`${darkButtonClass} w-full sm:w-auto`}>
-                  Save Permit
-                </SubmitButton>
+                <div className="grid gap-3 md:grid-cols-2 min-[112rem]:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.85fr)]">
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                    Permit Number
+                    <input
+                      type="text"
+                      name="permit_number"
+                      required
+                      maxLength={80}
+                      defaultValue={job.permit_number ?? ""}
+                      className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                    Jurisdiction
+                    <input
+                      type="text"
+                      name="jurisdiction"
+                      maxLength={120}
+                      defaultValue={job.jurisdiction ?? ""}
+                      className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm"
+                    />
+                  </label>
+                  <label className="grid gap-1.5 text-xs font-semibold text-slate-700 md:col-span-2 min-[112rem]:col-span-1">
+                    Permit Date
+                    <input
+                      type="date"
+                      name="permit_date"
+                      defaultValue={job.permit_date ?? ""}
+                      className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm"
+                    />
+                  </label>
+                </div>
+                <div className="flex border-t border-slate-100 pt-3">
+                  <SubmitButton loadingText="Saving..." className={`${darkButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
+                    Save Permit
+                  </SubmitButton>
+                </div>
               </form>
             </details>
           </div>
@@ -5334,7 +5542,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         {isServiceFieldFollowUpPendingInfo && serviceFollowUpProgressState.reason ? (
           <div
             id="next-service-action"
-            className="w-full rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2.5 text-sm"
+            className="w-full rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 text-sm"
           >
             <div className="font-semibold text-amber-950">
               {serviceFollowUpProgressState.reason.display}
@@ -5348,30 +5556,30 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               {serviceFollowUpProgressState.returnPromptLabel ?? "Keep the original follow-up reason visible while office progress is tracked here."}
             </div>
             {serviceFollowUpProgressState.nextActionLabel ? (
-              <div className="mt-3 flex flex-wrap gap-2">
+              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                 {serviceFollowUpProgressState.nextActionLabel === "Mark Part Ordered" ? (
-                  <form action={markServicePartOrderedFromForm}>
+                  <form action={markServicePartOrderedFromForm} className="w-full sm:w-auto">
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
-                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} min-h-11 w-full sm:w-auto sm:px-4`}>
                       Mark Part Ordered
                     </SubmitButton>
                   </form>
                 ) : null}
                 {serviceFollowUpProgressState.nextActionLabel === "Mark Part Arrived" ? (
-                  <form action={markServicePartArrivedFromForm}>
+                  <form action={markServicePartArrivedFromForm} className="w-full sm:w-auto">
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
-                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} min-h-11 w-full sm:w-auto sm:px-4`}>
                       Mark Part Arrived
                     </SubmitButton>
                   </form>
                 ) : null}
                 {serviceFollowUpProgressState.nextActionLabel === "Mark Approval Received" ? (
-                  <form action={markServiceApprovalReceivedFromForm}>
+                  <form action={markServiceApprovalReceivedFromForm} className="w-full sm:w-auto">
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
-                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                    <SubmitButton loadingText="Saving..." className={`${secondaryButtonClass} min-h-11 w-full sm:w-auto sm:px-4`}>
                       Mark Approval Received
                     </SubmitButton>
                   </form>
@@ -5380,7 +5588,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             ) : null}
             {serviceFollowUpProgressState.bridgeActionLabel ? (
               <div className="mt-3 space-y-3">
-                <form action={createNextServiceVisitFromForm} className="flex flex-wrap gap-2">
+                <form action={createNextServiceVisitFromForm} className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
                   <input type="hidden" name="job_id" value={job.id} />
                   <input type="hidden" name="tab" value={tab} />
                   <input type="hidden" name="visit_intent" value="return_visit" />
@@ -5388,17 +5596,17 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                   <input type="hidden" name="follow_up_bridge_action" value="add_to_scheduling_queue" />
                   <input type="hidden" name="next_visit_reason" value={serviceFollowUpProgressState.reason.display} />
                   <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
-                  <SubmitButton loadingText="Adding..." className={`${darkButtonClass} w-full sm:w-auto`}>
+                  <SubmitButton loadingText="Adding..." className={`${darkButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
                     {serviceFollowUpProgressState.bridgeActionLabel}
                   </SubmitButton>
                 </form>
-                <details className="group rounded-xl border border-slate-200 bg-white/80 p-3">
-                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-900">
+                <details className="group rounded-xl border border-slate-200 bg-white/90 p-3.5 shadow-sm">
+                  <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-900">
                     <span>Schedule Return Visit Now</span>
                     <span className="text-xs font-medium text-slate-500 group-open:hidden">Choose date</span>
                     <span className="hidden text-xs font-medium text-slate-500 group-open:inline">Close</span>
                   </summary>
-                  <form action={createNextServiceVisitFromForm} className="mt-3 grid gap-3 sm:grid-cols-3">
+                  <form action={createNextServiceVisitFromForm} className="mt-3 space-y-3.5">
                     <input type="hidden" name="job_id" value={job.id} />
                     <input type="hidden" name="tab" value={tab} />
                     <input type="hidden" name="visit_intent" value="return_visit" />
@@ -5406,33 +5614,35 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     <input type="hidden" name="follow_up_bridge_action" value="schedule_return_now" />
                     <input type="hidden" name="next_visit_reason" value={serviceFollowUpProgressState.reason.display} />
                     <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
-                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                      Date
-                      <input
-                        type="date"
-                        name="scheduled_date"
-                        required
-                        className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                      Start
-                      <input
-                        type="time"
-                        name="window_start"
-                        className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
-                      />
-                    </label>
-                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                      End
-                      <input
-                        type="time"
-                        name="window_end"
-                        className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
-                      />
-                    </label>
-                    <div className="sm:col-span-3">
-                      <SubmitButton loadingText="Scheduling..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                        Date
+                        <input
+                          type="date"
+                          name="scheduled_date"
+                          required
+                          className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm"
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                        Start
+                        <input
+                          type="time"
+                          name="window_start"
+                          className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm"
+                        />
+                      </label>
+                      <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
+                        End
+                        <input
+                          type="time"
+                          name="window_end"
+                          className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm"
+                        />
+                      </label>
+                    </div>
+                    <div className="border-t border-slate-100 pt-3">
+                      <SubmitButton loadingText="Scheduling..." className={`${secondaryButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
                         Schedule Return Visit Now
                       </SubmitButton>
                     </div>
