@@ -49,6 +49,8 @@ import {
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 
 import ServiceStatusActions from "./_components/ServiceStatusActions";
+import EquipmentEditCard from "./_components/EquipmentEditCard";
+import EquipmentCreateForm from "./_components/EquipmentCreateForm";
 import { displayDateLA, formatBusinessDateUS, formatDateOnlyDisplay, formatTimestampDateDisplayLA, formatTimestampDateTimeDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
@@ -158,7 +160,6 @@ import {
 } from "@/lib/communications/contact-recipients-read";
 import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
-import { equipmentRoleLabel } from "@/lib/utils/equipment-display";
 import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
 
 function dateToDateInput(value?: string | null) {
@@ -819,29 +820,6 @@ function truncateSummaryText(value: string, maxLength = 84) {
   return `${normalized.slice(0, maxLength - 1).trimEnd()}...`;
 }
 
-function presentEquipmentText(value: unknown) {
-  return String(value ?? "").trim();
-}
-
-function formatEquipmentTitle(eq: any) {
-  const role = equipmentRoleLabel(eq?.equipment_role);
-  const makeModel = [presentEquipmentText(eq?.manufacturer), presentEquipmentText(eq?.model)]
-    .filter(Boolean)
-    .join(" ");
-  return makeModel ? `${role} - ${makeModel}` : role;
-}
-
-function formatEquipmentMeta(eq: any) {
-  return [
-    presentEquipmentText(eq?.serial) ? `Serial ${presentEquipmentText(eq?.serial)}` : "",
-    presentEquipmentText(eq?.tonnage) ? `${presentEquipmentText(eq?.tonnage)} ton` : "",
-    presentEquipmentText(eq?.refrigerant_type) ? presentEquipmentText(eq?.refrigerant_type) : "",
-  ]
-    .filter(Boolean)
-    .join(" - ");
-}
-
-
 type JobSearchParams = {
   tab?: "info" | "ops" | "tests";
   banner?: string;
@@ -1037,6 +1015,14 @@ const recordLauncherClass =
   `${workspacePanelClass} group block rounded-2xl border-slate-200/80 bg-white p-2.5 text-left text-gray-900 ring-1 ring-blue-100/40 transition-[border-color,background-color,box-shadow,transform] duration-150 hover:border-blue-200/80 hover:bg-blue-50/20 hover:shadow-[0_18px_40px_-34px_rgba(15,23,42,0.3)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:rounded-2xl sm:p-4`;
 const recordPanelClass =
   "scroll-mt-24 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-[0_18px_42px_-36px_rgba(15,23,42,0.3)] ring-1 ring-blue-100/40 sm:rounded-2xl sm:p-5";
+const recordActionRowClass = "flex flex-col gap-2 pt-1 sm:flex-row sm:flex-wrap sm:items-center";
+const recordActionRowEndClass = `${recordActionRowClass} sm:justify-end`;
+const recordPrimaryButtonClass = `${primaryButtonClass} w-full sm:w-auto`;
+const recordSecondaryButtonClass = `${secondaryButtonClass} w-full sm:w-auto`;
+const recordDarkButtonClass = `${darkButtonClass} w-full sm:w-auto`;
+const recordCloseButtonClass = `${compactSecondaryButtonClass} w-full sm:w-auto`;
+const recordDestructiveButtonClass =
+  "inline-flex min-h-10 w-full items-center justify-center rounded-lg border border-rose-600 bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-rose-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:translate-y-[0.5px] sm:w-auto";
 const workspaceSoftCardClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
 const workspaceEmptyStateClass =
@@ -1474,11 +1460,14 @@ export default async function JobDetailPage({
       job_equipment (
         id,
         equipment_role,
+        system_location,
         manufacturer,
         model,
         serial,
         tonnage,
         heating_capacity_kbtu,
+        heating_output_btu,
+        heating_efficiency_percent,
         refrigerant_type,
         notes,
         created_at,
@@ -1506,6 +1495,14 @@ export default async function JobDetailPage({
   if (!job) return notFound();
   if (job.deleted_at) redirect("/ops?saved=job_archived");
   setPhaseValue("eccPayloadReads", phaseDurationsMs.mainJobRead ?? 0);
+
+  const { data: equipmentSystems, error: equipmentSystemsErr } = await supabase
+    .from("job_systems")
+    .select("id, name")
+    .eq("job_id", jobId)
+    .order("name", { ascending: true });
+
+  if (equipmentSystemsErr) throw equipmentSystemsErr;
 
   const parentJobId = (job as any).parent_job_id as string | null;
   const retestRootId = parentJobId ?? jobId;
@@ -8388,10 +8385,10 @@ const failureResolutionPathCount =
       className={workspaceTextareaClass}
     />
 
-    <div className="flex justify-end">
+    <div className={recordActionRowEndClass}>
       <SubmitButton
         loadingText="Adding note..."
-        className={secondaryButtonClass}
+        className={recordSecondaryButtonClass}
       >
         Save shared note
       </SubmitButton>
@@ -8417,7 +8414,7 @@ const failureResolutionPathCount =
               <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Job Details</div>
             </div>
-            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+            <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
           <div className="mt-4">
             <div className={workspaceDetailsDividerClass}>
@@ -8475,10 +8472,10 @@ const failureResolutionPathCount =
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 pt-1">
+                  <div className={recordActionRowClass}>
                     <SubmitButton
                       loadingText="Saving..."
-                      className={primaryButtonClass}
+                      className={recordPrimaryButtonClass}
                     >
                       Save Scheduling
                     </SubmitButton>
@@ -8489,7 +8486,7 @@ const failureResolutionPathCount =
 
                     <Link
                       href="/ops"
-                      className={secondaryButtonClass}
+                      className={recordSecondaryButtonClass}
                     >
                       Back to Ops
                     </Link>
@@ -8549,7 +8546,7 @@ const failureResolutionPathCount =
 
                     <SubmitButton
                       loadingText="Saving..."
-                      className={primaryButtonClass}
+                      className={recordPrimaryButtonClass}
                     >
                       Save Permit Info
                     </SubmitButton>
@@ -8597,7 +8594,7 @@ const failureResolutionPathCount =
 
                         <SubmitButton
                           loadingText="Saving..."
-                          className={secondaryButtonClass}
+                          className={recordSecondaryButtonClass}
                         >
                           Save contractor
                         </SubmitButton>
@@ -8693,7 +8690,7 @@ const failureResolutionPathCount =
 
                       <SubmitButton
                         loadingText="Saving..."
-                        className={secondaryButtonClass}
+                        className={recordSecondaryButtonClass}
                       >
                         Save service contract
                       </SubmitButton>
@@ -8717,12 +8714,12 @@ const failureResolutionPathCount =
                     Archive hides this job across Ops, portal, and searches. This can be undone later (by clearing deleted_at).
                   </div>
 
-                  <div className="flex flex-wrap gap-2">
+                  <div className={recordActionRowClass}>
                     <form action={archiveJobFromForm}>
                       <input type="hidden" name="job_id" value={job.id} />
                       <SubmitButton
                         loadingText="Archiving..."
-                        className="inline-flex min-h-10 items-center justify-center rounded-lg bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-rose-700"
+                        className={recordDestructiveButtonClass}
                       >
                         Archive Job
                       </SubmitButton>
@@ -8744,7 +8741,7 @@ const failureResolutionPathCount =
               <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Job Status</div>
             </div>
-            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+            <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
           <div className="mt-4">
             <div className={workspaceDetailsDividerClass}>
@@ -8780,7 +8777,7 @@ const failureResolutionPathCount =
                 Use this when the part, approval, access, or missing information is no longer blocking the job.
               </p>
               <div className="mt-2">
-                <SubmitButton formAction={releaseAndReevaluateFromForm} loadingText="Updating..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                <SubmitButton formAction={releaseAndReevaluateFromForm} loadingText="Updating..." className={recordSecondaryButtonClass}>
                   Mark Ready to Continue
                 </SubmitButton>
               </div>
@@ -8799,8 +8796,8 @@ const failureResolutionPathCount =
       />
     </div>
 
-    <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200/80 pt-3">
-      <SubmitButton loadingText="Saving..." className={primaryButtonClass}>
+    <div className={`${recordActionRowEndClass} border-t border-slate-200/80 pt-3`}>
+      <SubmitButton loadingText="Saving..." className={recordPrimaryButtonClass}>
         Save Interrupt State
       </SubmitButton>
     </div>
@@ -8832,7 +8829,7 @@ const failureResolutionPathCount =
           <form action={releaseAndReevaluateFromForm} className="mt-2">
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#job-status`} />
-            <SubmitButton loadingText="Updating..." className={`w-full ${secondaryButtonClass} sm:w-auto`}>
+            <SubmitButton loadingText="Updating..." className={recordSecondaryButtonClass}>
               {interruptReleaseActionLabel}
             </SubmitButton>
           </form>
@@ -8847,34 +8844,50 @@ const failureResolutionPathCount =
               <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Equipment</div>
             </div>
-            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+            <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
           <div className="mt-4">
             <div className={jobRecordsDetailsDividerClass}>
-            <div className="mb-3 flex items-center justify-end">
-              <Link href={`/jobs/${job.id}/info?f=equipment`} className={secondaryButtonClass}>
+            <div className={`mb-3 ${recordActionRowEndClass}`}>
+              <Link href={`/jobs/${job.id}/info?f=equipment`} className={recordSecondaryButtonClass}>
                 Manage Equipment
               </Link>
             </div>
 
-            {equipmentCount > 0 ? (
-              <div className="space-y-2">
-                {equipmentItems.slice(0, 3).map((eq: any) => {
-                  const meta = formatEquipmentMeta(eq);
-                  return (
-                    <div key={eq.id} className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2">
-                      <div className="text-sm font-semibold leading-5 text-slate-900">{formatEquipmentTitle(eq)}</div>
-                      {meta ? <div className="mt-0.5 text-xs leading-5 text-slate-600">{meta}</div> : null}
+            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+              <div className="border-b border-slate-200/80 px-4 py-3 sm:px-5">
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-slate-950">Current Equipment</h3>
+                  {equipmentCount > 0 ? (
+                    <div className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-slate-100 px-2 text-xs font-semibold text-slate-700">
+                      {equipmentCount}
                     </div>
-                  );
-                })}
-                {equipmentCount > 3 ? (
-                  <div className="text-xs font-semibold text-slate-500">+{equipmentCount - 3} more in Equipment</div>
-                ) : null}
+                  ) : null}
+                </div>
               </div>
-            ) : (
-              <div className={workspaceEmptyStateClass}>No equipment recorded yet.</div>
-            )}
+
+              {equipmentCount > 0 ? (
+                <div className="divide-y divide-slate-200">
+                  {equipmentItems.map((eq: any) => (
+                    <EquipmentEditCard
+                      key={eq.id}
+                      eq={eq}
+                      systems={equipmentSystems ?? []}
+                      jobId={job.id}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="px-5 py-8 text-center sm:px-6">
+                  <div className="text-sm text-slate-600">No equipment captured yet</div>
+                  <p className="mt-1 text-xs text-slate-500">Add equipment below to begin</p>
+                </div>
+              )}
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm">
+              <EquipmentCreateForm jobId={job.id} systems={equipmentSystems ?? []} />
+            </div>
           </div>
           </div>
         </section>
@@ -8884,14 +8897,14 @@ const failureResolutionPathCount =
               <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Attachments</div>
             </div>
-            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+            <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
           <div className="mt-4">
             <div className={`${jobRecordsDetailsDividerClass} px-0 pb-0`}>
-            <div className="mb-3 flex items-center justify-end">
+            <div className={`mb-3 ${recordActionRowEndClass}`}>
               <Link
                 href={`/jobs/${job.id}/attachments`}
-                className={secondaryButtonClass}
+                className={recordSecondaryButtonClass}
               >
                 View All Attachments
               </Link>
@@ -8911,7 +8924,7 @@ const failureResolutionPathCount =
               <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Follow Up</div>
             </div>
-            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+            <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
           <div className="mt-4">
             <div className={jobRecordsDetailsDividerClass}>
@@ -8963,7 +8976,7 @@ const failureResolutionPathCount =
                 />
               </div>
 
-              <SubmitButton loadingText="Saving..." className={`${darkButtonClass} w-fit`}>
+              <SubmitButton loadingText="Saving..." className={recordDarkButtonClass}>
                 Save Follow Up
               </SubmitButton>
             </form>
@@ -8977,7 +8990,7 @@ const failureResolutionPathCount =
               <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Follow-Up History</div>
             </div>
-            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+            <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
           <div className="mt-4">
             <div className={`${jobRecordsDetailsDividerClass} rounded-xl border border-slate-200/80 bg-white/96 p-4`}>
@@ -8997,7 +9010,7 @@ const failureResolutionPathCount =
               <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Timeline</div>
             </div>
-            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+            <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
           <div className="mt-4">
             <div className={`${jobRecordsDetailsDividerClass} space-y-2`}>
@@ -9030,7 +9043,7 @@ const failureResolutionPathCount =
               <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">Selected record panel</div>
               <div className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Service Chain</div>
             </div>
-            <a href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>
+            <a href="#job-details-records" className={recordCloseButtonClass}>Close</a>
           </div>
           <div className="mt-4">
             <div className={jobRecordsDetailsDividerClass}>

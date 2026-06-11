@@ -6,7 +6,7 @@ export default function CancelJobButton({ jobId }: { jobId: string }) {
   return (
     <form
       action={cancelJobFromForm}
-      className="min-w-[9.5rem] flex-1 sm:w-auto sm:min-w-0 sm:flex-none"
+      className="w-full sm:w-auto"
       onSubmit={(e) => {
         if (!window.confirm("Cancel this job? This action cannot be undone.")) {
           e.preventDefault();
@@ -16,7 +16,7 @@ export default function CancelJobButton({ jobId }: { jobId: string }) {
       <input type="hidden" name="job_id" value={jobId} />
       <button
         type="submit"
-        className="w-full min-h-10 inline-flex items-center justify-center whitespace-nowrap rounded-md border border-red-200 bg-red-50 px-4 text-sm font-medium text-red-600 hover:bg-red-100 sm:w-auto"
+        className="inline-flex min-h-10 w-full items-center justify-center whitespace-nowrap rounded-lg border border-red-300 bg-white px-4 py-2 text-sm font-semibold text-red-700 transition-[border-color,background-color,box-shadow,transform] hover:border-red-400 hover:bg-red-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-200 active:translate-y-[0.5px] sm:w-auto"
       >
         📋 Cancel Job (Admin)
       </button>
