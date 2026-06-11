@@ -8048,6 +8048,7 @@ if (!canonicalOwnerUserId) {
     String(formData.get("address_line1") || "").trim() ||
     jobAddressFormRaw ||
     String(existingLocationSnapshot?.address_line1 ?? "").trim();
+  const address_line2 = String(formData.get("address_line2") || "").trim() || null;
 
   const city = postedCity || String(existingLocationSnapshot?.city ?? "").trim();
   const state =
@@ -8869,6 +8870,7 @@ if (existingCustomerId && !existingLocationId) {
         customer_id: existingCustomerId,
         nickname: locationNickname,
         address_line1,
+        address_line2,
         city,
         state,
         zip,
@@ -8955,11 +8957,11 @@ if (existingCustomerId && !existingLocationId) {
   });
 
   try {
-    await maybeCreateLocationSiteAccessContact(existingLocationId);
+    await maybeCreateLocationSiteAccessContact(locationIdToUse);
   } catch (error) {
     console.error("site_access_contact_create_failed", {
       createdJobId: created.id,
-      linkedLocationId: existingLocationId,
+      linkedLocationId: locationIdToUse,
       error: error instanceof Error ? error.message : "Unknown site/access contact create error",
     });
   }
@@ -9002,6 +9004,7 @@ if (reusableLocation?.id) {
       customer_id: customerId,
       nickname: locationNickname,
       address_line1,
+      address_line2,
       city,
       state,
       zip,

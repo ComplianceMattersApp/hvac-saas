@@ -173,6 +173,7 @@ type NewJobDraft = {
   siteAccessContactNotes?: string;
   systems?: EquipmentSystem[];
   locationId?: string;
+  newLocationAddressLine2?: string;
   visitScopeSummary?: string;
   visitScopeItems?: Array<{
     id?: string;
@@ -477,6 +478,7 @@ export default function NewJobForm({
   });
   const [newLocationNickname, setNewLocationNickname] = useState("");
   const [newLocationAddressLine1, setNewLocationAddressLine1] = useState("");
+  const [newLocationAddressLine2, setNewLocationAddressLine2] = useState("");
   const [newLocationCity, setNewLocationCity] = useState("");
   const [newLocationState, setNewLocationState] = useState("CA");
   const [newLocationZip, setNewLocationZip] = useState("");
@@ -840,9 +842,6 @@ const [billingRecipient, setBillingRecipient] = useState<
     isInternalMode && selectedCustomerId && !createNewCustomer && locationMode === "new";
 
   const hasContextSingleLocation = isCustomerContextInternalMode && selectedCustomerLocations.length === 1;
-  const hasContextMultipleLocations = isCustomerContextInternalMode && selectedCustomerLocations.length > 1;
-  const hasContextNoLocations = isCustomerContextInternalMode && selectedCustomerLocations.length === 0;
-
   useEffect(() => {
     if (!isCustomerContextInternalMode) return;
     if (selectedCustomerLocations.length === 1) {
@@ -1103,6 +1102,7 @@ const [billingRecipient, setBillingRecipient] = useState<
         siteAccessContactNotes,
         systems,
         locationId,
+        newLocationAddressLine2,
         visitScopeSummary,
         visitScopeItems: visitScopeItems.map((item) => ({
           id: item.id,
@@ -1172,6 +1172,7 @@ const [billingRecipient, setBillingRecipient] = useState<
     setSiteAccessContactPhone(d.siteAccessContactPhone ?? "");
     setSiteAccessContactEmail(d.siteAccessContactEmail ?? "");
     setSiteAccessContactNotes(d.siteAccessContactNotes ?? "");
+    setNewLocationAddressLine2(d.newLocationAddressLine2 ?? "");
     setBillingRecipientDifferent((d.billingRecipient ?? "customer") === "other");
 
     setSystems(Array.isArray(d.systems) ? d.systems : []);
@@ -2102,137 +2103,100 @@ const [billingRecipient, setBillingRecipient] = useState<
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Step 2</p>
-                        <p className="mt-1 text-base font-semibold text-slate-900">Choose service location</p>
+                        <p className="mt-1 text-base font-semibold text-slate-900">Service Address</p>
                         <p className="mt-1 text-sm text-slate-500">
-                          {selectedCustomerLocations.length} location{selectedCustomerLocations.length === 1 ? "" : "s"} on file for this customer.
+                          This is where the job will take place.
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          {selectedCustomerLocations.length} saved service address{selectedCustomerLocations.length === 1 ? "" : "es"} on file for this customer.
                         </p>
                       </div>
-                      {resolvedExistingLocation && !hasContextSingleLocation ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            resetRelationshipDecision();
-                            setLocationMode("existing");
-                            setLocationId("");
-                          }}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600 shadow-sm hover:border-slate-300 hover:text-slate-900"
-                        >
-                          Change location
-                        </button>
-                      ) : null}
                     </div>
 
-                    {resolvedExistingLocation ? (
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900">
-                        <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                          {hasContextSingleLocation ? "Using saved location" : "Selected service location"}
-                        </p>
-                        <p className="mt-1 font-medium text-slate-900">{formatLocationContext(resolvedExistingLocation)}</p>
-                        {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
-                      </div>
-                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetRelationshipDecision();
+                          setLocationMode("existing");
+                          if (!locationId && selectedCustomerLocations.length === 1) {
+                            setLocationId(selectedCustomerLocations[0]?.id ?? "");
+                          }
+                        }}
+                        disabled={selectedCustomerLocations.length === 0}
+                        className={[
+                          "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all disabled:cursor-not-allowed disabled:opacity-60",
+                          locationMode === "existing"
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-slate-300 bg-white text-slate-700",
+                        ].join(" ")}
+                      >
+                        Use saved service address
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          resetRelationshipDecision();
+                          setLocationMode("new");
+                          setLocationId("");
+                        }}
+                        className={[
+                          "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
+                          locationMode === "new"
+                            ? "border-slate-900 bg-slate-900 text-white"
+                            : "border-slate-300 bg-white text-slate-700",
+                        ].join(" ")}
+                      >
+                        Add new service address
+                      </button>
+                    </div>
 
-                    {!resolvedExistingLocation ? (
-                      isCustomerContextInternalMode ? (
-                        <>
-                          {hasContextMultipleLocations ? (
-                            <>
-                              <select
-                                className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
-                                value={locationId}
-                                onChange={(e) => {
-                                  resetRelationshipDecision();
-                                  setLocationId(e.target.value);
-                                }}
-                              >
-                                <option value="">Select saved location...</option>
-                                {selectedCustomerLocations.map((l) => (
-                                  <option key={l.id} value={l.id}>
-                                    {(l.nickname ? `${l.nickname} - ` : "") +
-                                      (l.address_line1 ?? "Address") +
-                                      ", " +
-                                      [l.city, l.state, l.zip || l.postal_code].filter(Boolean).join(" ")}
-                                  </option>
-                                ))}
-                              </select>
-                              {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
-                            </>
-                          ) : null}
-
-                          {hasContextNoLocations ? (
-                            <div className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3 text-sm text-blue-900">
-                              No saved locations found. Add the first service location to continue.
+                    {locationMode === "existing" ? (
+                      selectedCustomerLocations.length > 0 ? (
+                        <div className="space-y-2">
+                          <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Saved service address
+                          </label>
+                          <select
+                            className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
+                            value={locationId}
+                            onChange={(e) => {
+                              resetRelationshipDecision();
+                              setLocationId(e.target.value);
+                            }}
+                          >
+                            <option value="">Select saved service address...</option>
+                            {selectedCustomerLocations.map((l) => (
+                              <option key={l.id} value={l.id}>
+                                {(l.nickname ? `${l.nickname} - ` : "") +
+                                  (l.address_line1 ?? "Address") +
+                                  ", " +
+                                  [l.city, l.state, l.zip || l.postal_code].filter(Boolean).join(" ")}
+                              </option>
+                            ))}
+                          </select>
+                          {resolvedExistingLocation ? (
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-sm text-emerald-900">
+                              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                                Selected service address
+                              </p>
+                              <p className="mt-1 font-medium text-slate-900">{formatLocationContext(resolvedExistingLocation)}</p>
                             </div>
                           ) : null}
-                        </>
+                          {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
+                        </div>
                       ) : (
-                        <>
-                          <div className="flex flex-wrap gap-2">
-                            <button
-                              type="button"
-                              onClick={() => {
-                                resetRelationshipDecision();
-                                setLocationMode("existing");
-                              }}
-                              className={[
-                                "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
-                                locationMode === "existing"
-                                  ? "border-slate-900 bg-slate-900 text-white"
-                                  : "border-slate-300 bg-white text-slate-700",
-                              ].join(" ")}
-                            >
-                              Use existing location
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                resetRelationshipDecision();
-                                setLocationMode("new");
-                              }}
-                              className={[
-                                "rounded-full border px-3 py-1.5 text-xs font-medium shadow-sm transition-all",
-                                locationMode === "new"
-                                  ? "border-slate-900 bg-slate-900 text-white"
-                                  : "border-slate-300 bg-white text-slate-700",
-                              ].join(" ")}
-                            >
-                              Create new location
-                            </button>
-                          </div>
-
-                          {locationMode === "existing" ? (
-                            selectedCustomerLocations.length > 0 ? (
-                              <>
-                                <select
-                                  className="w-full rounded-xl border border-slate-300 bg-white p-2.5 shadow-sm"
-                                  value={locationId}
-                                  onChange={(e) => {
-                                    resetRelationshipDecision();
-                                    setLocationId(e.target.value);
-                                  }}
-                                >
-                                  <option value="">Select existing location...</option>
-                                  {selectedCustomerLocations.map((l) => (
-                                    <option key={l.id} value={l.id}>
-                                      {(l.nickname ? `${l.nickname} - ` : "") +
-                                        (l.address_line1 ?? "Address") +
-                                        ", " +
-                                        [l.city, l.state, l.zip || l.postal_code].filter(Boolean).join(" ")}
-                                    </option>
-                                  ))}
-                                </select>
-                                {locationId ? <input type="hidden" name="location_id" value={locationId} /> : null}
-                              </>
-                            ) : (
-                              <p className="text-xs text-slate-500">No saved locations for this customer. Choose Create new location.</p>
-                            )
-                          ) : null}
-                        </>
+                        <div className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3 text-sm text-blue-900">
+                          No saved service addresses found. Add a new service address to continue.
+                        </div>
                       )
                     ) : null}
 
                     {isNewLocation ? (
                       <div className="mt-1 space-y-2 rounded-xl bg-slate-50/70 p-3 ring-1 ring-slate-200/80">
+                        <p className="text-xs text-slate-600">
+                          This service address will be saved under the customer for future jobs.
+                        </p>
                         <input
                           className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
                           name="location_nickname"
@@ -2247,6 +2211,13 @@ const [billingRecipient, setBillingRecipient] = useState<
                           required
                           value={newLocationAddressLine1}
                           onChange={(e) => setNewLocationAddressLine1(e.target.value)}
+                        />
+                        <input
+                          className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
+                          name="address_line2"
+                          placeholder="Unit, suite, or address line 2 (optional)"
+                          value={newLocationAddressLine2}
+                          onChange={(e) => setNewLocationAddressLine2(e.target.value)}
                         />
                         <div className="grid grid-cols-2 gap-2">
                           <input

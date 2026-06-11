@@ -52,9 +52,33 @@ describe("/jobs/new guided builder refresh", () => {
     expect(formSource).toContain("Defaults to responsible account contact details.");
   });
 
-  it("collapses customer and existing-location selectors after they are chosen", () => {
+  it("keeps the Service Address choice visible after customer selection", () => {
     expect(formSource).toContain("!isCustomerContextInternalMode && !createNewCustomer && !selectedCustomerId");
-    expect(formSource).toContain("Change location");
-    expect(formSource).toContain("Selected service location");
+    expect(formSource).toContain("Service Address");
+    expect(formSource).toContain("This is where the job will take place.");
+    expect(formSource).toContain("Use saved service address");
+    expect(formSource).toContain("Add new service address");
+    expect(formSource).toContain("Saved service address");
+    expect(formSource).toContain("Selected service address");
+    expect(formSource).toContain("Select saved service address...");
+    expect(formSource).not.toContain("Default address");
+  });
+
+  it("wires saved service address selection to the submitted location id", () => {
+    expect(formSource).toContain("value={locationId}");
+    expect(formSource).toContain("setLocationId(e.target.value)");
+    expect(formSource).toContain("selectedCustomerLocations.map((l) => (");
+    expect(formSource).toContain('<input type="hidden" name="location_id" value={locationId} />');
+  });
+
+  it("wires add-new service address mode through Branch 2 fields", () => {
+    expect(formSource).toContain('setLocationMode("new")');
+    expect(formSource).toContain('setLocationId("")');
+    expect(formSource).toContain('name="address_line1"');
+    expect(formSource).toContain('name="address_line2"');
+    expect(formSource).toContain('name="city"');
+    expect(formSource).toContain('name="state"');
+    expect(formSource).toContain('name="zip"');
+    expect(formSource).toContain("This service address will be saved under the customer for future jobs.");
   });
 });

@@ -27,6 +27,8 @@ type FixtureOptions = {
   throwOnJobsInsert?: boolean;
   contractorId?: string | null;
   accountSettingsProductMode?: "hybrid" | "ecc_hers" | "hvac_service" | null;
+  locationRows?: Array<Record<string, unknown>>;
+  createdLocationId?: string;
 };
 
 vi.mock("next/navigation", () => ({
@@ -139,9 +141,64 @@ function buildCustomerContextFormDataWithoutCustomer() {
   return formData;
 }
 
+function buildExistingCustomerSelectedLocationFormData(locationId: string) {
+  const formData = new FormData();
+  formData.set("job_type", "ecc");
+  formData.set("title", "Second Location Intake Job");
+  formData.set("customer_id", "cust-1");
+  formData.set("location_id", locationId);
+  return formData;
+}
+
+function buildExistingCustomerNewLocationFormData(options?: { siteAccessContact?: boolean }) {
+  const formData = new FormData();
+  formData.set("job_type", "ecc");
+  formData.set("title", "New Location Intake Job");
+  formData.set("customer_id", "cust-1");
+  formData.set("location_nickname", "Warehouse");
+  formData.set("address_line1", "200 Side St");
+  formData.set("address_line2", "Suite 4");
+  formData.set("city", "Lodi");
+  formData.set("state", "CA");
+  formData.set("zip", "95240");
+
+  if (options?.siteAccessContact) {
+    formData.set("site_access_contact_different", "1");
+    formData.set("site_access_contact_name", "Onsite Manager");
+    formData.set("site_access_contact_phone", "2095550100");
+  }
+
+  return formData;
+}
+
 function buildSupabaseFixture(options: FixtureOptions = {}) {
   const writeCalls: WriteCall[] = [];
   const insertCalls: InsertCall[] = [];
+  let lastLocationInsertPayload: Record<string, unknown> | null = null;
+  const locationRows = options.locationRows ?? [
+    {
+      id: "loc-1",
+      customer_id: "cust-1",
+      owner_user_id: "owner-1",
+      address_line1: "100 Main St",
+      city: "Stockton",
+      state: "CA",
+      zip: "95202",
+      postal_code: "95202",
+    },
+  ];
+
+  function locationById(id: unknown) {
+    const normalizedId = String(id ?? "").trim();
+    if (!normalizedId) return null;
+    if (normalizedId === (options.createdLocationId ?? "loc-new") && lastLocationInsertPayload) {
+      return {
+        id: normalizedId,
+        ...lastLocationInsertPayload,
+      };
+    }
+    return locationRows.find((row) => String(row.id ?? "").trim() === normalizedId) ?? null;
+  }
 
   function makeReadQuery(table: string, selected: string) {
     const filters: Array<{ column: string; value: unknown }> = [];
@@ -194,19 +251,22 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
       }
 
       if (table === "locations") {
+        const idFilter = filters.find((filter) => filter.column === "id");
+        const scopedLocation = idFilter ? locationById(idFilter.value) : null;
         if (selected.includes("owner_user_id")) {
           return {
-            data: { id: "loc-1", customer_id: "cust-1", owner_user_id: "owner-1" },
+            data: scopedLocation ?? { id: "loc-1", customer_id: "cust-1", owner_user_id: "owner-1" },
             error: null,
           };
         }
         return {
-          data: {
-            id: "loc-1",
-            address_line1: "100 Main St",
-            city: "Stockton",
-            zip: "95202",
-          },
+          data:
+            scopedLocation ?? {
+              id: "loc-1",
+              address_line1: "100 Main St",
+              city: "Stockton",
+              zip: "95202",
+            },
           error: null,
         };
       }
@@ -289,6 +349,16 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
         };
       }
 
+      if (table === "locations") {
+        return {
+          data: {
+            id: options.createdLocationId ?? "loc-new",
+            ...(lastLocationInsertPayload ?? {}),
+          },
+          error: null,
+        };
+      }
+
       return { data: null, error: null };
     }
 
@@ -298,7 +368,7 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
       }
 
       if (table === "locations") {
-        return { data: [], error: null };
+        return { data: locationRows, error: null };
       }
 
       return { data: [], error: null };
@@ -325,6 +395,11 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
         insert: vi.fn((_payload: unknown) => {
           writeCalls.push({ table, method: "insert" });
           insertCalls.push({ table, payload: _payload });
+          if (table === "locations") {
+            lastLocationInsertPayload = (
+              Array.isArray(_payload) ? _payload[0] : _payload
+            ) as Record<string, unknown>;
+          }
           return {
             select: vi.fn((selected: string) => makeReadQuery(table, selected)),
           };
@@ -399,6 +474,14 @@ describe("job intake create same-account hardening", () => {
     ).toHaveLength(0);
   }
 
+  function firstInsertPayload(fixture: { insertCalls: InsertCall[] }, table: string) {
+    const insertCall = fixture.insertCalls.find((call) => call.table === table);
+    const payloadRaw = insertCall?.payload;
+    return (
+      Array.isArray(payloadRaw) ? payloadRaw[0] : payloadRaw
+    ) as Record<string, unknown> | null | undefined;
+  }
+
   it("allows same-account internal createJobFromForm to reach authorized create path", async () => {
     const fixture = buildSupabaseFixture({ throwOnJobsInsert: true });
     createClientMock.mockResolvedValue(fixture.supabase);
@@ -450,6 +533,120 @@ describe("job intake create same-account hardening", () => {
     expect(jobsPayload).toBeTruthy();
     expect(jobsPayload?.job_notes).toBe("Customer noted intermittent airflow issue.");
     expect(String(jobsPayload?.job_notes ?? "")).not.toContain("Request source:");
+  });
+
+  it("creates an existing-customer job with the selected second saved location", async () => {
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: true,
+      locationRows: [
+        {
+          id: "loc-1",
+          customer_id: "cust-1",
+          owner_user_id: "owner-1",
+          address_line1: "100 Main St",
+          city: "Stockton",
+          state: "CA",
+          zip: "95202",
+          postal_code: "95202",
+        },
+        {
+          id: "loc-2",
+          customer_id: "cust-1",
+          owner_user_id: "owner-1",
+          address_line1: "200 Side St",
+          city: "Lodi",
+          state: "CA",
+          zip: "95240",
+          postal_code: "95240",
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(buildExistingCustomerSelectedLocationFormData("loc-2")),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    expect(firstInsertPayload(fixture, "jobs")).toMatchObject({
+      customer_id: "cust-1",
+      location_id: "loc-2",
+      job_address: "200 Side St",
+      city: "Lodi",
+    });
+  });
+
+  it("creates an existing-customer new location and job address snapshot", async () => {
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: true,
+      createdLocationId: "loc-new",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(createJobFromForm(buildExistingCustomerNewLocationFormData())).rejects.toThrow(
+      ALLOW_PATH_REACHED,
+    );
+
+    expect(firstInsertPayload(fixture, "locations")).toMatchObject({
+      customer_id: "cust-1",
+      nickname: "Warehouse",
+      address_line1: "200 Side St",
+      address_line2: "Suite 4",
+      city: "Lodi",
+      state: "CA",
+      zip: "95240",
+      postal_code: "95240",
+      owner_user_id: "owner-1",
+    });
+    expect(firstInsertPayload(fixture, "jobs")).toMatchObject({
+      customer_id: "cust-1",
+      location_id: "loc-new",
+      job_address: "200 Side St",
+      city: "Lodi",
+    });
+  });
+
+  it("uses the created location id for Branch 2 site/access contact creation", async () => {
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: false,
+      createdLocationId: "loc-new",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(buildExistingCustomerNewLocationFormData({ siteAccessContact: true })),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?banner=job_created");
+
+    const contactInsert = fixture.insertCalls.find((call) => call.table === "contact_recipients");
+    expect(contactInsert?.payload).toMatchObject({
+      linked_entity_type: "location",
+      linked_entity_id: "loc-new",
+      recipient_role: "site_access_contact",
+      display_name: "Onsite Manager",
+    });
   });
 
   it("preserves service job type for service-plan intake under ecc_hers mode", async () => {
