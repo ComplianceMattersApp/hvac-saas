@@ -514,7 +514,13 @@ describe("job detail field operations board layout", () => {
     expect(gridSlice).not.toContain("Save Scheduling");
     expect(gridSlice).not.toContain("Manage Equipment");
     expect(gridSlice).not.toContain("DeferredJobAttachmentsInternal");
-    expect(jobPageSource).toContain('href="#job-details-records" className={compactSecondaryButtonClass}>Close</a>');
+    expect(jobPageSource).toContain('href="#job-details-records" className={recordCloseButtonClass}>Close</a>');
+    expect(jobPageSource).toContain('import EquipmentEditCard from "./_components/EquipmentEditCard";');
+    expect(jobPageSource).toContain('import EquipmentCreateForm from "./_components/EquipmentCreateForm";');
+    expect(jobPageSource).toContain("job_systems");
+    expect(jobPageSource).toContain("<EquipmentEditCard");
+    expect(jobPageSource).toContain("<EquipmentCreateForm");
+    expect(jobPageSource).toContain("No equipment captured yet");
     expect(jobPageSource).toContain('#job-details-records:has(#edit-job:target) [data-record-launcher="edit-job"]');
     expect(panelSlice).toContain("Selected record panel");
   });
