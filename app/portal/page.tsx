@@ -1,7 +1,14 @@
 //app portal/page
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { AppAccessCtaCard } from "@/components/AppAccessCtaCard";
 import { createClient } from "@/lib/supabase/server";
+import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
+import {
+  loadAppAccessCtaEntitlementSnapshot,
+  resolveAppAccessCta,
+} from "@/lib/business/app-access-cta";
+import { getPlatformBillingAvailability } from "@/lib/business/platform-billing-stripe";
 import {
   extractFailureReasons,
   finalRunPass,
@@ -74,6 +81,20 @@ export default async function PortalPage({
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
+
+  const access = await resolveDualContextAccess({
+    supabase,
+    user: userData.user,
+  });
+  const appAccessCtaEntitlement = await loadAppAccessCtaEntitlementSnapshot({
+    supabase,
+    accountOwnerUserId: access.internalUser?.accountOwnerUserId ?? null,
+  });
+  const appAccessCta = resolveAppAccessCta({
+    access,
+    entitlement: appAccessCtaEntitlement,
+    billingAvailability: getPlatformBillingAvailability(),
+  });
 
   const portalContext = await (async () => {
     try {
@@ -449,6 +470,8 @@ export default async function PortalPage({
 
   return (
     <div className={portalPageClass}>
+      <AppAccessCtaCard cta={appAccessCta} />
+
       <div className={`${portalPanelClass} bg-white dark:bg-slate-950`}>
         <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,1fr)_220px] lg:items-start lg:gap-5">
           <div className="max-w-2xl">
