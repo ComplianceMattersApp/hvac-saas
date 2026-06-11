@@ -9322,7 +9322,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   // ✅ Read true current status from DB (source of truth)
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
-    .select("status, on_the_way_at")
+    .select("status, on_the_way_at, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, window_start, window_end, parent_job_id")
     .eq("id", id)
     .single();
 
@@ -9348,15 +9348,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
   // do not allow status flow to move into completed unless at least one
   // ECC test run has been completed. This matches the Tests workspace summary.
   if (next === "completed") {
-    const { data: jt, error: jtErr } = await supabase
-      .from("jobs")
-      .select("job_type")
-      .eq("id", id)
-      .single();
-
-    if (jtErr) throw jtErr;
-
-    if ((jt?.job_type ?? "").toLowerCase() === "ecc") {
+    if ((job?.job_type ?? "").toLowerCase() === "ecc") {
       const { data: runs, error: runErr } = await supabase
         .from("ecc_test_runs")
         .select("id, is_completed")
@@ -9382,17 +9374,11 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     const autoScheduleConfirmed =
       String(formData.get("auto_schedule_confirmed") || "").trim() === "1";
 
-    const { data: scheduleSnapshot, error: scheduleErr } = await _ftTimeSubphase(
-      "statusWrite.scheduleSnapshotRead",
-      async () =>
-        supabase
-          .from("jobs")
-          .select("scheduled_date, window_start, window_end")
-          .eq("id", id)
-          .single(),
-    );
-
-    if (scheduleErr) throw scheduleErr;
+    const scheduleSnapshot = {
+      scheduled_date: job?.scheduled_date ?? null,
+      window_start: job?.window_start ?? null,
+      window_end: job?.window_end ?? null,
+    };
 
     const hasFullSchedule =
       !!scheduleSnapshot?.scheduled_date &&
@@ -9488,13 +9474,6 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       redirect(buildJobRedirect({ banner: "status_already_updated" }));
     }
 
-    // Diagnostic re-read: confirm DB write persisted before event inserts.
-    const { data: rereadOtw } = await _ftTimeSubphase(
-      "eventBreadcrumb.diagnosticJobReread",
-      async () => supabase.from("jobs").select("status").eq("id", id).single(),
-    );
-    console.log("[ADVANCE_STATUS_REREAD]", { jobId: id, branch: "on_the_way_stamp", status_after_update: rereadOtw?.status ?? null });
-
     try {
       // Keep on_my_way close to user intent in event order.
       // assignment_added (if any) -> on_my_way -> schedule_updated (if any)
@@ -9589,20 +9568,12 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     // ✅ When field marks completed, push into Data Entry queue
     // When field marks completed, push into the correct Ops queue
     if (next === "completed") {
-      const { data: jt, error: jtErr } = await supabase
-        .from("jobs")
-        .select("job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, window_start, window_end")
-        .eq("id", id)
-        .single();
-
-      if (jtErr) throw jtErr;
-
-      const jobType = String(jt?.job_type ?? "").trim().toLowerCase();
+      const jobType = String(job?.job_type ?? "").trim().toLowerCase();
       completedJobType = jobType;
       completedAt = new Date().toISOString();
-      beforeOpsStatus = jt?.ops_status ?? null;
-      beforeFieldComplete = Boolean(jt?.field_complete);
-      beforeFieldCompleteAt = jt?.field_complete_at ?? null;
+      beforeOpsStatus = job?.ops_status ?? null;
+      beforeFieldComplete = Boolean(job?.field_complete);
+      beforeFieldCompleteAt = job?.field_complete_at ?? null;
 
       if (jobType === "ecc") {
         updatePayload.field_complete = true;
@@ -9671,36 +9642,11 @@ export async function advanceJobStatusFromForm(formData: FormData) {
       }
     }
 
-    try {
-      // Diagnostic re-read: confirm DB write persisted before post-update work.
-      const { data: rereadElse, error: rereadElseErr } = await _ftTimeSubphase(
-        "eventBreadcrumb.diagnosticJobReread",
-        async () => supabase.from("jobs").select("status").eq("id", id).single(),
-      );
-      if (rereadElseErr) throw rereadElseErr;
-      console.log("[ADVANCE_STATUS_REREAD]", { jobId: id, branch: "else", status_after_update: rereadElse?.status ?? null });
-    } catch (error) {
-      console.error("[ADVANCE_STATUS_POST_UPDATE_REREAD_FAILED]", {
-        jobId: id,
-        current,
-        next,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
     // ECC canonical resolution:
     // once the field lifecycle is marked complete, derive ops_status from ecc_test_runs
     if (next === "completed") {
       try {
-        const { data: jt2, error: jt2Err } = await supabase
-          .from("jobs")
-          .select("job_type")
-          .eq("id", id)
-          .single();
-
-        if (jt2Err) throw jt2Err;
-
-        if ((jt2?.job_type ?? "").toLowerCase() === "ecc") {
+        if ((job?.job_type ?? "").toLowerCase() === "ecc") {
           await evaluateEccOpsStatus(id, {
             timing: _ftEnabled
               ? (name, elapsedMs) => _ftRecordSubphase(`eccEvaluation.${name}`, elapsedMs)
@@ -9891,28 +9837,9 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     // Retest-specific lifecycle breadcrumb:
     // if this job is a linked retest child and it enters in_process,
     // log retest_started on BOTH the child and the parent.
-    let parentJobId = "";
-    try {
-      const { data: linkedJob, error: linkedErr } = await _ftTimeSubphase(
-        "eventBreadcrumb.linkedRetestRead",
-        async () =>
-          supabase
-            .from("jobs")
-            .select("parent_job_id")
-            .eq("id", id)
-            .maybeSingle(),
-      );
+    const parentJobId = next === "in_process" ? String(job?.parent_job_id ?? "").trim() : "";
 
-      if (linkedErr) throw linkedErr;
-      parentJobId = String(linkedJob?.parent_job_id ?? "").trim();
-    } catch (error) {
-      console.error("[ADVANCE_STATUS_LINKED_RETEST_READ_BEST_EFFORT_FAILED]", {
-        jobId: id,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    if (parentJobId && next === "in_process") {
+    if (parentJobId) {
       try {
         await _ftTimeSubphase("eventBreadcrumb.insertJobEvent.retest_started_child", async () =>
           insertJobEvent({
