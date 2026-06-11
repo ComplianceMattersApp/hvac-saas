@@ -2921,6 +2921,7 @@ const initialInterruptReason = activeWaitingState
   : onHoldReasonText;
 
 const locationId = serviceLocation?.id ?? null;
+const serviceLocationEditHref = locationId ? `/locations/${locationId}` : null;
 
 const digitsOnly = (v?: string | null) => String(v ?? "").replace(/\D/g, "");
 
@@ -4076,6 +4077,14 @@ const failureResolutionPathCount =
                     <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
                     <span className="break-words">{serviceAddressDisplay}</span>
                   </div>
+                ) : null}
+                {serviceLocationEditHref && isInternalUser ? (
+                  <Link
+                    href={serviceLocationEditHref}
+                    className="mt-2 inline-flex rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
+                  >
+                    Edit service address
+                  </Link>
                 ) : null}
               </div>
             </div>
@@ -6340,6 +6349,16 @@ const failureResolutionPathCount =
             />
           </Suspense>
         </div>
+        {serviceLocationEditHref && isInternalUser ? (
+          <div className="border-t border-slate-200/80 bg-white px-3 py-2">
+            <Link
+              href={serviceLocationEditHref}
+              className="inline-flex rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
+            >
+              Correct address
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <div id="visit-reason-card" className={`${workspaceSubtleCardClass} relative overflow-hidden border-slate-200/70 bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.24)]`}>

@@ -6,7 +6,7 @@ import {
   isInternalAccessError,
   requireInternalUser,
 } from "@/lib/auth/internal-user";
-import { updateLocationNotesFromForm } from "./notes-actions";
+import { updateLocationServiceAddressFromForm } from "./notes-actions";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 
 function isUuid(v: string) {
@@ -113,14 +113,17 @@ function customerDisplayName(customer: any) {
 
 export default async function LocationDetailPage(props: {
   params: Promise<{ id: string }>;
+  searchParams?: Promise<{ saved?: string }>;
 }) {
   const supabase = await createClient();
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
 
+  let internalUser: any;
   try {
-    await requireInternalUser({ supabase, userId: userData.user.id });
+    const internalResult = await requireInternalUser({ supabase, userId: userData.user.id });
+    internalUser = internalResult?.internalUser ?? internalResult;
   } catch (error) {
     if (isInternalAccessError(error)) {
       redirect("/login");
@@ -130,14 +133,18 @@ export default async function LocationDetailPage(props: {
   }
 
   const { id } = await props.params;
+  const sp = props.searchParams ? await props.searchParams : {};
+  const serviceAddressSaved = String(sp.saved ?? "") === "service_address";
   if (!id || !isUuid(id)) redirect("/customers");
 
   const locationId = id;
+  const accountOwnerUserId = String(internalUser?.account_owner_user_id ?? "").trim();
 
   const { data: location, error: locationErr } = await supabase
     .from("locations")
     .select("*")
     .eq("id", locationId)
+    .eq("owner_user_id", accountOwnerUserId)
     .maybeSingle();
 
   if (locationErr) throw locationErr;
@@ -157,6 +164,7 @@ export default async function LocationDetailPage(props: {
     .from("customers")
     .select("*")
     .eq("id", location.customer_id)
+    .eq("owner_user_id", accountOwnerUserId)
     .maybeSingle();
 
   if (customerErr) throw customerErr;
@@ -365,23 +373,113 @@ export default async function LocationDetailPage(props: {
       </section>
 
       <section className="rounded-lg border border-gray-200 bg-white p-4">
-        <h2 className="text-lg font-semibold text-gray-900">Location Notes</h2>
-        <p className="mt-1 text-sm text-gray-600">Internal notes for this property.</p>
-        <form action={updateLocationNotesFromForm} className="mt-4 space-y-3">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Edit Service Address
+            </h2>
+            <p className="mt-1 text-sm text-gray-600">
+              This is where jobs at this location take place.
+            </p>
+            <p className="mt-1 text-sm text-gray-600">
+              If this customer does not have a separate billing address, their billing address will stay aligned with this service address.
+            </p>
+          </div>
+          {serviceAddressSaved ? (
+            <div className="rounded-full border border-green-200 bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+              Service address saved
+            </div>
+          ) : null}
+        </div>
+
+        {totalJobs > 0 ? (
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            This saved service address is used by existing jobs. Correcting it updates the saved customer location and future job creation. Completed job snapshots are not bulk-rewritten.
+          </div>
+        ) : null}
+
+        <form action={updateLocationServiceAddressFromForm} className="mt-4 space-y-4">
           <input type="hidden" name="location_id" value={locationId} />
-          <textarea
-            name="notes"
-            defaultValue={(location as any).notes ?? ""}
-            rows={5}
-            className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
-            placeholder="Add notes for this location..."
-          />
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="grid gap-1 text-sm font-medium text-gray-700">
+              Nickname
+              <input
+                name="nickname"
+                defaultValue={(location as any).nickname ?? ""}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-gray-700">
+              Label
+              <input
+                name="label"
+                defaultValue={(location as any).label ?? ""}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-gray-700 sm:col-span-2">
+              Address Line 1
+              <input
+                name="address_line1"
+                required
+                defaultValue={(location as any).address_line1 ?? ""}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-gray-700 sm:col-span-2">
+              Address Line 2
+              <input
+                name="address_line2"
+                defaultValue={(location as any).address_line2 ?? ""}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-gray-700">
+              City
+              <input
+                name="city"
+                required
+                defaultValue={(location as any).city ?? ""}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-gray-700">
+              State
+              <input
+                name="state"
+                required
+                defaultValue={(location as any).state ?? ""}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-gray-700">
+              Zip / Postal Code
+              <input
+                name="zip"
+                required
+                defaultValue={(location as any).zip ?? (location as any).postal_code ?? ""}
+                className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-normal text-gray-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              />
+            </label>
+          </div>
+
+          <label className="grid gap-1 text-sm font-medium text-gray-700">
+            Notes
+            <textarea
+              name="notes"
+              defaultValue={(location as any).notes ?? ""}
+              rows={5}
+              className="w-full rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-normal text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/60"
+              placeholder="Add notes for this location..."
+            />
+          </label>
+
           <div>
             <button
               type="submit"
               className="inline-flex items-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
             >
-              Save
+              Save Service Address
             </button>
           </div>
         </form>

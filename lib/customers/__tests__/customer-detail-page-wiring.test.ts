@@ -129,6 +129,7 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain('name="customer_id" value={customerId}');
     expect(customerPageSource).toContain('name="location_id" value={locId}');
     expect(customerPageSource).toContain('href={`/locations/${locId}`}');
+    expect(customerPageSource).toContain("Edit Service Address");
   });
 
   it("keeps payment and service-plan controls out of Locations & Contacts tab", () => {
@@ -210,7 +211,7 @@ describe("customer detail relationship hub wiring", () => {
   it("keeps managed locations and recent active work sections", () => {
     expect(customerPageSource).toContain("Managed Locations");
     expect(customerPageSource).toContain("Recent / Active Work");
-    expect(customerPageSource).toContain("View Location");
+    expect(customerPageSource).toContain("Edit Service Address");
     expect(customerPageSource).toContain("Site / Access Contact");
   });
 

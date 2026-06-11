@@ -2095,7 +2095,7 @@ export default async function CustomerDetailPage(props: {
                             href={`/locations/${locId}`}
                             className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
                           >
-                            View Location
+                            Edit Service Address
                           </Link>
                         ) : null}
                       </div>
