@@ -1,7 +1,7 @@
 "use client";
 
 import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useFormStatus } from "react-dom";
 
 type JobFieldActionButtonProps = {
@@ -64,16 +64,6 @@ export function JobFieldActionButton({
 }: JobFieldActionButtonProps) {
   const [submitted, setSubmitted] = useState(false);
   const isDone = ["completed", "failed", "cancelled"].includes(currentStatus);
-
-  useEffect(() => {
-    if (!submitted) return;
-
-    const timeout = window.setTimeout(() => {
-      setSubmitted(false);
-    }, 1500);
-
-    return () => window.clearTimeout(timeout);
-  }, [submitted]);
 
   const label =
     currentStatus === "open"

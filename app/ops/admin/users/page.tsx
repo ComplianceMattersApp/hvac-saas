@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import {
   isInternalAccessError,
   requireInternalRole,
@@ -78,12 +79,13 @@ function FieldBillingAccessControls(params: {
               <h3 className="text-sm font-semibold text-slate-950">Field Billing Access</h3>
               <p className="text-xs leading-5 text-slate-600">These permissions do not change the user's role.</p>
             </div>
-            <button
+            <ImmediateSubmitButton
               type="submit"
+              pendingText="Saving..."
               className="inline-flex items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
             >
               Save Field Billing Access
-            </button>
+            </ImmediateSubmitButton>
           </div>
 
           <div className="mt-4 space-y-3">
@@ -581,12 +583,13 @@ export default async function AdminUsersCommandCenterPage({
               <option value="billing">Billing / AR</option>
               <option value="technician">Technician</option>
             </select>
-            <button
+            <ImmediateSubmitButton
               type="submit"
+              pendingText="Sending invite..."
               className="inline-flex items-center justify-center rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_16px_28px_-18px_rgba(15,23,42,0.45)] transition-[background-color,box-shadow,transform] hover:bg-slate-800 hover:shadow-[0_20px_30px_-18px_rgba(15,23,42,0.5)] active:translate-y-[0.5px]"
             >
               Send Invite
-            </button>
+            </ImmediateSubmitButton>
           </form>
         </div>
       </div>
@@ -661,12 +664,13 @@ export default async function AdminUsersCommandCenterPage({
                             <option value="billing">Billing / AR</option>
                             <option value="tech">Technician</option>
                           </select>
-                          <button
+                          <ImmediateSubmitButton
                             type="submit"
+                            pendingText="Updating..."
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
                             Update Role
-                          </button>
+                          </ImmediateSubmitButton>
                         </form>
                       ) : null}
 
@@ -674,22 +678,24 @@ export default async function AdminUsersCommandCenterPage({
                         record.isActiveFlag ? (
                           <form action={deactivateInternalUserFromForm}>
                             <input type="hidden" name="user_id" value={record.userId ?? ""} />
-                            <button
+                            <ImmediateSubmitButton
                               type="submit"
+                              pendingText="Pausing..."
                               className="rounded-md border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-50"
                             >
                               Pause Team Access
-                            </button>
+                            </ImmediateSubmitButton>
                           </form>
                         ) : (
                           <form action={activateInternalUserFromForm}>
                             <input type="hidden" name="user_id" value={record.userId ?? ""} />
-                            <button
+                            <ImmediateSubmitButton
                               type="submit"
+                              pendingText="Restoring..."
                               className="rounded-md border border-emerald-300 bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-50"
                             >
                               Restore Team Access
-                            </button>
+                            </ImmediateSubmitButton>
                           </form>
                         )
                       ) : null}
@@ -698,12 +704,13 @@ export default async function AdminUsersCommandCenterPage({
                         <form action={sendPasswordResetFromForm}>
                           <input type="hidden" name="email" value={record.email} />
                           <input type="hidden" name="return_to" value={returnTo} />
-                          <button
+                          <ImmediateSubmitButton
                             type="submit"
+                            pendingText="Sending..."
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
                             Recover Access
-                          </button>
+                          </ImmediateSubmitButton>
                         </form>
                       ) : null}
 
@@ -712,12 +719,13 @@ export default async function AdminUsersCommandCenterPage({
                           <input type="hidden" name="email" value={record.email} />
                           <input type="hidden" name="role" value={record.role} />
                           <input type="hidden" name="return_to" value={returnTo} />
-                          <button
+                          <ImmediateSubmitButton
                             type="submit"
+                            pendingText="Resending..."
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
                             Resend Setup Link
-                          </button>
+                          </ImmediateSubmitButton>
                         </form>
                       ) : null}
 
@@ -726,12 +734,13 @@ export default async function AdminUsersCommandCenterPage({
                           <input type="hidden" name="email" value={record.email} />
                           <input type="hidden" name="contractor_id" value={record.contractorId} />
                           <input type="hidden" name="return_to" value={returnTo} />
-                          <button
+                          <ImmediateSubmitButton
                             type="submit"
+                            pendingText="Resending..."
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
                             Resend Setup Link
-                          </button>
+                          </ImmediateSubmitButton>
                         </form>
                       ) : null}
                     </div>

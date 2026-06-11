@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import SubmitButton from "@/components/SubmitButton";
+import ImmediateSubmitButton from "@/components/ImmediateSubmitButton";
 import FlashBanner from "@/components/ui/FlashBanner";
 import { archiveJobFromForm } from "@/lib/actions/job-actions";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
@@ -7001,12 +7002,13 @@ const failureResolutionPathCount =
             <form action={markCertsCompleteFromForm}>
               <input type="hidden" name="job_id" value={job.id} />
               <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#closeout-actions`} />
-              <SubmitButton
-                loadingText="Saving..."
+              <ImmediateSubmitButton
+                type="submit"
+                pendingText="Saving..."
                 className={darkButtonClass}
               >
                 ✓ Certs Complete
-              </SubmitButton>
+              </ImmediateSubmitButton>
             </form>
           )}
 
@@ -7014,12 +7016,13 @@ const failureResolutionPathCount =
           <form action={markInvoiceCompleteFromForm}>
             <input type="hidden" name="job_id" value={job.id} />
             <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#closeout-actions`} />
-            <SubmitButton
-              loadingText="Saving..."
+            <ImmediateSubmitButton
+              type="submit"
+              pendingText="Saving..."
               className={darkButtonClass}
             >
               ✓ Mark External Billing Complete
-            </SubmitButton>
+            </ImmediateSubmitButton>
           </form>
         )}
       </div>
@@ -7962,12 +7965,13 @@ const failureResolutionPathCount =
 
       <form action={completeDataEntryFromForm} className="shrink-0">
         <input type="hidden" name="job_id" value={job.id} />
-        <SubmitButton
-          loadingText="Saving..."
+        <ImmediateSubmitButton
+          type="submit"
+          pendingText="Saving..."
           className={darkButtonClass}
         >
           Mark External Billing Complete
-        </SubmitButton>
+        </ImmediateSubmitButton>
       </form>
     </div>
   </div>
