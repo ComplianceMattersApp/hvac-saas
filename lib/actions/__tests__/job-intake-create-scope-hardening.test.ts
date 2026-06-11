@@ -96,6 +96,7 @@ function buildInternalServiceIntakeFormData(options?: {
   maintenanceAgreementId?: string;
   serviceVisitType?: "diagnostic" | "repair" | "install" | "return_visit" | "callback" | "maintenance";
   intakeContext?: "app" | "portal";
+  equipmentJson?: string;
 }) {
   const formData = new FormData();
   formData.set("job_type", "service");
@@ -114,6 +115,9 @@ function buildInternalServiceIntakeFormData(options?: {
   }
   if (options?.intakeContext) {
     formData.set("intake_context", options.intakeContext);
+  }
+  if (typeof options?.equipmentJson === "string") {
+    formData.set("equipment_json", options.equipmentJson);
   }
   return formData;
 }
@@ -348,6 +352,15 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
         return {
           data: {
             id: "event-1",
+          },
+          error: null,
+        };
+      }
+
+      if (table === "contractor_intake_submissions") {
+        return {
+          data: {
+            id: "proposal-1",
           },
           error: null,
         };
@@ -1083,17 +1096,62 @@ describe("job intake create same-account hardening", () => {
           intakeContext: "portal",
         }),
       ),
-    ).rejects.toThrow(ALLOW_PATH_REACHED);
+    ).rejects.toThrow("REDIRECT:/jobs/new?err=contractor_proposal_submitted");
 
-    const jobsInsertCall = fixture.insertCalls.find((call) => call.table === "jobs");
-    const jobsPayloadRaw = jobsInsertCall?.payload;
-    const jobsPayload = (
-      Array.isArray(jobsPayloadRaw) ? jobsPayloadRaw[0] : jobsPayloadRaw
-    ) as Record<string, unknown> | null | undefined;
+    const proposalPayload = firstInsertPayload(fixture, "contractor_intake_submissions");
+    expect(proposalPayload).toBeTruthy();
+    expect(String(proposalPayload?.proposed_job_notes ?? "")).not.toContain("Contractor proposal summary");
+    expect(fixture.writeCalls.some((call) => call.table === "jobs")).toBe(false);
+    expect(fixture.writeCalls.some((call) => call.table === "job_events")).toBe(false);
+  });
 
-    expect(jobsPayload).toBeTruthy();
-    expect(jobsPayload?.visit_scope_summary ?? null).toBeNull();
-    expect(Array.isArray(jobsPayload?.visit_scope_items) ? jobsPayload.visit_scope_items : []).toEqual([]);
+  it("stores portal intake equipment as proposed proposal context without canonical equipment writes", async () => {
+    const fixture = buildSupabaseFixture({ throwOnJobsInsert: true, contractorId: "ctr-1" });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalServiceIntakeFormData({
+          visitScopeSummary: "Contractor proposal summary",
+          visitScopeItemsJson: '[{"title":"Proposed scope","kind":"primary"}]',
+          intakeContext: "portal",
+          equipmentJson: JSON.stringify({
+            systems: [
+              {
+                name: "Upstairs",
+                components: [
+                  {
+                    type: "furnace",
+                    manufacturer: "Trane",
+                    model: "TUH",
+                    serial: "123",
+                    heating_capacity_kbtu: "80",
+                    heating_output_btu: "64000",
+                    heating_efficiency_percent: "80",
+                    notes: "Contractor supplied",
+                  },
+                ],
+              },
+            ],
+          }),
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/new?err=contractor_proposal_submitted");
+
+    const proposalPayload = firstInsertPayload(fixture, "contractor_intake_submissions");
+    expect(String(proposalPayload?.proposed_job_notes ?? "")).toContain("Proposed equipment:");
+    expect(String(proposalPayload?.proposed_job_notes ?? "")).toContain("- System: Upstairs");
+    expect(String(proposalPayload?.proposed_job_notes ?? "")).toContain("Furnace: manufacturer Trane");
+    expect(fixture.writeCalls.some((call) => call.table === "job_systems")).toBe(false);
+    expect(fixture.writeCalls.some((call) => call.table === "job_equipment")).toBe(false);
   });
 
   it("does not switch active app plus portal intake into contractor mode without explicit portal context", async () => {

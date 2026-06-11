@@ -26,6 +26,7 @@ import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import { formatEccEventLabel } from "@/lib/ecc/ecc-workflow-display";
+import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -334,7 +335,22 @@ export default async function PortalJobDetailPage({
       parent_job_id, contractor_id, job_type,
       contractors:contractor_id ( owner_user_id ),
       locations:location_id ( address_line1, address_line2, city, state, zip ),
-      customers:customer_id ( id, full_name, first_name, last_name, phone )
+      customers:customer_id ( id, full_name, first_name, last_name, phone ),
+      job_equipment (
+        id,
+        equipment_role,
+        system_location,
+        manufacturer,
+        model,
+        serial,
+        tonnage,
+        heating_capacity_kbtu,
+        heating_output_btu,
+        heating_efficiency_percent,
+        refrigerant_type,
+        notes,
+        created_at
+      )
       `
     )
     .eq("id", jobId)
@@ -1001,6 +1017,39 @@ export default async function PortalJobDetailPage({
           </div>
         </section>
       ) : null}
+
+      <section className={`${portalPanelClass} space-y-5`}>
+        <div>
+          <div className="text-base font-semibold text-slate-950 dark:text-slate-100">Equipment</div>
+          <div className="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">
+            Equipment is managed by Compliance Matters after intake review. Use notes below to share equipment updates for this job.
+          </div>
+        </div>
+
+        {Array.isArray((job as any).job_equipment) && (job as any).job_equipment.length > 0 ? (
+          <div className="space-y-2">
+            {(job as any).job_equipment.map((equipment: any) => (
+              <div key={String(equipment.id)} className={`${portalInsetClass} p-3.5`}>
+                <div className="text-sm font-medium text-slate-950 dark:text-slate-100">
+                  {String(equipment.system_location ?? "").trim() || "System"}
+                </div>
+                <div className="mt-1 text-sm leading-6 text-slate-700 dark:text-slate-200">
+                  {buildEquipmentSummaryLine(equipment)}
+                </div>
+                {String(equipment.notes ?? "").trim() ? (
+                  <div className="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                    Notes: {String(equipment.notes ?? "").trim()}
+                  </div>
+                ) : null}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className={`${portalInsetClass} text-sm text-slate-600 dark:text-slate-300`}>
+            No equipment has been added for this job yet.
+          </div>
+        )}
+      </section>
 
       <section className={`${portalPanelClass} space-y-5`}>
         <div>

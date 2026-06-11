@@ -52,6 +52,20 @@ function normalizeText(value: unknown) {
   return String(value ?? "").trim();
 }
 
+function splitProposedEquipmentNotes(value: unknown) {
+  const raw = normalizeText(value);
+  const marker = "Proposed equipment:";
+  const markerIndex = raw.indexOf(marker);
+  if (markerIndex < 0) {
+    return { generalNotes: raw, proposedEquipment: "" };
+  }
+
+  return {
+    generalNotes: raw.slice(0, markerIndex).trim(),
+    proposedEquipment: raw.slice(markerIndex + marker.length).trim(),
+  };
+}
+
 function formatDateTime(value: string | null) {
   if (!value) return "-";
   const dt = new Date(value);
@@ -303,6 +317,7 @@ export default async function ContractorIntakeSubmissionDetailPage({
   ]
     .filter(Boolean)
     .join(" ");
+  const proposalNotes = splitProposedEquipmentNotes(submission.proposed_job_notes);
 
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-4 text-gray-900 sm:p-6">
@@ -390,6 +405,14 @@ export default async function ContractorIntakeSubmissionDetailPage({
               <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Notes</dt>
               <dd className="mt-0.5 text-sm text-slate-700">{normalizeText(submission.proposed_job_notes) || "—"}</dd>
             </div>
+            {proposalNotes.proposedEquipment ? (
+              <div>
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Proposed equipment</dt>
+                <dd className="mt-0.5 whitespace-pre-wrap rounded-xl border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-950">
+                  {proposalNotes.proposedEquipment}
+                </dd>
+              </div>
+            ) : null}
             {proposedTypeIsEcc && proposedPermitNum ? (
               <div>
                 <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Permit #</dt>

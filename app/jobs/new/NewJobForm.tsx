@@ -31,6 +31,12 @@ import {
 import type { ProductMode } from "@/lib/business/product-mode-defaults";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
+import {
+  EQUIPMENT_ROLE_OPTIONS,
+  equipmentRoleLabel,
+  equipmentUsesRefrigerant,
+  isHeatingOnlyEquipment,
+} from "@/lib/utils/equipment-display";
 
 type Contractor = { id: string; name: string };
 
@@ -99,17 +105,7 @@ type MaintenanceAgreementPrefill = {
     category?: string | null;
   }>;
 };
-type ComponentType =
-  | "condenser_ac"
-  | "coil"
-  | "heat_pump_outdoor"
-  | "furnace_gas"
-  | "air_handler_electric"
-  | "package_gas_electric"
-  | "package_heat_pump"
-  | "mini_split_outdoor"
-  | "mini_split_head"
-  | "other";
+type ComponentType = (typeof EQUIPMENT_ROLE_OPTIONS)[number]["value"];
 
 type EquipmentComponent = {
   id: string;
@@ -217,30 +213,11 @@ function uid() {
 }
 
 function componentLabel(t: ComponentType) {
-  switch (t) {
-    case "condenser_ac":
-      return "Condenser (A/C)";
-    case "heat_pump_outdoor":
-      return "Heat Pump (Outdoor)";
-    case "furnace_gas":
-      return "Furnace (Gas)";
-    case "air_handler_electric":
-      return "Air Handler (Electric)";
-    case "package_gas_electric":
-      return "Package Unit (Gas/Electric)";
-    case "package_heat_pump":
-      return "Package Unit (Heat Pump)";
-    case "mini_split_outdoor":
-      return "Mini-Split Outdoor";
-    case "mini_split_head":
-      return "Mini-Split Indoor Head";
-    default:
-      return "Other";
-  }
+  return equipmentRoleLabel(t);
 }
 
 function componentUsesHeatingCapacity(t: ComponentType) {
-  return t === "furnace_gas";
+  return isHeatingOnlyEquipment(t);
 }
 
 function customerDisplayName(row: CustomerLookupRow | ExistingCustomer) {
@@ -3355,12 +3332,14 @@ const [billingRecipient, setBillingRecipient] = useState<
             ) : null}
 
             {/* Optional Equipment */}
-            {isInternalMode ? (
+            {isInternalMode || isContractorMode ? (
             <section className={guidedSectionShellClass}>
               {renderGuidedSectionIntro({
                 icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
-                title: "Additional Details",
-                description: productMode === "ecc_hers"
+                title: isContractorMode ? "Equipment" : "Additional Details",
+                description: isContractorMode
+                  ? "Add equipment now so Compliance Matters has the system details before the job is reviewed."
+                  : productMode === "ecc_hers"
                   ? "Supporting information only. Add it when it helps the compliance job move forward."
                   : "Supporting information only. Add it when it helps this work order move forward.",
                 summary: additionalDetailsSummary,
@@ -3434,9 +3413,11 @@ const [billingRecipient, setBillingRecipient] = useState<
               <div className={`${guidedSectionInsetClass} space-y-3`}>
           {renderSupportingSectionHeader({
             icon: <Wrench className="h-4 w-4" aria-hidden="true" />,
-            title: "Equipment systems",
-            description: "Add systems only when needed.",
-            trailing: (
+                  title: "Equipment systems",
+                  description: isContractorMode
+                    ? "Proposed equipment is intake context. Compliance Matters will verify final equipment before it becomes job equipment."
+                    : "Add systems only when needed.",
+                  trailing: (
               <button
                 type="button"
                 className={secondaryCompactButtonClass}
@@ -3500,15 +3481,11 @@ const [billingRecipient, setBillingRecipient] = useState<
                       }}
                     >
                       <option value="">- Select -</option>
-                      <option value="condenser_ac">Condenser (A/C)</option>
-                      <option value="heat_pump_outdoor">Heat Pump (Outdoor)</option>
-                      <option value="furnace_gas">Furnace (Gas)</option>
-                      <option value="air_handler_electric">Air Handler (Electric)</option>
-                      <option value="package_gas_electric">Package Unit (Gas/Electric)</option>
-                      <option value="package_heat_pump">Package Unit (Heat Pump)</option>
-                      <option value="mini_split_outdoor">Mini-Split Outdoor</option>
-                      <option value="mini_split_head">Mini-Split Indoor Head</option>
-                      <option value="other">Other</option>
+                      {EQUIPMENT_ROLE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -3584,11 +3561,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                           )}
                         </div>
 
-                        {(c.type === "condenser_ac" ||
-                          c.type === "heat_pump_outdoor" ||
-                          c.type === "package_gas_electric" ||
-                          c.type === "package_heat_pump" ||
-                          c.type === "mini_split_outdoor") && (
+                        {equipmentUsesRefrigerant(c.type) && (
                           <input
                             className="w-full rounded-md border border-slate-300 p-2"
                             placeholder="Refrigerant type (optional)"
@@ -3614,6 +3587,8 @@ const [billingRecipient, setBillingRecipient] = useState<
               {/* equipment_json payload */}
               <input type="hidden" name="equipment_json" value={equipmentJson} />
               </div>
+              {isInternalMode ? (
+                <>
               <div className={`${guidedSectionInsetClass} space-y-3`}>
                 {renderSupportingSectionHeader({
                   icon: <Camera className="h-4 w-4" aria-hidden="true" />,
@@ -3643,6 +3618,8 @@ const [billingRecipient, setBillingRecipient] = useState<
                   className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"
                 />
               </div>
+                </>
+              ) : null}
                 </>
               ) : null}
               </div>

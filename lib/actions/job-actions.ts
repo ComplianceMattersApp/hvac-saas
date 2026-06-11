@@ -84,6 +84,7 @@ import {
 import type { JobStatus } from "@/lib/types/job";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
+import { equipmentRoleLabel } from "@/lib/utils/equipment-display";
 import {
   buildContractorProposalSubmissionFields,
   deriveInternalIntakeJobTitle,
@@ -7273,6 +7274,60 @@ async function requireOperationalIntakeCreateEntitlementAccess(params: {
   redirect(`/ops/admin/company-profile?${search.toString()}`);
 }
 
+function formatContractorProposedEquipmentForNotes(equipmentPayload: any) {
+  const systems = Array.isArray(equipmentPayload?.systems) ? equipmentPayload.systems : [];
+  const lines: string[] = [];
+
+  for (const system of systems) {
+    const systemName = String(system?.name ?? "").trim();
+    const components = Array.isArray(system?.components) ? system.components : [];
+    if (!systemName || components.length === 0) continue;
+
+    const componentLines = components
+      .map((component: any) => {
+        const canonicalRole = mapToCanonicalRole(String(component?.type ?? ""));
+        if (!canonicalRole) return "";
+
+        const details = [
+          String(component?.manufacturer ?? "").trim() ? `manufacturer ${String(component.manufacturer).trim()}` : "",
+          String(component?.model ?? "").trim() ? `model ${String(component.model).trim()}` : "",
+          String(component?.serial ?? "").trim() ? `serial ${String(component.serial).trim()}` : "",
+          String(component?.tonnage ?? "").trim() ? `tonnage ${String(component.tonnage).trim()}` : "",
+          String(component?.heating_capacity_kbtu ?? "").trim()
+            ? `heating input ${String(component.heating_capacity_kbtu).trim()} KBTU/h`
+            : "",
+          String(component?.heating_output_btu ?? "").trim()
+            ? `heating output ${String(component.heating_output_btu).trim()} BTU/h`
+            : "",
+          String(component?.heating_efficiency_percent ?? "").trim()
+            ? `efficiency ${String(component.heating_efficiency_percent).trim()}%`
+            : "",
+          String(component?.refrigerant_type ?? "").trim()
+            ? `refrigerant ${String(component.refrigerant_type).trim()}`
+            : "",
+          String(component?.notes ?? "").trim() ? `notes ${String(component.notes).trim()}` : "",
+        ].filter(Boolean);
+
+        return `  - ${equipmentRoleLabel(canonicalRole)}${details.length ? `: ${details.join("; ")}` : ""}`;
+      })
+      .filter(Boolean);
+
+    if (componentLines.length > 0) {
+      lines.push(`- System: ${systemName}`);
+      lines.push(...componentLines);
+    }
+  }
+
+  return lines.length ? `Proposed equipment:\n${lines.join("\n")}` : "";
+}
+
+function appendContractorProposedEquipmentToNotes(notes: string, equipmentPayload: any) {
+  const proposedEquipment = formatContractorProposedEquipmentForNotes(equipmentPayload);
+  if (!proposedEquipment) return notes;
+  const base = String(notes ?? "").trim();
+  return [base, proposedEquipment].filter(Boolean).join("\n\n");
+}
+
 export async function createContractorProposalAttachmentUploadToken(input: {
   submissionId: string;
   fileName: string;
@@ -8573,7 +8628,7 @@ function canContractorWriteEvent(event_type: string) {
   }
 
   // ---- Branch 1: existing customer + existing location ----
-  if (existingCustomerId && existingLocationId) {
+  if (!isContractorUser && existingCustomerId && existingLocationId) {
     const existingDuplicateId = await findExistingIntakeDuplicate({
       customerId: existingCustomerId,
       locationId: existingLocationId,
@@ -8663,10 +8718,10 @@ function canContractorWriteEvent(event_type: string) {
   }
 
   // Contractor proposal seam:
-  // when canonical customer+location are not explicitly supplied,
-  // persist intake proposal data for internal finalization instead of
-  // creating canonical customer/location entities in this path.
-  if (isContractorUser && (!existingCustomerId || !existingLocationId)) {
+  // Explicit portal contractor intake is always a proposal for internal review.
+  // Resolved customer/location values are used only as proposal snapshots here;
+  // canonical job, system, and equipment writes remain internal-controlled.
+  if (isContractorUser) {
     const submittingUserId = String(userId ?? "").trim();
     const proposalContractorId = String(contractorIdFinal ?? "").trim();
     const proposalOwnerUserId = String(canonicalOwnerUserId ?? "").trim();
@@ -8741,9 +8796,14 @@ function canContractorWriteEvent(event_type: string) {
       redirect("/jobs/new?err=contractor_proposal_submit_failed");
     }
 
+    const proposedNotesWithEquipment = appendContractorProposedEquipmentToNotes(
+      jobNotesFinal,
+      equipmentPayload,
+    );
+
     const proposalFields = buildContractorProposalSubmissionFields({
       resolvedTitle: titleFinal,
-      jobNotesRaw: jobNotesFinal,
+      jobNotesRaw: proposedNotesWithEquipment,
     });
 
     const proposalWriteClient = createAdminClient();
