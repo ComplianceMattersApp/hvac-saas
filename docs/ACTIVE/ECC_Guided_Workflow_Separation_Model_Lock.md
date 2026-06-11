@@ -138,15 +138,17 @@ Internal confirmed `Retest Ready` means:
 Actions:
 
 - `Move to Needs Scheduling`
-- `Schedule Retest Now` remains deferred.
+- `Schedule Retest Now`
 
 Linked retest behavior:
 
 - The linked retest job continues the same service case/history.
 - The original failed job remains the historical failed/correction record.
 - `Move to Needs Scheduling` creates the linked retest child as `need_to_schedule`.
+- `Schedule Retest Now` creates the linked retest child and schedules it immediately.
 - The retest child becomes the active scheduling item immediately after creation.
 - The retest child becomes field-actionable only when its own scheduling/assignment rules make it actionable.
+- The original failed/correction job becomes historical/passive after the linked retest child exists.
 
 Rejected behavior:
 
@@ -230,8 +232,9 @@ Recorded decisions:
 - Contractor `retest_ready_requested` remains an event/portal signal until internal confirmation.
 - Internal confirmed Retest Ready is stored as `ops_status = retest_needed` plus a `retest_ready_confirmed` history event.
 - Internal confirmed Retest Ready offers `Move to Needs Scheduling`.
-- `Schedule Retest Now` remains deferred.
+- Internal confirmed Retest Ready offers `Schedule Retest Now`.
 - Move to Needs Scheduling creates the linked retest child job.
+- Schedule Retest Now creates the linked retest child job and schedules it immediately.
 - Linked retest jobs continue the same service case/history.
 - Original failed jobs remain historical failed/correction records.
 - ECC handoff is separate from permit, failed, correction, and retest workflows.
@@ -245,7 +248,6 @@ Owner decisions still deferred:
 
 - What exact internal action name should represent "request more correction" after review.
 - Whether handoff returned/needs-review should use existing `rejected` handoff status plus copy, or needs a future explicit returned status.
-- Schedule Retest Now interaction details.
 - Install with Permit guided workflow details.
 
 ---
@@ -257,6 +259,7 @@ Implemented current slices after this docs lock:
 - `ECC-B: Permit Needed automatic blocker + Permit Available action`
 - `ECC-C: Failed / Corrections Submitted / Retest Ready display cleanup`
 - `ECC-D: Confirm Retest Ready + Move to Needs Scheduling linked retest bridge`
+- `ECC-D parity: Schedule Retest Now linked retest bridge`
 
 Current implemented behavior:
 
@@ -265,11 +268,11 @@ Current implemented behavior:
 - Retest Ready Requested remains contractor/event signal only.
 - Confirm Retest Ready creates the confirmed internal state.
 - Move to Needs Scheduling creates the linked retest child as the active scheduling item.
+- Schedule Retest Now creates the linked retest child and schedules it immediately.
 - Original failed/correction parent becomes historical/passive after child creation.
 
 Still not implemented in the current pass:
 
-- Schedule Retest Now.
 - Handoff state changes.
 - Portal redesign.
 - Invoice/payment behavior changes.

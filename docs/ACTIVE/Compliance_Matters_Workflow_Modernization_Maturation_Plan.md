@@ -7,6 +7,23 @@ Mode: Audit-first planning document. No implementation, schema, migration, Supab
 
 ---
 
+## 0.1 June 2026 Polish Closeout Lock
+
+Recent committed/pushed polish lanes are closed for the current baseline and should be treated as active workflow constraints:
+
+- Customer multi-location job intake is restored. Customers/accounts can have multiple saved service addresses; `customers` remains account/contact/billing identity, `locations` remains saved service-address truth, and jobs continue to store `location_id` plus copied job address snapshot fields.
+- `/jobs/new` supports choosing a saved service address or adding a new service address. Saved service addresses can be edited/corrected. Billing sync stays aligned only when billing was blank or matched the old service address; intentionally different billing is preserved. Completed job snapshots are not bulk-rewritten.
+- ECC confirmed Retest Ready now has parity controls: Move to Needs Scheduling and Schedule Retest Now. Schedule Retest Now creates the linked retest child and schedules it immediately. Parent/original jobs become historical/passive after linked retest child creation. Invoice/payment/cert truth remains separate.
+- Dual Context V1A is locked: portal access and full-app access are separate; portal access survives expired/cancelled app access; active app + portal defaults to app and shows Partner Work; expired app + portal defaults to portal; expired app only routes to inactive access.
+- `/jobs/new` requires explicit portal intake context for contractor/portal submission and must not switch context solely because the same email has contractor membership.
+- Portal equipment capture is intake-context only. Contractors may provide proposed equipment during portal intake, but after a real job exists contractors cannot add/edit/delete canonical job equipment. Internal users retain final control over `job_systems` / `job_equipment`.
+- Portal-to-app CTA is visibility/routing only: portal-only never-trialed users can start the existing 14-day trial path; expired trial users resume through paid checkout, not a second free trial; cancelled/inactive users reactivate where safely supported; active app + portal users can open the app; portal work remains visible while app access is inactive.
+- Account Device Setup notification-card layout is corrected with no notification logic or PWA behavior change.
+
+Deferred/parked: job-only address snapshot correction only if needed later, true default service-location flag only if inferred ordering becomes confusing, broader customer/location IA redesign, contractor post-job equipment edit/delete, portal equipment multi-entry expansion, Install with Permit guided workflow, ECC handoff cleanup, and broader metadata consolidation.
+
+---
+
 ## 1. Purpose
 
 This document captures the newly clarified real-world workflow direction for Compliance Matters Software.

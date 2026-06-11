@@ -5,6 +5,20 @@ Mode: Documentation/planning only
 Authority: Subordinate to Active Spine and existing ACTIVE runbooks/roadmaps  
 Date: 2026-05-08
 
+## June 2026 Access / Portal / Location / Workflow Polish Closeout
+
+- Status: CLOSED for current implementation lanes.
+- Customer multi-location job intake is restored: accounts/customers can have multiple saved service addresses, `customers` remains account/contact/billing identity, `locations` remains saved service-address truth, and jobs keep `location_id` plus copied job address snapshot fields.
+- `/jobs/new` now visibly supports choosing an existing saved service address or adding a new service address during job intake.
+- Saved service-address editing/correction is complete. Billing sync rule is locked: if billing was blank or matched the old service address, billing remains aligned after correction; if billing was intentionally different, it is preserved. Completed job snapshots are not bulk-rewritten.
+- ECC retest scheduling parity is complete. Confirmed Retest Ready supports Move to Needs Scheduling and Schedule Retest Now. Schedule Retest Now creates the linked retest child and schedules it immediately. Parent/original jobs become historical/passive after the linked retest child exists. Invoice/payment/cert truth remains separate.
+- Dual Context V1A is complete. Portal access and full-app access are separate; portal access survives expired/cancelled app access; active app + portal defaults to app and shows Partner Work; expired app + portal defaults to portal; expired app only routes to inactive access.
+- `/jobs/new` no longer switches into contractor/portal submission merely because the same email has contractor membership. Portal context requires explicit portal intake context.
+- Contractor portal proposed-equipment intake capture is complete. Contractor-provided equipment is intake context only, not canonical post-job equipment authority. After a real job exists, contractors cannot add/edit/delete canonical job equipment; portal job detail may show equipment read-only and direct updates through notes/comments; internal users retain final control over `job_systems` / `job_equipment`.
+- Portal-to-app signup/reactivation CTA is complete. Portal-only never-trialed users can start the existing 14-day trial path. Expired trial users are directed to resume app access through paid checkout, not another free trial. Cancelled/inactive users are directed to reactivate where safely supported. Active app + portal users can open the app. Portal work remains visible while app access is inactive.
+- Account Device Setup layout polish is complete. The Account notification card layout is corrected; notification logic and PWA behavior did not change.
+- Deferred/parked: job-only address snapshot correction only if needed later; true default service-location flag only if inferred ordering becomes confusing; broader customer/location IA redesign; contractor post-job equipment edit/delete; portal equipment multi-entry expansion; Install with Permit guided workflow; ECC handoff cleanup; broader metadata consolidation.
+
 ## Payments / Deposits Reporting Foundation Closeout
 
 - Status: CLOSED for current reporting foundation.

@@ -56,6 +56,7 @@ ECC-side maturation:
 - `Retest Ready Requested` remains a contractor/event signal only.
 - `Retest Ready` exists only after internal confirmation.
 - `Move to Needs Scheduling` creates a linked retest child.
+- `Schedule Retest Now` creates the linked retest child and schedules it immediately.
 - The original failed/correction job becomes historical/passive after the retest child exists.
 - The retest child becomes the active scheduling item.
 - ECC handoff remains separate from permit, failed/correction, retest, and cert closeout blockers.
@@ -132,8 +133,9 @@ Retest path:
 
 - Contractor `Retest Ready Requested` is event-only and does not mean confirmed Retest Ready.
 - Internal confirmation creates the confirmed `Retest Ready` state.
-- Confirmed Retest Ready exposes `Move to Needs Scheduling`.
+- Confirmed Retest Ready exposes `Move to Needs Scheduling` and `Schedule Retest Now`.
 - `Move to Needs Scheduling` creates the linked retest child job.
+- `Schedule Retest Now` creates the linked retest child job and schedules it immediately.
 - The linked retest child starts as the active `need_to_schedule` work item.
 - The original failed/correction job becomes passive/historical once the active child exists.
 

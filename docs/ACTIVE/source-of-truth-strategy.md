@@ -16,7 +16,16 @@ This is locked to prevent drift, regressions, and “snapshot vs normalized” c
 
 ### Canonical Sources
 - **Customers:** `customers` table is the canonical source of customer identity + contact details.
-- **Locations:** `locations` table is the canonical source of job site address details.
+- **Locations:** `locations` table is the canonical source of saved service-address/job-site address details. Customers/accounts can have multiple saved service addresses.
+
+### June 2026 Customer / Location Closeout
+- Multi-location job intake is restored. `/jobs/new` supports choosing an existing saved service address or adding a new service address.
+- `customers` remains account/contact/billing identity. Do not collapse service-address truth back into the customer row.
+- `locations` remains saved service-address truth.
+- Jobs continue to store `location_id` plus copied job address snapshot fields.
+- Saved service addresses can be edited/corrected.
+- Billing sync rule: if billing was blank or matched the old service address, billing stays aligned after correction; if billing was intentionally different, it is preserved.
+- Completed job snapshots are not bulk-rewritten as part of service-address correction.
 
 ### Snapshot Fields (Operational Convenience)
 Some screens still read snapshot fields from `jobs` (e.g., `customer_phone`, `job_address`, `city`).  
