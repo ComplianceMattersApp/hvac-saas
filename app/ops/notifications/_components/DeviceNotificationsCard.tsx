@@ -310,7 +310,7 @@ export function DeviceNotificationsCard({
         <DeviceInstallHelper />
 
         <div className="rounded-xl border border-slate-200 bg-slate-50/90 p-4">
-          <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex flex-col gap-4">
             <div className="flex min-w-0 gap-3">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 text-blue-700">
                 <Bell className="h-5 w-5" aria-hidden="true" />
@@ -342,12 +342,12 @@ export function DeviceNotificationsCard({
               </div>
             </div>
 
-            <div className="flex shrink-0 flex-wrap gap-2 md:justify-end">
+            <div className="flex flex-wrap gap-2">
               {canDisable ? (
                 <button
                   type="button"
                   onClick={() => void handleDisable()}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   <BellOff className="h-4 w-4" aria-hidden="true" />
                   Not now
@@ -356,7 +356,7 @@ export function DeviceNotificationsCard({
                 <button
                   type="button"
                   onClick={() => void handleEnable()}
-                  className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-blue-700 bg-blue-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-blue-700 bg-blue-700 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                   disabled={!canEnable}
                 >
                   <Bell className="h-4 w-4" aria-hidden="true" />
