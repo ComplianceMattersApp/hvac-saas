@@ -155,7 +155,7 @@ Plain-language outcome:
 - Job page became the work and billing readiness surface.
 - Print invoice became the clean customer-facing invoice output.
 - No database truth layers were collapsed.
-- For ECC, invoice/payment/no-charge truth remains separate from cert closeout truth. ECC invoice send may be allowed while cert closeout remains blocked by Permit Needed, Failed / Correction Required, Corrections Submitted / Under Review, or Retest Ready. Invoice send, payment collection, no-charge handling, and external billing must not auto-clear ECC blockers.
+- For ECC, invoice/payment/no-charge truth remains separate from cert closeout truth. ECC invoice send may be allowed while cert closeout remains blocked by Permit Needed, Failed / Correction Required, Corrections Submitted / Under Review, or Retest Ready. Invoice send, payment collection, no-charge handling, and external billing must not auto-clear ECC blockers. See `docs/ACTIVE/Guided_Workflow_Maturation_Closeout.md` for the current service/ECC guided workflow closeout.
 
 ## 6. Explicit Non-Actions
 

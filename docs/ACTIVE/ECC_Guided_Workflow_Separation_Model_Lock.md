@@ -1,12 +1,12 @@
 # ECC Guided Workflow Separation Model Lock
 
-Status: ACTIVE MODEL LOCK
+Status: ACTIVE MODEL LOCK - current ECC guided workflow slices implemented for Permit Needed, failed/correction display, confirmed Retest Ready, and Move to Needs Scheduling.
 
-Purpose: Freeze the ECC guided workflow model before implementation. This document separates ECC blocker, failure, retest, handoff, and cert-closeout behavior from the service follow-up workflow.
+Purpose: Freeze the ECC guided workflow model and record the current implemented state. This document separates ECC blocker, failure, retest, handoff, and cert-closeout behavior from the service follow-up workflow.
 
 Authority: Subordinate to `docs/ACTIVE/Active Spine V4.0 Current.md` and aligned with `docs/ACTIVE/Compliance_Matters_Workflow_Modernization_Maturation_Plan.md`, `docs/ACTIVE/ECC_Test_Workflow_Maturity_Closeout.md`, and current invoice/payment source-of-truth specs.
 
-Mode: Docs/model lock only. This document authorizes no product code, schema, migration, Supabase, portal, invoice, payment, service workflow, or runtime behavior changes by itself.
+Mode: Docs/model lock only. This document authorizes no new product code, schema, migration, Supabase, portal, invoice, payment, service workflow, or runtime behavior changes by itself.
 
 ---
 
@@ -137,14 +137,16 @@ Internal confirmed `Retest Ready` means:
 
 Actions:
 
-- `Schedule Retest Now`
 - `Move to Needs Scheduling`
+- `Schedule Retest Now` remains deferred.
 
 Linked retest behavior:
 
 - The linked retest job continues the same service case/history.
 - The original failed job remains the historical failed/correction record.
-- The retest child becomes the active field work item when scheduled/assigned.
+- `Move to Needs Scheduling` creates the linked retest child as `need_to_schedule`.
+- The retest child becomes the active scheduling item immediately after creation.
+- The retest child becomes field-actionable only when its own scheduling/assignment rules make it actionable.
 
 Rejected behavior:
 
@@ -226,7 +228,10 @@ Recorded decisions:
 - Failed blocks cert closeout but does not automatically block invoice send.
 - Contractor correction submission should be displayed as Corrections Submitted / Under Review, not raw `pending_office_review`.
 - Contractor `retest_ready_requested` remains an event/portal signal until internal confirmation.
-- Internal confirmed Retest Ready should offer Schedule Retest Now and Move to Needs Scheduling.
+- Internal confirmed Retest Ready is stored as `ops_status = retest_needed` plus a `retest_ready_confirmed` history event.
+- Internal confirmed Retest Ready offers `Move to Needs Scheduling`.
+- `Schedule Retest Now` remains deferred.
+- Move to Needs Scheduling creates the linked retest child job.
 - Linked retest jobs continue the same service case/history.
 - Original failed jobs remain historical failed/correction records.
 - ECC handoff is separate from permit, failed, correction, and retest workflows.
@@ -236,32 +241,35 @@ Recorded decisions:
 - Invoice/payment/no-charge actions must not clear ECC blockers.
 - Portal must use plain ECC language and avoid raw internal statuses.
 
-Owner decisions still required before implementation:
+Owner decisions still deferred:
 
-- Whether internal confirmed Retest Ready should be stored as `ops_status = retest_needed`, an event/projection, or both.
-- Whether `Permit Needed` should be written immediately during closeout evaluation or only displayed until the user attempts cert closeout.
 - What exact internal action name should represent "request more correction" after review.
 - Whether handoff returned/needs-review should use existing `rejected` handoff status plus copy, or needs a future explicit returned status.
+- Schedule Retest Now interaction details.
+- Install with Permit guided workflow details.
 
 ---
 
 ## 11. Implementation Slice Lock
 
-Recommended next implementation slice after this docs lock:
+Implemented current slices after this docs lock:
 
-`ECC-B: Permit Needed automatic blocker + Permit Available action`
+- `ECC-B: Permit Needed automatic blocker + Permit Available action`
+- `ECC-C: Failed / Corrections Submitted / Retest Ready display cleanup`
+- `ECC-D: Confirm Retest Ready + Move to Needs Scheduling linked retest bridge`
 
-Scope should be narrow:
+Current implemented behavior:
 
-- Detect eligible ECC closeout/cert attempt or evaluation with blank permit.
-- Surface `Pending Info: Permit Needed`.
-- Add/confirm `Permit Available` action using existing permit save/recompute behavior.
-- Keep invoice send allowed.
-- Add focused tests.
+- Permit Needed blocks cert closeout, not invoice truth.
+- Pending office review is shown as Corrections Submitted / Under Review internally and Under Review in portal context.
+- Retest Ready Requested remains contractor/event signal only.
+- Confirm Retest Ready creates the confirmed internal state.
+- Move to Needs Scheduling creates the linked retest child as the active scheduling item.
+- Original failed/correction parent becomes historical/passive after child creation.
 
-Not in ECC-B:
+Still not implemented in the current pass:
 
-- Retest scheduling bridge.
+- Schedule Retest Now.
 - Handoff state changes.
 - Portal redesign.
 - Invoice/payment behavior changes.

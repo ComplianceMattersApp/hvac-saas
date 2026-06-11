@@ -25,9 +25,9 @@ The field user now reaches a compact finish panel at the real field finish momen
 
 Delivered default outcomes in the compact panel:
 - Work Completed
-- Parts Needed
+- Materials Needed
 - Approval Needed
-- Unable to Complete
+- Other
 
 Design intent achieved:
 - preserve lifecycle/source-of-truth boundaries
@@ -46,9 +46,9 @@ Implemented default finish behavior:
 - Unable to Complete
 
 Behavioral outcomes:
-- Parts Needed routes to `pending_info` with structured `waiting_on_part`.
-- Approval Needed routes to `pending_info` with structured `waiting_on_customer_approval`.
-- Unable to Complete routes to `pending_info` with structured `waiting_on_information`.
+- Materials Needed routes to `pending_info` with front-facing reason text.
+- Approval Needed routes to `pending_info` with front-facing reason text.
+- Other routes to `pending_info` with front-facing reason text.
 
 For office-owned outcomes above:
 - current field visit is marked complete for technician responsibility handoff (`field_complete = true`)
@@ -75,9 +75,9 @@ Guardrail results:
 | Outcome | Entry path | Job status write | Field complete write | Ops status write | Waiting reason type | Office-owned after submit | Return visit created | Invoice/payment side effects |
 |---|---|---|---|---|---|---|---|---|
 | Work Completed | `advanceJobStatusFromForm` | Existing path | Existing path | Existing resolver path | n/a | No | No | No new behavior |
-| Parts Needed | Compact panel secondary action | `completed` | `true` | `pending_info` | `waiting_on_part` | Yes | No | None added |
-| Approval Needed | Compact panel secondary action | `completed` | `true` | `pending_info` | `waiting_on_customer_approval` | Yes | No | None added |
-| Unable to Complete | Compact panel secondary action | `completed` | `true` | `pending_info` | `waiting_on_information` | Yes | No | None added |
+| Materials Needed | Compact panel secondary action | `completed` | `true` | `pending_info` | Front-facing `Materials Needed: [reason]` | Yes | No, until intentional follow-up bridge | None added |
+| Approval Needed | Compact panel secondary action | `completed` | `true` | `pending_info` | Front-facing `Approval Needed: [reason]` | Yes | No, until intentional follow-up bridge | None added |
+| Other | Compact panel secondary action | `completed` | `true` | `pending_info` | Front-facing `Other: [reason]` | Yes | No, until intentional follow-up bridge | None added |
 
 ## 6. What Was Intentionally Not Added
 
@@ -102,9 +102,9 @@ Delivered waiting posture:
 - queue display label behavior remains tied to waiting reason parsing/helpers
 
 Expected office-facing labels from structured reasons:
-- `waiting_on_part` -> Waiting on Part
-- `waiting_on_customer_approval` -> Approval Needed
-- `waiting_on_information` -> Waiting on Information
+- `Materials Needed: [reason]`
+- `Approval Needed: [reason]`
+- `Other: [reason]`
 
 This preserves B4-A/B2 waiting/exception helper posture without introducing new queue models.
 
@@ -148,6 +148,30 @@ All three reasons require a free-form note. Submitting any of these outcomes com
 - `Other: [reason]`
 
 The service case/history remains open when the job is linked to an active service case. Continuation happens through a future linked return job, not by resuming the same historical visit. Billing, no-charge, invoice, payment, ECC, portal, and schema truth are separate and unchanged by this slice.
+
+## 10B. Service Follow-Up Progression and Continuation Closeout
+
+The service follow-up maturation pass is complete for current scope.
+
+Materials Needed can progress through:
+- Part Ordered
+- Part Arrived
+
+Approval Needed can progress through:
+- Approval Received
+
+Once a follow-up is ready, Ops can:
+- Add to Scheduling Queue
+- Schedule Return Visit Now
+
+Continuation truth:
+- The linked return child job becomes the active work item.
+- The parent/original visit remains historical/continued and preserves the original reason.
+- The parent no longer appears as active Pending Info after continuation exists.
+- The child return job appears according to its own scheduling/assignment rules.
+- The workflow avoids same-visit resume or ready-to-continue language.
+
+See `docs/ACTIVE/Guided_Workflow_Maturation_Closeout.md` for the current canonical closeout across service and ECC guided workflows.
 
 ## 11. Future Recommended Next Lanes
 

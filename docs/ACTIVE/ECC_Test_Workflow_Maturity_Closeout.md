@@ -11,6 +11,7 @@ This pass represents a maturity-level increase for the ECC/HERS side of Complian
 ## Guided Workflow Separation Lock
 
 The next ECC workflow maturity layer is locked in `ECC_Guided_Workflow_Separation_Model_Lock.md`.
+The current service/ECC guided workflow maturation lane is closed in `Guided_Workflow_Maturation_Closeout.md`.
 
 This closeout remains the source for ECC field-entry/test workspace standards. The guided workflow lock is the source for ECC blocker, failed/correction, retest, handoff, portal-display, and cert-closeout separation.
 

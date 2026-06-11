@@ -121,15 +121,20 @@ Admin/Owner can see both.
 ### 4.5 ECC guided workflow separation
 
 ECC guided workflow is locked separately in `docs/ACTIVE/ECC_Guided_Workflow_Separation_Model_Lock.md`.
+The current service/ECC guided maturation pass is closed in `docs/ACTIVE/Guided_Workflow_Maturation_Closeout.md`.
 
 Service follow-up and ECC workflow must not be blended:
 
 - Service uses Materials Needed / Approval Needed / Other.
 - Service continuation happens through linked return visits.
 - Parent service visits become historical/continued after child continuation exists.
+- Service follow-up progress uses Part Ordered / Part Arrived for Materials Needed and Approval Received for Approval Needed.
+- Ready service follow-ups can Add to Scheduling Queue or Schedule Return Visit Now.
 - ECC uses Permit Needed, Failed / Correction Required, Corrections Submitted / Under Review, Retest Ready, linked retest jobs, ECC handoff, and cert closeout blockers.
 - ECC retests are not service return visits.
 - ECC failed state comes from ECC test truth, not broad service exception routing.
+- Retest Ready Requested is contractor/event signal only; Retest Ready is internal confirmation.
+- Move to Needs Scheduling creates the linked retest child and makes the original failed/correction job historical/passive.
 - Invoice/payment/no-charge truth is separate from ECC cert closeout truth.
 - Invoice send may remain allowed while Permit Needed, Failed / Correction Required, Corrections Submitted / Under Review, or Retest Ready blocks cert closeout.
 
