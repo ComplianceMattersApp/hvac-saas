@@ -5,6 +5,12 @@ Mode: Documentation/planning only
 Authority: Subordinate to Active Spine and existing ACTIVE runbooks/roadmaps  
 Date: 2026-05-08
 
+## Documentation Authority Note
+
+- Documentation workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md).
+- This roadmap should track strategic sequencing, deferred/gated lanes, unlock criteria, and roadmap order.
+- Minor tactical fixes and low-risk polish closeouts should be recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md), not expanded here unless they change roadmap sequencing.
+
 ## June 2026 Access / Portal / Location / Workflow Polish Closeout
 
 - Status: CLOSED for current implementation lanes.

@@ -12,6 +12,8 @@ This is a **launch-readiness checklist**, not the operational source of truth.
 
 If any item here conflicts with the active spine, the spine wins.
 
+Documentation workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md). Recent low-risk tactical fixes that support launch readiness are recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md); this checklist should only carry launch gates and concise readiness notes.
+
 ---
 
 ## 1.1 Recent access / portal / location / workflow closeout confirmations
