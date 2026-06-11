@@ -6,6 +6,7 @@ import {
   requireInternalUser,
 } from "@/lib/auth/internal-user";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
+import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 
 import EquipmentEditCard from "../_components/EquipmentEditCard";
 import EquipmentCreateForm from "../_components/EquipmentCreateForm";
@@ -50,9 +51,12 @@ function formatStatusLabel(value?: string | null) {
   return mapped[normalized] ?? normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function formatOpsStatusLabel(value?: string | null) {
+function formatOpsStatusLabel(value?: string | null, jobType?: string | null) {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (!normalized) return "No ops status";
+
+  const eccLabel = isEccJobType(jobType) ? formatEccOpsStatusLabel(normalized, "internal") : null;
+  if (eccLabel) return eccLabel;
 
   const mapped: Record<string, string> = {
     need_to_schedule: "Need to Schedule",
@@ -60,7 +64,7 @@ function formatOpsStatusLabel(value?: string | null) {
     on_the_way: "On The Way",
     in_process: "In Progress",
     pending_info: "Pending Info",
-    pending_office_review: "Pending Office Review",
+    pending_office_review: "Office Review Needed",
     on_hold: "On Hold",
     failed: "Failed",
     retest_needed: "Retest Needed",
@@ -201,7 +205,7 @@ if (!job) return notFound();
             appointmentLabel={appointmentLabel}
             jobTypeLabel={formatJobTypeLabel(job.job_type)}
             fieldStatusLabel={formatStatusLabel(job.status)}
-            opsStatusLabel={formatOpsStatusLabel(job.ops_status)}
+            opsStatusLabel={formatOpsStatusLabel(job.ops_status, job.job_type)}
             fieldStatusKey={normalizedStatus}
             opsStatusKey={normalizedOpsStatus}
             backHref={`/jobs/${job.id}`}

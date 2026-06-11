@@ -58,6 +58,7 @@ import { isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 import {
   REFRIGERANT_CHARGE_ATTACHMENT_TAG,
   stripRefrigerantChargeEvidenceTag,
@@ -143,9 +144,12 @@ function formatStatusLabel(value?: string | null) {
   return mapped[normalized] ?? normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function formatOpsStatusLabel(value?: string | null) {
+function formatOpsStatusLabel(value?: string | null, jobType?: string | null) {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (!normalized) return "No ops status";
+
+  const eccLabel = isEccJobType(jobType) ? formatEccOpsStatusLabel(normalized, "internal") : null;
+  if (eccLabel) return eccLabel;
 
   const mapped: Record<string, string> = {
     need_to_schedule: "Need to Schedule",
@@ -153,7 +157,7 @@ function formatOpsStatusLabel(value?: string | null) {
     on_the_way: "On The Way",
     in_process: "In Progress",
     pending_info: "Pending Info",
-    pending_office_review: "Pending Office Review",
+    pending_office_review: "Office Review Needed",
     on_hold: "On Hold",
     failed: "Failed",
     retest_needed: "Retest Needed",
@@ -1611,7 +1615,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           appointmentLabel={contextAppointmentLabel}
           jobTypeLabel={formatJobTypeLabel(job.job_type)}
           fieldStatusLabel={formatStatusLabel(job.status)}
-          opsStatusLabel={formatOpsStatusLabel(job.ops_status)}
+          opsStatusLabel={formatOpsStatusLabel(job.ops_status, job.job_type)}
           fieldStatusKey={normalizedStatus}
           opsStatusKey={normalizedOpsStatus}
           backHref={`/jobs/${job.id}`}

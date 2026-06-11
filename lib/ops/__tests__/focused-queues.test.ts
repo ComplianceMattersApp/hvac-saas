@@ -317,7 +317,9 @@ describe("focused queue display labels", () => {
 
   it("maps exception statuses to office review labels without changing membership", () => {
     expect(getExceptionQueueDisplayLabel({ ops_status: "pending_office_review" })).toBe("Office Review Needed");
+    expect(getExceptionQueueDisplayLabel({ job_type: "ecc", ops_status: "pending_office_review" })).toBe("Corrections Submitted / Under Review");
     expect(getExceptionQueueDisplayLabel({ ops_status: "failed" })).toBe("Failed Test");
+    expect(getExceptionQueueDisplayLabel({ job_type: "ecc", ops_status: "failed" })).toBe("Failed / Correction Required");
     expect(getExceptionQueueDisplayLabel({ ops_status: "retest_needed" })).toBe("Retest Needed");
     expect(getExceptionQueueDisplayLabel({ ops_status: "problem" })).toBe("Operational Issue");
 
@@ -407,6 +409,27 @@ describe("focused queue display labels", () => {
       ops_status: "failed",
       pending_info_reason: "Failed - needs review/correction",
     })).toBe("Failed: Needs review/correction");
+
+    expect(getOpsQueueCardStatusReason({
+      job_type: "ecc",
+      ops_status: "failed",
+      pending_info_reason: "Failed - needs review/correction",
+    })).toBe("Failed / Correction Required");
+
+    expect(getOpsQueueCardStatusReason({
+      job_type: "ecc",
+      ops_status: "pending_office_review",
+    })).toBe("Corrections Submitted / Under Review");
+
+    expect(getOpsQueueCardStatusReason({
+      job_type: "service",
+      ops_status: "pending_office_review",
+    })).toBe("Office Review Needed");
+
+    expect(getOpsQueueCardStatusReason({
+      job_type: "ecc",
+      ops_status: "retest_needed",
+    })).toBe("Retest Needed");
 
     expect(getOpsQueueCardStatusReason({ ops_status: "paperwork_required" })).toBe("Closeout: Paperwork Required");
     expect(getOpsQueueCardStatusReason({ ops_status: "invoice_required" })).toBe("Closeout: Invoice Required");

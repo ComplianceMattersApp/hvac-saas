@@ -24,6 +24,7 @@ import ContractorFilter from "./_components/ContractorFilter";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { getCloseoutNeeds, getCloseoutQueueNextStepLabel } from "@/lib/utils/closeout";
 import { formatBusinessDateUS, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
+import { formatEccOpsStatusLabel } from "@/lib/ecc/ecc-workflow-display";
 
 const baseSelect =
   "id, title, status, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, location_id, created_at, next_action_note, action_required_by, visit_scope_summary";
@@ -102,7 +103,7 @@ function jobTypeBadge(j: any) {
 function closeoutReasonLabel(job: any, needs: ReturnType<typeof getCloseoutNeeds>) {
   const ops = String(job?.ops_status ?? "").toLowerCase();
   if (ops === "failed" || ops === "retest_needed" || ops === "pending_office_review") {
-    return "Failed or review follow-up";
+    return formatEccOpsStatusLabel(ops, "internal") ?? "Failed / Correction Required";
   }
   if (needs.needsInvoice && needs.needsCerts) return "Invoice and paperwork required";
   if (needs.needsInvoice) return "Invoice required";
@@ -385,7 +386,7 @@ export default async function CloseoutQueuePage({
             <div className="mt-1 text-xl font-semibold text-slate-900 tabular-nums">{summary.paperworkRequired}</div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Failed/Review</div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-500">Failed / Correction</div>
             <div className="mt-1 text-xl font-semibold text-slate-900 tabular-nums">{summary.failedReview}</div>
           </div>
           <div className="rounded-xl border border-slate-200 bg-slate-50/85 px-3 py-2">
@@ -418,7 +419,7 @@ export default async function CloseoutQueuePage({
             href={`${baseHref}${contractor ? "&" : "?"}filter=failed_review&sort=${sort}`}
             className={`inline-flex rounded-full border px-3 py-1.5 text-[11px] font-semibold transition-colors ${filter === "failed_review" ? "border-slate-900 bg-slate-900 text-white" : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"}`}
           >
-            Failed / Review Required
+            Failed / Correction Required
           </Link>
           {showConfirmPaymentFilter ? (
             <Link

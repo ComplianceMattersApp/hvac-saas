@@ -18,6 +18,7 @@ import {
   type WaitingStateType,
 } from "@/lib/utils/ops-status";
 import { isEccPermitNeededReason } from "@/lib/ecc/permit-needed";
+import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 
 export type FocusedQueueJob = {
@@ -38,6 +39,7 @@ export type FocusedQueueJob = {
   updated_at?: string | null;
   account_owner_user_id?: string | null;
   field_complete?: boolean | null;
+  job_type?: string | null;
   service_follow_up_progress?: string | null;
   service_follow_up_progress_label?: string | null;
   service_follow_up_continued?: boolean | null;
@@ -213,8 +215,10 @@ export function getWaitingQueueRecommendedNextStep(
   return "Review blocker details and set next office action.";
 }
 
-export function getExceptionQueueDisplayLabel(job: Pick<FocusedQueueJob, "ops_status">): string {
+export function getExceptionQueueDisplayLabel(job: Pick<FocusedQueueJob, "ops_status" | "job_type">): string {
   const status = normalize(job?.ops_status);
+  const eccLabel = isEccJobType(job?.job_type) ? formatEccOpsStatusLabel(status, "ops") : null;
+  if (eccLabel) return eccLabel;
   return EXCEPTION_QUEUE_LABELS_BY_STATUS[status] ?? formatOpsStatusLabel(status);
 }
 
@@ -287,7 +291,7 @@ function isGenericAssignmentFallbackLabel(value: unknown): boolean {
 }
 
 export function getOpsQueueCardStatusReason(
-  job: Pick<FocusedQueueJob, "status" | "ops_status" | "pending_info_reason" | "on_hold_reason" | "service_follow_up_progress_label">,
+  job: Pick<FocusedQueueJob, "status" | "ops_status" | "job_type" | "pending_info_reason" | "on_hold_reason" | "service_follow_up_progress_label">,
 ): string {
   const status = normalize(job?.ops_status);
   const lifecycle = normalize(job?.status);
@@ -329,12 +333,17 @@ export function getOpsQueueCardStatusReason(
   }
 
   if (status === "failed") {
+    if (isEccJobType(job?.job_type)) return formatEccOpsStatusLabel(status, "ops") ?? "Failed / Correction Required";
     const reason = cleanReason(job?.pending_info_reason) || cleanReason(job?.on_hold_reason);
     return reason ? `Failed: ${sentenceCaseReason(reason.replace(/^failed\s*[-:]\s*/i, ""))}` : "Failed";
   }
 
-  if (status === "retest_needed") return "Retest Needed";
-  if (status === "pending_office_review") return "Office Review Needed";
+  if (status === "retest_needed") return formatEccOpsStatusLabel(status, "ops") ?? "Retest Needed";
+  if (status === "pending_office_review") {
+    return isEccJobType(job?.job_type)
+      ? formatEccOpsStatusLabel(status, "ops") ?? "Corrections Submitted / Under Review"
+      : "Office Review Needed";
+  }
   if (status === "problem") return "Operational Issue";
   if (status === "paperwork_required") return "Closeout: Paperwork Required";
   if (status === "invoice_required") return "Closeout: Invoice Required";

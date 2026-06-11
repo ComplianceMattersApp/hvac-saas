@@ -25,6 +25,7 @@ import {
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { isPortalVisibleJob } from "@/lib/visibility/portal";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { formatEccEventLabel } from "@/lib/ecc/ecc-workflow-display";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -145,7 +146,7 @@ function formatPortalTimelineLabel(type?: string | null, meta?: any) {
   if (type === "contractor_correction_submission") return "Correction submitted for review";
   if (type === "attachment_added") return "File shared";
   if (type === "customer_attempt") return "Contact attempt logged";
-  if (type === "retest_ready_requested") return "Retest ready requested";
+  if (type === "retest_ready_requested") return formatEccEventLabel(type) ?? "Retest Ready Requested";
   if (type === "contractor_report_sent") return "Contractor report shared";
   if (type === "status_changed") return `Status updated: ${contractorSafeStatusLabel(String(meta?.to ?? ""))}`;
   if (type === "job_failed") return "Result recorded: Failed";
@@ -780,11 +781,11 @@ export default async function PortalJobDetailPage({
       ) : null}
 
       {banner === "retest_ready_requires_ecc" ? (
-        <FlashBanner type="warning" message="Retest Ready is only available for ECC jobs." />
+        <FlashBanner type="warning" message="Retest-ready request is only available for ECC jobs." />
       ) : null}
 
       {banner === "retest_ready_not_failed" ? (
-        <FlashBanner type="warning" message="Retest Ready is only available when this job is currently marked failed." />
+        <FlashBanner type="warning" message="Retest-ready request is only available when this job is currently marked failed." />
       ) : null}
 
       {banner === "invalid_request" ? (
@@ -1019,7 +1020,7 @@ export default async function PortalJobDetailPage({
             </div>
             {hasRetestReadyRequest ? (
               <div className="text-sm text-emerald-700 dark:text-emerald-300">
-                Retest Ready has already been submitted.
+                Retest Ready Requested has already been submitted.
               </div>
             ) : (
               <form action={requestRetestReadyFromPortal}>

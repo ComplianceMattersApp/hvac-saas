@@ -63,6 +63,7 @@ import { formatAssignmentSummaryForJob, getOpsQueueCardStatusReason } from "@/li
 import {
   buildServiceFollowUpProgressState,
 } from "@/lib/jobs/service-follow-up-progress";
+import { formatEccRetestReadySignalLabel } from "@/lib/ecc/ecc-workflow-display";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -1750,7 +1751,7 @@ function queueReason(j: any, activeBucket: string) {
   }
 
   if (status === "pending_office_review") {
-    return "Under review — contractor corrections submitted and pending internal review";
+    return "Corrections submitted / under review — contractor corrections submitted and pending internal review";
   }
 
   if (activeBucket === "failed" || status === "failed") {
@@ -1759,7 +1760,7 @@ function queueReason(j: any, activeBucket: string) {
 
   if (activeBucket === "retest_needed" || status === "retest_needed") {
     if (hasSignalEventForJob(latestRetestReadyByJob, jobId)) {
-      return "Retest needed — contractor marked correction complete";
+      return "Retest needed — retest ready requested";
     }
     return "Retest needed — awaiting contractor action";
   }
@@ -1815,8 +1816,8 @@ function nextActionLabel(j: any, opts?: { retestReady?: boolean; newContractorJo
   if (opts?.scheduledRetest) return "No Immediate Action";
   if (status === "pending_info") return "Provide Requested Information";
   if (status === "on_hold") return "Await Hold Release";
-  if (status === "pending_office_review") return "Review Contractor Submission";
-  if (status === "failed" || status === "retest_needed") return "Await Contractor Correction";
+  if (status === "pending_office_review") return "Review Corrections Submitted";
+  if (status === "failed" || status === "retest_needed") return "Review Failed / Correction Required";
   if (status === "need_to_schedule") return "Need to Schedule Visit";
   if (
     status === "scheduled" ||
@@ -2505,7 +2506,7 @@ const signalCards = [
   {
     key: "retest_ready",
     bucket: "failed",
-    label: "Retest Ready",
+    label: formatEccRetestReadySignalLabel(),
     count: retestReadyCount,
   },
   {
@@ -2554,7 +2555,7 @@ const failedPaymentNoSideEffectContractSatisfied = showFailedPaymentAttentionCar
 const activeQueueLabel = OPS_TABS.find((t) => t.key === bucket)?.label ?? bucket;
 const activeSignalLabel =
   signal === "retest_ready"
-    ? "Retest Ready"
+    ? formatEccRetestReadySignalLabel()
     : signal === "new_contractor"
     ? "New Contractor Jobs"
     : signal === "new_work_requests"
@@ -2700,9 +2701,9 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const isPendingOfficeReview = opsStatus === "pending_office_review";
   const isRetestChild = Boolean(String(j?.parent_job_id ?? "").trim());
   const statusMeta = isFailed
-    ? { label: "FAILED", tone: "border-rose-200 bg-rose-50 text-rose-800" }
+    ? { label: "FAILED / CORRECTION REQUIRED", tone: "border-rose-200 bg-rose-50 text-rose-800" }
     : isPendingOfficeReview
-    ? { label: "UNDER REVIEW", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" }
+    ? { label: "CORRECTIONS SUBMITTED / UNDER REVIEW", tone: "border-cyan-200 bg-cyan-50 text-cyan-800" }
     : retestState === "pending_scheduling"
     ? { label: "Retest Pending Scheduling", tone: "border-amber-200 bg-amber-50 text-amber-800" }
     : scheduledRetestLabel
@@ -2782,7 +2783,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
   const normalizedFailureReason = rawFailureReason.replace(/^failed\s*[-:]\s*/i, "").trim();
   const failedReasonText = normalizedFailureReason || "Test requirement not met";
   const failedStatusLabel = isPendingOfficeReview
-    ? "Under Review"
+    ? "Corrections Submitted / Under Review"
     : retestState === "scheduled"
     ? "Retest Scheduled"
     : retestState === "pending_scheduling"
@@ -2791,7 +2792,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     ? "Retest Needed"
     : isRetestChild
     ? "Failed Retest"
-    : "Failed";
+    : "Failed / Correction Required";
   const failedSupportText = isPendingOfficeReview
     ? "Corrections submitted. Internal review is in progress."
     : retestState === "scheduled"
@@ -2800,7 +2801,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     ? "Retest job exists but still needs a scheduled date and time."
     : opsStatus === "retest_needed"
     ? hasRetestReady
-      ? "Contractor marked correction complete and is ready for retest review."
+      ? "Contractor requested retest-ready review."
       : "Retest is required before this failure can be cleared."
     : isRetestChild
     ? "This retest also failed and still needs correction."
@@ -3548,7 +3549,7 @@ if (panel !== "full_board") {
                 <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{newWorkRequestCount}</div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                <div className={`${opsUtilityLabelClass} text-slate-500`}>Retest Ready</div>
+                <div className={`${opsUtilityLabelClass} text-slate-500`}>{formatEccRetestReadySignalLabel()}</div>
                 <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{retestReadyCount}</div>
               </div>
             </div>
@@ -3681,7 +3682,7 @@ if (panel !== "full_board") {
               <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{newWorkRequestCount}</div>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2">
-              <div className={`${opsUtilityLabelClass} text-slate-500`}>Retest Ready</div>
+              <div className={`${opsUtilityLabelClass} text-slate-500`}>{formatEccRetestReadySignalLabel()}</div>
               <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{retestReadyCount}</div>
             </div>
           </div>

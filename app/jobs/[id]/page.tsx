@@ -67,6 +67,7 @@ import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/bus
 import { buildJobBillingStateReadModel } from "@/lib/business/job-billing-state";
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
 import { isEccPermitNeededBlocker } from "@/lib/ecc/permit-needed";
+import { formatEccOpsStatusLabel, isEccJobType as isEccWorkflowJobType } from "@/lib/ecc/ecc-workflow-display";
 import {
   resolveInternalInvoiceEmailDeliveries,
   type InternalInvoiceEmailDeliveryRecord,
@@ -2423,9 +2424,12 @@ export default async function JobDetailPage({
       ? "Time window TBD"
       : "No time window set";
 
-function formatOpsStatusLabel(value?: string | null) {
+function formatOpsStatusLabel(value?: string | null, jobType?: string | null) {
   const v = String(value ?? "").trim();
   if (!v) return "—";
+
+  const eccLabel = isEccWorkflowJobType(jobType) ? formatEccOpsStatusLabel(v, "internal") : null;
+  if (eccLabel) return eccLabel;
 
   const labelMap: Record<string, string> = {
     need_to_schedule: "Need to Schedule",
@@ -2433,7 +2437,7 @@ function formatOpsStatusLabel(value?: string | null) {
     on_the_way: "On the Way",
     in_process: "In Progress",
     pending_info: "Pending Info",
-    pending_office_review: "Pending Office Review",
+    pending_office_review: "Office Review Needed",
     on_hold: "On Hold",
     failed: "Failed",
     retest_needed: "Retest Needed",
@@ -2547,7 +2551,7 @@ const workflowChipLabel =
       : "Follow-Up Continued"
   : normalizedJobStatus === "in_process" && !isFieldComplete
     ? "In Process"
-    : formatOpsStatusLabel(job.ops_status);
+    : formatOpsStatusLabel(job.ops_status, job.job_type);
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
@@ -2977,7 +2981,7 @@ const jobStatusSummaryText = activeWaitingState
   ? `Pending Info${pendingInfoReasonText ? ` • ${truncateSummaryText(pendingInfoReasonText, 72)}` : ""}`
   : onHoldActive
   ? `On Hold${onHoldReasonText ? ` • ${truncateSummaryText(onHoldReasonText, 72)}` : ""}`
-  : `Current lifecycle: ${formatOpsStatusLabel(job.ops_status)}`;
+  : `Current lifecycle: ${formatOpsStatusLabel(job.ops_status, job.job_type)}`;
 const followUpSummaryText = hasFollowUpReminder
   ? [
       followUpOwnerLabel ? `For ${followUpOwnerLabel}` : null,
@@ -3953,7 +3957,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   };
   const mobileLifecycleStatusLabel =
     mobileLifecycleStatusLabelMap[mobileLifecycleStatus] ?? formatStatus(job.status);
-  const mobileOpsStatusLabel = formatOpsStatusLabel(job.ops_status);
+  const mobileOpsStatusLabel = formatOpsStatusLabel(job.ops_status, job.job_type);
   const mobileFieldLifecycleActive =
     mobileLifecycleStatus === "on_the_way" ||
     mobileLifecycleStatus === "in_process" ||
@@ -4129,7 +4133,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
                 <div className="text-xs font-semibold text-blue-900/70">Workflow</div>
-                <div className="mt-0.5 text-sm font-semibold text-slate-950">{formatOpsStatusLabel(job.ops_status)}</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-950">{formatOpsStatusLabel(job.ops_status, job.job_type)}</div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
                 <div className="text-xs font-semibold text-blue-900/70">Field</div>
@@ -5806,7 +5810,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-xs">
         <SettingsIcon className="h-3.5 w-3.5 text-blue-700" />
         <span className="font-semibold uppercase tracking-[0.08em] text-blue-900/55">Workflow</span>
-        <span className="font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status)}</span>
+        <span className="font-semibold text-slate-900">{formatOpsStatusLabel(job.ops_status, job.job_type)}</span>
       </div>
       <div className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/80 bg-white px-2.5 py-1 text-xs">
         <ClipboardIcon className="h-3.5 w-3.5 text-blue-700" />
@@ -7693,7 +7697,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <div className="mt-3 rounded-xl border border-amber-300 bg-amber-50/90 p-3.5 text-amber-900">
           <div className="text-sm font-semibold">{meta.title}</div>
           <div className="mt-1 text-sm">
-            Current status: <span className="font-medium">{formatOpsStatusLabel(ops)}</span>. {meta.body}
+            Current status: <span className="font-medium">{formatOpsStatusLabel(ops, job.job_type)}</span>. {meta.body}
           </div>
         </div>
       );
@@ -8506,7 +8510,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
       Current lifecycle
     </div>
     <div className="mt-1 text-base font-semibold text-slate-950">
-      {formatOpsStatusLabel(job.ops_status)}
+      {formatOpsStatusLabel(job.ops_status, job.job_type)}
     </div>
   </div>
 

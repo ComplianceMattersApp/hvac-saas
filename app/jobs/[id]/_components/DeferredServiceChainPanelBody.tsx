@@ -6,6 +6,7 @@ import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
+import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 
 type DeferredServiceChainPanelBodyProps = {
 	accountOwnerUserId: string;
@@ -50,9 +51,12 @@ function serviceChainVisitLabel(visit: any, idx: number) {
 	return `Visit ${idx + 1}`;
 }
 
-function formatOpsStatusLabel(value?: string | null) {
+function formatOpsStatusLabel(value?: string | null, jobType?: string | null) {
 	const normalized = String(value ?? "").trim();
-	if (!normalized) return "â€”";
+	if (!normalized) return "-";
+
+	const eccLabel = isEccJobType(jobType) ? formatEccOpsStatusLabel(normalized, "internal") : null;
+	if (eccLabel) return eccLabel;
 
 	const labelMap: Record<string, string> = {
 		need_to_schedule: "Need to Schedule",
@@ -60,7 +64,7 @@ function formatOpsStatusLabel(value?: string | null) {
 		on_the_way: "On the Way",
 		in_process: "In Progress",
 		pending_info: "Pending Info",
-		pending_office_review: "Pending Office Review",
+		pending_office_review: "Office Review Needed",
 		on_hold: "On Hold",
 		failed: "Failed",
 		retest_needed: "Retest Needed",
@@ -211,8 +215,13 @@ export default async function DeferredServiceChainPanelBody({
 				const failureReason = serviceChainFailureReasonByJob.get(visitId) ?? "";
 				const windowLabel =
 					visit.scheduled_date && visit.window_start && visit.window_end
-						? `${formatTimeDisplay(visit.window_start)}â€“${formatTimeDisplay(visit.window_end)}`
+						? `${formatTimeDisplay(visit.window_start)}-${formatTimeDisplay(visit.window_end)}`
 						: null;
+				const metadataParts = [
+					`Created: ${visit.created_at ? formatDateLAFromIso(String(visit.created_at)) : "-"}`,
+					visit.scheduled_date ? `Scheduled: ${formatBusinessDateUS(String(visit.scheduled_date))}` : null,
+					windowLabel,
+				].filter(Boolean) as string[];
 
 				return (
 					<div
@@ -227,8 +236,8 @@ export default async function DeferredServiceChainPanelBody({
 								<div className="flex flex-wrap items-center gap-2">
 									<div className="text-sm font-semibold text-slate-950">
 										{visitLabel}
-										{isCurrentActive ? <span className="text-blue-600"> • Active</span> : null}
-										{isContinuationChild ? <span className="text-blue-600"> • Active continuation</span> : null}
+										{isCurrentActive ? <span className="ml-2 text-blue-600">Active</span> : null}
+										{isContinuationChild ? <span className="ml-2 text-blue-600">Active continuation</span> : null}
 									</div>
 									<span
 										className={[
@@ -236,7 +245,7 @@ export default async function DeferredServiceChainPanelBody({
 											serviceChainBadgeClass(visit.ops_status, isCurrentActive, isContinuedParent),
 										].join(" ")}
 									>
-										{isContinuedParent ? "Continued" : formatOpsStatusLabel(visit.ops_status)}
+										{isContinuedParent ? "Continued" : formatOpsStatusLabel(visit.ops_status, visit.job_type)}
 									</span>
 								</div>
 
@@ -244,10 +253,15 @@ export default async function DeferredServiceChainPanelBody({
 									{normalizeRetestLinkedJobTitle(visit.title) || "Untitled Job"}
 								</div>
 
-								<div className="mt-1 text-xs text-slate-500">
-									Created: {visit.created_at ? formatDateLAFromIso(String(visit.created_at)) : "â€”"}
-									{visit.scheduled_date ? ` â€¢ Scheduled: ${formatBusinessDateUS(String(visit.scheduled_date))}` : ""}
-									{windowLabel ? ` â€¢ ${windowLabel}` : ""}
+								<div className="mt-1 flex flex-wrap items-center gap-y-1 text-xs text-slate-500">
+									{metadataParts.map((part, partIndex) => (
+										<span
+											key={`${visitId}-metadata-${partIndex}`}
+											className={partIndex === 0 ? "pr-2" : "border-l border-slate-300 px-2"}
+										>
+											{part}
+										</span>
+									))}
 								</div>
 
 								{isContinuedParent ? (

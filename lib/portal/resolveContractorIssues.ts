@@ -1,5 +1,7 @@
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
+import { formatEccOpsStatusLabel } from "@/lib/ecc/ecc-workflow-display";
+
 export type ContractorIssueGroup = "needs_info" | "failed" | "in_progress" | "passed";
 
 export type ContractorBucket = "action_required" | "in_progress" | "passed";
@@ -485,7 +487,7 @@ export function resolveContractorIssues(
       nextStep = "Retest decision needed.";
     }
   } else if (opsStatus === "pending_office_review") {
-    statusLabel = "Under Review";
+    statusLabel = formatEccOpsStatusLabel(opsStatus, "portal") ?? "Under Review";
     nextStep = "Corrections submitted. Our team is reviewing your submission.";
   } else if ((opsStatus === "paperwork_required" || opsStatus === "invoice_required") && hasFailureResolvedByReview) {
     statusLabel = "Final processing";

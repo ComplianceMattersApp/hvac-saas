@@ -8,6 +8,7 @@ import {
 } from "@/lib/auth/internal-user";
 import { loadScopedInternalAttachmentJobForMutation } from "@/lib/auth/internal-attachment-scope";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
+import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
 
 import JobAttachmentsInternal from "../_components/JobAttachmentsInternal";
 
@@ -50,9 +51,12 @@ function formatStatusLabel(value?: string | null) {
   return mapped[normalized] ?? normalized.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function formatOpsStatusLabel(value?: string | null) {
+function formatOpsStatusLabel(value?: string | null, jobType?: string | null) {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (!normalized) return "No ops status";
+
+  const eccLabel = isEccJobType(jobType) ? formatEccOpsStatusLabel(normalized, "internal") : null;
+  if (eccLabel) return eccLabel;
 
   const mapped: Record<string, string> = {
     need_to_schedule: "Need to Schedule",
@@ -60,7 +64,7 @@ function formatOpsStatusLabel(value?: string | null) {
     on_the_way: "On the Way",
     in_process: "In Progress",
     pending_info: "Pending Info",
-    pending_office_review: "Pending Office Review",
+    pending_office_review: "Office Review Needed",
     on_hold: "On Hold",
     failed: "Failed",
     retest_needed: "Retest Needed",
@@ -219,7 +223,7 @@ export default async function JobAttachmentsPage({
   );
   const jobTypeLabel = formatJobTypeLabel(job.job_type);
   const statusLabel = formatStatusLabel(job.status);
-  const opsStatusLabel = formatOpsStatusLabel(job.ops_status);
+  const opsStatusLabel = formatOpsStatusLabel(job.ops_status, job.job_type);
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-6">
