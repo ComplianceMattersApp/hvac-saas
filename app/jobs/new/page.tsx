@@ -4,6 +4,10 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import NewJobForm from "./NewJobForm";
 import {
+  landingPathForDualContextAccess,
+  resolveDualContextAccess,
+} from "@/lib/auth/dual-context-access";
+import {
   resolveDefaultJobTypeForAccountOwnerId,
   resolveProductModeForAccountOwnerId,
   type ProductMode,
@@ -57,18 +61,6 @@ type LocationSiteAccessHintRow = {
   updated_at: string | null;
 };
 
-type ContractorMembershipRow = {
-  contractor_id: string | null;
-  contractors:
-    | {
-        name: string | null;
-      }
-    | Array<{
-        name: string | null;
-      }>
-    | null;
-};
-
 type PricebookTemplateRow = {
   id: string | null;
   item_name: string | null;
@@ -91,6 +83,7 @@ export default async function NewJobPage(props: {
     proposal_id?: string;
     maintenance_agreement_id?: string;
     create_customer?: string;
+    context?: string;
   }>;
 }) {
   const supabase = await createClient();
@@ -99,27 +92,26 @@ export default async function NewJobPage(props: {
   if (!userData?.user) redirect("/login");
   
   const user = userData.user;
+  const sp = props.searchParams ? await props.searchParams : undefined;
+  const requestedContext = String(sp?.context ?? "").trim().toLowerCase();
+  const explicitPortalContext = requestedContext === "portal";
+  const access = await resolveDualContextAccess({ supabase, user });
+
+  if (explicitPortalContext) {
+    if (!access.hasPortalAccess || !access.portal) redirect("/portal");
+  } else if (!access.hasActiveAppAccess) {
+    redirect(landingPathForDualContextAccess(access));
+  }
 
   // Identify contractor user (multi-user per contractor)
   let myContractor: { id: string; name: string } | null = null;
   let initialJobType: "ecc" | "service" = "ecc";
 
-  const { data: cu, error: cuErr } = await supabase
-    .from("contractor_users")
-    .select("contractor_id, contractors ( name )")
-    .eq("user_id", user.id)
-    .maybeSingle();
-
-  if (cuErr) throw new Error(cuErr.message);
-
-  if (cu?.contractor_id) {
-    const contractorMembership = cu as ContractorMembershipRow;
-    const contractorRelation = contractorMembership.contractors;
-    const contractorNameSource = Array.isArray(contractorRelation)
-      ? contractorRelation[0]?.name
-      : contractorRelation?.name;
-    const contractorName = String(contractorNameSource ?? "").trim() || "Contractor";
-    myContractor = { id: cu.contractor_id, name: contractorName };
+  if (explicitPortalContext && access.portal?.contractorId) {
+    myContractor = {
+      id: access.portal.contractorId,
+      name: access.portal.contractorName ?? "Contractor",
+    };
   }
 
   let contractors: Array<{ id: string; name: string }> = [];
@@ -194,7 +186,6 @@ export default async function NewJobPage(props: {
     }
   }
 
-  const sp = props.searchParams ? await props.searchParams : undefined;
   const customerId = String(sp?.customer_id ?? "").trim();
   const source = String(sp?.source ?? "").trim().toLowerCase();
   const errorCode = String(sp?.err ?? "").trim() || null;

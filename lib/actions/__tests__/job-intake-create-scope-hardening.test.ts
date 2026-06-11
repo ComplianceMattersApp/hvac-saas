@@ -95,6 +95,7 @@ function buildInternalServiceIntakeFormData(options?: {
   visitScopeItemsJson?: string;
   maintenanceAgreementId?: string;
   serviceVisitType?: "diagnostic" | "repair" | "install" | "return_visit" | "callback" | "maintenance";
+  intakeContext?: "app" | "portal";
 }) {
   const formData = new FormData();
   formData.set("job_type", "service");
@@ -110,6 +111,9 @@ function buildInternalServiceIntakeFormData(options?: {
     formData.set("maintenance_agreement_id", options.maintenanceAgreementId);
     formData.set("service_case_kind", "maintenance");
     formData.set("service_visit_type", "maintenance");
+  }
+  if (options?.intakeContext) {
+    formData.set("intake_context", options.intakeContext);
   }
   return formData;
 }
@@ -1076,6 +1080,7 @@ describe("job intake create same-account hardening", () => {
         buildInternalServiceIntakeFormData({
           visitScopeSummary: "Contractor proposal summary",
           visitScopeItemsJson: '[{"title":"Proposed scope","kind":"primary"}]',
+          intakeContext: "portal",
         }),
       ),
     ).rejects.toThrow(ALLOW_PATH_REACHED);
@@ -1089,6 +1094,37 @@ describe("job intake create same-account hardening", () => {
     expect(jobsPayload).toBeTruthy();
     expect(jobsPayload?.visit_scope_summary ?? null).toBeNull();
     expect(Array.isArray(jobsPayload?.visit_scope_items) ? jobsPayload.visit_scope_items : []).toEqual([]);
+  });
+
+  it("does not switch active app plus portal intake into contractor mode without explicit portal context", async () => {
+    const fixture = buildSupabaseFixture({
+      throwOnJobsInsert: true,
+      contractorId: "ctr-1",
+      accountSettingsProductMode: "hybrid",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      createJobFromForm(
+        buildInternalServiceIntakeFormData({
+          visitScopeItemsJson: '[{"title":"Diagnose airflow issue","kind":"primary"}]',
+        }),
+      ),
+    ).rejects.toThrow(ALLOW_PATH_REACHED);
+
+    const jobsPayload = firstInsertPayload(fixture, "jobs");
+    expect(jobsPayload).toMatchObject({
+      contractor_id: null,
+    });
+    expect(Array.isArray(jobsPayload?.visit_scope_items) ? jobsPayload.visit_scope_items : []).toHaveLength(1);
   });
 
   it("denies cross-account or invalid-scope internal createJobFromForm before canonical writes and side effects", async () => {

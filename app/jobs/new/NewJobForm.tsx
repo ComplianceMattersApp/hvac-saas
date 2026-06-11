@@ -713,7 +713,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       : "New Job";
   const isHvacServiceMode = productMode === "hvac_service";
   const compactHeaderHelper = isContractorMode
-    ? "Enter customer and work details, then submit for review."
+    ? "Work shared between your company and Compliance Matters."
     : productMode === "ecc_hers"
       ? "Select the responsible account and service location, define the compliance work, then create the job."
       : "Select the responsible account, choose the work, then create the job.";
@@ -1647,10 +1647,10 @@ const [billingRecipient, setBillingRecipient] = useState<
       <div className="space-y-4">
       <header className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm shadow-slate-950/5 sm:px-5 sm:py-4">
         <p className="text-[11px] font-semibold uppercase text-slate-500">
-          {isContractorMode ? "Contractor intake" : "Internal intake"}
+          {isContractorMode ? "Portal Work Request" : "Internal intake"}
         </p>
         <h1 className="mt-1 text-xl font-semibold text-slate-950 sm:text-2xl">
-          {isContractorMode ? "New Job" : internalPageTitle}
+          {isContractorMode ? "Send Work to Compliance Matters" : internalPageTitle}
         </h1>
         <p className="mt-1 text-sm text-slate-600">{compactHeaderHelper}</p>
       </header>
@@ -1726,6 +1726,7 @@ const [billingRecipient, setBillingRecipient] = useState<
         <input type="hidden" name="relationship_action" value={shouldShowRelationshipStep ? relationshipAction : "new_case"} />
         <input type="hidden" name="relationship_job_id" value={selectedRelationshipJob?.id ?? ""} />
         <input type="hidden" name="maintenance_agreement_id" value={maintenanceAgreementPrefill?.agreement_id ?? ""} />
+        <input type="hidden" name="intake_context" value={isContractorMode ? "portal" : "app"} />
         {isCustomerContextInternalMode && customerContextSource ? (
           <input type="hidden" name="intake_source" value={customerContextSource} />
         ) : null}
@@ -3809,7 +3810,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               }}
             >
               {isContractorMode
-                ? isSubmitting ? "Submitting\u2026" : "Submit Job \u2192"
+                ? isSubmitting ? "Submitting\u2026" : "Send Work to Compliance Matters \u2192"
                 : isSubmitting ? "Creating Job\u2026" : "Create Job \u2192"}
             </button>
             </div>

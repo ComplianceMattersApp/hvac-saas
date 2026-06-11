@@ -22,6 +22,11 @@ import {
   type TodayReadModel,
 } from "@/lib/home/today-read-model";
 import TodayWelcomeModal from "@/components/home/TodayWelcomeModal";
+import {
+  landingPathForDualContextAccess,
+  resolveDualContextAccess,
+} from "@/lib/auth/dual-context-access";
+import { createClient } from "@/lib/supabase/server";
 import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +87,12 @@ function AccountBadge({
 }
 
 export default async function TodayPage() {
+  const supabase = await createClient();
+  const access = await resolveDualContextAccess({ supabase });
+  if (!access.hasActiveAppAccess) {
+    redirect(landingPathForDualContextAccess(access));
+  }
+
   const result = await buildTodayReadModel();
 
   if ("kind" in result && result.kind === "redirect") {

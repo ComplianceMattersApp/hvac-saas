@@ -1,0 +1,205 @@
+import { describe, expect, it } from "vitest";
+import {
+  landingPathForDualContextAccess,
+  resolveDualContextAccess,
+} from "@/lib/auth/dual-context-access";
+
+type FixtureInput = {
+  internal?: {
+    isActive?: boolean;
+    entitlementStatus?: string;
+    trialEndsAt?: string | null;
+    stripeSubscriptionStatus?: string | null;
+  } | null;
+  portal?: {
+    lifecycleState?: string | null;
+  } | null;
+};
+
+function makeSupabaseFixture(input: FixtureInput) {
+  const user = { id: "user-1", email: "user@example.com" };
+
+  const auth = {
+    getUser: async () => ({
+      data: { user },
+      error: null,
+    }),
+  };
+
+  function makeQuery(table: string) {
+    const query: any = {
+      select: () => query,
+      eq: () => query,
+      maybeSingle: async () => {
+        if (table === "internal_users") {
+          if (!input.internal) return { data: null, error: null };
+          return {
+            data: {
+              user_id: user.id,
+              role: "admin",
+              is_active: input.internal.isActive ?? true,
+              account_owner_user_id: "owner-1",
+              created_by: null,
+            },
+            error: null,
+          };
+        }
+
+        if (table === "contractor_users") {
+          if (!input.portal) return { data: null, error: null };
+          return {
+            data: {
+              contractor_id: "contractor-1",
+              contractors: {
+                id: "contractor-1",
+                name: "Partner Co",
+                lifecycle_state: input.portal.lifecycleState ?? "active",
+              },
+            },
+            error: null,
+          };
+        }
+
+        if (table === "platform_account_entitlements") {
+          if (!input.internal?.entitlementStatus) return { data: null, error: null };
+          return {
+            data: {
+              entitlement_status: input.internal.entitlementStatus,
+              seat_limit: 5,
+              trial_ends_at: input.internal.trialEndsAt ?? null,
+              notes: null,
+              stripe_customer_id: "cus_123",
+              stripe_subscription_id: "sub_123",
+              stripe_subscription_status: input.internal.stripeSubscriptionStatus ?? "active",
+            },
+            error: null,
+          };
+        }
+
+        throw new Error(`Unexpected table: ${table}`);
+      },
+    };
+    return query;
+  }
+
+  return {
+    auth,
+    from: (table: string) => makeQuery(table),
+  };
+}
+
+describe("resolveDualContextAccess", () => {
+  it("returns no context when auth session is missing", async () => {
+    const access = await resolveDualContextAccess({
+      supabase: {
+        auth: {
+          getUser: async () => ({
+            data: { user: null },
+            error: { name: "AuthSessionMissingError", message: "Auth session missing!" },
+          }),
+        },
+        from: () => {
+          throw new Error("No table reads expected");
+        },
+      },
+    });
+
+    expect(access.user).toBeNull();
+    expect(access.preferredLandingContext).toBe("none");
+  });
+
+  it("routes active app only to app context", async () => {
+    const access = await resolveDualContextAccess({
+      supabase: makeSupabaseFixture({
+        internal: { entitlementStatus: "active" },
+      }),
+    });
+
+    expect(access.hasActiveAppAccess).toBe(true);
+    expect(access.hasPortalAccess).toBe(false);
+    expect(access.preferredLandingContext).toBe("app");
+    expect(landingPathForDualContextAccess(access)).toBe("/today");
+  });
+
+  it("routes portal only to portal context", async () => {
+    const access = await resolveDualContextAccess({
+      supabase: makeSupabaseFixture({
+        portal: { lifecycleState: "active" },
+      }),
+    });
+
+    expect(access.hasActiveAppAccess).toBe(false);
+    expect(access.hasPortalAccess).toBe(true);
+    expect(access.preferredLandingContext).toBe("portal");
+    expect(landingPathForDualContextAccess(access)).toBe("/portal");
+  });
+
+  it("defaults active app plus portal to app while exposing both contexts", async () => {
+    const access = await resolveDualContextAccess({
+      supabase: makeSupabaseFixture({
+        internal: { entitlementStatus: "active" },
+        portal: { lifecycleState: "active" },
+      }),
+    });
+
+    expect(access.isDualContextUser).toBe(true);
+    expect(access.availableContexts).toEqual(["app", "portal"]);
+    expect(access.preferredLandingContext).toBe("app");
+  });
+
+  it("routes expired trial plus portal to portal", async () => {
+    const access = await resolveDualContextAccess({
+      supabase: makeSupabaseFixture({
+        internal: {
+          entitlementStatus: "trial",
+          trialEndsAt: "2020-01-01T00:00:00.000Z",
+        },
+        portal: { lifecycleState: "active" },
+      }),
+    });
+
+    expect(access.hasActiveAppAccess).toBe(false);
+    expect(access.hasExpiredOrInactiveAppAccess).toBe(true);
+    expect(access.hasPortalAccess).toBe(true);
+    expect(access.appAccessBlockedReason).toBe("blocked_trial_expired");
+    expect(access.preferredLandingContext).toBe("portal");
+  });
+
+  it("routes cancelled app plus portal to portal", async () => {
+    const access = await resolveDualContextAccess({
+      supabase: makeSupabaseFixture({
+        internal: { entitlementStatus: "cancelled" },
+        portal: { lifecycleState: "active" },
+      }),
+    });
+
+    expect(access.hasActiveAppAccess).toBe(false);
+    expect(access.hasPortalAccess).toBe(true);
+    expect(access.preferredLandingContext).toBe("portal");
+  });
+
+  it("routes expired app only to inactive app context", async () => {
+    const access = await resolveDualContextAccess({
+      supabase: makeSupabaseFixture({
+        internal: {
+          entitlementStatus: "trial",
+          trialEndsAt: "2020-01-01T00:00:00.000Z",
+        },
+      }),
+    });
+
+    expect(access.hasPortalAccess).toBe(false);
+    expect(access.preferredLandingContext).toBe("inactive_app");
+    expect(landingPathForDualContextAccess(access)).toBe("/access-inactive");
+  });
+
+  it("returns no valid context when neither membership exists", async () => {
+    const access = await resolveDualContextAccess({
+      supabase: makeSupabaseFixture({}),
+    });
+
+    expect(access.availableContexts).toEqual([]);
+    expect(access.preferredLandingContext).toBe("none");
+    expect(landingPathForDualContextAccess(access)).toBe("/login");
+  });
+});

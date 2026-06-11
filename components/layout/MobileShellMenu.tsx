@@ -98,24 +98,26 @@ export default function MobileShellMenu({
 
       {open ? (
         <div className="absolute right-0 z-50 mt-2 max-h-[calc(100vh-5.5rem)] w-[min(20rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-[0_18px_38px_-24px_rgba(15,23,42,0.38)] backdrop-blur">
-          <div className={sectionLabelClass()}>Create</div>
-          <Link href="/jobs/new" onClick={closeMenu} className="block rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-[0_12px_20px_-16px_rgba(37,99,235,0.55)] transition-colors hover:bg-blue-700">
-            {primaryJobCtaLabel}
-          </Link>
           {isInternalUser ? (
-            <Link href="/jobs/new?create_customer=1" onClick={closeMenu} className={mobileMenuItemClass()}>
-              New Customer
-            </Link>
-          ) : null}
-          {isInternalUser && isEstimatesEnabled ? (
-            <Link href="/estimates/new" onClick={closeMenu} className={mobileMenuItemClass()}>
-              New Estimate
-            </Link>
-          ) : null}
-          {isInternalUser && servicePlansEnabled ? (
-            <Link href="/service-plans" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/service-plans"))}>
-              New Service Plan
-            </Link>
+            <>
+              <div className={sectionLabelClass()}>Create</div>
+              <Link href="/jobs/new" onClick={closeMenu} className="block rounded-xl bg-blue-600 px-3 py-2 text-xs font-semibold text-white shadow-[0_12px_20px_-16px_rgba(37,99,235,0.55)] transition-colors hover:bg-blue-700">
+                {primaryJobCtaLabel}
+              </Link>
+              <Link href="/jobs/new?create_customer=1" onClick={closeMenu} className={mobileMenuItemClass()}>
+                New Customer
+              </Link>
+              {isEstimatesEnabled ? (
+                <Link href="/estimates/new" onClick={closeMenu} className={mobileMenuItemClass()}>
+                  New Estimate
+                </Link>
+              ) : null}
+              {servicePlansEnabled ? (
+                <Link href="/service-plans" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/service-plans"))}>
+                  New Service Plan
+                </Link>
+              ) : null}
+            </>
           ) : null}
 
           <div className="my-1.5 border-t border-slate-200/80" />
@@ -125,9 +127,11 @@ export default function MobileShellMenu({
               Today
             </Link>
           ) : null}
-          <Link href="/ops" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/ops"))}>
-            Operations
-          </Link>
+          {isInternalUser ? (
+            <Link href="/ops" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/ops"))}>
+              Operations
+            </Link>
+          ) : null}
           {isInternalUser ? (
             <Link href="/calendar" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/calendar"))}>
               Calendar
@@ -143,9 +147,11 @@ export default function MobileShellMenu({
               Partner Work
             </Link>
           ) : null}
-          <Link href="/customers" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/customers"))}>
-            Customers
-          </Link>
+          {isInternalUser ? (
+            <Link href="/customers" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/customers"))}>
+              Customers
+            </Link>
+          ) : null}
           {isInternalUser && servicePlansEnabled ? (
             <Link href="/service-plans" onClick={closeMenu} className={mobileMenuItemClass(isActivePath(pathname, "/service-plans"))}>
               Service Plans

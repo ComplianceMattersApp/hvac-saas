@@ -5,40 +5,15 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createClient } from "../../lib/supabase/client";
-import { resolveSafeAuthReturnPath } from "@/lib/auth/auth-return-path";
+import {
+  normalizeAuthReturnPath,
+  resolveSafeAuthReturnPath,
+} from "@/lib/auth/auth-return-path";
+import {
+  landingPathForDualContextAccess,
+  resolveDualContextAccess,
+} from "@/lib/auth/dual-context-access";
 import { AuthCommandCenterLayout } from "@/components/auth/AuthCommandCenterLayout";
-
-async function resolveLoginDestination(supabase: ReturnType<typeof createClient>, userId: string) {
-  const { data: internalUser, error: internalUserError } = await supabase
-    .from("internal_users")
-    .select("user_id, is_active")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (internalUserError) throw internalUserError;
-
-  if (internalUser?.user_id && internalUser.is_active) {
-    return "/today";
-  }
-
-  const { data: contractorUser, error: contractorError } = await supabase
-    .from("contractor_users")
-    .select("contractor_id, contractors ( lifecycle_state )")
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (contractorError) throw contractorError;
-
-  const contractorLifecycleState = String((contractorUser as any)?.contractors?.lifecycle_state ?? "active")
-    .trim()
-    .toLowerCase();
-
-  if (contractorUser?.contractor_id && contractorLifecycleState === "active") {
-    return "/portal";
-  }
-
-  return null;
-}
 
 function resolvePasswordResetRedirect() {
   const configuredAppUrl = String(process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
@@ -157,19 +132,34 @@ export default function LoginPage() {
         return;
       }
 
-      const destination = await resolveLoginDestination(supabase, user.id);
+      const access = await resolveDualContextAccess({ supabase, user });
+      const destination = landingPathForDualContextAccess(access);
 
-      if (!destination) {
+      if (destination === "/login") {
         setErrorMsg("This account is not configured for portal or internal access.");
         return;
       }
 
-      const actorKind = destination === "/portal" ? "contractor" : "internal";
-      const resumePath = resolveSafeAuthReturnPath({
-        actorKind,
-        candidateNext: nextPath,
-        fallbackPath: destination,
-      });
+      const normalizedNext = normalizeAuthReturnPath(nextPath);
+      let resumePath = destination;
+
+      if (access.hasActiveAppAccess) {
+        if (access.hasPortalAccess && normalizedNext?.startsWith("/portal")) {
+          resumePath = normalizedNext;
+        } else {
+          resumePath = resolveSafeAuthReturnPath({
+            actorKind: "internal",
+            candidateNext: nextPath,
+            fallbackPath: "/today",
+          });
+        }
+      } else if (access.hasPortalAccess) {
+        resumePath = resolveSafeAuthReturnPath({
+          actorKind: "contractor",
+          candidateNext: nextPath,
+          fallbackPath: "/portal",
+        });
+      }
 
       window.location.href = resumePath;
     } catch (error) {

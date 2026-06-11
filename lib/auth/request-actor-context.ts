@@ -1,5 +1,6 @@
 import { cache } from "react";
-import { getInternalUser, type InternalUserRow } from "@/lib/auth/internal-user";
+import type { InternalUserRow } from "@/lib/auth/internal-user";
+import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
 import { createClient } from "@/lib/supabase/server";
 
 export type RequestActorKind =
@@ -66,43 +67,19 @@ async function resolveRequestActorContextUncached(): Promise<RequestActorContext
     return buildUnauthenticatedActorContext(supabase);
   }
 
-  const contractorLookup = async () => {
-    const _t_contractorLookup = isOpsTimingEnabled() ? Date.now() : 0;
-    try {
-      return await supabase
-        .from("contractor_users")
-        .select("contractor_id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-    } finally {
-      finishOpsTiming("ops:requestActorContext:contractorLookup", _t_contractorLookup);
-    }
-  };
-
-  const internalLookup = getInternalUser({
-    supabase,
-    userId: user.id,
-    timing: (phase, elapsedMs) => {
-      if (!isOpsTimingEnabled()) return;
-      if (phase === "internalUserLookup") {
-        console.log(`[ops:requestActorContext:internalLookup] ${elapsedMs}ms`);
-      }
-    },
-  });
-
-  const [{ data: contractorUser, error: contractorErr }, internalUser] = await Promise.all([
-    contractorLookup(),
-    internalLookup,
-  ]);
   const _t_assembly = isOpsTimingEnabled() ? Date.now() : 0;
+  const access = await resolveDualContextAccess({ supabase, user });
 
-  if (contractorErr) throw contractorErr;
-
-  const contractorId = String(contractorUser?.contractor_id ?? "").trim() || null;
-
-  // Dual-membership users must be able to land in internal workspace paths.
-  // Prefer active internal access, then fall back to contractor membership.
-  if (internalUser?.is_active) {
+  // Dual-membership users land in app context only when app entitlement is active.
+  // Portal access remains available independently when app access is inactive.
+  if (access.hasActiveAppAccess && access.internalUser) {
+    const internalUser: InternalUserRow = {
+      user_id: access.internalUser.userId,
+      role: access.internalUser.role,
+      is_active: access.internalUser.isActive,
+      account_owner_user_id: access.internalUser.accountOwnerUserId,
+      created_by: access.internalUser.createdBy,
+    };
     finishOpsTiming("ops:requestActorContext:assembly", _t_assembly);
     return {
       supabase,
@@ -110,18 +87,18 @@ async function resolveRequestActorContextUncached(): Promise<RequestActorContext
       kind: "internal",
       internalUser,
       contractorId: null,
-      accountOwnerUserId: String(internalUser.account_owner_user_id ?? "").trim() || null,
+      accountOwnerUserId: String(access.internalUser.accountOwnerUserId ?? "").trim() || null,
     };
   }
 
-  if (contractorId) {
+  if (access.portal?.contractorId) {
     finishOpsTiming("ops:requestActorContext:assembly", _t_assembly);
     return {
       supabase,
       user,
       kind: "contractor",
       internalUser: null,
-      contractorId,
+      contractorId: access.portal.contractorId,
       accountOwnerUserId: null,
     };
   }

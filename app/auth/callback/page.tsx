@@ -3,7 +3,14 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { resolveSafeAuthReturnPath } from "@/lib/auth/auth-return-path";
+import {
+  normalizeAuthReturnPath,
+  resolveSafeAuthReturnPath,
+} from "@/lib/auth/auth-return-path";
+import {
+  landingPathForDualContextAccess,
+  resolveDualContextAccess,
+} from "@/lib/auth/dual-context-access";
 
 async function waitForSessionCommit(supabase: ReturnType<typeof createClient>) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -195,20 +202,26 @@ async function routeByRole(
     return;
   }
 
-  const { data: internalUserData, error: internalUserError } = await supabase
-    .from("internal_users")
-    .select("user_id, is_active")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
-
-  if (internalUserError) {
+  let access;
+  try {
+    access = await resolveDualContextAccess({
+      supabase,
+      user: userData.user,
+    });
+  } catch {
     setStatus("We could not complete sign-in. Redirecting to login...");
     setTimeout(() => router.push("/login"), 1500);
     return;
   }
 
-  if (internalUserData?.user_id && internalUserData.is_active) {
+  const normalizedNext = normalizeAuthReturnPath(nextPath);
+
+  if (access.hasActiveAppAccess) {
     setStatus("Redirecting...");
+    if (access.hasPortalAccess && normalizedNext?.startsWith("/portal")) {
+      router.push(normalizedNext);
+      return;
+    }
     const resumePath = resolveSafeAuthReturnPath({
       actorKind: "internal",
       candidateNext: nextPath,
@@ -218,17 +231,7 @@ async function routeByRole(
     return;
   }
 
-  const { data: contractorData } = await supabase
-    .from("contractor_users")
-    .select("contractor_id, contractors ( lifecycle_state )")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
-
-  const contractorLifecycleState = String((contractorData as any)?.contractors?.lifecycle_state ?? "active")
-    .trim()
-    .toLowerCase();
-
-  if (contractorData?.contractor_id && contractorLifecycleState === "active") {
+  if (access.hasPortalAccess) {
     setStatus("Redirecting...");
     const resumePath = resolveSafeAuthReturnPath({
       actorKind: "contractor",
@@ -236,6 +239,12 @@ async function routeByRole(
       fallbackPath: "/portal",
     });
     router.push(resumePath);
+    return;
+  }
+
+  if (access.hasExpiredOrInactiveAppAccess) {
+    setStatus("Redirecting...");
+    router.push(landingPathForDualContextAccess(access));
   } else {
     setStatus("This account is not configured for portal or internal access. Redirecting to login...");
     setTimeout(() => router.push("/login"), 1500);

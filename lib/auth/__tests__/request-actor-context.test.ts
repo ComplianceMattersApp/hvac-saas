@@ -11,6 +11,13 @@ vi.mock("@/lib/auth/internal-user", () => ({
   getInternalUser: (...args: unknown[]) => getInternalUserMock(...args),
 }));
 
+vi.mock("@/lib/business/platform-entitlement", () => ({
+  resolveOperationalMutationEntitlementAccess: vi.fn(async () => ({
+    authorized: true,
+    reason: "allowed_active",
+  })),
+}));
+
 function makeSupabaseFixture(input: {
   userId?: string | null;
   contractorId?: string | null;
@@ -26,7 +33,7 @@ function makeSupabaseFixture(input: {
   };
 
   const from = vi.fn((table: string) => {
-    if (table !== "contractor_users") {
+    if (table !== "contractor_users" && table !== "internal_users") {
       throw new Error(`Unexpected table: ${table}`);
     }
 
@@ -34,7 +41,12 @@ function makeSupabaseFixture(input: {
       select: vi.fn(() => query),
       eq: vi.fn(() => query),
       maybeSingle: vi.fn(async () => ({
-        data: input.contractorId ? { contractor_id: input.contractorId } : null,
+        data:
+          table === "contractor_users"
+            ? input.contractorId
+              ? { contractor_id: input.contractorId, contractors: { lifecycle_state: "active" } }
+              : null
+            : await getInternalUserMock(),
         error: null,
       })),
     };

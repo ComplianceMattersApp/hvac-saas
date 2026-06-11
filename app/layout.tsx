@@ -10,11 +10,12 @@ import ShellCreateMenu, { type ShellCreateItem } from "@/components/layout/Shell
 import ShellNavLink from "@/components/layout/ShellNavLink";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
-import { getRequestActorContext } from "@/lib/auth/request-actor-context";
+import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { shouldShowPartnerWorkMenuItem } from "@/lib/portal/partner-work-access";
+import { createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
 
 const geistSans = Geist({
@@ -57,9 +58,9 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const actorContext = await getRequestActorContext();
-  const supabase = actorContext.supabase;
-  const user = actorContext.user;
+  const supabase = await createClient();
+  const access = await resolveDualContextAccess({ supabase });
+  const user = access.user;
 
   let profileFullName: string | null = null;
 
@@ -74,7 +75,6 @@ export default async function RootLayout({
   }
 
   let homeHref = "/today";
-  let isContractor = false;
   let isInternalUser = false;
   let isAdmin = false;
   const estimatesEnabled = isEstimatesEnabled();
@@ -83,27 +83,19 @@ export default async function RootLayout({
   let productMode: ProductMode = "hybrid";
   let hasPartnerWorkAccess = false;
 
-  if (actorContext.kind === "contractor") {
+  if (access.preferredLandingContext === "portal") {
     homeHref = "/portal";
-    isContractor = true;
-  } else if (actorContext.kind === "internal" && actorContext.internalUser) {
+  } else if (access.hasActiveAppAccess && access.internalUser) {
     homeHref = "/today";
     isInternalUser = true;
-    isAdmin = actorContext.internalUser.role === "admin";
-    const accountOwnerUserId = String(actorContext.internalUser.account_owner_user_id ?? "").trim();
+    isAdmin = access.internalUser.role === "admin";
+    const accountOwnerUserId = String(access.internalUser.accountOwnerUserId ?? "").trim();
     unreadNotificationCount = await getInternalUnreadNotificationBadgeCount({
       supabase,
       accountOwnerUserId,
     });
 
-    const { data: contractorMembership } = await supabase
-      .from("contractor_users")
-      .select("contractor_id, contractors ( lifecycle_state )")
-      .eq("user_id", user.id)
-      .maybeSingle();
-
-    const contractorLifecycleState = String((contractorMembership as any)?.contractors?.lifecycle_state ?? "").trim().toLowerCase();
-    hasPartnerWorkAccess = Boolean(String((contractorMembership as any)?.contractor_id ?? "").trim()) && contractorLifecycleState === "active";
+    hasPartnerWorkAccess = access.hasPortalAccess;
 
     productMode = await resolveProductModeForAccountOwnerId({
       supabase,
@@ -117,13 +109,15 @@ export default async function RootLayout({
   });
 
   const primaryJobCtaLabel = productMode === "hvac_service" ? "+ New Work Order" : "+ New Job";
-  const createMenuItems: ShellCreateItem[] = [
-    {
+  const createMenuItems: ShellCreateItem[] = [];
+
+  if (isInternalUser) {
+    createMenuItems.push({
       label: productMode === "hvac_service" ? "New Work Order" : "New Job",
       href: "/jobs/new",
       description: "Start a new job or service visit.",
-    },
-  ];
+    });
+  }
 
   if (isInternalUser) {
     createMenuItems.push({
@@ -173,10 +167,10 @@ export default async function RootLayout({
 
           {user ? (
             <>
-              {isInternalUser && user.id ? (
+              {isInternalUser && user.id && access.internalUser ? (
                 <BrowserPushSubscriptionAutoReconciler
                   userId={user.id}
-                  accountOwnerUserId={String(actorContext.internalUser?.account_owner_user_id ?? "")}
+                  accountOwnerUserId={String(access.internalUser.accountOwnerUserId ?? "")}
                 />
               ) : null}
 
@@ -204,12 +198,14 @@ export default async function RootLayout({
 
                   {/* Primary nav — expands between brand and utilities, aligned left */}
                   <div className="hidden min-w-0 flex-1 items-center justify-start gap-2 lg:flex">
-                    <ShellCreateMenu items={createMenuItems} />
+                    {isInternalUser ? <ShellCreateMenu items={createMenuItems} /> : null}
                     <nav aria-label="Primary navigation" className="flex min-w-0 items-center gap-1">
                       {isInternalUser ? (
                         <ShellNavLink href="/today" exact>Today</ShellNavLink>
                       ) : null}
-                      <ShellNavLink href="/ops">Operations</ShellNavLink>
+                      {isInternalUser ? (
+                        <ShellNavLink href="/ops">Operations</ShellNavLink>
+                      ) : null}
                       {isInternalUser ? (
                         <ShellNavLink href="/calendar">Calendar</ShellNavLink>
                       ) : null}
@@ -221,7 +217,9 @@ export default async function RootLayout({
                       {showPartnerWorkMenuItem ? (
                         <ShellNavLink href="/portal">Partner Work</ShellNavLink>
                       ) : null}
-                      <ShellNavLink href="/customers">Customers</ShellNavLink>
+                      {isInternalUser ? (
+                        <ShellNavLink href="/customers">Customers</ShellNavLink>
+                      ) : null}
                       {isInternalUser && servicePlansEnabled ? (
                         <ShellNavLink href="/service-plans">Service Plans</ShellNavLink>
                       ) : null}

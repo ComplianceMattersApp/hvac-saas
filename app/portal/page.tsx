@@ -468,10 +468,10 @@ export default async function PortalPage({
 
           <div className="flex flex-col items-start gap-2 lg:items-end">
             <Link
-              href="/jobs/new"
+              href="/jobs/new?context=portal"
               className={portalPrimaryButtonClass}
             >
-              + Add Job
+              Send Work to Compliance Matters
             </Link>
             <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
               {activeResolvedJobs.length} portal jobs

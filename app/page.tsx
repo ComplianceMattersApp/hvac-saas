@@ -1,4 +1,8 @@
 import { redirect } from "next/navigation";
+import {
+  landingPathForDualContextAccess,
+  resolveDualContextAccess,
+} from "@/lib/auth/dual-context-access";
 import { createClient } from "@/lib/supabase/server";
 
 export default async function HomePage() {
@@ -7,13 +11,10 @@ export default async function HomePage() {
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
 
-  const { data: cu } = await supabase
-    .from("contractor_users")
-    .select("contractor_id")
-    .eq("user_id", userData.user.id)
-    .maybeSingle();
+  const access = await resolveDualContextAccess({
+    supabase,
+    user: userData.user,
+  });
 
-  if (cu?.contractor_id) redirect("/portal");
-
-  redirect("/today");
+  redirect(landingPathForDualContextAccess(access));
 }

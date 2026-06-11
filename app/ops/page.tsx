@@ -5,6 +5,10 @@ import { Clock3 } from "lucide-react";
 import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
+import {
+  landingPathForDualContextAccess,
+  resolveDualContextAccess,
+} from "@/lib/auth/dual-context-access";
 import { canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { resolveFieldBillingCapabilities } from "@/lib/auth/field-billing-access";
 import { loadFieldBillingExplicitCapabilitiesForUser } from "@/lib/auth/internal-user-access-capabilities";
@@ -280,10 +284,15 @@ export default async function OpsPage({
   const actorContext = await getRequestActorContext();
   const supabase = actorContext.supabase;
   const user = actorContext.user;
+  const access = await resolveDualContextAccess({ supabase, user });
 
   const signal = (sp.signal ?? "").trim().toLowerCase() || "";
 
   if (!user) redirect("/login");
+
+  if (!access.hasActiveAppAccess) {
+    redirect(landingPathForDualContextAccess(access));
+  }
 
   if (actorContext.kind === "contractor") {
     redirect("/portal");

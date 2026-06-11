@@ -7553,6 +7553,8 @@ const service_visit_reason = serviceVisitReasonRaw || null;
 const service_visit_outcome = normalizeServiceVisitOutcome(serviceVisitOutcomeRaw);
 const intakeSource = String(formData.get("intake_source") || "").trim().toLowerCase();
 const isCustomerContextIntake = intakeSource === "customer";
+const intakeContext = String(formData.get("intake_context") || "").trim().toLowerCase();
+const isExplicitPortalIntake = intakeContext === "portal";
 
 let jurisdiction: string | null = null;
 let permit_date: string | null = null;
@@ -7572,10 +7574,11 @@ const userId = user?.id ?? null;
 
 let isContractorUser = false;
 
-// Enforce contractor based on login (multi-user per contractor)
+// Portal proposal mode must be explicit. Same-email contractor membership alone
+// must not turn app New Job into a portal submission.
 let contractorIdFinal = contractor_id;
 
-if (userId) {
+if (userId && isExplicitPortalIntake) {
   const { data: cu, error: cuErr } = await supabase
     .from("contractor_users")
     .select("contractor_id")
@@ -7585,10 +7588,14 @@ if (userId) {
   if (cuErr) throw new Error(cuErr.message);
 
   if (cu?.contractor_id) {
-    contractorIdFinal = cu.contractor_id;
-    isContractorUser = true;
+      contractorIdFinal = cu.contractor_id;
+      isContractorUser = true;
   }
   
+}
+
+if (isExplicitPortalIntake && !isContractorUser) {
+  redirect("/portal");
 }
 
 // Contractor/customer intake: scheduling is set by ops after submission, not during intake.
