@@ -47,4 +47,12 @@ describe("calendar action responsiveness", () => {
     expect(calendarViewSource).toContain("Status legend");
     expect(calendarViewSource).toContain("Next dispatch action");
   });
+
+  it("desktop toolbar exposes jump-to-date without changing the selected view", () => {
+    expect(calendarViewSource).not.toContain("const showDateJump = view === 'day' || view === 'week'");
+    expect(calendarViewSource).toContain('<form action="/calendar" method="get"');
+    expect(calendarViewSource).toContain('<input type="hidden" name="view" value={view} />');
+    expect(calendarViewSource).toContain('name="date"');
+    expect(calendarViewSource).toContain("Jump to");
+  });
 });

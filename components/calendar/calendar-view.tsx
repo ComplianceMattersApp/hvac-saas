@@ -327,7 +327,6 @@ function unscheduledJobCueLabels(job: DispatchJob) {
 function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | null }) {
   const { view, date, tech } = props;
   const today = todayYmdLA();
-  const showDateJump = view === 'day' || view === 'week';
 
   const prev =
     view === 'month' || view === 'list'
@@ -357,29 +356,27 @@ function NavLinks(props: { view: CalendarUIView; date: string; tech?: string | n
           Next
         </Link>
       </div>
-      {showDateJump ? (
-        <form action="/calendar" method="get" className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 sm:ml-1 sm:w-auto">
-          <input type="hidden" name="view" value={view} />
-          {tech ? <input type="hidden" name="tech" value={tech} /> : null}
-          <label htmlFor={`calendar-jump-${view}`} className="text-xs font-medium text-slate-500">
-            Jump to
-          </label>
-          <input
-            id={`calendar-jump-${view}`}
-            type="date"
-            name="date"
-            defaultValue={date}
-            className="min-h-9 min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm shadow-slate-950/5 sm:flex-none"
-            aria-label={view === 'week' ? 'Jump to week containing date' : 'Jump to date'}
-          />
-          <button
-            type="submit"
-            className="min-h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
-          >
-            Go
-          </button>
-        </form>
-      ) : null}
+      <form action="/calendar" method="get" className="flex w-full items-center gap-2 rounded-md border border-slate-200 bg-slate-50/80 px-2.5 py-1.5 sm:ml-1 sm:w-auto">
+        <input type="hidden" name="view" value={view} />
+        {tech ? <input type="hidden" name="tech" value={tech} /> : null}
+        <label htmlFor={`calendar-jump-${view}`} className="text-xs font-medium text-slate-500">
+          Jump to
+        </label>
+        <input
+          id={`calendar-jump-${view}`}
+          type="date"
+          name="date"
+          defaultValue={date}
+          className="min-h-9 min-w-0 flex-1 rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm shadow-slate-950/5 sm:flex-none"
+          aria-label={view === 'week' ? 'Jump to week containing date' : 'Jump to date'}
+        />
+        <button
+          type="submit"
+          className="min-h-9 rounded-md border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+        >
+          Go
+        </button>
+      </form>
     </div>
   );
 }
