@@ -17,6 +17,7 @@ import {
   getActiveWaitingState,
   type WaitingStateType,
 } from "@/lib/utils/ops-status";
+import { isEccPermitNeededReason } from "@/lib/ecc/permit-needed";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
 
 export type FocusedQueueJob = {
@@ -293,6 +294,10 @@ export function getOpsQueueCardStatusReason(
   const progressLabel = cleanReason(job?.service_follow_up_progress_label);
 
   if (status === "pending_info" || status === "waiting") {
+    if (isEccPermitNeededReason(job?.pending_info_reason)) {
+      return "Permit Needed";
+    }
+
     const serviceFollowUpReason = parseServiceFieldFollowUpReason(job?.pending_info_reason);
     if (serviceFollowUpReason) {
       if (progressLabel === "Part Arrived") {

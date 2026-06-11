@@ -3,6 +3,11 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { setOpsStatusIfNotManual, forceSetOpsStatus } from "@/lib/actions/ops-status";
+import {
+  ECC_PERMIT_NEEDED_REASON,
+  isEccPermitNeededBlocker,
+  shouldApplyEccPermitNeededBlocker,
+} from "@/lib/ecc/permit-needed";
 import { resolveEccScenario } from "@/lib/ecc/scenario-resolver";
 import { resolveOpsStatus } from "@/lib/utils/ops-status";
 import type { OpsStatus } from "@/lib/actions/ops-status";
@@ -59,13 +64,28 @@ function resolveEccCloseoutStatus(job: any): OpsStatus {
 }
 
 async function applyResolvedEccCloseoutStatus(params: {
+  supabase: any;
   jobId: string;
+  job: any;
   currentOps: string;
   resolvedNextStatus: OpsStatus;
   reason: string;
   timing?: EccTimingRecorder;
 }) {
-  const { jobId, currentOps, resolvedNextStatus, reason, timing } = params;
+  const { supabase, jobId, job, currentOps, resolvedNextStatus, reason, timing } = params;
+
+  if (
+    resolvedNextStatus === "paperwork_required" &&
+    await applyEccPermitNeededBlocker({
+      supabase,
+      jobId,
+      job,
+      reason,
+      timing,
+    })
+  ) {
+    return;
+  }
 
   if (ECC_HARD_LOCKS.has(currentOps)) {
     console.warn("[ECC_EVAL]", {
@@ -127,6 +147,82 @@ async function applyResolvedEccCloseoutStatus(params: {
 
 const ECC_HARD_LOCKS = new Set<string>(["pending_info", "on_hold"]);
 
+async function applyEccPermitNeededBlocker(params: {
+  supabase: any;
+  jobId: string;
+  job: any;
+  reason: string;
+  timing?: EccTimingRecorder;
+}): Promise<boolean> {
+  const { supabase, jobId, job, reason, timing } = params;
+
+  if (isEccPermitNeededBlocker(job)) {
+    console.info("[ECC_EVAL]", {
+      jobId,
+      current_ops_status: job.ops_status ?? null,
+      computed_next_status: "pending_info",
+      reason,
+      final_ops_status: "pending_info",
+      permit_blocker_already_active: true,
+    });
+    return true;
+  }
+
+  if (!shouldApplyEccPermitNeededBlocker(job)) return false;
+
+  const beforeOpsStatus = job.ops_status ?? null;
+  const beforePendingInfoReason = job.pending_info_reason ?? null;
+
+  const { error: updateErr } = await timeEccPhase(
+    timing,
+    "permitNeededUpdate",
+    async () =>
+      supabase
+        .from("jobs")
+        .update({
+          ops_status: "pending_info",
+          pending_info_reason: ECC_PERMIT_NEEDED_REASON,
+        })
+        .eq("id", jobId),
+  );
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  const { error: eventErr } = await timeEccPhase(
+    timing,
+    "permitNeededEvent",
+    async () =>
+      supabase.from("job_events").insert({
+        job_id: jobId,
+        event_type: "ops_update",
+        message: "Permit number needed",
+        meta: {
+          timeline_v: 2,
+          event_family: "ecc_permit",
+          source_action: "evaluateEccOpsStatus",
+          reason,
+          changes: [
+            { field: "ops_status", from: beforeOpsStatus, to: "pending_info" },
+            { field: "pending_info_reason", from: beforePendingInfoReason, to: ECC_PERMIT_NEEDED_REASON },
+          ],
+        },
+      }),
+  );
+
+  if (eventErr) throw new Error(eventErr.message);
+
+  console.info("[ECC_EVAL]", {
+    jobId,
+    current_ops_status: beforeOpsStatus,
+    computed_next_status: "pending_info",
+    reason,
+    final_ops_status: "pending_info",
+    permit_blocker_applied: true,
+  });
+
+  return true;
+}
+
 /**
  * ECC Ops rules
  * - If ANY required ECC test FAILS -> ops_status = "failed"
@@ -153,7 +249,7 @@ export async function evaluateEccOpsStatus(
     async () =>
       supabase
         .from("jobs")
-        .select("id, status, job_type, project_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end")
+        .select("id, status, job_type, project_type, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end")
         .eq("id", jobId)
         .single(),
   );
@@ -267,7 +363,9 @@ export async function evaluateEccOpsStatus(
   if (!hasAnyRequiredTests) {
     if (isFieldComplete) {
       await applyResolvedEccCloseoutStatus({
+        supabase,
         jobId,
+        job,
         currentOps: String(job.ops_status ?? ""),
         resolvedNextStatus: resolveEccCloseoutStatus(job),
         reason: "field_complete_no_required_tests",
@@ -338,31 +436,15 @@ export async function evaluateEccOpsStatus(
 
     if (correctionResolutionEvent?.id) {
       const resolvedNextStatus = resolveEccCloseoutStatus(job);
-
-      if (ECC_HARD_LOCKS.has(currentOps)) {
-        console.error("[ECC_EVAL]", {
-          jobId,
-          current_ops_status: currentOps,
-          computed_next_status: resolvedNextStatus,
-          reason: "required_test_failed_resolved_by_correction_review",
-          manual_lock_prevented: true,
-          final_ops_status: currentOps,
-        });
-      } else {
-        await forceSetOpsStatus(jobId, resolvedNextStatus as OpsStatus, {
-          timing: options.timing
-            ? (phase, elapsedMs) => options.timing?.(`opsStatus.${phase}`, elapsedMs)
-            : undefined,
-        });
-        console.error("[ECC_EVAL]", {
-          jobId,
-          current_ops_status: currentOps,
-          computed_next_status: resolvedNextStatus,
-          reason: "required_test_failed_resolved_by_correction_review",
-          manual_lock_prevented: false,
-          final_ops_status: resolvedNextStatus,
-        });
-      }
+      await applyResolvedEccCloseoutStatus({
+        supabase,
+        jobId,
+        job,
+        currentOps: String(currentOps ?? ""),
+        resolvedNextStatus,
+        reason: "required_test_failed_resolved_by_correction_review",
+        timing: options.timing,
+      });
       return;
     }
 
@@ -404,7 +486,9 @@ export async function evaluateEccOpsStatus(
 
   if (allRequiredPassed) {
     await applyResolvedEccCloseoutStatus({
+      supabase,
       jobId,
+      job,
       currentOps: String(job.ops_status ?? ""),
       resolvedNextStatus: resolveEccCloseoutStatus(job),
       reason: "all_required_passed",
@@ -414,6 +498,18 @@ export async function evaluateEccOpsStatus(
   }
 
   if (isFieldComplete) {
+    if (
+      await applyEccPermitNeededBlocker({
+        supabase,
+        jobId,
+        job,
+        reason: "field_complete_fallback",
+        timing: options.timing,
+      })
+    ) {
+      return;
+    }
+
     const setResult = await setOpsStatusIfNotManual(jobId, "paperwork_required", {
       timing: options.timing
         ? (phase, elapsedMs) => options.timing?.(`opsStatus.${phase}`, elapsedMs)

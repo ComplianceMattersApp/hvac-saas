@@ -9188,7 +9188,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
   // ECC guard:
   // do not allow status flow to move into completed unless at least one
-  // completed ECC test run has a real result.
+  // ECC test run has been completed. This matches the Tests workspace summary.
   if (next === "completed") {
     const { data: jt, error: jtErr } = await supabase
       .from("jobs")
@@ -9201,20 +9201,15 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     if ((jt?.job_type ?? "").toLowerCase() === "ecc") {
       const { data: runs, error: runErr } = await supabase
         .from("ecc_test_runs")
-        .select("id, is_completed, computed_pass, override_pass")
+        .select("id, is_completed")
         .eq("job_id", id)
         .eq("is_completed", true);
 
       if (runErr) throw runErr;
 
-      const hasMeaningfulCompletedRun = (runs ?? []).some((r: any) => {
-        if (!r?.is_completed) return false;
-        if (r?.override_pass === true || r?.override_pass === false) return true;
-        if (r?.computed_pass === true || r?.computed_pass === false) return true;
-        return false;
-      });
+      const hasCompletedRun = (runs ?? []).some((r: any) => r?.is_completed === true);
 
-      if (!hasMeaningfulCompletedRun) {
+      if (!hasCompletedRun) {
         console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "ecc_test_required", current, next });
         _ftEmit("guard:ecc_test_required", buildJobRedirect({ notice: "ecc_test_required" }));
         redirect(buildJobRedirect({ notice: "ecc_test_required" }));

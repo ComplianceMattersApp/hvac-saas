@@ -38,6 +38,7 @@ import {
   markServiceApprovalReceivedFromForm,
   markJobFieldCompleteFromForm,
   markCertsCompleteFromForm,
+  markEccPermitAvailableFromForm,
   markInvoiceCompleteFromForm,
   resolveFailureByCorrectionReviewFromForm,
 } from "@/lib/actions/job-ops-actions";
@@ -65,6 +66,7 @@ import {
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { buildJobBillingStateReadModel } from "@/lib/business/job-billing-state";
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
+import { isEccPermitNeededBlocker } from "@/lib/ecc/permit-needed";
 import {
   resolveInternalInvoiceEmailDeliveries,
   type InternalInvoiceEmailDeliveryRecord,
@@ -1279,25 +1281,6 @@ export default async function JobDetailPage({
   };
 
   const showEccNotice = notice === "ecc_test_required";
-  const completionActionAttentionBanner =
-    showEccNotice
-      ? {
-          title: "One step missing",
-          message: (
-            <>
-              This is an <span className="font-semibold">ECC</span> job. Go to the{" "}
-              <span className="font-semibold">Tests</span> tab and complete at least{" "}
-              <span className="font-semibold">one ECC test run</span> before marking{" "}
-              <span className="font-semibold">Field Work Complete</span>.
-            </>
-          ),
-        }
-      : banner === "status_update_failed"
-      ? {
-          title: "Could not complete field work",
-          message: <>We could not update this job status. Refresh and try again.</>,
-        }
-      : null;
 
   const supabase = await timedPhase("createClient", () => createClient());
 
@@ -1500,6 +1483,8 @@ export default async function JobDetailPage({
       ecc_test_runs (
         id,
         test_type,
+        system_id,
+        is_completed,
         computed,
         computed_pass,
         override_pass,
@@ -2526,6 +2511,7 @@ const isJobArchived = Boolean(job.deleted_at) || normalizedOpsStatus === "archiv
 const isJobClosed = normalizedOpsStatus === "closed";
 const isJobCancelled = normalizedJobStatus === "cancelled";
 const showFieldOutcomePanel =
+  job.job_type !== "ecc" &&
   !isJobClosed &&
   !isJobCancelled &&
   !isJobArchived &&
@@ -2565,6 +2551,11 @@ const workflowChipLabel =
 
 const isFailedUnresolved =
   ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
+const isEccPermitNeededActive = isEccPermitNeededBlocker({
+  job_type: job.job_type,
+  ops_status: job.ops_status,
+  pending_info_reason: (job as any).pending_info_reason ?? null,
+});
 
 const billingState = buildJobBillingStateReadModel({
   billingMode,
@@ -2590,7 +2581,8 @@ const isCloseoutPending = isInCloseoutQueue(closeoutProjectionJob);
 const canShowCertsButton =
   job.job_type === "ecc" &&
   !job.certs_complete &&
-  !isFailedUnresolved;
+  !isFailedUnresolved &&
+  !isEccPermitNeededActive;
 
 const canShowInvoiceButton =
   job.job_type === "ecc" &&
@@ -2948,6 +2940,27 @@ const followUpDateValue = String((job as any).follow_up_date ?? "").trim();
 const followUpDateSummary = followUpDateValue ? formatTimestampDateDisplayLA(followUpDateValue) : "";
 const nextActionPreview = truncateSummaryText(String((job as any).next_action_note ?? ""), 78);
 const isEccJobType = job.job_type === "ecc";
+const hasCompletedEccTestRun = eccRuns.some((run: any) => run?.is_completed === true);
+const shouldShowEccMissingTestNotice = showEccNotice && isEccJobType && !hasCompletedEccTestRun;
+const completionActionAttentionBanner =
+  shouldShowEccMissingTestNotice
+    ? {
+        title: "One step missing",
+        message: (
+          <>
+            This is an <span className="font-semibold">ECC</span> job. Go to the{" "}
+            <span className="font-semibold">Tests</span> tab and complete at least{" "}
+            <span className="font-semibold">one ECC test run</span> before marking{" "}
+            <span className="font-semibold">Field Work Complete</span>.
+          </>
+        ),
+      }
+    : banner === "status_update_failed"
+    ? {
+        title: "Could not complete field work",
+        message: <>We could not update this job status. Refresh and try again.</>,
+      }
+    : null;
 const rightRailNoteCount = isEccJobType ? noteCountSummary.timelineNoteEventCount : noteCountSummary.internalCount;
 const rightRailNotesTitle = isEccJobType ? "Shared Notes" : "Job Notes";
 const rightRailNotesSubtitle = isEccJobType
@@ -5237,6 +5250,61 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             className="hidden w-full sm:block"
           />
         ) : null}
+        {isEccPermitNeededActive ? (
+          <div
+            id="ecc-permit-needed-action"
+            className="w-full rounded-lg border border-amber-200 bg-amber-50/90 px-3 py-2.5 text-sm text-amber-950"
+          >
+            <div className="font-semibold">Permit Needed</div>
+            <p className="mt-1 text-xs leading-5 text-amber-900/90">
+              Add the permit number to continue cert closeout. Invoice and payment work remain separate.
+            </p>
+            <details className="group mt-3 rounded-lg border border-amber-200 bg-white/85 p-3">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-900">
+                <span>Permit Available</span>
+                <span className="text-xs font-medium text-slate-500 group-open:hidden">Add permit</span>
+                <span className="hidden text-xs font-medium text-slate-500 group-open:inline">Close</span>
+              </summary>
+              <form action={markEccPermitAvailableFromForm} className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,0.8fr)_auto] sm:items-end">
+                <input type="hidden" name="job_id" value={job.id} />
+                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#ecc-permit-needed-action`} />
+                <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                  Permit Number
+                  <input
+                    type="text"
+                    name="permit_number"
+                    required
+                    maxLength={80}
+                    defaultValue={job.permit_number ?? ""}
+                    className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                  Jurisdiction
+                  <input
+                    type="text"
+                    name="jurisdiction"
+                    maxLength={120}
+                    defaultValue={job.jurisdiction ?? ""}
+                    className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                  Permit Date
+                  <input
+                    type="date"
+                    name="permit_date"
+                    defaultValue={job.permit_date ?? ""}
+                    className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
+                  />
+                </label>
+                <SubmitButton loadingText="Saving..." className={`${darkButtonClass} w-full sm:w-auto`}>
+                  Save Permit
+                </SubmitButton>
+              </form>
+            </details>
+          </div>
+        ) : null}
         {isHistoricalServiceFollowUpContinued && serviceFollowUpProgressState.reason ? (
           <div
             id="next-service-action"
@@ -5374,7 +5442,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             ) : null}
           </div>
         ) : null}
-        {(isFieldComplete || job.status === "completed") && !isServiceFieldFollowUpPendingInfo ? (
+        {(isFieldComplete || job.status === "completed") && !isServiceFieldFollowUpPendingInfo && !isEccPermitNeededActive ? (
           <div className="hidden w-full sm:flex">
             <span className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-900">
               Field work complete - invoice/certs can be handled as needed.
@@ -7174,6 +7242,34 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
         <FlashBanner
           type="warning"
           message="Pending Info reason is required."
+        />
+      )}
+
+      {banner === "permit_needed" && (
+        <FlashBanner
+          type="warning"
+          message="Permit number is required before ECC cert closeout can be completed."
+        />
+      )}
+
+      {banner === "permit_number_required" && (
+        <FlashBanner
+          type="warning"
+          message="Enter a permit number before saving Permit Available."
+        />
+      )}
+
+      {banner === "permit_available_saved" && (
+        <FlashBanner
+          type="success"
+          message="Permit number saved. ECC closeout blockers were recomputed."
+        />
+      )}
+
+      {banner === "permit_available_invalid" && (
+        <FlashBanner
+          type="warning"
+          message="Permit Available is only available for ECC jobs."
         />
       )}
 

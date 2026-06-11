@@ -48,6 +48,11 @@ import {
   finalRunPass,
   type ContractorFailureDetail,
 } from "@/lib/portal/resolveContractorIssues";
+import {
+  ECC_PERMIT_NEEDED_REASON,
+  isEccPermitNeededBlocker,
+  shouldApplyEccPermitNeededBlocker,
+} from "@/lib/ecc/permit-needed";
 export type { ContractorFailureDetail } from "@/lib/portal/resolveContractorIssues";
 
 const OPS_STATUSES = [
@@ -263,6 +268,58 @@ async function recomputeOpsAfterCloseoutMutation(supabase: any, jobId: string): 
 
   if (refreshedErr) throw new Error(refreshedErr.message);
   return refreshed?.ops_status ?? null;
+}
+
+async function persistEccPermitNeededBlocker(params: {
+  supabase: any;
+  jobId: string;
+  job: {
+    job_type?: string | null;
+    status?: string | null;
+    field_complete?: boolean | null;
+    certs_complete?: boolean | null;
+    permit_number?: string | null;
+    ops_status?: string | null;
+    pending_info_reason?: string | null;
+  };
+  sourceAction: string;
+  userId?: string | null;
+}): Promise<boolean> {
+  const { supabase, jobId, job, sourceAction, userId } = params;
+  if (isEccPermitNeededBlocker(job)) return true;
+  if (!shouldApplyEccPermitNeededBlocker(job)) return false;
+
+  const beforeOpsStatus = job.ops_status ?? null;
+  const beforePendingInfoReason = job.pending_info_reason ?? null;
+
+  const { error: updateErr } = await supabase
+    .from("jobs")
+    .update({
+      ops_status: "pending_info",
+      pending_info_reason: ECC_PERMIT_NEEDED_REASON,
+    })
+    .eq("id", jobId);
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  const { error: eventErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "ops_update",
+    message: "Permit number needed",
+    meta: {
+      timeline_v: 2,
+      event_family: "ecc_permit",
+      source_action: sourceAction,
+      changes: [
+        { field: "ops_status", from: beforeOpsStatus, to: "pending_info" },
+        { field: "pending_info_reason", from: beforePendingInfoReason, to: ECC_PERMIT_NEEDED_REASON },
+      ],
+    },
+    user_id: userId ?? null,
+  });
+
+  if (eventErr) throw new Error(eventErr.message);
+  return true;
 }
 
 type ContractorReportKind = "failed" | "pending_info";
@@ -1230,7 +1287,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   const { data: job, error: jobErr } = await supabase
     .from("jobs")
     .select(
-      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
+      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
     )
     .eq("id", jobId)
     .single();
@@ -1279,6 +1336,22 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
 
   if (!job.field_complete) {
     redirectToJob({ notice: "field_not_complete" });
+  }
+
+  if ((job.job_type ?? "").toLowerCase() === "ecc") {
+    const permitBlocked = await persistEccPermitNeededBlocker({
+      supabase,
+      jobId,
+      job,
+      sourceAction: "markCertsCompleteFromForm",
+      userId: user.id,
+    });
+
+    if (permitBlocked) {
+      revalidatePath(`/jobs/${jobId}`);
+      revalidatePath(`/ops`);
+      redirectToJob({ banner: "permit_needed" });
+    }
   }
 
     // Mark certs complete and verify update
@@ -1335,6 +1408,101 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
   redirectToJob({});
+}
+
+export async function markEccPermitAvailableFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  if (!jobId) throw new Error("Missing job_id");
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const permitNumber = String(formData.get("permit_number") || "").trim();
+  const jurisdiction = String(formData.get("jurisdiction") || "").trim();
+  const permitDate = String(formData.get("permit_date") || "").trim();
+
+  const redirectToJob = (params: { banner?: string; notice?: string }): never =>
+    redirect(
+      buildJobOpsRedirectPath({
+        jobId,
+        returnToRaw,
+        fallbackPath: `/jobs/${jobId}?tab=ops`,
+        banner: params.banner,
+        notice: params.notice,
+      }),
+    );
+
+  if (!permitNumber) {
+    redirectToJob({ banner: "permit_number_required" });
+  }
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) redirect("/login");
+  const authz = await requireInternalOpsAccessOrRedirect(supabase, user.id, jobId);
+  await requireOperationalJobOpsEntitlementAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: authz.internalUser.account_owner_user_id,
+  });
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select(
+      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, permit_number, jurisdiction, permit_date, scheduled_date, window_start, window_end, service_case_id",
+    )
+    .eq("id", jobId)
+    .single();
+
+  if (jobErr) throw new Error(jobErr.message);
+  if (!job?.id || String(job.job_type ?? "").trim().toLowerCase() !== "ecc") {
+    redirectToJob({ banner: "permit_available_invalid" });
+  }
+
+  const permitPatch = {
+    permit_number: permitNumber,
+    jurisdiction: jurisdiction || null,
+    permit_date: permitDate || null,
+  };
+
+  const { error: updateErr } = await supabase
+    .from("jobs")
+    .update(permitPatch)
+    .eq("id", jobId);
+
+  if (updateErr) throw new Error(updateErr.message);
+
+  const { error: eventErr } = await supabase.from("job_events").insert({
+    job_id: jobId,
+    event_type: "permit_info_updated",
+    message: "Permit number added",
+    meta: {
+      timeline_v: 2,
+      event_family: "ecc_permit",
+      source_action: "markEccPermitAvailableFromForm",
+      changes: [
+        { field: "permit_number", from: job.permit_number ?? null, to: permitPatch.permit_number },
+        { field: "jurisdiction", from: job.jurisdiction ?? null, to: permitPatch.jurisdiction },
+        { field: "permit_date", from: job.permit_date ?? null, to: permitPatch.permit_date },
+      ],
+    },
+    user_id: user.id,
+  });
+
+  if (eventErr) throw new Error(eventErr.message);
+
+  if (isEccPermitNeededBlocker(job)) {
+    await releasePendingInfoAndRecompute(jobId, "permit_available");
+  } else {
+    await evaluateEccOpsStatus(jobId);
+    await healStalePaperworkOpsStatus(jobId);
+  }
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/ops`);
+  revalidatePath(`/ops/closeout-queue`);
+  revalidatePath(`/portal/jobs/${jobId}`);
+  redirectToJob({ banner: "permit_available_saved" });
 }
 
 export async function markInvoiceCompleteFromForm(formData: FormData): Promise<void> {

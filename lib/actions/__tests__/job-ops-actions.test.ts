@@ -196,6 +196,65 @@ function makeSupabaseForReleaseFromForm(before: JobSnapshot, afterOpsStatus: str
   return { supabase, jobEvents, jobUpdates, afterOpsStatus };
 }
 
+function makeSupabaseForCertPermitBlocker(job: Record<string, unknown>) {
+  const jobUpdates: Record<string, unknown>[] = [];
+  const jobEvents: Record<string, unknown>[] = [];
+
+  const supabase = {
+    auth: {
+      getUser: vi.fn(async () => ({ data: { user: { id: "internal-user-1" } } })),
+    },
+    from(table: string) {
+      if (table === "jobs") {
+        const query: any = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          single: vi.fn(async () => ({ data: job, error: null })),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            jobUpdates.push(payload);
+            return query;
+          }),
+          then: (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
+            Promise.resolve({ data: [], error: null }).then(onFulfilled),
+        };
+        return query;
+      }
+
+      if (table === "ecc_test_runs") {
+        const query: any = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          then: (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
+            Promise.resolve({
+              data: [
+                {
+                  is_completed: true,
+                  computed_pass: true,
+                  override_pass: null,
+                },
+              ],
+              error: null,
+            }).then(onFulfilled),
+        };
+        return query;
+      }
+
+      if (table === "job_events") {
+        return {
+          insert: vi.fn(async (payload: Record<string, unknown>) => {
+            jobEvents.push(payload);
+            return { error: null };
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    },
+  };
+
+  return { supabase, jobUpdates, jobEvents };
+}
+
 describe("releaseAndReevaluate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -341,5 +400,53 @@ describe("releaseAndReevaluate", () => {
         }),
       }),
     );
+  });
+
+  it("blocks ECC cert closeout with Permit Needed instead of marking certs complete when permit is blank", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForCertPermitBlocker({
+      id: "job-1",
+      status: "completed",
+      job_type: "ecc",
+      field_complete: true,
+      certs_complete: false,
+      invoice_complete: false,
+      ops_status: "paperwork_required",
+      pending_info_reason: null,
+      permit_number: null,
+      scheduled_date: "2026-04-10",
+      window_start: "08:00",
+      window_end: "10:00",
+      data_entry_completed_at: null,
+      service_case_id: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+    redirectMock.mockImplementation((path: string) => {
+      throw new Error(`NEXT_REDIRECT:${path}`);
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("return_to", "/jobs/job-1?tab=ops#closeout-actions");
+
+    const { markCertsCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markCertsCompleteFromForm(formData)).rejects.toThrow("banner=permit_needed");
+    expect(jobUpdates).toEqual([
+      {
+        ops_status: "pending_info",
+        pending_info_reason: "Permit Needed",
+      },
+    ]);
+    expect(jobEvents).toEqual([
+      expect.objectContaining({
+        event_type: "ops_update",
+        message: "Permit number needed",
+        meta: expect.objectContaining({
+          event_family: "ecc_permit",
+          source_action: "markCertsCompleteFromForm",
+        }),
+      }),
+    ]);
+    expect(jobUpdates).not.toContainEqual({ certs_complete: true });
   });
 });

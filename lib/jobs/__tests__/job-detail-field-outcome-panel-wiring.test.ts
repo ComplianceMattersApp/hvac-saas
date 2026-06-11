@@ -7,6 +7,11 @@ const jobDetailSource = readFileSync(
   "utf8",
 );
 
+const jobActionsSource = readFileSync(
+  resolve(__dirname, "../../actions/job-actions.ts"),
+  "utf8",
+);
+
 const panelSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/FieldOutcomePanel.tsx"),
   "utf8",
@@ -46,6 +51,7 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("const isJobArchived = Boolean(job.deleted_at) || normalizedOpsStatus === \"archived\";");
     expect(jobDetailSource).toContain('const isJobClosed = normalizedOpsStatus === "closed";');
     expect(jobDetailSource).toContain('const isJobCancelled = normalizedJobStatus === "cancelled";');
+    expect(jobDetailSource).toContain('job.job_type !== "ecc" &&');
     expect(jobDetailSource).toContain('const normalizedServiceVisitType = String(job.service_visit_type ?? "").trim().toLowerCase();');
     expect(jobDetailSource).toContain('normalizedServiceVisitType === "callback" || normalizedServiceVisitType === "return_visit";');
     expect(jobDetailSource).toContain("const showFieldOutcomePanel =");
@@ -201,6 +207,32 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("serviceFollowUpProgressState.continuedScheduledDate");
     expect(jobDetailSource).toContain('"Return Scheduled"');
     expect(jobDetailSource).toContain('"Follow-Up Continued"');
+  });
+
+  it("wires ECC Permit Needed to a Permit Available action in Primary Next Action", () => {
+    expect(jobDetailSource).toContain("markEccPermitAvailableFromForm");
+    expect(jobDetailSource).toContain("isEccPermitNeededBlocker");
+    expect(jobDetailSource).toContain("const isEccPermitNeededActive =");
+    expect(jobDetailSource).toContain('id="ecc-permit-needed-action"');
+    expect(jobDetailSource).toContain("Permit Needed");
+    expect(jobDetailSource).toContain("Permit Available");
+    expect(jobDetailSource).toContain("form action={markEccPermitAvailableFromForm}");
+    expect(jobDetailSource).toContain('name="permit_number"');
+    expect(jobDetailSource).toContain('name="jurisdiction"');
+    expect(jobDetailSource).toContain('name="permit_date"');
+    expect(jobDetailSource).toContain("!isEccPermitNeededActive");
+    expect(jobDetailSource).toContain('banner === "permit_needed"');
+    expect(jobDetailSource).toContain('banner === "permit_available_saved"');
+  });
+
+  it("aligns ECC missing-test warning with Tests workspace completed-run truth", () => {
+    expect(jobDetailSource).toContain("is_completed,");
+    expect(jobDetailSource).toContain("const hasCompletedEccTestRun = eccRuns.some((run: any) => run?.is_completed === true);");
+    expect(jobDetailSource).toContain("const shouldShowEccMissingTestNotice = showEccNotice && isEccJobType && !hasCompletedEccTestRun;");
+    expect(jobDetailSource).toContain("shouldShowEccMissingTestNotice");
+    expect(jobActionsSource).toContain(".select(\"id, is_completed\")");
+    expect(jobActionsSource).toContain("const hasCompletedRun = (runs ?? []).some((r: any) => r?.is_completed === true);");
+    expect(jobActionsSource).not.toContain("hasMeaningfulCompletedRun");
   });
 
   it("renders completion blocker banners in the primary action region without lower duplicates", () => {

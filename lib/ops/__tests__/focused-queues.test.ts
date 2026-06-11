@@ -342,6 +342,11 @@ describe("focused queue display labels", () => {
 
     expect(getOpsQueueCardStatusReason({
       ops_status: "pending_info",
+      pending_info_reason: "Permit Needed",
+    })).toBe("Permit Needed");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
       pending_info_reason: "Materials Needed: Need 45/5 capacitor",
       service_follow_up_progress_label: "Part Ordered",
     })).toBe("Materials Needed: Need 45/5 capacitor • Progress: Part Ordered");

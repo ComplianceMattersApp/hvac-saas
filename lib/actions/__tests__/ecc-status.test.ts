@@ -29,6 +29,8 @@ type SupabaseFixture = {
   equipmentRows?: Array<Record<string, any>>;
   runs?: Array<Record<string, any>>;
   correctionResolutionEvent?: Record<string, any> | null;
+  jobUpdates?: Array<Record<string, any>>;
+  jobEvents?: Array<Record<string, any>>;
 };
 
 function makeResponse(data: any, error: { message: string } | null = null): QueryResponse {
@@ -36,13 +38,20 @@ function makeResponse(data: any, error: { message: string } | null = null): Quer
 }
 
 function makeSupabase(fixture: SupabaseFixture) {
+  const jobUpdates = fixture.jobUpdates ?? [];
+  const jobEvents = fixture.jobEvents ?? [];
+
   return {
     from(table: string) {
       const filters: Array<{ column: string; value: unknown }> = [];
 
       const resolveTableResponse = (mode: "single" | "maybeSingle" | "many"): QueryResponse => {
         if (table === "jobs") {
-          return makeResponse(fixture.job);
+          return makeResponse({
+            permit_number: "PERMIT-TEST",
+            pending_info_reason: null,
+            ...fixture.job,
+          });
         }
 
         if (table === "job_systems") {
@@ -82,6 +91,14 @@ function makeSupabase(fixture: SupabaseFixture) {
 
       const query: any = {
         select: vi.fn(() => query),
+        update: vi.fn((payload: Record<string, any>) => {
+          if (table === "jobs") jobUpdates.push(payload);
+          return query;
+        }),
+        insert: vi.fn((payload: Record<string, any>) => {
+          if (table === "job_events") jobEvents.push(payload);
+          return query;
+        }),
         eq: vi.fn((column: string, value: unknown) => {
           filters.push({ column, value });
           return query;
@@ -95,13 +112,17 @@ function makeSupabase(fixture: SupabaseFixture) {
 
       return query;
     },
+    __jobUpdates: jobUpdates,
+    __jobEvents: jobEvents,
   };
 }
 
 async function runEvaluation(fixture: SupabaseFixture) {
-  createClientMock.mockResolvedValue(makeSupabase(fixture));
+  const supabase = makeSupabase(fixture);
+  createClientMock.mockResolvedValue(supabase);
   const { evaluateEccOpsStatus } = await import("@/lib/actions/ecc-status");
   await evaluateEccOpsStatus(String(fixture.job.id ?? "job-1"));
+  return supabase;
 }
 
 describe("evaluateEccOpsStatus", () => {
@@ -238,6 +259,163 @@ describe("evaluateEccOpsStatus", () => {
     );
     expect(forceSetOpsStatusMock).toHaveBeenCalledTimes(1);
     expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
+  });
+
+  it("sets Permit Needed when ECC closeout is ready but permit number is blank", async () => {
+    const supabase = await runEvaluation({
+      job: {
+        id: "job-permit-needed",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "paperwork_required",
+        pending_info_reason: null,
+        permit_number: null,
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: true,
+          override_pass: null,
+          data: {},
+          computed: {},
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect((supabase as any).__jobUpdates).toContainEqual({
+      ops_status: "pending_info",
+      pending_info_reason: "Permit Needed",
+    });
+    expect((supabase as any).__jobEvents).toEqual([
+      expect.objectContaining({
+        job_id: "job-permit-needed",
+        event_type: "ops_update",
+        message: "Permit number needed",
+        meta: expect.objectContaining({
+          event_family: "ecc_permit",
+          source_action: "evaluateEccOpsStatus",
+        }),
+      }),
+    ]);
+    expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("does not let Permit Needed overwrite unresolved failed ECC truth", async () => {
+    const supabase = await runEvaluation({
+      job: {
+        id: "job-failed-before-permit",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "paperwork_required",
+        pending_info_reason: null,
+        permit_number: null,
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      correctionResolutionEvent: null,
+    });
+
+    expect(forceSetOpsStatusMock).toHaveBeenCalledWith(
+      "job-failed-before-permit",
+      "failed",
+      expect.objectContaining({ timing: undefined })
+    );
+    expect((supabase as any).__jobUpdates).toEqual([]);
+  });
+
+  it("does not let Permit Needed overwrite an explicit on-hold blocker", async () => {
+    const supabase = await runEvaluation({
+      job: {
+        id: "job-on-hold-before-permit",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "on_hold",
+        pending_info_reason: null,
+        permit_number: null,
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: true,
+          override_pass: null,
+          data: {},
+          computed: {},
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect((supabase as any).__jobUpdates).toEqual([]);
+    expect(setOpsStatusIfNotManualMock).not.toHaveBeenCalled();
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("does not let Permit Needed overwrite an existing manual pending-info reason", async () => {
+    const supabase = await runEvaluation({
+      job: {
+        id: "job-manual-pending-reason",
+        status: "completed",
+        job_type: "ecc",
+        project_type: "changeout",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "paperwork_required",
+        pending_info_reason: "Missing AHJ attachment",
+        permit_number: null,
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+      },
+      runs: [
+        {
+          id: "run-1",
+          system_id: "sys-1",
+          test_type: "duct_leakage",
+          is_completed: true,
+          computed_pass: true,
+          override_pass: null,
+          data: {},
+          computed: {},
+        },
+      ],
+      correctionResolutionEvent: null,
+    });
+
+    expect((supabase as any).__jobUpdates).toEqual([]);
+    expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith(
+      "job-manual-pending-reason",
+      "paperwork_required",
+      expect.objectContaining({ timing: undefined })
+    );
+    expect(forceSetOpsStatusMock).not.toHaveBeenCalled();
   });
 
   it("does not throw or force a closeout status when required tests pass before field completion", async () => {
