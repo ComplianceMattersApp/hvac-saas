@@ -295,6 +295,12 @@ export function getOpsQueueCardStatusReason(
   if (status === "pending_info" || status === "waiting") {
     const serviceFollowUpReason = parseServiceFieldFollowUpReason(job?.pending_info_reason);
     if (serviceFollowUpReason) {
+      if (progressLabel === "Part Arrived") {
+        return `Part Arrived - Ready to Schedule Return: ${serviceFollowUpReason.display}`;
+      }
+      if (progressLabel === "Approval Received") {
+        return `Approval Received - Ready to Schedule Return: ${serviceFollowUpReason.display}`;
+      }
       return progressLabel
         ? `${serviceFollowUpReason.display} • Progress: ${progressLabel}`
         : serviceFollowUpReason.display;

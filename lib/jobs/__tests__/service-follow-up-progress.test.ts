@@ -148,8 +148,43 @@ describe("service follow-up progress", () => {
       ],
     })).toMatchObject({
       continuedThroughChildJobId: "child-1",
+      continuedBridgeAction: "add_to_scheduling_queue",
+      continuedScheduledDate: null,
       bridgeActionLabel: null,
-      returnPromptLabel: "Linked return job added to scheduling queue",
+      returnPromptLabel: "Linked return job created",
+    });
+  });
+
+  it("detects follow-up continuation through linked scheduled return job", () => {
+    const events = [
+      {
+        created_at: "2026-06-10T10:00:00.000Z",
+        meta: {
+          follow_up_bridge_action: "schedule_return_now",
+          continued_through_child_job_id: "child-2",
+          scheduled_date: "2026-06-12",
+          window_start: "09:00",
+          window_end: "11:00",
+        },
+      },
+    ];
+
+    expect(getServiceFollowUpContinuedChildJobId(events)).toBe("child-2");
+    expect(buildServiceFollowUpProgressState({
+      pendingInfoReason: "Approval Needed: Customer approved",
+      events: [
+        {
+          created_at: "2026-06-10T09:00:00.000Z",
+          meta: { service_follow_up_progress: "approval_received" },
+        },
+        ...events,
+      ],
+    })).toMatchObject({
+      continuedThroughChildJobId: "child-2",
+      continuedBridgeAction: "schedule_return_now",
+      continuedScheduledDate: "2026-06-12",
+      bridgeActionLabel: null,
+      returnPromptLabel: "Linked return job created",
     });
   });
 });

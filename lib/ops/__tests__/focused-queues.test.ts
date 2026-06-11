@@ -349,6 +349,18 @@ describe("focused queue display labels", () => {
     expect(getOpsQueueCardStatusReason({
       ops_status: "pending_info",
       pending_info_reason: "Materials Needed: Need 45/5 capacitor",
+      service_follow_up_progress_label: "Part Arrived",
+    })).toBe("Part Arrived - Ready to Schedule Return: Materials Needed: Need 45/5 capacitor");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Approval Needed: Customer must approve added work",
+      service_follow_up_progress_label: "Approval Received",
+    })).toBe("Approval Received - Ready to Schedule Return: Approval Needed: Customer must approve added work");
+
+    expect(getOpsQueueCardStatusReason({
+      ops_status: "pending_info",
+      pending_info_reason: "Materials Needed: Need 45/5 capacitor",
     })).toBe("Materials Needed: Need 45/5 capacitor");
 
     expect(getOpsQueueCardStatusReason({
@@ -403,6 +415,13 @@ describe("focused queue display labels", () => {
     expect(opsPageSource).toContain("getOpsQueueCardStatusReason");
     expect(opsPageSource).toContain("Status/Reason:");
     expect(opsPageSource).not.toContain("Ops Status:");
+  });
+
+  it("waiting queue shows resolved service follow-ups as ready to schedule while preserving original reason", () => {
+    expect(waitingQueuePageSource).toContain("readyToScheduleLabel");
+    expect(waitingQueuePageSource).toContain("Ready to Schedule Return");
+    expect(waitingQueuePageSource).toContain('"Original reason"');
+    expect(waitingQueuePageSource).toContain("buildServiceFollowUpProgressState");
   });
 
   it("formats Operations Workspace assignment summaries without closing over render-order state", () => {

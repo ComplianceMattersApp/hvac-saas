@@ -28,6 +28,8 @@ export type ServiceFollowUpProgressState = {
   bridgeActionLabel: string | null;
   returnPromptLabel: string | null;
   continuedThroughChildJobId: string | null;
+  continuedBridgeAction: "add_to_scheduling_queue" | "schedule_return_now" | null;
+  continuedScheduledDate: string | null;
 };
 
 const REASON_PREFIXES: Array<{
@@ -58,27 +60,56 @@ function asMetaRecord(meta: unknown): Record<string, unknown> {
 export function getServiceFollowUpContinuedChildJobId(
   events: ServiceFollowUpProgressEvent[] | null | undefined,
 ): string | null {
-  let latest: { childJobId: string; event: ServiceFollowUpProgressEvent; index: number } | null = null;
+  return deriveLatestServiceFollowUpContinuation(events)?.childJobId ?? null;
+}
+
+function deriveLatestServiceFollowUpContinuation(
+  events: ServiceFollowUpProgressEvent[] | null | undefined,
+): {
+  childJobId: string;
+  bridgeAction: "add_to_scheduling_queue" | "schedule_return_now";
+  scheduledDate: string | null;
+  event: ServiceFollowUpProgressEvent;
+  index: number;
+} | null {
+  let latest: {
+    childJobId: string;
+    bridgeAction: "add_to_scheduling_queue" | "schedule_return_now";
+    scheduledDate: string | null;
+    event: ServiceFollowUpProgressEvent;
+    index: number;
+  } | null = null;
 
   for (const [index, event] of (events ?? []).entries()) {
     const meta = asMetaRecord(event?.meta);
     const bridgeAction = normalize(meta.follow_up_bridge_action).toLowerCase();
     const childJobId = normalize(meta.continued_through_child_job_id);
-    if (bridgeAction !== "add_to_scheduling_queue" || !childJobId) continue;
+    if (
+      bridgeAction !== "add_to_scheduling_queue" &&
+      bridgeAction !== "schedule_return_now"
+    ) continue;
+    if (!childJobId) continue;
+    const continuation = {
+      childJobId,
+      bridgeAction: bridgeAction as "add_to_scheduling_queue" | "schedule_return_now",
+      scheduledDate: normalize(meta.scheduled_date) || null,
+      event,
+      index,
+    };
 
     if (!latest) {
-      latest = { childJobId, event, index };
+      latest = continuation;
       continue;
     }
 
     const currentTs = timestampMs(event?.created_at);
     const latestTs = timestampMs(latest.event?.created_at);
     if (currentTs > latestTs || (currentTs === latestTs && index > latest.index)) {
-      latest = { childJobId, event, index };
+      latest = continuation;
     }
   }
 
-  return latest?.childJobId ?? null;
+  return latest;
 }
 
 export function parseServiceFollowUpReason(value: unknown): ParsedServiceFollowUpReason | null {
@@ -162,10 +193,11 @@ export function buildServiceFollowUpProgressState(params: {
   let nextActionLabel: string | null = null;
   let bridgeActionLabel: string | null = null;
   let returnPromptLabel: string | null = null;
-  const continuedThroughChildJobId = getServiceFollowUpContinuedChildJobId(params.events);
+  const continuation = deriveLatestServiceFollowUpContinuation(params.events);
+  const continuedThroughChildJobId = continuation?.childJobId ?? null;
 
   if (continuedThroughChildJobId) {
-    returnPromptLabel = "Linked return job added to scheduling queue";
+    returnPromptLabel = "Linked return job created";
   } else if (reason?.family === "materials_needed") {
     if (!progress) nextActionLabel = "Mark Part Ordered";
     else if (progress === "part_ordered") nextActionLabel = "Mark Part Arrived";
@@ -193,5 +225,7 @@ export function buildServiceFollowUpProgressState(params: {
     bridgeActionLabel,
     returnPromptLabel,
     continuedThroughChildJobId,
+    continuedBridgeAction: continuation?.bridgeAction ?? null,
+    continuedScheduledDate: continuation?.scheduledDate ?? null,
   };
 }

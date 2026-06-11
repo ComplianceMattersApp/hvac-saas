@@ -2538,8 +2538,28 @@ const callbackIntakeHistoricalAnchorEligible =
 const normalizedServiceVisitType = String(job.service_visit_type ?? "").trim().toLowerCase();
 const showDifferentIssueFoundOutcome =
   normalizedServiceVisitType === "callback" || normalizedServiceVisitType === "return_visit";
+const currentOpsStatus = String(job.ops_status ?? "").toLowerCase();
+const pendingInfoReasonText = String((job as any).pending_info_reason ?? "").trim();
+const hasServiceFieldFollowUpPendingInfo =
+  String(job.job_type ?? "").trim().toLowerCase() === "service" &&
+  isFieldComplete &&
+  currentOpsStatus === "pending_info" &&
+  /^(Materials Needed|Approval Needed|Other):/i.test(pendingInfoReasonText);
+const serviceFollowUpProgressState = buildServiceFollowUpProgressState({
+  pendingInfoReason: pendingInfoReasonText,
+  events: serviceFollowUpProgressEvents,
+});
+const isServiceFollowUpContinued = Boolean(serviceFollowUpProgressState.continuedThroughChildJobId);
+const isServiceFieldFollowUpPendingInfo =
+  hasServiceFieldFollowUpPendingInfo && !isServiceFollowUpContinued;
+const isHistoricalServiceFollowUpContinued =
+  hasServiceFieldFollowUpPendingInfo && isServiceFollowUpContinued;
 const workflowChipLabel =
-  normalizedJobStatus === "in_process" && !isFieldComplete
+  isHistoricalServiceFollowUpContinued
+    ? serviceFollowUpProgressState.continuedScheduledDate
+      ? "Return Scheduled"
+      : "Follow-Up Continued"
+  : normalizedJobStatus === "in_process" && !isFieldComplete
     ? "In Process"
     : formatOpsStatusLabel(job.ops_status);
 
@@ -2818,18 +2838,7 @@ const showSeparateFieldBillingDetails =
     fieldBillingSupplementalInvoiceSnapshots.length > 0
   );
 
-const currentOpsStatus = String(job.ops_status ?? "").toLowerCase();
-const pendingInfoReasonText = String((job as any).pending_info_reason ?? "").trim();
-const isServiceFieldFollowUpPendingInfo =
-  String(job.job_type ?? "").trim().toLowerCase() === "service" &&
-  isFieldComplete &&
-  currentOpsStatus === "pending_info" &&
-  /^(Materials Needed|Approval Needed|Other):/i.test(pendingInfoReasonText);
-const serviceFollowUpProgressState = buildServiceFollowUpProgressState({
-  pendingInfoReason: pendingInfoReasonText,
-  events: serviceFollowUpProgressEvents,
-});
-const canShowReleaseAndReevaluate = !isServiceFieldFollowUpPendingInfo && [
+const canShowReleaseAndReevaluate = !hasServiceFieldFollowUpPendingInfo && [
   "pending_info",
   "on_hold",
   "failed",
@@ -2839,9 +2848,9 @@ const canShowReleaseAndReevaluate = !isServiceFieldFollowUpPendingInfo && [
 ].includes(currentOpsStatus);
 
 const onHoldReasonText = String((job as any).on_hold_reason ?? "").trim();
-const explicitPendingInfoActive = currentOpsStatus === "pending_info";
+const explicitPendingInfoActive = currentOpsStatus === "pending_info" && !isHistoricalServiceFollowUpContinued;
 const onHoldActive = currentOpsStatus === "on_hold";
-const activeWaitingState = getActiveWaitingState({
+const activeWaitingState = isHistoricalServiceFollowUpContinued ? null : getActiveWaitingState({
   ops_status: job.ops_status ?? null,
   pending_info_reason: (job as any).pending_info_reason ?? null,
   on_hold_reason: (job as any).on_hold_reason ?? null,
@@ -5228,6 +5237,32 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
             className="hidden w-full sm:block"
           />
         ) : null}
+        {isHistoricalServiceFollowUpContinued && serviceFollowUpProgressState.reason ? (
+          <div
+            id="next-service-action"
+            className="w-full rounded-lg border border-emerald-200 bg-emerald-50/85 px-3 py-2.5 text-sm text-emerald-950"
+          >
+            <div className="font-semibold">Follow-up continued through linked return visit</div>
+            <div className="mt-1 text-xs leading-5 text-emerald-900/90">
+              Outcome: {serviceFollowUpProgressState.reason.label}. Reason: {serviceFollowUpProgressState.reason.reason || serviceFollowUpProgressState.reason.display}
+            </div>
+            {serviceFollowUpProgressState.progressLabel ? (
+              <div className="mt-2 inline-flex rounded-full border border-emerald-300 bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-emerald-900">
+                Progress: {serviceFollowUpProgressState.progressLabel}
+              </div>
+            ) : null}
+            {serviceFollowUpProgressState.continuedThroughChildJobId ? (
+              <div className="mt-3">
+                <Link
+                  href={`/jobs/${serviceFollowUpProgressState.continuedThroughChildJobId}?tab=ops`}
+                  className={`${secondaryButtonClass} w-full sm:w-auto`}
+                >
+                  Open Linked Return Visit
+                </Link>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
         {isServiceFieldFollowUpPendingInfo && serviceFollowUpProgressState.reason ? (
           <div
             id="next-service-action"
@@ -5276,18 +5311,66 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
               </div>
             ) : null}
             {serviceFollowUpProgressState.bridgeActionLabel ? (
-              <form action={createNextServiceVisitFromForm} className="mt-3 flex flex-wrap gap-2">
-                <input type="hidden" name="job_id" value={job.id} />
-                <input type="hidden" name="tab" value={tab} />
-                <input type="hidden" name="visit_intent" value="return_visit" />
-                <input type="hidden" name="return_creation_mode" value="needs_scheduling" />
-                <input type="hidden" name="follow_up_bridge_action" value="add_to_scheduling_queue" />
-                <input type="hidden" name="next_visit_reason" value={serviceFollowUpProgressState.reason.display} />
-                <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
-                <SubmitButton loadingText="Adding..." className={`${darkButtonClass} w-full sm:w-auto`}>
-                  {serviceFollowUpProgressState.bridgeActionLabel}
-                </SubmitButton>
-              </form>
+              <div className="mt-3 space-y-3">
+                <form action={createNextServiceVisitFromForm} className="flex flex-wrap gap-2">
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="tab" value={tab} />
+                  <input type="hidden" name="visit_intent" value="return_visit" />
+                  <input type="hidden" name="return_creation_mode" value="needs_scheduling" />
+                  <input type="hidden" name="follow_up_bridge_action" value="add_to_scheduling_queue" />
+                  <input type="hidden" name="next_visit_reason" value={serviceFollowUpProgressState.reason.display} />
+                  <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+                  <SubmitButton loadingText="Adding..." className={`${darkButtonClass} w-full sm:w-auto`}>
+                    {serviceFollowUpProgressState.bridgeActionLabel}
+                  </SubmitButton>
+                </form>
+                <details className="group rounded-xl border border-slate-200 bg-white/80 p-3">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-900">
+                    <span>Schedule Return Visit Now</span>
+                    <span className="text-xs font-medium text-slate-500 group-open:hidden">Choose date</span>
+                    <span className="hidden text-xs font-medium text-slate-500 group-open:inline">Close</span>
+                  </summary>
+                  <form action={createNextServiceVisitFromForm} className="mt-3 grid gap-3 sm:grid-cols-3">
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="tab" value={tab} />
+                    <input type="hidden" name="visit_intent" value="return_visit" />
+                    <input type="hidden" name="return_creation_mode" value="schedule_now" />
+                    <input type="hidden" name="follow_up_bridge_action" value="schedule_return_now" />
+                    <input type="hidden" name="next_visit_reason" value={serviceFollowUpProgressState.reason.display} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#next-service-action`} />
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Date
+                      <input
+                        type="date"
+                        name="scheduled_date"
+                        required
+                        className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Start
+                      <input
+                        type="time"
+                        name="window_start"
+                        className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      End
+                      <input
+                        type="time"
+                        name="window_end"
+                        className="min-h-10 rounded-md border border-slate-200 px-3 py-2 text-sm font-normal text-slate-900"
+                      />
+                    </label>
+                    <div className="sm:col-span-3">
+                      <SubmitButton loadingText="Scheduling..." className={`${secondaryButtonClass} w-full sm:w-auto`}>
+                        Schedule Return Visit Now
+                      </SubmitButton>
+                    </div>
+                  </form>
+                </details>
+              </div>
             ) : null}
           </div>
         ) : null}
@@ -6236,7 +6319,7 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
     </div>
   </div>
 
-  {isInternalUser && job.job_type === "service" && !isServiceFieldFollowUpPendingInfo ? (
+  {isInternalUser && job.job_type === "service" && !hasServiceFieldFollowUpPendingInfo ? (
     <div id="next-service-action" className="mt-4 rounded-xl border border-slate-200/80 bg-white/96 px-4 py-3 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.28)] sm:mt-3.5">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>

@@ -22,6 +22,11 @@ const exceptionPickerSource = readFileSync(
   "utf8",
 );
 
+const serviceChainPanelSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/DeferredServiceChainPanelBody.tsx"),
+  "utf8",
+);
+
 describe("job detail field outcome panel wiring", () => {
   it("wires the compact panel near field action areas", () => {
     expect(jobDetailSource).toContain('import FieldOutcomePanel from "./_components/FieldOutcomePanel";');
@@ -141,8 +146,10 @@ describe("job detail field outcome panel wiring", () => {
 
   it("suppresses same-visit resume controls for completed service follow-up holds", () => {
     expect(jobDetailSource).toContain("const isServiceFieldFollowUpPendingInfo =");
+    expect(jobDetailSource).toContain("const hasServiceFieldFollowUpPendingInfo =");
+    expect(jobDetailSource).toContain("const isHistoricalServiceFollowUpContinued =");
     expect(jobDetailSource).toContain("/^(Materials Needed|Approval Needed|Other):/i.test(pendingInfoReasonText)");
-    expect(jobDetailSource).toContain("const canShowReleaseAndReevaluate = !isServiceFieldFollowUpPendingInfo && [");
+    expect(jobDetailSource).toContain("const canShowReleaseAndReevaluate = !hasServiceFieldFollowUpPendingInfo && [");
     expect(jobDetailSource).toContain("buildServiceFollowUpProgressState");
     expect(jobDetailSource).toContain("serviceFollowUpProgressEventsPromise");
     expect(jobDetailSource).toContain("markServicePartOrderedFromForm");
@@ -157,6 +164,19 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('name="follow_up_bridge_action" value="add_to_scheduling_queue"');
     expect(jobDetailSource).toContain("serviceFollowUpProgressState.returnPromptLabel");
     expect(jobDetailSource).not.toContain("Ready to resume this service visit?");
+  });
+
+  it("renders continued service follow-up parents as historical after a linked return exists", () => {
+    expect(jobDetailSource).toContain("Follow-up continued through linked return visit");
+    expect(jobDetailSource).toContain("Open Linked Return Visit");
+    expect(jobDetailSource).toContain("!hasServiceFieldFollowUpPendingInfo");
+    expect(jobDetailSource).toContain("isHistoricalServiceFollowUpContinued ? null : getActiveWaitingState");
+    expect(serviceChainPanelSource).toContain("buildServiceFollowUpProgressState");
+    expect(serviceChainPanelSource).toContain("continuedParentIdByChildId");
+    expect(serviceChainPanelSource).toContain("isCurrentActive");
+    expect(serviceChainPanelSource).toContain("Active continuation");
+    expect(serviceChainPanelSource).toContain("Continued");
+    expect(serviceChainPanelSource).toContain("Linked return visit created");
   });
 
   it("removes the standalone exception card and ECC guardrail copy", () => {
@@ -174,6 +194,13 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("const workflowChipLabel =");
     expect(jobDetailSource).toContain('normalizedJobStatus === "in_process" && !isFieldComplete');
     expect(jobDetailSource).toContain('{workflowChipLabel}');
+  });
+
+  it("uses continuation copy for completed follow-up parent workflow chips", () => {
+    expect(jobDetailSource).toContain("isHistoricalServiceFollowUpContinued");
+    expect(jobDetailSource).toContain("serviceFollowUpProgressState.continuedScheduledDate");
+    expect(jobDetailSource).toContain('"Return Scheduled"');
+    expect(jobDetailSource).toContain('"Follow-Up Continued"');
   });
 
   it("renders completion blocker banners in the primary action region without lower duplicates", () => {

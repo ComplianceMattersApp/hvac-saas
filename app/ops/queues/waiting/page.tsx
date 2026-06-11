@@ -128,6 +128,9 @@ export default async function OpsWaitingQueuePage() {
               followUpProgress.nextActionLabel ??
               followUpProgress.returnPromptLabel ??
               getWaitingQueueRecommendedNextStep(job);
+            const readyToScheduleLabel = followUpProgress.bridgeActionLabel
+              ? `${followUpProgress.progressLabel ?? "Ready"} - Ready to Schedule Return`
+              : null;
 
             return (
               <li
@@ -145,7 +148,7 @@ export default async function OpsWaitingQueuePage() {
                     <div className="mt-1 text-sm text-slate-700">{customerLocationLabel(job)}</div>
                     <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                       <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-700">
-                        {waitingDisplay.label}
+                        {readyToScheduleLabel ?? waitingDisplay.label}
                       </span>
                       <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 font-semibold text-slate-500">
                         {resolveLifecycleAging({
@@ -161,7 +164,9 @@ export default async function OpsWaitingQueuePage() {
                         </span>
                       ) : null}
                     </div>
-                    <div className="mt-2 text-xs text-slate-600">Reason: {waitingDisplay.reason}</div>
+                    <div className="mt-2 text-xs text-slate-600">
+                      {readyToScheduleLabel ? "Original reason" : "Reason"}: {waitingDisplay.reason}
+                    </div>
                     <div className="mt-1 text-xs text-slate-500">
                       Next step: {nextStep}
                     </div>

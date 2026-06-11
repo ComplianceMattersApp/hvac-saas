@@ -3251,6 +3251,10 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
   const isAddToSchedulingQueueBridge =
     bridgeModeRaw === "needs_scheduling" ||
     bridgeActionRaw === "add_to_scheduling_queue";
+  const isScheduleReturnNowBridge =
+    bridgeModeRaw === "schedule_now" ||
+    bridgeActionRaw === "schedule_return_now";
+  const isServiceFollowUpBridge = isAddToSchedulingQueueBridge || isScheduleReturnNowBridge;
   let nextVisitReasonRaw = String(formData.get("next_visit_reason") || "").trim();
 
   if (!sourceJobId) throw new Error("Missing job_id");
@@ -3267,6 +3271,31 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
+
+  let scheduleNowFields: ReturnType<typeof deriveScheduleAndOps> | null = null;
+  if (isScheduleReturnNowBridge) {
+    try {
+      scheduleNowFields = deriveScheduleAndOps(formData);
+    } catch {
+      redirectToJobWithBanner({
+        jobId: sourceJobId,
+        banner: "schedule_window_invalid",
+        tabRaw,
+        returnToRaw,
+      });
+      return;
+    }
+
+    if (!scheduleNowFields.scheduled_date) {
+      redirectToJobWithBanner({
+        jobId: sourceJobId,
+        banner: "schedule_date_required",
+        tabRaw,
+        returnToRaw,
+      });
+      return;
+    }
+  }
 
   const { data: sourceJob, error: sourceJobErr } = await supabase
     .from("jobs")
@@ -3312,7 +3341,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     events: (followUpProgressEvents ?? []) as Array<{ created_at?: string | null; meta?: unknown }>,
   });
 
-  if (isAddToSchedulingQueueBridge) {
+  if (isServiceFollowUpBridge) {
     const isCompletedServiceFollowUp =
       String(sourceJob.status ?? "").trim().toLowerCase() === "completed" &&
       Boolean((sourceJob as any).field_complete) &&
@@ -3358,7 +3387,7 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     String(sourceJob.service_case_id ?? "").trim() ||
     (await ensureServiceCaseForJob({ supabase, jobId: sourceJobId }));
 
-  const isExplicitReturnVisitIntent = visitIntentRaw === "return_visit" || isAddToSchedulingQueueBridge;
+  const isExplicitReturnVisitIntent = visitIntentRaw === "return_visit" || isServiceFollowUpBridge;
 
   const childTitle = isExplicitReturnVisitIntent
     ? `Return Visit: ${nextVisitReasonRaw}`.slice(0, 220)
@@ -3415,6 +3444,22 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
     source: "create_next_service_visit",
   });
 
+  if (isScheduleReturnNowBridge && scheduleNowFields?.scheduled_date) {
+    const scheduleFormData = new FormData();
+    scheduleFormData.set("job_id", created.id);
+    scheduleFormData.set("scheduled_date", scheduleNowFields.scheduled_date);
+    if (scheduleNowFields.window_start) {
+      scheduleFormData.set("window_start", scheduleNowFields.window_start);
+    }
+    if (scheduleNowFields.window_end) {
+      scheduleFormData.set("window_end", scheduleNowFields.window_end);
+    }
+    scheduleFormData.set("schedule_reason", "Scheduled linked service return visit");
+    scheduleFormData.set("no_redirect", "1");
+
+    await updateJobScheduleFromForm(scheduleFormData);
+  }
+
   await insertJobEvent({
     supabase,
     jobId: sourceJobId,
@@ -3424,12 +3469,19 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
         child_job_id: created.id,
         service_case_id: serviceCaseId,
         next_visit_reason: nextVisitReasonRaw,
-        ...(isAddToSchedulingQueueBridge
+        ...(isServiceFollowUpBridge
           ? {
-              follow_up_bridge_action: "add_to_scheduling_queue",
+              follow_up_bridge_action: isScheduleReturnNowBridge ? "schedule_return_now" : "add_to_scheduling_queue",
               source_follow_up_reason: serviceFollowUpProgressState.reason?.display ?? null,
               source_follow_up_progress: serviceFollowUpProgressState.progress,
               source_follow_up_progress_label: serviceFollowUpProgressState.progressLabel,
+              ...(isScheduleReturnNowBridge
+                ? {
+                    scheduled_date: scheduleNowFields?.scheduled_date ?? null,
+                    window_start: scheduleNowFields?.window_start ?? null,
+                    window_end: scheduleNowFields?.window_end ?? null,
+                  }
+                : {}),
             }
           : {}),
         visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit",
@@ -3454,12 +3506,19 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
         service_case_id: serviceCaseId,
         next_visit_reason: nextVisitReasonRaw,
         parent_job_id: sourceJobId,
-        ...(isAddToSchedulingQueueBridge
+        ...(isServiceFollowUpBridge
           ? {
-              follow_up_bridge_action: "add_to_scheduling_queue",
+              follow_up_bridge_action: isScheduleReturnNowBridge ? "schedule_return_now" : "add_to_scheduling_queue",
               source_follow_up_reason: serviceFollowUpProgressState.reason?.display ?? null,
               source_follow_up_progress: serviceFollowUpProgressState.progress,
               source_follow_up_progress_label: serviceFollowUpProgressState.progressLabel,
+              ...(isScheduleReturnNowBridge
+                ? {
+                    scheduled_date: scheduleNowFields?.scheduled_date ?? null,
+                    window_start: scheduleNowFields?.window_start ?? null,
+                    window_end: scheduleNowFields?.window_end ?? null,
+                  }
+                : {}),
             }
           : {}),
         visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit",
@@ -3475,8 +3534,14 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
       event_type: "ops_update",
       meta: {
         source: "job_detail",
-        message: "Follow-up continued through linked return visit",
-        follow_up_bridge_action: isAddToSchedulingQueueBridge ? "add_to_scheduling_queue" : "create_return_visit",
+        message: isScheduleReturnNowBridge
+          ? "Follow-up continued through linked scheduled return visit"
+          : "Follow-up continued through linked return visit",
+        follow_up_bridge_action: isScheduleReturnNowBridge
+          ? "schedule_return_now"
+          : isAddToSchedulingQueueBridge
+            ? "add_to_scheduling_queue"
+            : "create_return_visit",
         blocker_action: "updated",
         blocker_type: activeWaitingState.blockerType,
         blocker_reason: activeWaitingState.blockerReason,
@@ -3485,6 +3550,13 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
         source_follow_up_reason: serviceFollowUpProgressState.reason?.display ?? null,
         source_follow_up_progress: serviceFollowUpProgressState.progress,
         source_follow_up_progress_label: serviceFollowUpProgressState.progressLabel,
+        ...(isScheduleReturnNowBridge
+          ? {
+              scheduled_date: scheduleNowFields?.scheduled_date ?? null,
+              window_start: scheduleNowFields?.window_start ?? null,
+              window_end: scheduleNowFields?.window_end ?? null,
+            }
+          : {}),
         ...(String((sourceJob as any).action_required_by ?? "").trim()
           ? { action_required_by: String((sourceJob as any).action_required_by).trim() }
           : {}),
@@ -3503,8 +3575,9 @@ export async function createNextServiceVisitFromForm(formData: FormData) {
   revalidatePath(`/jobs/${created.id}`, "page");
   revalidatePath("/ops", "page");
   revalidatePath("/jobs", "page");
+  revalidatePath("/calendar", "page");
 
-  redirect(`/jobs/${created.id}?banner=next_service_visit_created`);
+  redirect(`/jobs/${created.id}?banner=${isScheduleReturnNowBridge ? "return_visit_scheduled" : "next_service_visit_created"}`);
 }
 
 export async function createCallbackVisitFromForm(formData: FormData) {

@@ -32,7 +32,9 @@ describe("return visit action wiring", () => {
 
     expect(actionBlock).toContain('const visitIntentRaw = String(formData.get("visit_intent") || "").trim().toLowerCase();');
     expect(actionBlock).toContain('const isAddToSchedulingQueueBridge =');
-    expect(actionBlock).toContain('const isExplicitReturnVisitIntent = visitIntentRaw === "return_visit" || isAddToSchedulingQueueBridge;');
+    expect(actionBlock).toContain('const isScheduleReturnNowBridge =');
+    expect(actionBlock).toContain('const isServiceFollowUpBridge = isAddToSchedulingQueueBridge || isScheduleReturnNowBridge;');
+    expect(actionBlock).toContain('const isExplicitReturnVisitIntent = visitIntentRaw === "return_visit" || isServiceFollowUpBridge;');
     expect(actionBlock).toContain('const childVisitType = isExplicitReturnVisitIntent');
     expect(actionBlock).toContain('? "return_visit"');
     expect(actionBlock).toContain('normalizeServiceVisitType(String(sourceJob.service_visit_type ?? "").trim()) ?? "return_visit";');
@@ -49,16 +51,33 @@ describe("return visit action wiring", () => {
     expect(actionBlock).toContain('service_visit_outcome: "follow_up_required"');
   });
 
+  it("supports schedule-now bridge through existing scheduling semantics", () => {
+    const actionBlock = extractCreateNextVisitActionBlock();
+
+    expect(actionBlock).toContain('bridgeModeRaw === "schedule_now"');
+    expect(actionBlock).toContain('bridgeActionRaw === "schedule_return_now"');
+    expect(actionBlock).toContain("scheduleNowFields = deriveScheduleAndOps(formData);");
+    expect(actionBlock).toContain('banner: "schedule_date_required"');
+    expect(actionBlock).toContain('scheduleFormData.set("job_id", created.id);');
+    expect(actionBlock).toContain('scheduleFormData.set("scheduled_date", scheduleNowFields.scheduled_date);');
+    expect(actionBlock).toContain('scheduleFormData.set("no_redirect", "1");');
+    expect(actionBlock).toContain("await updateJobScheduleFromForm(scheduleFormData);");
+    expect(actionBlock).toContain('redirect(`/jobs/${created.id}?banner=${isScheduleReturnNowBridge ? "return_visit_scheduled" : "next_service_visit_created"}`);');
+  });
+
   it("writes source and child job events with explicit visit intent metadata", () => {
     const actionBlock = extractCreateNextVisitActionBlock();
 
     expect(actionBlock).toContain('event_type: "service_next_visit_created"');
     expect(actionBlock).toContain('event_type: "created_from_service_visit"');
-    expect(actionBlock).toContain('follow_up_bridge_action: "add_to_scheduling_queue"');
+    expect(actionBlock).toContain('? "add_to_scheduling_queue"');
+    expect(actionBlock).toContain('follow_up_bridge_action: isScheduleReturnNowBridge ? "schedule_return_now" : "add_to_scheduling_queue"');
     expect(actionBlock).toContain("continued_through_child_job_id: created.id");
     expect(actionBlock).toContain('visit_intent: isExplicitReturnVisitIntent ? "return_visit" : "next_service_visit"');
     expect(actionBlock).toContain("child_service_visit_type: childVisitType");
     expect(actionBlock).toContain("Follow-up continued through linked return visit");
+    expect(actionBlock).toContain("Follow-up continued through linked scheduled return visit");
+    expect(actionBlock).toContain("scheduled_date: scheduleNowFields?.scheduled_date ?? null");
     expect(actionBlock).not.toContain("Waiting state resumed through next service visit");
     expect(actionBlock).not.toContain("resumed_through_child_job_id");
   });
@@ -78,6 +97,12 @@ describe("office return visit entry points", () => {
     expect(jobPageSource).toContain("serviceFollowUpProgressState.bridgeActionLabel");
     expect(jobPageSource).toContain('name="return_creation_mode" value="needs_scheduling"');
     expect(jobPageSource).toContain('name="follow_up_bridge_action" value="add_to_scheduling_queue"');
+    expect(jobPageSource).toContain("Schedule Return Visit Now");
+    expect(jobPageSource).toContain('name="return_creation_mode" value="schedule_now"');
+    expect(jobPageSource).toContain('name="follow_up_bridge_action" value="schedule_return_now"');
+    expect(jobPageSource).toContain('name="scheduled_date"');
+    expect(jobPageSource).toContain('name="window_start"');
+    expect(jobPageSource).toContain('name="window_end"');
     expect(jobPageSource).toContain("Use when the original job is not finished yet and another visit is needed to complete it.");
     expect(jobPageSource).toContain("Examples: waiting on a part, customer approval, or more time needed to complete the same job.");
     expect(jobPageSource).toContain('id="next-service-action"');
