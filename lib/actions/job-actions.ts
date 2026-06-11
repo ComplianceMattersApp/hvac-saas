@@ -10926,6 +10926,9 @@ export async function createRetestJobFromForm(formData: FormData) {
 
   const copyEquipment = String(formData.get("copy_equipment") || "") === "1";
   const parentJobId = String(formData.get("parent_job_id") || "").trim();
+  const noRedirect = String(formData.get("no_redirect") || "").trim() === "1";
+  const bridgeAction =
+    String(formData.get("retest_bridge_action") || "").trim() || "move_to_needs_scheduling";
   if (!parentJobId) throw new Error("Missing parent_job_id");
 
   const supabase = await createClient();
@@ -10956,6 +10959,8 @@ export async function createRetestJobFromForm(formData: FormData) {
         "location_id",
         "contractor_id",
         "permit_number",
+        "jurisdiction",
+        "permit_date",
         "customer_phone",
         "customer_first_name",
         "customer_last_name",
@@ -11040,6 +11045,8 @@ export async function createRetestJobFromForm(formData: FormData) {
     ops_status: "need_to_schedule",
 
     permit_number: parent?.permit_number ?? null,
+    jurisdiction: parent?.jurisdiction ?? null,
+    permit_date: parent?.permit_date ?? null,
     customer_phone: parent?.customer_phone ?? null,
     customer_first_name: parent?.customer_first_name ?? null,
     customer_last_name: parent?.customer_last_name ?? null,
@@ -11065,7 +11072,7 @@ export async function createRetestJobFromForm(formData: FormData) {
       event_type: "retest_created",
       meta: {
         child_job_id: child.id,
-        bridge_action: "move_to_needs_scheduling",
+        bridge_action: bridgeAction,
         source_ops_status: parentOpsStatus || null,
       },
     });
@@ -11076,7 +11083,7 @@ export async function createRetestJobFromForm(formData: FormData) {
       event_type: "retest_created",
       meta: {
         parent_job_id: parentJobId,
-        bridge_action: "move_to_needs_scheduling",
+        bridge_action: bridgeAction,
         source_ops_status: parentOpsStatus || null,
       },
     });
@@ -11185,7 +11192,101 @@ export async function createRetestJobFromForm(formData: FormData) {
   revalidatePath(`/jobs/${child.id}`);
   revalidatePath(`/ops`);
 
+  if (noRedirect) {
+    return child;
+  }
+
   redirect(`/jobs/${child.id}?tab=ops`);
+}
+
+export async function scheduleRetestNowFromForm(formData: FormData) {
+  "use server";
+
+  const parentJobId = String(formData.get("parent_job_id") || "").trim();
+  if (!parentJobId) throw new Error("Missing parent_job_id");
+
+  const supabase = await createClient();
+  const { userId: actingUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: parentJobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  let scheduleFields: ReturnType<typeof deriveScheduleAndOps>;
+  try {
+    scheduleFields = deriveScheduleAndOps(formData);
+  } catch {
+    redirect(`/jobs/${parentJobId}?tab=ops&banner=schedule_window_invalid#next-service-action`);
+  }
+
+  if (!scheduleFields.scheduled_date) {
+    redirect(`/jobs/${parentJobId}?tab=ops&banner=schedule_date_required#next-service-action`);
+  }
+
+  const createFormData = new FormData();
+  createFormData.set("parent_job_id", parentJobId);
+  createFormData.set("no_redirect", "1");
+  createFormData.set("retest_bridge_action", "schedule_retest_now");
+  if (String(formData.get("copy_equipment") || "") === "1") {
+    createFormData.set("copy_equipment", "1");
+  }
+
+  const child = await createRetestJobFromForm(createFormData);
+  const childJobId = String((child as any)?.id ?? "").trim();
+  if (!childJobId) {
+    redirect(`/jobs/${parentJobId}?tab=ops&banner=retest_create_failed#next-service-action`);
+  }
+
+  const scheduleFormData = new FormData();
+  scheduleFormData.set("job_id", childJobId);
+  scheduleFormData.set("scheduled_date", scheduleFields.scheduled_date);
+  if (scheduleFields.window_start) {
+    scheduleFormData.set("window_start", scheduleFields.window_start);
+  }
+  if (scheduleFields.window_end) {
+    scheduleFormData.set("window_end", scheduleFields.window_end);
+  }
+  scheduleFormData.set("schedule_reason", "Scheduled linked ECC retest");
+  scheduleFormData.set("no_redirect", "1");
+
+  await updateJobScheduleFromForm(scheduleFormData);
+
+  const retestScheduledMeta = {
+    source_action: "schedule_retest_now",
+    child_job_id: childJobId,
+    parent_job_id: parentJobId,
+    scheduled_date: scheduleFields.scheduled_date,
+    window_start: scheduleFields.window_start ?? null,
+    window_end: scheduleFields.window_end ?? null,
+  };
+
+  await insertJobEvent({
+    supabase,
+    jobId: parentJobId,
+    event_type: "retest_scheduled",
+    meta: retestScheduledMeta,
+    userId: actingUserId,
+  });
+
+  await insertJobEvent({
+    supabase,
+    jobId: childJobId,
+    event_type: "retest_scheduled",
+    meta: retestScheduledMeta,
+    userId: actingUserId,
+  });
+
+  revalidatePath(`/jobs/${parentJobId}`);
+  revalidatePath(`/jobs/${childJobId}`);
+  revalidatePath(`/ops`);
+  revalidatePath(`/jobs`);
+  revalidatePath(`/calendar`);
+
+  redirect(`/jobs/${childJobId}?tab=ops&banner=retest_scheduled`);
 }
 
 /**

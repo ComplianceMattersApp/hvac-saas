@@ -73,6 +73,7 @@ type TargetAction =
   | "createCallbackVisitFromForm"
   | "confirmEccRetestReadyFromForm"
   | "createRetestJobFromForm"
+  | "scheduleRetestNowFromForm"
   | "archiveJobFromForm"
   | "cancelJobFromForm";
 
@@ -88,6 +89,15 @@ function buildCreateNextServiceVisitFormData() {
 function buildCreateRetestFormData() {
   const formData = new FormData();
   formData.set("parent_job_id", "job-1");
+  return formData;
+}
+
+function buildScheduleRetestNowFormData() {
+  const formData = new FormData();
+  formData.set("parent_job_id", "job-1");
+  formData.set("scheduled_date", "2026-06-18");
+  formData.set("window_start", "09:00");
+  formData.set("window_end", "11:00");
   return formData;
 }
 
@@ -135,6 +145,10 @@ const targets: Array<{ name: TargetAction; buildFormData: () => FormData }> = [
   {
     name: "createRetestJobFromForm",
     buildFormData: buildCreateRetestFormData,
+  },
+  {
+    name: "scheduleRetestNowFromForm",
+    buildFormData: buildScheduleRetestNowFormData,
   },
   {
     name: "confirmEccRetestReadyFromForm",

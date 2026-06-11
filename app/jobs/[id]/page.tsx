@@ -23,6 +23,7 @@ import {
   completeDataEntryFromForm,
   confirmEccRetestReadyFromForm,
   createRetestJobFromForm,
+  scheduleRetestNowFromForm,
   getOnTheWayUndoEligibility,
   promoteCompanionScopeToServiceJobFromForm,
   addPublicNoteFromForm,
@@ -3090,7 +3091,21 @@ const timelineSummaryText = undefined;
 
 const normalizedJobOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
 const hasActiveRetestChild = Boolean((activeRetestChild as any)?.id);
+const activeRetestChildScheduled = Boolean(
+  (activeRetestChild as any)?.scheduled_date ||
+    (activeRetestChild as any)?.window_start ||
+    (activeRetestChild as any)?.window_end,
+);
 const showLinkedRetestCreated = job.job_type === "ecc" && hasActiveRetestChild && !parentJobId;
+const linkedRetestPassiveHeading = activeRetestChildScheduled
+  ? "Retest Scheduled"
+  : "Linked Retest Created";
+const linkedRetestPassiveCopy = activeRetestChildScheduled
+  ? "The linked retest job is scheduled and is now the active work item."
+  : "The linked retest job is now the active scheduling item.";
+const linkedRetestPassiveMeta = activeRetestChildScheduled
+  ? "Retest scheduled"
+  : "Linked retest active";
 const showConfirmRetestReady =
   isInternalUser &&
   job.job_type === "ecc" &&
@@ -3111,7 +3126,7 @@ const failureResolutionSummaryText = showLinkedRetestCreated
   : showConfirmRetestReady && showCorrectionReviewResolution
   ? "Confirm retest readiness or resolve the failure through correction review."
   : showRetestSection
-  ? "Move this confirmed retest-ready job into the scheduling queue."
+  ? "Schedule this confirmed retest-ready job now, or place it in the scheduling queue."
   : showConfirmRetestReady
   ? "Confirm this job is ready for a linked retest visit."
   : "Resolve this failure through correction review only when a return visit is not needed.";
@@ -4419,11 +4434,55 @@ const failureResolutionPathCount =
                   <div>
                     <div className="font-semibold">Retest Ready</div>
                     <p className="mt-1 text-sm leading-6 text-orange-900/90">
-                      Creates a linked retest job and places it in the scheduling queue.
+                      Creates the linked retest job and schedules it immediately.
                     </p>
                   </div>
-                  <form action={createRetestJobFromForm} className="space-y-3">
+                  <form action={scheduleRetestNowFromForm} className="space-y-3 rounded-xl border border-orange-200 bg-white/85 p-3">
                     <input type="hidden" name="parent_job_id" value={job.id} />
+                    <label className="flex items-center gap-2 rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm text-slate-700">
+                      <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+                      <span>Copy equipment from original</span>
+                    </label>
+                    <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                      Date
+                      <input
+                        type="date"
+                        name="scheduled_date"
+                        required
+                        className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm"
+                      />
+                    </label>
+                    <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                      Start
+                      <input
+                        type="time"
+                        name="window_start"
+                        className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm"
+                      />
+                    </label>
+                    <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                      End
+                      <input
+                        type="time"
+                        name="window_end"
+                        className="min-h-12 rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-base font-normal text-slate-900 shadow-sm"
+                      />
+                    </label>
+                    <SubmitButton loadingText="Scheduling..." className={`${darkButtonClass} min-h-12 w-full`}>
+                      Schedule Retest Now
+                    </SubmitButton>
+                  </form>
+                  <form
+                    action={async (formData: FormData) => {
+                      "use server";
+                      await createRetestJobFromForm(formData);
+                    }}
+                    className="space-y-3"
+                  >
+                    <input type="hidden" name="parent_job_id" value={job.id} />
+                    <p className="text-sm leading-6 text-orange-900/90">
+                      Creates a linked retest job and places it in the scheduling queue.
+                    </p>
                     <label className="flex items-center gap-2 rounded-lg border border-orange-200 bg-white/80 px-3 py-2 text-sm text-slate-700">
                       <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
                       <span>Copy equipment from original</span>
@@ -5445,8 +5504,8 @@ const failureResolutionPathCount =
                   <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3 space-y-3">
                     {showLinkedRetestCreated ? (
                       <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
-                        <div className="font-semibold">Linked Retest Created</div>
-                        <div className="mt-1">The linked retest job is now the active scheduling item.</div>
+                        <div className="font-semibold">{linkedRetestPassiveHeading}</div>
+                        <div className="mt-1">{linkedRetestPassiveCopy}</div>
                       </div>
                     ) : null}
                     {showCorrectionReviewResolution ? (
@@ -5626,10 +5685,56 @@ const failureResolutionPathCount =
           >
             <div className="text-sm font-semibold">Retest Ready</div>
             <p className="mt-1 text-xs leading-5 text-orange-900/90">
-              Creates a linked retest job and places it in the scheduling queue.
+              Creates the linked retest job and schedules it immediately.
             </p>
-            <form action={createRetestJobFromForm} className="mt-3 space-y-3">
+            <form action={scheduleRetestNowFromForm} className="mt-3 space-y-3 rounded-xl border border-orange-200 bg-white/85 p-3">
               <input type="hidden" name="parent_job_id" value={job.id} />
+              <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-orange-200 bg-white px-3 py-2 text-sm text-slate-700">
+                <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+                <span>Copy equipment from original</span>
+              </label>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                  Date
+                  <input
+                    type="date"
+                    name="scheduled_date"
+                    required
+                    className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm"
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                  Start
+                  <input
+                    type="time"
+                    name="window_start"
+                    className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm"
+                  />
+                </label>
+                <label className="grid gap-1.5 text-sm font-semibold text-slate-700">
+                  End
+                  <input
+                    type="time"
+                    name="window_end"
+                    className="min-h-11 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-normal text-slate-900 shadow-sm"
+                  />
+                </label>
+              </div>
+              <SubmitButton loadingText="Scheduling..." className={`${darkButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
+                Schedule Retest Now
+              </SubmitButton>
+            </form>
+            <form
+              action={async (formData: FormData) => {
+                "use server";
+                await createRetestJobFromForm(formData);
+              }}
+              className="mt-3 space-y-3"
+            >
+              <input type="hidden" name="parent_job_id" value={job.id} />
+              <p className="text-xs leading-5 text-orange-900/90">
+                Creates a linked retest job and places it in the scheduling queue.
+              </p>
               <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-orange-200 bg-white/85 px-3 py-2 text-sm text-slate-700">
                 <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
                 <span>Copy equipment from original</span>
@@ -8983,8 +9088,8 @@ const failureResolutionPathCount =
   <summary className="cursor-pointer list-none">
     <CollapsibleHeader
       title={showLinkedRetestCreated ? "Retest Continuation" : "Correction Review"}
-      subtitle={showLinkedRetestCreated ? "Linked retest child is now the active scheduling item." : "Resolve this failure through correction review only when a return visit is not needed."}
-      meta={showLinkedRetestCreated ? "Linked retest active" : "1 path available"}
+      subtitle={showLinkedRetestCreated ? linkedRetestPassiveCopy : "Resolve this failure through correction review only when a return visit is not needed."}
+      meta={showLinkedRetestCreated ? linkedRetestPassiveMeta : "1 path available"}
       icon={<WarningIcon className="h-4 w-4" />}
     />
   </summary>
@@ -8993,9 +9098,9 @@ const failureResolutionPathCount =
   <div className={`grid gap-4${showLinkedRetestCreated && showCorrectionReviewResolution ? " lg:grid-cols-2" : ""}`}>
     {showLinkedRetestCreated ? (
       <div className={workspaceSoftCardClass}>
-        <div className="mb-2 text-sm font-semibold text-slate-950">Linked Retest Created</div>
+        <div className="mb-2 text-sm font-semibold text-slate-950">{linkedRetestPassiveHeading}</div>
         <div className="text-sm leading-6 text-slate-600">
-          The linked retest job is now the active scheduling item. This original failed/correction job remains historical.
+          {linkedRetestPassiveCopy} This original failed/correction job remains historical.
         </div>
         {(activeRetestChild as any)?.id ? (
           <Link
