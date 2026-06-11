@@ -151,6 +151,23 @@ describe("resolveContractorIssues", () => {
     expect(result.bucket).toBe("action_required");
   });
 
+  it("shows internally confirmed retest_needed as Retest Ready without contractor action required", () => {
+    const result = resolveContractorIssues({
+      job: {
+        id: "job-retest-ready",
+        ops_status: "retest_needed",
+        field_complete: true,
+      },
+      failureReasons: ["Failed - duct leakage over threshold"],
+    });
+
+    expect(result.primaryIssue.group).toBe("in_progress");
+    expect(result.primaryIssue.headline).toBe("Retest Ready");
+    expect(result.statusLabel).toBe("Retest Ready");
+    expect(result.bucket).toBe("in_progress");
+    expect(result.nextStep).toBe("Internal review confirmed this job is ready for retest scheduling.");
+  });
+
   it("keeps normal closed jobs as passed when not evidence-accepted", () => {
     const result = resolveContractorIssues({
       job: {

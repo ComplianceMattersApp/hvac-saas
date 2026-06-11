@@ -12,11 +12,12 @@ describe("ecc workflow display labels", () => {
     expect(formatEccOpsStatusLabel("failed", "ops")).toBe("Failed / Correction Required");
     expect(formatEccOpsStatusLabel("pending_office_review", "ops")).toBe("Corrections Submitted / Under Review");
     expect(formatEccOpsStatusLabel("pending_office_review", "portal")).toBe("Under Review");
-    expect(formatEccOpsStatusLabel("retest_needed", "ops")).toBe("Retest Needed");
+    expect(formatEccOpsStatusLabel("retest_needed", "ops")).toBe("Retest Ready");
   });
 
   it("maps retest-ready request events without implying internal confirmation", () => {
     expect(formatEccEventLabel("retest_ready_requested")).toBe("Retest Ready Requested");
+    expect(formatEccEventLabel("retest_ready_confirmed")).toBe("Retest Ready");
     expect(formatEccRetestReadySignalLabel()).toBe("Retest Ready Requested");
   });
 

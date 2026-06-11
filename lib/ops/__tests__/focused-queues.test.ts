@@ -321,6 +321,7 @@ describe("focused queue display labels", () => {
     expect(getExceptionQueueDisplayLabel({ ops_status: "failed" })).toBe("Failed Test");
     expect(getExceptionQueueDisplayLabel({ job_type: "ecc", ops_status: "failed" })).toBe("Failed / Correction Required");
     expect(getExceptionQueueDisplayLabel({ ops_status: "retest_needed" })).toBe("Retest Needed");
+    expect(getExceptionQueueDisplayLabel({ job_type: "ecc", ops_status: "retest_needed" })).toBe("Retest Ready");
     expect(getExceptionQueueDisplayLabel({ ops_status: "problem" })).toBe("Operational Issue");
 
     expect(EXCEPTION_QUEUE_STATUSES).toEqual([
@@ -429,7 +430,7 @@ describe("focused queue display labels", () => {
     expect(getOpsQueueCardStatusReason({
       job_type: "ecc",
       ops_status: "retest_needed",
-    })).toBe("Retest Needed");
+    })).toBe("Retest Ready");
 
     expect(getOpsQueueCardStatusReason({ ops_status: "paperwork_required" })).toBe("Closeout: Paperwork Required");
     expect(getOpsQueueCardStatusReason({ ops_status: "invoice_required" })).toBe("Closeout: Invoice Required");

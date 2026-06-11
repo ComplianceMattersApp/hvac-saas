@@ -386,6 +386,14 @@ export function resolveContractorIssues(
         explanation: "Retest child exists but still needs a scheduled date/time.",
         stage: "retest_pending_scheduling",
       };
+    } else if (opsStatus === "retest_needed") {
+      primaryIssue = {
+        group: "in_progress",
+        headline: "Retest Ready",
+        explanation: "Internal review confirmed this job is ready for retest scheduling.",
+        detailLines: failureReasons.length > 0 ? failureReasons : undefined,
+        stage: "retest_ready",
+      };
     } else {
       primaryIssue = {
         group: "failed",
@@ -482,6 +490,9 @@ export function resolveContractorIssues(
     } else if (retestState === "pending_scheduling") {
       statusLabel = "Retest Pending Scheduling";
       nextStep = "Retest needs to be scheduled";
+    } else if (opsStatus === "retest_needed") {
+      statusLabel = "Retest Ready";
+      nextStep = "Internal review confirmed this job is ready for retest scheduling.";
     } else {
       statusLabel = "Failed";
       nextStep = "Retest decision needed.";

@@ -202,15 +202,27 @@ export default async function DeferredServiceChainPanelBody({
 		}
 	}
 
+	const retestParentIdsWithActiveChild = new Set<string>();
+	for (const visit of serviceChainJobs) {
+		const childId = String((visit as any)?.id ?? "").trim();
+		const parentId = String((visit as any)?.parent_job_id ?? "").trim();
+		const status = String((visit as any)?.status ?? "").trim().toLowerCase();
+		const opsStatus = String((visit as any)?.ops_status ?? "").trim().toLowerCase();
+		if (!childId || !parentId || status === "cancelled" || opsStatus === "closed") continue;
+		retestParentIdsWithActiveChild.add(parentId);
+	}
+
 	return (
 		<div className="max-h-96 space-y-2 overflow-auto pr-1 sm:max-h-none sm:overflow-visible sm:pr-0">
 			{serviceChainJobs.map((visit: any, idx: number) => {
 				const visitId = String(visit.id ?? "").trim();
 				const followUpProgress = serviceFollowUpProgressByJob.get(visitId);
 				const isContinuedParent = Boolean(followUpProgress?.continuedThroughChildJobId);
+				const isLinkedRetestParent =
+					isEccJobType((visit as any)?.job_type) && retestParentIdsWithActiveChild.has(visitId);
 				const isContinuationChild = continuedParentIdByChildId.has(visitId);
 				const isCurrent = visit.id === currentJobId;
-				const isCurrentActive = isCurrent && !isContinuedParent;
+				const isCurrentActive = isCurrent && !isContinuedParent && !isLinkedRetestParent;
 				const visitLabel = serviceChainVisitLabel(visit, idx);
 				const failureReason = serviceChainFailureReasonByJob.get(visitId) ?? "";
 				const windowLabel =
@@ -242,10 +254,14 @@ export default async function DeferredServiceChainPanelBody({
 									<span
 										className={[
 											"inline-flex rounded-md px-2 py-1 text-xs font-semibold",
-											serviceChainBadgeClass(visit.ops_status, isCurrentActive, isContinuedParent),
+											serviceChainBadgeClass(visit.ops_status, isCurrentActive, isContinuedParent || isLinkedRetestParent),
 										].join(" ")}
 									>
-										{isContinuedParent ? "Continued" : formatOpsStatusLabel(visit.ops_status, visit.job_type)}
+										{isLinkedRetestParent
+											? "Linked Retest Created"
+											: isContinuedParent
+												? "Continued"
+												: formatOpsStatusLabel(visit.ops_status, visit.job_type)}
 									</span>
 								</div>
 
@@ -268,6 +284,13 @@ export default async function DeferredServiceChainPanelBody({
 									<div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs text-emerald-900">
 										<span className="font-semibold uppercase tracking-[0.08em] text-emerald-700">Continuation:</span>{" "}
 										Linked return visit created{followUpProgress?.progressLabel ? ` after ${followUpProgress.progressLabel}` : ""}.
+									</div>
+								) : null}
+
+								{isLinkedRetestParent ? (
+									<div className="mt-2 rounded-md border border-emerald-200 bg-emerald-50 px-2.5 py-2 text-xs text-emerald-900">
+										<span className="font-semibold uppercase tracking-[0.08em] text-emerald-700">Retest:</span>{" "}
+										Linked retest created. The child retest job is the active scheduling item.
 									</div>
 								) : null}
 

@@ -71,6 +71,7 @@ type TargetAction =
   | "createNextServiceVisitFromForm"
   | "recordCallbackReportFromForm"
   | "createCallbackVisitFromForm"
+  | "confirmEccRetestReadyFromForm"
   | "createRetestJobFromForm"
   | "archiveJobFromForm"
   | "cancelJobFromForm";
@@ -87,6 +88,12 @@ function buildCreateNextServiceVisitFormData() {
 function buildCreateRetestFormData() {
   const formData = new FormData();
   formData.set("parent_job_id", "job-1");
+  return formData;
+}
+
+function buildConfirmRetestReadyFormData() {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
   return formData;
 }
 
@@ -128,6 +135,10 @@ const targets: Array<{ name: TargetAction; buildFormData: () => FormData }> = [
   {
     name: "createRetestJobFromForm",
     buildFormData: buildCreateRetestFormData,
+  },
+  {
+    name: "confirmEccRetestReadyFromForm",
+    buildFormData: buildConfirmRetestReadyFormData,
   },
   {
     name: "recordCallbackReportFromForm",

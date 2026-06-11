@@ -154,7 +154,7 @@ const OPS_TABS: { key: BucketKey; label: string }[] = [
   { key: "pending_info", label: "Pending Info" },
   { key: "on_hold", label: "On Hold" },
   { key: "failed", label: "Failed" },
-  { key: "retest_needed", label: "Retest Needed" },
+  { key: "retest_needed", label: "Retest Ready" },
   { key: "paperwork_required", label: "Status: Paperwork Required" },
   { key: "invoice_required", label: "Status: Invoice Required" },
   { key: "closeout", label: "Closeout Work Queue" },
@@ -2203,6 +2203,7 @@ const retestReadyCount = uniqueAllOpenOpsJobs.filter((j: any) => {
   return (
     status === "failed" &&
     !resolvedFailedParentIds.has(jobId) &&
+    !failedParentIdsWithRetestChild.has(jobId) &&
     !hasScheduledRetestForJob(jobId) &&
     hasSignalEventForJob(latestRetestReadyByJob, jobId)
   );
@@ -2708,6 +2709,8 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     ? { label: "Retest Pending Scheduling", tone: "border-amber-200 bg-amber-50 text-amber-800" }
     : scheduledRetestLabel
     ? { label: "Retest Scheduled", tone: "border-emerald-200 bg-emerald-50 text-emerald-800" }
+    : opsStatus === "retest_needed"
+    ? { label: "Retest Ready", tone: "border-orange-200 bg-orange-50 text-orange-900" }
     : lifecycleStatus === "on_the_way"
     ? { label: "On the Way", tone: "border-sky-200 bg-sky-50 text-sky-800" }
     : lifecycleStatus === "in_progress"
@@ -2789,7 +2792,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : retestState === "pending_scheduling"
     ? "Retest Pending Scheduling"
     : opsStatus === "retest_needed"
-    ? "Retest Needed"
+    ? "Retest Ready"
     : isRetestChild
     ? "Failed Retest"
     : "Failed / Correction Required";
@@ -2801,8 +2804,8 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     ? "Retest job exists but still needs a scheduled date and time."
     : opsStatus === "retest_needed"
     ? hasRetestReady
-      ? "Contractor requested retest-ready review."
-      : "Retest is required before this failure can be cleared."
+      ? "Retest readiness was confirmed after contractor request."
+      : "Retest readiness was confirmed internally."
     : isRetestChild
     ? "This retest also failed and still needs correction."
     : "Awaiting correction or retest decision.";

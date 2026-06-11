@@ -144,6 +144,91 @@ function buildCreateRetestFormData() {
   return formData;
 }
 
+function buildConfirmRetestReadyFormData() {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  return formData;
+}
+
+function makeConfirmRetestReadySupabaseFixture() {
+  const jobUpdates: any[] = [];
+  const eventInserts: any[] = [];
+
+  const supabase = {
+    from(table: string) {
+      if (table === "jobs") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn((field: string) => {
+              if (field === "id") {
+                return {
+                  is: vi.fn(() => ({
+                    single: vi.fn(async () => ({
+                      data: { id: "job-1", job_type: "ecc", ops_status: "pending_office_review" },
+                      error: null,
+                    })),
+                  })),
+                };
+              }
+
+              return {
+                is: vi.fn(() => ({
+                  neq: vi.fn(() => ({
+                    neq: vi.fn(() => ({
+                      order: vi.fn(() => ({
+                        limit: vi.fn(() => ({
+                          maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+                        })),
+                      })),
+                    })),
+                  })),
+                })),
+              };
+            }),
+          })),
+          update: vi.fn((payload: any) => {
+            jobUpdates.push(payload);
+            return {
+              eq: vi.fn(async () => ({ error: null })),
+            };
+          }),
+        };
+      }
+
+      if (table === "job_events") {
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                order: vi.fn(() => ({
+                  limit: vi.fn(() => ({
+                    maybeSingle: vi.fn(async () => ({
+                      data: { id: "request-event-1", created_at: "2026-06-01T00:00:00.000Z" },
+                      error: null,
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          })),
+          insert: vi.fn((payload: any) => {
+            eventInserts.push(payload);
+            return {
+              select: vi.fn(() => ({
+                single: vi.fn(async () => ({ data: { id: "confirmed-event-1" }, error: null })),
+              })),
+            };
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    },
+  };
+
+  return { supabase, jobUpdates, eventInserts };
+}
+
 describe("legacy job-detail entrypoint same-account hardening", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -287,5 +372,30 @@ describe("legacy job-detail entrypoint same-account hardening", () => {
     );
 
     expect(writeCalls.filter((call) => ["jobs", "job_events"].includes(call.table))).toHaveLength(0);
+  });
+
+  it("confirms ECC retest readiness by setting retest_needed and writing history", async () => {
+    const { supabase, jobUpdates, eventInserts } = makeConfirmRetestReadySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { confirmEccRetestReadyFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(confirmEccRetestReadyFromForm(buildConfirmRetestReadyFormData())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?tab=ops&banner=retest_ready_confirmed#next-service-action",
+    );
+
+    expect(jobUpdates).toContainEqual({ ops_status: "retest_needed" });
+    expect(eventInserts).toContainEqual(expect.objectContaining({
+      job_id: "job-1",
+      event_type: "retest_ready_confirmed",
+      user_id: "internal-user-1",
+      meta: expect.objectContaining({
+        previous_ops_status: "pending_office_review",
+        next_ops_status: "retest_needed",
+        source: "retest_ready_requested",
+        source_event_id: "request-event-1",
+      }),
+    }));
   });
 });

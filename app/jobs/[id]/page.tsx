@@ -21,6 +21,7 @@ import {
   createNextServiceVisitFromForm,
   createCallbackVisitFromForm,
   completeDataEntryFromForm,
+  confirmEccRetestReadyFromForm,
   createRetestJobFromForm,
   getOnTheWayUndoEligibility,
   promoteCompanionScopeToServiceJobFromForm,
@@ -1748,6 +1749,24 @@ export default async function JobDetailPage({
     }));
   });
 
+  const activeRetestChildPromise = timedPhase("activeRetestChildRead", async () => {
+    if (String(job.job_type ?? "").trim().toLowerCase() !== "ecc" || parentJobId) return null;
+
+    const { data, error } = await supabase
+      .from("jobs")
+      .select("id, status, ops_status, scheduled_date, window_start, window_end")
+      .eq("parent_job_id", jobId)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .neq("ops_status", "closed")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    return data ?? null;
+  });
+
   const customerAttemptSummaryPromise = timedPhase("customerAttemptSummary", async () => {
     try {
       const [attemptCountRes, latestAttemptRes] = await Promise.all([
@@ -2110,6 +2129,7 @@ export default async function JobDetailPage({
     customerAttemptSummary,
     fieldBillingSummaryData,
     serviceFollowUpProgressEvents,
+    activeRetestChild,
   ] = await Promise.all([
     assignmentDisplayPromise,
     serviceCaseSummaryPromise,
@@ -2125,6 +2145,7 @@ export default async function JobDetailPage({
     customerAttemptSummaryPromise,
     fieldBillingSummaryDataPromise,
     serviceFollowUpProgressEventsPromise,
+    activeRetestChildPromise,
   ]);
 
   const contractorBilling = billingPartyReads.contractorBilling;
@@ -2562,6 +2583,10 @@ const isEccPermitNeededActive = isEccPermitNeededBlocker({
 });
 const hasActionHeavyPrimaryNextAction =
   isEccPermitNeededActive ||
+  (job.job_type === "ecc" &&
+    !parentJobId &&
+    !Boolean((activeRetestChild as any)?.id) &&
+    ["failed", "pending_office_review", "retest_needed"].includes(String(job.ops_status ?? "").trim().toLowerCase())) ||
   (isServiceFieldFollowUpPendingInfo && Boolean(serviceFollowUpProgressState.reason));
 
 const billingState = buildJobBillingStateReadModel({
@@ -3062,18 +3087,35 @@ const sharedNotesSummaryText = undefined;
 const internalNotesSummaryText = undefined;
 const timelineSummaryText = undefined;
 
+const normalizedJobOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+const hasActiveRetestChild = Boolean((activeRetestChild as any)?.id);
+const showLinkedRetestCreated = job.job_type === "ecc" && hasActiveRetestChild && !parentJobId;
+const showConfirmRetestReady =
+  isInternalUser &&
+  job.job_type === "ecc" &&
+  !hasActiveRetestChild &&
+  ["failed", "pending_office_review"].includes(normalizedJobOpsStatus);
 const showRetestSection =
-  ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
+  isInternalUser &&
+  job.job_type === "ecc" &&
+  !hasActiveRetestChild &&
+  normalizedJobOpsStatus === "retest_needed";
 const showCorrectionReviewResolution =
   isInternalUser &&
   job.job_type === "ecc" &&
-  ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
-const failureResolutionSummaryText = showRetestSection && showCorrectionReviewResolution
-  ? "Choose between retest creation and correction review resolution."
+  !hasActiveRetestChild &&
+  ["failed", "pending_office_review"].includes(normalizedJobOpsStatus);
+const failureResolutionSummaryText = showLinkedRetestCreated
+  ? "Linked retest child is now the active scheduling item."
+  : showConfirmRetestReady && showCorrectionReviewResolution
+  ? "Confirm retest readiness or resolve the failure through correction review."
   : showRetestSection
-  ? "Create a retest visit when a physical return is required."
+  ? "Move this confirmed retest-ready job into the scheduling queue."
+  : showConfirmRetestReady
+  ? "Confirm this job is ready for a linked retest visit."
   : "Resolve this failure through correction review only when a return visit is not needed.";
-const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrectionReviewResolution);
+const failureResolutionPathCount =
+  Number(showRetestSection) + Number(showConfirmRetestReady) + Number(showCorrectionReviewResolution);
 
   const DeferredInternalInvoicePanel = async () => {
     const {
@@ -4342,6 +4384,46 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                     Open Tests Workspace
                   </Link>
                 </div>
+              ) : showConfirmRetestReady ? (
+                <div
+                  id="mobile-next-service-action"
+                  className="space-y-3 rounded-xl border border-orange-200 bg-orange-50/90 px-3.5 py-3 text-sm text-orange-950"
+                >
+                  <div>
+                    <div className="font-semibold">Confirm Retest Ready</div>
+                    <p className="mt-1 text-sm leading-6 text-orange-900/90">
+                      Confirm corrections are ready for another ECC test visit.
+                    </p>
+                  </div>
+                  <form action={confirmEccRetestReadyFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <SubmitButton loadingText="Confirming..." className={`${darkButtonClass} min-h-12 w-full`}>
+                      Confirm Retest Ready
+                    </SubmitButton>
+                  </form>
+                </div>
+              ) : showRetestSection ? (
+                <div
+                  id="mobile-next-service-action"
+                  className="space-y-3 rounded-xl border border-orange-200 bg-orange-50/90 px-3.5 py-3 text-sm text-orange-950"
+                >
+                  <div>
+                    <div className="font-semibold">Retest Ready</div>
+                    <p className="mt-1 text-sm leading-6 text-orange-900/90">
+                      Creates a linked retest job and places it in the scheduling queue.
+                    </p>
+                  </div>
+                  <form action={createRetestJobFromForm} className="space-y-3">
+                    <input type="hidden" name="parent_job_id" value={job.id} />
+                    <label className="flex items-center gap-2 rounded-lg border border-orange-200 bg-white/80 px-3 py-2 text-sm text-slate-700">
+                      <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+                      <span>Copy equipment from original</span>
+                    </label>
+                    <SubmitButton loadingText="Creating..." className={`${darkButtonClass} min-h-12 w-full`}>
+                      Move to Needs Scheduling
+                    </SubmitButton>
+                  </form>
+                </div>
               ) : isHistoricalServiceFollowUpContinued && serviceFollowUpProgressState.reason ? (
                 <div
                   id="mobile-next-service-action"
@@ -5346,23 +5428,17 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 </div>
               </details>
 
-              {job.job_type === "ecc" && (showRetestSection || showCorrectionReviewResolution) ? (
+              {job.job_type === "ecc" && (showLinkedRetestCreated || showCorrectionReviewResolution) ? (
                 <details className="group">
                   <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
-                    <span className="inline-flex items-center gap-2"><WarningIcon className="h-4.5 w-4.5" />Failure Resolution</span>
+                    <span className="inline-flex items-center gap-2"><WarningIcon className="h-4.5 w-4.5" />Retest / Correction History</span>
                   </summary>
                   <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3 space-y-3">
-                    {showRetestSection ? (
-                      <form action={createRetestJobFromForm} className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
-                        <input type="hidden" name="parent_job_id" value={job.id} />
-                        <label className="flex items-center gap-2 text-base text-slate-700">
-                          <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
-                          Copy equipment
-                        </label>
-                        <SubmitButton loadingText="Creating..." className={darkButtonClass}>
-                          Create Retest Job
-                        </SubmitButton>
-                      </form>
+                    {showLinkedRetestCreated ? (
+                      <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+                        <div className="font-semibold">Linked Retest Created</div>
+                        <div className="mt-1">The linked retest job is now the active scheduling item.</div>
+                      </div>
                     ) : null}
                     {showCorrectionReviewResolution ? (
                       <form action={resolveFailureByCorrectionReviewFromForm} className="space-y-3 rounded-xl border border-slate-200 bg-white p-3">
@@ -5515,6 +5591,46 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
                 </div>
               </form>
             </details>
+          </div>
+        ) : null}
+        {showConfirmRetestReady ? (
+          <div
+            id="next-service-action"
+            className="w-full rounded-xl border border-orange-200 bg-orange-50/90 px-3.5 py-3 text-sm text-orange-950"
+          >
+            <div className="text-sm font-semibold">Confirm Retest Ready</div>
+            <p className="mt-1 text-xs leading-5 text-orange-900/90">
+              Confirm corrections are ready for another ECC test visit.
+            </p>
+            <form action={confirmEccRetestReadyFromForm} className="mt-3">
+              <input type="hidden" name="job_id" value={job.id} />
+              <SubmitButton loadingText="Confirming..." className={`${darkButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
+                Confirm Retest Ready
+              </SubmitButton>
+            </form>
+          </div>
+        ) : null}
+        {showRetestSection ? (
+          <div
+            id="next-service-action"
+            className="w-full rounded-xl border border-orange-200 bg-orange-50/90 px-3.5 py-3 text-sm text-orange-950"
+          >
+            <div className="text-sm font-semibold">Retest Ready</div>
+            <p className="mt-1 text-xs leading-5 text-orange-900/90">
+              Creates a linked retest job and places it in the scheduling queue.
+            </p>
+            <form action={createRetestJobFromForm} className="mt-3 space-y-3">
+              <input type="hidden" name="parent_job_id" value={job.id} />
+              <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-orange-200 bg-white/85 px-3 py-2 text-sm text-slate-700">
+                <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
+                <span>Copy equipment from original</span>
+              </label>
+              <div>
+                <SubmitButton loadingText="Creating..." className={`${darkButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
+                  Move to Needs Scheduling
+                </SubmitButton>
+              </div>
+            </form>
           </div>
         ) : null}
         {isHistoricalServiceFollowUpContinued && serviceFollowUpProgressState.reason ? (
@@ -8843,44 +8959,35 @@ const failureResolutionPathCount = Number(showRetestSection) + Number(showCorrec
   </div>
 
           {/* Failure Resolution */}
-{(showRetestSection || showCorrectionReviewResolution) ? (
+{(showLinkedRetestCreated || showCorrectionReviewResolution) ? (
 <details className={`${workspaceDetailsClass} order-3 mb-5 xl:order-3`}>
   <summary className="cursor-pointer list-none">
     <CollapsibleHeader
-      title="Failure Resolution"
-      subtitle={failureResolutionSummaryText}
-      meta={`${failureResolutionPathCount} path${failureResolutionPathCount === 1 ? "" : "s"} available`}
+      title={showLinkedRetestCreated ? "Retest Continuation" : "Correction Review"}
+      subtitle={showLinkedRetestCreated ? "Linked retest child is now the active scheduling item." : "Resolve this failure through correction review only when a return visit is not needed."}
+      meta={showLinkedRetestCreated ? "Linked retest active" : "1 path available"}
       icon={<WarningIcon className="h-4 w-4" />}
     />
   </summary>
 
   <div className={workspaceDetailsDividerClass}>
-  <div className={`grid gap-4${showRetestSection && showCorrectionReviewResolution ? " lg:grid-cols-2" : ""}`}>
-    {showRetestSection ? (
+  <div className={`grid gap-4${showLinkedRetestCreated && showCorrectionReviewResolution ? " lg:grid-cols-2" : ""}`}>
+    {showLinkedRetestCreated ? (
       <div className={workspaceSoftCardClass}>
-        <div className="mb-2 text-sm font-semibold text-slate-950">Create Retest Job</div>
-        <div className="mb-3 text-sm leading-6 text-slate-600">
-          Create a new retest visit when this failure requires a physical return visit.
+        <div className="mb-2 text-sm font-semibold text-slate-950">Linked Retest Created</div>
+        <div className="text-sm leading-6 text-slate-600">
+          The linked retest job is now the active scheduling item. This original failed/correction job remains historical.
         </div>
-
-        <form action={createRetestJobFromForm} className="space-y-3">
-          <input type="hidden" name="parent_job_id" value={job.id} />
-
-          <label className="flex items-center gap-2 text-sm text-slate-700">
-            <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
-            Copy equipment from original
-          </label>
-
-          <SubmitButton
-            loadingText="Creating..."
-            className={darkButtonClass}
+        {(activeRetestChild as any)?.id ? (
+          <Link
+            href={`/jobs/${(activeRetestChild as any).id}?tab=ops`}
+            className={`${secondaryButtonClass} mt-3 inline-flex`}
           >
-            Create Retest Job
-          </SubmitButton>
-        </form>
+            Open Linked Retest
+          </Link>
+        ) : null}
       </div>
     ) : null}
-
     {showCorrectionReviewResolution ? (
       <div className={workspaceSoftCardClass}>
         <div className="mb-2 text-sm font-semibold text-slate-950">Resolve by Correction Review</div>

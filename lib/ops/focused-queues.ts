@@ -338,7 +338,9 @@ export function getOpsQueueCardStatusReason(
     return reason ? `Failed: ${sentenceCaseReason(reason.replace(/^failed\s*[-:]\s*/i, ""))}` : "Failed";
   }
 
-  if (status === "retest_needed") return formatEccOpsStatusLabel(status, "ops") ?? "Retest Needed";
+  if (status === "retest_needed") {
+    return isEccJobType(job?.job_type) ? formatEccOpsStatusLabel(status, "ops") ?? "Retest Ready" : "Retest Needed";
+  }
   if (status === "pending_office_review") {
     return isEccJobType(job?.job_type)
       ? formatEccOpsStatusLabel(status, "ops") ?? "Corrections Submitted / Under Review"

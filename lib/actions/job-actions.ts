@@ -4057,6 +4057,94 @@ export async function requestRetestReadyFromPortal(formData: FormData) {
   redirect(`/portal/jobs/${jobId}?banner=retest_ready_requested`);
 }
 
+export async function confirmEccRetestReadyFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  if (!jobId) throw new Error("Missing job_id");
+
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id, job_type, ops_status")
+    .eq("id", jobId)
+    .is("deleted_at", null)
+    .single();
+
+  if (jobErr) throw jobErr;
+
+  const jobType = String(job?.job_type ?? "").trim().toLowerCase();
+  const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+
+  if (jobType !== "ecc" || !["failed", "pending_office_review", "retest_needed"].includes(opsStatus)) {
+    redirect(`/jobs/${jobId}?tab=ops&banner=retest_ready_not_eligible`);
+  }
+
+  const { data: activeRetestChild, error: activeChildErr } = await supabase
+    .from("jobs")
+    .select("id")
+    .eq("parent_job_id", jobId)
+    .is("deleted_at", null)
+    .neq("ops_status", "closed")
+    .neq("status", "cancelled")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (activeChildErr) throw activeChildErr;
+  if (activeRetestChild?.id) {
+    redirect(`/jobs/${jobId}?tab=ops&banner=retest_already_exists`);
+  }
+
+  const { data: latestRequest, error: requestErr } = await supabase
+    .from("job_events")
+    .select("id, created_at")
+    .eq("job_id", jobId)
+    .eq("event_type", "retest_ready_requested")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (requestErr) throw requestErr;
+
+  if (opsStatus !== "retest_needed") {
+    const { error: updateErr } = await supabase
+      .from("jobs")
+      .update({ ops_status: "retest_needed" })
+      .eq("id", jobId);
+
+    if (updateErr) throw updateErr;
+  }
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "retest_ready_confirmed",
+    meta: {
+      previous_ops_status: opsStatus || null,
+      next_ops_status: "retest_needed",
+      source: latestRequest?.id ? "retest_ready_requested" : "internal_review",
+      source_event_id: latestRequest?.id ?? null,
+    },
+    userId,
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/ops");
+
+  redirect(`/jobs/${jobId}?tab=ops&banner=retest_ready_confirmed#next-service-action`);
+}
+
 export async function archiveJobFromForm(formData: FormData) {
   "use server";
 
@@ -10917,7 +11005,7 @@ export async function createRetestJobFromForm(formData: FormData) {
   }
 
   // 2) Create retest job (unscheduled by default)
-  const retestTitle = `Retest — ${parent?.title ?? "Job"}`;
+  const retestTitle = `Retest - ${parent?.title ?? "Job"}`;
 
     const inheritedServiceCaseId =
     parent?.service_case_id
@@ -10972,14 +11060,22 @@ export async function createRetestJobFromForm(formData: FormData) {
       supabase,
       jobId: parentJobId,
       event_type: "retest_created",
-      meta: { child_job_id: child.id },
+      meta: {
+        child_job_id: child.id,
+        bridge_action: "move_to_needs_scheduling",
+        source_ops_status: parentOpsStatus || null,
+      },
     });
 
     await insertJobEvent({
       supabase,
       jobId: child.id,
       event_type: "retest_created",
-      meta: { parent_job_id: parentJobId },
+      meta: {
+        parent_job_id: parentJobId,
+        bridge_action: "move_to_needs_scheduling",
+        source_ops_status: parentOpsStatus || null,
+      },
     });
   } catch (e) {
     console.error("retest_created job_events insert failed:", e);
