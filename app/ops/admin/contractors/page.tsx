@@ -507,7 +507,7 @@ export default async function AdminContractorsPage({
 
       {productMode === "hvac_service" ? (
         <div className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 shadow-sm">
-          Optional collaboration tool for HVAC Service accounts. Core service dispatch can run without ECC contractor relationships.
+          Optional collaboration tool for Service accounts. Core service dispatch can run without ECC contractor relationships.
         </div>
       ) : null}
 

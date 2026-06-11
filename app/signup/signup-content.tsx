@@ -73,11 +73,11 @@ const SIGNUP_COPY: Record<
       "Tell us who should own the account. We'll email a secure setup link so you can finish creating your trial.",
   },
   service: {
-    eyebrow: "HVAC Service Trial",
-    title: "Start Your HVAC Service Trial",
+    eyebrow: "Service Trial",
+    title: "Start Your Service Trial",
     intro:
       "Set up the daily work your team already handles: customers, service calls, dispatch, field notes, invoices, and follow-up.",
-    details: "We'll send a secure setup link so you can finish creating your HVAC Service trial.",
+    details: "We'll send a secure setup link so you can finish creating your Service trial.",
     cards: [
       {
         title: "Keep service calls organized",
@@ -95,7 +95,7 @@ const SIGNUP_COPY: Record<
     trialGoal:
       "Your first 14 days: enter a few real customers and service jobs, try the dispatch flow, and see whether it helps your office and field team stay on the same page.",
     formIntro:
-      "Tell us who should own the account. We'll email a secure setup link so you can finish creating your HVAC Service trial.",
+      "Tell us who should own the account. We'll email a secure setup link so you can finish creating your Service trial.",
   },
   ecc: {
     eyebrow: "ECC / Compliance Testing Trial",

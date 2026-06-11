@@ -303,8 +303,8 @@ export default function LoginPage() {
               href="/signup/service"
               className="group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-blue-400/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50"
             >
-              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-300">HVAC Service</span>
-              <span className="mt-2 text-sm font-semibold text-white">Start HVAC Service Trial</span>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-300">Service</span>
+              <span className="mt-2 text-sm font-semibold text-white">Start Service Trial</span>
               <span className="mt-1 text-xs leading-5 text-slate-400">For service calls, dispatch, work orders, and follow-up.</span>
             </Link>
 

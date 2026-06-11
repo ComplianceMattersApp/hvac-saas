@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     template: "%s | Compliance Matters",
   },
   applicationName: "Compliance Matters",
-  description: "Compliance Matters operations software for HVAC service and compliance workflows",
+  description: "Compliance Matters operations software for service and compliance workflows",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,

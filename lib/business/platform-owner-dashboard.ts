@@ -153,7 +153,7 @@ export function formatProductModeLabel(params: {
   if (isPlatformInternalAccountRow(params.row, params.internalEmails ?? new Set<string>())) {
     return "Platform / Internal";
   }
-  if (params.row.productMode === "hvac_service") return "HVAC Service";
+  if (params.row.productMode === "hvac_service") return "Service";
   if (params.row.productMode === "ecc_hers") return "ECC";
   if (params.row.productMode === "hybrid") return "Hybrid";
   return "Not Set";

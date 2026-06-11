@@ -65,8 +65,8 @@ export function SignupProductChoiceLanding() {
           <div className="mt-4 grid grid-cols-1 gap-4">
             <ProductChoiceCard
               title="SERVICE"
-              copy="For HVAC service companies managing customers, service calls, scheduling, field work, and follow-up."
-              buttonLabel="Start HVAC Service Trial"
+              copy="For service companies managing customers, service calls, scheduling, field work, and follow-up."
+              buttonLabel="Start Service Trial"
               href="/signup/service"
               tone="service"
               previewItems={["Service call scheduled", "Field notes captured", "Closeout ready"]}

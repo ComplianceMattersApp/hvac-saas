@@ -564,7 +564,7 @@ export default async function AdminCompanyProfilePage({
 
             {billingMode === "external_billing" ? (
               <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-sm leading-6 text-blue-900">
-                <span className="font-semibold">HVAC Service company invoicing your own customers?</span>{" "}
+                <span className="font-semibold">Service company invoicing your own customers?</span>{" "}
                 Switch to <span className="font-semibold">Internal invoicing</span> to access the full invoice
                 creation and send workflow on each job.
               </div>

@@ -115,7 +115,7 @@ export default async function ContractorIntakeSubmissionsPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         {productMode === "hvac_service" ? (
           <div className="mb-3 rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-sm text-sky-900">
-            Optional collaboration queue for HVAC Service accounts.
+            Optional collaboration queue for Service accounts.
           </div>
         ) : null}
 

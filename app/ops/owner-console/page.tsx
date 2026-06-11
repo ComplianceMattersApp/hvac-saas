@@ -316,7 +316,7 @@ export default async function PlatformOwnerConsolePage(props: {
               className="mt-1 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 shadow-sm outline-none focus:border-slate-500"
             >
               <option value="all">All products</option>
-              <option value="hvac_service">HVAC Service</option>
+              <option value="hvac_service">Service</option>
               <option value="ecc_hers">ECC</option>
               <option value="hybrid">Hybrid</option>
               <option value="not_set">Not Set</option>
@@ -397,7 +397,7 @@ export default async function PlatformOwnerConsolePage(props: {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {(
             [
-              { label: "HVAC Service", value: viewSummary.displayedHvacServiceAccounts },
+              { label: "Service", value: viewSummary.displayedHvacServiceAccounts },
               { label: "ECC", value: viewSummary.displayedEccAccounts },
               { label: "Hybrid", value: viewSummary.displayedHybridAccounts },
               { label: "Not Set", value: viewSummary.displayedUnknownModeAccounts },

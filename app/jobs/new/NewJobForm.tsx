@@ -696,7 +696,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       : "Select the responsible account, choose the work, then create the job.";
   const internalModeHint =
     isHvacServiceMode
-      ? "HVAC Service accounts use the Service / Work Order family by default and presentation."
+      ? "Service accounts use the Service / Work Order family by default and presentation."
       : productMode === "ecc_hers"
         ? "ECC/HERS accounts use the ECC / Compliance Test family by default and presentation."
         : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";

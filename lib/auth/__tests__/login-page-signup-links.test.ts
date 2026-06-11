@@ -8,11 +8,11 @@ const loginPageSource = readFileSync(
 );
 
 describe("login page signup entry options", () => {
-  it("renders HVAC Service and ECC signup links", () => {
+  it("renders Service and ECC signup links", () => {
     expect(loginPageSource).toContain('href="/signup/service"');
     expect(loginPageSource).toContain('href="/signup/ecc"');
-    expect(loginPageSource).toContain("Sign up for HVAC Service");
-    expect(loginPageSource).toContain("Sign up for ECC / Compliance Testing");
+    expect(loginPageSource).toContain("Start Service Trial");
+    expect(loginPageSource).toContain("Start ECC / Compliance Trial");
   });
 
   it("does not render a hybrid signup link", () => {

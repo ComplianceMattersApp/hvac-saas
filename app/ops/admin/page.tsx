@@ -106,7 +106,7 @@ export default async function OpsAdminPage() {
 
   const modeContextByProductMode: Record<ProductMode, { badge: string; heroHint: string; peopleCopy: string }> = {
     hvac_service: {
-      badge: "HVAC Service",
+      badge: "Service",
       heroHint: "Service-first workspace. Contractor tools stay optional.",
       peopleCopy:
         "Start with People & Access, then use Internal Team. Contractor tools stay optional for outside collaboration.",

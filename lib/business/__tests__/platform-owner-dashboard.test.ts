@@ -518,7 +518,7 @@ describe("friendly display helpers", () => {
       formatProductModeLabel({
         row: { ...baseRow, productMode: "hvac_service" },
       } as any),
-    ).toBe("HVAC Service");
+    ).toBe("Service");
     expect(
       formatProductModeLabel({
         row: { ...baseRow, productMode: "ecc_hers" },
