@@ -161,7 +161,7 @@ describe("duct leakage required measured result hardening", () => {
     const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
     );
 
     const update = updates.find((call) => call.table === "ecc_test_runs");
@@ -196,7 +196,7 @@ describe("duct leakage required measured result hardening", () => {
     const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
     );
 
     const update = updates.find((call) => call.table === "ecc_test_runs");
@@ -219,7 +219,7 @@ describe("duct leakage required measured result hardening", () => {
     const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(saveAndCompleteDuctLeakageFromForm(fd)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
     );
 
     const update = updates.find((call) => call.table === "ecc_test_runs");

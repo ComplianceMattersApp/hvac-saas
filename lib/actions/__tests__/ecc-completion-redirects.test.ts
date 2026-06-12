@@ -305,16 +305,34 @@ describe("ECC completion redirects", () => {
   });
 
   it.each([
-    ["completeEccTestRunFromForm", "duct_leakage", baseFormData(), "/jobs/job-1/tests?t=duct_leakage&s=system-1"],
-    ["saveAndCompleteDuctLeakageFromForm", "duct_leakage", ductFormData(), "/jobs/job-1/tests?t=duct_leakage&s=system-1"],
-    ["saveAndCompleteAirflowFromForm", "airflow", airflowFormData(), "/jobs/job-1/tests?t=airflow&s=system-1"],
-    ["saveAndCompleteRefrigerantChargeFromForm", "refrigerant_charge", refrigerantFormData(), "/jobs/job-1/tests?t=refrigerant_charge&s=system-1"],
-    ["saveAndCompleteFanWattDrawFromForm", "fan_watt_draw", fanFormData(), "/jobs/job-1/tests?t=fan_watt_draw&s=system-1"],
-    ["saveAndCompleteAirFilterDeviceFromForm", "air_filter_device", airFilterFormData(), "/jobs/job-1/tests?t=air_filter_device&s=system-1"],
-    ["saveAndCompleteAhriVerificationFromForm", "ahri_verification", ahriFormData(), "/jobs/job-1/tests?t=ahri_verification&s=system-1"],
-    ["saveAndCompleteLocalMechanicalExhaustFromForm", "local_mechanical_exhaust", localExhaustFormData(), "/jobs/job-1/tests?t=local_mechanical_exhaust&s=system-1"],
-    ["saveAndCompleteQiiEnv22InsulationFromForm", "qii_insulation", qiiFormData(), "/jobs/job-1/tests?t=qii_insulation&s=system-1"],
+    ["completeEccTestRunFromForm", "duct_leakage", baseFormData(), "/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed"],
+    ["saveAndCompleteDuctLeakageFromForm", "duct_leakage", ductFormData(), "/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed"],
+    ["saveAndCompleteAirflowFromForm", "airflow", airflowFormData(), "/jobs/job-1/tests?t=airflow&s=system-1&notice=test_completed"],
+    ["saveAndCompleteRefrigerantChargeFromForm", "refrigerant_charge", refrigerantFormData(), "/jobs/job-1/tests?t=refrigerant_charge&s=system-1&notice=test_completed"],
+    ["saveAndCompleteFanWattDrawFromForm", "fan_watt_draw", fanFormData(), "/jobs/job-1/tests?t=fan_watt_draw&s=system-1&notice=test_completed"],
+    ["saveAndCompleteAirFilterDeviceFromForm", "air_filter_device", airFilterFormData(), "/jobs/job-1/tests?t=air_filter_device&s=system-1&notice=test_completed"],
+    ["saveAndCompleteAhriVerificationFromForm", "ahri_verification", ahriFormData(), "/jobs/job-1/tests?t=ahri_verification&s=system-1&notice=test_completed"],
+    ["saveAndCompleteLocalMechanicalExhaustFromForm", "local_mechanical_exhaust", localExhaustFormData(), "/jobs/job-1/tests?t=local_mechanical_exhaust&s=system-1&notice=test_completed"],
+    ["saveAndCompleteQiiEnv22InsulationFromForm", "qii_insulation", qiiFormData(), "/jobs/job-1/tests?t=qii_insulation&s=system-1&notice=test_completed"],
   ])("%s returns to the ECC tests workspace", async (actionName, testType, formData, redirectUrl) => {
+    createClientMock.mockResolvedValue(makeEccCompletionSupabase(testType));
+
+    const actions = await import("@/lib/actions/job-actions");
+    const action = actions[actionName as keyof typeof actions] as (data: FormData) => Promise<unknown>;
+
+    await expect(action(formData)).rejects.toThrow(`REDIRECT:${redirectUrl}`);
+  });
+
+  it.each([
+    ["saveDuctLeakageDataFromForm", "duct_leakage", ductFormData(), "/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=results_saved"],
+    ["saveAirflowDataFromForm", "airflow", airflowFormData(), "/jobs/job-1/tests?t=airflow&s=system-1&notice=results_saved"],
+    ["saveRefrigerantChargeDataFromForm", "refrigerant_charge", refrigerantFormData(), "/jobs/job-1/tests?t=refrigerant_charge&s=system-1&notice=results_saved"],
+    ["saveFanWattDrawDataFromForm", "fan_watt_draw", fanFormData(), "/jobs/job-1/tests?t=fan_watt_draw&s=system-1&notice=results_saved"],
+    ["saveAirFilterDeviceDataFromForm", "air_filter_device", airFilterFormData(), "/jobs/job-1/tests?t=air_filter_device&s=system-1&notice=results_saved"],
+    ["saveAhriVerificationDataFromForm", "ahri_verification", ahriFormData(), "/jobs/job-1/tests?t=ahri_verification&s=system-1&notice=results_saved"],
+    ["saveLocalMechanicalExhaustDataFromForm", "local_mechanical_exhaust", localExhaustFormData(), "/jobs/job-1/tests?t=local_mechanical_exhaust&s=system-1&notice=results_saved"],
+    ["saveQiiEnv22InsulationDataFromForm", "qii_insulation", qiiFormData(), "/jobs/job-1/tests?t=qii_insulation&s=system-1&notice=results_saved"],
+  ])("%s stays on the focused test page with saved feedback", async (actionName, testType, formData, redirectUrl) => {
     createClientMock.mockResolvedValue(makeEccCompletionSupabase(testType));
 
     const actions = await import("@/lib/actions/job-actions");
@@ -332,12 +350,12 @@ describe("ECC completion redirects", () => {
     const formData = new FormData();
     formData.set("job_id", "job-1");
     formData.set("system_id", "system-1");
-    formData.set("test_type", "duct_leakage");
+    formData.set("test_type", "airflow");
 
     const { addEccTestRunFromForm } = await import("@/lib/actions/job-actions");
 
     await expect(addEccTestRunFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1",
     );
   });
 });

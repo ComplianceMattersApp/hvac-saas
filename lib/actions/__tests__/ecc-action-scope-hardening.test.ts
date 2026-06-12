@@ -377,7 +377,7 @@ describe("internal ECC same-account hardening", () => {
     formData.set("override_reason", "Manual review passed");
 
     await expect(saveEccTestOverrideFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=results_saved",
     );
 
     expect(updateCalls).toContainEqual({

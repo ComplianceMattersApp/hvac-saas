@@ -228,7 +228,7 @@ describe("ECC target override persistence", () => {
 
     const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAndCompleteAirflowFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1",
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1&notice=test_completed",
     );
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
@@ -303,7 +303,7 @@ describe("ECC target override persistence", () => {
 
     const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAndCompleteDuctLeakageFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=test_completed",
     );
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
@@ -346,7 +346,7 @@ describe("ECC target override persistence", () => {
 
     const { saveEccTestOverrideFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveEccTestOverrideFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1&notice=results_saved",
     );
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");

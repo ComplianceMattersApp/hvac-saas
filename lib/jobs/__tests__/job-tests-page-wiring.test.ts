@@ -182,6 +182,23 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).not.toContain('Report tools are secondary during active field entry.');
     expect(jobTestsPageSource).not.toContain('Expand report');
   });
+
+  it("starts a not-yet-created mobile next test through the create-run action", () => {
+    expect(jobTestsPageSource).toContain('const mobileNextTestRequiresRun =');
+    expect(jobTestsPageSource).toContain('mobileNextTestRow?.status?.state === "required"');
+    expect(jobTestsPageSource).toContain('mobileNextTestRequiresRun ? (');
+    expect(jobTestsPageSource).toContain('<form action={addEccTestRunFromForm}>');
+    expect(jobTestsPageSource).toContain('name="test_type" value={mobileNextTestType}');
+    expect(jobTestsPageSource).toContain("Continue {mobileNextTestLabel}");
+  });
+
+  it("shows save and completion recognition on the focused ECC test page", () => {
+    expect(jobTestsPageSource).toContain('notice === "results_saved" || notice === "test_completed"');
+    expect(jobTestsPageSource).toContain('notice === "test_completed" ? "Test completed." : "Results saved."');
+    expect(jobTestsPageSource).toContain("Review the completed test here, or return to the test matrix when ready.");
+    expect(jobTestsPageSource).toContain("Your latest entries were saved. You can keep editing or return to the test matrix.");
+    expect(jobTestsPageSource).toContain("Back to Tests");
+  });
 });
 
 describe("job detail field operations board layout", () => {
