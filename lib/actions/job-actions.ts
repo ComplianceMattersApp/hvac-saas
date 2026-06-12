@@ -4537,17 +4537,17 @@ const systemId =
 
   if (!testType) {
     // preserve system if present, but don't emit blank s=
-    if (systemId) redirectToTests({ jobId, systemId });
-    redirectToTests({ jobId });
+    if (systemId) redirectToTests({ jobId, systemId, notice: "results_saved" });
+    redirectToTests({ jobId, notice: "results_saved" });
   }
 
   if (!systemId) {
     // explicit error OR redirect without s; pick one:
     // throw new Error("Missing system_id");
-    redirectToTests({ jobId, testType });
+    redirectToTests({ jobId, testType, notice: "results_saved" });
   }
 
-  redirectToTests({ jobId, testType, systemId });
+  redirectToTests({ jobId, testType, systemId, notice: "results_saved" });
 }
 
 function getDuctLeakagePercentAllowed(projectType: string) {
@@ -5361,7 +5361,7 @@ export async function markRefrigerantChargeExemptFromForm(formData: FormData) {
 
   revalidatePath(`/jobs/${jobId}/tests`);
   revalidatePath(`/jobs/${jobId}`);
-  redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
+  redirectToTests({ jobId, testType: "refrigerant_charge", systemId, notice: "results_saved" });
 }
 
 export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
@@ -5605,7 +5605,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
+  redirectToTests({ jobId, testType: "refrigerant_charge", systemId, notice: "results_saved" });
 }
 
 /** =========================
@@ -5722,7 +5722,7 @@ export async function saveAirflowDataFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "airflow", systemId });
+  redirectToTests({ jobId, testType: "airflow", systemId, notice: "results_saved" });
 }
 
 export async function saveFanWattDrawDataFromForm(formData: FormData) {
@@ -5764,7 +5764,7 @@ export async function saveFanWattDrawDataFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "fan_watt_draw", systemId });
+  redirectToTests({ jobId, testType: "fan_watt_draw", systemId, notice: "results_saved" });
 }
 
 export async function saveAirFilterDeviceDataFromForm(formData: FormData) {
@@ -5806,7 +5806,7 @@ export async function saveAirFilterDeviceDataFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "air_filter_device", systemId });
+  redirectToTests({ jobId, testType: "air_filter_device", systemId, notice: "results_saved" });
 }
 
 export async function saveAndCompleteAirFilterDeviceFromForm(formData: FormData) {
@@ -5855,7 +5855,7 @@ export async function saveAndCompleteAirFilterDeviceFromForm(formData: FormData)
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "air_filter_device", systemId });
+  redirectToTests({ jobId, testType: "air_filter_device", systemId, notice: "test_completed" });
 }
 
 export async function saveAndCompleteFanWattDrawFromForm(formData: FormData) {
@@ -5904,7 +5904,7 @@ export async function saveAndCompleteFanWattDrawFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "fan_watt_draw", systemId });
+  redirectToTests({ jobId, testType: "fan_watt_draw", systemId, notice: "test_completed" });
 }
 
 export async function saveAhriVerificationDataFromForm(formData: FormData) {
@@ -5946,7 +5946,7 @@ export async function saveAhriVerificationDataFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "ahri_verification", systemId });
+  redirectToTests({ jobId, testType: "ahri_verification", systemId, notice: "results_saved" });
 }
 
 export async function saveAndCompleteAhriVerificationFromForm(formData: FormData) {
@@ -5995,7 +5995,7 @@ export async function saveAndCompleteAhriVerificationFromForm(formData: FormData
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "ahri_verification", systemId });
+  redirectToTests({ jobId, testType: "ahri_verification", systemId, notice: "test_completed" });
 }
 
 export async function saveLocalMechanicalExhaustDataFromForm(formData: FormData) {
@@ -6037,7 +6037,7 @@ export async function saveLocalMechanicalExhaustDataFromForm(formData: FormData)
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "local_mechanical_exhaust", systemId });
+  redirectToTests({ jobId, testType: "local_mechanical_exhaust", systemId, notice: "results_saved" });
 }
 
 export async function saveAndCompleteLocalMechanicalExhaustFromForm(formData: FormData) {
@@ -6085,7 +6085,7 @@ export async function saveAndCompleteLocalMechanicalExhaustFromForm(formData: Fo
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "local_mechanical_exhaust", systemId });
+  redirectToTests({ jobId, testType: "local_mechanical_exhaust", systemId, notice: "test_completed" });
 }
 
 export async function saveQiiEnv22InsulationDataFromForm(formData: FormData) {
@@ -6127,7 +6127,7 @@ export async function saveQiiEnv22InsulationDataFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "qii_insulation", systemId });
+  redirectToTests({ jobId, testType: "qii_insulation", systemId, notice: "results_saved" });
 }
 
 export async function saveAndCompleteQiiEnv22InsulationFromForm(formData: FormData) {
@@ -6175,7 +6175,7 @@ export async function saveAndCompleteQiiEnv22InsulationFromForm(formData: FormDa
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "qii_insulation", systemId });
+  redirectToTests({ jobId, testType: "qii_insulation", systemId, notice: "test_completed" });
 }
 
 function resolveAirflowCfmPerTon(projectType: string, formData?: FormData): number {
@@ -6254,7 +6254,7 @@ export async function saveDuctLeakageDataFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "duct_leakage", systemId });
+  redirectToTests({ jobId, testType: "duct_leakage", systemId, notice: "results_saved" });
 }
 
 /** =========================
@@ -6460,7 +6460,7 @@ if (parentJobId) {
 
 
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: run.test_type, systemId });
+  redirectToTests({ jobId, testType: run.test_type, systemId, notice: "test_completed" });
 }
 
 /** =========================
@@ -6552,7 +6552,7 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "duct_leakage", systemId });
+  redirectToTests({ jobId, testType: "duct_leakage", systemId, notice: "test_completed" });
 }
 
 /** =========================
@@ -6697,7 +6697,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "airflow", systemId });
+  redirectToTests({ jobId, testType: "airflow", systemId, notice: "test_completed" });
 }
 
 /** =========================
@@ -6958,7 +6958,7 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
+  redirectToTests({ jobId, testType: "refrigerant_charge", systemId, notice: "test_completed" });
 }
 
 

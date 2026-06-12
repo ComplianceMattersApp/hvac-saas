@@ -1201,6 +1201,10 @@ export default async function JobTestsPage({
   const mobileNextTestLabel = mobileNextTestType
     ? getTestDisplayLabel(mobileNextTestType, packageSystem)
     : "Tests";
+  const mobileNextTestRequiresRun =
+    Boolean(selectedSystemId && mobileNextTestType) &&
+    mobileNextTestRow?.status?.state === "required" &&
+    !mobileNextTestRow?.carriedForward;
 
 const primaryEquipment =
   selectedSystemEquipment.find((eq: any) => isPackageEquipment(eq)) ??
@@ -1605,6 +1609,24 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             </div>
           </div>
         )}
+        {(notice === "results_saved" || notice === "test_completed") && (
+          <div className="rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 shadow-sm">
+            <div className="font-semibold">{notice === "test_completed" ? "Test completed." : "Results saved."}</div>
+            <div className="mt-1 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                {notice === "test_completed"
+                  ? "Review the completed test here, or return to the test matrix when ready."
+                  : "Your latest entries were saved. You can keep editing or return to the test matrix."}
+              </span>
+              <Link
+                href={selectedSystemId ? withS(undefined, selectedSystemId) : baseHref}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-sm transition-colors hover:bg-emerald-100"
+              >
+                Back to Tests
+              </Link>
+            </div>
+          </div>
+        )}
         {!isCompletionReportFocused ? (
         <JobSubpageContextHeader
           workspaceLabel="Job Subpage"
@@ -1664,12 +1686,26 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
           <div className="mt-3">
             {selectedSystemId && mobileNextTestType ? (
-              <Link
-                href={withS(mobileNextTestType, selectedSystemId)}
-                className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-colors hover:bg-blue-800"
-              >
-                Continue {mobileNextTestLabel}
-              </Link>
+              mobileNextTestRequiresRun ? (
+                <form action={addEccTestRunFromForm}>
+                  <input type="hidden" name="job_id" value={job.id} />
+                  <input type="hidden" name="system_id" value={selectedSystemId} />
+                  <input type="hidden" name="test_type" value={mobileNextTestType} />
+                  <SubmitButton
+                    loadingText="Starting..."
+                    className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-colors hover:bg-blue-800"
+                  >
+                    Continue {mobileNextTestLabel}
+                  </SubmitButton>
+                </form>
+              ) : (
+                <Link
+                  href={withS(mobileNextTestType, selectedSystemId)}
+                  className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-colors hover:bg-blue-800"
+                >
+                  Continue {mobileNextTestLabel}
+                </Link>
+              )
             ) : (
               <Link
                 href={`/jobs/${job.id}/info?f=equipment`}
