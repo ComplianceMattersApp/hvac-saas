@@ -528,7 +528,7 @@ export default async function AdminCompanyProfilePage({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invoice Settings</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Choose how your company handles invoices inside Compliance Matters.
+            Choose whether your company creates invoices in Compliance Matters or tracks billing in another system.
           </p>
         </div>
 
@@ -536,7 +536,7 @@ export default async function AdminCompanyProfilePage({
           <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-4">
             <div className="space-y-1.5">
               <label htmlFor="billing_mode" className="text-sm font-medium text-slate-700">
-                Invoice mode
+                Company invoice workflow
               </label>
               <select
                 id="billing_mode"
@@ -544,33 +544,32 @@ export default async function AdminCompanyProfilePage({
                 defaultValue={billingMode}
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-slate-200"
               >
-                <option value="external_billing">External billing — lightweight tracking only</option>
-                <option value="internal_invoicing">Internal invoicing — create, issue &amp; send invoices</option>
+                <option value="external_billing">Track billing outside Compliance Matters</option>
+                <option value="internal_invoicing">Use Compliance Matters invoices</option>
               </select>
             </div>
 
             <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
               <p>
-                <span className="font-medium text-slate-800">External billing</span> — use one-click
-                &ldquo;Mark invoice sent&rdquo; and &ldquo;Mark complete&rdquo; actions on each job.
-                No invoice document is created; this is lightweight close-out tracking only.
+                <span className="font-medium text-slate-800">Track billing outside Compliance Matters</span>{" "}
+                - use Compliance Matters for job workflow and closeout. Invoices are created and managed in
+                another system, such as QuickBooks.
               </p>
               <p>
-                <span className="font-medium text-slate-800">Internal invoicing</span> — create a full invoice
-                directly from the job, add line items from your pricebook, issue it, send it to the customer,
-                and optionally record payment received. Use this mode if your company handles billing directly.
+                <span className="font-medium text-slate-800">Use Compliance Matters invoices</span>{" "}
+                - create, issue, send, and track invoices from each job in Compliance Matters.
               </p>
             </div>
 
             {billingMode === "external_billing" ? (
               <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-sm leading-6 text-blue-900">
-                <span className="font-semibold">Service company invoicing your own customers?</span>{" "}
-                Switch to <span className="font-semibold">Internal invoicing</span> to access the full invoice
-                creation and send workflow on each job.
+                Outside billing tracking is active. Jobs can be closed out in Compliance Matters while invoices
+                are managed in another system.
               </div>
             ) : (
               <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm leading-6 text-emerald-900">
-                Internal invoicing is active. Your team can create, issue, and send invoices from each job.
+                Compliance Matters invoices are active. Your team can create, issue, send, and track invoices
+                from each job.
               </div>
             )}
           </div>
