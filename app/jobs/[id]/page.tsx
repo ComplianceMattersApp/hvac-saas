@@ -4879,7 +4879,7 @@ const failureResolutionPathCount =
                   <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={mobileFieldActionClass}>
                     <span className="inline-flex items-center gap-2">
                       <ReceiptIcon className="h-4.5 w-4.5" />
-                      <span>View Invoice</span>
+                      <span>{jobPageInvoiceNextAction}</span>
                     </span>
                   </Link>
                 ) : (
@@ -5163,6 +5163,40 @@ const failureResolutionPathCount =
             </div>
 
             <div className="mt-4 space-y-3">
+              {showInternalInvoicePanel ? (
+                <div id="mobile-invoice-summary-card" className="rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-xs font-semibold uppercase tracking-[0.08em] text-blue-700">Invoice</div>
+                      <div className="mt-1 text-base font-semibold leading-6 text-slate-950">{jobPageInvoiceStateLabel}</div>
+                      <div className="mt-1 break-words text-sm leading-5 text-slate-700">{jobPageInvoiceSummaryText}</div>
+                    </div>
+                    <ReceiptIcon className="mt-0.5 h-5 w-5 shrink-0 text-blue-700" />
+                  </div>
+                  {internalInvoiceTruth ? (
+                    <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={`${mobileFieldActionClass} mt-3 w-full`}>
+                      <span className="inline-flex items-center gap-2">
+                        <ReceiptIcon className="h-4.5 w-4.5" />
+                        <span>{jobPageInvoiceNextAction}</span>
+                      </span>
+                    </Link>
+                  ) : hasDirectInvoiceWorkflowAccess ? (
+                    <form action={createInternalInvoiceDraftFromForm} className="mt-3">
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="tab" value={tab} />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                      <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+                      <SubmitButton loadingText="Starting..." className={`${mobileFieldActionClass} w-full`}>
+                        <span className="inline-flex items-center gap-2">
+                          <ReceiptIcon className="h-4.5 w-4.5" />
+                          <span>{jobPageInvoiceNextAction}</span>
+                        </span>
+                      </SubmitButton>
+                    </form>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div id="mobile-visit-reason-card" className="rounded-xl border border-slate-200/80 bg-slate-50/75 px-3 py-3 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)]">
                 {isInternalUser ? (
                   <details className="group">

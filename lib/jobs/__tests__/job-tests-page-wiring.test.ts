@@ -309,6 +309,23 @@ describe("job detail field operations board layout", () => {
     expect(mobileWorkScopeSlice).toContain("Number(item.expected_unit_price).toFixed(2)");
   });
 
+  it("keeps post-build invoice state visible in the mobile Work & Invoice section", () => {
+    const mobileWorkScopeStart = jobPageSource.indexOf('id="mobile-work-scope"');
+    const mobileNotesStart = jobPageSource.indexOf('id="mobile-notes-hub"', mobileWorkScopeStart);
+    const mobileWorkScopeSlice =
+      mobileWorkScopeStart > -1 && mobileNotesStart > mobileWorkScopeStart
+        ? jobPageSource.slice(mobileWorkScopeStart, mobileNotesStart)
+        : "";
+
+    expect(mobileWorkScopeSlice).toContain('id="mobile-invoice-summary-card"');
+    expect(mobileWorkScopeSlice).toContain("{jobPageInvoiceStateLabel}");
+    expect(mobileWorkScopeSlice).toContain("{jobPageInvoiceSummaryText}");
+    expect(mobileWorkScopeSlice).toContain("{jobPageInvoiceNextAction}");
+    expect(mobileWorkScopeSlice).toContain('/invoice#invoice-workspace');
+    expect(mobileWorkScopeSlice).toContain("internalInvoiceTruth ? (");
+    expect(mobileWorkScopeSlice).toContain("createInternalInvoiceDraftFromForm");
+  });
+
   it("keeps mobile Visit Reason editing aligned inside the Visit Reason card", () => {
     const mobileVisitReasonStart = jobPageSource.indexOf('id="mobile-visit-reason-card"');
     const mobileVisitReasonEnd = jobPageSource.indexOf("{visitScopeItems.map((item, index) => (", mobileVisitReasonStart);
