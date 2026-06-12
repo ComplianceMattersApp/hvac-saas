@@ -429,7 +429,7 @@ export default function InternalInvoiceLineItemsTable({
 
       {lineItems.length === 0 ? (
         <div className="border-b border-dashed border-slate-200 bg-white/72 px-5 py-3.5 text-sm text-slate-600">
-          Start with the first charge below. Each row is a billing line for this invoice.
+          Start with the first charge below. Each row is an invoice charge for this invoice.
         </div>
       ) : null}
 
@@ -913,7 +913,7 @@ export default function InternalInvoiceLineItemsTable({
         ) : canMutateDraftLines ? null : (
           <div className="bg-slate-50/94 px-5 py-4">
             <div className="rounded-xl border border-slate-200/80 bg-white/82 px-4 py-3 text-xs leading-5 text-slate-500">
-              Draft invoice lines are visible, but no direct line mutations are available under your current permissions.
+              Draft invoice charges are visible, but charge changes are not available under your current permissions.
             </div>
           </div>
         )}

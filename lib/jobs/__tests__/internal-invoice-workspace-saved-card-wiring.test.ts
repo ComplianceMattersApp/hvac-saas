@@ -19,7 +19,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("const canAccessDraftLineWorkspace = hasDirectInvoiceDraftMutationAccess(fieldBillingCapabilities)");
     expect(source).toContain("invoice.status === \"draft\" && canAccessDraftLineWorkspace");
     expect(source).toContain("capabilities={fieldBillingCapabilities}");
-    expect(source).toContain("Draft invoice lines are view-only under your current permissions.");
+    expect(source).toContain("Draft invoice charges are view-only under your current permissions.");
   });
 
   it("keeps lifecycle and payment controls behind financial lifecycle authorization", () => {

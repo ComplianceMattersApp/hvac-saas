@@ -32,7 +32,7 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source).toContain("disabled={!canEditPrice}");
     expect(source).toContain("{canEditAnyLine ? (");
     expect(source).toContain("{canRemoveLine ? (");
-    expect(source).toContain("Draft invoice lines are visible, but no direct line mutations are available under your current permissions.");
+    expect(source).toContain("Draft invoice charges are visible, but charge changes are not available under your current permissions.");
   });
 
   it("keeps add-from-work-item and add-from-pricebook paths capability-aware", () => {

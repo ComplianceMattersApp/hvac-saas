@@ -814,7 +814,7 @@ export default async function InternalInvoiceWorkspacePage({
             ) : null}
             {invoice ? (
               <Link href="#invoice-charges" className={darkButtonClass}>
-                Open Invoice Lines
+                Open Invoice Charges
               </Link>
             ) : null}
           </div>
@@ -900,7 +900,7 @@ export default async function InternalInvoiceWorkspacePage({
             <section id="invoice-charges" className={`${panelClass} order-40 p-4 sm:p-5`}>
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Invoice Lines</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Invoice Charges</div>
                   <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">Charges</h2>
                   <p className="mt-1 text-sm leading-6 text-slate-600">
                     Review the current charges, then add another charge for fees, add-ons, or anything not already listed on the invoice.
@@ -938,11 +938,11 @@ export default async function InternalInvoiceWorkspacePage({
                 <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200/80 bg-slate-50/75">
                   {invoice.status === "draft" && !canAccessDraftLineWorkspace ? (
                     <div className="border-b border-slate-200/80 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-                      Draft invoice lines are view-only under your current permissions.
+                      Draft invoice charges are view-only under your current permissions.
                     </div>
                   ) : null}
                   {invoice.line_items.length === 0 ? (
-                    <div className="px-4 py-4 text-sm text-slate-600">No invoice lines were recorded on this invoice.</div>
+                    <div className="px-4 py-4 text-sm text-slate-600">No invoice charges were recorded on this invoice.</div>
                   ) : (
                     <div className="divide-y divide-slate-200/80">
                       {invoice.line_items.map((lineItem, index) => (
