@@ -312,8 +312,8 @@ describe("FieldBillingSummary", () => {
 
     expect(html).not.toContain("<form");
     expect(html).not.toContain("<button");
-    expect(html).not.toContain("Add proposed charge");
-    expect(html).not.toContain("Submit charge for office review");
+    expect(html).not.toContain("Propose charge for office review");
+    expect(html).not.toContain("Submit proposal for office review");
     expect(html).not.toContain("Collect Payment");
     expect(html).not.toContain("Add Charge");
     expect(html).not.toContain("Edit Charge");
@@ -337,7 +337,7 @@ describe("FieldBillingSummary", () => {
 
     expect(html).toContain("Start with work performed, then use the invoice workspace for billing actions.");
     expect(html).toContain("Issue Invoice");
-    expect(html).not.toContain("Add proposed charge");
+    expect(html).not.toContain("Propose charge for office review");
   });
 
   it("shows direct invoice workflow as primary when direct invoice authority exists", () => {
@@ -354,8 +354,8 @@ describe("FieldBillingSummary", () => {
 
     expect(html).toContain("Start with work performed, then use the invoice workspace for billing actions.");
     expect(html).toContain("Issue Invoice");
-    expect(html).not.toContain("Add proposed charge");
-    expect(html).not.toContain("Submit charge for office review");
+    expect(html).not.toContain("Propose charge for office review");
+    expect(html).not.toContain("Submit proposal for office review");
   });
 
   it("labels the direct no-invoice CTA as start invoice for field billing users", () => {
@@ -487,8 +487,7 @@ describe("FieldBillingSummary", () => {
     });
 
     expect(html).toContain("Field charge proposals");
-    expect(html).toContain("Review before these become invoice charges.");
-    expect(html).toContain("These proposals are not collectible yet.");
+    expect(html).toContain("Office/billing review is required before these become invoice charges or collectible invoice balances.");
     expect(html).toContain("Office/billing approval required before these become invoice charges.");
     expect(html).toContain("Diagnostic Visit");
     expect(html).toContain("Source: Pricebook");
@@ -522,14 +521,15 @@ describe("FieldBillingSummary", () => {
       ],
     });
 
-    expect(html).toContain("Add proposed charge");
+    expect(html).toContain("Propose charge for office review");
     expect(html).toContain("Field charge proposals");
     expect(html).toContain("No field charge proposals.");
-    expect(html).toContain("Submit charge for office review");
-    expect(html).toContain("These are proposals only and are not collectible until approved.");
+    expect(html).toContain("Submit proposal for office review");
+    expect(html).toContain("Proposed charges are not invoice charges and are not collectible invoice balances until office/billing approves or adds them.");
     expect(html).toContain("From Pricebook");
     expect(html).toContain("Diagnostic Visit - HVAC - $125.00");
     expect(html).not.toContain("From completed work / Visit Scope");
+    expect(html).not.toContain("Submit charge for office review");
     expect(html).not.toContain("Optional unit price override");
     expect(html).not.toContain("Manual");
     expect(html).not.toContain("Custom");
@@ -549,12 +549,14 @@ describe("FieldBillingSummary", () => {
       ],
     });
 
-    expect(html).toContain("Add proposed charge");
-    expect(html).toContain("Submit charge for office review");
-    expect(html).toContain("From completed work / Visit Scope");
+    expect(html).toContain("Propose charge for office review");
+    expect(html).toContain("Submit proposal for office review");
+    expect(html).toContain("From Work Items");
     expect(html).toContain("Repair blower assembly");
-    expect(html).toContain("Visit Scope pricing is context only here.");
-    expect(html).toContain("Submitting this does not add an invoice charge.");
+    expect(html).toContain("Work Item pricing is context only here.");
+    expect(html).toContain("Submitting this creates a proposal only; it does not add an invoice charge.");
+    expect(html).not.toContain("From completed work / Visit Scope");
+    expect(html).not.toContain("Visit Scope pricing is context only here.");
     expect(html).not.toContain("From Pricebook");
     expect(html).not.toContain("Manual");
     expect(html).not.toContain("Custom");
@@ -579,7 +581,7 @@ describe("FieldBillingSummary", () => {
     });
 
     expect(html).toContain("Optional unit price override");
-    expect(html).toContain("Submit charge for office review");
+    expect(html).toContain("Submit proposal for office review");
     expect(html).not.toContain("Collect Payment");
   });
 

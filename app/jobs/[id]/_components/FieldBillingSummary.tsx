@@ -304,7 +304,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
           <div>
             <h4 className="text-sm font-semibold text-slate-950">Field charge proposals</h4>
             <p className="mt-1 text-xs leading-5 text-slate-600">
-              Review before these become invoice charges. These proposals are not collectible yet.
+              Office/billing review is required before these become invoice charges or collectible invoice balances.
             </p>
           </div>
           {hasProposedTotal ? (
@@ -325,10 +325,10 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
         {canShowProposalEntry ? (
           <details className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2.5">
             <summary className="cursor-pointer text-sm font-semibold text-blue-950">
-              Add proposed charge
+              Propose charge for office review
             </summary>
             <p className="mt-2 text-xs leading-5 text-blue-900">
-              Submit charge for office review. These are proposals only and are not collectible until approved.
+              Submit a proposal for office review. Proposed charges are not invoice charges and are not collectible invoice balances until office/billing approves or adds them.
             </p>
             <div className="mt-3 grid gap-3 lg:grid-cols-2">
               {canSubmitPricebookProposal ? (
@@ -389,7 +389,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
                         type="submit"
                         className="inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
                       >
-                        Submit charge for office review
+                        Submit proposal for office review
                       </button>
                     </form>
                   ) : (
@@ -402,7 +402,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
 
               {canSubmitVisitScopeProposal ? (
                 <div className="rounded-lg border border-blue-100 bg-white/90 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">From completed work / Visit Scope</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">From Work Items</div>
                   {visitScopeProposalItems.length > 0 ? (
                     <form action={createFieldChargeProposalFromVisitScopeEntryForm} className="mt-2 grid gap-2">
                       <input type="hidden" name="job_id" value={props.jobId} />
@@ -441,13 +441,13 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
                         </label>
                       ) : null}
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-                        Visit Scope pricing is context only here. Submitting this does not add an invoice charge.
+                        Work Item pricing is context only here. Submitting this creates a proposal only; it does not add an invoice charge.
                       </div>
                       <button
                         type="submit"
                         className="inline-flex min-h-10 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200"
                       >
-                        Submit charge for office review
+                        Submit proposal for office review
                       </button>
                     </form>
                   ) : (
