@@ -247,7 +247,8 @@ describe("changeJobServiceLocationFromForm", () => {
     );
 
     expect(fixture.jobUpdates).toHaveLength(1);
-    expect(fixture.jobUpdates[0].payload).toMatchObject({ location_id: "loc-2" });
+    expect(fixture.jobUpdates[0].payload).toEqual({ location_id: "loc-2" });
+    expect(fixture.jobUpdates[0].payload).not.toHaveProperty("updated_at");
     expect(fixture.eventInserts).toHaveLength(1);
     expect(fixture.eventInserts[0]).toMatchObject({
       job_id: "job-1",
@@ -325,6 +326,8 @@ describe("changeJobServiceLocationFromForm", () => {
     );
 
     expect(fixture.jobUpdates).toHaveLength(1);
+    expect(fixture.jobUpdates[0].payload).toEqual({ location_id: "loc-2" });
+    expect(fixture.jobUpdates[0].payload).not.toHaveProperty("updated_at");
     expect(fixture.eventInserts).toHaveLength(1);
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       "service_location_changed job_events insert failed:",

@@ -10425,7 +10425,6 @@ export async function changeJobServiceLocationFromForm(formData: FormData) {
     .from("jobs")
     .update({
       location_id: nextLocationId,
-      updated_at: new Date().toISOString(),
     })
     .eq("id", id)
     .eq("customer_id", customerId);
