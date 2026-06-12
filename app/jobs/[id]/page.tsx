@@ -96,6 +96,7 @@ import {
   resolveJobInvoiceActionLabel,
   resolveJobInvoiceStateLabel,
 } from "@/lib/jobs/job-invoice-action";
+import { shouldShowInternalInvoiceRequiredBanner } from "@/lib/jobs/job-detail-invoice-banner";
 import { listFieldChargeProposalsForJob } from "@/lib/business/field-charge-proposals";
 import {
   addInternalInvoiceLineItemFromForm,
@@ -2693,14 +2694,15 @@ const canShowInvoiceButton =
 
 const billingModeBlocksLightweightBilling = !billingState.lightweightBillingAllowed;
 
-const showInternalInvoicingPlaceholder =
-  isInternalUser &&
-  billingModeBlocksLightweightBilling &&
-  !billingState.billedTruthSatisfied &&
-  (
-    job.job_type === "service" ||
-    (job.job_type === "ecc" && String(job.ops_status ?? "").toLowerCase() !== "closed")
-  );
+const showInternalInvoicingPlaceholder = shouldShowInternalInvoiceRequiredBanner({
+  isInternalUser,
+  billingModeBlocksLightweightBilling,
+  billedTruthSatisfied: billingState.billedTruthSatisfied,
+  needsInvoice: closeoutNeeds.needsInvoice,
+  isCloseoutPending,
+  currentOpsStatus,
+  jobType: job.job_type,
+});
 
 const showPrimaryCloseoutBlockers =
   isInternalUser &&

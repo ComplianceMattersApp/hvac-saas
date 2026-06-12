@@ -138,6 +138,14 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("Create invoice");
   });
 
+  it("gates the top invoice-required banner on billing closeout state instead of missing invoice alone", () => {
+    expect(source).toContain('import { shouldShowInternalInvoiceRequiredBanner } from "@/lib/jobs/job-detail-invoice-banner";');
+    expect(source).toContain("const showInternalInvoicingPlaceholder = shouldShowInternalInvoiceRequiredBanner({");
+    expect(source).toContain("needsInvoice: closeoutNeeds.needsInvoice");
+    expect(source).toContain("isCloseoutPending");
+    expect(source).toContain("billedTruthSatisfied: billingState.billedTruthSatisfied");
+  });
+
   it("formats job-page invoice references through the short display helper", () => {
     expect(source).toContain('import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";');
     expect(source).toContain("const jobPageInvoiceDisplayReference = internalInvoiceTruth");
