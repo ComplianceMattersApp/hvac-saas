@@ -6,7 +6,7 @@ Scope: model guidance plus Group 9A-2 backend foundation closeout documentation.
 
 ## Documentation Authority Note
 
-This spec owns durable Maintenance Agreements / Recurring Services source-of-truth contracts, lifecycle/status rules, service-plan operational boundaries, and recurring-service model decisions. Phase closeout proof and duplicated payment/service-plan smoke evidence belong in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md), with roadmap/deferred sequencing owned by roadmap docs.
+This spec owns durable Maintenance Agreements / Recurring Services source-of-truth contracts, lifecycle/status rules, service-plan operational boundaries, and recurring-service model decisions. Group 9A implementation and closeout evidence belongs in [Service_Plan_Model_Closeout_Evidence_Ledger.md](./Service_Plan_Model_Closeout_Evidence_Ledger.md). Duplicated payment/service-plan billing smoke evidence belongs in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md), with durable payment/billing contracts owned by [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md) and roadmap/deferred sequencing owned by roadmap docs.
 
 Duplicated closeout sections may be shortened against the evidence ledger when the durable model contract remains clear in this spec. Do not remove service-plan lifecycle truth, visit/next-due operational boundaries, source-of-truth boundaries, or production-activation safety notes from this spec.
 
@@ -21,6 +21,7 @@ This spec keeps the durable Maintenance Agreements / Recurring Services contract
 - Service-plan billing integration must preserve the boundary between recurring-service operations and invoice/payment truth.
 - Service plan UI changes do not alter billing logic, visit generation, payment/invoice truth, Stripe/webhook behavior, customer portal behavior, schema/migrations, or role/capability rules unless an owner spec explicitly unlocks that work.
 - Production activation remains gated by intentional environment process and applicable migration/feature-flag controls.
+
 ## Purpose
 
 Maintenance Agreements V1 defines the future customer-owned recurring service agreement model for Compliance Matters Software.
