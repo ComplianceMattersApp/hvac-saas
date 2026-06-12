@@ -19,6 +19,8 @@ describe("internal invoice line items table capability wiring", () => {
   it("accepts field billing capabilities and derives direct mutation booleans", () => {
     expect(source).toContain("capabilities: FieldBillingCapabilities");
     expect(source).toContain("const canAddPricebookLine = capabilities.can_select_pricebook_invoice_lines");
+    expect(source).toContain("const canAddManualLine = capabilities.can_add_manual_invoice_line");
+    expect(source).toContain("const canAddInvoiceLine = canAddPricebookLine || canAddManualLine");
     expect(source).toContain("const canAddVisitScopeLine = capabilities.can_convert_visit_scope_to_invoice_lines");
     expect(source).toContain("const canEditAnyLine = canEditDescription || canEditQuantity || canEditPrice");
     expect(source).toContain("const canRemoveLine = capabilities.can_remove_invoice_line");
@@ -35,8 +37,10 @@ describe("internal invoice line items table capability wiring", () => {
 
   it("keeps add-from-work-item and add-from-pricebook paths capability-aware", () => {
     expect(source).toContain("canAddVisitScopeLine && eligibleVisitScopeItems.length > 0");
-    expect(source).toContain("{canAddPricebookLine && isAddFormOpen ? (");
-    expect(source).toContain(") : canAddPricebookLine ? (");
+    expect(source).toContain("{canAddInvoiceLine && isAddFormOpen ? (");
+    expect(source).toContain("{canAddPricebookLine ? (");
+    expect(source).toContain("{canAddManualLine ? (");
+    expect(source).toContain(") : canAddInvoiceLine ? (");
   });
 
   it("shows Work Item price as carried into draft charges instead of always zero", () => {
@@ -52,10 +56,12 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source).not.toContain("Already added");
     expect(source).toContain("Add another charge");
     expect(source).toContain("Use this for fees, add-ons, or anything not already listed on the invoice.");
-    expect(source).toContain('itemLabel="Charge"');
     expect(source).toContain("const [selectedPricebookItemId, setSelectedPricebookItemId] = useState<string>('');");
-    expect(source).toContain("includeEmptyOption");
-    expect(source).toContain('emptyOptionLabel="Select a charge..."');
+    expect(source).toContain("const [pricebookSearchQuery, setPricebookSearchQuery] = useState('');");
+    expect(source).toContain("const filteredPricebookPickerItems = pricebookSearch");
+    expect(source).toContain('placeholder="Search Pricebook services..."');
+    expect(source).toContain("Search Pricebook");
+    expect(source).toContain("Manual Charge");
     expect(source).toContain("disabled={!selectedPricebookItemId}");
     expect(source).toContain("setSelectedPricebookItemId('');");
     expect(source).toContain("setIsAddFormOpen(false);");
@@ -104,19 +110,41 @@ describe("internal invoice line items table capability wiring", () => {
 
   it("keeps Add Charge wired to the existing pricebook invoice action fields", () => {
     const pricebookFormIndex = source.indexOf("action={handleAddPricebook}");
-    const pricebookFormSlice = source.slice(pricebookFormIndex, pricebookFormIndex + 4000);
+    const pricebookFormSlice = source.slice(pricebookFormIndex, pricebookFormIndex + 6000);
 
     expect(pricebookFormSlice).toContain('name="job_id" value={jobId}');
     expect(pricebookFormSlice).toContain('name="invoice_id" value={selectedInvoiceId}');
     expect(pricebookFormSlice).toContain('name="tab" value={tab}');
-    expect(pricebookFormSlice).toContain('itemFieldName="pricebook_item_id"');
-    expect(pricebookFormSlice).toContain('quantityFieldName="quantity"');
-    expect(pricebookFormSlice).toContain('quantityLabel="Quantity"');
-    expect(pricebookFormSlice).toContain('quantityDefaultValue="1.00"');
-    expect(pricebookFormSlice).toContain("includeEmptyOption");
-    expect(pricebookFormSlice).toContain('emptyOptionLabel="Select a charge..."');
+    expect(pricebookFormSlice).toContain('type="search"');
+    expect(pricebookFormSlice).toContain('name="pricebook_item_id" value={selectedPricebookItemId}');
+    expect(pricebookFormSlice).toContain('name="quantity"');
+    expect(pricebookFormSlice).toContain('defaultValue="1.00"');
     expect(pricebookFormSlice).toContain("disabled={!selectedPricebookItemId}");
-    expect(pricebookFormSlice).toContain("Cancel");
-    expect(pricebookFormSlice).toContain("Add Charge");
+    expect(source).toContain("Cancel");
+    expect(pricebookFormSlice).toContain("Add Pricebook Charge");
+  });
+
+  it("keeps manual charge entry wired to the manual invoice action fields", () => {
+    const manualFormIndex = source.indexOf("action={handleAddManual}");
+    const manualFormSlice = source.slice(manualFormIndex, manualFormIndex + 4000);
+
+    expect(source).toContain("async function handleAddManual(formData: FormData)");
+    expect(source).toContain("action: addLineItemAction");
+    expect(manualFormSlice).toContain('name="job_id" value={jobId}');
+    expect(manualFormSlice).toContain('name="invoice_id" value={selectedInvoiceId}');
+    expect(manualFormSlice).toContain('name="tab" value={tab}');
+    expect(manualFormSlice).toContain('name="item_name"');
+    expect(manualFormSlice).toContain('placeholder="Type invoice charge..."');
+    expect(manualFormSlice).toContain('name="item_type"');
+    expect(manualFormSlice).toContain('name="quantity"');
+    expect(manualFormSlice).toContain('name="unit_price"');
+    expect(manualFormSlice).toContain('name="description"');
+    expect(manualFormSlice).toContain("Add Manual Charge");
+  });
+
+  it("does not use the old select-only pricebook entry helper for invoice charge adds", () => {
+    expect(source).not.toContain("<PricebookLineEntryFields");
+    expect(source).not.toContain("includeEmptyOption");
+    expect(source).not.toContain('emptyOptionLabel="Select a charge..."');
   });
 });
