@@ -44,6 +44,8 @@ import {
   createSupplementalInternalInvoiceFromForm,
   createInternalInvoiceDraftFromForm,
   issueInternalInvoiceFromForm,
+  markInternalInvoiceExternallyBilledFromForm,
+  markInternalInvoiceNoChargeFromForm,
   removeInternalInvoiceLineItemFromForm,
   saveInternalInvoiceDraftFromForm,
   sendInternalInvoiceEmailFromForm,
@@ -911,6 +913,8 @@ export default async function InternalInvoiceWorkspacePage({
                   addLineItemAction={addInternalInvoiceLineItemFromForm}
                   addPricebookLineItemAction={addInternalInvoiceLineItemFromPricebookForm}
                   addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
+                  markNoChargeAction={markInternalInvoiceNoChargeFromForm}
+                  markExternallyBilledAction={markInternalInvoiceExternallyBilledFromForm}
                   updateLineItemAction={updateInternalInvoiceLineItemFromForm}
                   removeLineItemAction={removeInternalInvoiceLineItemFromForm}
                   pricebookPickerItems={pricebookPickerItems}

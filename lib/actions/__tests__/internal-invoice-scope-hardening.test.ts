@@ -144,6 +144,8 @@ type InvoiceMutationEntrypoint =
   | 'createInternalInvoiceDraftFromForm'
   | 'saveInternalInvoiceDraftFromForm'
   | 'issueInternalInvoiceFromForm'
+  | 'markInternalInvoiceNoChargeFromForm'
+  | 'markInternalInvoiceExternallyBilledFromForm'
   | 'voidInternalInvoiceFromForm'
   | 'addInternalInvoiceLineItemFromForm'
   | 'addInternalInvoiceLineItemFromPricebookForm'
@@ -156,6 +158,8 @@ type InvoiceLifecycleEntrypoint =
   | 'createInternalInvoiceDraftFromForm'
   | 'saveInternalInvoiceDraftFromForm'
   | 'issueInternalInvoiceFromForm'
+  | 'markInternalInvoiceNoChargeFromForm'
+  | 'markInternalInvoiceExternallyBilledFromForm'
   | 'voidInternalInvoiceFromForm'
   | 'sendInternalInvoiceEmailFromForm';
 
@@ -163,6 +167,8 @@ const targetedEntrypoints: InvoiceMutationEntrypoint[] = [
   'createInternalInvoiceDraftFromForm',
   'saveInternalInvoiceDraftFromForm',
   'issueInternalInvoiceFromForm',
+  'markInternalInvoiceNoChargeFromForm',
+  'markInternalInvoiceExternallyBilledFromForm',
   'voidInternalInvoiceFromForm',
   'addInternalInvoiceLineItemFromForm',
   'addInternalInvoiceLineItemFromPricebookForm',
@@ -176,6 +182,8 @@ const lifecycleEntrypoints: InvoiceLifecycleEntrypoint[] = [
   'createInternalInvoiceDraftFromForm',
   'saveInternalInvoiceDraftFromForm',
   'issueInternalInvoiceFromForm',
+  'markInternalInvoiceNoChargeFromForm',
+  'markInternalInvoiceExternallyBilledFromForm',
   'voidInternalInvoiceFromForm',
   'sendInternalInvoiceEmailFromForm',
 ];

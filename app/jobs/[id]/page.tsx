@@ -97,6 +97,8 @@ import {
   addInternalInvoiceLineItemsFromVisitScopeForm,
   createInternalInvoiceDraftFromForm,
   issueInternalInvoiceFromForm,
+  markInternalInvoiceExternallyBilledFromForm,
+  markInternalInvoiceNoChargeFromForm,
   removeInternalInvoiceLineItemFromForm,
   saveInternalInvoiceDraftFromForm,
   sendInternalInvoiceEmailFromForm,
@@ -3485,6 +3487,8 @@ const failureResolutionPathCount =
                       addLineItemAction={addInternalInvoiceLineItemFromForm}
                       addPricebookLineItemAction={addInternalInvoiceLineItemFromPricebookForm}
                       addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
+                      markNoChargeAction={markInternalInvoiceNoChargeFromForm}
+                      markExternallyBilledAction={markInternalInvoiceExternallyBilledFromForm}
                       updateLineItemAction={updateInternalInvoiceLineItemFromForm}
                       removeLineItemAction={removeInternalInvoiceLineItemFromForm}
                       pricebookPickerItems={pricebookPickerItems}

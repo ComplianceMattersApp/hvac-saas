@@ -45,6 +45,8 @@ type InternalInvoiceLineItemsTableProps = {
   addLineItemAction: ServerFormAction;
   addPricebookLineItemAction: ServerFormAction;
   addVisitScopeLineItemsAction: ServerFormAction;
+  markNoChargeAction: ServerFormAction;
+  markExternallyBilledAction: ServerFormAction;
   updateLineItemAction: ServerFormAction;
   removeLineItemAction: ServerFormAction;
   pricebookPickerItems: PricebookPickerItem[];
@@ -106,6 +108,9 @@ function invoiceBannerMessage(banner?: string | null) {
     internal_invoice_visit_scope_quantity_invalid: 'Quantity must be greater than zero.',
     internal_invoice_visit_scope_item_not_found: 'Work Item is unavailable.',
     internal_invoice_visit_scope_line_item_duplicate: 'Selected Work Items are already added.',
+    internal_invoice_no_charge_saved: 'Billing resolved as No Charge.',
+    internal_invoice_externally_billed_saved: 'Billing resolved as Externally Billed.',
+    internal_invoice_disposition_requires_zero_total: 'Billing disposition actions are only available for $0.00 draft invoices.',
     internal_invoice_locked: 'Invoice is locked and cannot be edited.',
     internal_invoice_line_items_locked: 'Invoice charges are locked.',
     internal_invoice_missing: 'Invoice was not found.',
@@ -180,6 +185,8 @@ export default function InternalInvoiceLineItemsTable({
   totalCents,
   addPricebookLineItemAction,
   addVisitScopeLineItemsAction,
+  markNoChargeAction,
+  markExternallyBilledAction,
   updateLineItemAction,
   removeLineItemAction,
   pricebookPickerItems,
@@ -274,6 +281,15 @@ export default function InternalInvoiceLineItemsTable({
     });
   }
 
+  async function handleBillingDisposition(formData: FormData, action: ServerFormAction) {
+    await runInlineMutation({
+      formData,
+      action,
+      successFallback: 'Billing disposition saved.',
+      errorFallback: 'Could not save billing disposition.',
+    });
+  }
+
   async function handleUpdateLineItem(formData: FormData) {
     await runInlineMutation({
       formData,
@@ -308,7 +324,7 @@ export default function InternalInvoiceLineItemsTable({
             <div className="min-w-0">
               <div className="text-sm font-semibold text-amber-950">$0.00 invoice - choose how to handle it</div>
               <div className="mt-1 text-xs leading-5 text-amber-900">
-                Add a charge if this is missing billing. Use No Charge for estimates, warranty, or courtesy work. Use Externally Billed for QuickBooks or off-platform billing.
+                Add a charge if billing is missing. No Charge resolves billing without collecting money. Externally Billed resolves billing handled outside Compliance Matters.
               </div>
             </div>
             <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
@@ -320,26 +336,32 @@ export default function InternalInvoiceLineItemsTable({
               >
                 Add Charge
               </button>
+              <form action={(formData) => handleBillingDisposition(formData, markNoChargeAction)}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
+                <input type="hidden" name="tab" value={tab} />
+                <SubmitButton
+                  loadingText="Saving..."
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-2 text-xs font-semibold text-emerald-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-200 active:translate-y-[0.5px]"
+                >
+                  Mark No Charge
+                </SubmitButton>
+              </form>
+              <form action={(formData) => handleBillingDisposition(formData, markExternallyBilledAction)}>
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
+                <input type="hidden" name="tab" value={tab} />
+                <SubmitButton
+                  loadingText="Saving..."
+                  className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
+                >
+                  Externally Billed
+                </SubmitButton>
+              </form>
               <button
                 type="button"
                 disabled
-                title="No Charge needs an approved invoice outcome model before it can be saved."
-                className="inline-flex min-h-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-400"
-              >
-                Mark No Charge
-              </button>
-              <button
-                type="button"
-                disabled
-                title="Externally Billed needs an approved invoice outcome model before it can be saved."
-                className="inline-flex min-h-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-400"
-              >
-                Externally Billed
-              </button>
-              <button
-                type="button"
-                disabled
-                title="Sending a no-payment-due invoice needs an approved zero-dollar send outcome model."
+                title="Sending a no-payment-due invoice needs an approved zero-dollar issued invoice model."
                 className="inline-flex min-h-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-400"
               >
                 Send $0 Invoice

@@ -260,6 +260,9 @@ describe("markInvoiceSent - canonical external billing completion contract", () 
       fixture.jobUpdates.some((row) => row.invoice_complete === true),
     ).toBe(true);
     expect(
+      fixture.jobUpdates.some((row) => row.billing_disposition === "externally_billed"),
+    ).toBe(true);
+    expect(
       fixture.jobUpdates.some((row) => Object.prototype.hasOwnProperty.call(row, "data_entry_completed_at")),
     ).toBe(true);
     expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith("job-1", "closed");

@@ -1566,6 +1566,8 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
     currentDataEntryCompletedAt: job.data_entry_completed_at,
     invoiceFieldMode: "always",
     dataEntryFieldMode: "if_missing",
+    billingDisposition: "externally_billed",
+    billingDispositionByUserId: user.id,
   });
   const completedAt = completionResult.completedAt;
 
@@ -1627,6 +1629,7 @@ export async function markInvoiceCompleteFromForm(formData: FormData): Promise<v
         ...(job.data_entry_completed_at
           ? []
           : [{ field: "data_entry_completed_at", from: job.data_entry_completed_at ?? null, to: completedAt }]),
+        { field: "billing_disposition", from: null, to: "externally_billed" },
         { field: "ops_status", from: job.ops_status ?? null, to: nextOps },
       ],
     },

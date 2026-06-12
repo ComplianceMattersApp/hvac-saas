@@ -238,6 +238,9 @@ describe("markInvoiceCompleteFromForm - external billing wording contract", () =
       fixture.jobUpdates.some((row) => row.invoice_complete === true),
     ).toBe(true);
     expect(
+      fixture.jobUpdates.some((row) => row.billing_disposition === "externally_billed"),
+    ).toBe(true);
+    expect(
       fixture.jobUpdates.some((row) => row.ops_status === "paperwork_required"),
     ).toBe(true);
     expect(

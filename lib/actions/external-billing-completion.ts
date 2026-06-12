@@ -1,4 +1,5 @@
 export type ExternalBillingCompletionFieldMode = "always" | "if_missing";
+export type JobBillingDisposition = "externally_billed" | "no_charge";
 
 export async function applyExternalBillingCompletionMutation(params: {
   supabase: any;
@@ -7,6 +8,10 @@ export async function applyExternalBillingCompletionMutation(params: {
   currentDataEntryCompletedAt?: string | null;
   invoiceFieldMode?: ExternalBillingCompletionFieldMode;
   dataEntryFieldMode?: ExternalBillingCompletionFieldMode;
+  billingDisposition?: JobBillingDisposition | null;
+  billingDispositionNote?: string | null;
+  billingDispositionByUserId?: string | null;
+  billingDispositionAt?: string | null;
   extraUpdateFields?: Record<string, unknown>;
 }) {
   const jobId = String(params.jobId ?? "").trim();
@@ -19,6 +24,7 @@ export async function applyExternalBillingCompletionMutation(params: {
   const invoiceFieldMode = params.invoiceFieldMode ?? "if_missing";
   const dataEntryFieldMode = params.dataEntryFieldMode ?? "if_missing";
   const completedAt = currentDataEntryCompletedAt ?? new Date().toISOString();
+  const dispositionAt = String(params.billingDispositionAt ?? "").trim() || completedAt;
 
   const updatePayload: Record<string, unknown> = {
     ...(params.extraUpdateFields ?? {}),
@@ -30,6 +36,15 @@ export async function applyExternalBillingCompletionMutation(params: {
 
   if (dataEntryFieldMode === "always" || !currentDataEntryCompletedAt) {
     updatePayload.data_entry_completed_at = completedAt;
+  }
+
+  if (params.billingDisposition) {
+    updatePayload.billing_disposition = params.billingDisposition;
+    updatePayload.billing_disposition_note =
+      String(params.billingDispositionNote ?? "").trim() || null;
+    updatePayload.billing_disposition_at = dispositionAt;
+    updatePayload.billing_disposition_by_user_id =
+      String(params.billingDispositionByUserId ?? "").trim() || null;
   }
 
   const shouldWrite = Object.keys(updatePayload).length > 0;

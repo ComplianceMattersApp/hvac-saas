@@ -320,6 +320,8 @@ export async function markInvoiceSent(jobIdOrFormData: string | FormData, return
     currentDataEntryCompletedAt: job.data_entry_completed_at,
     invoiceFieldMode: "if_missing",
     dataEntryFieldMode: "if_missing",
+    billingDisposition: "externally_billed",
+    billingDispositionByUserId: actingUserId,
   });
   const completedAt = completionResult.completedAt;
   const invoiceCompleteChanged = completionResult.invoiceCompleteChanged;
@@ -336,6 +338,8 @@ export async function markInvoiceSent(jobIdOrFormData: string | FormData, return
   if (dataEntryCompletedChanged) {
     changeSet.push({ field: "data_entry_completed_at", from: job.data_entry_completed_at ?? null, to: completedAt });
   }
+
+  changeSet.push({ field: "billing_disposition", from: null, to: "externally_billed" });
 
   if (result.updated) {
     changeSet.push({ field: "ops_status", from: job.ops_status ?? null, to: "closed" });

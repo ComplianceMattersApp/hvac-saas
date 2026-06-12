@@ -35,6 +35,10 @@ import {
 } from '@/lib/business/internal-invoice';
 import { createTenantInvoiceCheckoutSession } from '@/lib/business/internal-invoice-payments';
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from '@/lib/actions/job-evaluator';
+import {
+  applyExternalBillingCompletionMutation,
+  type JobBillingDisposition,
+} from '@/lib/actions/external-billing-completion';
 import { insertJobEvent } from '@/lib/actions/job-actions';
 import { reconcileServiceCaseStatusAfterJobChange } from '@/lib/actions/service-case-reconciliation';
 import { escapeHtml } from '@/lib/email/layout';
@@ -567,7 +571,7 @@ async function loadInternalInvoiceContext(formData: FormData) {
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
     .select(
-      'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
+      'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
     )
     .eq('id', jobId)
     .single();
@@ -1752,6 +1756,137 @@ export async function issueInternalInvoiceFromForm(formData: FormData) {
   revalidatePath('/jobs');
   revalidatePath('/ops');
   redirect(buildInternalInvoiceReturnHref(context.jobId, context.tab, 'internal_invoice_issued', context.returnTo));
+}
+
+function billingDispositionBanner(disposition: JobBillingDisposition) {
+  return disposition === 'no_charge'
+    ? 'internal_invoice_no_charge_saved'
+    : 'internal_invoice_externally_billed_saved';
+}
+
+async function markInternalInvoiceBillingDispositionFromForm(
+  formData: FormData,
+  disposition: JobBillingDisposition,
+): Promise<InternalInvoiceActionResult | void> {
+  const context = await loadInternalInvoiceContext(formData);
+  const noRedirect = isNoRedirectRequested(formData);
+  const banner = billingDispositionBanner(disposition);
+
+  requireFieldInvoiceIssueAccessOrRedirect({
+    actorUserId: context.userId,
+    internalUser: context.internalUser,
+    resourceAccountOwnerUserId: context.internalUser.account_owner_user_id,
+    explicitCapabilities: context.fieldBillingExplicitCapabilities,
+    redirectTo: buildInternalInvoiceReturnHref(context.jobId, context.tab, 'not_authorized', context.returnTo),
+  });
+
+  if (!context.invoice) {
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_missing',
+      noRedirect,
+      ok: false,
+    });
+  }
+
+  if (context.invoice.status !== 'draft') {
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_locked',
+      noRedirect,
+      ok: false,
+    });
+  }
+
+  if (!context.job.field_complete || String(context.job.status ?? '').trim().toLowerCase() !== 'completed') {
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_issue_blocked',
+      noRedirect,
+      ok: false,
+    });
+  }
+
+  if (Number(context.invoice.total_cents ?? 0) !== 0) {
+    return resolveSmallMutationResult({
+      jobId: context.jobId,
+      tab: context.tab,
+      banner: 'internal_invoice_disposition_requires_zero_total',
+      noRedirect,
+      ok: false,
+    });
+  }
+
+  const previousOpsStatus = String(context.job.ops_status ?? '').trim() || null;
+  const note = getOptionalText(formData.get('billing_disposition_note'));
+  const appliedAt = new Date().toISOString();
+
+  await applyExternalBillingCompletionMutation({
+    supabase: context.supabase,
+    jobId: context.jobId,
+    currentInvoiceComplete: context.job.invoice_complete,
+    currentDataEntryCompletedAt: (context.job as any).data_entry_completed_at,
+    invoiceFieldMode: 'always',
+    dataEntryFieldMode: 'if_missing',
+    billingDisposition: disposition,
+    billingDispositionNote: note,
+    billingDispositionByUserId: context.userId,
+    billingDispositionAt: appliedAt,
+  });
+
+  await insertJobEvent({
+    supabase: context.supabase,
+    jobId: context.jobId,
+    event_type: 'ops_update',
+    meta: {
+      source: 'internal_invoice_billing_disposition',
+      invoice_id: context.invoice.id,
+      invoice_number: context.invoice.invoice_number,
+      total_cents: context.invoice.total_cents,
+      billing_disposition: disposition,
+      billing_disposition_note: note,
+      changes: [
+        { field: 'invoice_complete', from: Boolean(context.job.invoice_complete), to: true },
+        { field: 'billing_disposition', from: null, to: disposition },
+      ],
+    },
+    userId: context.userId,
+  });
+
+  await recomputeOpsAfterInvoiceMutation({
+    supabase: context.supabase,
+    jobId: context.jobId,
+    userId: context.userId,
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    jobType: context.job.job_type ?? null,
+    serviceCaseId: context.job.service_case_id ?? null,
+    previousOpsStatus,
+    source: `internal_invoice_${disposition}_recompute`,
+  });
+
+  revalidatePath(`/jobs/${context.jobId}`);
+  revalidatePath(`/jobs/${context.jobId}/invoice`);
+  revalidatePath('/jobs');
+  revalidatePath('/ops');
+
+  return resolveSmallMutationResult({
+    jobId: context.jobId,
+    tab: context.tab,
+    banner,
+    noRedirect,
+    ok: true,
+  });
+}
+
+export async function markInternalInvoiceNoChargeFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
+  return markInternalInvoiceBillingDispositionFromForm(formData, 'no_charge');
+}
+
+export async function markInternalInvoiceExternallyBilledFromForm(formData: FormData): Promise<InternalInvoiceActionResult | void> {
+  return markInternalInvoiceBillingDispositionFromForm(formData, 'externally_billed');
 }
 
 export async function voidInternalInvoiceFromForm(formData: FormData) {
