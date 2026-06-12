@@ -265,6 +265,17 @@ describe("location service address actions", () => {
     expect(updates.some((update) => update.table === "jobs")).toBe(false);
   });
 
+  it("can return to the customer service locations workspace after inline customer-page edits", async () => {
+    buildFixture();
+    const { updateLocationServiceAddressFromForm } = await import("../../../app/locations/[id]/notes-actions");
+    const formData = buildForm({ location_id: "loc-1" });
+    formData.set("return_customer_id", "cust-1");
+
+    await expect(updateLocationServiceAddressFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/customers/cust-1?tab=locations-contacts&locSaved=updated#location-contacts-loc-1",
+    );
+  });
+
   it("preserves the notes-only update path with account scoping", async () => {
     const { updates } = buildFixture();
     const { updateLocationNotesFromForm } = await import("../../../app/locations/[id]/notes-actions");

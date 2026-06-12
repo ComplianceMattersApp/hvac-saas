@@ -206,6 +206,17 @@ export async function updateLocationServiceAddressFromForm(formData: FormData) {
     revalidatePath(`/customers/${location.customer_id}`);
   }
 
+  const returnCustomerId = readTrimmed(formData, "return_customer_id");
+  if (
+    returnCustomerId &&
+    location.customer_id &&
+    returnCustomerId === String(location.customer_id).trim()
+  ) {
+    redirect(
+      `/customers/${returnCustomerId}?tab=locations-contacts&locSaved=updated#location-contacts-${locationId}`,
+    );
+  }
+
   redirect(`/locations/${locationId}?saved=service_address`);
 }
 

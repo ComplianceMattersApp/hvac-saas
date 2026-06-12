@@ -16,6 +16,19 @@ function toFullName(first?: string | null, last?: string | null) {
   return [f, l].filter(Boolean).join(" ").trim();
 }
 
+function readTrimmed(formData: FormData, key: string) {
+  return String(formData.get(key) ?? "").trim();
+}
+
+function emptyToNull(value: string) {
+  const trimmed = value.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeAddressPart(value?: string | null) {
+  return String(value ?? "").trim().replace(/\s+/g, " ").toLowerCase();
+}
+
 async function requireOperationalCustomerMutationAccessOrRedirect(params: {
   supabase: any;
   accountOwnerUserId: string | null | undefined;
@@ -386,4 +399,101 @@ export async function createCustomerFromForm(formData: FormData) {
   revalidatePath("/ops");
 
   redirect(`/customers/${customerId}?created=1`);
+}
+
+export async function addCustomerServiceLocationFromForm(formData: FormData) {
+  const supabase = await createClient();
+  let scopedCustomer;
+  try {
+    scopedCustomer = await requireInternalScopedCustomerForMutation({
+      supabase,
+      customerId: readTrimmed(formData, "customer_id"),
+    });
+  } catch (error) {
+    if (isInternalAccessError(error)) {
+      redirect("/login");
+    }
+
+    throw error;
+  }
+
+  const customerId = scopedCustomer.customerId;
+  const accountOwnerUserId = scopedCustomer.accountOwnerUserId;
+  const nickname = readTrimmed(formData, "nickname");
+  const label = readTrimmed(formData, "label");
+  const addressLine1 = readTrimmed(formData, "address_line1");
+  const addressLine2 = readTrimmed(formData, "address_line2");
+  const city = readTrimmed(formData, "city");
+  const state = readTrimmed(formData, "state");
+  const zip = readTrimmed(formData, "zip");
+  const notes = readTrimmed(formData, "notes");
+
+  if (!addressLine1) throw new Error("Service address line 1 is required");
+  if (!city) throw new Error("Service address city is required");
+  if (!state) throw new Error("Service address state is required");
+  if (!zip) throw new Error("Service address zip is required");
+
+  const admin = createAdminClient();
+  const { data: existingLocations, error: existingLocationsErr } = await admin
+    .from("locations")
+    .select("id, address_line1, city, state, zip, postal_code")
+    .eq("customer_id", customerId)
+    .eq("owner_user_id", accountOwnerUserId);
+
+  if (existingLocationsErr) throw existingLocationsErr;
+
+  const normalizedAddressLine1 = normalizeAddressPart(addressLine1);
+  const normalizedCity = normalizeAddressPart(city);
+  const normalizedState = normalizeAddressPart(state);
+  const normalizedZip = normalizeAddressPart(zip);
+  const reusableLocation = ((existingLocations ?? []) as Array<Record<string, unknown>>).find((loc) => {
+    const locAddress = normalizeAddressPart(loc.address_line1 as string | null);
+    const locCity = normalizeAddressPart(loc.city as string | null);
+    const locState = normalizeAddressPart(loc.state as string | null);
+    const locZip = normalizeAddressPart(
+      (loc.zip as string | null) ?? (loc.postal_code as string | null),
+    );
+
+    return (
+      locAddress === normalizedAddressLine1 &&
+      locCity === normalizedCity &&
+      locState === normalizedState &&
+      locZip === normalizedZip
+    );
+  });
+
+  if (reusableLocation?.id) {
+    redirect(`/customers/${customerId}?tab=locations-contacts&locSaved=existing#location-contacts-${reusableLocation.id}`);
+  }
+
+  const { data: createdLocation, error: insertErr } = await admin
+    .from("locations")
+    .insert({
+      customer_id: customerId,
+      owner_user_id: accountOwnerUserId,
+      nickname: emptyToNull(nickname),
+      label: emptyToNull(label),
+      address_line1: addressLine1,
+      address_line2: emptyToNull(addressLine2),
+      city,
+      state,
+      zip,
+      postal_code: zip,
+      notes: emptyToNull(notes),
+    })
+    .select("id")
+    .single();
+
+  if (insertErr) throw insertErr;
+
+  revalidatePath(`/customers/${customerId}`);
+  revalidatePath("/customers");
+  revalidatePath("/jobs/new");
+
+  const createdLocationId = String(createdLocation?.id ?? "").trim();
+  redirect(
+    `/customers/${customerId}?tab=locations-contacts&locSaved=created${
+      createdLocationId ? `#location-contacts-${createdLocationId}` : ""
+    }`,
+  );
 }
