@@ -19,6 +19,7 @@ The current control-plane audit is [Documentation_Consolidation_Audit.md](./Docu
 | Release Scope / Roadmap | Strategic sequencing | Locked release scope, deferred/gated lanes, unlock criteria, roadmap order | Minor tactical fixes, UI polish logs, repeated model-spec detail |
 | Prelaunch Checklist | Launch readiness / operator gates | Launch-blocking checks, operator readiness, runbook-gated launch steps | Full feature history, tactical closeout details, domain model contracts |
 | Domain model specs | Durable domain contracts | Source-of-truth model, invariants, domain boundaries, approved model decisions | Global roadmap tracking, unrelated punch-list completions |
+| Domain model closeout evidence ledger | Historical domain evidence | Duplicated phase closeout proof, smoke evidence, implementation closeout summaries that support domain specs | Durable model contracts, current-state master truth, roadmap sequencing |
 | Runbooks | Execution-controlled procedure and evidence | Approved execution steps, production enablement evidence, rollback/no-go criteria | General product current-state summaries, unrelated roadmap items |
 | Tactical punch-list ledger | Minor fix closeout record | Low-risk UI polish, small regressions, duplicate-submit guards, tactical performance fixes, verified commit evidence | Durable domain model contracts, strategic roadmap decisions |
 | Historical closeout docs | Supporting evidence | Lane-specific completion evidence and validation history | Current-state master truth unless explicitly linked by a canonical doc |
@@ -58,6 +59,7 @@ Future docs prompts should name the intended authority target:
 ## Current Companion Docs
 
 - Tactical closeouts: [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md)
+- Domain model closeout evidence: [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md)
 - Current product truth: [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md)
 - Release/deferred order: [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md)
 - Launch gates: [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md)

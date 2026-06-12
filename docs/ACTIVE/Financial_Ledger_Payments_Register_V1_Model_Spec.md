@@ -4,6 +4,12 @@ Status: ACTIVE MODEL LOCK
 Owner lane: Financial Ledger / Payments Register V1
 Scope: docs/model only. No schema, migration, Supabase, Stripe, QBO, env, production, recurring billing, platform fee, or ACH UI work is authorized by this spec.
 
+## Documentation Authority Note
+
+This spec owns durable Financial Ledger / Payments Register source-of-truth contracts, invariants, and payment/register boundaries. Phase closeout proof and duplicated smoke evidence belong in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md), with roadmap/deferred sequencing owned by roadmap docs.
+
+Current duplicated closeout sections are preserved in-place for audit continuity until a later cleanup slice shortens them against the evidence ledger. Do not remove payment invariants, allocation truth, failed-payment handling, or invoice paid/balance projection contracts from this spec.
+
 ## Financial Trust Lane Settlement Boundary Note
 
 - Deposits / Payout Reconciliation V1 is documented in [Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md](./Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md).

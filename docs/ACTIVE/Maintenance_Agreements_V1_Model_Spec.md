@@ -4,6 +4,12 @@ Status: ACTIVE IMPLEMENTATION TRACKING SPEC
 Owner lane: Group 9A - Recurring Services / Maintenance Agreements  
 Scope: model guidance plus Group 9A-2 backend foundation closeout documentation. Backend foundation is committed in repo but is not production-active until migration apply is intentionally executed through the environment process.
 
+## Documentation Authority Note
+
+This spec owns durable Maintenance Agreements / Recurring Services source-of-truth contracts, lifecycle/status rules, service-plan operational boundaries, and recurring-service model decisions. Phase closeout proof and duplicated payment/service-plan smoke evidence belong in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md), with roadmap/deferred sequencing owned by roadmap docs.
+
+Current duplicated closeout sections are preserved in-place for audit continuity until a later cleanup slice shortens them against the evidence ledger. Do not remove service-plan lifecycle truth, visit/next-due operational boundaries, source-of-truth boundaries, or production-activation safety notes from this spec.
+
 ## Service Plans Command Center Cleanup Closeout Snapshot
 
 - `/service-plans` hierarchy is now command-center first: header/intro, compact health summary, compact Service Plan Types index, attention/upcoming panels, customer plan detail list, and compact template summary/actions.

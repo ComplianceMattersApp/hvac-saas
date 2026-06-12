@@ -4,6 +4,12 @@ Status: ACTIVE MODEL LOCK (Phase 2 + Phase 3A closeout)
 Owner lane: Payments V2 / Service Plan Billing Foundation
 Scope: docs/model only. No product code, schema, migrations, Supabase commands, Stripe behavior changes, checkout/session changes, env/flag changes, UI build, or provider integrations are authorized by this spec.
 
+## Documentation Authority Note
+
+This spec owns durable Payments V2 / Service Plan Billing source-of-truth contracts, billing-period boundaries, saved-method attempt model locks, and service-plan invoice relationship rules. Phase closeout proof and duplicated smoke evidence belong in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md), with roadmap/deferred sequencing owned by roadmap docs.
+
+Current duplicated closeout sections are preserved in-place for audit continuity until a later cleanup slice shortens them against the evidence ledger. Do not remove billing-period contracts, payment identity/dedupe boundaries, saved-method attempt truth, or service-plan invoice relationship contracts from this spec.
+
 ## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
 
 - Closed implementation commit: `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`), pushed to `origin/main` with clean working tree.
