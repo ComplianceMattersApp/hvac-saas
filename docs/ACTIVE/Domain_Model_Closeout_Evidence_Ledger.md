@@ -107,9 +107,11 @@ Durable truth to keep in the model specs:
 
 Preserved evidence category:
 
+- Phase 5C-2 production dormant billing-period migration proof confirmed `maintenance_agreement_billing_periods` was applied to production as a dormant table with required fields, constraints, indexes, RLS, policies, triggers/functions, zero rows, and no billing-period creation, invoice generation, UI, payment, Stripe, allocation, projection, or service-plan behavior change.
 - Billing-period invoice link/unlink UI wiring and sandbox smoke were recorded in Phase 5G-B2 and 5G-B3.
 - Stripe payment identity dedupe and conflict recovery were recorded in Phase 5G-B4F.
 - Linked billing-period smoke passed in Phase 5G-B4G.
+- Phase 6C generated draft invoice sandbox smoke proved the customer-profile UI could generate one draft job-scoped internal invoice and one controlled service-plan billing line from an eligible billing period without issue/send/email/payment-link, Stripe behavior, payment rows, allocation rows, visit-link mutation, or `next_due_date` mutation.
 - Phase 6E-C recorded saved-card setup and related sandbox evidence.
 
 Durable truth to keep in the model specs:
