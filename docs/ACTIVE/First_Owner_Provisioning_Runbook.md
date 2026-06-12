@@ -769,7 +769,7 @@ This section and this runbook are not:
 - An onboarding action. No provisioning apply or invite is implied or scheduled.
 - A production Estimates enablement. `ENABLE_ESTIMATES` production flag must remain unset/false until Estimates runbook gates are approved.
 - A Support Console enablement. `ENABLE_SUPPORT_CONSOLE` production flag must remain unset until Support Console runbook gates are approved.
-- A tenant customer payment execution path. Tenant invoice/payment track remains deferred.
+- A tenant customer payment setup or execution path. Tenant customer payments V1 current scope is complete elsewhere, but this provisioning runbook does not configure tenant payment setup, execute customer payments, or activate future payment add-ons.
 - A QBO enablement. QBO remains optional/downstream only.
 - A native app-store or offline/service-worker action. Those remain separate deferred slices.
 - Authorization to skip any step in §11.2 or bypass any gate in §11.3.

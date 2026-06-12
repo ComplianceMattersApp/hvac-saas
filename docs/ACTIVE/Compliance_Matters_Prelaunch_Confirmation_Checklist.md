@@ -200,9 +200,8 @@ Use [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) for cur
 - Sandbox/test Stripe values must never be committed.
 - `.env.local` remains local-only.
 - Local Stripe CLI webhook secret is not the same as deployed/live webhook secret.
-- Keep this priority separate from tenant customer invoice payment execution.
-- Tenant customer invoice payment execution remains deferred unless explicitly pulled forward.
-- Live payment execution surfaces (Pay Now/Charge Card/checkout/refunds/disputes/payouts) remain deferred.
+- Keep this priority separate from tenant customer invoice payments V1, which is complete for the current intended scope.
+- Future tenant payment add-ons remain deferred unless explicitly pulled forward, including saved cards beyond current approved flows, partial payments, customer self-service portal, refunds, disputes, payouts, ACH, QBO sync, and broader payment automation.
 
 ### 2.3.3 Completed production-shipped cleanup sequence confirmation
 - Completed production-shipped UI/regression cleanup batch is confirmed for launch-readiness posture.
