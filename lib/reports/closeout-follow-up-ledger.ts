@@ -128,7 +128,7 @@ const CLOSEOUT_EXCLUDED_STATUSES = '("pending_info","on_hold","closed")';
 const CERT_BLOCKED_STATUSES = '("failed","retest_needed","pending_office_review")';
 
 const JOB_BASE_SELECT =
-  "id, job_display_number, title, visit_scope_summary, job_type, status, ops_status, service_case_id, created_at, scheduled_date, field_complete, field_complete_at, invoice_complete, certs_complete, contractor_id, contractors(name), customer_id, location_id, customer_first_name, customer_last_name, job_address, city, follow_up_date, next_action_note, action_required_by";
+  "id, job_display_number, title, visit_scope_summary, job_type, status, ops_status, service_case_id, created_at, scheduled_date, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), customer_id, location_id, customer_first_name, customer_last_name, job_address, city, follow_up_date, next_action_note, action_required_by";
 
 function readParam(source: FilterSource, key: string) {
   if (source instanceof URLSearchParams) {
@@ -464,6 +464,7 @@ export async function listCloseoutFollowUpLedgerRows(params: {
       job_type: job?.job_type,
       ops_status: job?.ops_status,
       invoice_complete: job?.invoice_complete,
+      billing_disposition: job?.billing_disposition,
       certs_complete: job?.certs_complete,
     })),
   });

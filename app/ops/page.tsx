@@ -1141,7 +1141,7 @@ function shouldHideFailedParentJob(j: any) {
 
   // Common job select (keep lightweight)
  const baseSelect =
-   "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at, visit_scope_summary, visit_scope_items";
+   "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, billing_disposition, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at, visit_scope_summary, visit_scope_items";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -1307,7 +1307,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
   let operationalReportingJobsQ = supabase
     .from("jobs")
     .select(
-      "id, parent_job_id, service_case_id, job_type, status, ops_status, created_at, scheduled_date, field_complete, field_complete_at, service_visit_outcome, invoice_complete, certs_complete"
+      "id, parent_job_id, service_case_id, job_type, status, ops_status, created_at, scheduled_date, field_complete, field_complete_at, service_visit_outcome, invoice_complete, billing_disposition, certs_complete"
     )
     .is("deleted_at", null)
     .neq("status", "cancelled");
@@ -1494,6 +1494,7 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
     job_type: job?.job_type,
     ops_status: job?.ops_status,
     invoice_complete: job?.invoice_complete,
+    billing_disposition: job?.billing_disposition,
     certs_complete: job?.certs_complete,
   }));
 

@@ -20,6 +20,7 @@ function finishOpsTiming(label: string, startedAt: number) {
 type InternalInvoiceSnapshot = Pick<InternalInvoiceRecord, "status" | "invoice_number" | "issued_at"> | null | undefined;
 
 export type JobBillingStateTone = "slate" | "amber" | "emerald" | "rose";
+export type JobBillingDisposition = "externally_billed" | "no_charge";
 
 export type JobBillingStateReadModel = {
   billingMode: BillingMode;
@@ -43,6 +44,7 @@ export type BillingTruthProjectionJobInput = {
   ops_status?: string | null;
   invoice_complete?: boolean | null;
   certs_complete?: boolean | null;
+  billing_disposition?: string | null;
 };
 
 export type BillingTruthCloseoutProjection = {
@@ -59,6 +61,7 @@ export function buildJobBillingStateReadModel(input: {
   billingMode: BillingMode;
   invoiceComplete?: boolean | null;
   internalInvoice?: InternalInvoiceSnapshot;
+  billingDisposition?: string | null;
 }): JobBillingStateReadModel {
   const billingMode = input.billingMode;
   const usesInternalInvoicing = billingMode === "internal_invoicing";
@@ -68,9 +71,22 @@ export function buildJobBillingStateReadModel(input: {
   const internalInvoiceStatus = hasInternalInvoice
     ? normalizeInternalInvoiceStatus(input.internalInvoice?.status)
     : "missing";
+  const billingDisposition = normalizeJobBillingDisposition(input.billingDisposition);
+  const hasResolvedBillingDisposition = Boolean(billingDisposition);
 
   if (usesInternalInvoicing) {
-    const billedTruthSatisfied = internalInvoiceStatus === "issued";
+    const billedTruthSatisfied = internalInvoiceStatus === "issued" || hasResolvedBillingDisposition;
+    const statusLabel = billingDisposition === "no_charge"
+      ? "No Charge Recorded"
+      : billingDisposition === "externally_billed"
+        ? "Externally Billed"
+        : internalInvoiceStatus === "issued"
+          ? "Issued"
+          : internalInvoiceStatus === "void"
+            ? "Void"
+            : internalInvoiceStatus === "draft"
+              ? "Draft"
+              : "Not Started";
 
     return {
       billingMode,
@@ -83,16 +99,9 @@ export function buildJobBillingStateReadModel(input: {
       projectionMatchesBilledTruth: jobInvoiceCompleteProjection === billedTruthSatisfied,
       lightweightBillingAllowed: false,
       internalInvoicePanelEnabled: true,
-      statusLabel:
-        internalInvoiceStatus === "issued"
-          ? "Issued"
-          : internalInvoiceStatus === "void"
-            ? "Void"
-            : internalInvoiceStatus === "draft"
-              ? "Draft"
-              : "Not Started",
+      statusLabel,
       statusTone:
-        internalInvoiceStatus === "issued"
+        hasResolvedBillingDisposition || internalInvoiceStatus === "issued"
           ? "emerald"
           : internalInvoiceStatus === "void"
             ? "rose"
@@ -116,6 +125,20 @@ export function buildJobBillingStateReadModel(input: {
     statusLabel: jobInvoiceCompleteProjection ? "Invoice Complete" : "Billing Pending",
     statusTone: jobInvoiceCompleteProjection ? "emerald" : "amber",
   };
+}
+
+export function normalizeJobBillingDisposition(value?: string | null): JobBillingDisposition | null {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "no_charge" || normalized === "externally_billed"
+    ? normalized
+    : null;
+}
+
+export function formatJobBillingDispositionLabel(value?: string | null): string | null {
+  const disposition = normalizeJobBillingDisposition(value);
+  if (disposition === "no_charge") return "No Charge Recorded";
+  if (disposition === "externally_billed") return "Externally Billed";
+  return null;
 }
 
 export async function buildBillingTruthCloseoutProjectionMap(params: {
@@ -179,6 +202,7 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
       billingMode,
       invoiceComplete: job.invoice_complete,
       internalInvoice: internalInvoiceByJobId.get(jobId),
+      billingDisposition: job.billing_disposition,
     });
 
     projectionsByJobId.set(jobId, {

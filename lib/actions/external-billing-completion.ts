@@ -66,7 +66,7 @@ export async function applyExternalBillingCompletionMutation(params: {
   let updateResult: { data: any; error: any };
 
   if (typeof updateQuery?.select === "function") {
-    const selectedQuery = updateQuery.select("id, invoice_complete, data_entry_completed_at");
+    const selectedQuery = updateQuery.select("id, invoice_complete, data_entry_completed_at, billing_disposition, billing_disposition_at, billing_disposition_by_user_id");
     if (typeof selectedQuery?.maybeSingle === "function") {
       updateResult = await selectedQuery.maybeSingle();
     } else if (typeof selectedQuery?.single === "function") {
@@ -79,7 +79,7 @@ export async function applyExternalBillingCompletionMutation(params: {
   } else {
     updateResult = await params.supabase
       .from("jobs")
-      .select("id, invoice_complete, data_entry_completed_at")
+      .select("id, invoice_complete, data_entry_completed_at, billing_disposition, billing_disposition_at, billing_disposition_by_user_id")
       .eq("id", jobId)
       .maybeSingle();
   }
@@ -94,6 +94,18 @@ export async function applyExternalBillingCompletionMutation(params: {
 
   if (!currentDataEntryCompletedAt && !updatedRow.data_entry_completed_at) {
     throw new Error("Data entry completion update failed (timestamp missing).");
+  }
+
+  if (params.billingDisposition) {
+    if (updatedRow.billing_disposition !== params.billingDisposition) {
+      throw new Error("Billing disposition update failed (disposition missing).");
+    }
+    if (!updatedRow.billing_disposition_at) {
+      throw new Error("Billing disposition update failed (timestamp missing).");
+    }
+    if (params.billingDispositionByUserId && updatedRow.billing_disposition_by_user_id !== params.billingDispositionByUserId) {
+      throw new Error("Billing disposition update failed (user missing).");
+    }
   }
 
   return {

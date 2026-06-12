@@ -571,7 +571,7 @@ async function loadInternalInvoiceContext(formData: FormData) {
   const { data: job, error: jobErr } = await supabase
     .from('jobs')
     .select(
-      'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
+      'id, title, job_type, status, field_complete, ops_status, invoice_complete, billing_disposition, billing_disposition_note, billing_disposition_at, billing_disposition_by_user_id, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
     )
     .eq('id', jobId)
     .single();
@@ -1871,6 +1871,8 @@ async function markInternalInvoiceBillingDispositionFromForm(
   revalidatePath(`/jobs/${context.jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
+  revalidatePath('/ops/closeout-queue');
+  revalidatePath('/reports/closeout');
 
   return resolveSmallMutationResult({
     jobId: context.jobId,

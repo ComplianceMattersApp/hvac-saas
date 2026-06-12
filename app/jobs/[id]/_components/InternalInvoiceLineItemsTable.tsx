@@ -47,6 +47,7 @@ type InternalInvoiceLineItemsTableProps = {
   addVisitScopeLineItemsAction: ServerFormAction;
   markNoChargeAction: ServerFormAction;
   markExternallyBilledAction: ServerFormAction;
+  billingDisposition?: 'externally_billed' | 'no_charge' | null;
   updateLineItemAction: ServerFormAction;
   removeLineItemAction: ServerFormAction;
   pricebookPickerItems: PricebookPickerItem[];
@@ -82,6 +83,12 @@ function formatInternalInvoiceItemType(type?: InternalInvoiceItemType | string |
   const normalized = String(type ?? '').trim().toLowerCase();
   if (!normalized) return 'Service';
   return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+}
+
+function formatBillingDispositionLabel(disposition?: 'externally_billed' | 'no_charge' | null) {
+  if (disposition === 'no_charge') return 'No Charge Recorded';
+  if (disposition === 'externally_billed') return 'Externally Billed';
+  return null;
 }
 
 function invoiceBannerMessage(banner?: string | null) {
@@ -187,6 +194,7 @@ export default function InternalInvoiceLineItemsTable({
   addVisitScopeLineItemsAction,
   markNoChargeAction,
   markExternallyBilledAction,
+  billingDisposition = null,
   updateLineItemAction,
   removeLineItemAction,
   pricebookPickerItems,
@@ -215,6 +223,7 @@ export default function InternalInvoiceLineItemsTable({
     || canEditAnyLine
     || canRemoveLine;
   const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded);
+  const billingDispositionLabel = formatBillingDispositionLabel(billingDisposition);
 
   function toggleVisitScopeItem(itemId: string) {
     setSelectedVisitScopeItemIds((prev) =>
@@ -318,7 +327,16 @@ export default function InternalInvoiceLineItemsTable({
         </div>
       ) : null}
 
-      {Number(totalCents ?? 0) === 0 ? (
+      {Number(totalCents ?? 0) === 0 && billingDispositionLabel ? (
+        <div className="border-b border-emerald-200/80 bg-emerald-50/75 px-5 py-3">
+          <div className="flex flex-col gap-1">
+            <div className="text-sm font-semibold text-emerald-950">{billingDispositionLabel}</div>
+            <div className="text-xs leading-5 text-emerald-900">
+              Billing is handled for this $0.00 invoice. No payment was recorded.
+            </div>
+          </div>
+        </div>
+      ) : Number(totalCents ?? 0) === 0 ? (
         <div className="border-b border-amber-200/80 bg-amber-50/75 px-5 py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">

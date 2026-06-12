@@ -27,7 +27,7 @@ import { formatBusinessDateUS, formatTimestampDateDisplayLA } from "@/lib/utils/
 import { formatEccOpsStatusLabel } from "@/lib/ecc/ecc-workflow-display";
 
 const baseSelect =
-  "id, title, status, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, location_id, created_at, next_action_note, action_required_by, visit_scope_summary";
+  "id, title, status, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, billing_disposition, scheduled_date, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, location_id, created_at, next_action_note, action_required_by, visit_scope_summary";
 
 type CloseoutFilter = "all" | "invoice_required" | "paperwork_required" | "failed_review" | "confirm_payment";
 type CloseoutSort = "newest" | "oldest" | "contractor";
@@ -253,6 +253,7 @@ export default async function CloseoutQueuePage({
       job_type: job?.job_type,
       ops_status: job?.ops_status,
       invoice_complete: job?.invoice_complete,
+      billing_disposition: job?.billing_disposition,
       certs_complete: job?.certs_complete,
     })),
   });

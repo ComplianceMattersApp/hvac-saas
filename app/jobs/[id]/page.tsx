@@ -70,7 +70,7 @@ import {
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
-import { buildJobBillingStateReadModel } from "@/lib/business/job-billing-state";
+import { buildJobBillingStateReadModel, formatJobBillingDispositionLabel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
 import { isEccPermitNeededBlocker } from "@/lib/ecc/permit-needed";
 import { formatEccOpsStatusLabel, isEccJobType as isEccWorkflowJobType } from "@/lib/ecc/ecc-workflow-display";
@@ -1424,6 +1424,10 @@ export default async function JobDetailPage({
       field_complete,
       certs_complete,
       invoice_complete,
+      billing_disposition,
+      billing_disposition_note,
+      billing_disposition_at,
+      billing_disposition_by_user_id,
       invoice_number,
       job_display_number,
       pending_info_reason,
@@ -1908,6 +1912,7 @@ export default async function JobDetailPage({
       billingMode,
       invoiceComplete: job.invoice_complete,
       internalInvoice: internalInvoiceTruth,
+      billingDisposition: (job as any).billing_disposition,
     }).internalInvoicePanelEnabled;
 
   const fieldBillingSummaryDataPromise = timedPhase("fieldBillingSummaryRead", async () => {
@@ -2631,7 +2636,10 @@ const billingState = buildJobBillingStateReadModel({
   billingMode,
   invoiceComplete: job.invoice_complete,
   internalInvoice: internalInvoiceTruth,
+  billingDisposition: (job as any).billing_disposition,
 });
+const jobBillingDisposition = normalizeJobBillingDisposition((job as any).billing_disposition);
+const jobBillingDispositionLabel = formatJobBillingDispositionLabel(jobBillingDisposition);
 
 const closeoutProjectionJob = {
   field_complete: job.field_complete,
@@ -2884,7 +2892,9 @@ const jobPageInvoiceDisplayReference = internalInvoiceTruth
     })
   : null;
 const jobPageInvoiceStateLabel = internalInvoiceTruth
-  ? internalInvoiceTruth.status === "draft"
+  ? jobBillingDispositionLabel
+    ? jobBillingDispositionLabel
+    : internalInvoiceTruth.status === "draft"
     ? "Draft Invoice"
     : internalInvoiceTruth.status === "issued"
       ? billingState.billedTruthSatisfied
@@ -2902,6 +2912,8 @@ const jobPageInvoiceNextAction = !internalInvoiceTruth
   ? billingState.billedTruthSatisfied
     ? "View Billing Details"
     : "Create Invoice"
+  : jobBillingDispositionLabel
+    ? jobBillingDispositionLabel
   : isJobPageZeroDollarDraftInvoice
     ? "Resolve $0 Invoice"
     : isJobPageDraftInvoice
@@ -3503,6 +3515,7 @@ const failureResolutionPathCount =
                       addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
                       markNoChargeAction={markInternalInvoiceNoChargeFromForm}
                       markExternallyBilledAction={markInternalInvoiceExternallyBilledFromForm}
+                      billingDisposition={jobBillingDisposition}
                       updateLineItemAction={updateInternalInvoiceLineItemFromForm}
                       removeLineItemAction={removeInternalInvoiceLineItemFromForm}
                       pricebookPickerItems={pricebookPickerItems}

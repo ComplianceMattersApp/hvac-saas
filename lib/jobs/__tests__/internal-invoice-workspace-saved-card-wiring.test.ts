@@ -33,6 +33,20 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("Invoice send authority is not available for your current role.");
   });
 
+  it("reads durable billing disposition and treats resolved zero-dollar invoices as handled", () => {
+    expect(source).toContain("billing_disposition,");
+    expect(source).toContain("billing_disposition_note,");
+    expect(source).toContain("billing_disposition_at,");
+    expect(source).toContain("billing_disposition_by_user_id,");
+    expect(source).toContain("const jobBillingDisposition = normalizeJobBillingDisposition((job as any).billing_disposition)");
+    expect(source).toContain("const billingDispositionResolved = Boolean(jobBillingDisposition && job.invoice_complete)");
+    expect(source).toContain("const totalReady = billingDispositionResolved || Number(invoice?.total_cents ?? 0) > 0");
+    expect(source).toContain("const canIssue = Boolean(invoice && isDraft && !billingDispositionResolved");
+    expect(source).toContain('billingDisposition={jobBillingDisposition}');
+    expect(source).toContain("Billing handled");
+    expect(source).toContain("jobBillingDispositionLabel ?? \"Billing Handled\"");
+  });
+
   it("includes compact stage and next-step rail copy in header", () => {
     expect(source).toContain("function resolveInvoiceRevenueWorkflowRail");
     expect(source).toContain("Revenue Workflow Rail");

@@ -26,6 +26,7 @@ import {
   type InternalInvoiceItemType,
   type InternalInvoiceStatus,
 } from "@/lib/business/internal-invoice";
+import { formatJobBillingDispositionLabel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import {
   resolveInternalInvoiceEmailDeliveries,
   type InternalInvoiceEmailDeliveryRecord,
@@ -411,6 +412,11 @@ export default async function InternalInvoiceWorkspacePage({
       customer_id,
       location_id,
       service_case_id,
+      invoice_complete,
+      billing_disposition,
+      billing_disposition_note,
+      billing_disposition_at,
+      billing_disposition_by_user_id,
       billing_recipient,
       customer_first_name,
       customer_last_name,
@@ -560,10 +566,13 @@ export default async function InternalInvoiceWorkspacePage({
     : [];
   const recipientReady = Boolean(String(invoice?.billing_name ?? "").trim());
   const chargesReady = lineItemCount > 0;
-  const totalReady = Number(invoice?.total_cents ?? 0) > 0;
+  const jobBillingDisposition = normalizeJobBillingDisposition((job as any).billing_disposition);
+  const jobBillingDispositionLabel = formatJobBillingDispositionLabel(jobBillingDisposition);
+  const billingDispositionResolved = Boolean(jobBillingDisposition && job.invoice_complete);
+  const totalReady = billingDispositionResolved || Number(invoice?.total_cents ?? 0) > 0;
   const jobReady = Boolean(job.field_complete) && String(job.status ?? "").toLowerCase() === "completed";
   const isDraft = invoice?.status === "draft";
-  const canIssue = Boolean(invoice && isDraft && recipientReady && chargesReady && totalReady && jobReady);
+  const canIssue = Boolean(invoice && isDraft && !billingDispositionResolved && recipientReady && chargesReady && totalReady && jobReady);
   const latestSuccessfulInternalInvoiceEmailDelivery =
     (internalInvoiceEmailDeliveries as InternalInvoiceEmailDeliveryRecord[]).find((delivery) => delivery.status === "sent") ?? null;
   const internalInvoicePaymentRows: InternalInvoicePaymentRow[] = internalInvoicePaymentLedger?.rows ?? [];
@@ -915,6 +924,7 @@ export default async function InternalInvoiceWorkspacePage({
                   addVisitScopeLineItemsAction={addInternalInvoiceLineItemsFromVisitScopeForm}
                   markNoChargeAction={markInternalInvoiceNoChargeFromForm}
                   markExternallyBilledAction={markInternalInvoiceExternallyBilledFromForm}
+                  billingDisposition={jobBillingDisposition}
                   updateLineItemAction={updateInternalInvoiceLineItemFromForm}
                   removeLineItemAction={removeInternalInvoiceLineItemFromForm}
                   pricebookPickerItems={pricebookPickerItems}
@@ -1377,14 +1387,20 @@ export default async function InternalInvoiceWorkspacePage({
           <aside className="space-y-5">
             <section className={`${panelClass} p-4 sm:p-5`}>
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Issue Readiness</div>
-              <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">{canIssue ? "Ready to issue" : "Needs review"}</h2>
+              <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+                {billingDispositionResolved ? "Billing handled" : canIssue ? "Ready to issue" : "Needs review"}
+              </h2>
               <div className="mt-3 space-y-2">
                 {readinessRow("Billing recipient", recipientReady, recipientReady ? String(invoice.billing_name) : "Add a billing name.")}
                 {readinessRow("Charges", chargesReady, chargesReady ? `${lineItemCount} charge${lineItemCount === 1 ? "" : "s"} added.` : "Needs at least 1 charge.")}
-                {readinessRow("Total", totalReady, totalReady ? formatCurrencyFromCents(invoice.total_cents) : "Total must be above $0.00.")}
+                {readinessRow("Total", totalReady, billingDispositionResolved ? (jobBillingDispositionLabel ?? "Billing Handled") : totalReady ? formatCurrencyFromCents(invoice.total_cents) : "Total must be above $0.00.")}
                 {readinessRow("Job closeout", jobReady, jobReady ? "Job and field work are complete." : "Job must be completed and field complete.")}
               </div>
-              {invoice.status === "draft" && canIssueInvoiceLifecycle ? (
+              {billingDispositionResolved ? (
+                <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/75 px-3 py-2.5 text-sm text-emerald-900">
+                  {jobBillingDispositionLabel ?? "Billing Handled"}
+                </div>
+              ) : invoice.status === "draft" && canIssueInvoiceLifecycle ? (
                 <form action={issueInternalInvoiceFromForm} className="mt-4">
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="invoice_id" value={invoice.id} />

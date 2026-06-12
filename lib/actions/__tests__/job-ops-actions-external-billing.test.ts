@@ -118,26 +118,34 @@ function makeSupabaseForMarkInvoiceComplete(config: JobsTableMockConfig) {
                 eq: vi.fn(() => ({
                   select: vi.fn(() => ({
                     maybeSingle: vi.fn(async () => ({
-                      data: {
-                        id: config.initialJob.id,
-                        invoice_complete: true,
-                        data_entry_completed_at:
-                          config.initialJob.data_entry_completed_at ??
-                          "2026-05-20T12:00:00.000Z",
-                      },
-                      error: null,
-                    })),
-                  })),
-                  maybeSingle: vi.fn(async () => ({
                     data: {
                       id: config.initialJob.id,
                       invoice_complete: true,
                       data_entry_completed_at:
                         config.initialJob.data_entry_completed_at ??
                         "2026-05-20T12:00:00.000Z",
+                      billing_disposition: payload.billing_disposition,
+                      billing_disposition_at: payload.billing_disposition_at,
+                      billing_disposition_by_user_id:
+                        payload.billing_disposition_by_user_id,
                     },
                     error: null,
                   })),
+                })),
+                maybeSingle: vi.fn(async () => ({
+                  data: {
+                    id: config.initialJob.id,
+                    invoice_complete: true,
+                    data_entry_completed_at:
+                      config.initialJob.data_entry_completed_at ??
+                      "2026-05-20T12:00:00.000Z",
+                    billing_disposition: payload.billing_disposition,
+                    billing_disposition_at: payload.billing_disposition_at,
+                    billing_disposition_by_user_id:
+                      payload.billing_disposition_by_user_id,
+                  },
+                  error: null,
+                })),
                   then: undefined,
                 })),
               };

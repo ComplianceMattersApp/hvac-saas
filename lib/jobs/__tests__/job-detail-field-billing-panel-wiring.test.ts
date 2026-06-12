@@ -70,6 +70,20 @@ describe("job detail field billing panel wiring", () => {
     expect(immediateReadSlice).toContain('.neq("status", "void")');
   });
 
+  it("reads durable job billing disposition for job closeout and invoice labels", () => {
+    expect(source).toContain("billing_disposition,");
+    expect(source).toContain("billing_disposition_note,");
+    expect(source).toContain("billing_disposition_at,");
+    expect(source).toContain("billing_disposition_by_user_id,");
+    expect(source).toContain("billingDisposition: (job as any).billing_disposition");
+    expect(source).toContain("formatJobBillingDispositionLabel");
+    expect(source).toContain("normalizeJobBillingDisposition");
+    expect(source).toContain("const jobBillingDisposition = normalizeJobBillingDisposition((job as any).billing_disposition)");
+    expect(source).toContain("const jobBillingDispositionLabel = formatJobBillingDispositionLabel(jobBillingDisposition)");
+    expect(source).toContain("billingDisposition={jobBillingDisposition}");
+    expect(source).toContain("jobBillingDispositionLabel");
+  });
+
   it("degrades field proposal summary reads without crashing job detail", () => {
     const fieldBillingReadIndex = source.indexOf("timedPhase(\"fieldBillingSummaryRead\"");
     const fieldBillingReadSlice = source.slice(fieldBillingReadIndex, fieldBillingReadIndex + 2200);

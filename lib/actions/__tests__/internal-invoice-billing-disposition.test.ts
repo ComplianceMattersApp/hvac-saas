@@ -160,6 +160,9 @@ function makeSupabaseFixture() {
                       id: "job-1",
                       invoice_complete: true,
                       data_entry_completed_at: payload.data_entry_completed_at,
+                      billing_disposition: payload.billing_disposition,
+                      billing_disposition_at: payload.billing_disposition_at,
+                      billing_disposition_by_user_id: payload.billing_disposition_by_user_id,
                     },
                     error: null,
                   })),
@@ -263,11 +266,16 @@ describe("internal invoice billing disposition actions", () => {
         invoice_complete: true,
         billing_disposition: "no_charge",
         billing_disposition_note: "Warranty courtesy",
+        billing_disposition_at: expect.any(String),
         billing_disposition_by_user_id: "owner-1",
       }),
     );
     expect(fixture.forbiddenWrites).toHaveLength(0);
     expect(reconcileServiceCaseStatusAfterJobChangeMock).toHaveBeenCalled();
+    expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1/invoice");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/ops/closeout-queue");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/reports/closeout");
   });
 
   it("marks a zero-dollar draft invoice as externally billed without fake charges or payments", async () => {
@@ -289,6 +297,7 @@ describe("internal invoice billing disposition actions", () => {
       expect.objectContaining({
         invoice_complete: true,
         billing_disposition: "externally_billed",
+        billing_disposition_at: expect.any(String),
         billing_disposition_by_user_id: "owner-1",
       }),
     );

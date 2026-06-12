@@ -23,6 +23,7 @@ type OperationalKpiJob = {
   field_complete_at: string | null;
   job_type: string | null;
   invoice_complete: boolean | null;
+  billing_disposition: string | null;
   certs_complete: boolean | null;
 };
 
@@ -52,7 +53,7 @@ export async function buildOperationalKpiReadModel(params: {
   });
   const { data, error } = await params.supabase
     .from("jobs")
-    .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, certs_complete")
+    .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, billing_disposition, certs_complete")
     .is("deleted_at", null)
     .in("contractor_id", accountScopeInList(contractorIds));
 
@@ -68,6 +69,7 @@ export async function buildOperationalKpiReadModel(params: {
       job_type: job.job_type,
       ops_status: job.ops_status,
       invoice_complete: job.invoice_complete,
+      billing_disposition: job.billing_disposition,
       certs_complete: job.certs_complete,
     })),
   });
