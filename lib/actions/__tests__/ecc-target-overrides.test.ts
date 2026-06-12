@@ -227,7 +227,9 @@ describe("ECC target override persistence", () => {
     formData.set("airflow_exception_reason", "Field verified airflow delivered despite instrumentation drift.");
 
     const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
-    await expect(saveAndCompleteAirflowFromForm(formData)).rejects.toThrow("REDIRECT:/jobs/job-1#field-status-actions");
+    await expect(saveAndCompleteAirflowFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1",
+    );
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");
     expect(update?.payload.override_pass).toBe(true);
@@ -301,7 +303,7 @@ describe("ECC target override persistence", () => {
 
     const { saveAndCompleteDuctLeakageFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAndCompleteDuctLeakageFromForm(formData)).rejects.toThrow(
-      "REDIRECT:/jobs/job-1#field-status-actions",
+      "REDIRECT:/jobs/job-1/tests?t=duct_leakage&s=system-1",
     );
 
     const update = captured.find((entry) => entry.table === "ecc_test_runs" && entry.method === "update");

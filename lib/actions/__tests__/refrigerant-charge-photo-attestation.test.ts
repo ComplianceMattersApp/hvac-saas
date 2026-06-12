@@ -412,7 +412,7 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
 
     const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation())).rejects.toThrow(
-      "REDIRECT:/jobs/job-1#field-status-actions"
+      "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1"
     );
 
     const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");

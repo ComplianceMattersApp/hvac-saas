@@ -149,7 +149,9 @@ describe("airflow required measured result hardening", () => {
 
     const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
 
-    await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow("REDIRECT:/jobs/job-1#field-status-actions");
+    await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1",
+    );
 
     const update = updates.find((call) => call.table === "ecc_test_runs");
     expect(update).toBeDefined();
@@ -182,7 +184,9 @@ describe("airflow required measured result hardening", () => {
 
     const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
 
-    await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow("REDIRECT:/jobs/job-1#field-status-actions");
+    await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1",
+    );
 
     const update = updates.find((call) => call.table === "ecc_test_runs");
     expect(update).toBeDefined();
@@ -202,7 +206,9 @@ describe("airflow required measured result hardening", () => {
 
     const { saveAndCompleteAirflowFromForm } = await import("@/lib/actions/job-actions");
 
-    await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow("REDIRECT:/jobs/job-1#field-status-actions");
+    await expect(saveAndCompleteAirflowFromForm(fd)).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=airflow&s=system-1",
+    );
 
     const update = updates.find((call) => call.table === "ecc_test_runs");
     expect(update).toBeDefined();

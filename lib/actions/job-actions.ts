@@ -2347,10 +2347,6 @@ function redirectToTests(opts: {
   redirect(qs ? `/jobs/${jobId}/tests?${qs}` : `/jobs/${jobId}/tests`);
 }
 
-function redirectToJobTestSection(jobId: string) {
-  redirect(`/jobs/${jobId}#field-status-actions`);
-}
-
 const DUCT_LEAKAGE_EXCEPTION_LABELS: Record<string, string> = {
   asbestos: "Asbestos",
   smoke_test: "Smoke Test",
@@ -6556,7 +6552,7 @@ export async function saveAndCompleteDuctLeakageFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToJobTestSection(jobId);
+  redirectToTests({ jobId, testType: "duct_leakage", systemId });
 }
 
 /** =========================
@@ -6701,7 +6697,7 @@ export async function saveAndCompleteAirflowFromForm(formData: FormData) {
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToJobTestSection(jobId);
+  redirectToTests({ jobId, testType: "airflow", systemId });
 }
 
 /** =========================
@@ -6962,7 +6958,7 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
 
   await evaluateEccOpsStatus(jobId);
   revalidateEccProjectionConsumers(jobId);
-  redirectToJobTestSection(jobId);
+  redirectToTests({ jobId, testType: "refrigerant_charge", systemId });
 }
 
 
