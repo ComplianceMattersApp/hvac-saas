@@ -2627,14 +2627,6 @@ const isEccPermitNeededActive = isEccPermitNeededBlocker({
   ops_status: job.ops_status,
   pending_info_reason: (job as any).pending_info_reason ?? null,
 });
-const hasActionHeavyPrimaryNextAction =
-  isEccPermitNeededActive ||
-  (job.job_type === "ecc" &&
-    !parentJobId &&
-    !Boolean((activeRetestChild as any)?.id) &&
-    ["failed", "pending_office_review", "retest_needed"].includes(String(job.ops_status ?? "").trim().toLowerCase())) ||
-  (isServiceFieldFollowUpPendingInfo && Boolean(serviceFollowUpProgressState.reason));
-
 const billingState = buildJobBillingStateReadModel({
   billingMode,
   invoiceComplete: job.invoice_complete,
@@ -2696,6 +2688,15 @@ const showPrimaryCloseoutBlockers =
   isCloseoutPending &&
   !isServiceFieldFollowUpPendingInfo &&
   !isEccPermitNeededActive;
+
+const hasActionHeavyPrimaryNextAction =
+  showPrimaryCloseoutBlockers ||
+  isEccPermitNeededActive ||
+  (job.job_type === "ecc" &&
+    !parentJobId &&
+    !Boolean((activeRetestChild as any)?.id) &&
+    ["failed", "pending_office_review", "retest_needed"].includes(String(job.ops_status ?? "").trim().toLowerCase())) ||
+  (isServiceFieldFollowUpPendingInfo && Boolean(serviceFollowUpProgressState.reason));
 
 const primaryCloseoutMessage =
   closeoutNeeds.needsInvoice && closeoutNeeds.needsCerts
@@ -2904,13 +2905,21 @@ const jobPageInvoiceStateLabel = internalInvoiceTruth
   : hasVisitScopeDefined
     ? "Ready to build invoice"
     : "Add work items first";
+const isJobPageDraftInvoice = internalInvoiceTruth?.status === "draft";
+const isJobPageZeroDollarDraftInvoice =
+  Boolean(isJobPageDraftInvoice) &&
+  Number(internalInvoiceTruth?.total_cents ?? 0) === 0;
 const jobPageInvoiceNextAction = !internalInvoiceTruth
-  ? "Build Invoice"
-  : internalInvoiceTruth.status === "draft"
-    ? "Review Invoice"
-    : billingState.billedTruthSatisfied
-      ? "View Invoice"
-      : "Collect Payment";
+  ? billingState.billedTruthSatisfied
+    ? "View Billing Details"
+    : "Create Invoice"
+  : isJobPageZeroDollarDraftInvoice
+    ? "Resolve $0 Invoice"
+    : isJobPageDraftInvoice
+      ? "Issue Invoice"
+      : internalInvoiceTruth.status === "issued"
+        ? "Collect Payment"
+        : "View Invoice";
 const jobPageInvoiceSummaryText = internalInvoiceTruth
   ? `${jobPageInvoiceDisplayReference} - ${internalInvoiceTruth.line_item_count} charge${internalInvoiceTruth.line_item_count === 1 ? "" : "s"} - ${formatCurrencyFromCents(internalInvoiceTruth.total_cents)}`
   : hasVisitScopeDefined
@@ -3467,7 +3476,7 @@ const failureResolutionPathCount =
               <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
               <input type="hidden" name="auto_import_visit_scope_items" value={showReplacementInvoicePrompt ? "0" : "1"} />
               <SubmitButton loadingText="Creating..." className={hasVisitScopeDefined ? primaryButtonClass : secondaryButtonClass}>
-                {showReplacementInvoicePrompt ? "Create Replacement Invoice" : "Build Invoice"}
+                {showReplacementInvoicePrompt ? "Create Replacement Invoice" : "Create Invoice"}
               </SubmitButton>
             </form>
           </div>
@@ -4699,8 +4708,8 @@ const failureResolutionPathCount =
                   ) : null}
                 </div>
               ) : showPrimaryCloseoutBlockers ? (
-                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3">
-                  <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-center text-base font-semibold text-emerald-900">
+                <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3">
+                  <span className="inline-flex min-h-12 w-full items-center justify-start rounded-xl border border-amber-200 bg-white/90 px-4 py-2.5 text-left text-base font-semibold text-amber-950">
                     {primaryCloseoutMessage}
                   </span>
                   <div className="grid gap-2">
@@ -4709,7 +4718,7 @@ const failureResolutionPathCount =
                         href={`/jobs/${job.id}/invoice#invoice-workspace`}
                         className={`${darkButtonClass} min-h-12 w-full`}
                       >
-                        Review Invoice
+                        {jobPageInvoiceNextAction}
                       </Link>
                     ) : null}
                     {closeoutNeeds.needsInvoice && showExternalDataEntryPrompt && !canShowInvoiceButton ? (
@@ -4746,19 +4755,11 @@ const failureResolutionPathCount =
                           pendingText="Saving..."
                           className={`${darkButtonClass} min-h-12 w-full`}
                         >
-                          Certs Complete
+                          ✓ Certs Sent
                         </ImmediateSubmitButton>
                       </form>
                     ) : null}
                   </div>
-                  {job.job_type === "ecc" ? (
-                    <Link
-                      href={`/jobs/${job.id}/tests`}
-                      className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
-                    >
-                      Open Tests Workspace
-                    </Link>
-                  ) : null}
                 </div>
               ) : isFieldComplete || job.status === "completed" ? (
                 <div className="space-y-2">
@@ -4866,7 +4867,7 @@ const failureResolutionPathCount =
                     <SubmitButton loadingText="Starting..." className={mobileFieldActionClass}>
                       <span className="inline-flex items-center gap-2">
                         <ReceiptIcon className="h-4.5 w-4.5" />
-                        <span>Build Invoice</span>
+                        <span>Create Invoice</span>
                       </span>
                     </SubmitButton>
                   </form>
@@ -4882,7 +4883,7 @@ const failureResolutionPathCount =
                 <span className={mobileDisabledActionClass}>
                   <span className="inline-flex items-center gap-2">
                     <ReceiptIcon className="h-4.5 w-4.5" />
-                    <span>Build Invoice</span>
+                    <span>Create Invoice</span>
                   </span>
                 </span>
               )}
@@ -5051,11 +5052,11 @@ const failureResolutionPathCount =
                       <div>
                         <span className="inline-flex items-center gap-1.5 font-semibold"><ReceiptIcon className="h-4 w-4" />Invoice required</span>
                         <span className="text-amber-900/90"> · </span>
-                        <span>{internalInvoiceTruth ? "Open invoice" : "Build invoice"}</span>
+                        <span>{internalInvoiceTruth ? jobPageInvoiceNextAction : "Create invoice"}</span>
                       </div>
                       {internalInvoiceTruth ? (
                         <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100">
-                          Open invoice
+                          {jobPageInvoiceNextAction}
                         </Link>
                       ) : (
                         <form action={createInternalInvoiceDraftFromForm} className="shrink-0">
@@ -5064,7 +5065,7 @@ const failureResolutionPathCount =
                           <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
                           <input type="hidden" name="auto_import_visit_scope_items" value="1" />
                           <SubmitButton loadingText="Starting..." className="inline-flex min-h-9 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-1.5 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100">
-                            Build invoice
+                            Create invoice
                           </SubmitButton>
                         </form>
                       )}
@@ -5431,7 +5432,7 @@ const failureResolutionPathCount =
                   {!showMobileServiceInvoiceFieldAction && showInternalInvoicePanel && mobileInvoiceActionRelevant ? (
                     internalInvoiceTruth ? (
                       <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={mobileToolLinkClass}>
-                        Open Invoice Workspace
+                        {jobPageInvoiceNextAction}
                       </Link>
                     ) : (
                       <form action={createInternalInvoiceDraftFromForm}>
@@ -5440,7 +5441,7 @@ const failureResolutionPathCount =
                         <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
                         <input type="hidden" name="auto_import_visit_scope_items" value="1" />
                         <SubmitButton loadingText="Starting..." className={mobileToolLinkClass}>
-                          Build Invoice
+                          Create Invoice
                         </SubmitButton>
                       </form>
                     )
@@ -6025,17 +6026,17 @@ const failureResolutionPathCount =
         ) : null}
         {showPrimaryCloseoutBlockers ? (
           <div className="hidden w-full rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 sm:block">
-            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-              <span className="inline-flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-lg border border-amber-200 bg-white/90 px-4 py-2 text-center text-sm font-semibold text-amber-950">
+            <div className="space-y-3">
+              <span className="inline-flex min-h-11 w-full items-center justify-start rounded-lg border border-amber-200 bg-white/90 px-4 py-2 text-left text-sm font-semibold text-amber-950">
                 {primaryCloseoutMessage}
               </span>
-              <div className="flex flex-wrap justify-end gap-2">
+              <div className="flex flex-wrap gap-2">
                 {closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
                   <Link
                     href={`/jobs/${job.id}/invoice#invoice-workspace`}
                     className={darkButtonClass}
                   >
-                    Review Invoice
+                    {jobPageInvoiceNextAction}
                   </Link>
                 ) : null}
                 {closeoutNeeds.needsInvoice && showExternalDataEntryPrompt && !canShowInvoiceButton ? (
@@ -6072,17 +6073,9 @@ const failureResolutionPathCount =
                       pendingText="Saving..."
                       className={darkButtonClass}
                     >
-                      Certs Complete
+                      ✓ Certs Sent
                     </ImmediateSubmitButton>
                   </form>
-                ) : null}
-                {job.job_type === "ecc" ? (
-                  <Link
-                    href={`/jobs/${job.id}/tests`}
-                    className={compactWorkspaceActionButtonClass}
-                  >
-                    Open Tests Workspace
-                  </Link>
                 ) : null}
               </div>
             </div>
@@ -6094,17 +6087,6 @@ const failureResolutionPathCount =
             </span>
           </div>
         ) : null}
-        {job.job_type === "ecc" && (isFieldComplete || job.status === "completed") && !showPrimaryCloseoutBlockers ? (
-          <div className="hidden w-full sm:flex">
-            <Link
-              href={`/jobs/${job.id}/tests`}
-              className={`${compactWorkspaceActionButtonClass} min-h-11 w-full shadow-[0_12px_24px_-20px_rgba(15,31,53,0.35)]`}
-            >
-              Open Tests Workspace
-            </Link>
-          </div>
-        ) : null}
-
         <div className="hidden w-full flex-wrap gap-2 border-t border-slate-200/80 pt-2.5 sm:flex">
           <div className="flex flex-wrap gap-2">
             <Link
@@ -6129,6 +6111,15 @@ const failureResolutionPathCount =
                 className={`${compactUtilityButtonClass} shadow-[0_8px_18px_-18px_rgba(15,23,42,0.28)]`}
               >
                 Create Estimate
+              </Link>
+            ) : null}
+
+            {job.job_type === "ecc" ? (
+              <Link
+                href={`/jobs/${job.id}/tests`}
+                className={`${compactWorkspaceActionButtonClass} shadow-[0_8px_18px_-18px_rgba(15,23,42,0.28)]`}
+              >
+                Open Tests Workspace
               </Link>
             ) : null}
           </div>
@@ -7240,7 +7231,7 @@ const failureResolutionPathCount =
                 pendingText="Saving..."
                 className={darkButtonClass}
               >
-                ✓ Certs Complete
+                ✓ Certs Sent
               </ImmediateSubmitButton>
             </form>
           )}
@@ -8238,7 +8229,7 @@ const failureResolutionPathCount =
         <div className="rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5">
           <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Next Step</div>
           <div className="mt-0.5 text-sm font-semibold text-slate-900">
-            {!internalInvoiceTruth ? "Build invoice" : internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review invoice" : "Build charges") : "Open invoice"}
+            {jobPageInvoiceNextAction}
           </div>
         </div>
       </div>
@@ -8252,12 +8243,12 @@ const failureResolutionPathCount =
           <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
           <input type="hidden" name="auto_import_visit_scope_items" value="1" />
           <SubmitButton loadingText="Starting..." className={darkButtonClass}>
-            Build Invoice
+            Create Invoice
           </SubmitButton>
         </form>
       ) : (
         <Link href={`/jobs/${job.id}/invoice#invoice-workspace`} className={darkButtonClass}>
-          {internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review Invoice" : "Build Invoice") : "Open Invoice Workspace"}
+          {jobPageInvoiceNextAction}
         </Link>
       )) : hasProposalEntryWorkflowAccess ? (
         <Link href={`#field-billing-summary-title`} className={darkButtonClass}>

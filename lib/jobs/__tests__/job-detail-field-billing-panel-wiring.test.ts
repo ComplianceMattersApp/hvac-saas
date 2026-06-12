@@ -12,7 +12,7 @@ describe("job detail field billing panel wiring", () => {
     const workInvoiceIndex = source.indexOf("Work & Invoice");
     const invoiceStateIndex = source.indexOf("jobPageInvoiceStateLabel", workInvoiceIndex);
     const readyTotalIndex = source.indexOf("Ready-to-invoice total", workInvoiceIndex);
-    const nextActionIndex = source.indexOf("jobPageInvoiceNextAction", workInvoiceIndex);
+    const nextActionIndex = source.indexOf("jobPageInvoiceNextAction", readyTotalIndex);
 
     expect(workInvoiceIndex).toBeGreaterThanOrEqual(0);
     expect(invoiceStateIndex).toBeGreaterThan(workInvoiceIndex);
@@ -34,7 +34,7 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("fieldBillingSupplementalInvoiceSnapshots.length > 0");
 
     const fieldBillingDetailsIndex = source.indexOf("{showSeparateFieldBillingDetails ? (");
-    const reviewInvoiceIndex = source.indexOf("Review Invoice", fieldBillingDetailsIndex);
+    const invoiceActionIndex = source.indexOf("{jobPageInvoiceNextAction}", fieldBillingDetailsIndex);
     const billingCopyIndex = source.indexOf(
       "Invoice Charges are billed scope. Work Items remain operational scope.",
       fieldBillingDetailsIndex,
@@ -42,8 +42,8 @@ describe("job detail field billing panel wiring", () => {
     const summaryIndex = source.indexOf("<FieldBillingSummary", fieldBillingDetailsIndex);
 
     expect(fieldBillingDetailsIndex).toBeGreaterThanOrEqual(0);
-    expect(reviewInvoiceIndex).toBeGreaterThan(fieldBillingDetailsIndex);
-    expect(billingCopyIndex).toBeGreaterThan(reviewInvoiceIndex);
+    expect(invoiceActionIndex).toBeGreaterThan(fieldBillingDetailsIndex);
+    expect(billingCopyIndex).toBeGreaterThan(invoiceActionIndex);
     expect(summaryIndex).toBeGreaterThan(billingCopyIndex);
   });
 
@@ -92,7 +92,7 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("Invoice send authority is not available for your current role.");
   });
 
-  it("routes Build Invoice directly to the invoice workspace after draft creation", () => {
+  it("routes Create Invoice directly to the invoice workspace after draft creation", () => {
     const noInvoicePanelIndex = source.indexOf("Build a draft invoice from the Work Items when billing is ready.");
     const noInvoicePanelSlice = source.slice(noInvoicePanelIndex, noInvoicePanelIndex + 900);
 
@@ -101,12 +101,17 @@ describe("job detail field billing panel wiring", () => {
     expect(noInvoicePanelSlice).toContain("return_to");
     expect(noInvoicePanelSlice).toContain("/invoice#invoice-workspace");
     expect(noInvoicePanelSlice).toContain("auto_import_visit_scope_items");
-    expect(noInvoicePanelSlice).toContain("Build Invoice");
+    expect(noInvoicePanelSlice).toContain("Create Invoice");
     expect(noInvoicePanelSlice).not.toContain("Create Draft Invoice");
   });
 
   it("keeps existing draft invoices on the review path instead of creating duplicates", () => {
-    expect(source).toContain('internalInvoiceTruth.status === "draft" ? (internalInvoiceTruth.line_item_count > 0 ? "Review Invoice" : "Build Invoice") : "Open Invoice Workspace"');
+    expect(source).toContain('isJobPageZeroDollarDraftInvoice');
+    expect(source).toContain('"View Billing Details"');
+    expect(source).toContain('"Resolve $0 Invoice"');
+    expect(source).toContain('"Issue Invoice"');
+    expect(source).toContain('"Collect Payment"');
+    expect(source).not.toContain('"View Paid Invoice"');
     expect(source).toContain('internalInvoice.status === "draft"');
     expect(source).toContain("alreadyAdded: existingVisitScopeInvoiceSourceIds.has(persistedItemId)");
   });
@@ -116,7 +121,7 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("Ready-to-invoice total");
     expect(source).toContain("Price ${Number(item.expected_unit_price).toFixed(2)}");
     expect(source).toContain("Build an invoice later when billing is ready.");
-    expect(source).toContain("Build invoice");
+    expect(source).toContain("Create invoice");
   });
 
   it("formats job-page invoice references through the short display helper", () => {

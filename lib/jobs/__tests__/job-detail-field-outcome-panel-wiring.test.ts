@@ -68,7 +68,10 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
     expect(jobDetailSource).toContain('href={`/jobs/${job.id}/tests`}');
     expect(jobDetailSource).toContain("Open Tests Workspace");
-    expect(jobDetailSource).toContain('job.job_type === "ecc" && (isFieldComplete || job.status === "completed") && !showPrimaryCloseoutBlockers ? (');
+    expect(jobDetailSource).toContain("Back to Ops");
+    expect(jobDetailSource).toContain("Open Customer");
+    expect(jobDetailSource).toContain("Create Estimate");
+    expect(jobDetailSource).not.toContain('job.job_type === "ecc" && (isFieldComplete || job.status === "completed") && !showPrimaryCloseoutBlockers ? (');
     expect(jobDetailSource).not.toContain("|| showFieldOutcomePanel) ? (");
   });
 
@@ -77,8 +80,8 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
     expect(jobDetailSource).toContain("Field work complete - ready for closeout.");
     expect(jobDetailSource).toContain("showPrimaryCloseoutBlockers");
-    expect(jobDetailSource).toContain("Review Invoice");
-    expect(jobDetailSource).toContain("Certs Complete");
+    expect(jobDetailSource).toContain("jobPageInvoiceNextAction");
+    expect(jobDetailSource).toContain("✓ Certs Sent");
     expect(panelSource).not.toContain('import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";');
     expect(panelSource).not.toContain("form action={advanceJobStatusFromForm}");
     expect(panelSource).not.toContain("Confirm Work Completed");
@@ -237,10 +240,11 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("Field work complete - invoice is still needed.");
     expect(jobDetailSource).toContain("Field work complete - certs are still needed.");
     expect(jobDetailSource).toContain('href={`/jobs/${job.id}/invoice#invoice-workspace`}');
-    expect(jobDetailSource).toContain("Review Invoice");
+    expect(jobDetailSource).toContain("{jobPageInvoiceNextAction}");
     expect(jobDetailSource).toContain("form action={markCertsCompleteFromForm}");
-    expect(jobDetailSource).toContain("Certs Complete");
-    expect(jobDetailSource).toContain("!showPrimaryCloseoutBlockers");
+    expect(jobDetailSource).toContain("✓ Certs Sent");
+    expect(jobDetailSource).toContain("showPrimaryCloseoutBlockers ||");
+    expect(jobDetailSource).not.toContain("!showPrimaryCloseoutBlockers");
     expect(jobDetailSource).not.toContain("Field work complete - invoice/certs can be handled as needed.");
   });
 
