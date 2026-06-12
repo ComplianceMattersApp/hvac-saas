@@ -60,6 +60,60 @@ Status: CLOSED for the commits listed below. These items were verified from rece
 - Closed behavior: desktop planner/sidebar queue remains visible and usable while scrolling the calendar board.
 - Guardrails preserved: no drag/drop logic change, no scheduling rule change, no assignment semantic change, no calendar data fetching change, and mobile remained layout-compatible.
 
+### Production-Shipped Cleanup Sequence
+
+- Evidence source: formerly duplicated in `Compliance_Matters_Prelaunch_Confirmation_Checklist.md` Section 2.3.3.
+- Closed behavior: notification/proposal unread-awareness cleanup, proposal card identity restoration, contractor/internal note preservation, calendar/scheduling display fixes, no-tech scheduled visibility, unassigned filter chip, inspector default-collapsed behavior, responsive default calendar views, date-only display format polish, login password show/hide, and day/aging counters on Failed and Need Info/Pending Info surfaces.
+- ECC/test tactical items: refrigerant Photo Taken path clarified as attestation-only, Duct Leakage override suggestions include Asbestos while preserving custom/manual reasons.
+- Guardrails preserved: no payment execution behavior, no Pricebook behavior, no RLS behavior, no calendar engine rebuild claim, and no technician-assignment ownership change from calendar drag/drop.
+
+### Proposal / Closeout / Calendar Polish Catch-Up
+
+- Evidence source: formerly duplicated in `Compliance_Matters_Prelaunch_Confirmation_Checklist.md` Section 2.3.6.
+- Closed behavior: proposal builder visual cleanup, editable estimate line items, builder workflow polish, pricebook search model, save-manual-line-to-pricebook, redirect-to-new-job-after-convert-to-job, proposal print/customer presentation polish, Internal Proposal Boundaries box removal, Proposal Notes using the existing estimate notes field, proposal link/customer approval/email delivery smoke closeouts, Closeout Queue V1 confirmation, and Calendar Work Context derived-label confirmation.
+- Parked follow-ups remain unchanged: contact recipient write/edit workflow, Closeout Queue V2, provider-powered SMS, and Payments V2 deferred register.
+- Guardrails preserved: no schema changes for print/proposal polish, no SMS/text proposal delivery, no proposal payment collection, no QBO behavior, no invoice issue/send from proposal approval, no automatic job or invoice conversion, no customer portal login dependency, no e-signature/legal artifact model, and no live SMS behavior.
+
+### Job Detail Responsiveness and Contact Action Polish
+
+- Commits: `655d83b` and `4ecf127`.
+- Evidence source: formerly duplicated in `Compliance_Matters_Prelaunch_Confirmation_Checklist.md` Section 2.3.7.
+- Closed behavior: service closeout read de-dupe, job detail location preview deferral, timing instrumentation, first-paint/recomposition improvements, deferred secondary section bodies, invoice secondary-detail deferral, customer-attempt summary deferral, timeline summary softening, parent read fanout parallelization, contact-attempt calendar revalidation dedupe, action-specific contact pending feedback, and contact redirects returning near the contact section.
+- Guardrails preserved: responsiveness/perceived-performance only; no source-of-truth, lifecycle, `/ops`, Service Plans, invoice/payment, portal, SMS, QBO, schema, migration, auth/RLS, entitlement, feature-flag, event truth, redirect, revalidation, banner, attempt-count, or `tab=ops` continuity behavior changed.
+- Future backlog remains measured/surgical only: route speed, `/ops`, `/jobs/[id]`, lifecycle buttons, contact actions, `/jobs/new`, calendar, reports, backend/read variance, and safe partial-settle patterns.
+
+### Ops First Impression Performance Pass
+
+- Evidence source: formerly duplicated in `Compliance_Matters_Prelaunch_Confirmation_Checklist.md` Section 2.3.5.1.
+- Closed behavior: removed unused `/ops` Upcoming read path, added timing diagnostics, split actor/business identity timing, split major queue/read phases, narrowed contractor-update awareness, and added diagnostics for assignment display, closeout projection, and request actor context.
+- Guardrails preserved: no schema, migrations, Supabase commands, RLS/auth behavior, queue semantics, event/revalidation behavior, billing/payment behavior, Estimates, Support, QBO, or onboarding behavior changed.
+- Future backlog remains optional and measurement-driven: deeper auth/request-actor review, Ops-specific lightweight assignment helper, broader backend/read variance investigation.
+
+### Field Bus Improvement Passes
+
+- Evidence source: formerly duplicated in `Compliance_Matters_Prelaunch_Confirmation_Checklist.md` Section 2.3.6.
+- Closed behavior: new job/new work awareness clears when scheduled/finalized/rejected/handled, Owner Console company-name fallback correction, equipment/CHEERS/report label and visibility polish, login signup options and invited-user helper copy, `/jobs/new` Create New Customer shortcut, full `/ops/call-list` workspace, and schedule update permit-field preservation.
+- Guardrails preserved: manual Read remains available, contractor update scope unchanged, no equipment schema/storage/unit-conversion/test-type change, Hybrid signup remains hidden, customer search/reuse and server-side intake behavior unchanged, `/ops` remains command center, and schedule updates did not change scheduling source-of-truth, lifecycle, notification, or queue semantics.
+
+### Field-Ready PWA / Portal Loading Polish
+
+- Evidence source: formerly duplicated in `Compliance_Matters_Prelaunch_Confirmation_Checklist.md` Sections 2.3.7 and 2.3.7.1.
+- Closed behavior: web/PWA metadata/installability baseline hardening, login continuity hardening, update-safe refresh notice, service-worker update-failure handling, shared Device setup guidance with per-device notifications, Today/Ops first-action guidance, revenue workflow rail clarity, calendar mobile control compression, admin Day 1 essentials, protected unauthenticated deep-link `?next=` preservation, role-routing safety, and mobile-friendly contractor portal loading skeleton.
+- Guardrails preserved: web-first controlled rollout posture, mobile `/jobs/[id]` field-mode protection, no auth/session architecture change, no contractor/internal route separation change, no first-owner routing behavior change, no schema/migrations/RLS/Supabase/feature flag/production data changes, no service worker/offline caching expansion, and no native app-store packaging.
+
+### HVAC Service Ops First Impression + Shared Notes De-Emphasis
+
+- Evidence source: formerly duplicated in `Compliance_Matters_Prelaunch_Confirmation_Checklist.md` Section 2.3.8.
+- Closed behavior: HVAC Service `/ops` first impression uses Team Work Snapshot + Work by Technician, existing job search remains available, HVAC Service operational copy is team/work oriented, and Shared Notes is de-emphasized/optional for HVAC Service while Timeline and Internal Notes / Team Notes remain available.
+- Guardrails preserved: ECC/HERS contractor filter/search and contractor links/query params remain functional, Hybrid/Master/All-in-One behavior remains intact, no schema/migration/Supabase/auth/RLS/contractor-authority/source-of-truth/job_events/billing/payment/Stripe/QBO/report dataset/product split behavior changed, and `proxy.ts` remains the correct Next.js 16 routing convention.
+
+### Owner Console Readability / Display Polish
+
+- Evidence source: formerly duplicated in roadmap closeout notes for Owner Console UI Polish, Hidden Test Accounts, and Internal Account Separation / Display Polish.
+- Closed behavior: `/ops/owner-console` defaults to Current active/trial/grace metrics, inactive/cancelled rows remain inspectable through read-only filters, table readability was improved, `/ops/admin` shows the Owner Console link only for allowlisted platform-owner actors, hidden/test accounts can be suppressed from normal metrics while remaining inspectable, and platform/internal accounts can be separated from customer counts.
+- Guardrails preserved: access remains explicit allowlist-only; no impersonation, Support Console enablement, tenant mutation, product-mode mutation, database cleanup, Stripe cleanup, auth deletion, archive/delete action, or security/RLS behavior changed.
+- Configuration remains env-driven where applicable: `PLATFORM_OWNER_EMAILS`, optional `PLATFORM_OWNER_USER_IDS`, `PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS`, and `PLATFORM_OWNER_INTERNAL_ACCOUNT_EMAILS`.
+
 ## What This Ledger Does Not Change
 
 - No schema, migration, Supabase command, env/secret, payment, ECC, portal, SMS, QBO, support, or product-mode behavior is changed by this documentation record.

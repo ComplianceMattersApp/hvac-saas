@@ -1794,18 +1794,7 @@ HVAC Service Surface Cleanup V1 closeout note:
 - ECC/HERS and Hybrid visibility behavior is preserved.
 - No permissions/security/RLS/contractor-authority/billing/report/data behavior changed.
 
-HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 closeout note:
-
-- Completed as a presentation-focused HVAC Service-first polish for `/ops` and `/jobs/[id]`.
-- In `hvac_service` mode, `/ops` now presents Team Work Snapshot + Work by Technician in place of the primary contractor filter/search block, with existing job search still available.
-- HVAC Service operational framing now reads as team/work oriented where applicable.
-- ECC/HERS contractor filter/search, contractor links, and contractor query-param behavior remain preserved.
-- Hybrid / Master / All-in-One broad visibility behavior remains preserved, including contractor visibility.
-- `/jobs/[id]` keeps Timeline and Internal Notes / Team Notes visible.
-- Shared Notes remains available and was only de-emphasized/optional for HVAC Service mode; it was not removed from the shared platform.
-- Source-of-truth boundaries remain intact (`job_events` unchanged; no lifecycle/test-truth authority changes).
-- Validation recorded: TypeScript passed (`npx.cmd tsc --noEmit`), browser smoke passed across HVAC Service + ECC/HERS + Hybrid coverage, and no console/hydration issues were reported.
-- Non-change boundaries remain explicit: no schema/migration/Supabase command work, no auth/RLS/authority changes, no billing/payment/Stripe/QBO changes, and no report-calculation changes.
+HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 is complete. Current-state summary: HVAC Service Ops presentation is team/work oriented where applicable, Shared Notes is de-emphasized/optional only for HVAC Service, and ECC/HERS plus Hybrid / Master / All-in-One behavior remains preserved. Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#hvac-service-ops-first-impression--shared-notes-de-emphasis).
 
 `/jobs/new` Product-Mode Family Visibility Tightening V1 closeout note:
 
@@ -1875,29 +1864,7 @@ Product Choice Signup Landing V1 closeout note:
 - Hybrid remains manual/operator-only and has no public signup path.
 - No tier/add-on, billing/payment/QBO, security/RLS, or contractor-authority behavior changed.
 
-Owner Console UI Polish + Admin Link V1 closeout note:
-
-- Owner Console now defaults to a Current view that emphasizes active/trial/grace accounts in headline metrics.
-- Inactive/cancelled accounts are available through a separate read-only filter (`Inactive / Cancelled`) and `All` view remains available.
-- Owner Console table readability was improved (column priority/truncation and de-emphasized UUID placement) without adding mutation controls.
-- Admin Center now shows an `Owner Console` card only when `isPlatformOwnerActor` allowlist authority passes.
-- Link visibility is not granted by product mode (`hybrid` included), tenant admin role, billing mode, entitlement status, or profile metadata.
-- Scope boundaries remain unchanged: no impersonation, no support-console enablement, no tenant mutation actions, and no security/RLS behavior changes.
-
-Owner Console Hidden Test Accounts V1 closeout note:
-
-- Known internal/test accounts are suppressed from default Owner Console headline counts and the Current view via `PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS` env var (comma-separated, case-insensitive).
-- A new read-only `Hidden / Test` filter view exposes these accounts for inspection without adding them to normal operating metrics.
-- No data deletion, archive, Stripe cleanup, auth deletion, Support Console activation, impersonation, or tenant mutation was performed.
-- Logic lives entirely in `lib/business/platform-owner-dashboard.ts` (`parseHiddenAccountEmails`, `isHiddenTestAccountRow`, updated `filterPlatformOwnerDashboardRows` / `summarizePlatformOwnerDashboardRows`).
-- 25/25 tests passing; TSC clean.
-
-Owner Console Internal Account Separation + Display Polish V2 closeout note:
-
-- Platform/internal owner accounts are separated from customer counts through env-configured display classification (`PLATFORM_OWNER_INTERNAL_ACCOUNT_EMAILS`) and exposed in a read-only `Platform / Internal` view.
-- Hidden/test account suppression remains env-driven (`PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS`) for default customer counts/views, with read-only visibility in `Hidden / Test` and `All`.
-- Product/billing display labels are now friendly (`HVAC Service`, `ECC`, `Hybrid`, `Not Set`, `External Billing`, `Internal Invoicing`), and null product mode renders contextually (`Platform / Internal` for internal rows or `Not Set` for customer rows).
-- No product_mode mutation, no database cleanup, no Stripe cleanup, no Support Console activation, no impersonation, and no tenant mutation were performed.
+Owner Console read-only display/readability polish, hidden/test account visibility cleanup, and platform/internal account separation are complete. Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#owner-console-readability--display-polish). Roadmap impact: no impersonation, Support Console enablement, tenant mutation, product-mode mutation, database cleanup, Stripe cleanup, auth deletion, archive/delete action, or security/RLS behavior changed.
 
 - Initial guarded attempt correctly stopped when production ref `ornrnvxtwwtulohqwxop` was detected; no writes occurred in that stopped attempt.
 - Corrected pass relinked to sandbox ref `kvpesjdukqwwlgpkzfjm`.
@@ -2151,12 +2118,7 @@ P1 closeout note:
   - CSV header wording aligned where applicable
   - no invoice/payment calculations were changed
 
-Completed production-shipped cleanup batch note (current baseline):
-- Notifications/proposals: unread-awareness cleanup, card identity restoration, and proposal follow-up/internal-note preservation are complete with contractor/internal visibility boundaries intact.
-- Calendar/scheduling: customer/job phone wiring fix, card identity restoration, no-tech visibility + unassigned filter, inspector default-collapsed behavior, responsive default-view behavior, and unified-surface drag/drop direction are complete.
-- UI polish: date display format update (MM-DD-YYYY), login password show/hide, and Failed/Need Info aging counters are complete.
-- ECC/test workflow: refrigerant Photo Taken is attestation-only (no upload-proof validation claim), and Asbestos is included as a duct-leakage override suggestion while custom reasons remain supported.
-- This closeout note is baseline alignment only and does not add a new roadmap milestone.
+Completed production-shipped cleanup batch is part of the current baseline. Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#production-shipped-cleanup-sequence). This closeout note is baseline alignment only and does not add a new roadmap milestone.
 
 Field-note launch-hardening closeout alignment note (current baseline):
 - Completed commits in this batch:

@@ -1221,31 +1221,9 @@ Current Program Status Note (May 2026)
     - no RLS/auth change
     - no Support Console behavior change
 
-- HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 is complete and pushed (May 2026):
-  - Added mode-aware Ops presentation for HVAC Service accounts.
-  - In `hvac_service` mode, the primary contractor filter/search area is replaced with a compact Team Work Snapshot and a Work by Technician summary.
-  - HVAC Service operational scope language is now team/work oriented where applicable, while existing job search remains available.
-  - ECC/HERS contractor filtering/search behavior is preserved, including contractor-related links/query params.
-  - Hybrid / Master / All-in-One broad behavior is preserved, including contractor visibility.
-  - Job detail behavior for HVAC Service keeps Timeline and Internal Notes / Team Notes visible.
-  - Shared Notes is de-emphasized/optional for HVAC Service only and was not removed; ECC/HERS and Hybrid behavior is preserved.
-  - `job_events` behavior remains unchanged.
-  - Validation recorded:
-    - TypeScript passed: `npx.cmd tsc --noEmit`.
-    - Browser smoke passed across HVAC Service, ECC/HERS, and Hybrid / Master / All-in-One coverage for `/ops` and `/jobs/[id]` expectations.
-    - No console or hydration issues were reported during smoke.
-  - Explicit non-changes:
-    - no schema changes
-    - no migrations
-    - no Supabase commands
-    - no RLS/auth changes
-    - no source-of-truth changes
-    - no `job_events` mutation
-    - no contractor authority changes
-    - no billing/payment/Stripe/QBO behavior changes
-    - no report calculation changes
-    - no codebase split
-    - no feature deletion
+- HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 is complete and pushed (May 2026).
+  - Current-state summary: HVAC Service Ops presentation is team/work oriented where applicable, Shared Notes is de-emphasized/optional only for HVAC Service, and ECC/HERS plus Hybrid / Master / All-in-One behavior remains preserved.
+  - Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#hvac-service-ops-first-impression--shared-notes-de-emphasis).
 
 - `/jobs/new` Product-Mode Family Visibility Tightening V1 is complete and pushed (May 2026):
   - Normal product accounts now show only the relevant internal job-family lane on `/jobs/new`:
@@ -1293,66 +1271,9 @@ Current Program Status Note (May 2026)
   - Deferred to later phases: service-case/customer/location defaults, billing responsibility workflows, estimate/invoice sharing, portal access, approval workflows, notifications, external party accounts.
   - Planning-only boundary: no schema changes, no migrations, no Supabase commands, no auth/RLS changes.
 
-- Field Bus Improvement Passes closeout is complete and pushed (May 2026):
-  - New Job Alert lifecycle cleanup:
-    - New job/new work alerts no longer act as active unread awareness once scheduled, finalized, rejected, or otherwise handled.
-    - Manual Read remains available.
-    - Contractor note/update notification scope was not changed.
-  - Owner Console company-name fallback correction:
-    - customer account rows now use tenant-safe company-name resolution.
-    - when company name is missing, a neutral setup placeholder is shown instead of a platform fallback label.
-  - Equipment fields and CHEERS/report visibility:
-    - furnace labels are clarified to: Heating Input (KBTU/h), Heating Output (BTU/h), Efficiency / AFUE %.
-    - Heating Input helper text is now: Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
-    - saved equipment summary visibility in report surfaces includes the relevant equipment details.
-    - coil manufacturer/model/serial summary coverage was verified.
-    - no schema/storage/unit-conversion/test-type behavior changed.
-  - Login screen signup options and copy polish:
-    - login now links to HVAC Service signup and ECC / Compliance Testing signup.
-    - Hybrid public signup remains intentionally not exposed.
-    - invited-user admin access helper text is clarified.
-  - `/jobs/new` Create New Customer shortcut:
-    - Create New Customer entry is now reachable near the top of the intake flow.
-    - existing customer search/reuse and server-side intake behavior remain unchanged.
-  - `/ops/call-list` full page and polish:
-    - dedicated full Call List page is active for larger scheduling queues.
-    - `/ops` remains the command-center summary surface.
-    - premium polish pass is accepted with restrained operations-software styling.
-  - Schedule update permit-field preservation:
-    - `updateJobScheduleFromForm` preserves omitted permit fields server-side on schedule-only updates.
-    - schedule updates no longer clear `permit_number`, `jurisdiction`, or `permit_date` when those fields are omitted from the submitted schedule form.
-    - no scheduling source-of-truth, lifecycle model, or queue semantics changes were introduced.
-  - Calendar action responsiveness:
-    - Calendar Open Job action now has improved perceived responsiveness through a dedicated responsive/prefetching button.
-    - Schedule Save already shows immediate Saving feedback and remains server-confirmed.
-    - `scheduledAttentionWindowJobs` now uses the requested calendar anchor date instead of today.
-    - Permit preservation stayed intact.
-    - No calendar engine/source-of-truth rewrite.
-  - Contractor Report saved snapshot / resend workflow:
-    - Contractor report sent history reuses saved report content from `job_events` metadata.
-    - Saved report can be resent to another recipient without regenerating/retyping.
-    - Each send creates separate `contractor_report_sent` history entry.
-    - Failed sends do not create false sent history.
-    - No schema/PDF/notification-table/contractor authority changes.
-  - Contractor Report language + timeline polish:
-    - Timeline now shows recipient inline for `contractor_report_sent` entries when available. Example: "Contractor report sent to contractor@example.com".
-    - Contractor Report panel language cleaned up:
-      - Report history (was: Last sent report)
-      - Resend Report (was: Resend Saved Report)
-      - Generate Fresh Report (was: Generate Updated Report)
-      - Send Report (unified button label)
-    - User-facing wording no longer exposes internal snapshot/meta/payload concepts.
-  - Job detail technical chip cleanup:
-    - Removed implementation-style chips:
-      - DEFERRED (from Attachments section)
-      - NOTES LOAD BELOW (from Shared Notes and Internal Notes sections)
-      - RECENT ATTEMPTS LOADING (from Follow-Up History section)
-      - HISTORY LOADS BELOW (from Timeline section)
-    - Kept meaningful count/status chips:
-      - visit count (Service Chain section)
-      - equipment item count (Equipment section)
-      - ECC run count (ECC Summary section)
-    - Deferred loading behavior unchanged.
+- Field Bus Improvement Passes closeout is complete and pushed (May 2026).
+  - Current-state summary: field-bus UI/regression polish is part of the current baseline, including notification lifecycle cleanup, equipment/report label polish, signup/intake shortcuts, calendar/call-list usability, schedule permit preservation, contractor-report polish, and job-detail technical-chip cleanup.
+  - Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#field-bus-improvement-passes).
 
 - Estimate New Customer Assist V1 is complete for `/estimates/new`:
   - Internal users can add/reuse customer + service location inline from the estimate draft form and continue without leaving the flow.
@@ -2640,8 +2561,7 @@ deeper notification prioritization/escalation layers
 broader role model refinement
 future branding/settings/business-profile formalization
 True App Package / Device-App Experience closeout is complete for controlled tester use in current intended release.
-Field-ready installable/PWA access readiness V1 now includes metadata/installability baseline hardening, login continuity, update-safe refresh notice, service-worker update-failure handling, and shared Device setup install/add-to-phone guidance plus per-device notifications.
-Field-ready installable/PWA access readiness V1B-1 (Proxy Verification + Portal Loading Polish) remains complete: `proxy.ts` is confirmed active under Next.js 16 (the correct convention; `middleware.ts` is deprecated and must not be added), protected unauthenticated deep links preserve `?next=` for tested routes, and `app/portal/loading.tsx` provides a mobile-friendly contractor portal loading skeleton. Native-store distribution, deeper offline mode, and broader packaging expansion remain deferred unless explicitly reopened in the canonical register.
+Field-ready installable/PWA access readiness and portal loading polish are complete for controlled tester use; tactical evidence lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#field-ready-pwa--portal-loading-polish). `proxy.ts` remains the correct Next.js 16 routing convention for this app; native-store distribution, deeper offline mode, and broader packaging expansion remain deferred unless explicitly reopened in the canonical register.
 
 Note:
 Payment P1 foundation is closed at the current baseline.
@@ -3543,12 +3463,7 @@ Future end-of-road UX review option (deferred, not current implementation):
   - Address state capture/wiring is complete on relevant intake/finalization paths, including contractor intake proposal state persistence and downstream billing-state prefill support where captured.
   - Internal invoice void recovery/replacement behavior is complete: voided invoices remain historical, do not satisfy billed-truth closeout, and replacement draft flow exists as the active billing path.
   - Invoice report wording polish is complete: Send Status and Payment Count labels are now the launch wording targets.
-  - Completed production-shipped cleanup batch (notifications/calendar/UI/ECC) is now part of the current baseline:
-    - proposal unread-awareness cleanup, proposal/notification card identity restoration, and proposal-note boundary preservation are complete
-    - calendar details/identity/no-tech visibility/filtering/inspector-default behavior cleanup is complete
-    - unified calendar drag/drop behavior is complete without introducing technician-assignment ownership changes
-    - date-display formatting polish, login password show/hide toggle, and aging counters on Failed/Need Info surfaces are complete
-    - ECC refrigerant Photo Taken attestation path and Asbestos duct-leakage override suggestion are complete with existing truth boundaries preserved
+  - Completed production-shipped cleanup batch (notifications/calendar/UI/ECC) is now part of the current baseline; tactical evidence lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#production-shipped-cleanup-sequence).
   - These polish slices did not introduce payment execution, Stripe checkout, card charge flows, refunds/disputes, payouts, QBO sync, or RLS model changes.
 - Out-of-box readiness / business identity / settings packaging now has Admin Readiness / Setup Checklist V1 complete at the current baseline:
   - readiness is a read-only derived packaging layer over existing tenant/account data (no new truth table)

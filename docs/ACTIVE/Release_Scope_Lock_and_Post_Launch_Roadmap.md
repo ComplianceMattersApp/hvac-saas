@@ -1505,30 +1505,7 @@ Product Choice Signup Landing V1 closeout note:
 - Hybrid remains manual/operator-only and is not exposed as a public signup route.
 - No tier/add-on, billing/payment/QBO, security/RLS, or contractor-authority behavior changed.
 
-Owner Console UI Polish + Admin Link V1 closeout note:
-
-- `/ops/owner-console` now defaults to a Current view that keeps headline counts focused on active/trial/grace accounts.
-- Inactive/cancelled accounts remain visible through separate read-only filters (`Inactive / Cancelled` and `All`).
-- Readability polish was applied to the owner table (column priority, truncation, UUID de-emphasis) with no mutation controls added.
-- `/ops/admin` includes an `Owner Console` link card only for explicit platform-owner allowlist actors.
-- Access and visibility remain allowlist-based only (`PLATFORM_OWNER_EMAILS`, optional `PLATFORM_OWNER_USER_IDS`) and are not granted by product mode, tenant admin role, billing mode, entitlement status, or profile metadata.
-- Scope boundaries remain unchanged: no impersonation, no support-console enablement, no tenant mutation actions, and no security/RLS behavior changes.
-
-Owner Console Hidden Test Accounts V1 closeout note:
-
-- Known internal/test accounts are suppressed from default Owner Console headline counts and the Current view via `PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS` env var (comma-separated, case-insensitive).
-- A new read-only `Hidden / Test` filter view exposes these accounts for inspection without affecting normal operating metrics.
-- No data deletion, archive, Stripe cleanup, auth deletion, Support Console activation, impersonation, or tenant mutation was performed.
-- Logic lives entirely in `lib/business/platform-owner-dashboard.ts`; page wires the env-parsed set through filter and summarize at render time.
-- 25/25 tests passing; TSC clean.
-
-Owner Console Internal Account Separation + Display Polish V2 closeout note:
-
-- Platform/internal owner accounts are now separated from customer counts via env-configured display classification (`PLATFORM_OWNER_INTERNAL_ACCOUNT_EMAILS`) and a read-only `Platform / Internal` view.
-- Hidden/test accounts remain suppressed from default customer counts via env-configured filtering (`PLATFORM_OWNER_HIDDEN_ACCOUNT_EMAILS`) and remain inspectable in `Hidden / Test` and `All` views.
-- Product mode and billing mode now render with friendly display labels; null product mode renders as `Platform / Internal` for internal rows or `Not Set` for customer rows.
-- Owner Console table/readability polish is V2 complete (priority columns, cleaner status/date presentation, de-emphasized technical IDs), while remaining read-only and platform-owner-only.
-- No product_mode mutation, database cleanup, Stripe cleanup, Support Console activation, impersonation, or tenant mutation occurred.
+Owner Console read-only display/readability polish, hidden/test account visibility cleanup, and platform/internal account separation are complete. Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#owner-console-readability--display-polish). Roadmap impact: no impersonation, Support Console enablement, tenant mutation, product-mode mutation, database cleanup, Stripe cleanup, auth deletion, archive/delete action, or security/RLS behavior changed.
 
 ---
 

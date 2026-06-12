@@ -239,18 +239,9 @@ Use [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) for cur
 - Live payment execution surfaces (Pay Now/Charge Card/checkout/refunds/disputes/payouts) remain deferred.
 
 ### 2.3.3 Completed production-shipped cleanup sequence confirmation
-- Completed production-shipped cleanup batch is confirmed as launch-readiness baseline documentation:
-  - Notifications/proposals: unread-awareness cleanup on accept/reject/finalize, card identity restoration, preserved contractor follow-up comments, preserved internal adjudication notes, and intact contractor-visible/internal-only boundaries.
-  - Calendar/scheduling: phone wiring fix in details, card identity restoration (job title/city), no-tech scheduled visibility, unassigned filter chip, inspector collapsible/default-closed behavior, responsive default views (desktop Month, mobile List, explicit view preserved), and unified-surface drag/drop direction with manual scheduling still available.
-  - UI polish: date-only display format changed to MM-DD-YYYY (storage/input/query unchanged), login password show/hide toggle, and day/aging counters on Failed and Need Info/Pending Info internal/portal surfaces.
-  - ECC/test workflow: refrigerant Photo Taken path is attestation-only, does not require/verify uploaded photo proof, does not claim numeric pass, preserves computed_pass = null until manual/admin review or override where needed, and keeps numeric/manual override paths intact.
-  - Duct leakage override suggestion list includes Asbestos while preserving custom/manual reason support.
-- Confirmed boundaries for this closeout:
-  - no payment execution behavior change
-  - no Pricebook behavior change
-  - no RLS behavior change
-  - no claim of calendar engine rebuild
-  - no technician-assignment ownership change from calendar drag/drop
+- Completed production-shipped UI/regression cleanup batch is confirmed for launch-readiness posture.
+- Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#production-shipped-cleanup-sequence).
+- Launch gate impact: no payment execution, Pricebook, RLS, calendar engine, or technician-assignment ownership behavior changed.
 
 ### 2.3.4 Production contractor intake hotfix closeout (resolved)
 - Confirmed production incident: contractor-reported new work request for 4137 Amberwood Cir, Pleasanton showed an error/disappeared and did not save.
@@ -295,16 +286,11 @@ Use [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) for cur
   - targeted Vitest passed: contractor intake hotfix + attachment resilience tests, 2 files / 10 tests
 
 ### 2.3.6 Recent closeout polish pass (completed)
- Section 2I closeout recorded: visual builder cleanup, editable estimate line items, builder workflow polish, pricebook search model, save-manual-line-to-pricebook, redirect-to-new-job-after-convert-to-job, proposal print/customer presentation polish, Internal Proposal Boundaries box removal, Proposal Notes section using the existing estimate notes field, and no schema changes for print/proposal polish.
- Section 2J closeout recorded: 2J-A proposal-link foundation complete and pushed; controlled target-only migration window verified for `20260523130000_estimate_proposal_links_foundation.sql`; `estimate_proposal_links` table, expected columns, expected indexes/constraints, RLS, internal select/insert/update policies, and no delete/public-select policy verified; 2J-B public proposal read shell complete and pushed; 2J-C customer proposal approval complete and pushed; 2J-D internal proposal link copy/regenerate/revoke controls complete and pushed; live proposal-link smoke passed with valid render, successful customer approval, `approved_at` set, `estimate_approved` event created, `response_source = customer_proposal_link`, `proposal_link_id` present, raw token absent from event metadata, stale/reopen behavior safe, and invalid token rendering the generic unavailable page without estimate/customer/company leakage.
- Section 2K closeout recorded: Estimate Proposal Email Delivery / Customer Approval Flow is complete. Secure proposal-link foundation remains active and production-smoke proven; provider-backed proposal email send smoke passed; Customer Delivery deployed UI smoke passed; public proposal-link approval smoke passed; internal approval-notification smoke passed; active-link regeneration fallback smoke passed; local preview-mode smoke passed with rendered output written to `.tmp/email-outbox` and no real email send.
- Section 2K token safety recorded: raw token and token_hash are not persisted in events, communications, or notification payloads.
- Section 2K final workflow recorded: Build proposal -> Finalize Proposal -> Customer Delivery -> Send Proposal Email / Copy Link -> Customer Approves -> Internal Notification -> Review/Convert when ready.
- Explicit non-actions recorded for Section 2K: no SMS/text proposal delivery, no payment collection from proposal, no QBO behavior, no invoice issue/send behavior from proposal approval, no automatic job conversion, no automatic invoice conversion, no customer portal login dependency, no e-signature/legal artifact model, and no live SMS behavior.
- Section 2K remaining polish is parked (non-blocking): public proposal Service Location wording/presentation audit (must never show business address in Service Location slot), optional proposal email visual polish via `EMAIL_DELIVERY_MODE=preview`, visual-only Customer Delivery UI tweaks unless workflow evidence reopens behavior, optional assignment/admin/internal-email notification routing enhancements, optional multi-option customer-card presentation polish, and public proposal Service Location/card wording polish.
- Ops note: if there is any chance a live Supabase service-role key was exposed in terminal logs or transcripts during diagnostics, rotate the key after the smoke/diagnostic window and update deployed env afterward; do not record actual secret values in docs.
-  - Closeout Queue V1 continues to use existing closeout projection truth.
-  - Calendar Work Context uses a derived compact label, not a new truth model.
+- Recent proposal, closeout, and calendar polish closeouts are complete for launch-readiness posture; tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#proposal--closeout--calendar-polish-catch-up).
+- Proposal-link, token-safety, and customer-approval source-of-truth boundaries remain unchanged; durable estimate/proposal model details stay in the estimate/domain docs.
+- Ops note: if there is any chance a live Supabase service-role key was exposed in terminal logs or transcripts during diagnostics, rotate the key after the smoke/diagnostic window and update deployed env afterward; do not record actual secret values in docs.
+- Closeout Queue V1 continues to use existing closeout projection truth.
+- Calendar Work Context uses a derived compact label, not a new truth model.
 - Parked follow-up remains parked:
   - Contact recipient write/edit workflow stays deferred unless field use proves need.
   - Closeout Queue V2 waits until the owner uses V1 and provides feedback.
@@ -314,144 +300,20 @@ Use [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) for cur
   - `calendar-filtering.test.ts` is green again and no longer represents an active TypeScript fixture gap.
 
 ### 2.3.7 Performance/responsiveness closeout (current pass) and active backlog
-- The focused performance/responsiveness intervention batch is complete for the current pass and is now closed for this pass.
-- Additional job-detail responsiveness closeout is complete in commits `655d83b` and `4ecf127`:
-  - Service Closeout Read De-Dupe (`655d83b`): removed duplicate blocking job read from `ServiceStatusActions`; parent job detail now passes already-loaded `jobType` and `opsStatus`.
-  - Job Detail Location Preview Deferral (`4ecf127`): Street View/static map lookup is deferred behind `Suspense`, and immediate fallback preserves address context plus `Navigate` and `Open in Maps`.
-  - scope/boundary confirmation: responsiveness/perceived-performance only; no source-of-truth, lifecycle, `/ops`, Service Plans, invoice/payment, portal, SMS, QBO, schema, migration, auth/RLS, entitlement, or feature-flag behavior changes.
-  - validation recorded: `npx.cmd tsc --noEmit` passed, `git diff --check` passed, browser smoke passed for service and Service Plan-linked job paths.
-  - caveat: dedicated ECC-negative smoke should continue as part of normal ongoing testing; location preview deferral itself is job-type neutral.
-  - guardrail framing: this is documented as shared job-detail responsiveness hardening that preserves neutral actor boundaries and scalable operational truth.
-- Completed/current baseline from this pass:
-  - field action timing instrumentation
-  - job detail render timing instrumentation
-  - internal `/jobs/[id]` first-paint/recomposition improvements
-  - route loading/context preservation improvements
-  - deferred secondary section bodies moved out of parent render path:
-    - internal attachments
-    - follow-up/customer-attempt history
-    - service-chain detail/history body
-    - add-assignee selector/form
-    - timeline/shared/internal narrative bodies
-  - internal invoice secondary-detail deferral:
-    - immediate billing/closeout truth remains first-paint
-    - full invoice detail/lines/delivery/payment/pricebook panel data streams later
-  - customer-attempt summary deferral:
-    - `customerAttemptSummary` is now `0ms` on measured first-paint renders
-    - contact actions remain immediate
-    - no false "0 attempts" display is shown
-    - Follow-Up History remains authoritative and deferred
-  - timeline summary softening:
-    - blocking 200-row `job_events` parent read was removed from first paint
-    - shared/internal notes and timeline header counts/latest-date subtitles were replaced with neutral "loads below" copy
-    - `DeferredTimelineBody`, `DeferredSharedNotesBody`, and `DeferredInternalNotesBody` remain authoritative and still read `job_events` after streaming
-    - `ContractorReportPanel` generate/send behavior is unchanged; first-paint contractor response labels were display-softened only
-  - internal job-detail parent read fanout was parallelized after scoped boundary and main job load
-  - contact-attempt calendar revalidation dedupe completed
-  - timing instrumentation remains behind env-gated flags:
-    - `CONTACT_ATTEMPT_TIMING_DEBUG`
-    - `JOB_DETAIL_TIMING_DEBUG`
-  - contact buttons no longer remain stuck as `Recording...`
-  - contact pending feedback is action-specific
-  - No Answer and Sent Text return near contact section after redirect instead of snapping to top
-  - event write truth, redirects, revalidation behavior, banner behavior, attempt counts, and `tab=ops` continuity remain preserved
-- Current practical baseline note:
-  - earlier severe spikes were reduced significantly
-  - latest local `/jobs/[id]` smoke showed steady-state renders commonly around roughly `1.45-2.47s`
-  - `timelineSummary` usually measured around roughly `183-384ms` after softening
-  - `customerAttemptSummary` stayed `0ms`
-  - contact-action core timings have been observed around roughly `1.1-1.4s` on improved paths
-  - cold/backend/Supabase variance can still cause spikes
-- Performance is not done forever and remains an active launch-readiness backlog:
-  - app-wide route speed
-  - `/ops` first impression
-  - `/jobs/[id]` first load and recomposition
-  - `mainJobRead`/`eccPayloadReads` spike risk
-  - `assignmentDisplaySummary` spike risk
-  - `serviceChainSummary` spike risk
-  - invoice truth/detail split monitoring
-  - lifecycle buttons (On the Way / Work in Progress / Complete)
-  - contact actions
-  - `/jobs/new`
-  - calendar
-  - reports
-  - broader backend/read variance audit territory
-  - reducing full-page recomposition where safe
-  - future inline/partial settle patterns where appropriate
-- Performance no longer blocks all roadmap movement by default; next speed work must be measured, surgical, and intentionally queued.
-- Guardrails for this stream remain locked:
-  - do not weaken truth to chase speed
-  - no optimistic final-state UI without explicit approval
-  - do not trim revalidation without dependency mapping
-  - do not casually alter invoice/billing/payment performance paths
-  - continue audit -> small slice -> benchmark -> commit -> docs update
-  - do not weaken auth/scope/source-of-truth/event/audit/revalidation just to chase speed
+- The focused performance/responsiveness intervention batch is complete for the current pass and no longer blocks all roadmap movement by default.
+- Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#job-detail-responsiveness-and-contact-action-polish).
+- Launch-readiness posture: future speed work remains measured, surgical, and queued only when a specific issue harms usability.
+- Guardrails remain locked: do not weaken auth, scope, source-of-truth, event/audit, invoice/billing/payment, redirect, or revalidation behavior to chase speed.
 
 ### 2.3.5.1 Ops First Impression performance pass closeout (`/ops`) (completed)
-- Completed slices in this pass:
-  - A1 removed unused `/ops` Upcoming read path from the blocking render path (`0e0b05e`).
-  - A2 added `OPS_TIMING_DEBUG` diagnostics (`86d6e02`).
-  - A3 captured baseline timings.
-  - A4 split actor/business identity timing and safely overlapped business identity after actor scope was known (`c256153`).
-  - A5 added `primaryQueueReads` breakdown diagnostics (`3c5d261`).
-  - A6 split Field Work fetch vs post-filter (`277e898`).
-  - A7 compared Field Work vs Call List and confirmed Field Work was not uniquely slow (`1f978a6`).
-  - A8 split `secondarySignalReads` (`54708a8`).
-  - A9 split unread contractor notification cost (`bfcf72337cb1d9ce3afc2408b4db62eaa1e2fe55`).
-  - A10 switched Ops contractor-update awareness to a narrow helper, removing rich notification job enrichment from `/ops` first impression (`67163ec`).
-  - A11 split assignment display map internals (`64ce273`).
-  - A12 captured full current baseline after A10/A11.
-  - A13 split closeout projection internals (`44d63e1`).
-  - A14 split request actor context internals and confirmed variance source (`c07745c`).
-- Real behavior improvements delivered:
-  - unused Upcoming read path was removed from `/ops` first impression
-  - Ops contractor-update awareness now uses a narrow helper instead of rich notification enrichment
-- Diagnostic coverage now includes major `/ops` phases under `OPS_TIMING_DEBUG`:
-  - request actor context
-  - primary queues
+- `/ops` first-impression performance pass is complete for the current launch-readiness baseline.
+- Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#ops-first-impression-performance-pass).
+- Future performance backlog remains optional and measurement-driven only.
 
 ### 2.3.6 Field bus improvement passes closeout (completed)
 
-- The following field-bus improvement passes are complete, committed, and pushed.
-- Scope of this closeout is documentation alignment only; no new runtime behavior is implied beyond already shipped code.
-
-- New Job Alert lifecycle cleanup:
-  - New job/new work awareness is no longer treated as active unread once work is scheduled/finalized/rejected/handled.
-  - Manual Read remains available.
-  - Contractor note/update notification scope remains unchanged.
-
-- Owner Console company-name fallback correction:
-  - customer account rows use tenant-safe company-name resolution.
-  - missing company names render a neutral setup placeholder instead of platform fallback branding.
-
-- Equipment fields and CHEERS/report visibility:
-  - furnace labels are clarified as:
-    - Heating Input (KBTU/h)
-    - Heating Output (BTU/h)
-    - Efficiency / AFUE %
-  - Heating Input helper text is clarified: Enter thousands of BTU/h, for example 66 for 66,000 BTU/h.
-  - report/equipment summary surfaces include saved equipment details.
-  - coil manufacturer/model/serial summary coverage was verified.
-  - no schema/storage/unit-conversion/test-type behavior changed.
-
-- Login screen signup options and copy polish:
-  - login links to HVAC Service signup and ECC / Compliance Testing signup.
-  - Hybrid public signup remains intentionally not exposed.
-  - invited-user access helper text is clarified for company-invited users.
-
-- `/jobs/new` Create New Customer shortcut:
-  - Create New Customer is reachable near the top of the flow.
-  - existing customer search/reuse and server-side intake behavior remain unchanged.
-
-- `/ops/call-list` full page:
-  - dedicated full Call List workspace is active.
-  - `/ops` remains command-center summary.
-  - premium polish pass accepted with restrained operations-software styling.
-
-- Schedule update permit-field preservation:
-  - schedule-only updates now preserve omitted permit fields server-side in `updateJobScheduleFromForm`.
-  - omitted schedule-form submits no longer clear `permit_number`, `jurisdiction`, or `permit_date`.
-  - no scheduling source-of-truth, lifecycle, notification, or queue semantics changes were made.
+- Field-bus improvement passes are complete for launch-readiness posture; tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#field-bus-improvement-passes).
+- Launch gate impact: no scheduling source-of-truth, lifecycle, notification, queue semantics, equipment schema/storage/unit-conversion/test-type, signup exposure, or customer intake source-of-truth behavior changed.
 
 ### 2.3.7 Work Item and Estimate smart-entry closeout confirmation (completed)
 
@@ -552,81 +414,21 @@ Use [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) for cur
 - Controlled rollout support/feedback remains direct-to-owner for now; do not reopen the formal support-system lane in this pass.
 
 ### 2.3.7 Field-ready installable/PWA access readiness V1 (controlled rollout complete)
-- Completed scope now includes web/PWA metadata/installability baseline hardening, login continuity hardening, update-safe refresh notice, service-worker update-failure handling, and shared Device setup guidance plus per-device notifications.
-- Current posture remains web-first app-like install readiness for controlled rollout use.
-- Device setup now confirms:
-  - Chromium install prompt path when the browser exposes install prompt support
-  - iPhone/Safari manual Add to Home Screen guidance
-  - already-installed detection
-  - per-device notifications preserved in the same setup surface
-- Confirmed adjacent launch-readiness items closed in this pass:
-  - Today/Ops first-action guidance and clarity
-  - revenue workflow rail clarity
-  - calendar mobile control compression
-  - admin Day 1 essentials
-  - mobile `/jobs/[id]` field-mode protection remained intact during device-setup rollout
+- Controlled rollout posture remains web-first app-like install readiness.
+- Tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#field-ready-pwa--portal-loading-polish).
 - Native app-store distribution expansion beyond this lane remains intentionally deferred unless explicitly reopened.
 - Deeper offline mode/service-worker caching remains intentionally deferred to a separate planned slice.
 - SMS/provider messaging, QBO, customer portal, full support system, and deeper Payments V2 remain deferred.
 - Service Plan billing/autopay/generated invoice expansion remains deferred unless explicitly reopened under existing model locks.
 
 ### 2.3.7.1 Field-ready installable/PWA access readiness V1B-1 — Proxy Verification + Portal Loading Polish (completed)
-- Confirmed: `proxy.ts` is the active and correct routing convention for this project under Next.js 16.
-  - Next.js 16.0.0 officially renamed `middleware.ts` to `proxy.ts`; `middleware.ts` is deprecated.
-  - Root `proxy.ts` exports `function proxy(req: NextRequest)` — the correct named export form — and is wired and executing.
+- Proxy verification and portal loading polish are complete; tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#field-ready-pwa--portal-loading-polish).
+- `proxy.ts` remains the active Next.js 16 routing convention for this project; do not add `middleware.ts`.
 
 ### 2.3.8 HVAC Service Ops First Impression + Shared Notes De-Emphasis V1 (completed)
-- Scope is complete and treated as a mode-aware presentation/readability polish.
-- HVAC Service `/ops` first impression now uses Team Work Snapshot + Work by Technician in place of the primary contractor filter/search block.
-- Existing job search remains available for HVAC Service.
-- HVAC Service operational copy in the affected Ops surface is team/work oriented where applicable.
-- HVAC Service `/jobs/[id]` retains Timeline and Internal Notes / Team Notes visibility.
-- Shared Notes remains available and was only de-emphasized/optional for HVAC Service mode.
-- ECC/HERS behavior remains preserved:
-  - contractor filter/search remains visible/usable
-  - contractor links/query params remain functional
-  - Shared Notes behavior is unchanged
-- Hybrid / Master / All-in-One behavior remains preserved:
-  - broad behavior and contractor visibility remain intact
-  - Shared Notes remains present
-  - no clutter/broken-link regression was observed in smoke
-- Validation recorded:
-  - TypeScript passed: `npx.cmd tsc --noEmit`
-  - browser smoke passed for HVAC Service, ECC/HERS, and Hybrid / Master / All-in-One checks
-  - no console errors and no hydration issues were reported during smoke
-- Explicit non-changes:
-  - no schema/migration/Supabase command activity
-  - no auth/RLS/permission/contractor-authority changes
-  - no source-of-truth ownership changes and no `job_events` mutation
-  - no billing/payment/Stripe/QBO changes
-  - no report dataset/calculation changes
-  - no feature deletion or codebase split
-  - Do not add `middleware.ts`; `proxy.ts` is the correct baseline convention for this app.
-- Confirmed: protected unauthenticated deep links preserve `?next=` return path for tested routes:
-  - `/ops` → `/login?next=%2Fops`
-  - `/calendar` → `/login?next=%2Fcalendar`
-  - `/portal/jobs/some-deep-link-id` → `/login?next=%2Fportal%2Fjobs%2Fsome-deep-link-id`
-- Confirmed: post-login role-routing safety is enforced by `resolveSafeAuthReturnPath`:
-  - contractor users are constrained to `/portal/*` return paths
-  - internal users are blocked from contractor portal return paths
-- Added: `app/portal/loading.tsx` — mobile-friendly contractor portal loading skeleton with header card and job-list pulse animation.
-- Confirmed boundaries unchanged:
-  - auth/session architecture is unchanged
-  - contractor/internal route separation is unchanged
-  - first-owner routing behavior is unchanged
-  - Estimates and Support Console production enablement remain deferred
-  - source-of-truth boundaries remain unchanged
-  - no schema, migrations, RLS, Supabase commands, feature flag changes, or production data actions
-  - no service worker/offline caching
-  - no native app-store packaging
-- Validation:
-  - `npx.cmd tsc --noEmit` passed
-  - browser smoke passed for unauthenticated `/ops`, `/calendar`, and `/portal/jobs/...` deep-link redirects with `?next=`
-- Deferred from this slice:
-  - post-login role-routing smoke with live credentials (validated logically via `resolveSafeAuthReturnPath` tests)
-  - authenticated slow-load visual confirmation of portal loading skeleton
-  - service worker/offline caching (separate planned slice)
-  - native app-store distribution (intentionally deferred)
+- Mode-aware HVAC Service Ops first-impression and Shared Notes presentation polish is complete; tactical evidence now lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md#hvac-service-ops-first-impression--shared-notes-de-emphasis).
+- Launch gate impact: ECC/HERS, Hybrid / Master / All-in-One, contractor/internal route separation, auth/session architecture, source-of-truth boundaries, billing/payment/Stripe/QBO, report data/calculation, service worker/offline caching, and native app-store packaging remain unchanged.
+- Deferred from this slice remains deferred: post-login role-routing smoke with live credentials, authenticated slow-load visual confirmation of portal loading skeleton, service worker/offline caching, and native app-store distribution.
 
 ### 2.3.8 Service Workflow / Visit Scope Field Experience V1 Slice 1 (completed)
 - Service job detail now uses clearer field-first Work Items guidance.
