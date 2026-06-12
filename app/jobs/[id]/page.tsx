@@ -132,6 +132,7 @@ import FieldBillingSummary from "./_components/FieldBillingSummary";
 import InternalInvoiceLineItemsTable, {
   InternalInvoiceDraftSaveForm,
 } from "./_components/InternalInvoiceLineItemsTable";
+import ChangeServiceLocationForm from "./_components/ChangeServiceLocationForm";
 import {
   hasDirectInvoiceDraftMutationAccess,
   hasInvoiceIssueAccess,
@@ -2439,6 +2440,26 @@ export default async function JobDetailPage({
             }>;
           })
       : [];
+
+  const serviceLocationOptions = savedCustomerServiceLocations.map((loc) => {
+    const locAddress = [
+      loc.address_line1,
+      loc.address_line2,
+      [loc.city, loc.state, loc.zip ?? loc.postal_code].filter(Boolean).join(" "),
+    ]
+      .map((value) => String(value ?? "").trim())
+      .filter(Boolean)
+      .join(", ");
+    const locName = String(loc.nickname ?? loc.label ?? "").trim();
+    const label =
+      [locName, locAddress].filter(Boolean).join(" - ") ||
+      `Location ${loc.id.slice(0, 8)}`;
+
+    return {
+      id: loc.id,
+      label,
+    };
+  });
 
   const mobilePrimaryPhone = customerPhone !== "—" ? customerPhone : primarySiteAccessPhone || "";
   const mobilePrimaryPhoneDigits = mobilePrimaryPhone.replace(/\D/g, "");
@@ -6521,45 +6542,12 @@ const failureResolutionPathCount =
                     This job has invoice history. Changing the job service location will not rewrite invoice snapshot truth.
                   </div>
                 ) : null}
-                <form action={changeJobServiceLocationFromForm} className="space-y-2">
-                  <input type="hidden" name="job_id" value={String(job.id)} />
-                  <label className="grid gap-1 text-xs font-medium text-slate-700">
-                    Saved service location
-                    <select
-                      name="location_id"
-                      defaultValue={String(locationId ?? "")}
-                      required
-                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-normal text-slate-900"
-                    >
-                      <option value="">Select a saved location</option>
-                      {savedCustomerServiceLocations.map((loc) => {
-                        const locAddress = [
-                          loc.address_line1,
-                          loc.address_line2,
-                          [loc.city, loc.state, loc.zip ?? loc.postal_code].filter(Boolean).join(" "),
-                        ]
-                          .map((value) => String(value ?? "").trim())
-                          .filter(Boolean)
-                          .join(", ");
-                        const locName = String(loc.nickname ?? loc.label ?? "").trim();
-                        const label = [locName, locAddress].filter(Boolean).join(" - ") || `Location ${loc.id.slice(0, 8)}`;
-                        return (
-                          <option key={loc.id} value={loc.id}>
-                            {label}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </label>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <ImmediateSubmitButton
-                      className="inline-flex rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
-                      pendingText="Updating..."
-                    >
-                      Move this job to a different saved service location?
-                    </ImmediateSubmitButton>
-                  </div>
-                </form>
+                <ChangeServiceLocationForm
+                  action={changeJobServiceLocationFromForm}
+                  currentLocationId={String(locationId ?? "")}
+                  jobId={String(job.id)}
+                  locations={serviceLocationOptions}
+                />
               </div>
             </details>
           </div>

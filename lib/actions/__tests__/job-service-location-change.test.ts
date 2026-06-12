@@ -110,6 +110,7 @@ function makeSelectQuery(data: Row | null) {
 function makeFixture(options?: {
   job?: Row | null;
   location?: Row | null;
+  eventError?: { message: string };
 }) {
   const job = options?.job ?? {
     id: "job-1",
@@ -177,7 +178,7 @@ function makeFixture(options?: {
         return {
           insert: vi.fn((payload: Row) => {
             eventInserts.push(payload);
-            return Promise.resolve({ error: null });
+            return Promise.resolve({ error: options?.eventError ?? null });
           }),
         };
       }
@@ -314,6 +315,23 @@ describe("changeJobServiceLocationFromForm", () => {
     expect(fixture.touchedTables).not.toContain("contact_recipients");
     expect(fixture.forbiddenWrites).toHaveLength(0);
   });
+
+  it("still redirects after the job update if the audit event insert fails", async () => {
+    const fixture = makeFixture({ eventError: { message: "event insert failed" } });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
+
+    await expect(invoke()).rejects.toThrow(
+      "REDIRECT:/jobs/job-1?banner=service_location_updated#job-location",
+    );
+
+    expect(fixture.jobUpdates).toHaveLength(1);
+    expect(fixture.eventInserts).toHaveLength(1);
+    expect(consoleErrorSpy).toHaveBeenCalledWith(
+      "service_location_changed job_events insert failed:",
+      { message: "event insert failed" },
+    );
+    consoleErrorSpy.mockRestore();
+  });
 });
 
 describe("job service location page wiring and intake guardrails", () => {
@@ -329,13 +347,22 @@ describe("job service location page wiring and intake guardrails", () => {
     path.join(process.cwd(), "app", "jobs", "new", "page.tsx"),
     "utf8",
   );
+  const changeServiceLocationFormSource = readFileSync(
+    path.join(process.cwd(), "app", "jobs", "[id]", "_components", "ChangeServiceLocationForm.tsx"),
+    "utf8",
+  );
 
   it("renders the compact Change Service Location flow near the job location card", () => {
     expect(jobPageSource).toContain("Change Service Location");
     expect(jobPageSource).toContain("Use this if the job was created for the wrong saved address.");
-    expect(jobPageSource).toContain("Move this job to a different saved service location?");
     expect(jobPageSource).toContain("action={changeJobServiceLocationFromForm}");
+    expect(jobPageSource).toContain("locations={serviceLocationOptions}");
     expect(jobPageSource).toContain("Service location updated for this job.");
+    expect(changeServiceLocationFormSource).toContain('name="job_id"');
+    expect(changeServiceLocationFormSource).toContain('name="location_id"');
+    expect(changeServiceLocationFormSource).toContain("Update location");
+    expect(changeServiceLocationFormSource).toContain("pending ? \"Updating...\" : \"Update location\"");
+    expect(changeServiceLocationFormSource).toContain("disabled={!hasDifferentSelection}");
   });
 
   it("keeps job intake reading saved customer locations and reusing duplicates", () => {

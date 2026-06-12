@@ -10457,7 +10457,9 @@ export async function changeJobServiceLocationFromForm(formData: FormData) {
       },
     });
 
-  if (eventErr) throw eventErr;
+  if (eventErr) {
+    console.error("service_location_changed job_events insert failed:", eventErr);
+  }
 
   revalidatePath(`/jobs/${id}`);
   revalidatePath(`/customers/${customerId}`);
