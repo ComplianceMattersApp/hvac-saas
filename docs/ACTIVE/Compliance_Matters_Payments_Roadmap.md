@@ -37,152 +37,20 @@
 - Follow-on UX lane: customer page IA/UX cleanup after invoice page cleanup.
 - Safety/infra lock for this closeout: no production Stripe action and no schema change.
 
-## Phase 6F-C Closeout (Manual Saved-Card Charge for Issued Invoice)
+## Saved-Card, Scheduled Autopay, And Failed-Payment Roadmap Status
 
-- Phase 6F implementation is closed in commit `f7fa23fca188029a9a6f38e152a83180b346606e` (`feat(payments): charge saved card manually for issued invoice`) and pushed to `origin/main`.
-- Manual one-time saved-card charge now exists for eligible issued invoices and is explicitly not autopay and not Stripe subscription behavior.
-- Locked truth layering remains: manual attempt row in `tenant_saved_method_payment_attempts` is workflow/audit truth; webhook-created `internal_invoice_payments` is collected-money truth; allocation is created only after payment truth.
-- Fresh sandbox smoke evidence: invoice `INV-20260528-1CFFCB88` (`7f79e75b-06b5-4924-bd0c-91b78740f2d7`), attempt `99949838-81f3-442a-9de1-4bc736b4c40b`, payment `3788c9ff-700d-43ab-8339-46e4cbf24ae3`, allocation `2b702b07-690a-4e4d-82f2-6f6ed6e40627`, charge `ch_3Tbxg47itDepDR180C1KhPco`, amount `$17.50`, webhook HTTP 200, UI Paid / Balance `$0.00`.
-- Guardrails confirmed: no `tenant_customer_autopay_consents` creation, no `maintenance_agreement_visits` mutation, no `maintenance_agreements.next_due_date` mutation, no Stripe Billing subscription behavior, no ACH/bank-debit behavior.
-- Validation closeout: TypeScript no-emit pass, targeted Vitest matrix pass (8 files / 100 tests), `git diff --check` pass, `_tmp_*` cleanup confirmed, and implementation commit scope limited to intended code/tests only.
+Historical closeout proof for Phase 6F manual saved-card charge, Phase 6G scheduled-autopay attempts, Phase 6H failed-autopay retry/attention workflow, and Phase 6I failed-payment reconciliation visibility is preserved in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md).
 
-## Phase 6G-A Closeout (Scheduled Autopay Attempts Model/Audit Lock, Docs-Only)
-### Phase 6H-A Closeout (Failed Autopay Retry / Attention Workflow Model Lock, Docs-Only)
+Current roadmap status:
 
-- Phase 6H-A audit/model lock is complete as read-only analysis with no code, schema, docs-outside-scope, sandbox data, production data, Stripe charge, or UI mutation.
-- Canonical attempt states remain unchanged: `pending`, `submitted`, `succeeded`, `failed_declined`, `failed_requires_action`, `blocked_precondition`, `retry_scheduled`, `abandoned`.
-- Submit-path lock: declines map to `failed_declined`; authentication-required maps to `failed_requires_action`; readiness/scope/invoice/precondition failures remain `blocked_precondition`; stale amount snapshot blocks submit; duplicate in-flight remains blocked; 6G-E3 self-in-flight exception remains narrow/safe.
-- Webhook lock: `charge.failed` is currently routed; `payment_intent.payment_failed` is not currently routed; failed webhook rows are non-collected `internal_invoice_payments` truth; failed allocations stay non-counting (`inactive`); saved-method attempt failure resolution remains webhook-linked where identity is present.
-- Current surfaces: Payments Register separates recorded vs failed rows; Customer Payment History separates Failed Attempts; invoice workspace has manual saved-card failure banners, but no scheduled-autopay-specific attention read model yet.
-- Retry/attention policy recommendation (V1): manual-first retry, no automatic infinite retry, `failed_requires_action` pauses further scheduled submissions for same consent/agreement/customer path until operator resolution, `failed_declined` opens attention and allows manual retry only after revalidation, and failed autopay does not block service visits by default.
-- Schema/read-model recommendation: use existing attempt table fields first (`retry_count`, `next_retry_at`, `requires_action_type`, `blocked_reason_code`, `failure_code`, `failure_message`, resolved fields) plus a derived attention read model before any additive schema.
-- Customer communication remains deferred: failed-payment email/SMS, portal/self-service card-update + retry flows, retry reminders, and notification automation.
-- Locked sequence after this closeout: 6H-B read model/attention projection only, 6H-C invoice workspace read-only attention UI, 6H-D manual retry action with strict guards, 6H-E sandbox failed-path smoke, 6H-F docs closeout/production readiness gate.
-### Phase 6H-B Closeout (Failed Autopay Attention Read Model / Projection Only)
+- Manual one-time saved-card charge exists for eligible issued invoices and remains separate from autopay and Stripe Billing subscription behavior.
+- Scheduled-autopay attempt orchestration, failed-autopay attention, invoice-workspace visibility, manual retry, and failed-payment reconciliation visibility have historical closeout evidence preserved in the domain evidence ledger.
+- Durable payment register, allocation, failed-payment, and invoice paid/balance contracts remain in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md).
+- Durable service-plan billing, saved-method, scheduled-autopay attempt, and billing-period contracts remain in [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md).
+- Future customer communication and self-service flows remain deferred: failed-payment email/SMS, portal update-card flow, customer self-service retry, retry reminders, and broader notification automation.
+- Future payment add-ons remain deferred unless explicitly reopened in roadmap order: refunds, disputes, ACH, QBO sync, public/customer portal payment history, partial payments, broader saved-card flows, and deeper recurring-billing automation.
 
-- Phase 6H-B is complete in commit `e2690e2e36c0e40b2797d73bac8985693b18f381` (`feat(payments): add failed autopay attention read model`).
-- Added server-side read-only projection module `lib/business/failed-autopay-attention-read-model.ts` with focused tests in `lib/business/__tests__/failed-autopay-attention-read-model.test.ts`.
-- Projection scope is account-owned failed scheduled-autopay attention only (`failed_declined`, `failed_requires_action`, meaningful `blocked_precondition`) with counts by status/category and operator-facing recommended action.
-- Truth boundaries remain locked: `tenant_saved_method_payment_attempts` = attempt/attention truth; `internal_invoice_payments` = payment-event truth; `internal_invoice_payment_allocations` = allocation truth; Stripe = processor/payment-method truth; visits and `maintenance_agreements.next_due_date` remain operational truth and are not payment-mutated.
-- No Stripe behavior change, no schema change, no production enablement change, and no payment/allocation/invoice/visit/next_due writes outside existing webhook payment truth behavior.
-
-### Phase 6H-C Closeout (Invoice Workspace Read-Only Failed-Autopay Attention UI)
-
-- Phase 6H-C is complete in commit `5b383e842a62d0cc95f7b1d90ca3865b735f5e87` (`feat(payments): show failed autopay attention on invoice workspace`).
-- Invoice workspace now loads the failed-autopay attention read model server-side and renders a read-only "Failed Scheduled Autopay Attention" panel for internal operator visibility.
-- Panel surfaces open attention items, category, attempt status, timestamp, recommended operator action, and safe context metadata; no retry action is exposed.
-- This remains visibility-only: no Stripe calls, no payment/allocation/invoice mutations, no visit/next_due mutation, and no customer email/SMS/portal update-card flow launch in this slice.
-- Deferred lanes remain locked: 6H-D manual retry action, 6H-E failed/`requires_action` sandbox smoke, and customer communication/self-service update-card flows.
-
-### Phase 6H-D Closeout (Manual Retry for Failed Scheduled Autopay)
-
-- Phase 6H-D is complete in commit `c3ea465987ac138822b01c914839c6ec62a696fa`.
-- Added manual retry helper/action/UI affordance for retry-eligible failed scheduled-autopay attention through the sanctioned invoice-workspace action path.
-- Retry action behavior is guardrailed: it creates a new retry attempt in `tenant_saved_method_payment_attempts` and does not directly write `internal_invoice_payments`, does not directly write `internal_invoice_payment_allocations`, and does not directly mutate invoice paid/balance state.
-- Source-of-truth lock remains unchanged: `tenant_saved_method_payment_attempts` = attempt/attention truth; `internal_invoice_payments` = payment-event truth; `internal_invoice_payment_allocations` = allocation truth; Stripe = processor/payment-method truth.
-- Operational boundaries remain unchanged: no direct `maintenance_agreement_visits` mutation and no direct `maintenance_agreements.next_due_date` mutation.
-- Successful retry-settlement smoke remains optional/future and should only run when a valid saved-card path can be safely exercised through sanctioned flows.
-
-### Phase 6H-E Closeout (Declined-Path Manual Retry Smoke, Sandbox-Only)
-
-- 6H-E cleanup/stabilization is complete: E2/E3/E4 restored clean fixture baseline and consent/method coherence through sanctioned helpers with no code/docs/schema commits in that cleanup lane.
-- 6H-E5 is complete in commit `d5dd4f918b0178157dbcb54edd5f9203a9b943e3` with sanctioned billing-anchor job path (`linkBillingAnchorJobFromForm`) and no invoice/payment/allocation/Stripe/visit/next_due side effects.
-- 6H-E5B is complete in commit `b12e1cc6e934d2d4c0203104d3e393387890619c`, hard-blocking cancelled/canceled/closed/void/voided/archived/soft-deleted jobs as billing anchors.
-- 6H-E6 declined-path smoke is complete and validated for customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6`, billing period `c89c4c36-a842-40e2-9b20-745dce4b959c`, job `1a52288c-78ae-4e79-9472-d00ed928f32f`, invoice `INV-20260529-DDC200B6` (`3d5edb10-8695-42ab-a133-54bd64e4a2a0`).
-- Scheduled attempt `6d9120a4-d571-41a0-8ad3-b5172ac39275` ended `failed_declined` with failure "Your card was declined."; sanctioned manual retry created attempt `980c90c2-745f-470f-aa86-e2ba5b30fbc0` with `retry_count = 1` and `failed_declined`.
-- Stripe listener captured `charge.failed` and `payment_intent.payment_failed`; webhook POSTs returned HTTP 200.
-- Post-smoke truth was correct and non-silent: one failed `internal_invoice_payments` row (non-collected payment-event truth), one inactive `internal_invoice_payment_allocations` row (non-counting allocation truth), canonical invoice summary unpaid, paid amount `0`, balance `1750`.
-- Invoice paid/balance projection remains derived from recorded collected payment truth only; failed payment rows are non-collected and inactive allocations do not count toward paid balance.
-- Declined retry remained unpaid and visible in attention surfaces; no direct invoice paid mutation and no direct payment/allocation writes from retry action occurred.
-- Customer email/SMS/portal update-card flows remain deferred.
-- Next required visibility lane before production-grade scheduled autopay rollout: Failed Payment Alert + Reconciliation Queue, because failed payments must not occur silently.
-
-### Phase 6I-A Closeout (Failed Payment Alert + Reconciliation Queue Model Lock, Docs-Only)
-
-- Scope lock: docs/audit/model only. No code changes, migrations, sandbox/production mutation, Stripe actions, read-model implementation, alert-card implementation, or queue implementation.
-- Preflight lock: branch is clean and synced (`HEAD == origin/main`) at `10aa8983645b59f46f3a5a969f79298b9694b756`; latest commit on branch is `polish(tests): standardize mobile ECC console layout`.
-- History/docs reconciliation: commit grep for `docs(payments): close failed autopay retry smoke` is empty, but failed-autopay retry closeout is clearly reflected in ACTIVE docs (6H-B/6H-C/6H-D/6H-E6 sections).
-
-Failed-payment attention definition (V1 open):
-- `tenant_saved_method_payment_attempts.attempt_kind = scheduled_autopay`.
-- `attempt_status` in `failed_declined`, `failed_requires_action`, or meaningful `blocked_precondition`.
-- not resolved by `resolved_internal_invoice_payment_id`.
-- not terminal closed by `succeeded` or `abandoned`.
-- queue relevance should prefer invoice still issued/non-void with positive balance due.
-
-Visibility rule:
-- Failed payments must not occur silently.
-- Invoice-level attention already exists, but account-level/operator-level failed-payment visibility is required before production-grade autopay rollout.
-
-Source-of-truth lock (unchanged):
-- `tenant_saved_method_payment_attempts` = attempt/attention truth.
-- `internal_invoice_payments` = payment-event truth.
-- `internal_invoice_payment_allocations` = allocation truth.
-- Stripe = processor/payment-method truth.
-- invoice paid/balance = projection from collected payment truth only.
-- visits and `maintenance_agreements.next_due_date` remain operational truth and are not payment-mutated.
-- failed payment rows are non-collected truth.
-- inactive allocations do not count toward paid balance.
-
-Recommended V1 alert surface:
-- Owner/Admin/Billing-only failed-payment attention card on Ops or admin/dashboard surface.
-- show open failed-payment count and category/severity breakout when practical.
-- link to dedicated reconciliation queue.
-- rationale: Ops/admin is daily operational control plane; Payments Register remains payment-event truth but not attempt-attention truth.
-
-Recommended V1 reconciliation queue shape:
-- separate from Payments Register.
-- read-model-backed from attempt truth with invoice/payment enrichment.
-- row fields: customer, invoice number, balance due, failure category, failure reason, last attempt time, retry eligibility, recommended action, invoice workspace link.
-- V1 actions: open invoice workspace, open customer, copy failure context; retry remains invoice-workspace action.
-- `mark acknowledged/reviewed` remains deferred unless explicitly approved later.
-
-Deferred items:
-- failed-payment email notifications.
-- failed-payment SMS notifications.
-- portal update-card flow.
-- customer self-service retry.
-- automated retry scheduling/policies.
-- successful retry-settlement smoke unless safely executable through sanctioned saved-card flows.
-- `payment_intent.payment_failed` routing unless explicitly approved in this phase.
-
-Known risks/blockers:
-- scheduled-autopay close semantics are not fully explicit in current write paths; read model closure expects `resolved_internal_invoice_payment_id` or terminal status.
-- current webhook resolver appears scoped to `manual_saved_method` attempts; scheduled-autopay resolution should be made explicit before queue close/resolution actions.
-- `payment_intent.payment_failed` is not currently routed; failure truth currently relies on `charge.failed`.
-- latest `HEAD` differs from expected failed-autopay docs-closeout commit message; docs/history reconciliation should be explicitly recorded when closing 6I-A.
-
-Proposed implementation sequence:
-- 6I-B: failed-payment reconciliation read model.
-- 6I-C: Owner/Admin/Billing alert card.
-- 6I-D: reconciliation queue UI.
-- 6I-E: sandbox smoke + docs closeout.
-
-### Phase 6I-E Closeout (Failed Payment Reconciliation Visibility, Docs-Only)
-
-- 6I-B is complete: account-level failed-payment reconciliation read model is implemented and validated as read-only projection.
-- 6I-C is complete: Ops failed-payment alert card is implemented for financial-authority visibility (Owner/Admin/Billing).
-- 6I-D is complete: dedicated Failed Payment Reconciliation Queue route `/reports/failed-payments` is implemented and linked from Ops alert surface.
-- 6I-E smoke is complete after correcting account context to the fixture owner account (Service Account).
-- Proven visibility chain: failed-payment item appears in account-level read model -> Ops failed-payment alert is visible -> alert links to `/reports/failed-payments` -> queue displays failed-payment items -> queue links to invoice workspace -> invoice workspace shows detailed failed scheduled-autopay attention.
-- Smoke evidence on fixture account: queue rendered open failed payments `2`, balance at risk `$35.00`, and two declined rows for invoice `INV-20260529-DDC200B6`; queue drill-in opened `/jobs/1a52288c-78ae-4e79-9472-d00ed928f32f/invoice` and showed issued/unpaid state plus Failed Scheduled Autopay Attention items.
-- Read-only boundaries remain locked for alert and queue: no retry action on alert/queue, no acknowledge/review/resolve queue actions, no customer email/SMS, no portal update-card flow, and no customer self-service retry in this slice.
-- Retry remains invoice-workspace-only behavior.
-- Source-of-truth remains unchanged: `tenant_saved_method_payment_attempts` = attempt/attention truth; `internal_invoice_payments` = payment-event truth; `internal_invoice_payment_allocations` = allocation truth; Stripe = processor/payment-method truth; Payments Register remains payment-event history/reporting truth; Failed Payment Reconciliation Queue is unresolved attempt/attention visibility.
-- Invoice paid/balance remains collected-payment projection only; failed payment rows are non-collected truth; inactive allocations do not count toward paid balance.
-- Operational truth boundaries remain unchanged: visits and `maintenance_agreements.next_due_date` are not payment-mutated.
-- No schema changes, no Stripe behavior changes, no production enablement change, and no payment/allocation truth mutation outside existing webhook behavior.
-
-### Phase 6G-E4 Closeout (Fresh Scheduled Autopay Submit Smoke, Docs-Only)
-
-- Phase 6G-E4 passed after the 6G-E3 self-attempt revalidation fix in commit `c7329a8a9b19d392f6dd7196ca7145f86d62e713`.
-- Sandbox-only smoke used owner `9e82acca-c271-41bc-89af-396f37c1990c`, customer `ad18fa80-2817-476b-8fca-bdcf4ff3c3d6`, invoice `63e28e1c-1be9-43bb-923d-940d80887cb2` (`INV-20260528-9D731258`), job `91e31a74-cc1b-4585-8dc3-6812351fbbdf`, consent `3c24c9e6-6f78-4fe4-8619-9094782827bb`, and fresh pending attempt `67dc6700-83d9-4dd0-8af1-d8ae931db14a`.
-- 6G-B returned the invoice eligible, 6G-C created the fresh pending scheduled_autopay attempt, and 6G-D submitted it successfully with Stripe PaymentIntent `pi_3Tc6bF7itDepDR181kf2LE2p`, charge `ch_3Tc6bF7itDepDR181J27CvPs`, and webhook event `evt_3Tc6bF7itDepDR181B08QHZd`.
-- Webhook truth created exactly one `internal_invoice_payments` row and exactly one `internal_invoice_payment_allocations` row; invoice projection became paid with balance `$0.00`.
-- UI verification after refresh showed Issued / Paid / Paid `$17.50` / Balance `$0.00` with one recorded Stripe payment row.
-- Guardrails held: submit helper did not directly create payment or allocation rows, did not mark invoice paid, did not mutate visits or `next_due_date`, did not create invoice issue/send/email or payment-link side effects, and no production access occurred.
-- No code changed during the smoke; all requested validation commands passed.
-- Recommended next lane after this closeout is Phase 6G-F docs closeout, then Phase 6H failed-payment retry and attention workflow expansion.
+## Scheduled Autopay Roadmap / Source-Of-Truth Boundaries
 
 - Scope lock: audit/model/planning only. No code implementation, migrations, scheduler jobs, Supabase mutation, Stripe calls, webhook changes, or commit authorization.
 
