@@ -18,15 +18,10 @@ Documentation workflow is locked in [Documentation_Authority_Map.md](./Documenta
 
 ## 1.1 Recent access / portal / location / workflow closeout confirmations
 
-- Confirmed closed for current launch baseline: customer multi-location job intake restoration, saved service-address editing/correction with safe billing sync, ECC retest Schedule Now parity, Dual Context V1A app/portal access separation, contractor portal proposed-equipment intake capture, portal-to-app signup/reactivation CTA, and Account Device Setup notification-card layout polish.
-- Customer/location readiness: customers can have multiple saved service addresses; `customers` remains account/contact/billing identity; `locations` remains saved service-address truth; jobs keep `location_id` plus copied job address snapshots; `/jobs/new` supports saved-address selection and new service-address creation.
-- Saved service-address correction readiness: billing stays aligned only when billing was blank or matched the old service address; intentionally different billing is preserved; completed job snapshots are not bulk-rewritten.
-- ECC readiness: confirmed Retest Ready supports Move to Needs Scheduling and Schedule Retest Now; Schedule Retest Now creates and immediately schedules the linked retest child; parent/original jobs become historical/passive after linked retest child exists; invoice/payment/cert truth remains separate.
-- Access readiness: portal access and full-app access are separate; portal access survives expired/cancelled app access; active app + portal defaults to app and shows Partner Work; expired app + portal defaults to portal; expired app only routes to inactive access; `/jobs/new` requires explicit portal intake context for contractor/portal submission.
-- Portal/equipment readiness: contractors can provide proposed equipment during portal intake, but contractor-provided equipment is intake context only. Contractors cannot add/edit/delete canonical job equipment after a real job exists; internal users retain final `job_systems` / `job_equipment` control.
-- Signup/reactivation readiness: portal-only never-trialed users can start the existing 14-day trial path; expired trial users resume through paid checkout rather than a second free trial; cancelled/inactive users reactivate where safely supported; active app + portal users can open the app; portal work remains visible while app access is inactive.
-- Device setup readiness: Account notification-card layout is corrected; notification logic and PWA behavior did not change.
-- Parked after closeout: job-only address snapshot correction only if needed later, true default service-location flag only if ordering becomes confusing, broader customer/location IA redesign, contractor post-job equipment edit/delete, portal equipment multi-entry expansion, Install with Permit guided workflow, ECC handoff cleanup, and broader metadata consolidation.
+- Current launch baseline confirms the recent access, portal, customer/location, ECC retest, equipment-intake, signup/reactivation, and device-setup polish lanes are closed for current scope.
+- Canonical current-state details live in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md), with domain boundaries in [source-of-truth-strategy.md](./source-of-truth-strategy.md), [ECC_Guided_Workflow_Separation_Model_Lock.md](./ECC_Guided_Workflow_Separation_Model_Lock.md), and [Guided_Workflow_Maturation_Closeout.md](./Guided_Workflow_Maturation_Closeout.md).
+- Tactical minor-fix/polish evidence lives in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
+- This checklist should track only launch gates and operator readiness; parked/deferred items remain in the roadmap unless they become launch blockers.
 
 ---
 
