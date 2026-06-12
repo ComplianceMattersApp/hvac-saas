@@ -29,6 +29,19 @@ Recent committed/pushed polish lanes are closed for the current baseline, but th
 
 ---
 
+## 0.2 Repo-Backed Completion Status
+
+The following workflow-modernization lanes are no longer memory-only or future-only items:
+
+- Return Visit V1 is complete for the current intended scope: linked unscheduled office/dispatch-owned return visits preserve service-case continuity and become field My Work only after scheduling/assignment. Evidence: [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
+- Callback Visit V1 is complete for the current intended scope: callback reporting writes append-only event truth and can create linked callback child visits without rewriting the original job history. Evidence: [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
+- Different Issue Found is complete for the current intended scope as a callback/revisit-only field outcome that routes the completed callback/revisit responsibility to office review without creating payment, invoice, estimate, ECC, or new visit side effects. Evidence: [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
+- Field payment + office verification is complete for the current intended scope: field-reported cash/check/other payments remain pending workflow truth until authorized Confirm Payment verification creates final payment truth. Evidence: [Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md](./Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md) and [Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md](./Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md).
+
+Deferred follow-ups remain separate: callback/return timeline polish, field line-item/charge UX simplification, correction/void workflows for field-reported payments, refunds/reversals/export expansion, SMS/customer communications, QBO, and broader payment/customer portal add-ons.
+
+---
+
 ## 1. Purpose
 
 This document captures the newly clarified real-world workflow direction for Compliance Matters Software.
@@ -323,6 +336,8 @@ Recommended workflow:
 
 ## 8. Return visit workflow
 
+Current status: complete for Return Visit V1 current scope. See [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
+
 Return visit is for continuation of unresolved work, not a completed job that later failed.
 
 Recommended workflow:
@@ -337,6 +352,8 @@ Recommended workflow:
 ---
 
 ## 9. Callback workflow
+
+Current status: complete for Callback Visit V1 current scope. See [Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md](./Workflow_Modernization_B5_Return_Callback_Revisit_Closeout.md).
 
 Callback is separate from return visit.
 
@@ -366,6 +383,8 @@ Important rule:
 ---
 
 ## 10. Callback scenario: different issue found
+
+Current status: complete for current scope as a callback/revisit-only outcome route. Same-visit repair/new-issue billing refinements remain future workflow/business-posture decisions.
 
 Scenario: Customer calls back after a completed repair. Tech returns and finds a different issue not covered by the original repair.
 
@@ -661,6 +680,8 @@ Deliverable:
 - mobile-first field line-item UX plan
 
 ### Stage 11 — Field payment + office verification
+
+Current status: complete for the current intended scope. Field reports stay pending workflow truth; authorized office verification creates final payment truth.
 
 Implement field payment collection safely.
 

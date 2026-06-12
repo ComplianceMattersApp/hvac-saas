@@ -136,11 +136,12 @@ Deferred items:
 - Visual polish pass for Next Service Action and field finish panels.
 - Office/waiting/exception queue polish if field testing reveals confusion.
 - Callback/return reporting and history polish.
-- Collect Payment / field billing lane.
 - Field line-item / charge UX redesign.
-- Office payment verification for check/cash/other.
 - Job detail performance triage if timeout/57014 issues reproduce outside sandbox/dev-server conditions.
 - Customer communication/SMS later under SMS governance.
+
+Superseded by later closeouts:
+- Collect Payment / field billing lane and office payment verification for check/cash/other are complete for the current intended scope in [Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md](./Workflow_Modernization_B7_Field_Billing_Payments_Reconciliation_Closeout.md) and [Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md](./Workflow_Modernization_B8B_Field_Billing_Access_and_Payment_Workflow_Closeout.md).
 
 ## 13. Future Recommended Next Lanes
 
