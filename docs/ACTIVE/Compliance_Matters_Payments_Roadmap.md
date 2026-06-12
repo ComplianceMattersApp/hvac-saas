@@ -11,31 +11,20 @@
 - Current product truth belongs in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md); launch gates belong in [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md); tactical evidence belongs in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
 - Do not add full implementation closeouts, smoke evidence, tactical polish logs, or repeated model contracts here. Use short status summaries and backlinks. The control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
 
-## Phase 6J-A Closeout (Platform Application Fee Foundation: Config + Calculation Only)
+## Platform Application Fee Roadmap Status
 
-- Platform transaction fee model is now locked at default `25` basis points (`0.25%`) as a small configurable foundation value.
-- This slice is foundation-only: configuration derivation + calculation behavior. No Stripe checkout/session mutation, no saved-card/autopay PaymentIntent mutation, no webhook mutation, and no payment/allocation/invoice truth mutation were introduced.
-- Fee semantics are locked for the next implementation phase: Stripe Connect `application_fee_amount` only when enabled, never customer-facing invoice surcharge, and Compliance Matters invoice paid/balance truth remains gross-payment-based.
-- Guardrails are locked: disabled/comped/test-disabled/connect-not-ready paths skip fee application; zero/negative/unsafe amounts skip; fee must remain strictly less than charge amount; failed payments do not collect application fees.
-- Deferred to next phase: wiring this calculation into Stripe create calls after dedicated implementation and validation review.
+Phase 6J platform-fee smoke and wiring evidence is preserved in [Domain_Model_Closeout_Evidence_Ledger.md](./Domain_Model_Closeout_Evidence_Ledger.md). Durable payment-register and platform-fee boundaries remain in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md).
 
-## Phase 6J-E2 Closeout (Platform Application Fee Wiring + Sandbox Smoke, Docs-Only)
+Current roadmap status:
 
-- Phase 6J-A and 6J-B foundation scope is complete: platform application fee foundation is locked with default `25` basis points (`0.25%`) and guarded calculation behavior.
-- Phase 6J-C is complete: invoice Checkout path now wires `application_fee_amount` through sanctioned Stripe create-call behavior.
-- Phase 6J-D is complete: saved-card/manual path and scheduled-autopay shared PaymentIntent submit path now wire `application_fee_amount` through the same guarded fee policy.
-- Phase 6J-E/6J-E2 sandbox smoke is complete:
-- Checkout smoke proof: `1750` cents charge produced `application_fee_amount = 4` cents.
-- Saved-card/manual smoke proof: `1750` cents charge produced `application_fee_amount = 4` cents.
-- Financial truth lock remains unchanged: app payment truth is gross customer payment truth; platform application fee remains Stripe/platform revenue only.
-- Invoice/customer-facing billing lock remains unchanged: no customer-facing surcharge line item was introduced.
-- Projection lock remains unchanged: no invoice paid/balance distortion was introduced.
-- Operational lock remains unchanged: no `maintenance_agreement_visits` mutation and no `maintenance_agreements.next_due_date` mutation.
-- Failed-payment truth remains unchanged: failed attempts remain non-collected.
-- Deferred lanes remain unchanged: refunds/disputes deferred and ACH deferred. Customer payment success redirect polish is complete for the current Checkout return screen; webhook confirmation remains payment truth.
-- Next roadmap UX lane: invoice page UX cleanup.
-- Follow-on UX lane: customer page IA/UX cleanup after invoice page cleanup.
-- Safety/infra lock for this closeout: no production Stripe action and no schema change.
+- Default platform fee math is locked at `25` basis points (`0.25%`).
+- Stripe Connect `application_fee_amount` is the platform-fee mechanism where explicitly enabled.
+- Platform fee is Stripe/platform revenue only and must not create a customer-facing invoice surcharge line item.
+- Invoice paid/balance truth remains gross-payment-derived with no paid/balance distortion.
+- Failed payment rows remain non-collected.
+- Refunds/disputes remain deferred.
+- ACH remains deferred.
+- Next roadmap UX lane remains invoice page UX cleanup, followed by customer page IA/UX cleanup.
 
 ## Saved-Card, Scheduled Autopay, And Failed-Payment Roadmap Status
 
