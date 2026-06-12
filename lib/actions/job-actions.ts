@@ -10369,6 +10369,104 @@ export async function updateJobCustomerFromForm(formData: FormData) {
   redirect(`/jobs/${id}`);
 }
 
+export async function changeJobServiceLocationFromForm(formData: FormData) {
+  const id =
+    String(formData.get("id") || "").trim() ||
+    String(formData.get("job_id") || "").trim();
+  const nextLocationId = String(formData.get("location_id") || "").trim();
+
+  if (!id) throw new Error("Job ID is required");
+  if (!nextLocationId) {
+    redirect(`/jobs/${id}?banner=service_location_change_invalid#job-location`);
+  }
+
+  const supabase = await createClient();
+  const { userId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId: id,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const accountOwnerUserId = String(internalUser.account_owner_user_id ?? "").trim();
+  const { data: job, error: jobErr } = await supabase
+    .from("jobs")
+    .select("id, customer_id, location_id, service_case_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (jobErr) throw jobErr;
+  if (!job?.id || !job.customer_id) {
+    redirect(`/jobs/${id}?banner=service_location_change_invalid#job-location`);
+  }
+
+  const currentLocationId = String(job.location_id ?? "").trim();
+  const customerId = String(job.customer_id ?? "").trim();
+  if (currentLocationId && currentLocationId === nextLocationId) {
+    redirect(`/jobs/${id}?banner=service_location_already_selected#job-location`);
+  }
+
+  const { data: nextLocation, error: nextLocationErr } = await supabase
+    .from("locations")
+    .select("id, customer_id, owner_user_id, address_line1, city, state, zip, postal_code")
+    .eq("id", nextLocationId)
+    .eq("owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (nextLocationErr) throw nextLocationErr;
+  if (!nextLocation?.id || String(nextLocation.customer_id ?? "").trim() !== customerId) {
+    redirect(`/jobs/${id}?banner=service_location_change_invalid#job-location`);
+  }
+
+  const { error: updateErr } = await supabase
+    .from("jobs")
+    .update({
+      location_id: nextLocationId,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", id)
+    .eq("customer_id", customerId);
+
+  if (updateErr) throw updateErr;
+
+  const { error: eventErr } = await supabase
+    .from("job_events")
+    .insert({
+      job_id: id,
+      event_type: "service_location_changed",
+      message: "Service location changed",
+      user_id: userId,
+      meta: {
+        previous_location_id: currentLocationId || null,
+        new_location_id: nextLocationId,
+        customer_id: customerId,
+        service_case_id: String(job.service_case_id ?? "").trim() || null,
+        new_location_address: [
+          nextLocation.address_line1,
+          nextLocation.city,
+          nextLocation.state,
+          nextLocation.zip ?? nextLocation.postal_code,
+        ]
+          .map((value) => String(value ?? "").trim())
+          .filter(Boolean)
+          .join(", ") || null,
+        source_action: "changeJobServiceLocationFromForm",
+      },
+    });
+
+  if (eventErr) throw eventErr;
+
+  revalidatePath(`/jobs/${id}`);
+  revalidatePath(`/customers/${customerId}`);
+  if (currentLocationId) revalidatePath(`/locations/${currentLocationId}`);
+  revalidatePath(`/locations/${nextLocationId}`);
+
+  redirect(`/jobs/${id}?banner=service_location_updated#job-location`);
+}
+
 // Job timeline event writers: public_note + internal_note
 export async function addPublicNoteFromForm(formData: FormData) {
   const jobId = String(formData.get("job_id") || "").trim();

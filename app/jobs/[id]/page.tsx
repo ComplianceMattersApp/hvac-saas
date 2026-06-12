@@ -13,6 +13,7 @@ import {
   getContractors,
   setPrimaryJobAssigneeFromForm,
   removeJobAssigneeFromForm,
+  changeJobServiceLocationFromForm,
   updateJobCustomerFromForm,
   updateJobContractorFromForm,
   updateJobScheduleFromForm,
@@ -2416,6 +2417,29 @@ export default async function JobDetailPage({
   const serviceAddressDisplay =
     serviceAddressParts.length > 0 ? serviceAddressParts.join(", ") : "No address set";
 
+  const savedCustomerServiceLocations =
+    isInternalUser && customerId
+      ? await supabase
+          .from("locations")
+          .select("id, nickname, label, address_line1, address_line2, city, state, zip, postal_code")
+          .eq("customer_id", customerId)
+          .order("created_at", { ascending: true })
+          .then(({ data, error }) => {
+            if (error) throw error;
+            return (data ?? []) as Array<{
+              id: string;
+              nickname: string | null;
+              label: string | null;
+              address_line1: string | null;
+              address_line2: string | null;
+              city: string | null;
+              state: string | null;
+              zip: string | null;
+              postal_code?: string | null;
+            }>;
+          })
+      : [];
+
   const mobilePrimaryPhone = customerPhone !== "—" ? customerPhone : primarySiteAccessPhone || "";
   const mobilePrimaryPhoneDigits = mobilePrimaryPhone.replace(/\D/g, "");
   const mobileCallHref = mobilePrimaryPhoneDigits ? `tel:${mobilePrimaryPhoneDigits}` : null;
@@ -4217,6 +4241,18 @@ const failureResolutionPathCount =
 
           {banner === "status_updated" || banner === "ops_status_saved" || banner === "service_closeout_saved" ? (
             <FlashBanner type="success" message="Saved." />
+          ) : null}
+
+          {banner === "service_location_updated" ? (
+            <FlashBanner type="success" message="Service location updated for this job." />
+          ) : null}
+
+          {banner === "service_location_already_selected" ? (
+            <FlashBanner type="warning" message="That service location is already selected for this job." />
+          ) : null}
+
+          {banner === "service_location_change_invalid" ? (
+            <FlashBanner type="error" message="Could not change service location. Select a saved location for this same customer account." />
           ) : null}
 
           {banner === "on_the_way_reverted" ? (
@@ -6418,7 +6454,7 @@ const failureResolutionPathCount =
 
     {/* Center: destination panel */}
     <div className="space-y-4 sm:space-y-3">
-      <div className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_44px_-32px_rgba(15,23,42,0.32)] ring-1 ring-blue-100/50">
+      <div id="job-location" className="relative overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_44px_-32px_rgba(15,23,42,0.32)] ring-1 ring-blue-100/50">
         <span className="absolute inset-x-0 top-0 z-10 h-[3px] bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
         <div className="absolute left-3 top-3 z-10">
           <div className="rounded-full border border-blue-100/80 bg-white/88 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.3)] backdrop-blur-sm">
@@ -6452,14 +6488,80 @@ const failureResolutionPathCount =
             />
           </Suspense>
         </div>
-        {serviceLocationEditHref && isInternalUser ? (
-          <div className="border-t border-slate-200/80 bg-white px-3 py-2">
-            <Link
-              href={serviceLocationEditHref}
-              className="inline-flex rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
-            >
-              Correct address
-            </Link>
+        {isInternalUser ? (
+          <div className="space-y-2 border-t border-slate-200/80 bg-white px-3 py-2">
+            <div className="flex flex-wrap gap-2">
+              {serviceLocationEditHref ? (
+                <Link
+                  href={serviceLocationEditHref}
+                  className="inline-flex rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
+                >
+                  Correct address
+                </Link>
+              ) : null}
+              {customerId ? (
+                <Link
+                  href={`/customers/${customerId}?tab=locations-contacts`}
+                  className="inline-flex rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
+                >
+                  Add new location
+                </Link>
+              ) : null}
+            </div>
+            <details className="rounded-lg border border-slate-200 bg-slate-50 p-2.5">
+              <summary className="cursor-pointer text-xs font-semibold text-slate-800">
+                Change Service Location
+              </summary>
+              <div className="mt-2 space-y-2">
+                <p className="text-xs leading-5 text-slate-600">
+                  Use this if the job was created for the wrong saved address. To fix a typo in an address, edit the saved location instead.
+                </p>
+                {internalInvoiceTruth ? (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                    This job has invoice history. Changing the job service location will not rewrite invoice snapshot truth.
+                  </div>
+                ) : null}
+                <form action={changeJobServiceLocationFromForm} className="space-y-2">
+                  <input type="hidden" name="job_id" value={String(job.id)} />
+                  <label className="grid gap-1 text-xs font-medium text-slate-700">
+                    Saved service location
+                    <select
+                      name="location_id"
+                      defaultValue={String(locationId ?? "")}
+                      required
+                      className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-xs font-normal text-slate-900"
+                    >
+                      <option value="">Select a saved location</option>
+                      {savedCustomerServiceLocations.map((loc) => {
+                        const locAddress = [
+                          loc.address_line1,
+                          loc.address_line2,
+                          [loc.city, loc.state, loc.zip ?? loc.postal_code].filter(Boolean).join(" "),
+                        ]
+                          .map((value) => String(value ?? "").trim())
+                          .filter(Boolean)
+                          .join(", ");
+                        const locName = String(loc.nickname ?? loc.label ?? "").trim();
+                        const label = [locName, locAddress].filter(Boolean).join(" - ") || `Location ${loc.id.slice(0, 8)}`;
+                        return (
+                          <option key={loc.id} value={loc.id}>
+                            {label}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <ImmediateSubmitButton
+                      className="inline-flex rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                      pendingText="Updating..."
+                    >
+                      Move this job to a different saved service location?
+                    </ImmediateSubmitButton>
+                  </div>
+                </form>
+              </div>
+            </details>
           </div>
         ) : null}
       </div>
