@@ -71,7 +71,7 @@ describe("internal user admin guard and role labels", () => {
       expect(source).toContain("These permissions do not change the user's role.");
       expect(source).toContain("Save Field Billing Access");
       expect(source).toContain("Includes billing status, card collection, and cash/check/other collection.");
-      expect(source).toContain("Cash/check/other collected by field users requires Confirm Payment before it counts as paid.");
+      expect(source).toContain("Cash/check/other reported by field users requires Confirm Payment before it counts as collected payment.");
       expect(source).toContain("value=\"field_billing_enabled\"");
       expect(source).toContain("Office confirmation");
       expect(source).toContain("Confirm field-reported payments");

@@ -242,7 +242,7 @@ function bannerMessage(value?: string | null) {
     internal_invoice_failed_autopay_retry_failed_requires_action:
       "Failed-autopay retry requires customer action. No automatic retry was scheduled.",
     field_payment_reported:
-      "Payment report submitted for office reconciliation. Invoice balance updates after the payment is verified.",
+      "Payment reported - awaiting office confirmation. Invoice balance updates after payment is confirmed.",
     field_payment_report_invalid: "Payment report request was invalid.",
     field_payment_report_requires_issued: "Invoice must be issued before reporting field payment collection.",
     field_payment_report_method_invalid: "Select check, cash, or other for field-reported collection.",
@@ -263,9 +263,9 @@ function bannerMessage(value?: string | null) {
     field_payment_verification_overpay_denied:
       "Reported amount exceeds current invoice balance due and cannot be verified.",
     field_payment_verified:
-      "Field payment verified. Final payment truth was recorded and invoice totals were updated through the payment register path.",
+      "Payment confirmed. Final collected-payment truth was recorded and invoice totals were updated through the payment register path.",
     field_payment_verification_verified:
-      "Field payment verified. Final payment truth was recorded and invoice totals were updated through the payment register path.",
+      "Payment confirmed. Final collected-payment truth was recorded and invoice totals were updated through the payment register path.",
     field_payment_verification_rejection_reason_required: "A rejection reason is required to reject this field payment report.",
     field_payment_rejected:
       "Field payment report rejected. No final payment truth was created and invoice balance was unchanged.",
@@ -1223,13 +1223,13 @@ export default async function InternalInvoiceWorkspacePage({
                   Card payments open a secure checkout page. Once the payment is complete, this invoice updates automatically.
                 </p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">
-                  Cash, check, and other reported payments are submitted for office confirmation before the invoice is marked paid.
+                  Cash, check, and other reported payments are submitted for office confirmation before they count as collected payment.
                 </p>
                 {hasOpenFieldPaymentReportForSelectedInvoice ? (
                   <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50/80 p-4 text-sm leading-6 text-amber-900">
                     <div className="font-semibold">Reported payment awaiting confirmation</div>
                     <div className="mt-1">
-                      Reported payment is awaiting office confirmation before this invoice is marked paid.
+                      Payment reported - awaiting office confirmation before it counts as collected payment.
                     </div>
                   </div>
                 ) : null}
@@ -1261,7 +1261,7 @@ export default async function InternalInvoiceWorkspacePage({
                     <div>
                       <div className="text-sm font-semibold text-amber-950">Report Payment</div>
                       <div className="mt-1 text-sm leading-6 text-slate-700">
-                        Report this payment for office confirmation. The invoice is not marked paid until the office confirms the money was received.
+                        Report this payment for office confirmation. It does not count as collected payment until the office confirms the money was received.
                       </div>
                     </div>
                     <div className="grid gap-3 sm:grid-cols-2">

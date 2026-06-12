@@ -103,7 +103,7 @@ function FieldBillingAccessControls(params: {
                   Includes billing status, card collection, and cash/check/other collection.
                 </span>
                 <span className="block text-xs leading-5 text-slate-600">
-                  Cash/check/other collected by field users requires Confirm Payment before it counts as paid.
+                  Cash/check/other reported by field users requires Confirm Payment before it counts as collected payment.
                 </span>
               </span>
             </label>
@@ -126,7 +126,7 @@ function FieldBillingAccessControls(params: {
                 </span>
               </label>
               <p className="mt-2 text-xs leading-5 text-amber-800">
-                Cash/check/other payments collected by field users require Confirm Payment unless the user has office confirmation authority.
+                Cash/check/other payments reported by field users require Confirm Payment unless the user has office confirmation authority.
               </p>
             </div>
           </div>

@@ -147,7 +147,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("collectIssuedInvoiceCardPaymentFromForm");
     expect(source).toContain("Collect or report payment");
     expect(source).toContain("Card payments open a secure checkout page. Once the payment is complete, this invoice updates automatically.");
-    expect(source).toContain("Cash, check, and other reported payments are submitted for office confirmation before the invoice is marked paid.");
+    expect(source).toContain("Cash, check, and other reported payments are submitted for office confirmation before they count as collected payment.");
     expect(source).toContain("Card collection is not enabled for your role.");
     expect(source).toContain("Online payments are not ready.");
     expect(source).toContain("Use Record Office Payment only after the office has confirmed the money was received. This records collected payment truth in Compliance Matters.");
@@ -187,7 +187,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("&& canReportNonCardPaymentAccess");
     expect(source).toContain("action={reportNonCardFieldPaymentCollectionFromForm}");
     expect(source).toContain("Report Payment");
-    expect(source).toContain("Report this payment for office confirmation. The invoice is not marked paid until the office confirms the money was received.");
+    expect(source).toContain("Report this payment for office confirmation. It does not count as collected payment until the office confirms the money was received.");
     expect(source).toContain("<option value=\"cash\">Cash</option>");
     expect(source).toContain("<option value=\"check\">Check</option>");
     expect(source).toContain("<option value=\"other\">Other</option>");
@@ -203,7 +203,7 @@ describe("internal invoice workspace saved-card charge wiring", () => {
     expect(source).toContain("const hasOpenFieldPaymentReportForSelectedInvoice = openFieldPaymentReportsForSelectedInvoice.length > 0;");
     expect(source).toContain("Reported Payment");
     expect(source).toContain("Reported payment awaiting confirmation");
-    expect(source).toContain("Reported payment is awaiting office confirmation before this invoice is marked paid.");
+    expect(source).toContain("Payment reported - awaiting office confirmation before it counts as collected payment.");
     expect(source).not.toContain("verifyFieldPaymentCollectionReportFromForm");
     expect(source).not.toContain("rejectFieldPaymentCollectionReportFromForm");
   });
