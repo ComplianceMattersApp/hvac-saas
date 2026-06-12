@@ -116,16 +116,10 @@ Use [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) for cur
   - Billing / AR is not Admin and does not manage team access/admin settings unless separately assigned Admin
 - Confirm Financial Ledger / Payments Register access-control prerequisite is satisfied:
   - source spec: `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`
-  - **Payments Register V1A/V1B are now implemented (commit `c9dc763`)**: read-only `/reports/payments` register with Owner/Admin/Billing gating, recorded/failed separation, method taxonomy (ACH hidden), and filtered CSV export at `/reports/payments/export`
-  - Register reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, Stripe/Supabase/prod changes
-  - Future phases may add payment recording, corrections, allocations, customer history, dashboard cards, QBO, ACH, fees, recurring billing
-- Confirm Financial Ledger / Payments Register access-control prerequisite is satisfied:
-  - source spec: `docs/ACTIVE/Service_Role_Controls_and_Financial_Access_V1_Model_Spec.md`
-  - **Payments Register V1A/V1B are now implemented (commit `c9dc763`)**: read-only `/reports/payments` register with Owner/Admin/Billing gating, recorded/failed separation, method taxonomy (ACH hidden), and filtered CSV export at `/reports/payments/export`
-  - **Payments Register V1C is now implemented and browser smoke passed (commit `55dab8c`)**: customer profile Payment History card section on `/customers/{id}` with Owner/Admin/Billing gating, default block for Dispatcher/Technician/Contractor/Portal users, recorded/failed/other status separation, and per-payment details (amount, status, method, date, invoice, job link, reference, notes)
-  - V1C card is read-only; register/history reads from `internal_invoice_payments` current truth only; no mutations, corrections, allocations, schema changes, Stripe/Supabase/prod changes
-  - Browser smoke confirmed: card render, recorded payment row, Open Payments Register link, full register customer filter, recorded/failed section separation, and retained full-register CSV export availability
-  - Deferred remains explicit: register-based payment recording/corrections, allocations, broader financial dashboard cards, QBO, ACH, platform fees, recurring billing, customer portal payment history
+  - Payments Register and Customer Profile Payment History are implemented as read-only financial visibility surfaces with Owner/Admin/Billing gating.
+  - Register/history reads from `internal_invoice_payments` current truth only; no payment mutation or provider behavior is introduced by the read surfaces.
+  - Detailed model and evidence belong in [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md).
+  - Deferred remains explicit in the roadmap: register-based corrections/expansion, broader financial dashboard cards, QBO, ACH, platform fees, recurring billing, and customer portal payment history.
 
 ### 2.4 Time Clock lane closeout confirmation (completed)
 - Time Clock V1 through V1.5A is complete for current intended scope.
@@ -153,37 +147,9 @@ Use [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) for cur
   - no QBO/payroll sync behavior
 
 ### 2.3.1 Launch-readiness catch-up confirmations (completed)
-- Scope vs Line Items / Work Items terminology alignment is complete.
-- Confirmed UI no longer presents free-form scope and structured line items as duplicate concepts on validated core surfaces.
-- Validated surfaces:
-  - internal `/jobs/new`
-  - service `/jobs/[id]`
-  - invoice panel / build-from-work-items path
-  - contractor `/portal/jobs`
-  - contractor new-job/request form (`/jobs/new` in contractor mode)
-- Validation passed:
-  - targeted tests: `npx vitest run lib/jobs/__tests__/visit-scope.test.ts lib/business/__tests__/internal-invoice-line-items-provenance.test.ts` (`2` files passed, `8` tests passed)
-  - TypeScript: `npx tsc --noEmit` (`TSC_OK`)
-  - browser smoke including contractor-authenticated follow-up
-- Confirmed no behavior/schema/Estimate/invoice/Pricebook/payment/support/contractor-authority changes.
-- Service / Visit Scope clarity pass is complete:
-  - Service Details vs Visit Scope purpose wording is clarified on job detail
-  - Job Title fallback copy is clarified
-  - no model/validation/billing/ECC/RLS behavior changes were introduced
-- Invoice job-detail TLC pass is complete:
-  - panel scanability and issue/send/payment/void wording are clearer
-  - invoice truth anchor is explicit; payment recording remains tracking-only
-  - external-billing lightweight wording emphasizes Invoice Sent tracking
-- Internal invoice prefill fallback hardening is complete where source fields exist; existing drafts are not overwritten.
-- Address state capture/wiring pass is complete for relevant intake/finalization seams and supports billing-state prefill where source data is captured.
-- Internal invoice void recovery/replacement pass is complete:
-  - voided invoices remain historical
-  - voided invoices do not satisfy closeout billed truth
-  - replacement draft flow is available for same-job continuity
-- Invoice report wording polish is complete:
-  - Send Status replaces Comm State
-  - Payment Count replaces Payments
-  - CSV header wording aligned where applicable
+- Launch gate posture: terminology, Visit Scope / Work Items clarity, invoice scanability/truth wording, address state capture, invoice prefill fallback, void recovery/replacement, and invoice report wording polish are complete for current intended launch.
+- Tactical/UI evidence belongs in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md); durable Work Items / Invoice Charges boundaries belong in [Visit_Scope_First_Model_Brief.md](./Visit_Scope_First_Model_Brief.md) and [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md).
+- Launch gate impact: no behavior/schema/Estimate/invoice/Pricebook/payment/support/contractor-authority model expansion is implied by this checklist summary.
 
 ### 2.3.1A Customer/location relationship-intake and display verification (completed)
 - Completed closeout scope references:
