@@ -5,6 +5,8 @@ Scope: minor fixes, low-risk polish, small regressions, tactical performance fix
 
 Authority: governed by [Documentation_Authority_Map.md](./Documentation_Authority_Map.md). The Active Spine remains current product truth; this ledger is tactical evidence and should not be treated as a model spec.
 
+Control-plane rule: record minor UI polish, low-risk regressions, duplicate-submit/pending-state fixes, tactical performance fixes, and small punch-list completions here with concise commit evidence and guardrails. Do not use this ledger for durable model contracts, launch gates, roadmap sequencing, production runbook execution, or historical lane consolidation. If a tactical fix changes current product truth, add only a short Spine summary with a backlink here.
+
 ## June 2026 Remote / Low-Risk Punch-List Closeout
 
 Status: CLOSED for the commits listed below. These items were verified from recent git history and are recorded here to avoid copying tactical details into the Spine, Roadmap, or Prelaunch checklist.
@@ -63,4 +65,3 @@ Status: CLOSED for the commits listed below. These items were verified from rece
 - No schema, migration, Supabase command, env/secret, payment, ECC, portal, SMS, QBO, support, or product-mode behavior is changed by this documentation record.
 - This ledger does not reopen old roadmap lanes.
 - This ledger does not make minor tactical fixes canonical model truth; durable truth remains in the relevant canonical docs.
-

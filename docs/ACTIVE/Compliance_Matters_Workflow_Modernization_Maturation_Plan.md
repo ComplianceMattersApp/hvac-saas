@@ -7,6 +7,16 @@ Mode: Audit-first planning document. No implementation, schema, migration, Supab
 
 ---
 
+## 0.0 Documentation Authority Note
+
+- Documentation workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md).
+- This plan owns workflow-modernization direction, role/responsibility posture, and future operational sequencing.
+- Current product truth belongs in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md); global deferred/growth sequencing belongs in [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md).
+- Durable ECC, service-case, customer/location, payment, and SMS model truth belongs in the owning domain specs.
+- Do not add full implementation closeouts, smoke evidence, tactical polish logs, or repeated model contracts here. Use short status summaries and backlinks. The control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
+
+---
+
 ## 0.1 June 2026 Polish Closeout Lock
 
 Recent committed/pushed polish lanes are closed for the current baseline, but this plan should not duplicate the full closeout log.

@@ -6,6 +6,9 @@ Purpose: Align future development, audits, and thread handoffs to the current, s
 **Documentation Authority Map:**
 Docs workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md). The Spine should remain concise current product truth and source-of-truth boundaries, not a chronological punch-list log. Recent low-risk tactical fixes and UI polish closeouts are recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
 
+**Control-plane rule:**
+Use this Spine for current operating posture, durable source-of-truth boundaries, and short links to canonical specs. Do not add full closeout blocks, smoke evidence, tactical polish logs, implementation commit lists, or roadmap backlog detail here. Put strategic sequencing in [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md), launch gates in [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md), tactical evidence in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md), and broader cleanup decisions in [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
+
 **June 2026 Access / Portal / Location / Workflow Polish Closeout:**
 Status: CLOSED for current implementation lanes.
 

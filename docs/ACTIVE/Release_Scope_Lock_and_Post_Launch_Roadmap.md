@@ -8,8 +8,12 @@ Date: 2026-05-08
 ## Documentation Authority Note
 
 - Documentation workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md).
-- This roadmap should track strategic sequencing, deferred/gated lanes, unlock criteria, and roadmap order.
+- This roadmap owns strategic sequencing, deferred/gated lanes, unlock criteria, and roadmap order.
+- It should not store full implementation closeouts, smoke evidence, tactical polish logs, or repeated model contracts.
+- Current product truth belongs in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md).
+- Launch-readiness gates belong in [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md).
 - Minor tactical fixes and low-risk polish closeouts should be recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md), not expanded here unless they change roadmap sequencing.
+- The control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
 
 ## June 2026 Access / Portal / Location / Workflow Polish Closeout
 

@@ -12,7 +12,9 @@ This is a **launch-readiness checklist**, not the operational source of truth.
 
 If any item here conflicts with the active spine, the spine wins.
 
-Documentation workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md). Recent low-risk tactical fixes that support launch readiness are recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md); this checklist should only carry launch gates and concise readiness notes.
+Documentation workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md). This checklist owns launch gates, operator readiness, and runbook-gated launch confirmations only. Do not add full implementation closeouts, tactical polish logs, roadmap backlog detail, or repeated model contracts here.
+
+Use [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md) for current product truth, [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for deferred/growth sequencing, and [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md) for recent low-risk tactical fixes that support launch readiness. The control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
 
 ---
 

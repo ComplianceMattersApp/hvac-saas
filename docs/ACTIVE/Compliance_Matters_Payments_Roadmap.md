@@ -3,6 +3,14 @@
 **Status:** ACTIVE IMPLEMENTATION DIRECTION (platform-subscription V1 live platform smoke complete; tenant customer payments V1 current scope implemented and locally/sandbox validated)
 **Purpose:** Define the locked payment architecture and current-shipped V1 scope, while keeping deferred add-ons explicitly parked.
 
+## Documentation Authority Note
+
+- Documentation workflow is locked in [Documentation_Authority_Map.md](./Documentation_Authority_Map.md).
+- This roadmap owns payment sequencing, deferred payment lanes, payment unlock criteria, and high-level payment architecture direction.
+- Durable payment model contracts belong in their owning model specs, including [Financial_Ledger_Payments_Register_V1_Model_Spec.md](./Financial_Ledger_Payments_Register_V1_Model_Spec.md), [Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md](./Payments_V2_Service_Plan_Billing_Foundation_Model_Spec.md), and [Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md](./Financial_Trust_Lane_Deposits_Payout_Reconciliation_V1_Model_Spec.md).
+- Current product truth belongs in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md); launch gates belong in [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md); tactical evidence belongs in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
+- Do not add full implementation closeouts, smoke evidence, tactical polish logs, or repeated model contracts here. Use short status summaries and backlinks. The control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
+
 ## Phase 6J-A Closeout (Platform Application Fee Foundation: Config + Calculation Only)
 
 - Platform transaction fee model is now locked at default `25` basis points (`0.25%`) as a small configurable foundation value.

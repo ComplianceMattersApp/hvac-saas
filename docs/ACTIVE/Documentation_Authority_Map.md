@@ -9,6 +9,8 @@ This map defines where current truth, roadmap intent, launch gates, domain contr
 
 Use this file to prevent ACTIVE docs from carrying duplicate versions of the same story.
 
+The current control-plane audit is [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md). It confirms the cleanup sequence and should be used before any broad documentation consolidation, archival move, or control-plane rewrite.
+
 ## Authority Roles
 
 | Doc family | Role | Should contain | Should not contain |
@@ -29,6 +31,19 @@ Use this file to prevent ACTIVE docs from carrying duplicate versions of the sam
 4. Launch-blocking operator work belongs in the Prelaunch Checklist.
 5. Runbooks remain procedure/evidence docs for their domain and should receive backlinks rather than duplicated current-state narratives.
 6. Historical closeout docs remain evidence/supporting records unless a cleanup pass explicitly archives or consolidates them.
+7. Do not copy full closeout blocks, smoke evidence, commit logs, or model contracts into control-plane docs. Use a one-line status summary plus a backlink to the owner doc.
+8. If a future prompt asks to "update docs" without naming an authority target, stop and identify the intended target before editing.
+
+## Control-Plane Lock
+
+The control-plane docs are:
+
+- [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md): concise current product truth.
+- [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md): strategic sequence, deferred lanes, and unlock criteria.
+- [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md): launch gates and operator readiness.
+- [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md): minor fix and low-risk tactical evidence.
+
+Supporting strategic docs such as the Business Layer Roadmap, Payments Roadmap, and Workflow Modernization Plan may remain ACTIVE, but they should not override the control-plane docs or duplicate historical closeout detail.
 
 ## Prompting Guidance
 
@@ -46,4 +61,3 @@ Future docs prompts should name the intended authority target:
 - Current product truth: [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md)
 - Release/deferred order: [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md)
 - Launch gates: [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md)
-

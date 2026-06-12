@@ -1,3 +1,5 @@
+> Documentation control note: this roadmap should own business/commercial-layer sequencing and planning only. It should not receive new copied closeout blocks, smoke evidence, tactical polish logs, or repeated payment/model contracts. Current product truth belongs in [Active Spine V4.0 Current.md](./Active%20Spine%20V4.0%20Current.md); payment sequencing belongs in [Compliance_Matters_Payments_Roadmap.md](./Compliance_Matters_Payments_Roadmap.md); launch gates belong in [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md); tactical evidence belongs in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md). Cleanup guidance is tracked in [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md). Existing historical evidence is preserved until an approved cleanup slice moves or trims it.
+
 ### Phase 6E-C Closeout
 
 - Phase 6E-C — Saved Card Setup Flow / Stripe Checkout Setup Mode
