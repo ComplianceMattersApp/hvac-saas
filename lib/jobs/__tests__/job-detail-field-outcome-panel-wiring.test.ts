@@ -59,14 +59,16 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('normalizedJobStatus === "in_process";');
     expect(jobDetailSource).toContain("{showFieldOutcomePanel ? (");
     expect(jobDetailSource).toContain("Field work complete - ready for closeout.");
-    expect(jobDetailSource).toContain("Field work complete - invoice/certs can be handled as needed.");
+    expect(jobDetailSource).toContain("Field work complete - invoice and certs are still needed.");
+    expect(jobDetailSource).toContain("Field work complete - invoice is still needed.");
+    expect(jobDetailSource).toContain("Field work complete - certs are still needed.");
   });
 
   it("suppresses duplicate ECC tests workspace shortcuts while the primary in-process action row is visible", () => {
     expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
     expect(jobDetailSource).toContain('href={`/jobs/${job.id}/tests`}');
     expect(jobDetailSource).toContain("Open Tests Workspace");
-    expect(jobDetailSource).toContain('job.job_type === "ecc" && (isFieldComplete || job.status === "completed") ? (');
+    expect(jobDetailSource).toContain('job.job_type === "ecc" && (isFieldComplete || job.status === "completed") && !showPrimaryCloseoutBlockers ? (');
     expect(jobDetailSource).not.toContain("|| showFieldOutcomePanel) ? (");
   });
 
@@ -74,7 +76,9 @@ describe("job detail field outcome panel wiring", () => {
     expect(fieldActionButtonSource).toContain("Complete Field Work");
     expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
     expect(jobDetailSource).toContain("Field work complete - ready for closeout.");
-    expect(jobDetailSource).toContain("Field work complete - invoice/certs can be handled as needed.");
+    expect(jobDetailSource).toContain("showPrimaryCloseoutBlockers");
+    expect(jobDetailSource).toContain("Review Invoice");
+    expect(jobDetailSource).toContain("Certs Complete");
     expect(panelSource).not.toContain('import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";');
     expect(panelSource).not.toContain("form action={advanceJobStatusFromForm}");
     expect(panelSource).not.toContain("Confirm Work Completed");
@@ -223,6 +227,21 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("!isEccPermitNeededActive");
     expect(jobDetailSource).toContain('banner === "permit_needed"');
     expect(jobDetailSource).toContain('banner === "permit_available_saved"');
+  });
+
+  it("surfaces closeout blockers and actions in Primary Next Action after field completion", () => {
+    expect(jobDetailSource).toContain("const showPrimaryCloseoutBlockers =");
+    expect(jobDetailSource).toContain("isCloseoutPending");
+    expect(jobDetailSource).toContain("closeoutNeeds.needsInvoice && closeoutNeeds.needsCerts");
+    expect(jobDetailSource).toContain("Field work complete - invoice and certs are still needed.");
+    expect(jobDetailSource).toContain("Field work complete - invoice is still needed.");
+    expect(jobDetailSource).toContain("Field work complete - certs are still needed.");
+    expect(jobDetailSource).toContain('href={`/jobs/${job.id}/invoice#invoice-workspace`}');
+    expect(jobDetailSource).toContain("Review Invoice");
+    expect(jobDetailSource).toContain("form action={markCertsCompleteFromForm}");
+    expect(jobDetailSource).toContain("Certs Complete");
+    expect(jobDetailSource).toContain("!showPrimaryCloseoutBlockers");
+    expect(jobDetailSource).not.toContain("Field work complete - invoice/certs can be handled as needed.");
   });
 
   it("aligns ECC missing-test warning with Tests workspace completed-run truth", () => {

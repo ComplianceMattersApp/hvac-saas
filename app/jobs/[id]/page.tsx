@@ -2690,6 +2690,22 @@ const showCloseoutRow =
       : canShowInvoiceButton
   );
 
+const showPrimaryCloseoutBlockers =
+  isInternalUser &&
+  (isFieldComplete || job.status === "completed") &&
+  isCloseoutPending &&
+  !isServiceFieldFollowUpPendingInfo &&
+  !isEccPermitNeededActive;
+
+const primaryCloseoutMessage =
+  closeoutNeeds.needsInvoice && closeoutNeeds.needsCerts
+    ? "Field work complete - invoice and certs are still needed."
+    : closeoutNeeds.needsInvoice
+      ? "Field work complete - invoice is still needed."
+      : closeoutNeeds.needsCerts
+        ? "Field work complete - certs are still needed."
+        : "Field work complete - closeout is resolved.";
+
 const showExternalDataEntryPrompt =
   billingState.lightweightBillingAllowed &&
   ["data_entry", "invoice_required"].includes(String(job.ops_status ?? "").toLowerCase());
@@ -4682,6 +4698,68 @@ const failureResolutionPathCount =
                     </div>
                   ) : null}
                 </div>
+              ) : showPrimaryCloseoutBlockers ? (
+                <div className="space-y-2 rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3">
+                  <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-center text-base font-semibold text-emerald-900">
+                    {primaryCloseoutMessage}
+                  </span>
+                  <div className="grid gap-2">
+                    {closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
+                      <Link
+                        href={`/jobs/${job.id}/invoice#invoice-workspace`}
+                        className={`${darkButtonClass} min-h-12 w-full`}
+                      >
+                        Review Invoice
+                      </Link>
+                    ) : null}
+                    {closeoutNeeds.needsInvoice && showExternalDataEntryPrompt && !canShowInvoiceButton ? (
+                      <form action={completeDataEntryFromForm}>
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <ImmediateSubmitButton
+                          type="submit"
+                          pendingText="Saving..."
+                          className={`${darkButtonClass} min-h-12 w-full`}
+                        >
+                          Mark External Billing Complete
+                        </ImmediateSubmitButton>
+                      </form>
+                    ) : null}
+                    {closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
+                      <form action={markInvoiceCompleteFromForm}>
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#field-status-actions`} />
+                        <ImmediateSubmitButton
+                          type="submit"
+                          pendingText="Saving..."
+                          className={`${darkButtonClass} min-h-12 w-full`}
+                        >
+                          Mark External Billing Complete
+                        </ImmediateSubmitButton>
+                      </form>
+                    ) : null}
+                    {closeoutNeeds.needsCerts && canShowCertsButton ? (
+                      <form action={markCertsCompleteFromForm}>
+                        <input type="hidden" name="job_id" value={job.id} />
+                        <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#field-status-actions`} />
+                        <ImmediateSubmitButton
+                          type="submit"
+                          pendingText="Saving..."
+                          className={`${darkButtonClass} min-h-12 w-full`}
+                        >
+                          Certs Complete
+                        </ImmediateSubmitButton>
+                      </form>
+                    ) : null}
+                  </div>
+                  {job.job_type === "ecc" ? (
+                    <Link
+                      href={`/jobs/${job.id}/tests`}
+                      className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
+                    >
+                      Open Tests Workspace
+                    </Link>
+                  ) : null}
+                </div>
               ) : isFieldComplete || job.status === "completed" ? (
                 <div className="space-y-2">
                   <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-center text-base font-semibold text-emerald-900">
@@ -5945,14 +6023,78 @@ const failureResolutionPathCount =
             ) : null}
           </div>
         ) : null}
-        {(isFieldComplete || job.status === "completed") && !isServiceFieldFollowUpPendingInfo && !isEccPermitNeededActive ? (
+        {showPrimaryCloseoutBlockers ? (
+          <div className="hidden w-full rounded-xl border border-amber-200 bg-amber-50/80 px-3.5 py-3 sm:block">
+            <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+              <span className="inline-flex min-h-11 min-w-0 flex-1 items-center justify-center rounded-lg border border-amber-200 bg-white/90 px-4 py-2 text-center text-sm font-semibold text-amber-950">
+                {primaryCloseoutMessage}
+              </span>
+              <div className="flex flex-wrap justify-end gap-2">
+                {closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
+                  <Link
+                    href={`/jobs/${job.id}/invoice#invoice-workspace`}
+                    className={darkButtonClass}
+                  >
+                    Review Invoice
+                  </Link>
+                ) : null}
+                {closeoutNeeds.needsInvoice && showExternalDataEntryPrompt && !canShowInvoiceButton ? (
+                  <form action={completeDataEntryFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <ImmediateSubmitButton
+                      type="submit"
+                      pendingText="Saving..."
+                      className={darkButtonClass}
+                    >
+                      Mark External Billing Complete
+                    </ImmediateSubmitButton>
+                  </form>
+                ) : null}
+                {closeoutNeeds.needsInvoice && canShowInvoiceButton ? (
+                  <form action={markInvoiceCompleteFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#field-status-actions`} />
+                    <ImmediateSubmitButton
+                      type="submit"
+                      pendingText="Saving..."
+                      className={darkButtonClass}
+                    >
+                      Mark External Billing Complete
+                    </ImmediateSubmitButton>
+                  </form>
+                ) : null}
+                {closeoutNeeds.needsCerts && canShowCertsButton ? (
+                  <form action={markCertsCompleteFromForm}>
+                    <input type="hidden" name="job_id" value={job.id} />
+                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#field-status-actions`} />
+                    <ImmediateSubmitButton
+                      type="submit"
+                      pendingText="Saving..."
+                      className={darkButtonClass}
+                    >
+                      Certs Complete
+                    </ImmediateSubmitButton>
+                  </form>
+                ) : null}
+                {job.job_type === "ecc" ? (
+                  <Link
+                    href={`/jobs/${job.id}/tests`}
+                    className={compactWorkspaceActionButtonClass}
+                  >
+                    Open Tests Workspace
+                  </Link>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ) : (isFieldComplete || job.status === "completed") && !isServiceFieldFollowUpPendingInfo && !isEccPermitNeededActive ? (
           <div className="hidden w-full sm:flex">
             <span className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-900">
-              Field work complete - invoice/certs can be handled as needed.
+              Field work complete - ready for closeout.
             </span>
           </div>
         ) : null}
-        {job.job_type === "ecc" && (isFieldComplete || job.status === "completed") ? (
+        {job.job_type === "ecc" && (isFieldComplete || job.status === "completed") && !showPrimaryCloseoutBlockers ? (
           <div className="hidden w-full sm:flex">
             <Link
               href={`/jobs/${job.id}/tests`}
