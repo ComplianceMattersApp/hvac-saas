@@ -88,8 +88,14 @@ import {
 } from "@/lib/business/internal-invoice";
 import {
   resolveInvoiceCollectedPaymentLedger,
+  resolveInvoiceCollectedPaymentSummary,
+  type InternalInvoiceCollectedPaymentSummary,
   type InternalInvoicePaymentRow,
 } from "@/lib/business/internal-invoice-payments";
+import {
+  resolveJobInvoiceActionLabel,
+  resolveJobInvoiceStateLabel,
+} from "@/lib/jobs/job-invoice-action";
 import { listFieldChargeProposalsForJob } from "@/lib/business/field-charge-proposals";
 import {
   addInternalInvoiceLineItemFromForm,
@@ -1545,6 +1551,7 @@ export default async function JobDetailPage({
           billing_email: string | null;
           line_item_count: number;
         } | null,
+        internalInvoicePaymentSummaryTruth: null as InternalInvoiceCollectedPaymentSummary | null,
       };
     }
 
@@ -1561,13 +1568,24 @@ export default async function JobDetailPage({
     if (!invoiceTruthRow) {
       return {
         internalInvoiceTruth: null,
+        internalInvoicePaymentSummaryTruth: null,
       };
     }
 
-    const { count: lineItemCount, error: lineItemCountErr } = await supabase
-      .from("internal_invoice_line_items")
-      .select("id", { count: "exact", head: true })
-      .eq("invoice_id", invoiceTruthRow.id);
+    const [
+      { count: lineItemCount, error: lineItemCountErr },
+      internalInvoicePaymentSummaryTruth,
+    ] = await Promise.all([
+      supabase
+        .from("internal_invoice_line_items")
+        .select("id", { count: "exact", head: true })
+        .eq("invoice_id", invoiceTruthRow.id),
+      resolveInvoiceCollectedPaymentSummary(
+        internalUser.account_owner_user_id,
+        String(invoiceTruthRow.id),
+        supabase,
+      ),
+    ]);
 
     if (lineItemCountErr) throw lineItemCountErr;
 
@@ -1583,6 +1601,7 @@ export default async function JobDetailPage({
         billing_email: String(invoiceTruthRow.billing_email ?? "").trim() || null,
         line_item_count: Number(lineItemCount ?? 0) || 0,
       },
+      internalInvoicePaymentSummaryTruth,
     };
   });
 
@@ -1905,7 +1924,7 @@ export default async function JobDetailPage({
       .filter((row) => row.id && row.item_name);
   });
 
-  const { internalInvoiceTruth } = await immediateInvoiceTruthPromise;
+  const { internalInvoiceTruth, internalInvoicePaymentSummaryTruth } = await immediateInvoiceTruthPromise;
   const showInternalInvoicePanelForFieldBillingRead =
     isInternalUser &&
     buildJobBillingStateReadModel({
@@ -2891,38 +2910,41 @@ const jobPageInvoiceDisplayReference = internalInvoiceTruth
       invoiceId: internalInvoiceTruth.id,
     })
   : null;
-const jobPageInvoiceStateLabel = internalInvoiceTruth
-  ? jobBillingDispositionLabel
-    ? jobBillingDispositionLabel
-    : internalInvoiceTruth.status === "draft"
-    ? "Draft Invoice"
-    : internalInvoiceTruth.status === "issued"
-      ? billingState.billedTruthSatisfied
-        ? "Paid Invoice"
-        : "Issued Invoice"
-      : "Invoice"
-  : hasVisitScopeDefined
-    ? "Ready to build invoice"
-    : "Add work items first";
-const isJobPageDraftInvoice = internalInvoiceTruth?.status === "draft";
-const isJobPageZeroDollarDraftInvoice =
-  Boolean(isJobPageDraftInvoice) &&
-  Number(internalInvoiceTruth?.total_cents ?? 0) === 0;
-const jobPageInvoiceNextAction = !internalInvoiceTruth
-  ? billingState.billedTruthSatisfied
-    ? "View Billing Details"
-    : "Create Invoice"
-  : jobBillingDispositionLabel
-    ? jobBillingDispositionLabel
-  : isJobPageZeroDollarDraftInvoice
-    ? "Resolve $0 Invoice"
-    : isJobPageDraftInvoice
-      ? "Issue Invoice"
-      : internalInvoiceTruth.status === "issued"
-        ? "Collect Payment"
-        : "View Invoice";
+const jobPageInvoiceStateLabel = resolveJobInvoiceStateLabel({
+  hasInvoice: Boolean(internalInvoiceTruth),
+  invoiceStatus: internalInvoiceTruth?.status,
+  invoiceTotalCents: internalInvoiceTruth?.total_cents,
+  paymentStatus: internalInvoicePaymentSummaryTruth?.paymentStatus,
+  balanceDueCents: internalInvoicePaymentSummaryTruth?.balanceDueCents,
+  billingDispositionLabel: jobBillingDispositionLabel,
+  billedTruthSatisfied: billingState.billedTruthSatisfied,
+  hasVisitScopeDefined,
+});
+const jobPageInvoiceNextAction = resolveJobInvoiceActionLabel({
+  hasInvoice: Boolean(internalInvoiceTruth),
+  invoiceStatus: internalInvoiceTruth?.status,
+  invoiceTotalCents: internalInvoiceTruth?.total_cents,
+  paymentStatus: internalInvoicePaymentSummaryTruth?.paymentStatus,
+  balanceDueCents: internalInvoicePaymentSummaryTruth?.balanceDueCents,
+  billingDispositionLabel: jobBillingDispositionLabel,
+  billedTruthSatisfied: billingState.billedTruthSatisfied,
+  hasVisitScopeDefined,
+});
+const jobPageInvoicePaymentSummaryText =
+  internalInvoiceTruth?.status === "issued" && internalInvoicePaymentSummaryTruth && !jobBillingDispositionLabel
+    ? internalInvoicePaymentSummaryTruth.paymentStatus === "paid"
+      ? `Paid ${formatCurrencyFromCents(internalInvoicePaymentSummaryTruth.amountPaidCents)}`
+      : internalInvoicePaymentSummaryTruth.paymentStatus === "partial"
+        ? `Paid ${formatCurrencyFromCents(internalInvoicePaymentSummaryTruth.amountPaidCents)} - Balance ${formatCurrencyFromCents(internalInvoicePaymentSummaryTruth.balanceDueCents)}`
+        : `Balance ${formatCurrencyFromCents(internalInvoicePaymentSummaryTruth.balanceDueCents)}`
+    : null;
 const jobPageInvoiceSummaryText = internalInvoiceTruth
-  ? `${jobPageInvoiceDisplayReference} - ${internalInvoiceTruth.line_item_count} charge${internalInvoiceTruth.line_item_count === 1 ? "" : "s"} - ${formatCurrencyFromCents(internalInvoiceTruth.total_cents)}`
+  ? [
+      jobPageInvoiceDisplayReference,
+      `${internalInvoiceTruth.line_item_count} charge${internalInvoiceTruth.line_item_count === 1 ? "" : "s"}`,
+      formatCurrencyFromCents(internalInvoiceTruth.total_cents),
+      jobPageInvoicePaymentSummaryText,
+    ].filter(Boolean).join(" - ")
   : hasVisitScopeDefined
     ? `${visitScopeCount} work item${visitScopeCount === 1 ? "" : "s"} ready to price and review.`
     : "Add work performed, then price it before building the invoice.";

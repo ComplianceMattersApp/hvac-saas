@@ -119,13 +119,13 @@ describe("job detail field billing panel wiring", () => {
     expect(noInvoicePanelSlice).not.toContain("Create Draft Invoice");
   });
 
-  it("keeps existing draft invoices on the review path instead of creating duplicates", () => {
-    expect(source).toContain('isJobPageZeroDollarDraftInvoice');
-    expect(source).toContain('"View Billing Details"');
-    expect(source).toContain('"Resolve $0 Invoice"');
-    expect(source).toContain('"Issue Invoice"');
-    expect(source).toContain('"Collect Payment"');
-    expect(source).not.toContain('"View Paid Invoice"');
+  it("keeps invoice actions state-aware without creating duplicate draft invoices", () => {
+    expect(source).toContain("resolveJobInvoiceActionLabel");
+    expect(source).toContain("resolveJobInvoiceStateLabel");
+    expect(source).toContain("internalInvoicePaymentSummaryTruth?.paymentStatus");
+    expect(source).toContain("internalInvoicePaymentSummaryTruth?.balanceDueCents");
+    expect(source).toContain("jobPageInvoicePaymentSummaryText");
+    expect(source).toContain("Balance ${formatCurrencyFromCents");
     expect(source).toContain('internalInvoice.status === "draft"');
     expect(source).toContain("alreadyAdded: existingVisitScopeInvoiceSourceIds.has(persistedItemId)");
   });

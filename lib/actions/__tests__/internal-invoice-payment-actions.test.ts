@@ -419,7 +419,35 @@ describe('recordInternalInvoicePaymentFromForm', () => {
     expect(resolveOperationalMutationEntitlementAccessMock).toHaveBeenCalledWith(
       expect.objectContaining({ accountOwnerUserId: 'owner-1' }),
     );
-    expect(writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(true);
+    const paymentInsert = writes.find((w) => w.table === 'internal_invoice_payments' && w.op === 'insert');
+    expect(paymentInsert).toBeTruthy();
+    expect(paymentInsert?.payload).toEqual(
+      expect.objectContaining({
+        payment_status: 'recorded',
+        payment_method: 'cash',
+        amount_cents: 2500,
+      }),
+    );
+    expect(paymentInsert?.payload).not.toEqual(
+      expect.objectContaining({
+        processor_name: expect.any(String),
+      }),
+    );
+    expect(paymentInsert?.payload).not.toEqual(
+      expect.objectContaining({
+        stripe_event_id: expect.any(String),
+      }),
+    );
+    expect(paymentInsert?.payload).not.toEqual(
+      expect.objectContaining({
+        stripe_checkout_session_id: expect.any(String),
+      }),
+    );
+    expect(paymentInsert?.payload).not.toEqual(
+      expect.objectContaining({
+        stripe_payment_intent_id: expect.any(String),
+      }),
+    );
     expect(upsertInvoicePaymentAllocationForPaymentRowMock).toHaveBeenCalledWith(
       expect.objectContaining({
         paymentRow: expect.objectContaining({
@@ -438,7 +466,11 @@ describe('recordInternalInvoicePaymentFromForm', () => {
       }),
     );
     expect(revalidatePathMock).toHaveBeenCalledWith('/jobs/job-1');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/jobs/job-1/invoice');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/ops/closeout-queue');
     expect(revalidatePathMock).toHaveBeenCalledWith('/reports/invoices');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/reports/payments');
+    expect(revalidatePathMock).toHaveBeenCalledWith('/reports/payment-reconciliation');
   });
 
   it('denies overpayment based on derived balance due', async () => {

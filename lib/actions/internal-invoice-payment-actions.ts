@@ -412,7 +412,10 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
   revalidatePath(`/jobs/${jobId}/invoice`);
   revalidatePath('/jobs');
   revalidatePath('/ops');
+  revalidatePath('/ops/closeout-queue');
   revalidatePath('/reports/invoices');
+  revalidatePath('/reports/payments');
+  revalidatePath('/reports/payment-reconciliation');
 
   redirect(buildInternalInvoiceReturnHref(jobId, tab, 'internal_invoice_payment_recorded', returnTo));
 }

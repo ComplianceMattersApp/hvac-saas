@@ -285,7 +285,7 @@ export default function FieldBillingSummary(props: FieldBillingSummaryProps) {
             {props.invoice
               ? props.invoice.status === "draft"
                 ? props.invoice.lineItemCount > 0
-                  ? "Review Invoice"
+                  ? "Issue Invoice"
                   : "Build Invoice"
                 : "Open Invoice Workspace"
               : "Start Invoice"}
