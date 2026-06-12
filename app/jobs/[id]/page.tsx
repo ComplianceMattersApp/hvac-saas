@@ -2671,17 +2671,6 @@ const showInternalInvoicingPlaceholder =
     (job.job_type === "ecc" && String(job.ops_status ?? "").toLowerCase() !== "closed")
   );
 
-const showCloseoutRow =
-  isInternalUser &&
-  job.status === "completed" &&
-  isFieldComplete &&
-  !isAdminComplete &&
-  (
-    !isFailedUnresolved
-      ? (canShowCertsButton || canShowInvoiceButton)
-      : canShowInvoiceButton
-  );
-
 const showPrimaryCloseoutBlockers =
   isInternalUser &&
   (isFieldComplete || job.status === "completed") &&
@@ -5029,7 +5018,7 @@ const failureResolutionPathCount =
             </section>
           ) : null}
 
-          {(sp?.schedule_required === "1" || activeWaitingState || showExternalDataEntryPrompt || showInternalInvoicingPlaceholder || showMobileInvoiceOpenAttention || markVisitCountedLinkId || suggestedNextDueProjection || isCloseoutPending) ? (
+          {(sp?.schedule_required === "1" || activeWaitingState || showExternalDataEntryPrompt || showInternalInvoicingPlaceholder || showMobileInvoiceOpenAttention || markVisitCountedLinkId || suggestedNextDueProjection) ? (
             <section className="space-y-2">
 
                 {showExternalDataEntryPrompt ? (
@@ -5085,22 +5074,6 @@ const failureResolutionPathCount =
                         View
                       </Link>
                     </div>
-                  </div>
-                ) : null}
-
-                {isCloseoutPending ? (
-                  <div className={mobileAttentionStripClass}>
-                    <span className="inline-flex items-center gap-1.5 font-semibold"><WarningIcon className="h-4 w-4" />Closeout open</span>
-                    <span>
-                      {" / "}
-                      {closeoutNeeds.needsInvoice && closeoutNeeds.needsCerts
-                        ? "Invoice and certs are still pending."
-                        : closeoutNeeds.needsCerts
-                        ? "Certs are still pending."
-                        : closeoutNeeds.needsInvoice
-                        ? "Invoice is still pending."
-                        : "Review closeout status."}
-                    </span>
                   </div>
                 ) : null}
 
@@ -7214,57 +7187,6 @@ const failureResolutionPathCount =
 
       {/* Always-visible Top Actions */}
 
-      {/* Closeout Actions (Internal Only) */}
-    {showCloseoutRow && (
-      <div id="closeout-actions" className="mt-3 min-w-0 scroll-mt-24 rounded-xl border border-slate-200/80 bg-slate-50/80 px-4 py-3 shadow-[0_12px_28px_-26px_rgba(15,23,42,0.35)]">
-    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-      <div className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-700"><SettingsIcon className="h-4 w-4" />Closeout</div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {/* ECC only: Certs */}
-          {canShowCertsButton && (
-            <form action={markCertsCompleteFromForm}>
-              <input type="hidden" name="job_id" value={job.id} />
-              <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#closeout-actions`} />
-              <ImmediateSubmitButton
-                type="submit"
-                pendingText="Saving..."
-                className={darkButtonClass}
-              >
-                ✓ Certs Sent
-              </ImmediateSubmitButton>
-            </form>
-          )}
-
-        {canShowInvoiceButton && (
-          <form action={markInvoiceCompleteFromForm}>
-            <input type="hidden" name="job_id" value={job.id} />
-            <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#closeout-actions`} />
-            <ImmediateSubmitButton
-              type="submit"
-              pendingText="Saving..."
-              className={darkButtonClass}
-            >
-              ✓ Mark External Billing Complete
-            </ImmediateSubmitButton>
-          </form>
-        )}
-      </div>
-    </div>
-
-    <div className="mt-2 text-xs leading-5 text-slate-600">
-      Start with the Work Items for this visit. Closeout and billing come after the work is ready.
-    </div>
-
-    {showInternalInvoicingPlaceholder && String(job.ops_status ?? "").toLowerCase() !== "closed" ? (
-      <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-xs leading-5 text-amber-900">
-        Internal invoicing mode is enabled for this company. Lightweight invoice-complete controls are hidden so
-        this job uses the job-linked internal invoice panel instead of the external billing actions.
-      </div>
-    ) : null}
-  </div>
-)}
-
       {banner === "job_created" && (
         <FlashBanner
           type="success"
@@ -7457,7 +7379,7 @@ const failureResolutionPathCount =
       {banner === "internal_invoicing_billing_pending" && (
         <FlashBanner
           type="warning"
-          message="Internal invoicing mode is enabled. Use the job-linked internal invoice panel instead of the external billing actions."
+          message="Use the invoice workspace to finish billing for this job."
         />
       )}
 

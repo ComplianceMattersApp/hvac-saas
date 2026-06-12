@@ -248,6 +248,17 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).not.toContain("Field work complete - invoice/certs can be handled as needed.");
   });
 
+  it("keeps the obsolete middle Closeout action lane removed", () => {
+    expect(jobDetailSource).not.toContain("const showCloseoutRow =");
+    expect(jobDetailSource).not.toContain('id="closeout-actions"');
+    expect(jobDetailSource).not.toContain("Closeout Actions (Internal Only)");
+    expect(jobDetailSource).not.toContain("Closeout open");
+    expect(jobDetailSource).not.toContain("lightweight invoice-complete controls");
+    expect(jobDetailSource).not.toContain("job-linked internal invoice panel");
+    expect(jobDetailSource).not.toContain("Internal invoicing mode is enabled");
+    expect(jobDetailSource).toContain("Use the invoice workspace to finish billing for this job.");
+  });
+
   it("aligns ECC missing-test warning with Tests workspace completed-run truth", () => {
     expect(jobDetailSource).toContain("is_completed,");
     expect(jobDetailSource).toContain("const hasCompletedEccTestRun = eccRuns.some((run: any) => run?.is_completed === true);");
