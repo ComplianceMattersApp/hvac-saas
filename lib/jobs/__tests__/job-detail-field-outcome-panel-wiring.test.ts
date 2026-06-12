@@ -157,6 +157,13 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).not.toContain("return_needed");
   });
 
+  it("renders Different Issue Found banners with callback/return and original-history context", () => {
+    expect(jobDetailSource).toContain("different_issue_found_saved");
+    expect(jobDetailSource).toContain("Different issue noted. This callback/return visit is complete and office review is next; the original job history was not changed.");
+    expect(jobDetailSource).toContain("Different Issue Found is only for callback or return visits. Use the normal follow-up options for first visits.");
+    expect(jobDetailSource).toContain("Add a short note explaining the different issue before routing this callback/return visit to office review.");
+  });
+
   it("suppresses same-visit resume controls for completed service follow-up holds", () => {
     expect(jobDetailSource).toContain("const isServiceFieldFollowUpPendingInfo =");
     expect(jobDetailSource).toContain("const hasServiceFieldFollowUpPendingInfo =");
@@ -190,6 +197,17 @@ describe("job detail field outcome panel wiring", () => {
     expect(serviceChainPanelSource).toContain("Active continuation");
     expect(serviceChainPanelSource).toContain("Continued");
     expect(serviceChainPanelSource).toContain("Linked return visit created");
+  });
+
+  it("distinguishes callback children from return visits in service-chain labels", () => {
+    expect(jobDetailSource).toContain('const visitType = String(visit?.service_visit_type ?? "").trim().toLowerCase();');
+    expect(jobDetailSource).toContain('if (visit?.parent_job_id && visitType === "callback") return "Callback visit";');
+    expect(jobDetailSource).toContain('if (visit?.parent_job_id && visitType === "return_visit") return "Return visit";');
+    expect(jobDetailSource).toContain('if (visit?.parent_job_id && String(visit?.job_type ?? "").toLowerCase() === "service") return "Linked service visit";');
+    expect(serviceChainPanelSource).toContain("job_type, service_visit_type, created_at");
+    expect(serviceChainPanelSource).toContain('if (visit?.parent_job_id && visitType === "callback") return "Callback visit";');
+    expect(serviceChainPanelSource).toContain('if (visit?.parent_job_id && visitType === "return_visit") return "Return visit";');
+    expect(serviceChainPanelSource).toContain('if (visit?.parent_job_id && String(visit?.job_type ?? "").toLowerCase() === "service") return "Linked service visit";');
   });
 
   it("removes the standalone exception card and ECC guardrail copy", () => {

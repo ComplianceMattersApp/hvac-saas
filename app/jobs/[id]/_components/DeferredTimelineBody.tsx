@@ -147,6 +147,11 @@ function formatTimelineDetail(type?: string | null, meta?: any, message?: string
     return "";
   }
 
+  if (["callback_reported", "callback_visit_created", "created_from_callback_report"].includes(String(type ?? ""))) {
+    const callbackReason = summarizePlainText(String(meta?.callback_visit_reason ?? meta?.callback_report_text ?? ""), 140);
+    return callbackReason || cleanMessage;
+  }
+
   if (["internal_invoice_drafted", "internal_invoice_issued", "internal_invoice_voided"].includes(String(type ?? ""))) {
     const invoiceNumber = summarizePlainText(String(meta?.invoice_number ?? ""), 48);
     const totalDisplay = summarizePlainText(String(meta?.total_display ?? ""), 24);
@@ -224,6 +229,9 @@ function formatTimelineEvent(type?: string | null, meta?: any, message?: string 
     job_failed: "Job failed",
     job_passed: "Job passed",
     retest_created: "Retest created",
+    callback_reported: "Callback report recorded",
+    callback_visit_created: "Callback visit created",
+    created_from_callback_report: "Created from callback report",
     retest_scheduled: "Retest scheduled",
     retest_started: "Retest started",
     retest_passed: "Retest passed",
@@ -365,6 +373,24 @@ function renderTimelineItem(e: any, key: string, actorDisplayMap: Record<string,
           Retest failed again:{" "}
           <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
             View retest job
+          </Link>
+        </div>
+      ) : null}
+
+      {type === "callback_visit_created" && meta?.child_job_id ? (
+        <div className="mt-1 text-sm">
+          Callback visit:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.child_job_id)}?tab=ops`}>
+            View linked callback
+          </Link>
+        </div>
+      ) : null}
+
+      {type === "created_from_callback_report" && meta?.anchor_job_id ? (
+        <div className="mt-1 text-sm">
+          Original job:{" "}
+          <Link className="underline" href={`/jobs/${String(meta.anchor_job_id)}?tab=ops`}>
+            View original job
           </Link>
         </div>
       ) : null}

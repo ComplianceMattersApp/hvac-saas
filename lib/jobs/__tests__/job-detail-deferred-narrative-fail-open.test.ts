@@ -337,4 +337,60 @@ describe("job detail deferred narrative fail-open behavior", () => {
     expect(html).not.toContain("job-2 is closed/completed");
     expect(html).not.toContain("Job is closed/completed.");
   });
+
+  it("renders callback timeline entries with linked callback/original context", async () => {
+    createClientMock.mockResolvedValue(
+      buildSupabaseClient(
+        {
+          jobEvents: {
+            data: [
+              {
+                id: "evt-callback-created",
+                job_id: "job-1",
+                created_at: "2026-06-12T16:00:00.000Z",
+                event_type: "callback_visit_created",
+                message: null,
+                user_id: "user-1",
+                meta: {
+                  child_job_id: "job-callback",
+                  callback_visit_reason: "Customer says the airflow issue came back",
+                },
+              },
+              {
+                id: "evt-callback-child",
+                job_id: "job-callback",
+                created_at: "2026-06-12T16:01:00.000Z",
+                event_type: "created_from_callback_report",
+                message: null,
+                user_id: "user-1",
+                meta: {
+                  anchor_job_id: "job-1",
+                  callback_visit_reason: "Customer says the airflow issue came back",
+                },
+              },
+            ],
+            error: null,
+          },
+        },
+        [],
+      ),
+    );
+
+    const jsx = await DeferredTimelineBody({
+      jobId: "job-1",
+      timelineJobIds: ["job-1", "job-callback"],
+      hasDirectNarrativeChain: true,
+      emptyStateClassName: "empty-state",
+      jobSummary: baseJobSummary,
+    });
+
+    const html = renderToStaticMarkup(jsx);
+    expect(html).toContain("Callback visit created");
+    expect(html).toContain("Created from callback report");
+    expect(html).toContain("Customer says the airflow issue came back");
+    expect(html).toContain("Callback visit:");
+    expect(html).toContain("View linked callback");
+    expect(html).toContain("Original job:");
+    expect(html).toContain("View original job");
+  });
 });

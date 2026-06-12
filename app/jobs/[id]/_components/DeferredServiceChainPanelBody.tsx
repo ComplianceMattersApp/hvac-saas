@@ -46,7 +46,10 @@ function isFailedFamilyOpsStatus(value?: string | null) {
 
 function serviceChainVisitLabel(visit: any, idx: number) {
 	if (idx === 0 && !visit?.parent_job_id) return "Original visit";
-	if (visit?.parent_job_id && String(visit?.job_type ?? "").toLowerCase() === "service") return "Return visit";
+	const visitType = String(visit?.service_visit_type ?? "").trim().toLowerCase();
+	if (visit?.parent_job_id && visitType === "callback") return "Callback visit";
+	if (visit?.parent_job_id && visitType === "return_visit") return "Return visit";
+	if (visit?.parent_job_id && String(visit?.job_type ?? "").toLowerCase() === "service") return "Linked service visit";
 	if (visit?.parent_job_id) return "Retest visit";
 	return `Visit ${idx + 1}`;
 }
@@ -120,7 +123,7 @@ export default async function DeferredServiceChainPanelBody({
 	const { data: serviceChainJobs, error: serviceChainErr } = await supabase
 		.from("jobs")
 		.select(
-			"id, title, status, ops_status, job_type, created_at, scheduled_date, window_start, window_end, parent_job_id, pending_info_reason"
+			"id, title, status, ops_status, job_type, service_visit_type, created_at, scheduled_date, window_start, window_end, parent_job_id, pending_info_reason"
 		)
 		.eq("service_case_id", serviceCaseId)
 		.is("deleted_at", null)

@@ -296,6 +296,10 @@ function isFailedFamilyOpsStatus(value?: string | null) {
 
 function serviceChainVisitLabel(visit: any, idx: number) {
   if (idx === 0 && !visit?.parent_job_id) return "Original visit";
+  const visitType = String(visit?.service_visit_type ?? "").trim().toLowerCase();
+  if (visit?.parent_job_id && visitType === "callback") return "Callback visit";
+  if (visit?.parent_job_id && visitType === "return_visit") return "Return visit";
+  if (visit?.parent_job_id && String(visit?.job_type ?? "").toLowerCase() === "service") return "Linked service visit";
   if (visit?.parent_job_id) return "Retest visit";
   return `Visit ${idx + 1}`;
 }
@@ -4365,6 +4369,41 @@ const failureResolutionPathCount =
             />
           ) : null}
 
+          {banner === "different_issue_found_saved" ? (
+            <FlashBanner
+              type="success"
+              message="Different issue noted. This callback/return visit is complete and office review is next; the original job history was not changed."
+            />
+          ) : null}
+
+          {banner === "different_issue_found_callback_revisit_only" ? (
+            <FlashBanner
+              type="warning"
+              message="Different Issue Found is only for callback or return visits. Use the normal follow-up options for first visits."
+            />
+          ) : null}
+
+          {banner === "different_issue_found_service_only" ? (
+            <FlashBanner
+              type="warning"
+              message="Different Issue Found is only available for service callback or return visits."
+            />
+          ) : null}
+
+          {banner === "different_issue_found_note_required" ? (
+            <FlashBanner
+              type="warning"
+              message="Add a short note explaining the different issue before routing this callback/return visit to office review."
+            />
+          ) : null}
+
+          {banner === "different_issue_found_invalid_status" || banner === "different_issue_found_already_completed" ? (
+            <FlashBanner
+              type="warning"
+              message="This callback/return visit cannot be routed as Different Issue Found from its current state."
+            />
+          ) : null}
+
           {banner === "internal_invoice_draft_created" || banner === "internal_invoice_draft_saved" || banner === "internal_invoice_issued" ? (
             <FlashBanner type="success" message="Invoice updated." />
           ) : null}
@@ -7837,6 +7876,41 @@ const failureResolutionPathCount =
         <FlashBanner
           type="warning"
           message="Record Callback Report is available only for service jobs that are field-complete, completed, or closed."
+        />
+      )}
+
+      {banner === "different_issue_found_saved" && (
+        <FlashBanner
+          type="success"
+          message="Different issue noted. This callback/return visit is complete and office review is next; the original job history was not changed."
+        />
+      )}
+
+      {banner === "different_issue_found_callback_revisit_only" && (
+        <FlashBanner
+          type="warning"
+          message="Different Issue Found is only for callback or return visits. Use the normal follow-up options for first visits."
+        />
+      )}
+
+      {banner === "different_issue_found_service_only" && (
+        <FlashBanner
+          type="warning"
+          message="Different Issue Found is only available for service callback or return visits."
+        />
+      )}
+
+      {banner === "different_issue_found_note_required" && (
+        <FlashBanner
+          type="warning"
+          message="Add a short note explaining the different issue before routing this callback/return visit to office review."
+        />
+      )}
+
+      {(banner === "different_issue_found_invalid_status" || banner === "different_issue_found_already_completed") && (
+        <FlashBanner
+          type="warning"
+          message="This callback/return visit cannot be routed as Different Issue Found from its current state."
         />
       )}
 
