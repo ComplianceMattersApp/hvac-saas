@@ -55,3 +55,35 @@ export function getCloseoutQueueNextStepLabel(job: CloseoutProjectionInput) {
   if (needs.needsInvoice) return "Invoice";
   return "Review closeout requirements";
 }
+
+export function getJobDetailCloseoutReadinessMessage(job: CloseoutProjectionInput) {
+  const needs = getCloseoutNeeds(job);
+
+  if (needs.isEcc && needs.isFailureFlow) {
+    return needs.needsInvoice
+      ? "Complete billing; job needs retest or review."
+      : "Job needs retest or review before closeout.";
+  }
+
+  if (needs.isEcc && needs.needsInvoice && needs.needsCerts) {
+    return "Send certs and complete billing to close this job.";
+  }
+
+  if (needs.isEcc && needs.needsInvoice) {
+    return "Complete billing to close this job.";
+  }
+
+  if (needs.isEcc && needs.needsCerts) {
+    return "Send certs to close this job.";
+  }
+
+  if (needs.isEcc) {
+    return "Invoice and certs are complete.";
+  }
+
+  if (needs.needsInvoice) {
+    return "Complete billing to close this job.";
+  }
+
+  return "Field work complete - ready for closeout.";
+}

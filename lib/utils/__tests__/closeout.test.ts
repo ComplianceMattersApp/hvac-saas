@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   getCloseoutNeeds,
   getCloseoutQueueNextStepLabel,
+  getJobDetailCloseoutReadinessMessage,
   isInCloseoutQueue,
 } from "@/lib/utils/closeout";
 
@@ -136,5 +137,78 @@ describe("closeout queue projection", () => {
         invoice_complete: false,
       }),
     ).toBe("Invoice");
+  });
+
+  it("uses retest/review closeout banner copy for failed ECC after billing is complete", () => {
+    const message = getJobDetailCloseoutReadinessMessage({
+      field_complete: true,
+      job_type: "ecc",
+      ops_status: "failed",
+      invoice_complete: true,
+      certs_complete: false,
+    });
+
+    expect(message).toBe("Job needs retest or review before closeout.");
+    expect(message).not.toContain("ready for closeout");
+  });
+
+  it("keeps billing in the closeout banner copy for failed ECC when invoice remains pending", () => {
+    expect(
+      getJobDetailCloseoutReadinessMessage({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "failed",
+        invoice_complete: false,
+        certs_complete: false,
+      }),
+    ).toBe("Complete billing; job needs retest or review.");
+  });
+
+  it("uses billing-only closeout banner copy for passed ECC with certs complete", () => {
+    expect(
+      getJobDetailCloseoutReadinessMessage({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "invoice_required",
+        invoice_complete: false,
+        certs_complete: true,
+      }),
+    ).toBe("Complete billing to close this job.");
+  });
+
+  it("uses cert-only closeout banner copy for passed ECC with billing complete", () => {
+    expect(
+      getJobDetailCloseoutReadinessMessage({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "paperwork_required",
+        invoice_complete: true,
+        certs_complete: false,
+      }),
+    ).toBe("Send certs to close this job.");
+  });
+
+  it("uses combined billing and cert closeout banner copy for passed ECC with both pending", () => {
+    expect(
+      getJobDetailCloseoutReadinessMessage({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "paperwork_required",
+        invoice_complete: false,
+        certs_complete: false,
+      }),
+    ).toBe("Send certs and complete billing to close this job.");
+  });
+
+  it("uses complete closeout banner copy for passed ECC when invoice and certs are complete", () => {
+    expect(
+      getJobDetailCloseoutReadinessMessage({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "closed",
+        invoice_complete: true,
+        certs_complete: true,
+      }),
+    ).toBe("Invoice and certs are complete.");
   });
 });

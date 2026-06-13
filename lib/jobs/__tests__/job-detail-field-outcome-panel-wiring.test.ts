@@ -58,10 +58,8 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("!isFieldComplete &&");
     expect(jobDetailSource).toContain('normalizedJobStatus === "in_process";');
     expect(jobDetailSource).toContain("{showFieldOutcomePanel ? (");
-    expect(jobDetailSource).toContain("Field work complete - ready for closeout.");
-    expect(jobDetailSource).toContain("Field work complete - invoice and certs are still needed.");
-    expect(jobDetailSource).toContain("Field work complete - invoice is still needed.");
-    expect(jobDetailSource).toContain("Field work complete - certs are still needed.");
+    expect(jobDetailSource).toContain("getJobDetailCloseoutReadinessMessage");
+    expect(jobDetailSource).toContain("{primaryCloseoutMessage}");
   });
 
   it("suppresses duplicate ECC tests workspace shortcuts while the primary in-process action row is visible", () => {
@@ -78,7 +76,7 @@ describe("job detail field outcome panel wiring", () => {
   it("keeps completion on the primary action and leaves the outcome panel for exceptions only", () => {
     expect(fieldActionButtonSource).toContain("Complete Field Work");
     expect(jobDetailSource).toContain('!isFieldComplete && job.status !== "completed" ? (');
-    expect(jobDetailSource).toContain("Field work complete - ready for closeout.");
+    expect(jobDetailSource).toContain("getJobDetailCloseoutReadinessMessage(closeoutProjectionJob)");
     expect(jobDetailSource).toContain("showPrimaryCloseoutBlockers");
     expect(jobDetailSource).toContain("jobPageInvoiceNextAction");
     expect(jobDetailSource).toContain("✓ Certs Sent");
@@ -253,10 +251,8 @@ describe("job detail field outcome panel wiring", () => {
   it("surfaces closeout blockers and actions in Primary Next Action after field completion", () => {
     expect(jobDetailSource).toContain("const showPrimaryCloseoutBlockers =");
     expect(jobDetailSource).toContain("isCloseoutPending");
-    expect(jobDetailSource).toContain("closeoutNeeds.needsInvoice && closeoutNeeds.needsCerts");
-    expect(jobDetailSource).toContain("Field work complete - invoice and certs are still needed.");
-    expect(jobDetailSource).toContain("Field work complete - invoice is still needed.");
-    expect(jobDetailSource).toContain("Field work complete - certs are still needed.");
+    expect(jobDetailSource).toContain("(isCloseoutPending || closeoutNeeds.isFailureFlow)");
+    expect(jobDetailSource).toContain("getJobDetailCloseoutReadinessMessage(closeoutProjectionJob)");
     expect(jobDetailSource).toContain('href={`/jobs/${job.id}/invoice#invoice-workspace`}');
     expect(jobDetailSource).toContain("{jobPageInvoiceNextAction}");
     expect(jobDetailSource).toContain("form action={markCertsCompleteFromForm}");

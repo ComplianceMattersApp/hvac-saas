@@ -58,7 +58,11 @@ import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/
 import type { JobStatus } from "@/lib/types/job";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import UnscheduleButton from "./_components/UnscheduleButton";
-import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
+import {
+  getCloseoutNeeds,
+  getJobDetailCloseoutReadinessMessage,
+  isInCloseoutQueue,
+} from "@/lib/utils/closeout";
 import ContractorReportPanel from "./_components/ContractorReportPanel";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import {
@@ -2650,7 +2654,9 @@ const workflowChipLabel =
     : formatOpsStatusLabel(job.ops_status, job.job_type);
 
 const isFailedUnresolved =
-  ["failed", "retest_needed", "pending_office_review"].includes(String(job.ops_status ?? ""));
+  ["failed", "retest_needed", "pending_office_review"].includes(
+    String(job.ops_status ?? "").trim().toLowerCase(),
+  );
 const isEccPermitNeededActive = isEccPermitNeededBlocker({
   job_type: job.job_type,
   ops_status: job.ops_status,
@@ -2707,7 +2713,7 @@ const showInternalInvoicingPlaceholder = shouldShowInternalInvoiceRequiredBanner
 const showPrimaryCloseoutBlockers =
   isInternalUser &&
   (isFieldComplete || job.status === "completed") &&
-  isCloseoutPending &&
+  (isCloseoutPending || closeoutNeeds.isFailureFlow) &&
   !isServiceFieldFollowUpPendingInfo &&
   !isEccPermitNeededActive;
 
@@ -2721,13 +2727,7 @@ const hasActionHeavyPrimaryNextAction =
   (isServiceFieldFollowUpPendingInfo && Boolean(serviceFollowUpProgressState.reason));
 
 const primaryCloseoutMessage =
-  closeoutNeeds.needsInvoice && closeoutNeeds.needsCerts
-    ? "Field work complete - invoice and certs are still needed."
-    : closeoutNeeds.needsInvoice
-      ? "Field work complete - invoice is still needed."
-      : closeoutNeeds.needsCerts
-        ? "Field work complete - certs are still needed."
-        : "Field work complete - closeout is resolved.";
+  getJobDetailCloseoutReadinessMessage(closeoutProjectionJob);
 
 const showExternalDataEntryPrompt =
   billingState.lightweightBillingAllowed &&
@@ -4829,7 +4829,7 @@ const failureResolutionPathCount =
               ) : isFieldComplete || job.status === "completed" ? (
                 <div className="space-y-2">
                   <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-center text-base font-semibold text-emerald-900">
-                    Field work complete - ready for closeout.
+                    {primaryCloseoutMessage}
                   </span>
                   {job.job_type === "ecc" ? (
                     <Link
@@ -6166,7 +6166,7 @@ const failureResolutionPathCount =
         ) : (isFieldComplete || job.status === "completed") && !isServiceFieldFollowUpPendingInfo && !isEccPermitNeededActive ? (
           <div className="hidden w-full sm:flex">
             <span className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-center text-sm font-semibold text-emerald-900">
-              Field work complete - ready for closeout.
+              {primaryCloseoutMessage}
             </span>
           </div>
         ) : null}
