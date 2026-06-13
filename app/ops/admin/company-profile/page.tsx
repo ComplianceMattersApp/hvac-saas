@@ -84,27 +84,27 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   },
   authorized_ecc_rater_saved: {
     tone: "success",
-    message: "Authorized ECC rater saved.",
+    message: "Manual ECC rater tracking record saved.",
   },
   authorized_ecc_rater_display_name_required: {
     tone: "error",
-    message: "Display name is required for an authorized ECC rater.",
+    message: "Display name is required for a manual ECC rater tracking record.",
   },
   authorized_ecc_rater_save_failed: {
     tone: "error",
-    message: "Could not save authorized ECC rater. Please try again.",
+    message: "Could not save manual ECC rater tracking record. Please try again.",
   },
   authorized_ecc_rater_default_saved: {
     tone: "success",
-    message: "Default authorized ECC rater updated.",
+    message: "Default connected ECC rater updated.",
   },
   authorized_ecc_rater_default_failed: {
     tone: "error",
-    message: "Could not set default authorized ECC rater.",
+    message: "Could not set default connected ECC rater.",
   },
   authorized_ecc_rater_archived: {
     tone: "success",
-    message: "Authorized ECC rater archived.",
+    message: "ECC rater archived.",
   },
   authorized_ecc_rater_archive_failed: {
     tone: "error",
@@ -112,15 +112,15 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   },
   connected_rater_added: {
     tone: "success",
-    message: "Connected account rater added.",
+    message: "Connected ECC rater added.",
   },
   connected_rater_exists: {
     tone: "warn",
-    message: "Connected account rater is already configured.",
+    message: "Connected ECC rater is already configured.",
   },
   connected_rater_error: {
     tone: "error",
-    message: "Could not add connected account rater.",
+    message: "Could not add connected ECC rater.",
   },
   connection_requested: {
     tone: "success",
@@ -587,9 +587,9 @@ export default async function AdminCompanyProfilePage({
 
       <div id="authorized-ecc-raters" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
-          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Authorized ECC Raters</h2>
+          <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Connected ECC Raters</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Set up who can receive ECC handoffs from workflow guidance. If one active rater exists, future workflow handoff can default to that rater. If multiple exist, the user will choose from a dropdown.
+            Add the ECC rater accounts this company is allowed to send jobs to. For Compliance Matters testing, paste the Rater Link ID provided by Compliance Matters. Other connected rating companies can provide their own Link ID when available.
           </p>
         </div>
 
@@ -606,7 +606,7 @@ export default async function AdminCompanyProfilePage({
         <div className="mt-5 space-y-3">
           {authorizedEccRecipients.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 px-4 py-3 text-sm text-slate-600">
-              No authorized ECC raters are set up yet.
+              No connected ECC raters are set up yet. Add Compliance Matters or another authorized rater account to enable ECC handoffs.
             </div>
           ) : (
             authorizedEccRecipients.map((recipient) => {
@@ -673,8 +673,76 @@ export default async function AdminCompanyProfilePage({
           )}
         </div>
 
-        <form action={createAuthorizedEccRaterFromForm} className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="text-sm font-semibold text-slate-900">Add authorized rater</div>
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
+          <div className="text-sm font-semibold text-slate-900">Add connected ECC rater</div>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            For Compliance Matters, use the Rater Link ID provided by Compliance Matters. This lets jobs be shared for ECC testing, corrections, retests, and cert closeout.
+          </p>
+
+          {activeConnectedRecipientConnections.length === 0 ? (
+            <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-3 py-2 text-sm text-slate-600">
+              No active connected rater accounts yet. <a href="#account-handoff-connections" className="font-semibold text-slate-900 underline-offset-2 hover:underline">Add a Rater Link ID</a> from Compliance Matters or another connected rating company first.
+            </div>
+          ) : activeConnectedRecipientConnections.length === 1 ? (
+            <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
+              <input type="hidden" name="connection_id" value={activeConnectedRecipientConnections[0].id} />
+              <div className="text-sm text-slate-700">
+                Connect rater account {activeConnectedRecipientConnections[0].recipient_account_owner_user_id.slice(0, 8)} for ECC handoffs.
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
+                Set as default ECC rater
+              </label>
+              <button
+                type="submit"
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+              >
+                Connect ECC rater
+              </button>
+            </form>
+          ) : (
+            <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
+              <div className="space-y-1.5">
+                <label htmlFor="connected-rater-connection-id" className="text-sm font-medium text-slate-700">
+                  Rater Link ID
+                </label>
+                <select
+                  id="connected-rater-connection-id"
+                  name="connection_id"
+                  required
+                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
+                >
+                  {activeConnectedRecipientConnections.map((connection) => (
+                    <option key={connection.id} value={connection.id}>
+                      {connection.recipient_account_owner_user_id}
+                    </option>
+                  ))}
+                </select>
+                <p className="text-xs leading-5 text-slate-500">
+                  Choose an active Rater Link ID that has already been connected below.
+                </p>
+              </div>
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
+                <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
+                Set as default ECC rater
+              </label>
+              <button
+                type="submit"
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
+              >
+                Add connected rater
+              </button>
+            </form>
+          )}
+        </div>
+
+        <form action={createAuthorizedEccRaterFromForm} className="mt-5 space-y-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-4">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">Track manual/external rater</div>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              Use this only for tracking a rater that is not connected by Rater Link ID yet. Manual tracking remains available, but connected rater accounts are preferred for ECC handoffs.
+            </p>
+          </div>
           <input type="hidden" name="handoff_kind" value="ecc" />
           <input type="hidden" name="recipient_type" value="external_manual" />
 
@@ -688,7 +756,7 @@ export default async function AdminCompanyProfilePage({
                 name="display_name"
                 required
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="Central Valley HERS Rater"
+                placeholder="Compliance Matters ECC"
               />
             </div>
 
@@ -700,7 +768,7 @@ export default async function AdminCompanyProfilePage({
                 id="authorized-rater-company"
                 name="external_company_name"
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="External Rating Co"
+                placeholder="Compliance Matters"
               />
             </div>
 
@@ -712,7 +780,7 @@ export default async function AdminCompanyProfilePage({
                 id="authorized-rater-contact"
                 name="external_contact_name"
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="Jane Rater"
+                placeholder="Rater contact"
               />
             </div>
 
@@ -761,7 +829,7 @@ export default async function AdminCompanyProfilePage({
           </label>
 
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
-            External/manual raters are fully supported. Connected-account raters are supported through Connected Handoff Accounts.
+            Manual/external rater records are tracking only. Use connected ECC raters when the rater provides a Rater Link ID.
           </div>
 
           <div className="flex justify-end">
@@ -769,70 +837,10 @@ export default async function AdminCompanyProfilePage({
               type="submit"
               className="inline-flex min-h-10 items-center rounded-lg bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-[background-color,box-shadow,transform] hover:bg-slate-800"
             >
-              Add authorized rater
+              Add manual rater record
             </button>
           </div>
         </form>
-
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
-          <div className="text-sm font-semibold text-slate-900">Connected account raters</div>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
-            Active connected accounts can be added as authorized ECC rater routing options. This still does not share jobs, customers, service cases, or payment data.
-          </p>
-
-          {activeConnectedRecipientConnections.length === 0 ? (
-            <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-3 py-2 text-sm text-slate-600">
-              No active connected handoff accounts yet. <a href="#account-handoff-connections" className="font-semibold text-slate-900 underline-offset-2 hover:underline">Open Connected Handoff Accounts setup</a>.
-            </div>
-          ) : activeConnectedRecipientConnections.length === 1 ? (
-            <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
-              <input type="hidden" name="connection_id" value={activeConnectedRecipientConnections[0].id} />
-              <div className="text-sm text-slate-700">
-                Add connected account {activeConnectedRecipientConnections[0].recipient_account_owner_user_id.slice(0, 8)} as an authorized ECC rater.
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
-                Set as default ECC rater
-              </label>
-              <button
-                type="submit"
-                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
-              >
-                Add connected account rater
-              </button>
-            </form>
-          ) : (
-            <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
-              <div className="space-y-1.5">
-                <label htmlFor="connected-rater-connection-id" className="text-sm font-medium text-slate-700">
-                  Select active connected account
-                </label>
-                <select
-                  id="connected-rater-connection-id"
-                  name="connection_id"
-                  required
-                  className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                >
-                  {activeConnectedRecipientConnections.map((connection) => (
-                    <option key={connection.id} value={connection.id}>
-                      {connection.recipient_account_owner_user_id}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
-                <input type="checkbox" name="is_default" value="1" className="h-4 w-4 rounded border-slate-300 text-slate-900" />
-                Set as default ECC rater
-              </label>
-              <button
-                type="submit"
-                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-800 transition-colors hover:bg-slate-50"
-              >
-                Add connected account rater
-              </button>
-            </form>
-          )}
-        </div>
       </div>
 
       <div id="account-handoff-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
@@ -846,22 +854,25 @@ export default async function AdminCompanyProfilePage({
         <form action={requestAccountHandoffConnectionFromForm} className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-sm font-semibold text-slate-900">Request connection</div>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
-            Enter the account owner user id for the company you want to connect with. Company lookup/search can come later.
+            Enter the Rater Link ID provided by the connected rating company. For Compliance Matters testing, use the Rater Link ID provided by Compliance Matters.
           </div>
           <input type="hidden" name="handoff_kind" value="ecc" />
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <label htmlFor="connection-recipient-account-owner-id" className="text-sm font-medium text-slate-700">
-                Recipient account owner user id
+                Rater Link ID
               </label>
               <input
                 id="connection-recipient-account-owner-id"
                 name="recipient_account_owner_user_id"
                 required
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="00000000-0000-4000-8000-000000000000"
+                placeholder="Compliance Matters Rater Link ID"
               />
+              <p className="text-xs leading-5 text-slate-500">
+                This uses the current connected account owner lookup until dedicated Rater Link ID validation is available.
+              </p>
             </div>
 
             <div className="space-y-1.5 sm:col-span-2">
@@ -1038,7 +1049,7 @@ function ConnectionListSection(props: {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-slate-900">{resolveOtherAccountOwnerUserId(connection, props.currentAccountOwnerUserId)}</div>
-                    <div className="mt-1 text-xs text-slate-600">Other account owner user id</div>
+                    <div className="mt-1 text-xs text-slate-600">Connected account ID</div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${connectionStatusBadgeClass(connection.connection_status)}`}>
