@@ -24,6 +24,19 @@ describe("authorized ECC raters company profile wiring", () => {
     expect(pageSource).toContain("Workflow handoff will ask the user to choose a rater.");
   });
 
+  it("shows the current account rater link id as a read-only shareable field", () => {
+    const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
+
+    expect(pageSource).toContain("const raterLinkId = internalUser.account_owner_user_id;");
+    expect(pageSource).toContain("My Rater Link ID");
+    expect(pageSource).toContain("Share this ID with contractors who use Compliance Matters");
+    expect(pageSource).toContain("connect to your rater account for ECC testing, corrections, retests, and cert closeout");
+    expect(pageSource).toContain('id="my-rater-link-id"');
+    expect(pageSource).toContain("readOnly");
+    expect(pageSource).toContain("value={raterLinkId}");
+    expect(pageSource).toContain('aria-label="Copy Rater Link ID"');
+  });
+
   it("wires active recipients list, default badge, and archive/default actions", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
@@ -76,7 +89,7 @@ describe("authorized ECC raters company profile wiring", () => {
 
     expect(pageSource).toContain("Rater Link ID");
     expect(pageSource).toContain('name="recipient_account_owner_user_id"');
-    expect(pageSource).toContain("current connected account owner lookup until dedicated Rater Link ID validation is available");
+    expect(pageSource).toContain("current connected account lookup until dedicated Rater Link ID validation is available");
   });
 
   it("labels connected recipient rows clearly", () => {

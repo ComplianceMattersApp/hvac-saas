@@ -240,6 +240,7 @@ export default async function AdminCompanyProfilePage({
   const companyInitial = companyName.charAt(0).toUpperCase() || "C";
   const platformBillingAvailability = getPlatformBillingAvailability();
   const authorizedEccRecipients = authorizedEccSelection.recipients;
+  const raterLinkId = internalUser.account_owner_user_id;
   const pendingOutgoingConnections = accountHandoffConnections.filter((connection) =>
     connection.connection_status === "pending"
     && connection.requesting_account_owner_user_id === internalUser.account_owner_user_id,
@@ -593,6 +594,28 @@ export default async function AdminCompanyProfilePage({
           </p>
         </div>
 
+        <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+          <div className="text-sm font-semibold text-emerald-950">My Rater Link ID</div>
+          <p className="mt-1 text-sm leading-6 text-emerald-900">
+            Share this ID with contractors who use Compliance Matters so they can connect to your rater account for ECC testing, corrections, retests, and cert closeout.
+          </p>
+          <div className="mt-3 space-y-1.5">
+            <label htmlFor="my-rater-link-id" className="text-sm font-medium text-emerald-950">
+              Rater Link ID
+            </label>
+            <input
+              id="my-rater-link-id"
+              readOnly
+              value={raterLinkId}
+              aria-label="Copy Rater Link ID"
+              className="w-full select-all rounded-xl border border-emerald-200 bg-white px-3.5 py-2.5 font-mono text-sm text-slate-950 shadow-sm"
+            />
+          </div>
+          <p className="mt-2 text-xs leading-5 text-emerald-900">
+            Contractors can paste this Rater Link ID when adding Compliance Matters or another connected rater account.
+          </p>
+        </div>
+
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
           {authorizedEccSelection.mode === "none" ? (
             <span>Workflow handoff will show setup required.</span>
@@ -871,7 +894,7 @@ export default async function AdminCompanyProfilePage({
                 placeholder="Compliance Matters Rater Link ID"
               />
               <p className="text-xs leading-5 text-slate-500">
-                This uses the current connected account owner lookup until dedicated Rater Link ID validation is available.
+                This uses the current connected account lookup until dedicated Rater Link ID validation is available.
               </p>
             </div>
 
