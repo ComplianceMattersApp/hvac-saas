@@ -56,6 +56,9 @@ import {
   isEccPermitNeededBlocker,
   shouldApplyEccPermitNeededBlocker,
 } from "@/lib/ecc/permit-needed";
+import {
+  withJobsBillingDispositionSelectFallback,
+} from "@/lib/supabase/jobs-billing-disposition-compat";
 export type { ContractorFailureDetail } from "@/lib/portal/resolveContractorIssues";
 
 type CloseoutInternalInvoiceSnapshot =
@@ -87,6 +90,48 @@ type ActionRequiredBy = (typeof ACTION_REQUIRED_BY)[number];
 
 function isActionRequiredBy(value: unknown): value is ActionRequiredBy {
   return typeof value === 'string' && (ACTION_REQUIRED_BY as readonly string[]).includes(value);
+}
+
+type CertCloseoutJobSnapshot = {
+  id: string;
+  status: string | null;
+  job_type: string | null;
+  field_complete: boolean | null;
+  certs_complete: boolean | null;
+  invoice_complete: boolean | null;
+  billing_disposition: string | null;
+  ops_status: string | null;
+  pending_info_reason: string | null;
+  permit_number: string | null;
+  scheduled_date: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  data_entry_completed_at: string | null;
+  service_case_id: string | null;
+};
+
+async function readCertCloseoutJobSnapshot(params: {
+  supabase: any;
+  jobId: string;
+}): Promise<{ data: CertCloseoutJobSnapshot | null; error: any }> {
+  return withJobsBillingDispositionSelectFallback<CertCloseoutJobSnapshot | null>({
+    runPrimary: () =>
+      params.supabase
+        .from("jobs")
+        .select(
+          "id, status, job_type, field_complete, certs_complete, invoice_complete, billing_disposition, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
+        )
+        .eq("id", params.jobId)
+        .single(),
+    runCompat: () =>
+      params.supabase
+        .from("jobs")
+        .select(
+          "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
+        )
+        .eq("id", params.jobId)
+        .single(),
+  });
 }
 
 type OpsSnapshot = {
@@ -1327,15 +1372,13 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   });
 
   // Read current job snapshot
-  const { data: job, error: jobErr } = await supabase
-    .from("jobs")
-    .select(
-      "id, status, job_type, field_complete, certs_complete, invoice_complete, billing_disposition, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
-    )
-    .eq("id", jobId)
-    .single();
+  const { data: job, error: jobErr } = await readCertCloseoutJobSnapshot({
+    supabase,
+    jobId,
+  });
 
   if (jobErr) throw jobErr;
+  if (!job?.id) throw new Error("Job not found");
 
   if (job.ops_status === "failed" || job.ops_status === "retest_needed") {
     redirectToJob({ notice: "failed_requires_retest" });

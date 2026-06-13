@@ -64,9 +64,12 @@ export async function applyExternalBillingCompletionMutation(params: {
     .eq("id", jobId);
 
   let updateResult: { data: any; error: any };
+  const selectColumns = params.billingDisposition
+    ? "id, invoice_complete, data_entry_completed_at, billing_disposition, billing_disposition_at, billing_disposition_by_user_id"
+    : "id, invoice_complete, data_entry_completed_at";
 
   if (typeof updateQuery?.select === "function") {
-    const selectedQuery = updateQuery.select("id, invoice_complete, data_entry_completed_at, billing_disposition, billing_disposition_at, billing_disposition_by_user_id");
+    const selectedQuery = updateQuery.select(selectColumns);
     if (typeof selectedQuery?.maybeSingle === "function") {
       updateResult = await selectedQuery.maybeSingle();
     } else if (typeof selectedQuery?.single === "function") {
@@ -79,7 +82,7 @@ export async function applyExternalBillingCompletionMutation(params: {
   } else {
     updateResult = await params.supabase
       .from("jobs")
-      .select("id, invoice_complete, data_entry_completed_at, billing_disposition, billing_disposition_at, billing_disposition_by_user_id")
+      .select(selectColumns)
       .eq("id", jobId)
       .maybeSingle();
   }

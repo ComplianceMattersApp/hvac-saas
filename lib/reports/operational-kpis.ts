@@ -13,6 +13,7 @@ import {
   accountScopeInList,
   resolveReportAccountContractorIds,
 } from "@/lib/reports/report-account-scope";
+import { withJobsBillingDispositionSelectFallback } from "@/lib/supabase/jobs-billing-disposition-compat";
 
 type OperationalKpiJob = {
   id: string;
@@ -51,11 +52,20 @@ export async function buildOperationalKpiReadModel(params: {
     supabase: params.supabase,
     accountOwnerUserId: params.accountOwnerUserId,
   });
-  const { data, error } = await params.supabase
-    .from("jobs")
-    .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, billing_disposition, certs_complete")
-    .is("deleted_at", null)
-    .in("contractor_id", accountScopeInList(contractorIds));
+  const { data, error } = await withJobsBillingDispositionSelectFallback<any[]>({
+    runPrimary: () =>
+      params.supabase
+        .from("jobs")
+        .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, billing_disposition, certs_complete")
+        .is("deleted_at", null)
+        .in("contractor_id", accountScopeInList(contractorIds)),
+    runCompat: () =>
+      params.supabase
+        .from("jobs")
+        .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, certs_complete")
+        .is("deleted_at", null)
+        .in("contractor_id", accountScopeInList(contractorIds)),
+  });
 
   if (error) throw error;
 

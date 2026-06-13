@@ -176,6 +176,7 @@ import {
 import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
 import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
+import { isMissingJobsBillingDispositionColumnError } from "@/lib/supabase/jobs-billing-disposition-compat";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -349,6 +350,194 @@ function getEventAttachmentCount(meta?: any) {
   }
   return 0;
 }
+
+const MAIN_JOB_SELECT_WITH_BILLING_DISPOSITION = `
+      customer_id,
+      location_id,
+       service_case_id,
+      job_type,
+      service_visit_type,
+      service_visit_reason,
+      service_visit_outcome,
+      visit_scope_summary,
+      visit_scope_items,
+      project_type,
+      id,
+      parent_job_id,
+      title,
+      city,
+      job_address,
+      status,
+      scheduled_date,
+      created_at,
+      deleted_at,
+      contractor_id,
+      ops_status,
+      field_complete,
+      certs_complete,
+      invoice_complete,
+      billing_disposition,
+      billing_disposition_note,
+      billing_disposition_at,
+      billing_disposition_by_user_id,
+      invoice_number,
+      job_display_number,
+      pending_info_reason,
+      on_hold_reason,
+      follow_up_date,
+      next_action_note,
+      action_required_by,
+      permit_number,
+      jurisdiction,
+      permit_date,
+      window_start,
+      window_end,
+      customer_phone,
+      on_the_way_at,
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      job_notes,
+      billing_recipient,
+      billing_name,
+      billing_email,
+      billing_phone,
+      billing_address_line1,
+      billing_address_line2,
+      billing_city,
+      billing_state,
+      billing_zip,
+      locations:location_id (
+        id,
+        nickname,
+        label,
+        address_line1,
+        address_line2,
+        city,
+        state,
+        zip
+      ),
+      job_equipment (
+        id,
+        equipment_role,
+        system_location,
+        manufacturer,
+        model,
+        serial,
+        tonnage,
+        heating_capacity_kbtu,
+        heating_output_btu,
+        heating_efficiency_percent,
+        refrigerant_type,
+        notes,
+        created_at,
+        updated_at
+      ),
+      ecc_test_runs (
+        id,
+        test_type,
+        system_id,
+        is_completed,
+        computed,
+        computed_pass,
+        override_pass,
+        override_reason,
+        created_at,
+        updated_at
+      )
+    `;
+
+const MAIN_JOB_SELECT_COMPAT = `
+      customer_id,
+      location_id,
+       service_case_id,
+      job_type,
+      service_visit_type,
+      service_visit_reason,
+      service_visit_outcome,
+      visit_scope_summary,
+      visit_scope_items,
+      project_type,
+      id,
+      parent_job_id,
+      title,
+      city,
+      job_address,
+      status,
+      scheduled_date,
+      created_at,
+      deleted_at,
+      contractor_id,
+      ops_status,
+      field_complete,
+      certs_complete,
+      invoice_complete,
+      invoice_number,
+      job_display_number,
+      pending_info_reason,
+      on_hold_reason,
+      follow_up_date,
+      next_action_note,
+      action_required_by,
+      permit_number,
+      jurisdiction,
+      permit_date,
+      window_start,
+      window_end,
+      customer_phone,
+      on_the_way_at,
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      job_notes,
+      billing_recipient,
+      billing_name,
+      billing_email,
+      billing_phone,
+      billing_address_line1,
+      billing_address_line2,
+      billing_city,
+      billing_state,
+      billing_zip,
+      locations:location_id (
+        id,
+        nickname,
+        label,
+        address_line1,
+        address_line2,
+        city,
+        state,
+        zip
+      ),
+      job_equipment (
+        id,
+        equipment_role,
+        system_location,
+        manufacturer,
+        model,
+        serial,
+        tonnage,
+        heating_capacity_kbtu,
+        heating_output_btu,
+        heating_efficiency_percent,
+        refrigerant_type,
+        notes,
+        created_at,
+        updated_at
+      ),
+      ecc_test_runs (
+        id,
+        test_type,
+        system_id,
+        is_completed,
+        computed,
+        computed_pass,
+        override_pass,
+        override_reason,
+        created_at,
+        updated_at
+      )
+    `;
 
 function JobAttachmentsSectionFallback() {
   return (
@@ -1411,108 +1600,36 @@ export default async function JobDetailPage({
     return notFound();
   }
 
-  const { data: job, error: jobError } = await timedPhase("mainJobRead", async () =>
-    supabase
+  const { data: job, error: jobError } = await timedPhase("mainJobRead", async () => {
+    const primary = await supabase
       .from("jobs")
-      .select(`
-      customer_id,
-      location_id,
-       service_case_id,
-      job_type,
-      service_visit_type,
-      service_visit_reason,
-      service_visit_outcome,
-      visit_scope_summary,
-      visit_scope_items,
-      project_type,
-      id,
-      parent_job_id,
-      title,
-      city,
-      job_address,
-      status,
-      scheduled_date,
-      created_at,
-      deleted_at,
-      contractor_id,
-      ops_status,
-      field_complete,
-      certs_complete,
-      invoice_complete,
-      billing_disposition,
-      billing_disposition_note,
-      billing_disposition_at,
-      billing_disposition_by_user_id,
-      invoice_number,
-      job_display_number,
-      pending_info_reason,
-      on_hold_reason,
-      follow_up_date,
-      next_action_note,
-      action_required_by,
-      permit_number,
-      jurisdiction,
-      permit_date,
-      window_start,
-      window_end,
-      customer_phone,
-      on_the_way_at,
-      customer_first_name,
-      customer_last_name,
-      customer_email,
-      job_notes,
-      billing_recipient,
-      billing_name,
-      billing_email,
-      billing_phone,
-      billing_address_line1,
-      billing_address_line2,
-      billing_city,
-      billing_state,
-      billing_zip,
-      locations:location_id (
-        id,
-        nickname,
-        label,
-        address_line1,
-        address_line2,
-        city,
-        state,
-        zip
-      ),
-      job_equipment (
-        id,
-        equipment_role,
-        system_location,
-        manufacturer,
-        model,
-        serial,
-        tonnage,
-        heating_capacity_kbtu,
-        heating_output_btu,
-        heating_efficiency_percent,
-        refrigerant_type,
-        notes,
-        created_at,
-        updated_at
-      ),
-      ecc_test_runs (
-        id,
-        test_type,
-        system_id,
-        is_completed,
-        computed,
-        computed_pass,
-        override_pass,
-        override_reason,
-        created_at,
-        updated_at
-      )
-    `)
+      .select(MAIN_JOB_SELECT_WITH_BILLING_DISPOSITION)
       .eq("id", jobId)
+      .single();
 
-      .single(),
-  );
+    if (!primary.error || !isMissingJobsBillingDispositionColumnError(primary.error)) {
+      return primary;
+    }
+
+    const compat = await supabase
+      .from("jobs")
+      .select(MAIN_JOB_SELECT_COMPAT)
+      .eq("id", jobId)
+      .single();
+
+    if (compat.error) return compat;
+
+    return {
+      data: {
+        ...(compat.data ?? {}),
+        billing_disposition: null,
+        billing_disposition_note: null,
+        billing_disposition_at: null,
+        billing_disposition_by_user_id: null,
+      },
+      error: null,
+    };
+  });
 
   if (jobError) throw jobError;
   if (!job) return notFound();

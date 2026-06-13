@@ -84,6 +84,14 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("jobBillingDispositionLabel");
   });
 
+  it("falls back to a compatibility select when jobs.billing_disposition is unavailable", () => {
+    expect(source).toContain("isMissingJobsBillingDispositionColumnError");
+    expect(source).toContain("const MAIN_JOB_SELECT_WITH_BILLING_DISPOSITION =");
+    expect(source).toContain("const MAIN_JOB_SELECT_COMPAT =");
+    expect(source).toContain("isMissingJobsBillingDispositionColumnError(primary.error)");
+    expect(source).toContain("billing_disposition: null");
+  });
+
   it("degrades field proposal summary reads without crashing job detail", () => {
     const fieldBillingReadIndex = source.indexOf("timedPhase(\"fieldBillingSummaryRead\"");
     const fieldBillingReadSlice = source.slice(fieldBillingReadIndex, fieldBillingReadIndex + 2200);

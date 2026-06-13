@@ -42,6 +42,13 @@ describe("/ops/closeout-queue page", () => {
     expect(closeoutQueuePageSource).toContain('.neq("ops_status", "closed")');
   });
 
+  it("falls back to a compatibility jobs select when billing_disposition is unavailable", () => {
+    expect(closeoutQueuePageSource).toContain("withJobsBillingDispositionSelectFallback");
+    expect(closeoutQueuePageSource).toContain("const baseSelectCompat =");
+    expect(closeoutQueuePageSource).toContain("runPrimary: () => buildQueueQuery(baseSelect)");
+    expect(closeoutQueuePageSource).toContain("runCompat: () => buildQueueQuery(baseSelectCompat)");
+  });
+
   it("derives queue membership from canonical billing-truth closeout projection", () => {
     expect(closeoutQueuePageSource).toContain("buildBillingTruthCloseoutProjectionMap");
     expect(closeoutQueuePageSource).toContain("listCloseoutQueueJobs");

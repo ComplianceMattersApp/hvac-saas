@@ -269,6 +269,7 @@ function makeSupabaseForCertCloseout(params: {
   internalInvoiceError?: { message: string } | null;
   recomputedOpsStatus: string;
   certUpdateError?: { message: string } | null;
+  jobReadMissingBillingDisposition?: boolean;
 }) {
   const jobUpdates: Record<string, unknown>[] = [];
   const jobEvents: Record<string, unknown>[] = [];
@@ -290,6 +291,23 @@ function makeSupabaseForCertCloseout(params: {
           }),
           single: vi.fn(async () => {
             jobsSingleCount += 1;
+
+            if (params.jobReadMissingBillingDisposition) {
+              if (jobsSingleCount === 1) {
+                return {
+                  data: null,
+                  error: {
+                    code: "42703",
+                    message: "column jobs.billing_disposition does not exist",
+                  },
+                };
+              }
+              if (jobsSingleCount === 2) {
+                return { data: params.job, error: null };
+              }
+              return { data: { ops_status: params.recomputedOpsStatus }, error: null };
+            }
+
             if (jobsSingleCount === 1) {
               return { data: params.job, error: null };
             }
@@ -620,6 +638,49 @@ describe("releaseAndReevaluate", () => {
     ]);
     expect(revalidatePathMock).toHaveBeenCalledWith("/ops/closeout-queue");
     expect(revalidatePathMock).toHaveBeenCalledWith("/reports/closeout");
+  });
+
+  it("falls back when jobs.billing_disposition is unavailable and still resolves cert closeout", async () => {
+    const { supabase, jobUpdates } = makeSupabaseForCertCloseout({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        ops_status: "paperwork_required",
+        pending_info_reason: null,
+        permit_number: "PERMIT-123",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+        data_entry_completed_at: null,
+        service_case_id: null,
+      },
+      internalInvoice: {
+        status: "issued",
+        invoice_number: "INV-100",
+        issued_at: "2026-06-01T12:00:00.000Z",
+      },
+      recomputedOpsStatus: "closed",
+      jobReadMissingBillingDisposition: true,
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValueOnce("internal_invoicing");
+    redirectMock.mockImplementation((path: string) => {
+      throw new Error(`NEXT_REDIRECT:${path}`);
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("return_to", "/jobs/job-1?tab=ops#field-status-actions");
+
+    const { markCertsCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markCertsCompleteFromForm(formData)).rejects.toThrow("banner=certs_closeout_closed");
+    expect(jobUpdates).toContainEqual({ certs_complete: true, invoice_complete: true });
+    expect(jobUpdates).toContainEqual({ ops_status: "closed" });
   });
 
   it("marks certs sent but keeps a billing blocker visible when billing truth remains pending", async () => {

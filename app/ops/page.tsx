@@ -68,6 +68,7 @@ import {
   buildServiceFollowUpProgressState,
 } from "@/lib/jobs/service-follow-up-progress";
 import { formatEccRetestReadySignalLabel } from "@/lib/ecc/ecc-workflow-display";
+import { withJobsBillingDispositionSelectFallback } from "@/lib/supabase/jobs-billing-disposition-compat";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -1140,8 +1141,14 @@ function shouldHideFailedParentJob(j: any) {
 
 
   // Common job select (keep lightweight)
- const baseSelect =
-   "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, billing_disposition, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at, visit_scope_summary, visit_scope_items";
+  const baseSelectWithBillingDisposition =
+    "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, billing_disposition, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at, visit_scope_summary, visit_scope_items";
+  const baseSelectCompat =
+    "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at, visit_scope_summary, visit_scope_items";
+  const operationalReportingSelectWithBillingDisposition =
+    "id, parent_job_id, service_case_id, job_type, status, ops_status, created_at, scheduled_date, field_complete, field_complete_at, service_visit_outcome, invoice_complete, billing_disposition, certs_complete";
+  const operationalReportingSelectCompat =
+    "id, parent_job_id, service_case_id, job_type, status, ops_status, created_at, scheduled_date, field_complete, field_complete_at, service_visit_outcome, invoice_complete, certs_complete";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -1212,153 +1219,35 @@ const recentServiceWindowCutoffIso = new Date(
   now.getTime() - 30 * 24 * 60 * 60 * 1000
 ).toISOString();
 
-// 1) FIELD WORK (scheduled today in LA and not field-complete)
-let fieldWorkQ = supabase
-  .from("jobs")
-  .select(baseSelect)
-  .is("deleted_at", null)
-  .neq("status", "cancelled")
-  .neq("ops_status", "closed")
-  .eq("field_complete", false)
-  .gte("scheduled_date", startTodayUtc)
-  .lt("scheduled_date", startTomorrowUtc)
-  .order("window_start", { ascending: true });
+  const runJobsSelectWithCompat = async (buildQuery: (selectClause: string) => any) =>
+    withJobsBillingDispositionSelectFallback<any[]>({
+      runPrimary: () => buildQuery(baseSelectWithBillingDisposition),
+      runCompat: () => buildQuery(baseSelectCompat),
+    });
 
-fieldWorkQ = applyCommonFilters(fieldWorkQ);
+  const runOperationalReportingJobsSelectWithCompat = async () =>
+    withJobsBillingDispositionSelectFallback<any[]>({
+      runPrimary: () => {
+        let q = supabase
+          .from("jobs")
+          .select(operationalReportingSelectWithBillingDisposition)
+          .is("deleted_at", null)
+          .neq("status", "cancelled");
 
-  // 3) CALL LIST preview (need_to_schedule)
-  let callListQ = supabase
-    .from("jobs")
-    .select(baseSelect)
-    .is("deleted_at", null)
-    .neq("status", "cancelled")
-    .eq("status", "open")
-    .eq("ops_status", "need_to_schedule")
-    .order("created_at", { ascending: false })
-    .limit(10);
+        if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
+        return q;
+      },
+      runCompat: () => {
+        let q = supabase
+          .from("jobs")
+          .select(operationalReportingSelectCompat)
+          .is("deleted_at", null)
+          .neq("status", "cancelled");
 
-  callListQ = applyCommonFilters(callListQ);
-
-  // Scheduled queue snapshot for jobs that still need technician assignment visibility.
-  let scheduledSnapshotQ = supabase
-    .from("jobs")
-    .select(baseSelect)
-    .is("deleted_at", null)
-    .neq("status", "cancelled")
-    .eq("status", "open")
-    .eq("ops_status", "scheduled")
-    .order("scheduled_date", { ascending: true })
-    .order("window_start", { ascending: true })
-    .limit(50);
-
-  scheduledSnapshotQ = applyCommonFilters(scheduledSnapshotQ);
-
-    // 4) CLOSEOUT COMMAND BOARD (derived from field_complete + remaining office obligations)
-    let closeoutQ = supabase
-      .from("jobs")
-      .select(baseSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("field_complete", true)
-      .neq("ops_status", "closed")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    closeoutQ = applyCommonFilters(closeoutQ);
-
-    // 5) EXCEPTIONS: Still Open (scheduled before today in LA and not field-complete)
-    let stillOpenQ = supabase
-      .from("jobs")
-      .select(baseSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .neq("ops_status", "closed")
-      .eq("field_complete", false)
-      .lt("scheduled_date", startTodayUtc)
-      .order("scheduled_date", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(100);
-
-    stillOpenQ = applyCommonFilters(stillOpenQ);
-
-    // 6) NEEDS ATTENTION preview (aging-based escalation queue)
-    let attentionQ = supabase
-      .from("jobs")
-      .select(baseSelect)
-      .is("deleted_at", null)
-      .or(
-        [
-          // Need to Schedule older than 3 business days
-          `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
-
-          // Pending Info older than 3 business days
-          `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
-
-          // Failed older than 14 calendar days
-          `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
-          `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
-        ].join(",")
-      )
-      .order("created_at", { ascending: true })
-      .limit(10);
-
-    attentionQ = applyCommonFilters(attentionQ);
-
-  let operationalReportingJobsQ = supabase
-    .from("jobs")
-    .select(
-      "id, parent_job_id, service_case_id, job_type, status, ops_status, created_at, scheduled_date, field_complete, field_complete_at, service_visit_outcome, invoice_complete, billing_disposition, certs_complete"
-    )
-    .is("deleted_at", null)
-    .neq("status", "cancelled");
-
-  if (contractorScopeFilter) operationalReportingJobsQ = operationalReportingJobsQ.eq("contractor_id", contractorScopeFilter);
-
-  // 7) BUCKET list (tabs)
-    let bucketQ = supabase
-      .from("jobs")
-      .select(baseSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (bucket === "attention") {
-      bucketQ = bucketQ.or(
-        [
-          `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
-          `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
-          `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
-          `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
-        ].join(",")
-      );
-    } else if (bucket === "failed") {
-      bucketQ = bucketQ.in("ops_status", ["failed", "pending_office_review"]);
-    } else if (bucket === "workflow_all") {
-      bucketQ = bucketQ.in("ops_status", [
-        "need_to_schedule",
-        "pending_info",
-        "on_hold",
-        "failed",
-        "pending_office_review",
-      ]);
-    } else if (bucket === "closeout") {
-      bucketQ = bucketQ
-        .eq("field_complete", true)
-        .neq("ops_status", "closed");
-    } else if (bucket === "recent_closed") {
-      bucketQ = bucketQ
-        .eq("ops_status", "closed")
-        .order("created_at", { ascending: false })
-        .limit(15);
-    } else {
-      bucketQ = bucketQ.eq("ops_status", bucket);
-      if (bucket === "need_to_schedule" || bucket === "scheduled") {
-        bucketQ = bucketQ.eq("status", "open");
-      }
-    }
-
-    bucketQ = applyCommonFilters(bucketQ);
+        if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
+        return q;
+      },
+    });
 
   const _t_primaryQueueReads = opsTimingEnabled ? Date.now() : 0;
     const [
@@ -1373,18 +1262,166 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
     ] = await Promise.all([
       trackOpsTiming(
         "ops:primaryQueueReads:fieldWork",
-        trackOpsTiming("ops:fieldWork:fetch", fieldWorkQ)
+        trackOpsTiming(
+          "ops:fieldWork:fetch",
+          runJobsSelectWithCompat((selectClause) => {
+            let q = supabase
+              .from("jobs")
+              .select(selectClause)
+              .is("deleted_at", null)
+              .neq("status", "cancelled")
+              .neq("ops_status", "closed")
+              .eq("field_complete", false)
+              .gte("scheduled_date", startTodayUtc)
+              .lt("scheduled_date", startTomorrowUtc)
+              .order("window_start", { ascending: true });
+            q = applyCommonFilters(q);
+            return q;
+          }),
+        )
       ),
       trackOpsTiming(
         "ops:primaryQueueReads:callList",
-        trackOpsTiming("ops:callList:fetch", callListQ)
+        trackOpsTiming(
+          "ops:callList:fetch",
+          runJobsSelectWithCompat((selectClause) => {
+            let q = supabase
+              .from("jobs")
+              .select(selectClause)
+              .is("deleted_at", null)
+              .neq("status", "cancelled")
+              .eq("status", "open")
+              .eq("ops_status", "need_to_schedule")
+              .order("created_at", { ascending: false })
+              .limit(10);
+            q = applyCommonFilters(q);
+            return q;
+          }),
+        )
       ),
-      trackOpsTiming("ops:primaryQueueReads:scheduledSnapshot", scheduledSnapshotQ),
-      trackOpsTiming("ops:primaryQueueReads:closeoutSource", closeoutQ),
-      trackOpsTiming("ops:primaryQueueReads:stillOpenExceptions", stillOpenQ),
-      trackOpsTiming("ops:primaryQueueReads:attention", attentionQ),
-      trackOpsTiming("ops:primaryQueueReads:reportingJobs", operationalReportingJobsQ),
-      trackOpsTiming("ops:primaryQueueReads:activeBucket", bucketQ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:scheduledSnapshot",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .neq("status", "cancelled")
+            .eq("status", "open")
+            .eq("ops_status", "scheduled")
+            .order("scheduled_date", { ascending: true })
+            .order("window_start", { ascending: true })
+            .limit(50);
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:closeoutSource",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .neq("status", "cancelled")
+            .eq("field_complete", true)
+            .neq("ops_status", "closed")
+            .order("created_at", { ascending: false })
+            .limit(100);
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:stillOpenExceptions",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .neq("status", "cancelled")
+            .neq("ops_status", "closed")
+            .eq("field_complete", false)
+            .lt("scheduled_date", startTodayUtc)
+            .order("scheduled_date", { ascending: true })
+            .order("created_at", { ascending: true })
+            .limit(100);
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:attention",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .or(
+              [
+                `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
+                `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
+                `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
+                `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
+              ].join(","),
+            )
+            .order("created_at", { ascending: true })
+            .limit(10);
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
+      trackOpsTiming("ops:primaryQueueReads:reportingJobs", runOperationalReportingJobsSelectWithCompat()),
+      trackOpsTiming(
+        "ops:primaryQueueReads:activeBucket",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .neq("status", "cancelled")
+            .order("created_at", { ascending: false })
+            .limit(100);
+
+          if (bucket === "attention") {
+            q = q.or(
+              [
+                `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
+                `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
+                `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
+                `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
+              ].join(","),
+            );
+          } else if (bucket === "failed") {
+            q = q.in("ops_status", ["failed", "pending_office_review"]);
+          } else if (bucket === "workflow_all") {
+            q = q.in("ops_status", [
+              "need_to_schedule",
+              "pending_info",
+              "on_hold",
+              "failed",
+              "pending_office_review",
+            ]);
+          } else if (bucket === "closeout") {
+            q = q
+              .eq("field_complete", true)
+              .neq("ops_status", "closed");
+          } else if (bucket === "recent_closed") {
+            q = q
+              .eq("ops_status", "closed")
+              .order("created_at", { ascending: false })
+              .limit(15);
+          } else {
+            q = q.eq("ops_status", bucket);
+            if (bucket === "need_to_schedule" || bucket === "scheduled") {
+              q = q.eq("status", "open");
+            }
+          }
+
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
     ]);
 
   if (fieldWorkRes.error) throw fieldWorkRes.error;
