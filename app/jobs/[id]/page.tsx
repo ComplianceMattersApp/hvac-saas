@@ -7388,6 +7388,27 @@ const failureResolutionPathCount =
         />
       )}
 
+      {banner === "certs_closeout_closed" && (
+        <FlashBanner
+          type="success"
+          message="Certs sent. Job closed out."
+        />
+      )}
+
+      {banner === "certs_closeout_saved" && (
+        <FlashBanner
+          type="success"
+          message="Certs sent. Closeout blockers were recomputed."
+        />
+      )}
+
+      {banner === "certs_closeout_failed" && (
+        <FlashBanner
+          type="error"
+          message="Could not mark certs sent. Refresh and try again."
+        />
+      )}
+
       {banner === "maintenance_visit_count_saved" && (
         <FlashBanner
           type="success"

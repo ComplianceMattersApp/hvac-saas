@@ -9,6 +9,7 @@ const redirectMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 const loadScopedInternalJobForMutationMock = vi.fn();
 const resolveOperationalMutationEntitlementAccessMock = vi.fn();
+const resolveBillingModeByAccountOwnerIdMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
@@ -27,6 +28,12 @@ vi.mock("@/lib/auth/internal-job-scope", () => ({
 vi.mock("@/lib/business/platform-entitlement", () => ({
   resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
     resolveOperationalMutationEntitlementAccessMock(...args),
+}));
+
+vi.mock("@/lib/business/internal-business-profile", () => ({
+  resolveBillingModeByAccountOwnerId: (...args: unknown[]) =>
+    resolveBillingModeByAccountOwnerIdMock(...args),
+  resolveInternalBusinessIdentityByAccountOwnerId: vi.fn(),
 }));
 
 vi.mock("next/cache", () => ({
@@ -255,6 +262,108 @@ function makeSupabaseForCertPermitBlocker(job: Record<string, unknown>) {
   return { supabase, jobUpdates, jobEvents };
 }
 
+function makeSupabaseForCertCloseout(params: {
+  job: Record<string, unknown>;
+  eccRuns?: Array<Record<string, unknown>>;
+  internalInvoice?: Record<string, unknown> | null;
+  recomputedOpsStatus: string;
+  certUpdateError?: { message: string } | null;
+}) {
+  const jobUpdates: Record<string, unknown>[] = [];
+  const jobEvents: Record<string, unknown>[] = [];
+  let jobsSingleCount = 0;
+
+  const supabase = {
+    auth: {
+      getUser: vi.fn(async () => ({ data: { user: { id: "internal-user-1" } } })),
+    },
+    from(table: string) {
+      if (table === "jobs") {
+        const query: any = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          update: vi.fn((payload: Record<string, unknown>) => {
+            jobUpdates.push(payload);
+            query.__lastUpdatePayload = payload;
+            return query;
+          }),
+          single: vi.fn(async () => {
+            jobsSingleCount += 1;
+            if (jobsSingleCount === 1) {
+              return { data: params.job, error: null };
+            }
+            return { data: { ops_status: params.recomputedOpsStatus }, error: null };
+          }),
+          maybeSingle: vi.fn(async () => {
+            if (params.certUpdateError) {
+              return { data: null, error: params.certUpdateError };
+            }
+
+            return {
+              data: {
+                id: params.job.id,
+                certs_complete: true,
+                invoice_complete: Boolean(
+                  (query.__lastUpdatePayload ?? {}).invoice_complete ??
+                    params.job.invoice_complete,
+                ),
+              },
+              error: null,
+            };
+          }),
+        };
+
+        return query;
+      }
+
+      if (table === "ecc_test_runs") {
+        const query: any = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          then: (onFulfilled: (value: { data: unknown[]; error: null }) => unknown) =>
+            Promise.resolve({
+              data: params.eccRuns ?? [
+                {
+                  is_completed: true,
+                  computed_pass: true,
+                  override_pass: null,
+                },
+              ],
+              error: null,
+            }).then(onFulfilled),
+        };
+        return query;
+      }
+
+      if (table === "internal_invoices") {
+        const query: any = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          neq: vi.fn(() => query),
+          maybeSingle: vi.fn(async () => ({
+            data: params.internalInvoice ?? null,
+            error: null,
+          })),
+        };
+        return query;
+      }
+
+      if (table === "job_events") {
+        return {
+          insert: vi.fn(async (payload: Record<string, unknown>) => {
+            jobEvents.push(payload);
+            return { error: null };
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected table: ${table}`);
+    },
+  };
+
+  return { supabase, jobEvents, jobUpdates };
+}
+
 describe("releaseAndReevaluate", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -279,6 +388,7 @@ describe("releaseAndReevaluate", () => {
       authorized: true,
       reason: "allowed_active",
     });
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValue("external_billing");
   });
 
   it("heals fully complete ECC jobs to closed after release reevaluation", async () => {
@@ -448,5 +558,148 @@ describe("releaseAndReevaluate", () => {
       }),
     ]);
     expect(jobUpdates).not.toContainEqual({ certs_complete: true });
+  });
+
+  it("marks ECC certs sent and closes out when existing internal invoice truth is satisfied", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForCertCloseout({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        billing_disposition: null,
+        ops_status: "paperwork_required",
+        pending_info_reason: null,
+        permit_number: "PERMIT-123",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+        data_entry_completed_at: null,
+        service_case_id: null,
+      },
+      internalInvoice: {
+        status: "issued",
+        invoice_number: "INV-100",
+        issued_at: "2026-06-01T12:00:00.000Z",
+      },
+      recomputedOpsStatus: "closed",
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValueOnce("internal_invoicing");
+    redirectMock.mockImplementation((path: string) => {
+      throw new Error(`NEXT_REDIRECT:${path}`);
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("return_to", "/jobs/job-1?tab=ops#field-status-actions");
+
+    const { markCertsCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markCertsCompleteFromForm(formData)).rejects.toThrow("banner=certs_closeout_closed");
+
+    expect(jobUpdates).toContainEqual({ certs_complete: true, invoice_complete: true });
+    expect(jobUpdates).toContainEqual({ ops_status: "closed" });
+    expect(jobEvents).toEqual([
+      expect.objectContaining({
+        event_type: "ops_update",
+        message: "Certs marked complete",
+        meta: expect.objectContaining({
+          changes: expect.arrayContaining([
+            { field: "certs_complete", from: false, to: true },
+            { field: "invoice_complete", from: false, to: true, source: "billing_truth_projection" },
+            { field: "ops_status", from: "paperwork_required", to: "closed" },
+          ]),
+        }),
+      }),
+    ]);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/ops/closeout-queue");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/reports/closeout");
+  });
+
+  it("marks certs sent but keeps a billing blocker visible when billing truth remains pending", async () => {
+    const { supabase, jobUpdates } = makeSupabaseForCertCloseout({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        billing_disposition: null,
+        ops_status: "paperwork_required",
+        pending_info_reason: null,
+        permit_number: "PERMIT-123",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+        data_entry_completed_at: null,
+        service_case_id: null,
+      },
+      internalInvoice: {
+        status: "draft",
+        invoice_number: "INV-100",
+        issued_at: null,
+      },
+      recomputedOpsStatus: "invoice_required",
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValueOnce("internal_invoicing");
+    redirectMock.mockImplementation((path: string) => {
+      throw new Error(`NEXT_REDIRECT:${path}`);
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("return_to", "/jobs/job-1?tab=ops#field-status-actions");
+
+    const { markCertsCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markCertsCompleteFromForm(formData)).rejects.toThrow("banner=certs_closeout_saved");
+
+    expect(jobUpdates).toContainEqual({ certs_complete: true });
+    expect(jobUpdates).toContainEqual({ ops_status: "invoice_required" });
+    expect(jobUpdates).not.toContainEqual({ certs_complete: true, invoice_complete: true });
+  });
+
+  it("redirects with an actionable banner when cert closeout persistence fails", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForCertCloseout({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: true,
+        billing_disposition: null,
+        ops_status: "paperwork_required",
+        pending_info_reason: null,
+        permit_number: "PERMIT-123",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+        data_entry_completed_at: null,
+        service_case_id: null,
+      },
+      recomputedOpsStatus: "paperwork_required",
+      certUpdateError: { message: "write failed" },
+    });
+    createClientMock.mockResolvedValue(supabase);
+    redirectMock.mockImplementation((path: string) => {
+      throw new Error(`NEXT_REDIRECT:${path}`);
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("return_to", "/jobs/job-1?tab=ops#field-status-actions");
+
+    const { markCertsCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markCertsCompleteFromForm(formData)).rejects.toThrow("banner=certs_closeout_failed");
+
+    expect(jobUpdates).toEqual([{ certs_complete: true }]);
+    expect(jobEvents).toEqual([]);
   });
 });
