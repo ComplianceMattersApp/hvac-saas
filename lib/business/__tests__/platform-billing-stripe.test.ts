@@ -5,7 +5,92 @@ import {
   derivePlatformCheckoutSeatQuantity,
   mapStripeSubscriptionStatusToEntitlementStatus,
   reconcilePlatformSubscriptionSeatQuantity,
+  syncPlatformEntitlementFromStripeForAccountOwner,
+  syncPlatformEntitlementFromStripeSubscriptionEvent,
 } from "@/lib/business/platform-billing-stripe";
+
+function makeEntitlementStore(initialRows: any[]) {
+  const rows = initialRows.map((row) => ({ ...row }));
+
+  return {
+    rows,
+    admin: {
+      from(table: string) {
+        if (table === "internal_users") {
+          return {
+            select: () => ({
+              eq: () => ({
+                eq: async () => ({ data: null, count: 1, error: null }),
+              }),
+            }),
+          };
+        }
+
+        if (table !== "platform_account_entitlements") {
+          throw new Error(`Unexpected table: ${table}`);
+        }
+
+        const filters: Array<{ column: string; value: unknown }> = [];
+        const query: any = {
+          select: () => query,
+          eq: (column: string, value: unknown) => {
+            filters.push({ column, value });
+            return query;
+          },
+          maybeSingle: async () => ({
+            data:
+              rows.find((row) =>
+                filters.every((filter) => row[filter.column] === filter.value),
+              ) ?? null,
+            error: null,
+          }),
+          upsert: (payload: any) => {
+            const index = rows.findIndex(
+              (row) => row.account_owner_user_id === payload.account_owner_user_id,
+            );
+            if (index >= 0) {
+              rows[index] = { ...rows[index], ...payload };
+            } else {
+              rows.push({ ...payload });
+            }
+
+            return {
+              select: () => ({
+                single: async () => ({
+                  data: rows.find(
+                    (row) => row.account_owner_user_id === payload.account_owner_user_id,
+                  ),
+                  error: null,
+                }),
+              }),
+            };
+          },
+        };
+
+        return query;
+      },
+    },
+  };
+}
+
+function entitlementRow(overrides: Record<string, unknown> = {}) {
+  return {
+    account_owner_user_id: "owner_1",
+    plan_key: "starter",
+    entitlement_status: "trial",
+    trial_ends_at: null,
+    entitlement_valid_until: null,
+    stripe_customer_id: "cus_123",
+    stripe_subscription_id: "sub_123",
+    stripe_price_id: "price_123",
+    stripe_subscription_status: null,
+    stripe_current_period_end: null,
+    stripe_cancel_at_period_end: false,
+    stripe_last_webhook_event_id: null,
+    stripe_last_synced_at: null,
+    ...overrides,
+  };
+}
 
 describe("platform-billing-stripe", () => {
   it.each([
@@ -53,6 +138,87 @@ describe("platform-billing-stripe", () => {
     expect(patch.stripe_last_synced_at).toBeTruthy();
     expect(patch.stripe_current_period_end).toBeTruthy();
     expect(patch.trial_ends_at).toBeTruthy();
+  });
+
+  it("does not let a stale initial incomplete event downgrade an already-active paid subscription", async () => {
+    const store = makeEntitlementStore([
+      entitlementRow({
+        entitlement_status: "active",
+        stripe_subscription_status: "active",
+        stripe_last_webhook_event_id: "evt_checkout_completed",
+      }),
+    ]);
+
+    const result = await syncPlatformEntitlementFromStripeSubscriptionEvent({
+      admin: store.admin,
+      eventId: "evt_subscription_created_initial",
+      subscription: {
+        id: "sub_123",
+        customer: "cus_123",
+        status: "incomplete",
+        items: {
+          data: [
+            {
+              current_period_end: 1793577600,
+              price: { id: "price_123" },
+            },
+          ],
+        },
+      } as any,
+    });
+
+    expect(result).toEqual(expect.objectContaining({ skipped: true }));
+    expect(store.rows[0]).toEqual(
+      expect.objectContaining({
+        entitlement_status: "active",
+        stripe_subscription_status: "active",
+        stripe_last_webhook_event_id: "evt_checkout_completed",
+      }),
+    );
+  });
+
+  it("refreshes a linked subscription from Stripe source truth for the account owner", async () => {
+    const store = makeEntitlementStore([
+      entitlementRow({
+        entitlement_status: "suspended",
+        stripe_subscription_status: "incomplete",
+        stripe_last_webhook_event_id: "evt_subscription_created_initial",
+      }),
+    ]);
+    const stripe = {
+      subscriptions: {
+        retrieve: vi.fn(async () => ({
+          id: "sub_123",
+          customer: "cus_123",
+          status: "active",
+          cancel_at_period_end: false,
+          items: {
+            data: [
+              {
+                current_period_end: 1793577600,
+                price: { id: "price_123" },
+              },
+            ],
+          },
+        })),
+      },
+    } as any;
+
+    const result = await syncPlatformEntitlementFromStripeForAccountOwner({
+      accountOwnerUserId: "owner_1",
+      admin: store.admin,
+      stripe,
+    });
+
+    expect(result).toEqual(expect.objectContaining({ skipped: false, reason: "synced" }));
+    expect(stripe.subscriptions.retrieve).toHaveBeenCalledWith("sub_123");
+    expect(store.rows[0]).toEqual(
+      expect.objectContaining({
+        entitlement_status: "active",
+        stripe_subscription_status: "active",
+        stripe_last_webhook_event_id: "evt_subscription_created_initial",
+      }),
+    );
   });
 
   it("derives checkout seat quantity with a minimum of one", () => {

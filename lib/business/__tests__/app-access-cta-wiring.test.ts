@@ -35,11 +35,14 @@ describe("app access CTA wiring", () => {
   it("renders the same app access CTA model on access-inactive", () => {
     const inactivePage = readRepoFile("app/access-inactive/page.tsx");
 
+    expect(inactivePage).toContain("refreshPlatformSubscriptionStatusFromForm");
     expect(inactivePage).toContain("loadAppAccessCtaEntitlementSnapshot");
     expect(inactivePage).toContain("resolveAppAccessCta");
     expect(inactivePage).toContain("getPlatformBillingAvailability");
     expect(inactivePage).toContain("<AppAccessCtaCard cta={appAccessCta} />");
     expect(inactivePage).toContain('if (access.hasPortalAccess) redirect("/portal")');
+    expect(inactivePage).toContain("Billing status may still be syncing");
+    expect(inactivePage).toContain("Refresh subscription status");
   });
 
   it("routes portal-only trial start to signup and inactive app resume to checkout", () => {
