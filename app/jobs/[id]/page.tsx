@@ -6314,7 +6314,7 @@ const failureResolutionPathCount =
               </Link>
             ) : null}
 
-            {job.job_type === "ecc" ? (
+            {job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
               <Link
                 href={`/jobs/${job.id}/tests`}
                 className={`${compactWorkspaceActionButtonClass} shadow-[0_8px_18px_-18px_rgba(15,23,42,0.28)]`}
@@ -6346,7 +6346,7 @@ const failureResolutionPathCount =
               </Link>
             ) : null}
 
-            {job.job_type === "ecc" ? (
+            {job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
               <Link href={`/jobs/${job.id}/tests`} className={compactWorkspaceActionButtonClass}>
                 Open Tests Workspace
               </Link>
