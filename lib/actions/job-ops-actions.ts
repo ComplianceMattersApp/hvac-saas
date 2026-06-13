@@ -1478,20 +1478,6 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     redirectToJob({ banner: "certs_closeout_failed" });
   }
 
-  try {
-    nextOps =
-      (await recomputeOpsAfterCloseoutMutation(supabase, jobId)) ?? nextOps;
-  } catch (error) {
-    console.error("[markCertsCompleteFromForm] closeout recompute failed", {
-      jobId,
-      error: error instanceof Error ? error.message : String(error),
-    });
-    revalidatePath(`/jobs/${jobId}`);
-    revalidatePath(`/ops`);
-    revalidatePath(`/ops/closeout-queue`);
-    redirectToJob({ banner: "certs_closeout_failed" });
-  }
-
   const { error: eventErr } = await supabase.from("job_events").insert({
     job_id: jobId,
     event_type: "ops_update",

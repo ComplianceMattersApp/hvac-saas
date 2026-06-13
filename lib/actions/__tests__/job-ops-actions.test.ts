@@ -266,6 +266,7 @@ function makeSupabaseForCertCloseout(params: {
   job: Record<string, unknown>;
   eccRuns?: Array<Record<string, unknown>>;
   internalInvoice?: Record<string, unknown> | null;
+  internalInvoiceError?: { message: string } | null;
   recomputedOpsStatus: string;
   certUpdateError?: { message: string } | null;
 }) {
@@ -341,8 +342,8 @@ function makeSupabaseForCertCloseout(params: {
           eq: vi.fn(() => query),
           neq: vi.fn(() => query),
           maybeSingle: vi.fn(async () => ({
-            data: params.internalInvoice ?? null,
-            error: null,
+            data: params.internalInvoiceError ? null : params.internalInvoice ?? null,
+            error: params.internalInvoiceError ?? null,
           })),
         };
         return query;
@@ -602,6 +603,8 @@ describe("releaseAndReevaluate", () => {
 
     expect(jobUpdates).toContainEqual({ certs_complete: true, invoice_complete: true });
     expect(jobUpdates).toContainEqual({ ops_status: "closed" });
+    expect(evaluateJobOpsStatusMock).not.toHaveBeenCalled();
+    expect(healStalePaperworkOpsStatusMock).not.toHaveBeenCalled();
     expect(jobEvents).toEqual([
       expect.objectContaining({
         event_type: "ops_update",
@@ -662,6 +665,50 @@ describe("releaseAndReevaluate", () => {
     expect(jobUpdates).toContainEqual({ certs_complete: true });
     expect(jobUpdates).toContainEqual({ ops_status: "invoice_required" });
     expect(jobUpdates).not.toContainEqual({ certs_complete: true, invoice_complete: true });
+    expect(evaluateJobOpsStatusMock).not.toHaveBeenCalled();
+    expect(healStalePaperworkOpsStatusMock).not.toHaveBeenCalled();
+  });
+
+  it("redirects with an actionable banner when billing truth read fails", async () => {
+    const { supabase, jobUpdates, jobEvents } = makeSupabaseForCertCloseout({
+      job: {
+        id: "job-1",
+        status: "completed",
+        job_type: "ecc",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+        billing_disposition: null,
+        ops_status: "paperwork_required",
+        pending_info_reason: null,
+        permit_number: "PERMIT-123",
+        scheduled_date: "2026-04-10",
+        window_start: "08:00",
+        window_end: "10:00",
+        data_entry_completed_at: null,
+        service_case_id: null,
+      },
+      internalInvoiceError: { message: "invoice lookup timed out" },
+      recomputedOpsStatus: "paperwork_required",
+    });
+    createClientMock.mockResolvedValue(supabase);
+    resolveBillingModeByAccountOwnerIdMock.mockResolvedValueOnce("internal_invoicing");
+    redirectMock.mockImplementation((path: string) => {
+      throw new Error(`NEXT_REDIRECT:${path}`);
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("return_to", "/jobs/job-1?tab=ops#field-status-actions");
+
+    const { markCertsCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markCertsCompleteFromForm(formData)).rejects.toThrow("banner=certs_closeout_failed");
+
+    expect(jobUpdates).toEqual([]);
+    expect(jobEvents).toEqual([]);
+    expect(evaluateJobOpsStatusMock).not.toHaveBeenCalled();
+    expect(healStalePaperworkOpsStatusMock).not.toHaveBeenCalled();
   });
 
   it("redirects with an actionable banner when cert closeout persistence fails", async () => {
