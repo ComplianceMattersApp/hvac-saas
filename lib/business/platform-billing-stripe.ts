@@ -665,6 +665,19 @@ function isActiveStripeBackedEntitlementForSameSubscription(
   );
 }
 
+function pickMostRelevantPlatformSubscription(subscriptions: Stripe.Subscription[]) {
+  const rankedStatuses = ["active", "trialing", "past_due", "incomplete"] as const;
+
+  for (const status of rankedStatuses) {
+    const match = subscriptions.find(
+      (subscription) => toCleanString(subscription.status).toLowerCase() === status,
+    );
+    if (match) return match;
+  }
+
+  return subscriptions[0] ?? null;
+}
+
 export async function syncPlatformEntitlementFromStripeSubscriptionEvent(params: {
   subscription: Stripe.Subscription;
   eventId: string;
@@ -754,7 +767,21 @@ export async function syncPlatformEntitlementFromStripeForAccountOwner(params: {
   }
 
   const subscriptionId = toCleanString(entitlement.stripe_subscription_id);
-  if (!subscriptionId) {
+  const customerId = toCleanString(entitlement.stripe_customer_id);
+  let subscription: Stripe.Subscription | null = null;
+
+  if (subscriptionId) {
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  } else if (customerId) {
+    const listed = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 10,
+    });
+    subscription = pickMostRelevantPlatformSubscription(listed.data ?? []);
+  }
+
+  if (!subscription) {
     return {
       skipped: true,
       reason: "missing_subscription" as const,
@@ -762,7 +789,6 @@ export async function syncPlatformEntitlementFromStripeForAccountOwner(params: {
     };
   }
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId);
   const patch = buildPlatformEntitlementStripePatch({
     subscription,
     eventId: null,

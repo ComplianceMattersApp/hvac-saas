@@ -43,6 +43,8 @@ describe("app access CTA wiring", () => {
     expect(inactivePage).toContain('if (access.hasPortalAccess) redirect("/portal")');
     expect(inactivePage).toContain("Billing status may still be syncing");
     expect(inactivePage).toContain("Refresh subscription status");
+    expect(inactivePage).toContain("billingCustomerLinked");
+    expect(inactivePage).toContain("!canRefreshPlatformSubscription ? <AppAccessCtaCard cta={appAccessCta} /> : null");
   });
 
   it("routes portal-only trial start to signup and inactive app resume to checkout", () => {

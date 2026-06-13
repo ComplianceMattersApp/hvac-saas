@@ -91,7 +91,8 @@ export default async function AccessInactivePage({
   const canRefreshPlatformSubscription =
     access.internalUser?.isActive === true &&
     access.internalUser.role === "admin" &&
-    Boolean(appAccessCtaEntitlement?.billingSubscriptionLinked);
+    (Boolean(appAccessCtaEntitlement?.billingSubscriptionLinked) ||
+      Boolean(appAccessCtaEntitlement?.billingCustomerLinked));
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-16">
@@ -143,7 +144,7 @@ export default async function AccessInactivePage({
             </div>
           </section>
         ) : null}
-        <AppAccessCtaCard cta={appAccessCta} />
+        {!canRefreshPlatformSubscription ? <AppAccessCtaCard cta={appAccessCta} /> : null}
       </div>
     </main>
   );

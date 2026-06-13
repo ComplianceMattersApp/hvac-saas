@@ -221,6 +221,64 @@ describe("platform-billing-stripe", () => {
     );
   });
 
+  it("finds an active subscription from a linked Stripe customer when subscription id is missing", async () => {
+    const store = makeEntitlementStore([
+      entitlementRow({
+        entitlement_status: "suspended",
+        stripe_subscription_id: null,
+        stripe_subscription_status: "incomplete",
+      }),
+    ]);
+    const stripe = {
+      subscriptions: {
+        list: vi.fn(async () => ({
+          data: [
+            {
+              id: "sub_old",
+              customer: "cus_123",
+              status: "canceled",
+              items: { data: [] },
+            },
+            {
+              id: "sub_active",
+              customer: "cus_123",
+              status: "active",
+              cancel_at_period_end: false,
+              items: {
+                data: [
+                  {
+                    current_period_end: 1793577600,
+                    price: { id: "price_123" },
+                  },
+                ],
+              },
+            },
+          ],
+        })),
+      },
+    } as any;
+
+    const result = await syncPlatformEntitlementFromStripeForAccountOwner({
+      accountOwnerUserId: "owner_1",
+      admin: store.admin,
+      stripe,
+    });
+
+    expect(result).toEqual(expect.objectContaining({ skipped: false, reason: "synced" }));
+    expect(stripe.subscriptions.list).toHaveBeenCalledWith({
+      customer: "cus_123",
+      status: "all",
+      limit: 10,
+    });
+    expect(store.rows[0]).toEqual(
+      expect.objectContaining({
+        entitlement_status: "active",
+        stripe_subscription_id: "sub_active",
+        stripe_subscription_status: "active",
+      }),
+    );
+  });
+
   it("derives checkout seat quantity with a minimum of one", () => {
     expect(derivePlatformCheckoutSeatQuantity(5)).toBe(5);
     expect(derivePlatformCheckoutSeatQuantity(1)).toBe(1);
