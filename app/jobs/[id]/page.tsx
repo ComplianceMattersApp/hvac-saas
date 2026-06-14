@@ -4896,12 +4896,24 @@ const failureResolutionPathCount =
                   </span>
                   <div className="grid gap-2">
                     {closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
-                      <Link
-                        href={`/jobs/${job.id}/invoice#invoice-workspace`}
-                        className={`${darkButtonClass} min-h-12 w-full`}
-                      >
-                        {jobPageInvoiceNextAction}
-                      </Link>
+                      internalInvoiceTruth ? (
+                        <Link
+                          href={`/jobs/${job.id}/invoice#invoice-workspace`}
+                          className={`${darkButtonClass} min-h-12 w-full`}
+                        >
+                          {jobPageInvoiceNextAction}
+                        </Link>
+                      ) : (
+                        <form action={createInternalInvoiceDraftFromForm}>
+                          <input type="hidden" name="job_id" value={job.id} />
+                          <input type="hidden" name="tab" value={tab} />
+                          <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                          <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+                          <SubmitButton loadingText="Starting..." className={`${darkButtonClass} min-h-12 w-full`}>
+                            {jobPageInvoiceNextAction}
+                          </SubmitButton>
+                        </form>
+                      )
                     ) : null}
                     {closeoutNeeds.needsInvoice && showExternalDataEntryPrompt && !canShowInvoiceButton ? (
                       <form action={completeDataEntryFromForm}>
@@ -6232,12 +6244,24 @@ const failureResolutionPathCount =
               </span>
               <div className="flex flex-wrap gap-2">
                 {closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
-                  <Link
-                    href={`/jobs/${job.id}/invoice#invoice-workspace`}
-                    className={darkButtonClass}
-                  >
-                    {jobPageInvoiceNextAction}
-                  </Link>
+                  internalInvoiceTruth ? (
+                    <Link
+                      href={`/jobs/${job.id}/invoice#invoice-workspace`}
+                      className={darkButtonClass}
+                    >
+                      {jobPageInvoiceNextAction}
+                    </Link>
+                  ) : (
+                    <form action={createInternalInvoiceDraftFromForm}>
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="tab" value={tab} />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                      <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+                      <SubmitButton loadingText="Starting..." className={darkButtonClass}>
+                        {jobPageInvoiceNextAction}
+                      </SubmitButton>
+                    </form>
+                  )
                 ) : null}
                 {closeoutNeeds.needsInvoice && showExternalDataEntryPrompt && !canShowInvoiceButton ? (
                   <form action={completeDataEntryFromForm}>
