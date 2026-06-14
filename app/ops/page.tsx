@@ -40,7 +40,7 @@ import {
 } from "@/lib/actions/notification-read-actions";
 import {
   buildOpsStatusEnteredAtByJob,
-  resolveLifecycleAging,
+  resolveLifecycleDaysAgingLabel,
 } from "@/lib/utils/lifecycle-aging";
 import {
   didOpsStatusChangeTo,
@@ -521,7 +521,7 @@ function subtractBusinessDays(date: Date, days: number) {
   function workspaceAgeLabel(job: any) {
     const jobId = String(job?.id ?? "").trim();
     return (
-      resolveLifecycleAging({
+      resolveLifecycleDaysAgingLabel({
         status: String(job?.status ?? "").trim() || null,
         opsStatus: String(job?.ops_status ?? "").trim() || null,
         createdAt: String(job?.created_at ?? "").trim() || null,
@@ -529,7 +529,7 @@ function subtractBusinessDays(date: Date, days: number) {
         fieldCompleteAt: String(job?.field_complete_at ?? "").trim() || null,
         stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
         failedEvidenceAt: failedStatusSinceByJob(jobId),
-      }).label ?? "-"
+      }) ?? "Not available"
     );
   }
 
@@ -961,11 +961,8 @@ function subtractBusinessDays(date: Date, days: number) {
                         <span className="font-medium text-slate-500">Status/Reason:</span> {wsStatusReason(job, selectedWorkspaceKey)}
                       </div>
                       <div>
-                        <span className="font-medium text-slate-500">Age/Time:</span>{" "}
-                        {selectedWorkspaceKey === "field_work" || selectedWorkspaceKey === "without_tech"
-                          ? (job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "Not scheduled") +
-                            (displayWindowLA(job?.window_start, job?.window_end) ? ` ${displayWindowLA(job?.window_start, job?.window_end)}` : "")
-                          : workspaceAgeLabel(job)}
+                        <span className="font-medium text-slate-500">Days Aging:</span>{" "}
+                        {workspaceAgeLabel(job)}
                       </div>
                       <div>
                         <span className="font-medium text-slate-500">Assignment:</span>{" "}
@@ -3401,7 +3398,7 @@ function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {
 
   const jobId = String(job?.id ?? "").trim();
   return (
-    resolveLifecycleAging({
+    resolveLifecycleDaysAgingLabel({
       status: String(job?.status ?? "").trim() || null,
       opsStatus: String(job?.ops_status ?? "").trim() || null,
       createdAt: String(job?.created_at ?? "").trim() || null,
@@ -3409,7 +3406,7 @@ function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {
       fieldCompleteAt: String(job?.field_complete_at ?? "").trim() || null,
       stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
       failedEvidenceAt: failedStatusSinceByJob(jobId),
-    }).label ?? "-"
+    }) ?? "Not available"
   );
 }
 
@@ -3635,7 +3632,7 @@ if (panel !== "full_board") {
                       {workspaceStatusReason(job, selectedWorkspaceQueue.key)}
                     </div>
                     <div>
-                      <span className="font-medium text-slate-500">Age/Time:</span>{" "}
+                      <span className="font-medium text-slate-500">Days Aging:</span>{" "}
                       {workspaceAgeTime(job, selectedWorkspaceQueue.key)}
                     </div>
                     <div>
