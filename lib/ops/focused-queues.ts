@@ -222,6 +222,16 @@ export function getExceptionQueueDisplayLabel(job: Pick<FocusedQueueJob, "ops_st
   return EXCEPTION_QUEUE_LABELS_BY_STATUS[status] ?? formatOpsStatusLabel(status);
 }
 
+export function formatFailedEccQueueReasonFromRun(run: unknown): string {
+  const testType = normalize((run as { test_type?: unknown } | null)?.test_type);
+
+  if (testType === "duct_leakage") return "Duct Leakage Failed";
+  if (testType === "refrigerant_charge") return "Refrigerant Charge Failed";
+  if (testType === "airflow") return "Airflow Failed";
+
+  return "";
+}
+
 function cleanReason(value: unknown): string {
   return String(value ?? "").trim();
 }

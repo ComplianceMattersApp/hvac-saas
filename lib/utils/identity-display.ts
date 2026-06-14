@@ -54,10 +54,30 @@ export function formatPersonNamePart(value: unknown): string {
   if (!text) return "";
 
   return text.replace(/[A-Za-z]+/g, (part) => {
-    const lower = part.toLowerCase();
-    const shouldNormalizeCase = part === lower || part === part.toUpperCase();
-    if (!shouldNormalizeCase) return part;
-    return part.charAt(0).toUpperCase() + lower.slice(1);
+    return formatNameLikeToken(part, { preserveShortAllCaps: false });
+  });
+}
+
+function formatNameLikeToken(part: string, options: { preserveShortAllCaps: boolean }): string {
+  const lower = part.toLowerCase();
+  const isLower = part === lower;
+  const isAllCaps = part === part.toUpperCase();
+  if (!isLower && !isAllCaps) return part;
+  if (options.preserveShortAllCaps && isAllCaps && part.length <= 2) return part;
+
+  if (lower.startsWith("mc") && lower.length > 2) {
+    return `Mc${lower.charAt(2).toUpperCase()}${lower.slice(3)}`;
+  }
+
+  return part.charAt(0).toUpperCase() + lower.slice(1);
+}
+
+export function formatCityNamePart(value: unknown): string {
+  const text = String(value ?? "").trim().replace(/\s+/g, " ");
+  if (!text) return "";
+
+  return text.replace(/[A-Za-z]+/g, (part) => {
+    return formatNameLikeToken(part, { preserveShortAllCaps: true });
   });
 }
 

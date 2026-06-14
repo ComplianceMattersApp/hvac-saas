@@ -21,7 +21,7 @@ import {
   startOfTodayUtcIsoLA,
   startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
-import { formatPersonNamePart } from "@/lib/utils/identity-display";
+import { formatCityNamePart, formatPersonNamePart } from "@/lib/utils/identity-display";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
@@ -63,7 +63,11 @@ import {
   resolveRecentAttemptDisplay,
 } from "@/lib/ops/recent-attempt-display";
 import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
-import { formatAssignmentSummaryForJob, getOpsQueueCardStatusReason } from "@/lib/ops/focused-queues";
+import {
+  formatAssignmentSummaryForJob,
+  formatFailedEccQueueReasonFromRun,
+  getOpsQueueCardStatusReason,
+} from "@/lib/ops/focused-queues";
 import {
   buildServiceFollowUpProgressState,
 } from "@/lib/jobs/service-follow-up-progress";
@@ -489,10 +493,10 @@ function subtractBusinessDays(date: Date, days: number) {
   }
 
   function workspaceCustomerLocation(job: any) {
-    const customer = [String(job?.customer_first_name ?? "").trim(), String(job?.customer_last_name ?? "").trim()]
+    const customer = [formatPersonNamePart(job?.customer_first_name), formatPersonNamePart(job?.customer_last_name)]
       .filter(Boolean)
       .join(" ");
-    const location = [String(job?.job_address ?? "").trim(), String(job?.city ?? "").trim()]
+    const location = [String(job?.job_address ?? "").trim(), formatCityNamePart(job?.city)]
       .filter(Boolean)
       .join(", ");
 
@@ -500,9 +504,14 @@ function subtractBusinessDays(date: Date, days: number) {
     return customer || location || "Customer / location pending";
   }
 
+  function workspaceContractorName(job: any) {
+    return String((job as any)?.contractors?.name ?? "").trim();
+  }
+
   // Initialize lifecycle maps before any workspace preview rendering to avoid TDZ crashes.
   let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
   let latestFailedRunByJob = new Map<string, any>();
+  let primaryFailureReasonByJob = new Map<string, string>();
   let serviceFollowUpProgressLabelByJob = new Map<string, string>();
   let continuedServiceFollowUpParentIds = new Set<string>();
 
@@ -535,6 +544,7 @@ function subtractBusinessDays(date: Date, days: number) {
 
   function wsStatusReason(job: any, queueKey: string) {
     const lifecycle = String(job?.status ?? "").toLowerCase();
+    const specificFailureReason = workspaceFailedReason(job);
 
     if (queueKey === "need_to_schedule") return "Awaiting scheduling";
     if (queueKey === "field_work") {
@@ -543,7 +553,18 @@ function subtractBusinessDays(date: Date, days: number) {
       return "Scheduled field work";
     }
     if (queueKey === "without_tech") return "Scheduled without active tech assignment";
+    if (specificFailureReason) return specificFailureReason;
     return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
+  }
+
+  function workspaceFailedReason(job: any) {
+    const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+    if (opsStatus === "retest_needed") return "Retest Needed";
+    if (opsStatus === "pending_office_review") return "Correction Required";
+    if (opsStatus !== "failed") return "";
+
+    const jobId = String(job?.id ?? "").trim();
+    return (jobId ? primaryFailureReasonByJob.get(jobId) ?? "" : "") || "Failed";
   }
 
   const wsStartTodayUtc = startOfTodayUtcIsoLA();
@@ -551,7 +572,7 @@ function subtractBusinessDays(date: Date, days: number) {
 
   if (panel !== "full_board") {
     const workspaceSelect =
-      "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, created_at";
+      "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, field_complete_at, contractor_id, contractors(name), created_at";
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start";
 
@@ -827,6 +848,20 @@ function subtractBusinessDays(date: Date, days: number) {
         })
       : {};
 
+    const selectedPreviewFailedRunsRes = selectedPreviewJobIds.length
+      ? await supabase
+          .from("ecc_test_runs")
+          .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
+          .in("job_id", selectedPreviewJobIds)
+          .eq("is_completed", true)
+          .or("override_pass.eq.false,computed_pass.eq.false")
+      : { data: [], error: null };
+
+    if (selectedPreviewFailedRunsRes.error) throw selectedPreviewFailedRunsRes.error;
+
+    latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);
+    primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
+
     const operationalTenantIdentity = await operationalTenantIdentityPromise;
     const focusedQueueHref = `/ops${buildQueryString({
       bucket,
@@ -968,6 +1003,12 @@ function subtractBusinessDays(date: Date, days: number) {
                         <span className="font-medium text-slate-500">Assignment:</span>{" "}
                         {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
                       </div>
+                      {workspaceContractorName(job) ? (
+                        <div>
+                          <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                          {workspaceContractorName(job)}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -1648,7 +1689,7 @@ function customerLine(j: any) {
 
 function addressLine(j: any) {
   const parts = addressParts(j);
-  const cityStateZip = [parts.city, [parts.state, parts.zip].filter(Boolean).join(" ")]
+  const cityStateZip = [formatCityNamePart(parts.city), [parts.state, parts.zip].filter(Boolean).join(" ")]
     .filter(Boolean)
     .join(", ");
   const out = [parts.address, cityStateZip].filter(Boolean).join(", ");
@@ -1702,42 +1743,45 @@ function contractorNameOnly(j: any) {
 
 function normalizeFailureLine(line: string, testTypeRaw: string): string {
   const text = String(line ?? "").trim();
-  const testType = String(testTypeRaw ?? "").trim().toLowerCase();
-  const lower = text.toLowerCase();
-
-  if (testType === "refrigerant_charge") {
-    if (
-      lower.includes("subcool") ||
-      lower.includes("superheat") ||
-      lower.includes("filter drier") ||
-      lower.includes("outdoor temp") ||
-      lower.includes("indoor temp")
-    ) {
-      return "Failed - refrigerant charge out of range";
-    }
-    return text ? `Failed - refrigerant charge: ${text}` : "Failed - refrigerant charge out of range";
-  }
-
-  if (testType === "duct_leakage") {
-    if (lower.includes("above") || lower.includes("leakage") || lower.includes("max")) {
-      return "Failed - duct leakage above threshold";
-    }
-    return text ? `Failed - duct leakage: ${text}` : "Failed - duct leakage above threshold";
-  }
-
-  if (testType === "airflow") {
-    if (lower.includes("below") || lower.includes("required") || lower.includes("target")) {
-      return "Failed - airflow below target";
-    }
-    return text ? `Failed - airflow: ${text}` : "Failed - airflow below target";
-  }
-
-  return text ? `Failed - ${text}` : "Failed - test requirement not met";
+  return formatFailedEccQueueReasonFromRun({ test_type: testTypeRaw }) || (text ? "Correction Required" : "");
 }
 
 function toEpochMs(value?: string | null) {
   const t = new Date(String(value ?? "")).getTime();
   return Number.isFinite(t) ? t : 0;
+}
+
+function buildLatestFailedRunByJob(runs: any[]) {
+  const latestByJob = new Map<string, any>();
+  for (const run of runs ?? []) {
+    const jobId = String((run as any)?.job_id ?? "").trim();
+    if (!jobId) continue;
+
+    const current = latestByJob.get(jobId);
+    if (!current) {
+      latestByJob.set(jobId, run);
+      continue;
+    }
+
+    const currentMs = Math.max(toEpochMs((current as any)?.created_at));
+    const nextMs = Math.max(toEpochMs((run as any)?.created_at));
+
+    if (nextMs > currentMs) {
+      latestByJob.set(jobId, run);
+    }
+  }
+  return latestByJob;
+}
+
+function buildPrimaryFailureReasonByJob(latestByJob: Map<string, any>) {
+  const reasonByJob = new Map<string, string>();
+  for (const [jobId, run] of latestByJob.entries()) {
+    const reasons = extractFailureReasons(run);
+    const primaryLine = reasons[0] ?? "";
+    const formatted = normalizeFailureLine(primaryLine, String((run as any)?.test_type ?? ""));
+    if (formatted) reasonByJob.set(jobId, formatted);
+  }
+  return reasonByJob;
 }
 
 function pendingInfoBannerText(j: any) {
@@ -2160,36 +2204,8 @@ const unreadContractorUpdateNotifications = unreadContractorAwarenessNotificatio
 
 const failedRuns = failedRunsRes.data ?? [];
 
-latestFailedRunByJob = new Map<string, any>();
-for (const run of failedRuns ?? []) {
-  const jobId = String((run as any)?.job_id ?? "").trim();
-  if (!jobId) continue;
-
-  const current = latestFailedRunByJob.get(jobId);
-  if (!current) {
-    latestFailedRunByJob.set(jobId, run);
-    continue;
-  }
-
-  const currentMs = Math.max(
-    toEpochMs((current as any)?.created_at)
-  );
-  const nextMs = Math.max(
-    toEpochMs((run as any)?.created_at)
-  );
-
-  if (nextMs > currentMs) {
-    latestFailedRunByJob.set(jobId, run);
-  }
-}
-
-const primaryFailureReasonByJob = new Map<string, string>();
-for (const [jobId, run] of latestFailedRunByJob.entries()) {
-  const reasons = extractFailureReasons(run);
-  const primaryLine = reasons[0] ?? "";
-  const formatted = normalizeFailureLine(primaryLine, String((run as any)?.test_type ?? ""));
-  primaryFailureReasonByJob.set(jobId, formatted);
-}
+latestFailedRunByJob = buildLatestFailedRunByJob(failedRuns ?? []);
+primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
 
 function failedStatusSinceByJob(jobId: string): string | null {
   const run = latestFailedRunByJob.get(jobId);
@@ -3376,6 +3392,7 @@ const selectedWorkspaceQueue =
   workspaceQueues.find((queue) => queue.key === selectedWorkspaceKey) ?? workspaceQueues[0];
 
 function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
+  const specificFailureReason = workspaceFailedReason(job);
   if (queueKey === "need_to_schedule") return "Awaiting scheduling";
   if (queueKey === "field_work") {
     const lifecycle = String(job?.status ?? "").toLowerCase();
@@ -3384,6 +3401,7 @@ function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
     return "Scheduled field work";
   }
   if (queueKey === "without_tech") return "Scheduled without active tech assignment";
+  if (specificFailureReason) return specificFailureReason;
   return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
 }
 
@@ -3639,6 +3657,12 @@ if (panel !== "full_board") {
                       <span className="font-medium text-slate-500">Assignment:</span>{" "}
                       {assignmentSummaryForJob(String(job?.id ?? ""))}
                     </div>
+                    {workspaceContractorName(job) ? (
+                      <div>
+                        <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                        {workspaceContractorName(job)}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}
