@@ -169,6 +169,36 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain('isCompletionReportFocused ? "hidden" : eccPanelClass');
   });
 
+  it("adds completion-report cert closeout through the existing job ops action path", () => {
+    expect(jobTestsPageSource).toContain('import { markCertsCompleteFromForm } from "@/lib/actions/job-ops-actions";');
+    expect(jobTestsPageSource).toContain("const canShowCompletionReportCertsSentAction =");
+    expect(jobTestsPageSource).toContain("isCompletionReportFocused");
+    expect(jobTestsPageSource).toContain("isInternalUser");
+    expect(jobTestsPageSource).toContain("isEccJobType(job.job_type)");
+    expect(jobTestsPageSource).toContain("!Boolean(job.certs_complete)");
+    expect(jobTestsPageSource).toContain("hasSelectedCompletionReportPass");
+    expect(jobTestsPageSource).toContain("!isFailedOrRetestState");
+    expect(jobTestsPageSource).toContain("<form action={markCertsCompleteFromForm}>");
+    expect(jobTestsPageSource).toContain('name="return_to" value={completionReportReturnTo}');
+    expect(jobTestsPageSource).toContain("Certs Sent");
+  });
+
+  it("shows passive cert status on the completion report once certs are already sent", () => {
+    expect(jobTestsPageSource).toContain("const showCompletionReportCertsSentStatus =");
+    expect(jobTestsPageSource).toContain("Boolean(job.certs_complete)");
+    expect(jobTestsPageSource).toContain("showCompletionReportCertsSentStatus ? (");
+    expect(jobTestsPageSource).toContain("Certs sent");
+  });
+
+  it("suppresses completion-report cert closeout for failed, retest, and correction-review states", () => {
+    expect(jobTestsPageSource).toContain(
+      'const isFailedOrRetestState = ["failed", "retest_needed", "pending_office_review"].includes(normalizedOpsStatus);',
+    );
+    expect(jobTestsPageSource).toContain('row.status.state === "fail" || row.status.state === "fail_override" || row.status.state === "unknown"');
+    expect(jobTestsPageSource).toContain("selectedAttentionCount === 0");
+    expect(jobTestsPageSource).toContain('!["fail", "fail_override", "unknown"].includes(String(row.status.state ?? ""))');
+  });
+
   it("keeps the mobile test hub matrix focused on actions and visible system chips", () => {
     expect(jobTestsPageSource).not.toContain('Test Queue');
     expect(jobTestsPageSource).not.toContain('<summary className="flex min-h-14 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">\n              Systems');

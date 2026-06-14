@@ -39,6 +39,7 @@ import {
   saveAndCompleteQiiEnv22InsulationFromForm,
   saveAndCompleteRefrigerantChargeFromForm,
 } from "@/lib/actions/job-actions";
+import { markCertsCompleteFromForm } from "@/lib/actions/job-ops-actions";
 
 import {
   getActiveManualAddTests,
@@ -682,6 +683,7 @@ export default async function JobTestsPage({
 
     throw error;
   }
+  const isInternalUser = Boolean(internalUser?.user_id);
 
   const { data: job, error } = await supabase
     .from("jobs")
@@ -692,6 +694,9 @@ export default async function JobTestsPage({
       parent_job_id,
       status,
       ops_status,
+      field_complete,
+      certs_complete,
+      invoice_complete,
       job_address,
       city,
       job_type,
@@ -1171,6 +1176,28 @@ export default async function JobTestsPage({
     selectedTotalCount > 0
       ? `${selectedCompletedCount}/${selectedTotalCount} completed`
       : "No active tests";
+  const hasSelectedCompletionReportPass =
+    selectedTotalCount > 0 &&
+    selectedRequiredRemainingCount === 0 &&
+    selectedAttentionCount === 0 &&
+    selectedSystemStatusRows.every((row) =>
+      row.complete &&
+      !["fail", "fail_override", "unknown"].includes(String(row.status.state ?? "")),
+    );
+  const isFailedOrRetestState = ["failed", "retest_needed", "pending_office_review"].includes(normalizedOpsStatus);
+  const canShowCompletionReportCertsSentAction =
+    isCompletionReportFocused &&
+    isInternalUser &&
+    isEccJobType(job.job_type) &&
+    Boolean(job.field_complete || job.status === "completed") &&
+    !Boolean(job.certs_complete) &&
+    hasSelectedCompletionReportPass &&
+    !isFailedOrRetestState;
+  const showCompletionReportCertsSentStatus =
+    isCompletionReportFocused &&
+    isInternalUser &&
+    isEccJobType(job.job_type) &&
+    Boolean(job.certs_complete);
 
   const focusedCustomTestType =
     focusedType &&
@@ -1491,6 +1518,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
     const qs = q.toString();
     return qs ? `${baseHref}?${qs}` : baseHref;
   };
+  const completionReportReturnTo = selectedSystemId
+    ? withS("completion_report", selectedSystemId)
+    : `${baseHref}?t=completion_report`;
 
   const systemSummaries = systems.map((sys: any) => {
     const systemId = canonicalId(sys.id);
@@ -1824,6 +1854,19 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           <p className="text-sm text-slate-600">Print-ready ECC report for {customerName}.</p>
         </div>
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          {canShowCompletionReportCertsSentAction ? (
+            <form action={markCertsCompleteFromForm}>
+              <input type="hidden" name="job_id" value={job.id} />
+              <input type="hidden" name="return_to" value={completionReportReturnTo} />
+              <SubmitButton loadingText="Saving..." className={eccSecondaryButtonClass}>
+                Certs Sent
+              </SubmitButton>
+            </form>
+          ) : showCompletionReportCertsSentStatus ? (
+            <span className="inline-flex min-h-10 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800">
+              Certs sent
+            </span>
+          ) : null}
           <Link href={selectedSystemId ? withS(undefined, selectedSystemId) : baseHref} className={eccSecondaryButtonClass}>
             Back
           </Link>
