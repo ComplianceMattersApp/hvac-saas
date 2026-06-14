@@ -570,6 +570,50 @@ function refrigerantNumericChecksPassing(run: any) {
   );
 }
 
+function hasRefrigerantNumericReportValues(run: any) {
+  const data = run?.data ?? {};
+  const computed = run?.computed ?? {};
+  return [
+    data.lowest_return_air_db_f,
+    data.condenser_air_entering_db_f,
+    data.liquid_line_temp_f,
+    data.liquid_line_pressure_psig,
+    data.condenser_sat_temp_f,
+    data.target_subcool_f,
+    data.suction_line_temp_f,
+    data.suction_line_pressure_psig,
+    data.evaporator_sat_temp_f,
+    computed.measured_subcool_f,
+    computed.measured_superheat_f,
+  ].some((value) => value !== null && value !== undefined && String(value).trim() !== "");
+}
+
+function isRefrigerantPhotoDocumentation(run: any) {
+  return (
+    String(run?.data?.verification_method ?? "").trim() === "photo_taken" ||
+    String(run?.computed?.status ?? "").trim() === "photo_evidence"
+  );
+}
+
+function isRefrigerantTemperatureException(run: any) {
+  const exemptReason = String(run?.data?.charge_exempt_reason ?? "").trim();
+  return (
+    exemptReason === "conditions_not_met" ||
+    includesBlocked(run?.computed, "indoor temp below") ||
+    includesBlocked(run?.computed, "outdoor temp below")
+  );
+}
+
+function refrigerantConciseReportStatus(run: any) {
+  if (!run) return null;
+  if (isRefrigerantPhotoDocumentation(run)) return "Refrigerant charge documented by photo.";
+  if (isRefrigerantTemperatureException(run)) return "Temperature requirements were not met.";
+  if (run.is_completed !== true && !hasRefrigerantNumericReportValues(run)) {
+    return "Refrigerant Charge Test Still Open";
+  }
+  return null;
+}
+
 function outdoorQualificationStatus(run: any) {
   const computed = run?.computed ?? {};
   if (includesBlocked(computed, "outdoor temp below")) {
@@ -770,6 +814,26 @@ export default async function JobTestsPage({
 
   if (String(job.job_type ?? "").trim().toLowerCase() !== "ecc") {
     redirect(`/jobs/${id}?tab=ops`);
+  }
+
+  const hasCompletedFailedEccRun = (job.ecc_test_runs ?? []).some((run: any) => {
+    if (run?.is_completed !== true) return false;
+    if (run?.override_pass === false) return true;
+    if (run?.override_pass === true) return false;
+    return run?.computed_pass === false;
+  });
+  let hasCorrectionReviewResolution = false;
+  if (hasCompletedFailedEccRun) {
+    const { data: correctionResolutionEvent, error: correctionResolutionErr } = await supabase
+      .from("job_events")
+      .select("id")
+      .eq("job_id", id)
+      .eq("event_type", "failure_resolved_by_correction_review")
+      .limit(1)
+      .maybeSingle();
+
+    if (correctionResolutionErr) throw correctionResolutionErr;
+    hasCorrectionReviewResolution = Boolean(correctionResolutionEvent?.id);
   }
 
   let internalBusinessDisplayName = "";
@@ -1176,23 +1240,17 @@ export default async function JobTestsPage({
     selectedTotalCount > 0
       ? `${selectedCompletedCount}/${selectedTotalCount} completed`
       : "No active tests";
-  const hasSelectedCompletionReportPass =
-    selectedTotalCount > 0 &&
-    selectedRequiredRemainingCount === 0 &&
-    selectedAttentionCount === 0 &&
-    selectedSystemStatusRows.every((row) =>
-      row.complete &&
-      !["fail", "fail_override", "unknown"].includes(String(row.status.state ?? "")),
-    );
   const isFailedOrRetestState = ["failed", "retest_needed", "pending_office_review"].includes(normalizedOpsStatus);
+  const isCompletionReportCertCloseoutBlocked =
+    isFailedOrRetestState ||
+    (hasCompletedFailedEccRun && !hasCorrectionReviewResolution);
   const canShowCompletionReportCertsSentAction =
     isCompletionReportFocused &&
     isInternalUser &&
     isEccJobType(job.job_type) &&
     Boolean(job.field_complete || job.status === "completed") &&
     !Boolean(job.certs_complete) &&
-    hasSelectedCompletionReportPass &&
-    !isFailedOrRetestState;
+    !isCompletionReportCertCloseoutBlocked;
   const showCompletionReportCertsSentStatus =
     isCompletionReportFocused &&
     isInternalUser &&
@@ -1958,8 +2016,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 Boolean(sys.runRefrigerant?.data?.charge_exempt) ||
                 Boolean(sys.runRefrigerant?.data?.charge_exempt_reason) ||
                 String(sys.runRefrigerant?.computed?.status ?? "").toLowerCase() === "exempt";
+              const rcConciseReportStatus = refrigerantConciseReportStatus(sys.runRefrigerant);
               const shouldForcePrintBreak =
-                index > 0 && Boolean(sys.runRefrigerant) && !isRefrigerantException;
+                index > 0 && Boolean(sys.runRefrigerant) && !isRefrigerantException && !rcConciseReportStatus;
 
               return (
                 <div key={sys.systemId} className={`break-inside-avoid rounded-xl border border-slate-200 bg-white p-4 space-y-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.34)] print:rounded-none print:border-slate-500 print:p-3 print:space-y-3 print:shadow-none ${shouldForcePrintBreak ? "print:break-before-page" : ""}`}>
@@ -2240,6 +2299,8 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       </div>
                     ) : !sys.runRefrigerant ? (
                       <div className="text-sm text-slate-700 print:text-[12px]">No refrigerant charge run found for this system.</div>
+                    ) : rcConciseReportStatus ? (
+                      <div className="text-sm font-semibold text-slate-800 print:text-[12px]">{rcConciseReportStatus}</div>
                     ) : isRefrigerantException ? (
                       <div className="text-sm text-slate-800 space-y-1 print:text-[12px]">
                         <div>Result: Exception</div>
