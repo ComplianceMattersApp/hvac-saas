@@ -4092,7 +4092,6 @@ export async function confirmEccRetestReadyFromForm(formData: FormData) {
     .select("id")
     .eq("parent_job_id", jobId)
     .is("deleted_at", null)
-    .neq("ops_status", "closed")
     .neq("status", "cancelled")
     .order("created_at", { ascending: false })
     .limit(1)
@@ -11086,10 +11085,9 @@ export async function createRetestJobFromForm(formData: FormData) {
 
   const { data: activeRetestChild, error: activeChildErr } = await supabase
     .from("jobs")
-    .select("id")
+    .select("id, status, ops_status")
     .eq("parent_job_id", parentJobId)
     .is("deleted_at", null)
-    .neq("ops_status", "closed")
     .neq("status", "cancelled")
     .order("created_at", { ascending: false })
     .limit(1)
@@ -11098,7 +11096,10 @@ export async function createRetestJobFromForm(formData: FormData) {
   if (activeChildErr) throw activeChildErr;
 
   if (activeRetestChild?.id) {
-    redirect(`/jobs/${parentJobId}?tab=ops&banner=retest_already_exists`);
+    if (noRedirect) {
+      return { ...activeRetestChild, alreadyExists: true };
+    }
+    redirect(`/jobs/${activeRetestChild.id}?tab=ops&banner=retest_already_exists`);
   }
 
   // 2) Create retest job (unscheduled by default)
@@ -11328,6 +11329,9 @@ export async function scheduleRetestNowFromForm(formData: FormData) {
   const childJobId = String((child as any)?.id ?? "").trim();
   if (!childJobId) {
     redirect(`/jobs/${parentJobId}?tab=ops&banner=retest_create_failed#next-service-action`);
+  }
+  if ((child as any)?.alreadyExists) {
+    redirect(`/jobs/${childJobId}?tab=ops&banner=retest_already_exists`);
   }
 
   const scheduleFormData = new FormData();

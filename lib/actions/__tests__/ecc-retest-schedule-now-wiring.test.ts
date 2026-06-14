@@ -9,7 +9,7 @@ const jobActionsSource = readFileSync(
 
 function extractScheduleRetestNowBlock() {
   const start = jobActionsSource.indexOf("export async function scheduleRetestNowFromForm");
-  const end = jobActionsSource.indexOf("/**\n * CANCEL JOB", start);
+  const end = jobActionsSource.indexOf("export async function cancelJobFromForm", start);
   if (start < 0 || end < 0 || end <= start) {
     throw new Error("Could not find scheduleRetestNowFromForm block boundaries.");
   }
@@ -77,13 +77,26 @@ describe("ECC retest schedule-now wiring", () => {
     expect(block).toContain("permit_date: parent?.permit_date ?? null");
   });
 
-  it("continues guarding against duplicate active retest children", () => {
+  it("continues guarding against duplicate linked retest children, including completed ones", () => {
     const block = extractCreateRetestBlock();
 
     expect(block).toContain("activeRetestChild");
     expect(block).toContain('.eq("parent_job_id", parentJobId)');
-    expect(block).toContain('.neq("ops_status", "closed")');
     expect(block).toContain('.neq("status", "cancelled")');
+    expect(block).not.toContain('.neq("ops_status", "closed")');
+    expect(block).toContain("alreadyExists: true");
+    expect(block).toContain("if (noRedirect)");
+    expect(block).toContain("redirect(`/jobs/${activeRetestChild.id}?tab=ops&banner=retest_already_exists`)");
     expect(block).toContain("retest_already_exists");
+  });
+
+  it("does not schedule an existing linked retest returned from the idempotent create path", () => {
+    const block = extractScheduleRetestNowBlock();
+
+    expect(block).toContain("if ((child as any)?.alreadyExists)");
+    expect(block).toContain("redirect(`/jobs/${childJobId}?tab=ops&banner=retest_already_exists`)");
+    expect(block.indexOf("if ((child as any)?.alreadyExists)")).toBeLessThan(
+      block.indexOf("const scheduleFormData = new FormData()"),
+    );
   });
 });

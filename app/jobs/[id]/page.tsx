@@ -1910,7 +1910,6 @@ export default async function JobDetailPage({
       .eq("parent_job_id", jobId)
       .is("deleted_at", null)
       .neq("status", "cancelled")
-      .neq("ops_status", "closed")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -3307,19 +3306,28 @@ const timelineSummaryText = undefined;
 
 const normalizedJobOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
 const hasActiveRetestChild = Boolean((activeRetestChild as any)?.id);
+const linkedRetestChildClosed =
+  String((activeRetestChild as any)?.ops_status ?? "").trim().toLowerCase() === "closed" ||
+  String((activeRetestChild as any)?.status ?? "").trim().toLowerCase() === "completed";
 const activeRetestChildScheduled = Boolean(
   (activeRetestChild as any)?.scheduled_date ||
     (activeRetestChild as any)?.window_start ||
     (activeRetestChild as any)?.window_end,
 );
 const showLinkedRetestCreated = job.job_type === "ecc" && hasActiveRetestChild && !parentJobId;
-const linkedRetestPassiveHeading = activeRetestChildScheduled
+const linkedRetestPassiveHeading = linkedRetestChildClosed
+  ? "Linked Retest Completed"
+  : activeRetestChildScheduled
   ? "Retest Scheduled"
   : "Linked Retest Created";
-const linkedRetestPassiveCopy = activeRetestChildScheduled
+const linkedRetestPassiveCopy = linkedRetestChildClosed
+  ? "The linked retest job is complete. Review that retest result and remaining closeout blockers before creating any additional retest work."
+  : activeRetestChildScheduled
   ? "The linked retest job is scheduled and is now the active work item."
   : "The linked retest job is now the active scheduling item.";
-const linkedRetestPassiveMeta = activeRetestChildScheduled
+const linkedRetestPassiveMeta = linkedRetestChildClosed
+  ? "Linked retest completed"
+  : activeRetestChildScheduled
   ? "Retest scheduled"
   : "Linked retest active";
 const showConfirmRetestReady =
@@ -4700,7 +4708,7 @@ const failureResolutionPathCount =
                   <div>
                     <div className="font-semibold">Retest Ready</div>
                     <p className="mt-1 text-sm leading-6 text-orange-900/90">
-                      Creates the linked retest job and schedules it immediately.
+                      Schedule a linked retest now, or move it to the scheduling queue.
                     </p>
                   </div>
                   <form action={scheduleRetestNowFromForm} className="space-y-3 rounded-xl border border-orange-200 bg-white/85 p-3">
@@ -4737,23 +4745,15 @@ const failureResolutionPathCount =
                     <SubmitButton loadingText="Scheduling..." className={`${darkButtonClass} min-h-12 w-full`}>
                       Schedule Retest Now
                     </SubmitButton>
-                  </form>
-                  <form
-                    action={async (formData: FormData) => {
-                      "use server";
-                      await createRetestJobFromForm(formData);
-                    }}
-                    className="space-y-3"
-                  >
-                    <input type="hidden" name="parent_job_id" value={job.id} />
-                    <p className="text-sm leading-6 text-orange-900/90">
-                      Creates a linked retest job and places it in the scheduling queue.
-                    </p>
-                    <label className="flex items-center gap-2 rounded-lg border border-orange-200 bg-white/80 px-3 py-2 text-sm text-slate-700">
-                      <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
-                      <span>Copy equipment from original</span>
-                    </label>
-                    <SubmitButton loadingText="Creating..." className={`${darkButtonClass} min-h-12 w-full`}>
+                    <SubmitButton
+                      formNoValidate
+                      formAction={async (formData: FormData) => {
+                        "use server";
+                        await createRetestJobFromForm(formData);
+                      }}
+                      loadingText="Creating..."
+                      className={`${secondaryButtonClass} min-h-12 w-full`}
+                    >
                       Move to Needs Scheduling
                     </SubmitButton>
                   </form>
@@ -6035,7 +6035,7 @@ const failureResolutionPathCount =
           >
             <div className="text-sm font-semibold">Retest Ready</div>
             <p className="mt-1 text-xs leading-5 text-orange-900/90">
-              Creates the linked retest job and schedules it immediately.
+              Schedule a linked retest now, or move it to the scheduling queue.
             </p>
             <form action={scheduleRetestNowFromForm} className="mt-3 space-y-3 rounded-xl border border-orange-200 bg-white/85 p-3">
               <input type="hidden" name="parent_job_id" value={job.id} />
@@ -6073,27 +6073,17 @@ const failureResolutionPathCount =
               <SubmitButton loadingText="Scheduling..." className={`${darkButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
                 Schedule Retest Now
               </SubmitButton>
-            </form>
-            <form
-              action={async (formData: FormData) => {
-                "use server";
-                await createRetestJobFromForm(formData);
-              }}
-              className="mt-3 space-y-3"
-            >
-              <input type="hidden" name="parent_job_id" value={job.id} />
-              <p className="text-xs leading-5 text-orange-900/90">
-                Creates a linked retest job and places it in the scheduling queue.
-              </p>
-              <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-orange-200 bg-white/85 px-3 py-2 text-sm text-slate-700">
-                <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
-                <span>Copy equipment from original</span>
-              </label>
-              <div>
-                <SubmitButton loadingText="Creating..." className={`${darkButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
-                  Move to Needs Scheduling
-                </SubmitButton>
-              </div>
+              <SubmitButton
+                formNoValidate
+                formAction={async (formData: FormData) => {
+                  "use server";
+                  await createRetestJobFromForm(formData);
+                }}
+                loadingText="Creating..."
+                className={`${secondaryButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}
+              >
+                Move to Needs Scheduling
+              </SubmitButton>
             </form>
           </div>
         ) : null}

@@ -174,11 +174,9 @@ function makeConfirmRetestReadySupabaseFixture() {
               return {
                 is: vi.fn(() => ({
                   neq: vi.fn(() => ({
-                    neq: vi.fn(() => ({
-                      order: vi.fn(() => ({
-                        limit: vi.fn(() => ({
-                          maybeSingle: vi.fn(async () => ({ data: null, error: null })),
-                        })),
+                    order: vi.fn(() => ({
+                      limit: vi.fn(() => ({
+                        maybeSingle: vi.fn(async () => ({ data: null, error: null })),
                       })),
                     })),
                   })),
