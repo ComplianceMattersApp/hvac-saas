@@ -1027,154 +1027,258 @@ function JobDetailDesktopLegacyLayout({ children }: { children: ReactNode }) {
   return <div className="hidden space-y-5 lg:block">{children}</div>;
 }
 
-function JobDetailDesktopWorkbenchV2({ children: _children }: { children: ReactNode }) {
-  const previewZoneClass =
-    "min-h-36 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_14px_32px_-30px_rgba(15,23,42,0.42)]";
-  const previewZoneEyebrowClass =
-    "text-[11px] font-semibold uppercase text-slate-500";
-  const previewZoneTitleClass =
-    "mt-1 text-base font-semibold text-slate-950";
-  const previewZoneBodyClass =
-    "mt-2 text-sm leading-6 text-slate-600";
-  const primaryZones = [
-    {
-      key: "job-brief",
-      title: "Job Brief",
-      body: "Visit reason, customer concern, intake notes, work summary, and service details will land here in a later content migration.",
-    },
-    {
-      key: "primary-work",
-      title: "Primary Work",
-      body: "Work items, companion service items, and work capture entry points will be placed here without changing their source of truth.",
-    },
-    {
-      key: "billing-closeout",
-      title: "Billing / Closeout",
-      body: "Invoice state, payment state, field billing, and closeout blockers will be grouped here after parity checks.",
-    },
-    {
-      key: "follow-up-service-chain",
-      title: "Follow-up / Service Chain",
-      body: "Return visits, callbacks, service-plan effects, workflow guidance, and linked visit continuity will be staged here.",
-    },
-  ];
-  const railZones = [
-    {
-      key: "job-memory",
-      title: "Job Memory / Notes Hub",
-      body: "Internal notes, shared notes, correction context, and communication memory placeholders only.",
-    },
-    {
-      key: "people-responsibility",
-      title: "People & Responsibility",
-      body: "Customer, contacts, contractor, assignments, and responsibility context will be grouped here later.",
-    },
-    {
-      key: "place-work",
-      title: "Place & Work",
-      body: "Service location, address controls, and safe location-change affordances will live here.",
-    },
-    {
-      key: "ecc-compliance",
-      title: "ECC / Compliance",
-      body: "Permit, tests, certs, retest, and correction review surfaces will be reserved here when applicable.",
-    },
-  ];
+function JobDetailDesktopWorkbenchV2({
+  children: _children,
+  variant = "v2-command",
+}: {
+  children: ReactNode;
+  variant?: string;
+}) {
+  const selectedVariant =
+    variant === "v2-board" || variant === "v2-timeline" ? variant : "v2-command";
+  const placeholderLabel = "V2 preview placeholder";
+  const zoneBody =
+    "Inert concept shell only. Real job-detail tools, forms, actions, anchors, and records stay in legacy until a later migration slice.";
+  const zoneCopy: Record<string, string> = {
+    "global-alert-strip": "Reserved for route-level banners and action feedback without changing current banner query-param behavior.",
+    "header-primary-action-bar": "Reserved for job identity, lifecycle state, schedule context, and primary next action controls.",
+    "job-brief": "Reserved for Visit Reason, Customer Concern, Intake Notes, Work Summary, and Service Details as distinct sources.",
+    "job-memory": "Reserved for internal notes, shared notes, correction context, latest contact attempt, and communication memory.",
+    "people-responsibility": "Reserved for customer/account, role contacts, contractor context, and team ownership.",
+    "place-work": "Reserved for service location, address confidence, directions/search, and safe location-change affordances.",
+    "primary-work": "Reserved for Work Items, companion service items, pricing context, and work capture surfaces.",
+    "billing-closeout": "Reserved for invoice state, payment state, charge proposals, and closeout blockers.",
+    "ecc-compliance": "Reserved for permit, tests, certs, retest, correction review, and contractor correction context.",
+    "follow-up-service-chain": "Reserved for return visits, callbacks, waiting release, service plan, workflow guidance, and linked visits.",
+    "records-workspace": "Reserved for timeline, attachments, equipment, follow-up history, service chain, notes history, and target panels.",
+    "admin-danger-zone": "Reserved for admin-only and destructive controls, still isolated from daily work.",
+  };
+  const renderCompactZone = (
+    key: string,
+    title: string,
+    tone: "blue" | "green" | "amber" | "slate" | "red" = "slate"
+  ) => {
+    const toneClass =
+      tone === "blue"
+        ? "border-blue-200 bg-blue-50/70 text-blue-950"
+        : tone === "green"
+        ? "border-emerald-200 bg-emerald-50/70 text-emerald-950"
+        : tone === "amber"
+        ? "border-amber-200 bg-amber-50/75 text-amber-950"
+        : tone === "red"
+        ? "border-red-200 bg-red-50/75 text-red-950"
+        : "border-slate-200 bg-white text-slate-950";
+    return (
+      <section
+        key={key}
+        data-v2-zone={key}
+        className={`min-h-36 rounded-xl border p-4 shadow-[0_18px_38px_-34px_rgba(15,23,42,0.55)] ${toneClass}`}
+      >
+        <div className="text-[11px] font-semibold uppercase text-slate-500">{placeholderLabel}</div>
+        <h2 className="mt-1 text-base font-semibold">{title}</h2>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{zoneCopy[key] ?? zoneBody}</p>
+      </section>
+    );
+  };
 
-  return (
-    <div className="hidden space-y-5 lg:block" data-desktop-layout-preview="v2">
+  const renderCommandCockpit = () => (
+    <div className="hidden space-y-5 lg:block" data-desktop-layout-preview="v2-command">
       <section
         data-v2-zone="global-alert-strip"
-        className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-[0_14px_32px_-30px_rgba(180,83,9,0.45)]"
+        className="rounded-xl border border-amber-200 bg-[#fff7ed] px-4 py-3 text-sm text-amber-950 shadow-[0_14px_34px_-30px_rgba(180,83,9,0.5)]"
       >
-        <div className={previewZoneEyebrowClass}>V2 Preview Placeholder</div>
-        <div className="mt-1 font-semibold">Global alert strip</div>
-        <p className="mt-1 leading-6">
-          Route-level banners and action feedback will remain above the workbench. No banner behavior is wired here yet.
-        </p>
+        <div className="font-semibold">Global alert strip</div>
+        <p className="mt-1 leading-6">{zoneCopy["global-alert-strip"]}</p>
       </section>
 
       <section
         data-v2-zone="header-primary-action-bar"
-        className="rounded-2xl border border-slate-200 bg-[#f8fafc] p-5 shadow-[0_22px_56px_-44px_rgba(15,23,42,0.5)]"
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-[#f7faf8] shadow-[0_30px_72px_-50px_rgba(15,23,42,0.55)]"
       >
-        <div className="flex items-start justify-between gap-6">
-          <div className="min-w-0">
-            <div className={previewZoneEyebrowClass}>Desktop Workbench V2</div>
-            <h1 className="mt-2 text-2xl font-semibold text-slate-950">
-              Header and primary action bar
-            </h1>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-              Job identity, status, schedule context, and primary lifecycle actions will be arranged here after the content migration.
-            </p>
-          </div>
-          <div className="w-80 shrink-0 space-y-3">
+        <div className="border-b border-slate-200 bg-[#102033] px-6 py-5 text-white">
+          <div className="text-[11px] font-semibold uppercase text-blue-100">{placeholderLabel}</div>
+          <div className="mt-2 flex items-end justify-between gap-6">
             <div>
-              <div className="text-xs font-semibold text-slate-500">Status</div>
-              <div className="mt-1 h-2 rounded bg-slate-300" />
+              <h1 className="text-3xl font-semibold">Command Cockpit</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-200">
+                Strong job identity, state, schedule, and primary next action will anchor this desktop workbench.
+              </p>
             </div>
-            <div>
-              <div className="text-xs font-semibold text-slate-500">Next Action</div>
-              <div className="mt-1 h-2 rounded bg-blue-300" />
+            <div className="w-80 shrink-0 border-l border-white/20 pl-5">
+              <div className="text-[11px] font-semibold uppercase text-blue-100">Primary next action zone</div>
+              <div className="mt-3 h-2 rounded bg-blue-300" />
+              <div className="mt-2 h-2 w-2/3 rounded bg-emerald-300" />
             </div>
           </div>
         </div>
+        <div className="grid gap-0 divide-x divide-slate-200 bg-white md:grid-cols-4">
+          {["State", "Schedule", "Owner", "Risk"].map((label) => (
+            <div key={label} className="px-5 py-4">
+              <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
+              <div className="mt-2 h-2 rounded bg-slate-200" />
+            </div>
+          ))}
+        </div>
       </section>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.72fr)]">
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(21rem,0.62fr)]">
         <main className="min-w-0 space-y-5">
-          <div className="grid gap-5 2xl:grid-cols-2">
-            {primaryZones.map((zone) => (
-              <section key={zone.key} data-v2-zone={zone.key} className={previewZoneClass}>
-                <div className={previewZoneEyebrowClass}>V2 Preview Placeholder</div>
-                <h2 className={previewZoneTitleClass}>{zone.title}</h2>
-                <p className={previewZoneBodyClass}>{zone.body}</p>
-              </section>
-            ))}
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,0.52fr)]">
+            {renderCompactZone("job-brief", "Job Brief", "blue")}
+            {renderCompactZone("job-memory", "Job Memory / Notes Hub", "amber")}
           </div>
-
-          <section
-            data-v2-zone="records-workspace"
-            className="min-h-48 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_14px_32px_-30px_rgba(15,23,42,0.42)]"
-          >
-            <div className={previewZoneEyebrowClass}>V2 Preview Placeholder</div>
-            <h2 className={previewZoneTitleClass}>Records Workspace</h2>
-            <p className={previewZoneBodyClass}>
-              Timeline, attachments, equipment, follow-up history, service chain, notes history, and existing hash-target panels will be preserved here later.
-            </p>
-            <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 lg:grid-cols-3">
-              {["Job Controls", "Work Records", "Activity Records"].map((label) => (
-                <div key={label} className="text-sm font-semibold text-slate-600">
-                  {label}
-                </div>
-              ))}
-            </div>
-          </section>
+          <div className="grid gap-5 2xl:grid-cols-2">
+            {renderCompactZone("primary-work", "Primary Work", "green")}
+            {renderCompactZone("billing-closeout", "Billing / Closeout", "slate")}
+            {renderCompactZone("follow-up-service-chain", "Follow-up / Service Chain", "blue")}
+            {renderCompactZone("records-workspace", "Records Workspace", "slate")}
+          </div>
         </main>
-
         <aside className="space-y-5">
-          {railZones.map((zone) => (
-            <section key={zone.key} data-v2-zone={zone.key} className={previewZoneClass}>
-              <div className={previewZoneEyebrowClass}>V2 Preview Placeholder</div>
-              <h2 className={previewZoneTitleClass}>{zone.title}</h2>
-              <p className={previewZoneBodyClass}>{zone.body}</p>
-            </section>
-          ))}
-
-          <section
-            data-v2-zone="admin-danger-zone"
-            className="min-h-32 rounded-xl border border-red-200 bg-red-50 p-4 text-red-950 shadow-[0_14px_32px_-30px_rgba(185,28,28,0.42)]"
-          >
-            <div className="text-[11px] font-semibold uppercase text-red-700">V2 Preview Placeholder</div>
-            <h2 className="mt-1 text-base font-semibold">Admin / Danger Zone</h2>
-            <p className="mt-2 text-sm leading-6 text-red-900">
-              Destructive and admin-only controls will stay isolated here when migrated. No live controls are rendered in this preview shell.
-            </p>
-          </section>
+          {renderCompactZone("people-responsibility", "People & Responsibility", "slate")}
+          {renderCompactZone("place-work", "Place & Work", "green")}
+          {renderCompactZone("ecc-compliance", "ECC / Compliance", "amber")}
+          {renderCompactZone("admin-danger-zone", "Admin / Danger Zone", "red")}
         </aside>
       </div>
     </div>
   );
+
+  const renderIntelligenceBoard = () => (
+    <div className="hidden space-y-5 lg:block" data-desktop-layout-preview="v2-board">
+      <section
+        data-v2-zone="global-alert-strip"
+        className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-950 shadow-[0_14px_34px_-30px_rgba(37,99,235,0.45)]"
+      >
+        <div className="font-semibold">Global alert strip</div>
+        <p className="mt-1 leading-6">{zoneCopy["global-alert-strip"]}</p>
+      </section>
+
+      <section
+        data-v2-zone="header-primary-action-bar"
+        className="rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_28px_72px_-52px_rgba(15,23,42,0.52)]"
+      >
+        <div className="grid gap-5 xl:grid-cols-[minmax(0,0.9fr)_minmax(30rem,0.72fr)]">
+          <div>
+            <div className="text-[11px] font-semibold uppercase text-slate-500">{placeholderLabel}</div>
+            <h1 className="mt-2 text-3xl font-semibold text-slate-950">Job Intelligence Board</h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              A higher-signal board for state, risk, attention, notes intelligence, and grouped work areas.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-4 border-l border-slate-200 pl-5">
+            {["Attention", "Blockers", "Memory"].map((label) => (
+              <div key={label}>
+                <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
+                <div className="mt-3 h-16 rounded-lg bg-[linear-gradient(180deg,#e0f2fe,#f8fafc)]" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(18rem,0.48fr)_minmax(0,1fr)_minmax(20rem,0.55fr)]">
+        <aside className="space-y-5">
+          {renderCompactZone("people-responsibility", "People & Responsibility", "blue")}
+          {renderCompactZone("place-work", "Place & Work", "green")}
+          {renderCompactZone("admin-danger-zone", "Admin / Danger Zone", "red")}
+        </aside>
+        <main className="min-w-0 space-y-5">
+          {renderCompactZone("job-brief", "Job Brief", "blue")}
+          <section
+            data-v2-zone="records-workspace"
+            className="min-h-64 rounded-xl border border-slate-200 bg-[#fbfcfd] p-5 shadow-[0_18px_42px_-34px_rgba(15,23,42,0.55)]"
+          >
+            <div className="text-[11px] font-semibold uppercase text-slate-500">{placeholderLabel}</div>
+            <h2 className="mt-1 text-base font-semibold text-slate-950">Records Workspace</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">{zoneCopy["records-workspace"]}</p>
+            <div className="mt-5 grid gap-3 border-t border-slate-200 pt-4 md:grid-cols-4">
+              {["Timeline", "Files", "Equipment", "Panels"].map((label) => (
+                <div key={label} className="text-sm font-semibold text-slate-700">{label}</div>
+              ))}
+            </div>
+          </section>
+          <div className="grid gap-5 2xl:grid-cols-2">
+            {renderCompactZone("primary-work", "Primary Work", "green")}
+            {renderCompactZone("billing-closeout", "Billing / Closeout", "amber")}
+          </div>
+        </main>
+        <aside className="space-y-5">
+          {renderCompactZone("job-memory", "Job Memory / Notes Hub", "amber")}
+          {renderCompactZone("ecc-compliance", "ECC / Compliance", "slate")}
+          {renderCompactZone("follow-up-service-chain", "Follow-up / Service Chain", "blue")}
+        </aside>
+      </div>
+    </div>
+  );
+
+  const renderTimelineConcept = () => (
+    <div className="hidden space-y-5 lg:block" data-desktop-layout-preview="v2-timeline">
+      <section
+        data-v2-zone="global-alert-strip"
+        className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-950 shadow-[0_14px_34px_-30px_rgba(5,150,105,0.45)]"
+      >
+        <div className="font-semibold">Global alert strip</div>
+        <p className="mt-1 leading-6">{zoneCopy["global-alert-strip"]}</p>
+      </section>
+
+      <section
+        data-v2-zone="header-primary-action-bar"
+        className="rounded-2xl border border-slate-200 bg-[#fbfcfd] p-5 shadow-[0_28px_72px_-52px_rgba(15,23,42,0.5)]"
+      >
+        <div className="text-[11px] font-semibold uppercase text-slate-500">{placeholderLabel}</div>
+        <h1 className="mt-2 text-3xl font-semibold text-slate-950">Operations Timeline</h1>
+        <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+          A lifecycle spine concept with current action, notes, records, billing, and compliance grouped around the active stage.
+        </p>
+      </section>
+
+      <div className="grid gap-6 xl:grid-cols-[17rem_minmax(0,1fr)_22rem]">
+        <aside className="space-y-5 border-r border-slate-200 pr-5">
+          {["Intake", "Scheduled", "Field Work", "Closeout", "Archive"].map((label, index) => (
+            <div key={label} className="relative pl-5">
+              <span className={`absolute left-0 top-1 h-3 w-3 rounded-full ${index === 2 ? "bg-blue-500" : "bg-slate-300"}`} />
+              <div className="text-sm font-semibold text-slate-800">{label}</div>
+              <div className="mt-1 h-1.5 rounded bg-slate-200" />
+            </div>
+          ))}
+        </aside>
+
+        <main className="min-w-0 space-y-5">
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,0.7fr)_minmax(0,0.55fr)]">
+            {renderCompactZone("job-brief", "Job Brief", "blue")}
+            {renderCompactZone("job-memory", "Job Memory / Notes Hub", "amber")}
+          </div>
+          <div className="grid gap-5 2xl:grid-cols-2">
+            {["primary-work", "billing-closeout", "ecc-compliance", "follow-up-service-chain"].map((key) =>
+              renderCompactZone(
+                key,
+                key === "primary-work"
+                  ? "Primary Work"
+                  : key === "billing-closeout"
+                  ? "Billing / Closeout"
+                  : key === "ecc-compliance"
+                  ? "ECC / Compliance"
+                  : "Follow-up / Service Chain",
+                key === "primary-work" ? "green" : key === "ecc-compliance" ? "amber" : "slate"
+              )
+            )}
+          </div>
+          {renderCompactZone("records-workspace", "Records Workspace", "blue")}
+        </main>
+
+        <aside className="space-y-5">
+          {renderCompactZone("people-responsibility", "People & Responsibility", "slate")}
+          {renderCompactZone("place-work", "Place & Work", "green")}
+          {renderCompactZone("admin-danger-zone", "Admin / Danger Zone", "red")}
+        </aside>
+      </div>
+    </div>
+  );
+
+  if (selectedVariant === "v2-board") return renderIntelligenceBoard();
+  if (selectedVariant === "v2-timeline") return renderTimelineConcept();
+  return renderCommandCockpit();
 }
 
 function truncateSummaryText(value: string, maxLength = 84) {
@@ -1422,10 +1526,17 @@ export default async function JobDetailPage({
       : typeof desktopLayoutRaw === "string"
       ? desktopLayoutRaw
       : "";
-  const useDesktopWorkbenchV2 = desktopLayout === "v2";
-  const DesktopJobDetailLayout = useDesktopWorkbenchV2
-    ? JobDetailDesktopWorkbenchV2
-    : JobDetailDesktopLegacyLayout;
+  const useDesktopWorkbenchV2 =
+    desktopLayout === "v2" ||
+    desktopLayout === "v2-command" ||
+    desktopLayout === "v2-board" ||
+    desktopLayout === "v2-timeline";
+  const DesktopJobDetailLayout = ({ children }: { children: ReactNode }) =>
+    useDesktopWorkbenchV2 ? (
+      <JobDetailDesktopWorkbenchV2 variant={desktopLayout}>{children}</JobDetailDesktopWorkbenchV2>
+    ) : (
+      <JobDetailDesktopLegacyLayout>{children}</JobDetailDesktopLegacyLayout>
+    );
 
   const noticeRaw = sp.notice;
   const notice =
