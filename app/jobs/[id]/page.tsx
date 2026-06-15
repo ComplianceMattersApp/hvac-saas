@@ -1029,9 +1029,11 @@ function JobDetailDesktopLegacyLayout({ children }: { children: ReactNode }) {
 
 function JobDetailDesktopWorkbenchV2({
   children: _children,
+  sitePlaceWorkContent,
   variant = "v2-site",
 }: {
   children: ReactNode;
+  sitePlaceWorkContent?: ReactNode;
   variant?: string;
 }) {
   const selectedVariant =
@@ -1416,33 +1418,7 @@ function JobDetailDesktopWorkbenchV2({
         </aside>
 
         <main className="min-w-0 space-y-4">
-          <section
-            data-v2-zone="place-work"
-            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_34px_84px_-58px_rgba(15,23,42,0.62)]"
-          >
-            <div className="relative min-h-[22rem] bg-[linear-gradient(135deg,#dbeafe_0%,#ecfeff_42%,#f8fafc_100%)]">
-              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.03),rgba(15,23,42,0.18))]" />
-              <div className="absolute left-6 top-6 rounded-full border border-white/80 bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase text-slate-600 shadow-sm">
-                Service-location / house-photo placeholder
-              </div>
-              <div className="absolute inset-x-5 bottom-5 rounded-xl border border-white/70 bg-white/92 p-4 shadow-[0_20px_48px_-40px_rgba(15,23,42,0.5)]">
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_14rem]">
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase text-slate-500">Address / navigation placeholder</div>
-                    <div className="mt-0.5 text-lg font-semibold text-slate-950">Job site visual anchor</div>
-                    <p className="mt-1 text-sm leading-5 text-slate-600">
-                      Real photo, map, address confidence, and navigation affordances will be migrated here later.
-                    </p>
-                  </div>
-                  <div className="border-l border-slate-200 pl-4">
-                    <div className="text-[11px] font-semibold uppercase text-slate-500">Site confidence</div>
-                    <div className="mt-2.5 h-1.5 rounded bg-emerald-200" />
-                    <div className="mt-1.5 h-1.5 w-2/3 rounded bg-slate-200" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </section>
+          {sitePlaceWorkContent}
 
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_22px_52px_-48px_rgba(15,23,42,0.46)]">
             <div className="grid gap-5 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,0.5fr)]">
@@ -1775,13 +1751,6 @@ export default async function JobDetailPage({
     desktopLayout === "v2-board" ||
     desktopLayout === "v2-timeline" ||
     desktopLayout === "v2-site";
-  const DesktopJobDetailLayout = ({ children }: { children: ReactNode }) =>
-    useDesktopWorkbenchV2 ? (
-      <JobDetailDesktopWorkbenchV2 variant={desktopLayout}>{children}</JobDetailDesktopWorkbenchV2>
-    ) : (
-      <JobDetailDesktopLegacyLayout>{children}</JobDetailDesktopLegacyLayout>
-    );
-
   const noticeRaw = sp.notice;
   const notice =
     Array.isArray(noticeRaw)
@@ -4792,6 +4761,89 @@ const failureResolutionPathCount =
     job.job_type === "service" && Boolean(internalInvoiceTruth) && !showInternalInvoicingPlaceholder;
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
   const showMobileContractorContext = job.job_type === "ecc" && Boolean(contractorId);
+  const sitePlaceWorkContent = (
+    <section
+      data-v2-zone="place-work"
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_34px_84px_-58px_rgba(15,23,42,0.62)]"
+    >
+      <div className="relative bg-[linear-gradient(135deg,#dbeafe_0%,#ecfeff_42%,#f8fafc_100%)] p-3">
+        <div className="absolute left-5 top-5 z-10 rounded-full border border-white/80 bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase text-slate-600 shadow-sm">
+          Service Location
+        </div>
+        <Suspense
+          fallback={
+            <JobLocationPreviewFallback
+              addressLine1={serviceAddressLine1}
+              addressLine2={serviceAddressLine2}
+              city={serviceCity}
+              state={serviceState}
+              zip={serviceZip}
+              showAddressOverlay
+              className="[&_img]:h-[17rem] [&>div:last-child]:pt-1"
+            />
+          }
+        >
+          <TimedJobLocationPreview
+            addressLine1={serviceAddressLine1}
+            addressLine2={serviceAddressLine2}
+            city={serviceCity}
+            state={serviceState}
+            zip={serviceZip}
+            showAddressOverlay
+            className="[&_a:first-child]:rounded-xl [&_img]:h-[17rem] [&>div:last-child]:pt-1"
+            timingEnabled={timingEnabled}
+            onPhaseTiming={recordBlockingPhase}
+          />
+        </Suspense>
+      </div>
+      <div className="border-t border-slate-200/80 bg-white px-4 py-3">
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+          <div>
+            <div className="text-[11px] font-semibold uppercase text-slate-500">
+              Address / navigation
+            </div>
+            <div className="mt-0.5 text-lg font-semibold text-slate-950">
+              {serviceAddressDisplay}
+            </div>
+            <p className="mt-1 text-sm leading-5 text-slate-600">
+              Existing service location preview reused from the legacy desktop route. Change-location form is deferred in this V2 slice.
+            </p>
+          </div>
+          {isInternalUser ? (
+            <div className="flex flex-wrap gap-2 xl:justify-end">
+              {serviceLocationEditHref ? (
+                <Link
+                  href={serviceLocationEditHref}
+                  className="inline-flex rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
+                >
+                  Correct address
+                </Link>
+              ) : null}
+              {customerId ? (
+                <Link
+                  href={`/customers/${customerId}?tab=locations-contacts`}
+                  className="inline-flex rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
+                >
+                  Add new location
+                </Link>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+  const DesktopJobDetailLayout = ({ children }: { children: ReactNode }) =>
+    useDesktopWorkbenchV2 ? (
+      <JobDetailDesktopWorkbenchV2
+        sitePlaceWorkContent={sitePlaceWorkContent}
+        variant={desktopLayout}
+      >
+        {children}
+      </JobDetailDesktopWorkbenchV2>
+    ) : (
+      <JobDetailDesktopLegacyLayout>{children}</JobDetailDesktopLegacyLayout>
+    );
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
