@@ -1029,13 +1029,18 @@ function JobDetailDesktopLegacyLayout({ children }: { children: ReactNode }) {
 
 function JobDetailDesktopWorkbenchV2({
   children: _children,
-  variant = "v2-command",
+  variant = "v2-site",
 }: {
   children: ReactNode;
   variant?: string;
 }) {
   const selectedVariant =
-    variant === "v2-board" || variant === "v2-timeline" ? variant : "v2-command";
+    variant === "v2-command" ||
+    variant === "v2-board" ||
+    variant === "v2-timeline" ||
+    variant === "v2-site"
+      ? variant
+      : "v2-site";
   const placeholderLabel = "V2 preview placeholder";
   const zoneBody =
     "Inert concept shell only. Real job-detail tools, forms, actions, anchors, and records stay in legacy until a later migration slice.";
@@ -1053,6 +1058,12 @@ function JobDetailDesktopWorkbenchV2({
     "records-workspace": "Reserved for timeline, attachments, equipment, follow-up history, service chain, notes history, and target panels.",
     "admin-danger-zone": "Reserved for admin-only and destructive controls, still isolated from daily work.",
   };
+  const siteRecordsGroups: Array<{ group: string; items: string[] }> = [
+    { group: "Activity", items: ["Timeline", "Notes History"] },
+    { group: "Files & Assets", items: ["Attachments", "Equipment"] },
+    { group: "Continuity", items: ["Follow-up", "Service Chain"] },
+    { group: "Controls", items: ["Permit Details", "Job Status", "Admin"] },
+  ];
   const renderCompactZone = (
     key: string,
     title: string,
@@ -1276,8 +1287,240 @@ function JobDetailDesktopWorkbenchV2({
     </div>
   );
 
+  const renderSiteCommandWorkbench = () => (
+    <div className="hidden space-y-4 lg:block" data-desktop-layout-preview="v2-site">
+      <section
+        data-v2-zone="header-primary-action-bar"
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_30px_76px_-56px_rgba(15,23,42,0.58)]"
+      >
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_minmax(34rem,0.78fr)]">
+          <div className="bg-[#0f1f35] px-5 py-4 text-white">
+            <div className="text-[11px] font-semibold uppercase text-blue-100">V2 Site Command Preview</div>
+            <h1 className="mt-1.5 text-2xl font-semibold">Site Command Workbench</h1>
+            <p className="mt-1.5 max-w-3xl text-sm leading-5 text-slate-200">
+              Desktop job command screen anchored by the site visual, current action, job brief, memory, and closeout posture.
+            </p>
+          </div>
+          <div className="grid grid-cols-3 divide-x divide-slate-200 bg-[#fbfcfd]">
+            {[
+              ["Job Identity", "status"],
+              ["Schedule", "when"],
+              ["Next Action", "decision"],
+            ].map(([label, meta]) => (
+              <div key={label} className="px-4 py-4">
+                <div className="text-[11px] font-semibold uppercase text-slate-500">{label}</div>
+                <div className="mt-1.5 text-sm font-semibold text-slate-900">{meta}</div>
+                <div className="mt-2.5 h-1.5 rounded bg-slate-200" />
+                <div className="mt-1.5 h-1.5 w-2/3 rounded bg-blue-200" />
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section
+        data-v2-zone="job-memory"
+        className="rounded-2xl border border-amber-200 bg-[#fffbeb] px-4 py-3 text-amber-950 shadow-[0_16px_36px_-34px_rgba(180,83,9,0.32)]"
+      >
+        <div className="grid gap-3 xl:grid-cols-[13.5rem_minmax(0,1fr)]">
+          <div>
+            <div className="text-[11px] font-semibold uppercase text-amber-700">Working Memory</div>
+            <div className="mt-0.5 text-sm font-semibold">Notes and contact context</div>
+            <p className="mt-1 text-xs leading-4 text-amber-900">
+              Internal, shared, correction, and contact-attempt memory stays distinct.
+            </p>
+            <span className="mt-2 inline-flex rounded-full border border-amber-200 bg-white/80 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-800">
+              6 notes
+            </span>
+          </div>
+          <div className="grid gap-2.5 xl:grid-cols-3">
+            {[
+              ["Internal / Office Note", "Office flagged access timing and billing recipient review before dispatch."],
+              ["Shared / Field Note", "Field update remains separate from internal office memory."],
+              ["Contact Attempt", "Latest no-answer attempt remains communication history, not a shared note."],
+            ].map(([label, body]) => (
+              <div key={label} className="rounded-xl bg-white/72 px-3 py-2 shadow-[inset_3px_0_0_rgba(217,119,6,0.18)]">
+                <div className="text-[10px] font-semibold uppercase text-amber-700">{label}</div>
+                <p className="mt-1 line-clamp-2 text-xs leading-4 text-slate-700">{body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-[18.5rem_minmax(0,1fr)_21.5rem]">
+        <aside className="space-y-3.5">
+          <section
+            data-v2-zone="people-responsibility"
+            className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3.5 text-blue-950 shadow-[0_18px_42px_-36px_rgba(37,99,235,0.34)]"
+          >
+            <div className="text-[11px] font-semibold uppercase text-blue-700">Responsibility rail</div>
+            <h2 className="mt-1 text-base font-semibold">People & Responsibility</h2>
+            <p className="mt-1.5 text-xs leading-5 text-blue-900">{zoneCopy["people-responsibility"]}</p>
+            <div className="mt-3 space-y-3 border-t border-blue-200 pt-3">
+              <div className="rounded-xl bg-white/75 px-3 py-2.5 shadow-[inset_3px_0_0_rgba(37,99,235,0.18)]">
+                <div className="text-[10px] font-semibold uppercase text-blue-700">Customer / Account</div>
+                <div className="mt-1 text-sm font-semibold text-slate-950">Avery Homeowner</div>
+                <div className="mt-0.5 text-xs leading-5 text-slate-600">555-0104 · homeowner@example.test</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {["Call", "Text", "Open Customer"].map((label) => (
+                    <span key={label} className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-semibold text-blue-800">
+                      {label} placeholder
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <div className="text-[10px] font-semibold uppercase text-blue-700">Role Contacts</div>
+                {[
+                  ["Billing Recipient", "Avery Homeowner · email preferred"],
+                  ["Access Contact", "Site contact · gate code on file"],
+                  ["Contractor / Billing", "Partner context · invoice audience"],
+                ].map(([label, value]) => (
+                  <div key={label} className="border-l border-blue-200 pl-3">
+                    <div className="text-xs font-semibold text-slate-900">{label}</div>
+                    <div className="text-xs leading-5 text-slate-600">{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="rounded-xl bg-white/65 px-3 py-2.5">
+                <div className="text-[10px] font-semibold uppercase text-blue-700">Assigned Team</div>
+                <div className="mt-2 flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-950">Jordan Field Lead</div>
+                    <div className="text-xs leading-5 text-slate-600">Owns field coordination</div>
+                  </div>
+                  <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-semibold uppercase text-blue-800">Primary</span>
+                </div>
+                <div className="mt-2 rounded-lg border border-dashed border-blue-200 px-2.5 py-1.5 text-xs font-semibold text-blue-800">
+                  Manage / add assignee placeholder
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-white/65 px-3 py-2.5">
+                <div className="text-[10px] font-semibold uppercase text-blue-700">Contact Log</div>
+                <div className="mt-1 text-sm font-semibold text-slate-950">Latest attempt: No answer</div>
+                <div className="text-xs leading-5 text-slate-600">Today · office follow-up context placeholder</div>
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {["No Answer", "Log Text Attempt"].map((label) => (
+                    <span key={label} className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700">
+                      {label} inert
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+        </aside>
+
+        <main className="min-w-0 space-y-4">
+          <section
+            data-v2-zone="place-work"
+            className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_34px_84px_-58px_rgba(15,23,42,0.62)]"
+          >
+            <div className="relative min-h-[22rem] bg-[linear-gradient(135deg,#dbeafe_0%,#ecfeff_42%,#f8fafc_100%)]">
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.03),rgba(15,23,42,0.18))]" />
+              <div className="absolute left-6 top-6 rounded-full border border-white/80 bg-white/90 px-3 py-1 text-[11px] font-semibold uppercase text-slate-600 shadow-sm">
+                Service-location / house-photo placeholder
+              </div>
+              <div className="absolute inset-x-5 bottom-5 rounded-xl border border-white/70 bg-white/92 p-4 shadow-[0_20px_48px_-40px_rgba(15,23,42,0.5)]">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_14rem]">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase text-slate-500">Address / navigation placeholder</div>
+                    <div className="mt-0.5 text-lg font-semibold text-slate-950">Job site visual anchor</div>
+                    <p className="mt-1 text-sm leading-5 text-slate-600">
+                      Real photo, map, address confidence, and navigation affordances will be migrated here later.
+                    </p>
+                  </div>
+                  <div className="border-l border-slate-200 pl-4">
+                    <div className="text-[11px] font-semibold uppercase text-slate-500">Site confidence</div>
+                    <div className="mt-2.5 h-1.5 rounded bg-emerald-200" />
+                    <div className="mt-1.5 h-1.5 w-2/3 rounded bg-slate-200" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_22px_52px_-48px_rgba(15,23,42,0.46)]">
+            <div className="grid gap-5 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,0.5fr)]">
+              <div data-v2-zone="job-brief">
+                <div className="text-[11px] font-semibold uppercase text-blue-700">Operational explanation</div>
+                <h2 className="mt-0.5 text-lg font-semibold text-slate-950">Job Brief</h2>
+                <p className="mt-1.5 text-sm leading-5 text-slate-600">{zoneCopy["job-brief"]}</p>
+                <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-3">
+                  <div className="h-2 rounded bg-blue-200" />
+                  <div className="h-2 w-5/6 rounded bg-slate-200" />
+                  <div className="h-2 w-2/3 rounded bg-slate-200" />
+                </div>
+              </div>
+              <div data-v2-zone="primary-work" className="border-l border-slate-200 pl-5">
+                <div className="text-[11px] font-semibold uppercase text-emerald-700">Work to perform</div>
+                <h2 className="mt-0.5 text-base font-semibold text-slate-950">Primary Work</h2>
+                <p className="mt-1.5 text-sm leading-5 text-slate-600">{zoneCopy["primary-work"]}</p>
+              </div>
+            </div>
+          </section>
+        </main>
+
+        <aside className="space-y-3.5">
+          <section
+            data-v2-zone="follow-up-service-chain"
+            className="rounded-2xl border border-blue-200 bg-blue-50/75 p-3.5 text-blue-950 shadow-[0_18px_42px_-36px_rgba(37,99,235,0.38)]"
+          >
+            <div className="text-[11px] font-semibold uppercase text-blue-700">Decision rail</div>
+            <h2 className="mt-1 text-base font-semibold">Primary Next Action / Closeout</h2>
+            <p className="mt-1.5 text-sm leading-5 text-blue-900">{zoneCopy["follow-up-service-chain"]}</p>
+            <div className="mt-3 h-1.5 rounded bg-blue-300" />
+          </section>
+          {renderCompactZone("billing-closeout", "Billing / Closeout", "amber")}
+          {renderCompactZone("ecc-compliance", "ECC / Compliance", "slate")}
+          <section
+            data-v2-zone="permit-quick-reference"
+            className="rounded-xl bg-[#f8fafc] p-4 text-slate-950 shadow-[inset_3px_0_0_rgba(37,99,235,0.18)]"
+          >
+            <div className="text-[11px] font-semibold uppercase text-slate-500">V2 preview placeholder</div>
+            <h2 className="mt-1 text-base font-semibold">Permit Quick Reference</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">Inert permit summary placeholder for the site command rail.</p>
+          </section>
+        </aside>
+      </div>
+
+      <section
+        data-v2-zone="records-workspace"
+        className="rounded-2xl border border-slate-200 bg-[#fbfcfd] p-5 shadow-[0_22px_56px_-50px_rgba(15,23,42,0.42)]"
+      >
+        <div className="flex items-start justify-between gap-6">
+          <div>
+            <div className="text-[11px] font-semibold uppercase text-slate-500">Records console</div>
+            <h2 className="mt-1 text-lg font-semibold text-slate-950">Lower Records Workspace</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Grouped records placeholder only. Existing legacy anchors, drawers, target panels, and records remain untouched.
+            </p>
+          </div>
+          <div className="text-right text-[11px] font-semibold uppercase text-slate-500">Secondary workspace</div>
+        </div>
+        <div className="mt-5 grid gap-6 border-t border-slate-200 pt-5 md:grid-cols-4">
+          {siteRecordsGroups.map(({ group, items }) => (
+            <div key={group} className="min-w-0">
+              <div className="text-[11px] font-semibold uppercase text-slate-500">{group}</div>
+              <div className="mt-3 space-y-2">
+                {items.map((label) => (
+                  <div key={label} className="text-sm font-semibold text-slate-700">{label}</div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+
   if (selectedVariant === "v2-board") return renderIntelligenceBoard();
   if (selectedVariant === "v2-timeline") return renderTimelineConcept();
+  if (selectedVariant === "v2-site") return renderSiteCommandWorkbench();
   return renderCommandCockpit();
 }
 
@@ -1530,7 +1773,8 @@ export default async function JobDetailPage({
     desktopLayout === "v2" ||
     desktopLayout === "v2-command" ||
     desktopLayout === "v2-board" ||
-    desktopLayout === "v2-timeline";
+    desktopLayout === "v2-timeline" ||
+    desktopLayout === "v2-site";
   const DesktopJobDetailLayout = ({ children }: { children: ReactNode }) =>
     useDesktopWorkbenchV2 ? (
       <JobDetailDesktopWorkbenchV2 variant={desktopLayout}>{children}</JobDetailDesktopWorkbenchV2>
