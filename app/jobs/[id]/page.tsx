@@ -54,7 +54,8 @@ import EquipmentEditCard from "./_components/EquipmentEditCard";
 import EquipmentCreateForm from "./_components/EquipmentCreateForm";
 import { displayDateLA, formatBusinessDateUS, formatDateOnlyDisplay, formatTimestampDateDisplayLA, formatTimestampDateTimeDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonNamePart } from "@/lib/utils/identity-display";
-import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
+import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
+import { formatJobDisplayReference } from "@/lib/utils/display-references";
 import type { JobStatus } from "@/lib/types/job";
 import { JobFieldActionButton } from "./_components/JobFieldActionButton";
 import UnscheduleButton from "./_components/UnscheduleButton";
@@ -1020,6 +1021,10 @@ function CollapsibleHeader(props: {
       {meta ? <div className={`header-meta ${metaClassName}`}>{meta}</div> : null}
     </div>
   );
+}
+
+function JobDetailDesktopLegacyLayout({ children }: { children: ReactNode }) {
+  return <div className="hidden space-y-5 lg:block">{children}</div>;
 }
 
 function truncateSummaryText(value: string, maxLength = 84) {
@@ -5876,7 +5881,7 @@ const failureResolutionPathCount =
         </div>
       </div>
 
-      <div className="hidden space-y-5 lg:block">
+      <JobDetailDesktopLegacyLayout>
 
 <section className={`${workspaceSectionClass} relative mb-6 overflow-hidden border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] shadow-[0_26px_64px_-42px_rgba(15,23,42,0.44)] ring-1 ring-blue-100/70`}>
   <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
@@ -9623,7 +9628,7 @@ const failureResolutionPathCount =
   </>
 ) : null}
 
-      </div>
+      </JobDetailDesktopLegacyLayout>
 
 {timingEnabled ? <JobDetailTimingLog /> : null}
 
