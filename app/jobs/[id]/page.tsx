@@ -176,6 +176,7 @@ import {
 import { buildInternalJobRoleContactSections } from "@/lib/communications/contact-recipients-display";
 import RoleContactsCard from "@/components/RoleContactsCard";
 import { formatRecentAttemptDateTime } from "@/lib/ops/recent-attempt-display";
+import { isMissingJobsBillingDispositionColumnError } from "@/lib/supabase/jobs-billing-disposition-compat";
 
 function dateToDateInput(value?: string | null) {
   if (!value) return "";
@@ -349,6 +350,194 @@ function getEventAttachmentCount(meta?: any) {
   }
   return 0;
 }
+
+const MAIN_JOB_SELECT_WITH_BILLING_DISPOSITION = `
+      customer_id,
+      location_id,
+       service_case_id,
+      job_type,
+      service_visit_type,
+      service_visit_reason,
+      service_visit_outcome,
+      visit_scope_summary,
+      visit_scope_items,
+      project_type,
+      id,
+      parent_job_id,
+      title,
+      city,
+      job_address,
+      status,
+      scheduled_date,
+      created_at,
+      deleted_at,
+      contractor_id,
+      ops_status,
+      field_complete,
+      certs_complete,
+      invoice_complete,
+      billing_disposition,
+      billing_disposition_note,
+      billing_disposition_at,
+      billing_disposition_by_user_id,
+      invoice_number,
+      job_display_number,
+      pending_info_reason,
+      on_hold_reason,
+      follow_up_date,
+      next_action_note,
+      action_required_by,
+      permit_number,
+      jurisdiction,
+      permit_date,
+      window_start,
+      window_end,
+      customer_phone,
+      on_the_way_at,
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      job_notes,
+      billing_recipient,
+      billing_name,
+      billing_email,
+      billing_phone,
+      billing_address_line1,
+      billing_address_line2,
+      billing_city,
+      billing_state,
+      billing_zip,
+      locations:location_id (
+        id,
+        nickname,
+        label,
+        address_line1,
+        address_line2,
+        city,
+        state,
+        zip
+      ),
+      job_equipment (
+        id,
+        equipment_role,
+        system_location,
+        manufacturer,
+        model,
+        serial,
+        tonnage,
+        heating_capacity_kbtu,
+        heating_output_btu,
+        heating_efficiency_percent,
+        refrigerant_type,
+        notes,
+        created_at,
+        updated_at
+      ),
+      ecc_test_runs (
+        id,
+        test_type,
+        system_id,
+        is_completed,
+        computed,
+        computed_pass,
+        override_pass,
+        override_reason,
+        created_at,
+        updated_at
+      )
+    `;
+
+const MAIN_JOB_SELECT_COMPAT = `
+      customer_id,
+      location_id,
+       service_case_id,
+      job_type,
+      service_visit_type,
+      service_visit_reason,
+      service_visit_outcome,
+      visit_scope_summary,
+      visit_scope_items,
+      project_type,
+      id,
+      parent_job_id,
+      title,
+      city,
+      job_address,
+      status,
+      scheduled_date,
+      created_at,
+      deleted_at,
+      contractor_id,
+      ops_status,
+      field_complete,
+      certs_complete,
+      invoice_complete,
+      invoice_number,
+      job_display_number,
+      pending_info_reason,
+      on_hold_reason,
+      follow_up_date,
+      next_action_note,
+      action_required_by,
+      permit_number,
+      jurisdiction,
+      permit_date,
+      window_start,
+      window_end,
+      customer_phone,
+      on_the_way_at,
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      job_notes,
+      billing_recipient,
+      billing_name,
+      billing_email,
+      billing_phone,
+      billing_address_line1,
+      billing_address_line2,
+      billing_city,
+      billing_state,
+      billing_zip,
+      locations:location_id (
+        id,
+        nickname,
+        label,
+        address_line1,
+        address_line2,
+        city,
+        state,
+        zip
+      ),
+      job_equipment (
+        id,
+        equipment_role,
+        system_location,
+        manufacturer,
+        model,
+        serial,
+        tonnage,
+        heating_capacity_kbtu,
+        heating_output_btu,
+        heating_efficiency_percent,
+        refrigerant_type,
+        notes,
+        created_at,
+        updated_at
+      ),
+      ecc_test_runs (
+        id,
+        test_type,
+        system_id,
+        is_completed,
+        computed,
+        computed_pass,
+        override_pass,
+        override_reason,
+        created_at,
+        updated_at
+      )
+    `;
 
 function JobAttachmentsSectionFallback() {
   return (
@@ -1411,108 +1600,36 @@ export default async function JobDetailPage({
     return notFound();
   }
 
-  const { data: job, error: jobError } = await timedPhase("mainJobRead", async () =>
-    supabase
+  const { data: job, error: jobError } = await timedPhase("mainJobRead", async () => {
+    const primary = await supabase
       .from("jobs")
-      .select(`
-      customer_id,
-      location_id,
-       service_case_id,
-      job_type,
-      service_visit_type,
-      service_visit_reason,
-      service_visit_outcome,
-      visit_scope_summary,
-      visit_scope_items,
-      project_type,
-      id,
-      parent_job_id,
-      title,
-      city,
-      job_address,
-      status,
-      scheduled_date,
-      created_at,
-      deleted_at,
-      contractor_id,
-      ops_status,
-      field_complete,
-      certs_complete,
-      invoice_complete,
-      billing_disposition,
-      billing_disposition_note,
-      billing_disposition_at,
-      billing_disposition_by_user_id,
-      invoice_number,
-      job_display_number,
-      pending_info_reason,
-      on_hold_reason,
-      follow_up_date,
-      next_action_note,
-      action_required_by,
-      permit_number,
-      jurisdiction,
-      permit_date,
-      window_start,
-      window_end,
-      customer_phone,
-      on_the_way_at,
-      customer_first_name,
-      customer_last_name,
-      customer_email,
-      job_notes,
-      billing_recipient,
-      billing_name,
-      billing_email,
-      billing_phone,
-      billing_address_line1,
-      billing_address_line2,
-      billing_city,
-      billing_state,
-      billing_zip,
-      locations:location_id (
-        id,
-        nickname,
-        label,
-        address_line1,
-        address_line2,
-        city,
-        state,
-        zip
-      ),
-      job_equipment (
-        id,
-        equipment_role,
-        system_location,
-        manufacturer,
-        model,
-        serial,
-        tonnage,
-        heating_capacity_kbtu,
-        heating_output_btu,
-        heating_efficiency_percent,
-        refrigerant_type,
-        notes,
-        created_at,
-        updated_at
-      ),
-      ecc_test_runs (
-        id,
-        test_type,
-        system_id,
-        is_completed,
-        computed,
-        computed_pass,
-        override_pass,
-        override_reason,
-        created_at,
-        updated_at
-      )
-    `)
+      .select(MAIN_JOB_SELECT_WITH_BILLING_DISPOSITION)
       .eq("id", jobId)
+      .single();
 
-      .single(),
-  );
+    if (!primary.error || !isMissingJobsBillingDispositionColumnError(primary.error)) {
+      return primary;
+    }
+
+    const compat = await supabase
+      .from("jobs")
+      .select(MAIN_JOB_SELECT_COMPAT)
+      .eq("id", jobId)
+      .single();
+
+    if (compat.error) return compat;
+
+    return {
+      data: {
+        ...(compat.data ?? {}),
+        billing_disposition: null,
+        billing_disposition_note: null,
+        billing_disposition_at: null,
+        billing_disposition_by_user_id: null,
+      },
+      error: null,
+    };
+  });
 
   if (jobError) throw jobError;
   if (!job) return notFound();
@@ -1793,7 +1910,6 @@ export default async function JobDetailPage({
       .eq("parent_job_id", jobId)
       .is("deleted_at", null)
       .neq("status", "cancelled")
-      .neq("ops_status", "closed")
       .order("created_at", { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -3190,19 +3306,28 @@ const timelineSummaryText = undefined;
 
 const normalizedJobOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
 const hasActiveRetestChild = Boolean((activeRetestChild as any)?.id);
+const linkedRetestChildClosed =
+  String((activeRetestChild as any)?.ops_status ?? "").trim().toLowerCase() === "closed" ||
+  String((activeRetestChild as any)?.status ?? "").trim().toLowerCase() === "completed";
 const activeRetestChildScheduled = Boolean(
   (activeRetestChild as any)?.scheduled_date ||
     (activeRetestChild as any)?.window_start ||
     (activeRetestChild as any)?.window_end,
 );
 const showLinkedRetestCreated = job.job_type === "ecc" && hasActiveRetestChild && !parentJobId;
-const linkedRetestPassiveHeading = activeRetestChildScheduled
+const linkedRetestPassiveHeading = linkedRetestChildClosed
+  ? "Linked Retest Completed"
+  : activeRetestChildScheduled
   ? "Retest Scheduled"
   : "Linked Retest Created";
-const linkedRetestPassiveCopy = activeRetestChildScheduled
+const linkedRetestPassiveCopy = linkedRetestChildClosed
+  ? "The linked retest job is complete. Review that retest result and remaining closeout blockers before creating any additional retest work."
+  : activeRetestChildScheduled
   ? "The linked retest job is scheduled and is now the active work item."
   : "The linked retest job is now the active scheduling item.";
-const linkedRetestPassiveMeta = activeRetestChildScheduled
+const linkedRetestPassiveMeta = linkedRetestChildClosed
+  ? "Linked retest completed"
+  : activeRetestChildScheduled
   ? "Retest scheduled"
   : "Linked retest active";
 const showConfirmRetestReady =
@@ -4583,7 +4708,7 @@ const failureResolutionPathCount =
                   <div>
                     <div className="font-semibold">Retest Ready</div>
                     <p className="mt-1 text-sm leading-6 text-orange-900/90">
-                      Creates the linked retest job and schedules it immediately.
+                      Schedule a linked retest now, or move it to the scheduling queue.
                     </p>
                   </div>
                   <form action={scheduleRetestNowFromForm} className="space-y-3 rounded-xl border border-orange-200 bg-white/85 p-3">
@@ -4620,23 +4745,15 @@ const failureResolutionPathCount =
                     <SubmitButton loadingText="Scheduling..." className={`${darkButtonClass} min-h-12 w-full`}>
                       Schedule Retest Now
                     </SubmitButton>
-                  </form>
-                  <form
-                    action={async (formData: FormData) => {
-                      "use server";
-                      await createRetestJobFromForm(formData);
-                    }}
-                    className="space-y-3"
-                  >
-                    <input type="hidden" name="parent_job_id" value={job.id} />
-                    <p className="text-sm leading-6 text-orange-900/90">
-                      Creates a linked retest job and places it in the scheduling queue.
-                    </p>
-                    <label className="flex items-center gap-2 rounded-lg border border-orange-200 bg-white/80 px-3 py-2 text-sm text-slate-700">
-                      <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
-                      <span>Copy equipment from original</span>
-                    </label>
-                    <SubmitButton loadingText="Creating..." className={`${darkButtonClass} min-h-12 w-full`}>
+                    <SubmitButton
+                      formNoValidate
+                      formAction={async (formData: FormData) => {
+                        "use server";
+                        await createRetestJobFromForm(formData);
+                      }}
+                      loadingText="Creating..."
+                      className={`${secondaryButtonClass} min-h-12 w-full`}
+                    >
                       Move to Needs Scheduling
                     </SubmitButton>
                   </form>
@@ -4779,12 +4896,24 @@ const failureResolutionPathCount =
                   </span>
                   <div className="grid gap-2">
                     {closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
-                      <Link
-                        href={`/jobs/${job.id}/invoice#invoice-workspace`}
-                        className={`${darkButtonClass} min-h-12 w-full`}
-                      >
-                        {jobPageInvoiceNextAction}
-                      </Link>
+                      internalInvoiceTruth ? (
+                        <Link
+                          href={`/jobs/${job.id}/invoice#invoice-workspace`}
+                          className={`${darkButtonClass} min-h-12 w-full`}
+                        >
+                          {jobPageInvoiceNextAction}
+                        </Link>
+                      ) : (
+                        <form action={createInternalInvoiceDraftFromForm}>
+                          <input type="hidden" name="job_id" value={job.id} />
+                          <input type="hidden" name="tab" value={tab} />
+                          <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                          <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+                          <SubmitButton loadingText="Starting..." className={`${darkButtonClass} min-h-12 w-full`}>
+                            {jobPageInvoiceNextAction}
+                          </SubmitButton>
+                        </form>
+                      )
                     ) : null}
                     {closeoutNeeds.needsInvoice && showExternalDataEntryPrompt && !canShowInvoiceButton ? (
                       <form action={completeDataEntryFromForm}>
@@ -5906,7 +6035,7 @@ const failureResolutionPathCount =
           >
             <div className="text-sm font-semibold">Retest Ready</div>
             <p className="mt-1 text-xs leading-5 text-orange-900/90">
-              Creates the linked retest job and schedules it immediately.
+              Schedule a linked retest now, or move it to the scheduling queue.
             </p>
             <form action={scheduleRetestNowFromForm} className="mt-3 space-y-3 rounded-xl border border-orange-200 bg-white/85 p-3">
               <input type="hidden" name="parent_job_id" value={job.id} />
@@ -5944,27 +6073,17 @@ const failureResolutionPathCount =
               <SubmitButton loadingText="Scheduling..." className={`${darkButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
                 Schedule Retest Now
               </SubmitButton>
-            </form>
-            <form
-              action={async (formData: FormData) => {
-                "use server";
-                await createRetestJobFromForm(formData);
-              }}
-              className="mt-3 space-y-3"
-            >
-              <input type="hidden" name="parent_job_id" value={job.id} />
-              <p className="text-xs leading-5 text-orange-900/90">
-                Creates a linked retest job and places it in the scheduling queue.
-              </p>
-              <label className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-orange-200 bg-white/85 px-3 py-2 text-sm text-slate-700">
-                <input type="checkbox" name="copy_equipment" value="1" defaultChecked />
-                <span>Copy equipment from original</span>
-              </label>
-              <div>
-                <SubmitButton loadingText="Creating..." className={`${darkButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}>
-                  Move to Needs Scheduling
-                </SubmitButton>
-              </div>
+              <SubmitButton
+                formNoValidate
+                formAction={async (formData: FormData) => {
+                  "use server";
+                  await createRetestJobFromForm(formData);
+                }}
+                loadingText="Creating..."
+                className={`${secondaryButtonClass} min-h-11 w-full sm:w-auto sm:px-5`}
+              >
+                Move to Needs Scheduling
+              </SubmitButton>
             </form>
           </div>
         ) : null}
@@ -6115,12 +6234,24 @@ const failureResolutionPathCount =
               </span>
               <div className="flex flex-wrap gap-2">
                 {closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (
-                  <Link
-                    href={`/jobs/${job.id}/invoice#invoice-workspace`}
-                    className={darkButtonClass}
-                  >
-                    {jobPageInvoiceNextAction}
-                  </Link>
+                  internalInvoiceTruth ? (
+                    <Link
+                      href={`/jobs/${job.id}/invoice#invoice-workspace`}
+                      className={darkButtonClass}
+                    >
+                      {jobPageInvoiceNextAction}
+                    </Link>
+                  ) : (
+                    <form action={createInternalInvoiceDraftFromForm}>
+                      <input type="hidden" name="job_id" value={job.id} />
+                      <input type="hidden" name="tab" value={tab} />
+                      <input type="hidden" name="return_to" value={`/jobs/${job.id}/invoice#invoice-workspace`} />
+                      <input type="hidden" name="auto_import_visit_scope_items" value="1" />
+                      <SubmitButton loadingText="Starting..." className={darkButtonClass}>
+                        {jobPageInvoiceNextAction}
+                      </SubmitButton>
+                    </form>
+                  )
                 ) : null}
                 {closeoutNeeds.needsInvoice && showExternalDataEntryPrompt && !canShowInvoiceButton ? (
                   <form action={completeDataEntryFromForm}>
@@ -6197,7 +6328,7 @@ const failureResolutionPathCount =
               </Link>
             ) : null}
 
-            {job.job_type === "ecc" ? (
+            {job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
               <Link
                 href={`/jobs/${job.id}/tests`}
                 className={`${compactWorkspaceActionButtonClass} shadow-[0_8px_18px_-18px_rgba(15,23,42,0.28)]`}
@@ -6229,7 +6360,7 @@ const failureResolutionPathCount =
               </Link>
             ) : null}
 
-            {job.job_type === "ecc" ? (
+            {job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
               <Link href={`/jobs/${job.id}/tests`} className={compactWorkspaceActionButtonClass}>
                 Open Tests Workspace
               </Link>
@@ -7385,6 +7516,27 @@ const failureResolutionPathCount =
         <FlashBanner
           type="warning"
           message="Could not save changes."
+        />
+      )}
+
+      {banner === "certs_closeout_closed" && (
+        <FlashBanner
+          type="success"
+          message="Certs sent. Job closed out."
+        />
+      )}
+
+      {banner === "certs_closeout_saved" && (
+        <FlashBanner
+          type="success"
+          message="Certs sent. Closeout blockers were recomputed."
+        />
+      )}
+
+      {banner === "certs_closeout_failed" && (
+        <FlashBanner
+          type="error"
+          message="Could not mark certs sent. Refresh and try again."
         />
       )}
 

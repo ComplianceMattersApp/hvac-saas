@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildOpsStatusEnteredAtByJob,
   resolveLifecycleAging,
+  resolveLifecycleDaysAgingLabel,
 } from "@/lib/utils/lifecycle-aging";
 
 describe("lifecycle-aging resolver", () => {
@@ -73,6 +74,20 @@ describe("lifecycle-aging resolver", () => {
     expect(result.sourceKind).toBe("state_entry");
   });
 
+  it("keeps pending-info jobs ageable when lifecycle is completed but ops remains open", () => {
+    const result = resolveLifecycleDaysAgingLabel({
+      status: "completed",
+      opsStatus: "pending_info",
+      createdAt: "2026-05-28T12:00:00.000Z",
+      stateEnteredAtByStatus: {
+        pending_info: "2026-06-01T10:00:00.000Z",
+      },
+      now,
+    });
+
+    expect(result).toBe("1 day");
+  });
+
   it("failed and retest use state-entry or failed evidence before created_at", () => {
     const failedFromEvidence = resolveLifecycleAging({
       opsStatus: "failed",
@@ -95,6 +110,29 @@ describe("lifecycle-aging resolver", () => {
 
     expect(retestFromStateEntry.label).toBe("Retest pending 1 day");
     expect(retestFromStateEntry.sourceKind).toBe("state_entry");
+  });
+
+  it("keeps exception jobs ageable when lifecycle is completed but ops remains open", () => {
+    const result = resolveLifecycleDaysAgingLabel({
+      status: "completed",
+      opsStatus: "failed",
+      failedEvidenceAt: "2026-05-29T18:00:00.000Z",
+      createdAt: "2026-05-20T08:00:00.000Z",
+      now,
+    });
+
+    expect(result).toBe("4 days");
+  });
+
+  it("formats same-day active queue aging as Today", () => {
+    const result = resolveLifecycleDaysAgingLabel({
+      status: "open",
+      opsStatus: "need_to_schedule",
+      createdAt: "2026-06-02T08:00:00.000Z",
+      now,
+    });
+
+    expect(result).toBe("Today");
   });
 
   it("closeout uses closeout-entry then field_complete_at then scheduled_date", () => {

@@ -69,8 +69,7 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("Back to Ops");
     expect(jobDetailSource).toContain("Open Customer");
     expect(jobDetailSource).toContain("Create Estimate");
-    expect(jobDetailSource).not.toContain('job.job_type === "ecc" && (isFieldComplete || job.status === "completed") && !showPrimaryCloseoutBlockers ? (');
-    expect(jobDetailSource).not.toContain("|| showFieldOutcomePanel) ? (");
+    expect(jobDetailSource).toContain('job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (');
   });
 
   it("keeps completion on the primary action and leaves the outcome panel for exceptions only", () => {
@@ -257,8 +256,14 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("{jobPageInvoiceNextAction}");
     expect(jobDetailSource).toContain("form action={markCertsCompleteFromForm}");
     expect(jobDetailSource).toContain("✓ Certs Sent");
+    expect(jobDetailSource).toContain("invoice_complete: billingState.billedTruthSatisfied");
+    expect(jobDetailSource).toContain('banner === "certs_closeout_closed"');
+    expect(jobDetailSource).toContain("Certs sent. Job closed out.");
+    expect(jobDetailSource).toContain('banner === "certs_closeout_saved"');
+    expect(jobDetailSource).toContain("Certs sent. Closeout blockers were recomputed.");
+    expect(jobDetailSource).toContain('banner === "certs_closeout_failed"');
+    expect(jobDetailSource).toContain("Could not mark certs sent. Refresh and try again.");
     expect(jobDetailSource).toContain("showPrimaryCloseoutBlockers ||");
-    expect(jobDetailSource).not.toContain("!showPrimaryCloseoutBlockers");
     expect(jobDetailSource).not.toContain("Field work complete - invoice/certs can be handled as needed.");
   });
 

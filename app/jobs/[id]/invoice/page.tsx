@@ -78,6 +78,7 @@ import { formatPersonNamePart } from "@/lib/utils/identity-display";
 import { formatInvoiceDisplayReference } from "@/lib/utils/display-references";
 import { formatInvoiceBillingAddressLines } from "@/lib/business/internal-invoice-address-rendering";
 import { resolveInvoicePaymentLinkUiState } from "./invoice-payment-link-ui";
+import { withJobsBillingDispositionSelectFallback } from "@/lib/supabase/jobs-billing-disposition-compat";
 
 type SearchParams = Record<string, string | string[] | undefined>;
 
@@ -399,9 +400,11 @@ export default async function InternalInvoiceWorkspacePage({
     supabase,
   );
 
-  const { data: job, error: jobErr } = await supabase
-    .from("jobs")
-    .select(`
+  const { data: job, error: jobErr } = await withJobsBillingDispositionSelectFallback<any>({
+    runPrimary: () =>
+      supabase
+        .from("jobs")
+        .select(`
       id,
       job_display_number,
       title,
@@ -431,8 +434,41 @@ export default async function InternalInvoiceWorkspacePage({
         zip
       )
     `)
-    .eq("id", jobId)
-    .single();
+        .eq("id", jobId)
+        .single(),
+    runCompat: () =>
+      supabase
+        .from("jobs")
+        .select(`
+      id,
+      job_display_number,
+      title,
+      status,
+      field_complete,
+      job_type,
+      ops_status,
+      customer_id,
+      location_id,
+      service_case_id,
+      invoice_complete,
+      billing_recipient,
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      customer_phone,
+      visit_scope_items,
+      locations:location_id (
+        address_line1,
+        address_line2,
+        city,
+        state,
+        zip
+      )
+    `)
+        .eq("id", jobId)
+        .single(),
+    includeDispositionMetadata: true,
+  });
 
   if (jobErr) throw jobErr;
   if (!job?.id) notFound();

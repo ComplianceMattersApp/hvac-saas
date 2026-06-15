@@ -26,6 +26,7 @@ export type AppAccessCtaEntitlementSnapshot = {
   entitlementStatus: EntitlementStatus | string | null;
   trialEndsAt: string | Date | null;
   billingSubscriptionStatus?: string | null;
+  billingCustomerLinked?: boolean;
   billingSubscriptionLinked?: boolean;
 };
 
@@ -105,6 +106,14 @@ export function resolveAppAccessCta(input: {
     return NO_CTA;
   }
 
+  const hasLinkedPlatformBilling =
+    Boolean(input.entitlement?.billingSubscriptionLinked) ||
+    Boolean(input.entitlement?.billingCustomerLinked);
+
+  if (access.hasExpiredOrInactiveAppAccess && hasLinkedPlatformBilling) {
+    return NO_CTA;
+  }
+
   const trialExpired =
     access.appAccessBlockedReason === "blocked_trial_expired" ||
     (entitlementStatus === "trial" && isPastDate(input.entitlement?.trialEndsAt ?? null, now));
@@ -169,6 +178,7 @@ export async function loadAppAccessCtaEntitlementSnapshot(params: {
         "entitlement_status",
         "trial_ends_at",
         "stripe_subscription_status",
+        "stripe_customer_id",
         "stripe_subscription_id",
       ].join(", "),
     )
@@ -182,6 +192,7 @@ export async function loadAppAccessCtaEntitlementSnapshot(params: {
     entitlementStatus: clean(data.entitlement_status) || null,
     trialEndsAt: clean(data.trial_ends_at) || null,
     billingSubscriptionStatus: clean(data.stripe_subscription_status) || null,
+    billingCustomerLinked: Boolean(clean(data.stripe_customer_id)),
     billingSubscriptionLinked: Boolean(clean(data.stripe_subscription_id)),
   };
 }

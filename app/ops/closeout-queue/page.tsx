@@ -25,9 +25,12 @@ import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { getCloseoutNeeds, getCloseoutQueueNextStepLabel } from "@/lib/utils/closeout";
 import { formatBusinessDateUS, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatEccOpsStatusLabel } from "@/lib/ecc/ecc-workflow-display";
+import { withJobsBillingDispositionSelectFallback } from "@/lib/supabase/jobs-billing-disposition-compat";
 
 const baseSelect =
   "id, title, status, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, billing_disposition, scheduled_date, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, location_id, created_at, next_action_note, action_required_by, visit_scope_summary";
+const baseSelectCompat =
+  "id, title, status, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, scheduled_date, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, location_id, created_at, next_action_note, action_required_by, visit_scope_summary";
 
 type CloseoutFilter = "all" | "invoice_required" | "paperwork_required" | "failed_review" | "confirm_payment";
 type CloseoutSort = "newest" | "oldest" | "contractor";
@@ -228,18 +231,24 @@ export default async function CloseoutQueuePage({
   const sort = normalizeSort(sp.sort ?? null);
   const notice = normalizeNotice(sp.notice ?? null);
 
-  let q = supabase
-    .from("jobs")
-    .select(baseSelect)
-    .is("deleted_at", null)
-    .neq("status", "cancelled")
-    .eq("field_complete", true)
-    .neq("ops_status", "closed")
-    .order("created_at", { ascending: sort === "oldest" });
+  const buildQueueQuery = (selectClause: string) => {
+    let q = supabase
+      .from("jobs")
+      .select(selectClause)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("field_complete", true)
+      .neq("ops_status", "closed")
+      .order("created_at", { ascending: sort === "oldest" });
 
-  if (contractor) q = q.eq("contractor_id", contractor);
+    if (contractor) q = q.eq("contractor_id", contractor);
+    return q;
+  };
 
-  const { data, error } = await q;
+  const { data, error } = await withJobsBillingDispositionSelectFallback<any[]>({
+    runPrimary: () => buildQueueQuery(baseSelect),
+    runCompat: () => buildQueueQuery(baseSelectCompat),
+  });
   if (error) throw error;
 
   const sourceJobs = data ?? [];

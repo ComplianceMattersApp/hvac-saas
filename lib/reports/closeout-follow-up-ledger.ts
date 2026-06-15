@@ -16,6 +16,7 @@ import {
   resolveReportAccountContractorIds,
 } from "@/lib/reports/report-account-scope";
 import { preferredJobReference } from "@/lib/utils/display-references";
+import { withJobsBillingDispositionSelectFallback } from "@/lib/supabase/jobs-billing-disposition-compat";
 
 export const CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT = 300;
 export const CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT = 5000;
@@ -129,6 +130,8 @@ const CERT_BLOCKED_STATUSES = '("failed","retest_needed","pending_office_review"
 
 const JOB_BASE_SELECT =
   "id, job_display_number, title, visit_scope_summary, job_type, status, ops_status, service_case_id, created_at, scheduled_date, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), customer_id, location_id, customer_first_name, customer_last_name, job_address, city, follow_up_date, next_action_note, action_required_by";
+const JOB_BASE_SELECT_COMPAT =
+  "id, job_display_number, title, visit_scope_summary, job_type, status, ops_status, service_case_id, created_at, scheduled_date, field_complete, field_complete_at, invoice_complete, certs_complete, contractor_id, contractors(name), customer_id, location_id, customer_first_name, customer_last_name, job_address, city, follow_up_date, next_action_note, action_required_by";
 
 function readParam(source: FilterSource, key: string) {
   if (source instanceof URLSearchParams) {
@@ -437,21 +440,28 @@ export async function listCloseoutFollowUpLedgerRows(params: {
     billingMode === "internal_invoicing" &&
     (params.filters.invoiceOnly || params.filters.closeoutOnly);
 
-  let query = params.supabase
-    .from("jobs")
-    .select(JOB_BASE_SELECT, params.includeCount === false ? undefined : { count: "exact" })
-    .is("deleted_at", null)
-    .in("contractor_id", accountScopeInList(contractorIds));
+  const buildJobsQuery = (selectClause: string) => {
+    let query = params.supabase
+      .from("jobs")
+      .select(selectClause, params.includeCount === false ? undefined : { count: "exact" })
+      .is("deleted_at", null)
+      .in("contractor_id", accountScopeInList(contractorIds));
 
-  query = applyLedgerFilters(query, params.filters, assignedJobIds, {
-    allowRawInvoiceProjectionFilters: !requiresNormalizedCloseoutFiltering,
+    query = applyLedgerFilters(query, params.filters, assignedJobIds, {
+      allowRawInvoiceProjectionFilters: !requiresNormalizedCloseoutFiltering,
+    });
+
+    if (!requiresNormalizedCloseoutFiltering) {
+      query = query.limit(limit);
+    }
+
+    return query;
+  };
+
+  const { data, error, count } = await withJobsBillingDispositionSelectFallback<any[]>({
+    runPrimary: () => buildJobsQuery(JOB_BASE_SELECT),
+    runCompat: () => buildJobsQuery(JOB_BASE_SELECT_COMPAT),
   });
-
-  if (!requiresNormalizedCloseoutFiltering) {
-    query = query.limit(limit);
-  }
-
-  const { data, error, count } = await query;
   if (error) throw error;
 
   const jobs = data ?? [];

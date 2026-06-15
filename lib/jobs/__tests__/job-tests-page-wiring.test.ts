@@ -169,6 +169,61 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain('isCompletionReportFocused ? "hidden" : eccPanelClass');
   });
 
+  it("adds completion-report cert closeout through the existing job ops action path", () => {
+    expect(jobTestsPageSource).toContain('import { markCertsCompleteFromForm } from "@/lib/actions/job-ops-actions";');
+    expect(jobTestsPageSource).toContain("const canShowCompletionReportCertsSentAction =");
+    expect(jobTestsPageSource).toContain("isCompletionReportFocused");
+    expect(jobTestsPageSource).toContain("isInternalUser");
+    expect(jobTestsPageSource).toContain("isEccJobType(job.job_type)");
+    expect(jobTestsPageSource).toContain("!Boolean(job.certs_complete)");
+    expect(jobTestsPageSource).toContain("!isCompletionReportCertCloseoutBlocked");
+    expect(jobTestsPageSource).not.toContain("hasSelectedCompletionReportPass");
+    expect(jobTestsPageSource).toContain("<form action={markCertsCompleteFromForm}>");
+    expect(jobTestsPageSource).toContain('name="return_to" value={completionReportReturnTo}');
+    expect(jobTestsPageSource).toContain("Certs Sent");
+  });
+
+  it("shows passive cert status on the completion report once certs are already sent", () => {
+    expect(jobTestsPageSource).toContain("const showCompletionReportCertsSentStatus =");
+    expect(jobTestsPageSource).toContain("Boolean(job.certs_complete)");
+    expect(jobTestsPageSource).toContain("showCompletionReportCertsSentStatus ? (");
+    expect(jobTestsPageSource).toContain("Certs sent");
+  });
+
+  it("suppresses completion-report cert closeout for failed, retest, and correction-review states", () => {
+    expect(jobTestsPageSource).toContain(
+      'const isFailedOrRetestState = ["failed", "retest_needed", "pending_office_review"].includes(normalizedOpsStatus);',
+    );
+    expect(jobTestsPageSource).toContain("const hasCompletedFailedEccRun = (job.ecc_test_runs ?? []).some");
+    expect(jobTestsPageSource).toContain('event_type", "failure_resolved_by_correction_review"');
+    expect(jobTestsPageSource).toContain("const isCompletionReportCertCloseoutBlocked =");
+    expect(jobTestsPageSource).toContain("hasCompletedFailedEccRun && !hasCorrectionReviewResolution");
+    expect(jobTestsPageSource).toContain('row.status.state === "fail" || row.status.state === "fail_override" || row.status.state === "unknown"');
+  });
+
+  it("renders concise Refrigerant Charge report statuses instead of blank field rows", () => {
+    expect(jobTestsPageSource).toContain("function refrigerantConciseReportStatus(run: any)");
+    expect(jobTestsPageSource).toContain('return "Refrigerant Charge Test Still Open";');
+    expect(jobTestsPageSource).toContain('return "Refrigerant charge documented by photo.";');
+    expect(jobTestsPageSource).toContain('return "Temperature requirements were not met.";');
+    expect(jobTestsPageSource).toContain("const rcConciseReportStatus = refrigerantConciseReportStatus(sys.runRefrigerant);");
+    expect(jobTestsPageSource).toContain(") : rcConciseReportStatus ? (");
+    expect(jobTestsPageSource).toContain("{rcConciseReportStatus}");
+  });
+
+  it("keeps completed numeric Refrigerant Charge report values in the detailed measured and target rows", () => {
+    const conciseIndex = jobTestsPageSource.indexOf(") : rcConciseReportStatus ? (");
+    const numericIndex = jobTestsPageSource.indexOf("Measured Subcooling:", conciseIndex);
+
+    expect(conciseIndex).toBeGreaterThanOrEqual(0);
+    expect(numericIndex).toBeGreaterThan(conciseIndex);
+    expect(jobTestsPageSource).toContain("function hasRefrigerantNumericReportValues(run: any)");
+    expect(jobTestsPageSource).toContain("computed.measured_subcool_f");
+    expect(jobTestsPageSource).toContain("computed.measured_superheat_f");
+    expect(jobTestsPageSource).toContain("Target Subcooling from Manufacturer:");
+    expect(jobTestsPageSource).toContain("Measured Superheat:");
+  });
+
   it("keeps the mobile test hub matrix focused on actions and visible system chips", () => {
     expect(jobTestsPageSource).not.toContain('Test Queue');
     expect(jobTestsPageSource).not.toContain('<summary className="flex min-h-14 cursor-pointer list-none items-center justify-center text-base font-semibold text-slate-950">\n              Systems');

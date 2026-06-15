@@ -9,6 +9,7 @@ import {
   buildWaitingQueueRows,
   buildWithoutTechQueueRows,
   formatAssignmentSummaryForJob,
+  formatFailedEccQueueReasonFromRun,
   getExceptionQueueDisplayLabel,
   getOpsQueueCardStatusReason,
   getWaitingQueueDisplay,
@@ -476,12 +477,51 @@ describe("focused queue display labels", () => {
     })).toBe("Alex Tech");
   });
 
+  it("formats specific ECC failed reasons from failed test-run evidence", () => {
+    expect(formatFailedEccQueueReasonFromRun({ test_type: "duct_leakage" })).toBe("Duct Leakage Failed");
+    expect(formatFailedEccQueueReasonFromRun({ test_type: "refrigerant_charge" })).toBe("Refrigerant Charge Failed");
+    expect(formatFailedEccQueueReasonFromRun({ test_type: "airflow" })).toBe("Airflow Failed");
+    expect(formatFailedEccQueueReasonFromRun({ test_type: "custom" })).toBe("");
+  });
+
   it("early Operations Workspace preview cards use an initialized preview assignment map", () => {
     expect(opsPageSource).toContain("selectedPreviewAssignmentDisplayMap");
     expect(opsPageSource).toContain(
       "formatAssignmentSummaryForJob(String(job?.id ?? \"\"), selectedPreviewAssignmentDisplayMap)",
     );
     expect(opsPageSource).toContain("return formatAssignmentSummaryForJob(jobId, activeAssignmentDisplayMap);");
+  });
+
+  it("Operations Workspace rows include contractor context only when a job contractor exists", () => {
+    expect(opsPageSource).toContain("contractors(name)");
+    expect(opsPageSource).toContain("workspaceContractorName(job)");
+    expect(opsPageSource).toContain("Contractor:");
+    expect(opsPageSource).not.toContain("Contractor:</span> -");
+    expect(opsPageSource).not.toContain("formatCityNamePart(workspaceContractorName");
+    expect(opsPageSource).not.toContain("formatPersonNamePart(workspaceContractorName");
+  });
+
+  it("Operations Workspace failed rows use specific ECC failure evidence and fall back safely", () => {
+    expect(opsPageSource).toContain("formatFailedEccQueueReasonFromRun");
+    expect(opsPageSource).toContain("primaryFailureReasonByJob.get(jobId)");
+    expect(opsPageSource).toContain('|| "Failed"');
+    expect(opsPageSource).toContain('"Correction Required"');
+    expect(opsPageSource).toContain('"Retest Needed"');
+  });
+
+  it("Operations Workspace rows normalize person and city casing without touching companies", () => {
+    expect(opsPageSource).toContain("formatPersonNamePart(job?.customer_first_name)");
+    expect(opsPageSource).toContain("formatCityNamePart(job?.city)");
+    expect(opsPageSource).toContain("formatCityNamePart(parts.city)");
+    expect(opsPageSource).toContain("{workspaceContractorName(job)}");
+  });
+
+  it("Operations Workspace rows keep Days Aging and avoid dash-only metadata fallbacks", () => {
+    expect(opsPageSource).toContain("Days Aging:");
+    expect(opsPageSource).toContain("resolveLifecycleDaysAgingLabel");
+    expect(opsPageSource).toContain("Not available");
+    expect(opsPageSource).not.toContain("Age/Time:");
+    expect(opsPageSource).not.toContain('?? "-"');
   });
 });
 

@@ -12,6 +12,7 @@ import {
   accountScopeInList,
   resolveReportAccountContractorIds,
 } from "@/lib/reports/report-account-scope";
+import { withJobsBillingDispositionSelectFallback } from "@/lib/supabase/jobs-billing-disposition-compat";
 
 type DashboardJobRow = {
   id: string;
@@ -280,11 +281,20 @@ export async function buildReportCenterDashboardReadModel(params: {
 
   const [families, jobsResult, invoiceResult, billingMode] = await Promise.all([
     listReportCenterKpiFamilies(params),
-    params.supabase
-      .from("jobs")
-      .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, billing_disposition, certs_complete")
-      .is("deleted_at", null)
-      .in("contractor_id", accountScopeInList(contractorIds)),
+    withJobsBillingDispositionSelectFallback<any[]>({
+      runPrimary: () =>
+        params.supabase
+          .from("jobs")
+          .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, billing_disposition, certs_complete")
+          .is("deleted_at", null)
+          .in("contractor_id", accountScopeInList(contractorIds)),
+      runCompat: () =>
+        params.supabase
+          .from("jobs")
+          .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, certs_complete")
+          .is("deleted_at", null)
+          .in("contractor_id", accountScopeInList(contractorIds)),
+    }),
     params.supabase
       .from("internal_invoices")
       .select("id, job_id, status, issued_at, total_cents")

@@ -25,6 +25,9 @@ import {
   insertInternalNotificationForEvent,
 } from "@/lib/actions/notification-actions";
 import {
+  buildJobBillingStateReadModel,
+} from "@/lib/business/job-billing-state";
+import {
   resolveBillingModeByAccountOwnerId,
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
@@ -53,7 +56,13 @@ import {
   isEccPermitNeededBlocker,
   shouldApplyEccPermitNeededBlocker,
 } from "@/lib/ecc/permit-needed";
+import {
+  withJobsBillingDispositionSelectFallback,
+} from "@/lib/supabase/jobs-billing-disposition-compat";
 export type { ContractorFailureDetail } from "@/lib/portal/resolveContractorIssues";
+
+type CloseoutInternalInvoiceSnapshot =
+  Parameters<typeof buildJobBillingStateReadModel>[0]["internalInvoice"];
 
 const OPS_STATUSES = [
   "need_to_schedule",
@@ -81,6 +90,48 @@ type ActionRequiredBy = (typeof ACTION_REQUIRED_BY)[number];
 
 function isActionRequiredBy(value: unknown): value is ActionRequiredBy {
   return typeof value === 'string' && (ACTION_REQUIRED_BY as readonly string[]).includes(value);
+}
+
+type CertCloseoutJobSnapshot = {
+  id: string;
+  status: string | null;
+  job_type: string | null;
+  field_complete: boolean | null;
+  certs_complete: boolean | null;
+  invoice_complete: boolean | null;
+  billing_disposition: string | null;
+  ops_status: string | null;
+  pending_info_reason: string | null;
+  permit_number: string | null;
+  scheduled_date: string | null;
+  window_start: string | null;
+  window_end: string | null;
+  data_entry_completed_at: string | null;
+  service_case_id: string | null;
+};
+
+async function readCertCloseoutJobSnapshot(params: {
+  supabase: any;
+  jobId: string;
+}): Promise<{ data: CertCloseoutJobSnapshot | null; error: any }> {
+  return withJobsBillingDispositionSelectFallback<CertCloseoutJobSnapshot | null>({
+    runPrimary: () =>
+      params.supabase
+        .from("jobs")
+        .select(
+          "id, status, job_type, field_complete, certs_complete, invoice_complete, billing_disposition, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
+        )
+        .eq("id", params.jobId)
+        .single(),
+    runCompat: () =>
+      params.supabase
+        .from("jobs")
+        .select(
+          "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
+        )
+        .eq("id", params.jobId)
+        .single(),
+  });
 }
 
 type OpsSnapshot = {
@@ -215,6 +266,43 @@ async function requireOperationalJobOpsEntitlementAccessOrRedirect(params: {
     reason: access.reason,
   });
   redirect(`/ops/admin/company-profile?${search.toString()}`);
+}
+
+async function resolveExistingBillingTruthForCloseout(params: {
+  supabase: any;
+  accountOwnerUserId: string | null | undefined;
+  job: {
+    id: string;
+    invoice_complete?: boolean | null;
+    billing_disposition?: string | null;
+  };
+}) {
+  const billingMode = await resolveBillingModeByAccountOwnerId({
+    supabase: params.supabase,
+    accountOwnerUserId: params.accountOwnerUserId,
+  });
+
+  let internalInvoice: CloseoutInternalInvoiceSnapshot = null;
+
+  if (billingMode === "internal_invoicing") {
+    const { data, error } = await params.supabase
+      .from("internal_invoices")
+      .select("status, invoice_number, issued_at")
+      .eq("job_id", params.job.id)
+      .eq("invoice_kind", "primary")
+      .neq("status", "void")
+      .maybeSingle();
+
+    if (error) throw new Error(error.message);
+    internalInvoice = data ?? null;
+  }
+
+  return buildJobBillingStateReadModel({
+    billingMode,
+    invoiceComplete: params.job.invoice_complete,
+    internalInvoice,
+    billingDisposition: params.job.billing_disposition,
+  });
 }
 
 function buildJobOpsRedirectPath(params: {
@@ -1284,15 +1372,13 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
   });
 
   // Read current job snapshot
-  const { data: job, error: jobErr } = await supabase
-    .from("jobs")
-    .select(
-      "id, status, job_type, field_complete, certs_complete, invoice_complete, ops_status, pending_info_reason, permit_number, scheduled_date, window_start, window_end, data_entry_completed_at, service_case_id"
-    )
-    .eq("id", jobId)
-    .single();
+  const { data: job, error: jobErr } = await readCertCloseoutJobSnapshot({
+    supabase,
+    jobId,
+  });
 
   if (jobErr) throw jobErr;
+  if (!job?.id) throw new Error("Job not found");
 
   if (job.ops_status === "failed" || job.ops_status === "retest_needed") {
     redirectToJob({ notice: "failed_requires_retest" });
@@ -1338,6 +1424,29 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     redirectToJob({ notice: "field_not_complete" });
   }
 
+  let billingState: ReturnType<typeof buildJobBillingStateReadModel>;
+  try {
+    billingState = await resolveExistingBillingTruthForCloseout({
+      supabase,
+      accountOwnerUserId: authz.internalUser.account_owner_user_id,
+      job: {
+        id: job.id,
+        invoice_complete: job.invoice_complete,
+        billing_disposition: job.billing_disposition,
+      },
+    });
+  } catch (error) {
+    console.error("[markCertsCompleteFromForm] billing truth read failed", {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return redirectToJob({ banner: "certs_closeout_failed" });
+  }
+
+  const billedTruthSatisfied = Boolean(billingState.billedTruthSatisfied);
+  const shouldHealInvoiceProjection =
+    billedTruthSatisfied && !Boolean(job.invoice_complete);
+
   if ((job.job_type ?? "").toLowerCase() === "ecc") {
     const permitBlocked = await persistEccPermitNeededBlocker({
       supabase,
@@ -1354,19 +1463,34 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     }
   }
 
-    // Mark certs complete and verify update
-    const { data: updatedCertRow, error: updErr } = await supabase
-      .from("jobs")
-      .update({ certs_complete: true })
-      .eq("id", jobId)
-      .select("id, certs_complete")
-      .maybeSingle();
+  // Mark certs complete and verify update. If billing truth is already satisfied
+  // but the lightweight job projection is stale, heal the projection so the
+  // shared closeout resolver can close the job instead of reopening invoice work.
+  const certUpdatePayload = {
+    certs_complete: true,
+    ...(shouldHealInvoiceProjection ? { invoice_complete: true } : {}),
+  };
+  const { data: updatedCertRow, error: updErr } = await supabase
+    .from("jobs")
+    .update(certUpdatePayload)
+    .eq("id", jobId)
+    .select("id, certs_complete, invoice_complete")
+    .maybeSingle();
 
-    if (updErr) throw updErr;
+  if (updErr) {
+    console.error("[markCertsCompleteFromForm] cert update failed", {
+      jobId,
+      message: updErr.message,
+    });
+    redirectToJob({ banner: "certs_closeout_failed" });
+  }
 
-    if (!updatedCertRow?.id || updatedCertRow.certs_complete !== true) {
-      throw new Error("Certs complete update failed (no row updated).");
-    }
+  if (!updatedCertRow?.id || updatedCertRow.certs_complete !== true) {
+    console.error("[markCertsCompleteFromForm] cert update missing updated row", {
+      jobId,
+    });
+    redirectToJob({ banner: "certs_closeout_failed" });
+  }
     
   // Recompute ops_status using shared resolver
   let nextOps = resolveOpsStatus({
@@ -1377,7 +1501,7 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     window_end: job.window_end,
     field_complete: job.field_complete,
     certs_complete: true,
-    invoice_complete: job.invoice_complete,
+    invoice_complete: billedTruthSatisfied,
     current_ops_status: job.ops_status,
   });
 
@@ -1386,10 +1510,16 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     .update({ ops_status: nextOps })
     .eq("id", jobId);
 
-  if (opsErr) throw opsErr;
-
-  nextOps =
-    (await recomputeOpsAfterCloseoutMutation(supabase, jobId)) ?? nextOps;
+  if (opsErr) {
+    console.error("[markCertsCompleteFromForm] ops update failed", {
+      jobId,
+      message: opsErr.message,
+    });
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/ops`);
+    revalidatePath(`/ops/closeout-queue`);
+    redirectToJob({ banner: "certs_closeout_failed" });
+  }
 
   const { error: eventErr } = await supabase.from("job_events").insert({
     job_id: jobId,
@@ -1398,16 +1528,34 @@ export async function markCertsCompleteFromForm(formData: FormData): Promise<voi
     meta: {
       changes: [
         { field: "certs_complete", from: !!job.certs_complete, to: true },
+        ...(shouldHealInvoiceProjection
+          ? [{ field: "invoice_complete", from: !!job.invoice_complete, to: true, source: "billing_truth_projection" }]
+          : []),
         { field: "ops_status", from: job.ops_status ?? null, to: nextOps },
       ],
     },
   });
 
-  if (eventErr) throw eventErr;
+  if (eventErr) {
+    console.error("[markCertsCompleteFromForm] event insert failed", {
+      jobId,
+      message: eventErr.message,
+    });
+    revalidatePath(`/jobs/${jobId}`);
+    revalidatePath(`/ops`);
+    revalidatePath(`/ops/closeout-queue`);
+    redirectToJob({ banner: "certs_closeout_failed" });
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath(`/ops`);
-  redirectToJob({});
+  revalidatePath(`/ops/closeout-queue`);
+  revalidatePath(`/reports/closeout`);
+  redirectToJob({
+    banner: String(nextOps ?? "").trim().toLowerCase() === "closed"
+      ? "certs_closeout_closed"
+      : "certs_closeout_saved",
+  });
 }
 
 export async function markEccPermitAvailableFromForm(formData: FormData): Promise<void> {

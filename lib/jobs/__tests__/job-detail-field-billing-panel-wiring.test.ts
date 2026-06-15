@@ -84,6 +84,14 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("jobBillingDispositionLabel");
   });
 
+  it("falls back to a compatibility select when jobs.billing_disposition is unavailable", () => {
+    expect(source).toContain("isMissingJobsBillingDispositionColumnError");
+    expect(source).toContain("const MAIN_JOB_SELECT_WITH_BILLING_DISPOSITION =");
+    expect(source).toContain("const MAIN_JOB_SELECT_COMPAT =");
+    expect(source).toContain("isMissingJobsBillingDispositionColumnError(primary.error)");
+    expect(source).toContain("billing_disposition: null");
+  });
+
   it("degrades field proposal summary reads without crashing job detail", () => {
     const fieldBillingReadIndex = source.indexOf("timedPhase(\"fieldBillingSummaryRead\"");
     const fieldBillingReadSlice = source.slice(fieldBillingReadIndex, fieldBillingReadIndex + 2200);
@@ -117,6 +125,29 @@ describe("job detail field billing panel wiring", () => {
     expect(noInvoicePanelSlice).toContain("auto_import_visit_scope_items");
     expect(noInvoicePanelSlice).toContain("Create Invoice");
     expect(noInvoicePanelSlice).not.toContain("Create Draft Invoice");
+  });
+
+  it("uses direct draft creation for invoice-required job detail CTAs instead of a button-to-button link", () => {
+    const mobileCloseoutIndex = source.indexOf("{closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (");
+    const mobileCloseoutSlice = source.slice(mobileCloseoutIndex, mobileCloseoutIndex + 1400);
+    const desktopCloseoutIndex = source.indexOf(
+      "{closeoutNeeds.needsInvoice && billingState.internalInvoicePanelEnabled ? (",
+      mobileCloseoutIndex + 1,
+    );
+    const desktopCloseoutSlice = source.slice(desktopCloseoutIndex, desktopCloseoutIndex + 1400);
+
+    expect(mobileCloseoutIndex).toBeGreaterThanOrEqual(0);
+    expect(desktopCloseoutIndex).toBeGreaterThan(mobileCloseoutIndex);
+
+    for (const closeoutSlice of [mobileCloseoutSlice, desktopCloseoutSlice]) {
+      expect(closeoutSlice).toContain("internalInvoiceTruth ? (");
+      expect(closeoutSlice).toContain("href={`/jobs/${job.id}/invoice#invoice-workspace`}");
+      expect(closeoutSlice).toContain("createInternalInvoiceDraftFromForm");
+      expect(closeoutSlice).toContain("return_to");
+      expect(closeoutSlice).toContain("/invoice#invoice-workspace");
+      expect(closeoutSlice).toContain("auto_import_visit_scope_items");
+      expect(closeoutSlice).toContain("SubmitButton");
+    }
   });
 
   it("keeps invoice actions state-aware without creating duplicate draft invoices", () => {

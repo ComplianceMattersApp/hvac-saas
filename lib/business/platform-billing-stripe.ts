@@ -612,7 +612,7 @@ export async function reconcilePlatformSubscriptionSeatQuantity(params: {
 
 export function buildPlatformEntitlementStripePatch(params: {
   subscription: PlatformStripeSubscriptionLike;
-  eventId: string;
+  eventId?: string | null;
 }) {
   const subscription = params.subscription;
   const stripeCustomerId = extractStripeCustomerId(subscription.customer);
@@ -632,12 +632,50 @@ export function buildPlatformEntitlementStripePatch(params: {
     stripe_subscription_status: stripeSubscriptionStatus,
     stripe_current_period_end: stripeCurrentPeriodEnd,
     stripe_cancel_at_period_end: Boolean(subscription.cancel_at_period_end),
-    stripe_last_webhook_event_id: params.eventId,
+    stripe_last_webhook_event_id: toCleanString(params.eventId) || null,
     stripe_last_synced_at: new Date().toISOString(),
     entitlement_status: mapStripeSubscriptionStatusToEntitlementStatus(subscription.status),
     entitlement_valid_until: stripeCurrentPeriodEnd,
     trial_ends_at: trialEndsAt,
   };
+}
+
+function isInitialIncompleteStripeStatus(status: unknown) {
+  const normalized = toCleanString(status).toLowerCase();
+  return normalized === "incomplete" || normalized === "incomplete_expired";
+}
+
+function isActiveStripeBackedEntitlementForSameSubscription(
+  row: PlatformEntitlementStripeRow,
+  params: {
+    subscriptionId: string;
+    customerId: string | null;
+  },
+) {
+  const rowSubscriptionId = toCleanString(row.stripe_subscription_id);
+  const rowCustomerId = toCleanString(row.stripe_customer_id);
+  const rowEntitlementStatus = toCleanString(row.entitlement_status).toLowerCase();
+  const rowSubscriptionStatus = toCleanString(row.stripe_subscription_status).toLowerCase();
+
+  return (
+    rowEntitlementStatus === "active" &&
+    rowSubscriptionStatus === "active" &&
+    rowSubscriptionId === params.subscriptionId &&
+    (!params.customerId || !rowCustomerId || rowCustomerId === params.customerId)
+  );
+}
+
+function pickMostRelevantPlatformSubscription(subscriptions: Stripe.Subscription[]) {
+  const rankedStatuses = ["active", "trialing", "past_due", "incomplete"] as const;
+
+  for (const status of rankedStatuses) {
+    const match = subscriptions.find(
+      (subscription) => toCleanString(subscription.status).toLowerCase() === status,
+    );
+    if (match) return match;
+  }
+
+  return subscriptions[0] ?? null;
 }
 
 export async function syncPlatformEntitlementFromStripeSubscriptionEvent(params: {
@@ -674,6 +712,21 @@ export async function syncPlatformEntitlementFromStripeSubscriptionEvent(params:
     };
   }
 
+  if (
+    subscriptionId &&
+    isInitialIncompleteStripeStatus(subscription.status) &&
+    isActiveStripeBackedEntitlementForSameSubscription(entitlement, {
+      subscriptionId,
+      customerId,
+    })
+  ) {
+    return {
+      skipped: true,
+      entitlement,
+      reason: "stale_initial_incomplete_subscription_event" as const,
+    };
+  }
+
   const patch = buildPlatformEntitlementStripePatch({
     subscription,
     eventId: params.eventId,
@@ -683,6 +736,68 @@ export async function syncPlatformEntitlementFromStripeSubscriptionEvent(params:
 
   return {
     skipped: false,
+    entitlement: updated,
+  };
+}
+
+export async function syncPlatformEntitlementFromStripeForAccountOwner(params: {
+  accountOwnerUserId: string;
+  admin?: any;
+  stripe?: Stripe;
+}) {
+  const admin = params.admin ?? createAdminClient();
+  const stripe = params.stripe ?? getStripeServerClient();
+  const accountOwnerUserId = toCleanString(params.accountOwnerUserId);
+
+  if (!accountOwnerUserId) {
+    return {
+      skipped: true,
+      reason: "missing_account_owner_user_id" as const,
+      entitlement: null,
+    };
+  }
+
+  const entitlement = await getPlatformEntitlementByOwnerId(admin, accountOwnerUserId);
+  if (!entitlement) {
+    return {
+      skipped: true,
+      reason: "missing_entitlement" as const,
+      entitlement: null,
+    };
+  }
+
+  const subscriptionId = toCleanString(entitlement.stripe_subscription_id);
+  const customerId = toCleanString(entitlement.stripe_customer_id);
+  let subscription: Stripe.Subscription | null = null;
+
+  if (subscriptionId) {
+    subscription = await stripe.subscriptions.retrieve(subscriptionId);
+  } else if (customerId) {
+    const listed = await stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 10,
+    });
+    subscription = pickMostRelevantPlatformSubscription(listed.data ?? []);
+  }
+
+  if (!subscription) {
+    return {
+      skipped: true,
+      reason: "missing_subscription" as const,
+      entitlement,
+    };
+  }
+
+  const patch = buildPlatformEntitlementStripePatch({
+    subscription,
+    eventId: null,
+  });
+  const updated = await patchPlatformEntitlementRow(admin, entitlement, patch);
+
+  return {
+    skipped: false,
+    reason: "synced" as const,
     entitlement: updated,
   };
 }

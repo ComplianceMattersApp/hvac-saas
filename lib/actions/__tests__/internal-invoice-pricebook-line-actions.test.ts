@@ -815,6 +815,42 @@ describe('internal invoice line item pricebook plumbing', () => {
     expect(invoiceUpdates[0].total_cents).toBe(18950);
   });
 
+  it('opens the invoice workspace without creating a duplicate when a draft already exists', async () => {
+    const { supabase, insertedInvoices, insertedLineItems } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(draftInvoice());
+
+    const { createInternalInvoiceDraftFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      createInternalInvoiceDraftFromForm(
+        createDraftFormData({ auto_import_visit_scope_items: '1' }),
+      ),
+    ).rejects.toThrow('REDIRECT:/jobs/job-1/invoice?banner=internal_invoice_draft_exists#invoice-workspace');
+
+    expect(insertedInvoices).toHaveLength(0);
+    expect(insertedLineItems).toHaveLength(0);
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
+  it('opens the invoice workspace without creating a duplicate when an issued invoice already exists', async () => {
+    const { supabase, insertedInvoices, insertedLineItems } = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(draftInvoice({ status: 'issued', total_cents: 18950 }));
+
+    const { createInternalInvoiceDraftFromForm } = await import('@/lib/actions/internal-invoice-actions');
+
+    await expect(
+      createInternalInvoiceDraftFromForm(
+        createDraftFormData({ auto_import_visit_scope_items: '1' }),
+      ),
+    ).rejects.toThrow('REDIRECT:/jobs/job-1/invoice?banner=internal_invoice_draft_exists#invoice-workspace');
+
+    expect(insertedInvoices).toHaveLength(0);
+    expect(insertedLineItems).toHaveLength(0);
+    expect(revalidatePathMock).not.toHaveBeenCalled();
+  });
+
   it('auto-imports unpriced work items at zero dollars for draft review', async () => {
     const selectedScopeId = '8e0e1a2f-fc8c-45c7-aa99-098dd1d79b1f';
     const { supabase, insertedLineItems, invoiceUpdates } = makeSupabaseFixture({

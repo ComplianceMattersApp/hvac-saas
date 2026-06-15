@@ -99,6 +99,25 @@ describe("resolveAppAccessCta", () => {
     expect(cta.helper).toContain("Portal work with Compliance Matters is still available");
   });
 
+  it("does not offer checkout when inactive app access already has linked Stripe billing", () => {
+    const cta = resolveAppAccessCta({
+      access: adminAccess({
+        appAccessBlockedReason: "blocked_trial_expired",
+      }),
+      entitlement: {
+        entitlementStatus: "trial",
+        trialEndsAt: "2026-06-01T00:00:00.000Z",
+        billingCustomerLinked: true,
+        billingSubscriptionLinked: false,
+      },
+      billingAvailability: checkoutAvailable,
+      now: new Date("2026-06-11T00:00:00.000Z"),
+    });
+
+    expect(cta.kind).toBe("none");
+    expect(cta.target).toBeNull();
+  });
+
   it.each([
     { status: "cancelled", expected: "reactivate_app_access" },
     { status: "suspended", expected: "reactivate_app_access" },

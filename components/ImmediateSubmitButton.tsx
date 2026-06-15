@@ -38,6 +38,16 @@ export default function ImmediateSubmitButton({
     return () => window.clearTimeout(timeout);
   }, [pending, sawPending, submitted]);
 
+  useEffect(() => {
+    if (!submitted || pending || sawPending) return;
+
+    const timeout = window.setTimeout(() => {
+      setSubmitted(false);
+    }, 1500);
+
+    return () => window.clearTimeout(timeout);
+  }, [pending, sawPending, submitted]);
+
   return (
     <button
       type="submit"
@@ -53,7 +63,9 @@ export default function ImmediateSubmitButton({
         const form = button.form;
         if (form && !form.checkValidity()) return;
 
-        setSubmitted(true);
+        window.setTimeout(() => {
+          setSubmitted(true);
+        }, 0);
       }}
       {...props}
     >

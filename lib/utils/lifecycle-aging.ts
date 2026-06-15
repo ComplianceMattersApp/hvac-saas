@@ -56,6 +56,14 @@ const CLOSEOUT_STATUSES = new Set([
   "paperwork_required",
 ]);
 
+const ACTIVE_AGING_OPS_STATUSES = new Set([
+  "need_to_schedule",
+  "scheduled",
+  ...WAITING_STATUSES,
+  ...FAILED_STATUSES,
+  ...CLOSEOUT_STATUSES,
+]);
+
 function normalizeStatus(value: unknown): string {
   return String(value ?? "").trim().toLowerCase();
 }
@@ -218,6 +226,32 @@ function buildScheduledLabel(params: {
   };
 }
 
+function dayNumberFromYmd(value: unknown): number | null {
+  const parsed = parseYmdToUtcNoon(value);
+  if (!parsed) return null;
+  return Math.floor(parsed.getTime() / 86400000);
+}
+
+function laDayNumberFromInstant(value: unknown): number | null {
+  const parsed = parseIsoInstant(value);
+  if (!parsed) return null;
+
+  const ymd = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(parsed);
+
+  return dayNumberFromYmd(ymd);
+}
+
+function formatDaysAging(days: number): string {
+  const normalized = Math.max(0, Math.floor(days));
+  if (normalized === 0) return "Today";
+  return `${normalized} ${normalized === 1 ? "day" : "days"}`;
+}
+
 function runningLabel(params: {
   prefix: string;
   bucket: LifecycleBucket;
@@ -259,7 +293,11 @@ export function resolveLifecycleAging(input: LifecycleAgingInput): LifecycleAgin
   const stateEntryAt = String(stateEnteredAtByStatus[opsStatus] ?? "").trim() || null;
   const now = input.now ?? new Date();
 
-  if (status === "completed" || status === "cancelled" || opsStatus === "closed") {
+  if (
+    status === "cancelled" ||
+    opsStatus === "closed" ||
+    (status === "completed" && !ACTIVE_AGING_OPS_STATUSES.has(opsStatus))
+  ) {
     return {
       label: null,
       bucket: "completed",
@@ -342,6 +380,23 @@ export function resolveLifecycleAging(input: LifecycleAgingInput): LifecycleAgin
     usedFallback: true,
     confidence: "partial",
   };
+}
+
+export function resolveLifecycleDaysAgingLabel(input: LifecycleAgingInput): string | null {
+  const resolved = resolveLifecycleAging(input);
+  const sourceTimestamp = String(resolved.sourceTimestamp ?? "").trim();
+  if (!sourceTimestamp || resolved.sourceKind === "none") return null;
+
+  const now = input.now ?? new Date();
+  const todayDate = String(input.todayDate ?? "").trim() || defaultTodayDate(now);
+  const todayDay = dayNumberFromYmd(todayDate);
+  const sourceDay =
+    resolved.sourceKind === "scheduled_date"
+      ? dayNumberFromYmd(sourceTimestamp)
+      : laDayNumberFromInstant(sourceTimestamp);
+
+  if (todayDay == null || sourceDay == null) return null;
+  return formatDaysAging(todayDay - sourceDay);
 }
 
 function extractOpsStatusTransitionTo(meta: unknown): string | null {

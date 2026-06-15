@@ -46,6 +46,7 @@ import { sendEmail } from '@/lib/email/sendEmail';
 import { resolveNotificationAccountOwnerUserId } from '@/lib/notifications/account-owner';
 import { sanitizeVisitScopeItemId, sanitizeVisitScopeItems } from '@/lib/jobs/visit-scope';
 import { formatInvoiceDisplayReference } from '@/lib/utils/display-references';
+import { withJobsBillingDispositionSelectFallback } from '@/lib/supabase/jobs-billing-disposition-compat';
 
 function getTrimmedString(value: FormDataEntryValue | null | undefined) {
   return String(value ?? '').trim();
@@ -568,13 +569,25 @@ async function loadInternalInvoiceContext(formData: FormData) {
     redirect(buildJobDetailHref(jobId, tab, 'internal_invoicing_billing_pending'));
   }
 
-  const { data: job, error: jobErr } = await supabase
-    .from('jobs')
-    .select(
-      'id, title, job_type, status, field_complete, ops_status, invoice_complete, billing_disposition, billing_disposition_note, billing_disposition_at, billing_disposition_by_user_id, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
-    )
-    .eq('id', jobId)
-    .single();
+  const { data: job, error: jobErr } = await withJobsBillingDispositionSelectFallback<any>({
+    runPrimary: () =>
+      supabase
+        .from('jobs')
+        .select(
+          'id, title, job_type, status, field_complete, ops_status, invoice_complete, billing_disposition, billing_disposition_note, billing_disposition_at, billing_disposition_by_user_id, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
+        )
+        .eq('id', jobId)
+        .single(),
+    runCompat: () =>
+      supabase
+        .from('jobs')
+        .select(
+          'id, title, job_type, status, field_complete, ops_status, invoice_complete, invoice_number, data_entry_completed_at, customer_id, contractor_id, location_id, service_case_id, billing_recipient, customer_first_name, customer_last_name, billing_name, billing_email, billing_phone, billing_address_line1, billing_address_line2, billing_city, billing_state, billing_zip'
+        )
+        .eq('id', jobId)
+        .single(),
+    includeDispositionMetadata: true,
+  });
 
   if (jobErr) throw jobErr;
 

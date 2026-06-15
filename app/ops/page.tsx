@@ -21,7 +21,7 @@ import {
   startOfTodayUtcIsoLA,
   startOfTomorrowUtcIsoLA,
 } from "@/lib/utils/schedule-la";
-import { formatPersonNamePart } from "@/lib/utils/identity-display";
+import { formatCityNamePart, formatPersonNamePart } from "@/lib/utils/identity-display";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
@@ -40,7 +40,7 @@ import {
 } from "@/lib/actions/notification-read-actions";
 import {
   buildOpsStatusEnteredAtByJob,
-  resolveLifecycleAging,
+  resolveLifecycleDaysAgingLabel,
 } from "@/lib/utils/lifecycle-aging";
 import {
   didOpsStatusChangeTo,
@@ -63,11 +63,16 @@ import {
   resolveRecentAttemptDisplay,
 } from "@/lib/ops/recent-attempt-display";
 import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
-import { formatAssignmentSummaryForJob, getOpsQueueCardStatusReason } from "@/lib/ops/focused-queues";
+import {
+  formatAssignmentSummaryForJob,
+  formatFailedEccQueueReasonFromRun,
+  getOpsQueueCardStatusReason,
+} from "@/lib/ops/focused-queues";
 import {
   buildServiceFollowUpProgressState,
 } from "@/lib/jobs/service-follow-up-progress";
 import { formatEccRetestReadySignalLabel } from "@/lib/ecc/ecc-workflow-display";
+import { withJobsBillingDispositionSelectFallback } from "@/lib/supabase/jobs-billing-disposition-compat";
 
 
 function startOfDayUtcForTimeZone(timeZone: string, d = new Date()) {
@@ -488,10 +493,10 @@ function subtractBusinessDays(date: Date, days: number) {
   }
 
   function workspaceCustomerLocation(job: any) {
-    const customer = [String(job?.customer_first_name ?? "").trim(), String(job?.customer_last_name ?? "").trim()]
+    const customer = [formatPersonNamePart(job?.customer_first_name), formatPersonNamePart(job?.customer_last_name)]
       .filter(Boolean)
       .join(" ");
-    const location = [String(job?.job_address ?? "").trim(), String(job?.city ?? "").trim()]
+    const location = [String(job?.job_address ?? "").trim(), formatCityNamePart(job?.city)]
       .filter(Boolean)
       .join(", ");
 
@@ -499,9 +504,14 @@ function subtractBusinessDays(date: Date, days: number) {
     return customer || location || "Customer / location pending";
   }
 
+  function workspaceContractorName(job: any) {
+    return String((job as any)?.contractors?.name ?? "").trim();
+  }
+
   // Initialize lifecycle maps before any workspace preview rendering to avoid TDZ crashes.
   let opsStatusEnteredAtByJob = new Map<string, Record<string, string>>();
   let latestFailedRunByJob = new Map<string, any>();
+  let primaryFailureReasonByJob = new Map<string, string>();
   let serviceFollowUpProgressLabelByJob = new Map<string, string>();
   let continuedServiceFollowUpParentIds = new Set<string>();
 
@@ -520,7 +530,7 @@ function subtractBusinessDays(date: Date, days: number) {
   function workspaceAgeLabel(job: any) {
     const jobId = String(job?.id ?? "").trim();
     return (
-      resolveLifecycleAging({
+      resolveLifecycleDaysAgingLabel({
         status: String(job?.status ?? "").trim() || null,
         opsStatus: String(job?.ops_status ?? "").trim() || null,
         createdAt: String(job?.created_at ?? "").trim() || null,
@@ -528,12 +538,13 @@ function subtractBusinessDays(date: Date, days: number) {
         fieldCompleteAt: String(job?.field_complete_at ?? "").trim() || null,
         stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
         failedEvidenceAt: failedStatusSinceByJob(jobId),
-      }).label ?? "-"
+      }) ?? "Not available"
     );
   }
 
   function wsStatusReason(job: any, queueKey: string) {
     const lifecycle = String(job?.status ?? "").toLowerCase();
+    const specificFailureReason = workspaceFailedReason(job);
 
     if (queueKey === "need_to_schedule") return "Awaiting scheduling";
     if (queueKey === "field_work") {
@@ -542,7 +553,18 @@ function subtractBusinessDays(date: Date, days: number) {
       return "Scheduled field work";
     }
     if (queueKey === "without_tech") return "Scheduled without active tech assignment";
+    if (specificFailureReason) return specificFailureReason;
     return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
+  }
+
+  function workspaceFailedReason(job: any) {
+    const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+    if (opsStatus === "retest_needed") return "Retest Needed";
+    if (opsStatus === "pending_office_review") return "Correction Required";
+    if (opsStatus !== "failed") return "";
+
+    const jobId = String(job?.id ?? "").trim();
+    return (jobId ? primaryFailureReasonByJob.get(jobId) ?? "" : "") || "Failed";
   }
 
   const wsStartTodayUtc = startOfTodayUtcIsoLA();
@@ -550,7 +572,7 @@ function subtractBusinessDays(date: Date, days: number) {
 
   if (panel !== "full_board") {
     const workspaceSelect =
-      "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, created_at";
+      "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, field_complete_at, contractor_id, contractors(name), created_at";
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start";
 
@@ -826,6 +848,20 @@ function subtractBusinessDays(date: Date, days: number) {
         })
       : {};
 
+    const selectedPreviewFailedRunsRes = selectedPreviewJobIds.length
+      ? await supabase
+          .from("ecc_test_runs")
+          .select("job_id, test_type, computed, computed_pass, override_pass, is_completed, created_at")
+          .in("job_id", selectedPreviewJobIds)
+          .eq("is_completed", true)
+          .or("override_pass.eq.false,computed_pass.eq.false")
+      : { data: [], error: null };
+
+    if (selectedPreviewFailedRunsRes.error) throw selectedPreviewFailedRunsRes.error;
+
+    latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);
+    primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
+
     const operationalTenantIdentity = await operationalTenantIdentityPromise;
     const focusedQueueHref = `/ops${buildQueryString({
       bucket,
@@ -960,16 +996,19 @@ function subtractBusinessDays(date: Date, days: number) {
                         <span className="font-medium text-slate-500">Status/Reason:</span> {wsStatusReason(job, selectedWorkspaceKey)}
                       </div>
                       <div>
-                        <span className="font-medium text-slate-500">Age/Time:</span>{" "}
-                        {selectedWorkspaceKey === "field_work" || selectedWorkspaceKey === "without_tech"
-                          ? (job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "Not scheduled") +
-                            (displayWindowLA(job?.window_start, job?.window_end) ? ` ${displayWindowLA(job?.window_start, job?.window_end)}` : "")
-                          : workspaceAgeLabel(job)}
+                        <span className="font-medium text-slate-500">Days Aging:</span>{" "}
+                        {workspaceAgeLabel(job)}
                       </div>
                       <div>
                         <span className="font-medium text-slate-500">Assignment:</span>{" "}
                         {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
                       </div>
+                      {workspaceContractorName(job) ? (
+                        <div>
+                          <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                          {workspaceContractorName(job)}
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -1140,8 +1179,14 @@ function shouldHideFailedParentJob(j: any) {
 
 
   // Common job select (keep lightweight)
- const baseSelect =
-   "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, billing_disposition, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at, visit_scope_summary, visit_scope_items";
+  const baseSelectWithBillingDisposition =
+    "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, billing_disposition, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at, visit_scope_summary, visit_scope_items";
+  const baseSelectCompat =
+    "id, title, status, parent_job_id, service_case_id, job_type, ops_status, field_complete, field_complete_at, certs_complete, invoice_complete, invoice_number, permit_number, pending_info_reason, on_hold_reason, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, contractor_id, contractors(name), customer_id, deleted_at, location_id, created_at, visit_scope_summary, visit_scope_items";
+  const operationalReportingSelectWithBillingDisposition =
+    "id, parent_job_id, service_case_id, job_type, status, ops_status, created_at, scheduled_date, field_complete, field_complete_at, service_visit_outcome, invoice_complete, billing_disposition, certs_complete";
+  const operationalReportingSelectCompat =
+    "id, parent_job_id, service_case_id, job_type, status, ops_status, created_at, scheduled_date, field_complete, field_complete_at, service_visit_outcome, invoice_complete, certs_complete";
 
   // Helper to apply filters
   const applyCommonFilters = (qb: any) => {
@@ -1212,153 +1257,35 @@ const recentServiceWindowCutoffIso = new Date(
   now.getTime() - 30 * 24 * 60 * 60 * 1000
 ).toISOString();
 
-// 1) FIELD WORK (scheduled today in LA and not field-complete)
-let fieldWorkQ = supabase
-  .from("jobs")
-  .select(baseSelect)
-  .is("deleted_at", null)
-  .neq("status", "cancelled")
-  .neq("ops_status", "closed")
-  .eq("field_complete", false)
-  .gte("scheduled_date", startTodayUtc)
-  .lt("scheduled_date", startTomorrowUtc)
-  .order("window_start", { ascending: true });
+  const runJobsSelectWithCompat = async (buildQuery: (selectClause: string) => any) =>
+    withJobsBillingDispositionSelectFallback<any[]>({
+      runPrimary: () => buildQuery(baseSelectWithBillingDisposition),
+      runCompat: () => buildQuery(baseSelectCompat),
+    });
 
-fieldWorkQ = applyCommonFilters(fieldWorkQ);
+  const runOperationalReportingJobsSelectWithCompat = async () =>
+    withJobsBillingDispositionSelectFallback<any[]>({
+      runPrimary: () => {
+        let q = supabase
+          .from("jobs")
+          .select(operationalReportingSelectWithBillingDisposition)
+          .is("deleted_at", null)
+          .neq("status", "cancelled");
 
-  // 3) CALL LIST preview (need_to_schedule)
-  let callListQ = supabase
-    .from("jobs")
-    .select(baseSelect)
-    .is("deleted_at", null)
-    .neq("status", "cancelled")
-    .eq("status", "open")
-    .eq("ops_status", "need_to_schedule")
-    .order("created_at", { ascending: false })
-    .limit(10);
+        if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
+        return q;
+      },
+      runCompat: () => {
+        let q = supabase
+          .from("jobs")
+          .select(operationalReportingSelectCompat)
+          .is("deleted_at", null)
+          .neq("status", "cancelled");
 
-  callListQ = applyCommonFilters(callListQ);
-
-  // Scheduled queue snapshot for jobs that still need technician assignment visibility.
-  let scheduledSnapshotQ = supabase
-    .from("jobs")
-    .select(baseSelect)
-    .is("deleted_at", null)
-    .neq("status", "cancelled")
-    .eq("status", "open")
-    .eq("ops_status", "scheduled")
-    .order("scheduled_date", { ascending: true })
-    .order("window_start", { ascending: true })
-    .limit(50);
-
-  scheduledSnapshotQ = applyCommonFilters(scheduledSnapshotQ);
-
-    // 4) CLOSEOUT COMMAND BOARD (derived from field_complete + remaining office obligations)
-    let closeoutQ = supabase
-      .from("jobs")
-      .select(baseSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .eq("field_complete", true)
-      .neq("ops_status", "closed")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    closeoutQ = applyCommonFilters(closeoutQ);
-
-    // 5) EXCEPTIONS: Still Open (scheduled before today in LA and not field-complete)
-    let stillOpenQ = supabase
-      .from("jobs")
-      .select(baseSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .neq("ops_status", "closed")
-      .eq("field_complete", false)
-      .lt("scheduled_date", startTodayUtc)
-      .order("scheduled_date", { ascending: true })
-      .order("created_at", { ascending: true })
-      .limit(100);
-
-    stillOpenQ = applyCommonFilters(stillOpenQ);
-
-    // 6) NEEDS ATTENTION preview (aging-based escalation queue)
-    let attentionQ = supabase
-      .from("jobs")
-      .select(baseSelect)
-      .is("deleted_at", null)
-      .or(
-        [
-          // Need to Schedule older than 3 business days
-          `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
-
-          // Pending Info older than 3 business days
-          `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
-
-          // Failed older than 14 calendar days
-          `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
-          `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
-        ].join(",")
-      )
-      .order("created_at", { ascending: true })
-      .limit(10);
-
-    attentionQ = applyCommonFilters(attentionQ);
-
-  let operationalReportingJobsQ = supabase
-    .from("jobs")
-    .select(
-      "id, parent_job_id, service_case_id, job_type, status, ops_status, created_at, scheduled_date, field_complete, field_complete_at, service_visit_outcome, invoice_complete, billing_disposition, certs_complete"
-    )
-    .is("deleted_at", null)
-    .neq("status", "cancelled");
-
-  if (contractorScopeFilter) operationalReportingJobsQ = operationalReportingJobsQ.eq("contractor_id", contractorScopeFilter);
-
-  // 7) BUCKET list (tabs)
-    let bucketQ = supabase
-      .from("jobs")
-      .select(baseSelect)
-      .is("deleted_at", null)
-      .neq("status", "cancelled")
-      .order("created_at", { ascending: false })
-      .limit(100);
-
-    if (bucket === "attention") {
-      bucketQ = bucketQ.or(
-        [
-          `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
-          `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
-          `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
-          `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
-        ].join(",")
-      );
-    } else if (bucket === "failed") {
-      bucketQ = bucketQ.in("ops_status", ["failed", "pending_office_review"]);
-    } else if (bucket === "workflow_all") {
-      bucketQ = bucketQ.in("ops_status", [
-        "need_to_schedule",
-        "pending_info",
-        "on_hold",
-        "failed",
-        "pending_office_review",
-      ]);
-    } else if (bucket === "closeout") {
-      bucketQ = bucketQ
-        .eq("field_complete", true)
-        .neq("ops_status", "closed");
-    } else if (bucket === "recent_closed") {
-      bucketQ = bucketQ
-        .eq("ops_status", "closed")
-        .order("created_at", { ascending: false })
-        .limit(15);
-    } else {
-      bucketQ = bucketQ.eq("ops_status", bucket);
-      if (bucket === "need_to_schedule" || bucket === "scheduled") {
-        bucketQ = bucketQ.eq("status", "open");
-      }
-    }
-
-    bucketQ = applyCommonFilters(bucketQ);
+        if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
+        return q;
+      },
+    });
 
   const _t_primaryQueueReads = opsTimingEnabled ? Date.now() : 0;
     const [
@@ -1373,18 +1300,166 @@ fieldWorkQ = applyCommonFilters(fieldWorkQ);
     ] = await Promise.all([
       trackOpsTiming(
         "ops:primaryQueueReads:fieldWork",
-        trackOpsTiming("ops:fieldWork:fetch", fieldWorkQ)
+        trackOpsTiming(
+          "ops:fieldWork:fetch",
+          runJobsSelectWithCompat((selectClause) => {
+            let q = supabase
+              .from("jobs")
+              .select(selectClause)
+              .is("deleted_at", null)
+              .neq("status", "cancelled")
+              .neq("ops_status", "closed")
+              .eq("field_complete", false)
+              .gte("scheduled_date", startTodayUtc)
+              .lt("scheduled_date", startTomorrowUtc)
+              .order("window_start", { ascending: true });
+            q = applyCommonFilters(q);
+            return q;
+          }),
+        )
       ),
       trackOpsTiming(
         "ops:primaryQueueReads:callList",
-        trackOpsTiming("ops:callList:fetch", callListQ)
+        trackOpsTiming(
+          "ops:callList:fetch",
+          runJobsSelectWithCompat((selectClause) => {
+            let q = supabase
+              .from("jobs")
+              .select(selectClause)
+              .is("deleted_at", null)
+              .neq("status", "cancelled")
+              .eq("status", "open")
+              .eq("ops_status", "need_to_schedule")
+              .order("created_at", { ascending: false })
+              .limit(10);
+            q = applyCommonFilters(q);
+            return q;
+          }),
+        )
       ),
-      trackOpsTiming("ops:primaryQueueReads:scheduledSnapshot", scheduledSnapshotQ),
-      trackOpsTiming("ops:primaryQueueReads:closeoutSource", closeoutQ),
-      trackOpsTiming("ops:primaryQueueReads:stillOpenExceptions", stillOpenQ),
-      trackOpsTiming("ops:primaryQueueReads:attention", attentionQ),
-      trackOpsTiming("ops:primaryQueueReads:reportingJobs", operationalReportingJobsQ),
-      trackOpsTiming("ops:primaryQueueReads:activeBucket", bucketQ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:scheduledSnapshot",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .neq("status", "cancelled")
+            .eq("status", "open")
+            .eq("ops_status", "scheduled")
+            .order("scheduled_date", { ascending: true })
+            .order("window_start", { ascending: true })
+            .limit(50);
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:closeoutSource",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .neq("status", "cancelled")
+            .eq("field_complete", true)
+            .neq("ops_status", "closed")
+            .order("created_at", { ascending: false })
+            .limit(100);
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:stillOpenExceptions",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .neq("status", "cancelled")
+            .neq("ops_status", "closed")
+            .eq("field_complete", false)
+            .lt("scheduled_date", startTodayUtc)
+            .order("scheduled_date", { ascending: true })
+            .order("created_at", { ascending: true })
+            .limit(100);
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
+      trackOpsTiming(
+        "ops:primaryQueueReads:attention",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .or(
+              [
+                `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
+                `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
+                `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
+                `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
+              ].join(","),
+            )
+            .order("created_at", { ascending: true })
+            .limit(10);
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
+      trackOpsTiming("ops:primaryQueueReads:reportingJobs", runOperationalReportingJobsSelectWithCompat()),
+      trackOpsTiming(
+        "ops:primaryQueueReads:activeBucket",
+        runJobsSelectWithCompat((selectClause) => {
+          let q = supabase
+            .from("jobs")
+            .select(selectClause)
+            .is("deleted_at", null)
+            .neq("status", "cancelled")
+            .order("created_at", { ascending: false })
+            .limit(100);
+
+          if (bucket === "attention") {
+            q = q.or(
+              [
+                `and(ops_status.eq.need_to_schedule,status.eq.open,created_at.lte.${attentionBusinessCutoffIso})`,
+                `and(ops_status.eq.pending_info,created_at.lte.${attentionBusinessCutoffIso})`,
+                `and(ops_status.eq.failed,created_at.lte.${failedCutoffIso})`,
+                `and(ops_status.eq.pending_office_review,created_at.lte.${failedCutoffIso})`,
+              ].join(","),
+            );
+          } else if (bucket === "failed") {
+            q = q.in("ops_status", ["failed", "pending_office_review"]);
+          } else if (bucket === "workflow_all") {
+            q = q.in("ops_status", [
+              "need_to_schedule",
+              "pending_info",
+              "on_hold",
+              "failed",
+              "pending_office_review",
+            ]);
+          } else if (bucket === "closeout") {
+            q = q
+              .eq("field_complete", true)
+              .neq("ops_status", "closed");
+          } else if (bucket === "recent_closed") {
+            q = q
+              .eq("ops_status", "closed")
+              .order("created_at", { ascending: false })
+              .limit(15);
+          } else {
+            q = q.eq("ops_status", bucket);
+            if (bucket === "need_to_schedule" || bucket === "scheduled") {
+              q = q.eq("status", "open");
+            }
+          }
+
+          q = applyCommonFilters(q);
+          return q;
+        }),
+      ),
     ]);
 
   if (fieldWorkRes.error) throw fieldWorkRes.error;
@@ -1614,7 +1689,7 @@ function customerLine(j: any) {
 
 function addressLine(j: any) {
   const parts = addressParts(j);
-  const cityStateZip = [parts.city, [parts.state, parts.zip].filter(Boolean).join(" ")]
+  const cityStateZip = [formatCityNamePart(parts.city), [parts.state, parts.zip].filter(Boolean).join(" ")]
     .filter(Boolean)
     .join(", ");
   const out = [parts.address, cityStateZip].filter(Boolean).join(", ");
@@ -1668,42 +1743,45 @@ function contractorNameOnly(j: any) {
 
 function normalizeFailureLine(line: string, testTypeRaw: string): string {
   const text = String(line ?? "").trim();
-  const testType = String(testTypeRaw ?? "").trim().toLowerCase();
-  const lower = text.toLowerCase();
-
-  if (testType === "refrigerant_charge") {
-    if (
-      lower.includes("subcool") ||
-      lower.includes("superheat") ||
-      lower.includes("filter drier") ||
-      lower.includes("outdoor temp") ||
-      lower.includes("indoor temp")
-    ) {
-      return "Failed - refrigerant charge out of range";
-    }
-    return text ? `Failed - refrigerant charge: ${text}` : "Failed - refrigerant charge out of range";
-  }
-
-  if (testType === "duct_leakage") {
-    if (lower.includes("above") || lower.includes("leakage") || lower.includes("max")) {
-      return "Failed - duct leakage above threshold";
-    }
-    return text ? `Failed - duct leakage: ${text}` : "Failed - duct leakage above threshold";
-  }
-
-  if (testType === "airflow") {
-    if (lower.includes("below") || lower.includes("required") || lower.includes("target")) {
-      return "Failed - airflow below target";
-    }
-    return text ? `Failed - airflow: ${text}` : "Failed - airflow below target";
-  }
-
-  return text ? `Failed - ${text}` : "Failed - test requirement not met";
+  return formatFailedEccQueueReasonFromRun({ test_type: testTypeRaw }) || (text ? "Correction Required" : "");
 }
 
 function toEpochMs(value?: string | null) {
   const t = new Date(String(value ?? "")).getTime();
   return Number.isFinite(t) ? t : 0;
+}
+
+function buildLatestFailedRunByJob(runs: any[]) {
+  const latestByJob = new Map<string, any>();
+  for (const run of runs ?? []) {
+    const jobId = String((run as any)?.job_id ?? "").trim();
+    if (!jobId) continue;
+
+    const current = latestByJob.get(jobId);
+    if (!current) {
+      latestByJob.set(jobId, run);
+      continue;
+    }
+
+    const currentMs = Math.max(toEpochMs((current as any)?.created_at));
+    const nextMs = Math.max(toEpochMs((run as any)?.created_at));
+
+    if (nextMs > currentMs) {
+      latestByJob.set(jobId, run);
+    }
+  }
+  return latestByJob;
+}
+
+function buildPrimaryFailureReasonByJob(latestByJob: Map<string, any>) {
+  const reasonByJob = new Map<string, string>();
+  for (const [jobId, run] of latestByJob.entries()) {
+    const reasons = extractFailureReasons(run);
+    const primaryLine = reasons[0] ?? "";
+    const formatted = normalizeFailureLine(primaryLine, String((run as any)?.test_type ?? ""));
+    if (formatted) reasonByJob.set(jobId, formatted);
+  }
+  return reasonByJob;
 }
 
 function pendingInfoBannerText(j: any) {
@@ -2126,36 +2204,8 @@ const unreadContractorUpdateNotifications = unreadContractorAwarenessNotificatio
 
 const failedRuns = failedRunsRes.data ?? [];
 
-latestFailedRunByJob = new Map<string, any>();
-for (const run of failedRuns ?? []) {
-  const jobId = String((run as any)?.job_id ?? "").trim();
-  if (!jobId) continue;
-
-  const current = latestFailedRunByJob.get(jobId);
-  if (!current) {
-    latestFailedRunByJob.set(jobId, run);
-    continue;
-  }
-
-  const currentMs = Math.max(
-    toEpochMs((current as any)?.created_at)
-  );
-  const nextMs = Math.max(
-    toEpochMs((run as any)?.created_at)
-  );
-
-  if (nextMs > currentMs) {
-    latestFailedRunByJob.set(jobId, run);
-  }
-}
-
-const primaryFailureReasonByJob = new Map<string, string>();
-for (const [jobId, run] of latestFailedRunByJob.entries()) {
-  const reasons = extractFailureReasons(run);
-  const primaryLine = reasons[0] ?? "";
-  const formatted = normalizeFailureLine(primaryLine, String((run as any)?.test_type ?? ""));
-  primaryFailureReasonByJob.set(jobId, formatted);
-}
+latestFailedRunByJob = buildLatestFailedRunByJob(failedRuns ?? []);
+primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
 
 function failedStatusSinceByJob(jobId: string): string | null {
   const run = latestFailedRunByJob.get(jobId);
@@ -3342,6 +3392,7 @@ const selectedWorkspaceQueue =
   workspaceQueues.find((queue) => queue.key === selectedWorkspaceKey) ?? workspaceQueues[0];
 
 function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
+  const specificFailureReason = workspaceFailedReason(job);
   if (queueKey === "need_to_schedule") return "Awaiting scheduling";
   if (queueKey === "field_work") {
     const lifecycle = String(job?.status ?? "").toLowerCase();
@@ -3350,6 +3401,7 @@ function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
     return "Scheduled field work";
   }
   if (queueKey === "without_tech") return "Scheduled without active tech assignment";
+  if (specificFailureReason) return specificFailureReason;
   return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
 }
 
@@ -3364,7 +3416,7 @@ function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {
 
   const jobId = String(job?.id ?? "").trim();
   return (
-    resolveLifecycleAging({
+    resolveLifecycleDaysAgingLabel({
       status: String(job?.status ?? "").trim() || null,
       opsStatus: String(job?.ops_status ?? "").trim() || null,
       createdAt: String(job?.created_at ?? "").trim() || null,
@@ -3372,7 +3424,7 @@ function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {
       fieldCompleteAt: String(job?.field_complete_at ?? "").trim() || null,
       stateEnteredAtByStatus: opsStatusEnteredAtByJob.get(jobId) ?? null,
       failedEvidenceAt: failedStatusSinceByJob(jobId),
-    }).label ?? "-"
+    }) ?? "Not available"
   );
 }
 
@@ -3598,13 +3650,19 @@ if (panel !== "full_board") {
                       {workspaceStatusReason(job, selectedWorkspaceQueue.key)}
                     </div>
                     <div>
-                      <span className="font-medium text-slate-500">Age/Time:</span>{" "}
+                      <span className="font-medium text-slate-500">Days Aging:</span>{" "}
                       {workspaceAgeTime(job, selectedWorkspaceQueue.key)}
                     </div>
                     <div>
                       <span className="font-medium text-slate-500">Assignment:</span>{" "}
                       {assignmentSummaryForJob(String(job?.id ?? ""))}
                     </div>
+                    {workspaceContractorName(job) ? (
+                      <div>
+                        <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                        {workspaceContractorName(job)}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
               ))}
