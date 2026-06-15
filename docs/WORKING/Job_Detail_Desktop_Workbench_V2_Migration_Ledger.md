@@ -95,3 +95,31 @@ Note: a broader `job-tests-page-wiring.test.ts` run was attempted and the releva
 - `npx.cmd tsc --noEmit`
 - `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
 - `git diff --check`
+
+## Slice: V2 Pulse Hero Read-Only State
+
+### Items reviewed
+
+| Hero item | Status | Notes |
+|---|---|---|
+| Current lifecycle/status | Migrated to V2 Pulse hero | Uses existing `formatOpsStatusLabel`, `job.ops_status`, `job.status`, and closed/cancelled/archive booleans already derived in the route. |
+| Field status / field completion | Migrated to V2 Pulse hero | Uses existing `job.field_complete`, `isFieldComplete`, and lifecycle status. |
+| Schedule state | Migrated to V2 Pulse hero | Uses existing `job.scheduled_date`, `appointmentDateLabel`, and `appointmentTimeLabel`. |
+| Current next-action copy | Partially migrated | Uses existing `nextActionPreview` when present; otherwise uses conservative read-only copy based on already-rendered lifecycle/schedule/field/closeout values. |
+| Closeout readiness headline | Migrated to V2 Pulse hero | Uses existing `primaryCloseoutMessage`, `isCloseoutPending`, and closeout needs already computed in the route. |
+| Workflow/progress stages | Migrated as read-only display | Stages are derived only from already-loaded schedule, lifecycle, field-complete, closed, and billing truth values. No new workflow source was introduced. |
+| Existing action/button copy | Deferred | Hero controls remain non-mutating display only. No submit buttons, mutation links, server actions, or live controls were introduced. |
+| Last visit chip | Deferred | The hero chip remains an explicit `Deferred` placeholder because no route-loaded last-visit source was identified for this slice. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- The V2 Pulse hero uses only existing route-loaded job/schedule/billing data and existing route-derived closeout/status values.
+- No heavy/deferred bodies were rendered: timeline, notes history, attachments, invoices, ECC detail, and service chain remain untouched.
+- Operational cards, Activity rail, Records dock, People, Site Card, Work, Billing, ECC, Notes, Attachments, and Service Chain remain unmigrated in `v2-pulse`.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`

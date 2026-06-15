@@ -1073,12 +1073,38 @@ type PulseHeaderContent = {
   metaLabel: string;
 };
 
+type PulseHeroStage = {
+  label: string;
+  meta: string;
+  complete: boolean;
+  current: boolean;
+  iconName: PulseIconName;
+};
+
+type PulseHeroChip = {
+  label: string;
+  value: string;
+  iconName: PulseIconName;
+};
+
+type PulseHeroContent = {
+  eyebrow: string;
+  title: string;
+  body: string;
+  stateLabel: string;
+  stateMeta: string;
+  stateTone: "emerald" | "blue" | "amber" | "red" | "slate";
+  stages: PulseHeroStage[];
+  chips: PulseHeroChip[];
+};
+
 function JobDetailDesktopWorkbenchV2({
   children: _children,
   sitePlaceWorkContent,
   jobBriefContent,
   pulseHeaderContent,
   pulseStatusItems: pulseStatusItemsOverride,
+  pulseHeroContent,
   variant = "v2-pulse",
 }: {
   children: ReactNode;
@@ -1086,6 +1112,7 @@ function JobDetailDesktopWorkbenchV2({
   jobBriefContent?: ReactNode;
   pulseHeaderContent?: PulseHeaderContent;
   pulseStatusItems?: PulseStatusItem[];
+  pulseHeroContent?: PulseHeroContent;
   variant?: string;
 }) {
   const selectedVariant =
@@ -1590,13 +1617,27 @@ function JobDetailDesktopWorkbenchV2({
     { label: "Customer", value: "Acme Manufacturing", meta: "(217) 555-0198", tone: "slate", iconName: "contact" },
     { label: "Assigned Team", value: "Field Team A", meta: "John D., Lead", tone: "slate", iconName: "team" },
   ];
-  const pulseTimelineStages: Array<[string, string, boolean, PulseIconName]> = [
-    ["Scheduled", "Apr 28", true, "schedule"],
-    ["En Route", "May 1, 7:45 AM", true, "navigate"],
-    ["On Site", "Since 8:05 AM", true, "location"],
-    ["Complete", "Pending", false, "brief"],
-    ["Invoiced", "Pending", false, "billing"],
-  ];
+  const pulseHero = pulseHeroContent ?? {
+    eyebrow: "Next Move",
+    title: "Complete Field Work",
+    body: "On site and in progress. Finish diagnostics, verify repairs, capture required photos, and complete checklist items.",
+    stateLabel: "On Site",
+    stateMeta: "Active stage placeholder",
+    stateTone: "emerald" as const,
+    stages: [
+      { label: "Scheduled", meta: "Apr 28", complete: true, current: false, iconName: "schedule" as const },
+      { label: "En Route", meta: "May 1, 7:45 AM", complete: true, current: false, iconName: "navigate" as const },
+      { label: "On Site", meta: "Since 8:05 AM", complete: true, current: true, iconName: "location" as const },
+      { label: "Complete", meta: "Pending", complete: false, current: false, iconName: "brief" as const },
+      { label: "Invoiced", meta: "Pending", complete: false, current: false, iconName: "billing" as const },
+    ],
+    chips: [
+      { label: "Est. time remaining", value: "2h 15m", iconName: "clock" as const },
+      { label: "Technician", value: "John Davis", iconName: "team" as const },
+      { label: "Last Visit", value: "Not reviewed", iconName: "clock" as const },
+      { label: "Weather", value: "68F Sunny", iconName: "activity" as const },
+    ],
+  };
   const pulseActivityItems: Array<[string, string, string, "amber" | "blue" | "green" | "violet", PulseIconName]> = [
     ["Internal Note", "Found dirty condenser coil. Cleaning in progress.", "10:32 AM", "amber", "message"],
     ["Status Updated", "En Route -> On Site", "10:15 AM", "blue", "activity"],
@@ -1719,25 +1760,37 @@ function JobDetailDesktopWorkbenchV2({
                   <div>
                     <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-100">
                       {renderPulseIcon("navigate", "h-4 w-4")}
-                      <span>Next Move</span>
+                      <span>{pulseHero.eyebrow}</span>
                     </div>
-                    <h2 className="mt-1 text-3xl font-semibold tracking-normal text-white">Complete Field Work</h2>
+                    <h2 className="mt-1 text-3xl font-semibold tracking-normal text-white">{pulseHero.title}</h2>
                     <p className="mt-2 max-w-2xl text-sm leading-5 text-slate-200">
-                      On site and in progress. Finish diagnostics, verify repairs, capture required photos, and complete checklist items.
+                      {pulseHero.body}
                     </p>
                   </div>
                   <div className="rounded-xl border border-white/15 bg-white/8 px-4 py-3 shadow-[0_18px_42px_-36px_rgba(0,0,0,0.65)]">
                     <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
-                      On Site
+                      <span
+                        className={`h-2.5 w-2.5 rounded-full ${
+                          pulseHero.stateTone === "emerald"
+                            ? "bg-emerald-400"
+                            : pulseHero.stateTone === "blue"
+                            ? "bg-blue-400"
+                            : pulseHero.stateTone === "amber"
+                            ? "bg-amber-400"
+                            : pulseHero.stateTone === "red"
+                            ? "bg-red-400"
+                            : "bg-slate-300"
+                        }`}
+                      />
+                      {pulseHero.stateLabel}
                     </div>
-                    <div className="mt-1 text-xs text-slate-300">Active stage placeholder</div>
+                    <div className="mt-1 text-xs text-slate-300">{pulseHero.stateMeta}</div>
                   </div>
                 </div>
 
                 <div className="mt-7 flex items-start">
-                  {pulseTimelineStages.map(([stage, meta, complete, iconName], index) => (
-                    <div key={stage} className="relative flex min-w-0 flex-1 flex-col items-center">
+                  {pulseHero.stages.map(({ label, meta, complete, current, iconName }, index) => (
+                    <div key={label} className="relative flex min-w-0 flex-1 flex-col items-center">
                       {index > 0 ? (
                         <div
                           className={`absolute left-0 top-4 h-0.5 w-1/2 ${
@@ -1745,16 +1798,16 @@ function JobDetailDesktopWorkbenchV2({
                           }`}
                         />
                       ) : null}
-                      {index < pulseTimelineStages.length - 1 ? (
+                      {index < pulseHero.stages.length - 1 ? (
                         <div
                           className={`absolute right-0 top-4 h-0.5 w-1/2 ${
-                            index < 2 ? "bg-emerald-400" : "bg-white/25"
+                            pulseHero.stages[index + 1]?.complete ? "bg-emerald-400" : "bg-white/25"
                           }`}
                         />
                       ) : null}
                       <div
                         className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border ${
-                          index === 2
+                          current
                             ? "border-blue-200 bg-blue-600 shadow-[0_0_0_6px_rgba(37,99,235,0.24)]"
                             : complete
                             ? "border-emerald-300 bg-emerald-500"
@@ -1763,22 +1816,17 @@ function JobDetailDesktopWorkbenchV2({
                       >
                         {renderPulseIcon(iconName, "h-3.5 w-3.5 text-white")}
                       </div>
-                      <div className="mt-2 text-center text-xs font-semibold text-white">{stage}</div>
+                      <div className="mt-2 text-center text-xs font-semibold text-white">{label}</div>
                       <div className="mt-0.5 text-center text-[10px] leading-4 text-slate-300">{meta}</div>
                     </div>
                   ))}
                 </div>
 
                 <div className="mt-6 grid gap-2 rounded-xl border border-white/10 bg-white/8 p-2 xl:grid-cols-4">
-                  {[
-                    ["Est. time remaining", "2h 15m", "clock"],
-                    ["Technician", "John Davis", "team"],
-                    ["Last Visit", "Not reviewed", "clock"],
-                    ["Weather", "68F Sunny", "activity"],
-                  ].map(([label, value, iconName]) => (
+                  {pulseHero.chips.map(({ label, value, iconName }) => (
                     <span key={label} className="rounded-lg border border-white/10 bg-[#071f3a]/70 px-3 py-2">
                       <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-100">
-                        {renderPulseIcon(iconName as PulseIconName, "h-3 w-3")}
+                        {renderPulseIcon(iconName, "h-3 w-3")}
                         <span>{label}</span>
                       </span>
                       <span className="mt-0.5 block text-xs font-semibold text-white">{value}</span>
@@ -4329,6 +4377,137 @@ const pulseStatusStripItems: PulseStatusItem[] = [
     iconName: "team",
   },
 ];
+const pulseStageState =
+  isJobClosed
+    ? "invoiced"
+    : isFieldComplete || normalizedJobStatus === "completed"
+    ? "complete"
+    : normalizedJobStatus === "in_process"
+    ? "on_site"
+    : normalizedJobStatus === "on_the_way" || normalizedOpsStatus === "on_the_way"
+    ? "en_route"
+    : job.scheduled_date || normalizedOpsStatus === "scheduled"
+    ? "scheduled"
+    : "needs_schedule";
+const pulseHeroTitle =
+  isJobClosed
+    ? "Job Closed"
+    : isFieldComplete || normalizedJobStatus === "completed"
+    ? "Review Closeout Requirements"
+    : normalizedJobStatus === "in_process"
+    ? "Complete Field Work"
+    : normalizedJobStatus === "on_the_way" || normalizedOpsStatus === "on_the_way"
+    ? "Technician En Route"
+    : job.scheduled_date || normalizedOpsStatus === "scheduled"
+    ? "Scheduled / On Deck"
+    : "Schedule / Dispatch Job";
+const pulseHeroBody =
+  isJobClosed
+    ? "This job is closed. Review records, billing, service chain, and audit history from the lower workspaces."
+    : isFieldComplete || normalizedJobStatus === "completed"
+    ? primaryCloseoutMessage
+    : completionActionAttentionBanner
+    ? String(completionActionAttentionBanner.title)
+    : nextActionPreview
+    ? nextActionPreview
+    : normalizedJobStatus === "in_process"
+    ? "Field work is active. Track field status, required outcomes, and closeout posture from the job workbench."
+    : normalizedJobStatus === "on_the_way" || normalizedOpsStatus === "on_the_way"
+    ? "The assigned team is on the way. Keep schedule, site access, and customer context visible for dispatch."
+    : job.scheduled_date || normalizedOpsStatus === "scheduled"
+    ? `This job is scheduled for ${appointmentDateLabel}${appointmentTimeLabel ? `, ${appointmentTimeLabel}` : ""}. Keep it ready for dispatch.`
+    : "This job needs scheduling. Use the legacy scheduling controls for now; Pulse actions remain deferred in this preview.";
+const pulseHeroStateLabel =
+  isJobClosed
+    ? "Closed"
+    : isCloseoutPending
+    ? "Closeout"
+    : pulseLifecycleValue;
+const pulseHeroStateMeta =
+  isFieldComplete || normalizedJobStatus === "completed"
+    ? primaryCloseoutMessage
+    : jobStatusSummaryText;
+const pulseHeroStateTone: PulseHeroContent["stateTone"] =
+  isJobClosed
+    ? "slate"
+    : isFieldComplete || normalizedJobStatus === "completed" || isCloseoutPending
+    ? "amber"
+    : normalizedJobStatus === "in_process" || normalizedJobStatus === "on_the_way"
+    ? "emerald"
+    : job.scheduled_date || normalizedOpsStatus === "scheduled"
+    ? "blue"
+    : normalizedOpsStatus === "need_to_schedule"
+    ? "blue"
+    : "slate";
+const pulseHeroStages: PulseHeroStage[] = [
+  {
+    label: "Scheduled",
+    meta: job.scheduled_date ? appointmentDateLabel : "Needs scheduling",
+    complete: Boolean(job.scheduled_date) || ["en_route", "on_site", "complete", "invoiced"].includes(pulseStageState),
+    current: pulseStageState === "scheduled" || pulseStageState === "needs_schedule",
+    iconName: "schedule",
+  },
+  {
+    label: "En Route",
+    meta: pulseStageState === "en_route" ? "Current" : ["on_site", "complete", "invoiced"].includes(pulseStageState) ? "Passed" : "Pending",
+    complete: ["en_route", "on_site", "complete", "invoiced"].includes(pulseStageState),
+    current: pulseStageState === "en_route",
+    iconName: "navigate",
+  },
+  {
+    label: "On Site",
+    meta: pulseStageState === "on_site" ? "Current" : ["complete", "invoiced"].includes(pulseStageState) ? "Passed" : "Pending",
+    complete: ["on_site", "complete", "invoiced"].includes(pulseStageState),
+    current: pulseStageState === "on_site",
+    iconName: "location",
+  },
+  {
+    label: "Complete",
+    meta: pulseStageState === "complete" ? "Closeout" : pulseStageState === "invoiced" ? "Complete" : "Pending",
+    complete: ["complete", "invoiced"].includes(pulseStageState),
+    current: pulseStageState === "complete",
+    iconName: "brief",
+  },
+  {
+    label: "Invoiced",
+    meta: billingState.billedTruthSatisfied ? "Satisfied" : isJobClosed ? "Closed" : "Pending",
+    complete: billingState.billedTruthSatisfied || pulseStageState === "invoiced",
+    current: pulseStageState === "invoiced",
+    iconName: "billing",
+  },
+];
+const pulseHeroChips: PulseHeroChip[] = [
+  {
+    label: "Schedule",
+    value: job.scheduled_date ? `${appointmentDateLabel} · ${appointmentTimeLabel}` : "Needs scheduling",
+    iconName: "schedule",
+  },
+  {
+    label: "Assigned lead",
+    value: pulseAssignedTeamValue,
+    iconName: "team",
+  },
+  {
+    label: "Last Visit",
+    value: "Deferred",
+    iconName: "clock",
+  },
+  {
+    label: "Closeout",
+    value: isJobClosed ? "Closed" : isCloseoutPending ? "Pending" : isFieldComplete ? "Ready" : "Not ready",
+    iconName: "billing",
+  },
+];
+const pulseHeroContent: PulseHeroContent = {
+  eyebrow: "Current Job State",
+  title: pulseHeroTitle,
+  body: pulseHeroBody,
+  stateLabel: pulseHeroStateLabel,
+  stateMeta: pulseHeroStateMeta,
+  stateTone: pulseHeroStateTone,
+  stages: pulseHeroStages,
+  chips: pulseHeroChips,
+};
 const showSharedNotesCard = !isHvacServiceMode;
 const showEccSummaryCard = job.job_type === "ecc";
 const showJobRecordsPermitCard = showEccSummaryCard || hasPermitDetails;
@@ -5495,6 +5674,7 @@ const failureResolutionPathCount =
         jobBriefContent={jobBriefContent}
         pulseHeaderContent={pulseHeaderContent}
         pulseStatusItems={pulseStatusStripItems}
+        pulseHeroContent={pulseHeroContent}
         variant={desktopLayout}
       >
         {children}
