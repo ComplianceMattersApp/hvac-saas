@@ -1037,15 +1037,55 @@ function JobDetailDesktopLegacyLayout({ children }: { children: ReactNode }) {
   return <div className="hidden space-y-5 lg:block">{children}</div>;
 }
 
+type PulseIconName =
+  | "activity"
+  | "audit"
+  | "billing"
+  | "brief"
+  | "clock"
+  | "contact"
+  | "equipment"
+  | "files"
+  | "location"
+  | "message"
+  | "navigate"
+  | "payment"
+  | "schedule"
+  | "service"
+  | "settings"
+  | "team"
+  | "warning"
+  | "work";
+
+type PulseStatusItem = {
+  label: string;
+  value: string;
+  meta: string;
+  tone: "emerald" | "red" | "amber" | "blue" | "slate";
+  iconName: PulseIconName;
+};
+
+type PulseHeaderContent = {
+  title: string;
+  reference: string;
+  serviceCaseReference: string;
+  createdLabel: string;
+  metaLabel: string;
+};
+
 function JobDetailDesktopWorkbenchV2({
   children: _children,
   sitePlaceWorkContent,
   jobBriefContent,
+  pulseHeaderContent,
+  pulseStatusItems: pulseStatusItemsOverride,
   variant = "v2-pulse",
 }: {
   children: ReactNode;
   sitePlaceWorkContent?: ReactNode;
   jobBriefContent?: ReactNode;
+  pulseHeaderContent?: PulseHeaderContent;
+  pulseStatusItems?: PulseStatusItem[];
   variant?: string;
 }) {
   const selectedVariant =
@@ -1498,25 +1538,6 @@ function JobDetailDesktopWorkbenchV2({
     </div>
   );
 
-  type PulseIconName =
-    | "activity"
-    | "audit"
-    | "billing"
-    | "brief"
-    | "clock"
-    | "contact"
-    | "equipment"
-    | "files"
-    | "location"
-    | "message"
-    | "navigate"
-    | "payment"
-    | "schedule"
-    | "service"
-    | "settings"
-    | "team"
-    | "warning"
-    | "work";
   const renderPulseIcon = (name: PulseIconName, className = "h-4 w-4") => {
     switch (name) {
       case "audit":
@@ -1553,14 +1574,21 @@ function JobDetailDesktopWorkbenchV2({
         return <ChevronRightIcon className={className} />;
     }
   };
-  const pulseStatusItems: Array<[string, string, string, "emerald" | "red" | "amber" | "blue" | "slate", PulseIconName]> = [
-    ["Status", "In Progress", "Since 10:15 AM", "emerald", "activity"],
-    ["Priority", "High", "Due today 12:00 PM", "red", "warning"],
-    ["Aging", "3 Days", "Opened Apr 28", "amber", "clock"],
-    ["Schedule", "May 1, 2025", "8:00 AM - 12:00 PM", "blue", "schedule"],
-    ["Service Location", "123 Main Street", "Site verified", "slate", "location"],
-    ["Customer", "Acme Manufacturing", "(217) 555-0198", "slate", "contact"],
-    ["Assigned Team", "Field Team A", "John D., Lead", "slate", "team"],
+  const pulseHeader = pulseHeaderContent ?? {
+    title: "Job #J-2025-04158",
+    reference: "Job # placeholder",
+    serviceCaseReference: "Service case placeholder",
+    createdLabel: "Created timestamp placeholder",
+    metaLabel: "Job Pulse concept placeholders",
+  };
+  const pulseStatusItems: PulseStatusItem[] = pulseStatusItemsOverride ?? [
+    { label: "Status", value: "In Progress", meta: "Since 10:15 AM", tone: "emerald", iconName: "activity" },
+    { label: "Priority", value: "High", meta: "Due today 12:00 PM", tone: "red", iconName: "warning" },
+    { label: "Aging", value: "3 Days", meta: "Opened Apr 28", tone: "amber", iconName: "clock" },
+    { label: "Schedule", value: "May 1, 2025", meta: "8:00 AM - 12:00 PM", tone: "blue", iconName: "schedule" },
+    { label: "Service Location", value: "123 Main Street", meta: "Site verified", tone: "slate", iconName: "location" },
+    { label: "Customer", value: "Acme Manufacturing", meta: "(217) 555-0198", tone: "slate", iconName: "contact" },
+    { label: "Assigned Team", value: "Field Team A", meta: "John D., Lead", tone: "slate", iconName: "team" },
   ];
   const pulseTimelineStages: Array<[string, string, boolean, PulseIconName]> = [
     ["Scheduled", "Apr 28", true, "schedule"],
@@ -1609,15 +1637,15 @@ function JobDetailDesktopWorkbenchV2({
             <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               <span>Jobs</span>
               <span>/</span>
-              <span>Job #J-2025-04158</span>
+              <span>{pulseHeader.reference}</span>
             </div>
-            <h1 className="mt-1.5 text-3xl font-semibold tracking-normal text-slate-950">Job #J-2025-04158</h1>
+            <h1 className="mt-1.5 text-3xl font-semibold tracking-normal text-slate-950">{pulseHeader.title}</h1>
             <p className="mt-1 flex flex-wrap gap-2 text-xs leading-5 text-slate-500">
-              <span>Service Case: SC-025811</span>
+              <span>{pulseHeader.serviceCaseReference}</span>
               <span>|</span>
-              <span>Created: Apr 25, 2025 at 8:42 AM</span>
+              <span>{pulseHeader.createdLabel}</span>
               <span>|</span>
-              <span>Job Pulse concept placeholders</span>
+              <span>{pulseHeader.metaLabel}</span>
             </p>
           </div>
           <div className="flex items-center justify-end gap-2 bg-[#fbfcfd] px-5 py-4">
@@ -1646,7 +1674,7 @@ function JobDetailDesktopWorkbenchV2({
         data-v2-zone="status-summary-strip"
         className="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_42px_-40px_rgba(15,23,42,0.38)] xl:grid-cols-7"
       >
-        {pulseStatusItems.map(([label, value, meta, tone, iconName]) => (
+        {pulseStatusItems.map(({ label, value, meta, tone, iconName }) => (
           <div key={label} className="min-w-0 border-b border-r border-slate-100 px-4 py-3 last:border-r-0 xl:border-b-0">
             <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               {renderPulseIcon(iconName, "h-3.5 w-3.5")}
@@ -1745,7 +1773,7 @@ function JobDetailDesktopWorkbenchV2({
                   {[
                     ["Est. time remaining", "2h 15m", "clock"],
                     ["Technician", "John Davis", "team"],
-                    ["Vehicle", "Van 27", "navigate"],
+                    ["Last Visit", "Not reviewed", "clock"],
                     ["Weather", "68F Sunny", "activity"],
                   ].map(([label, value, iconName]) => (
                     <span key={label} className="rounded-lg border border-white/10 bg-[#071f3a]/70 px-3 py-2">
@@ -4191,6 +4219,116 @@ const headerJobTypeLabel = String(job.job_type ?? "service")
   .filter(Boolean)
   .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
   .join(" ");
+const pulseCreatedAt = String((job as any).created_at ?? "").trim();
+const pulseCreatedMs = toTimestampMs(pulseCreatedAt);
+const pulseElapsedDays = pulseCreatedMs > 0
+  ? Math.max(0, Math.floor((Date.now() - pulseCreatedMs) / 86_400_000))
+  : null;
+const pulseAgingValue =
+  pulseElapsedDays == null
+    ? "Aging deferred"
+    : pulseElapsedDays === 0
+    ? "Opened today"
+    : `${pulseElapsedDays} day${pulseElapsedDays === 1 ? "" : "s"}`;
+const pulseCreatedDateLabel = pulseCreatedAt
+  ? formatTimestampDateDisplayLA(pulseCreatedAt)
+  : "Created date unavailable";
+const pulseHeaderCreatedLabel = pulseCreatedAt
+  ? `Created: ${formatTimestampDateTimeDisplayLA(pulseCreatedAt)}`
+  : "Created timestamp unavailable";
+const pulseServiceCaseReference = serviceCaseId
+  ? `Service Case: ${serviceCaseId.slice(0, 8)}...`
+  : "Service Case: none linked";
+const pulseServiceCaseMeta = serviceCaseId
+  ? `${formatJobBriefDisplayLabel((serviceCase as any)?.case_kind, "Service case")} - ${serviceCaseVisitCount} visit${serviceCaseVisitCount === 1 ? "" : "s"} linked`
+  : "No service case linked";
+const pulseLifecycleValue = isFieldComplete
+  ? "Field Complete"
+  : formatOpsStatusLabel(job.ops_status, job.job_type);
+const pulseLifecycleMeta = `Field status: ${formatStatus(job.status)}`;
+const pulseLifecycleTone: PulseStatusItem["tone"] =
+  String(job.status ?? "").trim().toLowerCase() === "failed" ||
+  String(job.status ?? "").trim().toLowerCase() === "cancelled"
+    ? "red"
+    : isFieldComplete
+    ? "emerald"
+    : "blue";
+const pulsePrimaryAssignee = assignedTeam.find((assignee) => assignee.is_primary) ?? assignedTeam[0] ?? null;
+const pulseAssignedTeamValue = pulsePrimaryAssignee
+  ? formatPersonNamePart(pulsePrimaryAssignee.display_name)
+  : "Awaiting assignment";
+const pulseAssignedTeamMeta = assignedTeam.length > 0
+  ? `${assignedTeam.length} assigned${pulsePrimaryAssignee?.is_primary ? " - primary set" : ""}`
+  : "No team assigned";
+const pulseCustomerValue = customerDisplayName !== "â€”" ? customerDisplayName : "Customer not set";
+const pulseCustomerMeta = customerPhone !== "â€”"
+  ? String(customerPhone)
+  : customerEmail !== "â€”"
+  ? String(customerEmail)
+  : "No contact saved";
+const pulseServiceLocationValue = serviceAddressDisplay !== "No address set"
+  ? serviceAddressDisplay
+  : "No address set";
+const pulseServiceLocationMeta =
+  serviceAddressDisplay !== "No address set" ? "Service location loaded" : "Location deferred";
+const pulseHeaderContent: PulseHeaderContent = {
+  title: jobWorkbenchTitle,
+  reference: jobHeaderReference,
+  serviceCaseReference: pulseServiceCaseReference,
+  createdLabel: pulseHeaderCreatedLabel,
+  metaLabel: pulseServiceCaseMeta,
+};
+const pulseStatusStripItems: PulseStatusItem[] = [
+  {
+    label: "Status",
+    value: pulseLifecycleValue,
+    meta: pulseLifecycleMeta,
+    tone: pulseLifecycleTone,
+    iconName: "activity",
+  },
+  {
+    label: "Priority",
+    value: "Priority deferred",
+    meta: "No loaded priority source",
+    tone: "slate",
+    iconName: "warning",
+  },
+  {
+    label: "Aging",
+    value: pulseAgingValue,
+    meta: pulseCreatedDateLabel,
+    tone: pulseElapsedDays != null && pulseElapsedDays >= 3 ? "amber" : "slate",
+    iconName: "clock",
+  },
+  {
+    label: "Schedule",
+    value: appointmentDateLabel,
+    meta: appointmentTimeLabel,
+    tone: job.scheduled_date ? "blue" : "slate",
+    iconName: "schedule",
+  },
+  {
+    label: "Service Location",
+    value: pulseServiceLocationValue,
+    meta: pulseServiceLocationMeta,
+    tone: serviceAddressDisplay !== "No address set" ? "slate" : "amber",
+    iconName: "location",
+  },
+  {
+    label: "Customer",
+    value: pulseCustomerValue,
+    meta: pulseCustomerMeta,
+    tone: customerDisplayName !== "â€”" ? "slate" : "amber",
+    iconName: "contact",
+  },
+  {
+    label: "Assigned Team",
+    value: pulseAssignedTeamValue,
+    meta: pulseAssignedTeamMeta,
+    tone: assignedTeam.length > 0 ? "slate" : "amber",
+    iconName: "team",
+  },
+];
 const showSharedNotesCard = !isHvacServiceMode;
 const showEccSummaryCard = job.job_type === "ecc";
 const showJobRecordsPermitCard = showEccSummaryCard || hasPermitDetails;
@@ -5355,6 +5493,8 @@ const failureResolutionPathCount =
       <JobDetailDesktopWorkbenchV2
         sitePlaceWorkContent={sitePlaceWorkContent}
         jobBriefContent={jobBriefContent}
+        pulseHeaderContent={pulseHeaderContent}
+        pulseStatusItems={pulseStatusStripItems}
         variant={desktopLayout}
       >
         {children}

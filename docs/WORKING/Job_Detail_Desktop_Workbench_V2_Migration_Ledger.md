@@ -63,3 +63,35 @@ Scope: desktop V2 preview only for internal `/jobs/[id]`
 - `git diff --check`
 
 Note: a broader `job-tests-page-wiring.test.ts` run was attempted and the relevant Job Brief assertion passed, but unrelated legacy field-operations-board source-string assertions in that file failed against the current visual-lab branch structure.
+
+## Slice: V2 Pulse Header + Status Summary Strip
+
+### Items reviewed
+
+| Legacy item | Status | Notes |
+|---|---|---|
+| Job title / display title | Migrated to V2 Pulse preview | Uses existing `jobWorkbenchTitle`; no new source field was introduced. |
+| Job number / display reference | Migrated to V2 Pulse preview | Uses existing `jobHeaderReference` from `formatJobDisplayReference`. |
+| Service case reference | Migrated to V2 Pulse preview | Uses already-loaded `serviceCaseId`, `serviceCase.case_kind`, and `serviceCaseVisitCount`; no new service-case read was added. |
+| Created timestamp | Migrated to V2 Pulse preview | Uses already-loaded `job.created_at` with the existing timestamp display helper. |
+| Header actions | Deferred | Share, Edit Job, and Actions remain inert placeholders. Real navigation/actions are intentionally deferred to a later action/header slice. |
+| Status / lifecycle state | Migrated to V2 Pulse preview | Uses existing `formatOpsStatusLabel`, `formatStatus`, `job.ops_status`, `job.status`, and field-complete state. |
+| Priority | Deferred | No route-loaded priority source was identified for this page. The strip keeps an explicit priority placeholder. |
+| Aging | Migrated to V2 Pulse preview | Uses already-loaded `job.created_at` for a lightweight elapsed-days/opened-date display. |
+| Schedule date/window | Migrated to V2 Pulse preview | Uses existing `appointmentDateLabel` and `appointmentTimeLabel`. |
+| Service location summary | Migrated to V2 Pulse preview | Uses existing `serviceAddressDisplay`; the full site/location card remains unmigrated in Pulse. |
+| Customer summary | Migrated to V2 Pulse preview | Uses existing `customerDisplayName`, `customerPhone`, and `customerEmail`. |
+| Assigned team summary | Migrated to V2 Pulse preview | Uses existing `assignedTeam` and primary assignee display data. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- The V2 Pulse header and status strip use only route-loaded job, service case, customer, schedule, location, and assignment display data.
+- Header action placeholders remain inert and do not render forms, links, server actions, or mutation paths.
+- The Job Pulse hero, Activity rail, operational cards, records dock, Job Brief, People, Site Card, Work, Billing, ECC, Timeline, Attachments, Notes, and Service Chain remain unmigrated in `v2-pulse`.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`
