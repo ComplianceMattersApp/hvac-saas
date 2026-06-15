@@ -1027,6 +1027,24 @@ function JobDetailDesktopLegacyLayout({ children }: { children: ReactNode }) {
   return <div className="hidden space-y-5 lg:block">{children}</div>;
 }
 
+function JobDetailDesktopWorkbenchV2({ children: _children }: { children: ReactNode }) {
+  return (
+    <div className="hidden space-y-5 lg:block">
+      <section className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-5 text-slate-900 shadow-sm">
+        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+          Desktop Workbench V2 Preview
+        </div>
+        <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+          Shell only
+        </h2>
+        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+          This preview switch is wired, but the V2 desktop layout has not been implemented yet.
+        </p>
+      </section>
+    </div>
+  );
+}
+
 function truncateSummaryText(value: string, maxLength = 84) {
   const normalized = value.trim().replace(/\s+/g, " ");
   if (normalized.length <= maxLength) return normalized;
@@ -1265,6 +1283,17 @@ export default async function JobDetailPage({
       : typeof tabRaw === "string"
       ? tabRaw
       : "info";
+  const desktopLayoutRaw = sp.desktopLayout;
+  const desktopLayout =
+    Array.isArray(desktopLayoutRaw)
+      ? desktopLayoutRaw[0]
+      : typeof desktopLayoutRaw === "string"
+      ? desktopLayoutRaw
+      : "";
+  const useDesktopWorkbenchV2 = desktopLayout === "v2";
+  const DesktopJobDetailLayout = useDesktopWorkbenchV2
+    ? JobDetailDesktopWorkbenchV2
+    : JobDetailDesktopLegacyLayout;
 
   const noticeRaw = sp.notice;
   const notice =
@@ -5881,7 +5910,7 @@ const failureResolutionPathCount =
         </div>
       </div>
 
-      <JobDetailDesktopLegacyLayout>
+      <DesktopJobDetailLayout>
 
 <section className={`${workspaceSectionClass} relative mb-6 overflow-hidden border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.99),rgba(248,250,252,0.96))] shadow-[0_26px_64px_-42px_rgba(15,23,42,0.44)] ring-1 ring-blue-100/70`}>
   <div className="absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#0f1f35,#2563eb)]" />
@@ -9628,7 +9657,7 @@ const failureResolutionPathCount =
   </>
 ) : null}
 
-      </JobDetailDesktopLegacyLayout>
+      </DesktopJobDetailLayout>
 
 {timingEnabled ? <JobDetailTimingLog /> : null}
 
