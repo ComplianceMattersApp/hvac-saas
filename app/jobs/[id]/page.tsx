@@ -1052,7 +1052,8 @@ function JobDetailDesktopWorkbenchV2({
     variant === "v2-command" ||
     variant === "v2-board" ||
     variant === "v2-timeline" ||
-    variant === "v2-site"
+    variant === "v2-site" ||
+    variant === "v2-pulse"
       ? variant
       : "v2-site";
   const placeholderLabel = "V2 preview placeholder";
@@ -1497,8 +1498,220 @@ function JobDetailDesktopWorkbenchV2({
     </div>
   );
 
+  const pulseStatusItems = [
+    ["Status", "On Site", "Active"],
+    ["Priority", "Standard", "Office"],
+    ["Aging", "2d 4h", "Clock"],
+    ["Schedule", "Today 1-3 PM", "Window"],
+    ["Service Location", "Site verified", "Map"],
+    ["Customer", "Account ready", "Contact"],
+    ["Assigned Team", "2 techs", "Crew"],
+  ];
+  const pulseTimelineStages = ["Scheduled", "En Route", "On Site", "Complete", "Invoiced"];
+  const pulseActivityItems = [
+    ["Internal Note", "Office tagged billing context and access timing for dispatch review.", "Now"],
+    ["Status Updated", "Moved from En Route to On Site in the active job lifecycle.", "12 min"],
+    ["Shared Note", "Field-facing note captured without mixing into internal memory.", "28 min"],
+    ["Job Scheduled", "Arrival window and assigned team were confirmed.", "9:10 AM"],
+    ["Service Case Created", "Continuity record opened for this visit path.", "Yesterday"],
+    ["View Full Timeline", "Placeholder for full timeline and records history.", "Dock"],
+  ];
+  const pulseOperationalCards = [
+    ["Job Brief", "Visit reason, customer concern, intake notes, and service details remain distinct."],
+    ["People & Contact", "Customer, access, billing recipient, assigned team, and contact attempts."],
+    ["Service Location / Site", "Visible site card keeps address and house context in the command center."],
+    ["Work to Perform", "Primary work, work items, companion service, and pricing context later."],
+    ["Billing / Closeout", "Invoice readiness, payment state, closeout blockers, and billing audience."],
+    ["ECC / Compliance", "Permit, tests, certs, correction review, retest, and compliance posture."],
+    ["Follow-up / Service Chain", "Return visit, callback, waiting release, and linked service continuity."],
+    ["Documents & Photos", "Attachments, field photos, documents, equipment, and record assets."],
+  ];
+  const pulseRecordsDockItems = [
+    "Timeline",
+    "Notes",
+    "Attachments",
+    "Equipment",
+    "Invoices",
+    "Payments",
+    "Service Chain",
+    "History",
+    "Audit Log",
+  ];
+
+  const renderPulseWorkbench = () => (
+    <div className="hidden space-y-4 lg:block" data-desktop-layout-preview="v2-pulse">
+      <section
+        data-v2-zone="header-primary-action-bar"
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_34px_82px_-58px_rgba(15,23,42,0.62)]"
+      >
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_23rem]">
+          <div className="bg-[#101827] px-5 py-4 text-white">
+            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase text-blue-100">
+              <span className="rounded-full border border-blue-200/30 bg-white/10 px-2 py-1">Job Pulse Preview</span>
+              <span>Job # placeholder</span>
+              <span>Service case placeholder</span>
+              <span>Created timestamp placeholder</span>
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold">Premium Job Command Center</h1>
+            <p className="mt-1.5 max-w-4xl text-sm leading-5 text-slate-200">
+              Inert concept centered on current job state, next action, workflow progress, and live memory.
+            </p>
+          </div>
+          <div className="flex items-center justify-end gap-2 bg-[#f8fafc] px-5 py-4">
+            {["Share", "Edit Job", "Actions"].map((label) => (
+              <span
+                key={label}
+                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm"
+              >
+                {label} placeholder
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section
+        data-v2-zone="status-summary-strip"
+        className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_20px_48px_-44px_rgba(15,23,42,0.42)] xl:grid-cols-7"
+      >
+        {pulseStatusItems.map(([label, value, meta]) => (
+          <div key={label} className="rounded-xl bg-slate-50 px-3 py-2.5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
+            <div className="mt-1 text-sm font-semibold text-slate-950">{value}</div>
+            <div className="mt-0.5 text-xs text-slate-500">{meta}</div>
+          </div>
+        ))}
+      </section>
+
+      <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_24rem]">
+        <main className="min-w-0 space-y-4">
+          <section
+            data-v2-zone="job-pulse"
+            className="overflow-hidden rounded-3xl border border-blue-200 bg-[linear-gradient(135deg,#eef6ff_0%,#ffffff_46%,#ecfeff_100%)] shadow-[0_38px_92px_-62px_rgba(37,99,235,0.62)]"
+          >
+            <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_17rem]">
+              <div className="p-5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Current pulse</div>
+                <div className="mt-2 flex flex-wrap items-end justify-between gap-5">
+                  <div>
+                    <h2 className="text-3xl font-semibold text-slate-950">Primary next action / active state</h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                      Hero panel reserved for the active office decision, field stage, and workflow momentum.
+                    </p>
+                  </div>
+                  <div className="rounded-2xl border border-blue-200 bg-white/85 px-4 py-3 text-right shadow-sm">
+                    <div className="text-[10px] font-semibold uppercase text-blue-700">Pulse strength</div>
+                    <div className="mt-1 text-2xl font-semibold text-slate-950">82%</div>
+                    <div className="text-xs text-slate-500">placeholder</div>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid gap-2 xl:grid-cols-5">
+                  {pulseTimelineStages.map((stage, index) => (
+                    <div key={stage} className="relative rounded-xl border border-white/80 bg-white/75 px-3 py-3 shadow-sm">
+                      <div className={`h-1.5 rounded-full ${index <= 2 ? "bg-blue-500" : "bg-slate-200"}`} />
+                      <div className="mt-2 text-sm font-semibold text-slate-950">{stage}</div>
+                      <div className="mt-0.5 text-xs text-slate-500">{index === 2 ? "Current stage" : "placeholder"}</div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-5 flex flex-wrap gap-2">
+                  {["Technician", "Weather", "Time remaining", "Vehicle", "Office watch"].map((label) => (
+                    <span key={label} className="rounded-full border border-blue-100 bg-white/85 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                      {label} context
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="border-t border-blue-100 bg-white/68 p-5 xl:border-l xl:border-t-0">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Site snapshot</div>
+                <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
+                  <div className="h-40 bg-[linear-gradient(135deg,#cbd5e1,#eff6ff_52%,#d1fae5)]" />
+                  <div className="border-t border-slate-200 bg-white px-3 py-3">
+                    <div className="text-sm font-semibold text-slate-950">Service location placeholder</div>
+                    <div className="mt-1 text-xs leading-5 text-slate-600">House/photo and address context stays visible but secondary to the pulse.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section
+            data-v2-zone="operational-card-grid"
+            className="grid gap-3 xl:grid-cols-4"
+          >
+            {pulseOperationalCards.map(([title, body], index) => (
+              <div
+                key={title}
+                className={`min-h-36 rounded-2xl border p-4 shadow-[0_18px_42px_-38px_rgba(15,23,42,0.42)] ${
+                  index === 0
+                    ? "border-blue-200 bg-blue-50/80"
+                    : index === 2
+                    ? "border-emerald-200 bg-emerald-50/70"
+                    : "border-slate-200 bg-white"
+                }`}
+              >
+                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Inert zone</div>
+                <h3 className="mt-1 text-base font-semibold text-slate-950">{title}</h3>
+                <p className="mt-2 text-sm leading-5 text-slate-600">{body}</p>
+              </div>
+            ))}
+          </section>
+        </main>
+
+        <aside
+          data-v2-zone="job-memory"
+          className="rounded-2xl border border-amber-200 bg-[#fffbeb] p-4 text-amber-950 shadow-[0_26px_64px_-52px_rgba(180,83,9,0.46)]"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Activity / Memory</div>
+              <h2 className="mt-1 text-lg font-semibold">Live job memory stream</h2>
+            </div>
+            <span className="rounded-full border border-amber-200 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase text-amber-800">
+              Inert
+            </span>
+          </div>
+          <div className="mt-4 space-y-3">
+            {pulseActivityItems.map(([label, body, meta]) => (
+              <div key={`${label}-${meta}`} className="rounded-xl bg-white/75 px-3 py-3 shadow-[inset_3px_0_0_rgba(217,119,6,0.18)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-xs font-semibold uppercase text-amber-800">{label}</div>
+                  <div className="text-[10px] font-semibold uppercase text-slate-400">{meta}</div>
+                </div>
+                <p className="mt-1 text-xs leading-5 text-slate-700">{body}</p>
+              </div>
+            ))}
+          </div>
+        </aside>
+      </div>
+
+      <section
+        data-v2-zone="records-workspace"
+        className="rounded-2xl border border-slate-200 bg-[#fbfcfd] px-4 py-3 shadow-[0_22px_56px_-50px_rgba(15,23,42,0.42)]"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Records dock</div>
+            <div className="mt-0.5 text-sm font-semibold text-slate-950">Secondary workspaces remain available below the pulse.</div>
+          </div>
+          <div className="grid flex-1 gap-2 md:grid-cols-5 xl:grid-cols-9">
+            {pulseRecordsDockItems.map((label) => (
+              <div key={label} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center text-xs font-semibold text-slate-700">
+                {label}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+
   if (selectedVariant === "v2-board") return renderIntelligenceBoard();
   if (selectedVariant === "v2-timeline") return renderTimelineConcept();
+  if (selectedVariant === "v2-pulse") return renderPulseWorkbench();
   if (selectedVariant === "v2-site") return renderSiteCommandWorkbench();
   return renderCommandCockpit();
 }
@@ -1753,7 +1966,8 @@ export default async function JobDetailPage({
     desktopLayout === "v2-command" ||
     desktopLayout === "v2-board" ||
     desktopLayout === "v2-timeline" ||
-    desktopLayout === "v2-site";
+    desktopLayout === "v2-site" ||
+    desktopLayout === "v2-pulse";
   const noticeRaw = sp.notice;
   const notice =
     Array.isArray(noticeRaw)
