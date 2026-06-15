@@ -821,6 +821,16 @@ function nextStatusLabel(status?: string | null) {
   return nextMap[s] ?? "—";
 }
 
+function formatJobBriefDisplayLabel(value?: string | null, fallback = "Not set") {
+  const text = String(value ?? "").trim();
+  if (!text) return fallback;
+  return text
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
+    .join(" ");
+}
+
 function MobileLineIcon(props: { children: ReactNode; className?: string }) {
   const { children, className } = props;
   return (
@@ -1030,10 +1040,12 @@ function JobDetailDesktopLegacyLayout({ children }: { children: ReactNode }) {
 function JobDetailDesktopWorkbenchV2({
   children: _children,
   sitePlaceWorkContent,
+  jobBriefContent,
   variant = "v2-site",
 }: {
   children: ReactNode;
   sitePlaceWorkContent?: ReactNode;
+  jobBriefContent?: ReactNode;
   variant?: string;
 }) {
   const selectedVariant =
@@ -1422,16 +1434,7 @@ function JobDetailDesktopWorkbenchV2({
 
           <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_22px_52px_-48px_rgba(15,23,42,0.46)]">
             <div className="grid gap-5 xl:grid-cols-[minmax(0,0.78fr)_minmax(0,0.5fr)]">
-              <div data-v2-zone="job-brief">
-                <div className="text-[11px] font-semibold uppercase text-blue-700">Operational explanation</div>
-                <h2 className="mt-0.5 text-lg font-semibold text-slate-950">Job Brief</h2>
-                <p className="mt-1.5 text-sm leading-5 text-slate-600">{zoneCopy["job-brief"]}</p>
-                <div className="mt-3 space-y-1.5 border-t border-slate-200 pt-3">
-                  <div className="h-2 rounded bg-blue-200" />
-                  <div className="h-2 w-5/6 rounded bg-slate-200" />
-                  <div className="h-2 w-2/3 rounded bg-slate-200" />
-                </div>
-              </div>
+              {jobBriefContent}
               <div data-v2-zone="primary-work" className="border-l border-slate-200 pl-5">
                 <div className="text-[11px] font-semibold uppercase text-emerald-700">Work to perform</div>
                 <h2 className="mt-0.5 text-base font-semibold text-slate-950">Primary Work</h2>
@@ -4833,10 +4836,106 @@ const failureResolutionPathCount =
       </div>
     </section>
   );
+  const jobBriefServiceCaseKindLabel = formatJobBriefDisplayLabel((serviceCase as any)?.case_kind ?? "reactive");
+  const jobBriefVisitTypeLabel = formatJobBriefDisplayLabel(job.service_visit_type ?? "diagnostic");
+  const jobBriefVisitOutcomeLabel = formatJobBriefDisplayLabel(job.service_visit_outcome ?? "follow_up_required");
+  const jobBriefRows: Array<{ label: string; value: string; emphasis?: boolean }> = [
+    { label: "Visit Reason", value: visitReasonText, emphasis: true },
+    ...(shouldShowCustomerConcern ? [{ label: "Customer Concern", value: jobTitleText }] : []),
+    ...(shouldShowIntakeNotes ? [{ label: "Intake Notes", value: jobNotesText }] : []),
+    ...(shouldShowWorkSummary ? [{ label: "Work Summary", value: visitScopeSummary ?? "" }] : []),
+  ];
+  const jobBriefContent = (
+    <div data-v2-zone="job-brief" className="min-w-0">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-semibold uppercase text-blue-700">Operational explanation</div>
+          <h2 className="mt-0.5 text-lg font-semibold text-slate-950">Job Brief</h2>
+        </div>
+        <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase text-slate-500">
+          Read only
+        </span>
+      </div>
+
+      <div className="mt-3 space-y-2.5">
+        {jobBriefRows.map(({ label, value, emphasis }) => (
+          <div
+            key={label}
+            className={
+              emphasis
+                ? "rounded-lg border border-blue-100 bg-blue-50/45 px-3 py-2.5 shadow-[inset_3px_0_0_rgba(37,99,235,0.18)]"
+                : "rounded-lg border border-slate-200/80 bg-white px-3 py-2.5"
+            }
+          >
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">
+              {label}
+            </div>
+            <div
+              className={
+                emphasis
+                  ? "mt-1 whitespace-pre-wrap break-words text-base leading-7 text-slate-900"
+                  : "mt-1 whitespace-pre-wrap break-words text-[15px] leading-7 text-slate-800"
+              }
+            >
+              {value}
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              Service Details
+            </div>
+            <p className="mt-1 text-xs leading-5 text-slate-600">
+              Service details classify the visit. Work Items tell the team what work belongs to this trip.
+            </p>
+          </div>
+          <span className="rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold uppercase text-slate-500">
+            Work Items deferred
+          </span>
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <div className="rounded-lg bg-white px-2.5 py-2">
+            <div className="text-[10px] font-semibold uppercase text-slate-500">Job Type</div>
+            <div className="mt-0.5 text-sm font-semibold text-slate-900">{headerJobTypeLabel || "Not set"}</div>
+          </div>
+          {job.job_type === "service" ? (
+            <>
+              <div className="rounded-lg bg-white px-2.5 py-2">
+                <div className="text-[10px] font-semibold uppercase text-slate-500">Service Type</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{jobBriefServiceCaseKindLabel}</div>
+              </div>
+              <div className="rounded-lg bg-white px-2.5 py-2">
+                <div className="text-[10px] font-semibold uppercase text-slate-500">Visit Type</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{jobBriefVisitTypeLabel}</div>
+              </div>
+              <div className="rounded-lg bg-white px-2.5 py-2">
+                <div className="text-[10px] font-semibold uppercase text-slate-500">Visit Outcome</div>
+                <div className="mt-0.5 text-sm font-semibold text-slate-900">{jobBriefVisitOutcomeLabel}</div>
+              </div>
+              {serviceVisitReasonText ? (
+                <div className="rounded-lg bg-white px-2.5 py-2 sm:col-span-2">
+                  <div className="text-[10px] font-semibold uppercase text-slate-500">Reason For Visit</div>
+                  <div className="mt-0.5 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">
+                    {serviceVisitReasonText}
+                  </div>
+                </div>
+              ) : null}
+            </>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
   const DesktopJobDetailLayout = ({ children }: { children: ReactNode }) =>
     useDesktopWorkbenchV2 ? (
       <JobDetailDesktopWorkbenchV2
         sitePlaceWorkContent={sitePlaceWorkContent}
+        jobBriefContent={jobBriefContent}
         variant={desktopLayout}
       >
         {children}
