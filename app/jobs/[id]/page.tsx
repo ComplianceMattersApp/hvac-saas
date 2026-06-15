@@ -1041,7 +1041,7 @@ function JobDetailDesktopWorkbenchV2({
   children: _children,
   sitePlaceWorkContent,
   jobBriefContent,
-  variant = "v2-site",
+  variant = "v2-pulse",
 }: {
   children: ReactNode;
   sitePlaceWorkContent?: ReactNode;
@@ -1055,7 +1055,7 @@ function JobDetailDesktopWorkbenchV2({
     variant === "v2-site" ||
     variant === "v2-pulse"
       ? variant
-      : "v2-site";
+      : "v2-pulse";
   const placeholderLabel = "V2 preview placeholder";
   const zoneBody =
     "Inert concept shell only. Real job-detail tools, forms, actions, anchors, and records stay in legacy until a later migration slice.";
@@ -1498,72 +1498,144 @@ function JobDetailDesktopWorkbenchV2({
     </div>
   );
 
-  const pulseStatusItems = [
-    ["Status", "On Site", "Active"],
-    ["Priority", "Standard", "Office"],
-    ["Aging", "2d 4h", "Clock"],
-    ["Schedule", "Today 1-3 PM", "Window"],
-    ["Service Location", "Site verified", "Map"],
-    ["Customer", "Account ready", "Contact"],
-    ["Assigned Team", "2 techs", "Crew"],
+  type PulseIconName =
+    | "activity"
+    | "audit"
+    | "billing"
+    | "brief"
+    | "clock"
+    | "contact"
+    | "equipment"
+    | "files"
+    | "location"
+    | "message"
+    | "navigate"
+    | "payment"
+    | "schedule"
+    | "service"
+    | "settings"
+    | "team"
+    | "warning"
+    | "work";
+  const renderPulseIcon = (name: PulseIconName, className = "h-4 w-4") => {
+    switch (name) {
+      case "audit":
+      case "settings":
+        return <SettingsIcon className={className} />;
+      case "billing":
+      case "payment":
+        return <ReceiptIcon className={className} />;
+      case "brief":
+        return <ClipboardIcon className={className} />;
+      case "clock":
+      case "schedule":
+        return <ClockIcon className={className} />;
+      case "contact":
+      case "team":
+        return <UserIcon className={className} />;
+      case "equipment":
+      case "work":
+        return <ToolIcon className={className} />;
+      case "files":
+        return <PaperclipIcon className={className} />;
+      case "location":
+        return <MapPinIcon className={className} />;
+      case "message":
+        return <ChatIcon className={className} />;
+      case "navigate":
+        return <NavigateIcon className={className} />;
+      case "service":
+        return <FolderIcon className={className} />;
+      case "warning":
+        return <WarningIcon className={className} />;
+      case "activity":
+      default:
+        return <ChevronRightIcon className={className} />;
+    }
+  };
+  const pulseStatusItems: Array<[string, string, string, "emerald" | "red" | "amber" | "blue" | "slate", PulseIconName]> = [
+    ["Status", "In Progress", "Since 10:15 AM", "emerald", "activity"],
+    ["Priority", "High", "Due today 12:00 PM", "red", "warning"],
+    ["Aging", "3 Days", "Opened Apr 28", "amber", "clock"],
+    ["Schedule", "May 1, 2025", "8:00 AM - 12:00 PM", "blue", "schedule"],
+    ["Service Location", "123 Main Street", "Site verified", "slate", "location"],
+    ["Customer", "Acme Manufacturing", "(217) 555-0198", "slate", "contact"],
+    ["Assigned Team", "Field Team A", "John D., Lead", "slate", "team"],
   ];
-  const pulseTimelineStages = ["Scheduled", "En Route", "On Site", "Complete", "Invoiced"];
-  const pulseActivityItems = [
-    ["Internal Note", "Office tagged billing context and access timing for dispatch review.", "Now"],
-    ["Status Updated", "Moved from En Route to On Site in the active job lifecycle.", "12 min"],
-    ["Shared Note", "Field-facing note captured without mixing into internal memory.", "28 min"],
-    ["Job Scheduled", "Arrival window and assigned team were confirmed.", "9:10 AM"],
-    ["Service Case Created", "Continuity record opened for this visit path.", "Yesterday"],
-    ["View Full Timeline", "Placeholder for full timeline and records history.", "Dock"],
+  const pulseTimelineStages: Array<[string, string, boolean, PulseIconName]> = [
+    ["Scheduled", "Apr 28", true, "schedule"],
+    ["En Route", "May 1, 7:45 AM", true, "navigate"],
+    ["On Site", "Since 8:05 AM", true, "location"],
+    ["Complete", "Pending", false, "brief"],
+    ["Invoiced", "Pending", false, "billing"],
   ];
-  const pulseOperationalCards = [
-    ["Job Brief", "Visit reason, customer concern, intake notes, and service details remain distinct."],
-    ["People & Contact", "Customer, access, billing recipient, assigned team, and contact attempts."],
-    ["Service Location / Site", "Visible site card keeps address and house context in the command center."],
-    ["Work to Perform", "Primary work, work items, companion service, and pricing context later."],
-    ["Billing / Closeout", "Invoice readiness, payment state, closeout blockers, and billing audience."],
-    ["ECC / Compliance", "Permit, tests, certs, correction review, retest, and compliance posture."],
-    ["Follow-up / Service Chain", "Return visit, callback, waiting release, and linked service continuity."],
-    ["Documents & Photos", "Attachments, field photos, documents, equipment, and record assets."],
+  const pulseActivityItems: Array<[string, string, string, "amber" | "blue" | "green" | "violet", PulseIconName]> = [
+    ["Internal Note", "Found dirty condenser coil. Cleaning in progress.", "10:32 AM", "amber", "message"],
+    ["Status Updated", "En Route -> On Site", "10:15 AM", "blue", "activity"],
+    ["Shared Note", "Customer reports a coil issue before arrival.", "9:08 AM", "green", "message"],
+    ["Job Scheduled", "May 1, 2025, 8:00 AM - 12:00 PM", "Apr 28", "blue", "schedule"],
+    ["Service Case Created", "SC-025811", "Apr 28", "violet", "service"],
   ];
-  const pulseRecordsDockItems = [
-    "Timeline",
-    "Notes",
-    "Attachments",
-    "Equipment",
-    "Invoices",
-    "Payments",
-    "Service Chain",
-    "History",
-    "Audit Log",
+  const pulseOperationalCards: Array<[string, string, string, string, PulseIconName]> = [
+    ["Job Brief", "Reason for Visit", "System not cooling. Customer reported poor cooling in building.", "View full brief", "brief"],
+    ["People & Contact", "Primary Contact", "Jim Williams, Facilities Manager. On-site team and billing contacts stay separate.", "View all", "contact"],
+    ["Service Location", "123 Main Street", "Compact site card keeps address, access, and photo context visible.", "View map", "location"],
+    ["Work to Perform", "5 placeholder items", "Diagnose cooling issue, inspect compressor, verify airflow, and confirm performance.", "View scope", "work"],
+    ["Billing / Closeout", "Not invoiced", "Estimated amount, approval required, and ready-to-invoice posture placeholders.", "View details", "billing"],
+    ["ECC / Compliance", "Compliance posture", "ECC job, tests, certs, and permit status remain grouped for later migration.", "View ECC", "warning"],
+    ["Follow-up / Service Chain", "In progress", "Next visit, chain continuity, warranty, and return reason placeholders.", "View chain", "service"],
+    ["Documents & Photos", "Latest assets", "Photo and document placeholders for field media and office records.", "View all", "files"],
+  ];
+  const pulseRecordsDockItems: Array<[string, PulseIconName]> = [
+    ["Timeline", "clock"],
+    ["Notes", "message"],
+    ["Attachments", "files"],
+    ["Equipment", "equipment"],
+    ["Invoices", "billing"],
+    ["Payments", "payment"],
+    ["Service Chain", "service"],
+    ["History", "clock"],
+    ["Audit Log", "audit"],
   ];
 
   const renderPulseWorkbench = () => (
-    <div className="hidden space-y-4 lg:block" data-desktop-layout-preview="v2-pulse">
+    <div className="hidden space-y-3.5 lg:block" data-desktop-layout-preview="v2-pulse">
       <section
         data-v2-zone="header-primary-action-bar"
-        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_34px_82px_-58px_rgba(15,23,42,0.62)]"
+        className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_30px_78px_-58px_rgba(15,23,42,0.55)]"
       >
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_23rem]">
-          <div className="bg-[#101827] px-5 py-4 text-white">
-            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase text-blue-100">
-              <span className="rounded-full border border-blue-200/30 bg-white/10 px-2 py-1">Job Pulse Preview</span>
-              <span>Job # placeholder</span>
-              <span>Service case placeholder</span>
-              <span>Created timestamp placeholder</span>
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_22rem]">
+          <div className="px-5 py-4">
+            <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <span>Jobs</span>
+              <span>/</span>
+              <span>Job #J-2025-04158</span>
             </div>
-            <h1 className="mt-2 text-2xl font-semibold">Premium Job Command Center</h1>
-            <p className="mt-1.5 max-w-4xl text-sm leading-5 text-slate-200">
-              Inert concept centered on current job state, next action, workflow progress, and live memory.
+            <h1 className="mt-1.5 text-3xl font-semibold tracking-normal text-slate-950">Job #J-2025-04158</h1>
+            <p className="mt-1 flex flex-wrap gap-2 text-xs leading-5 text-slate-500">
+              <span>Service Case: SC-025811</span>
+              <span>|</span>
+              <span>Created: Apr 25, 2025 at 8:42 AM</span>
+              <span>|</span>
+              <span>Job Pulse concept placeholders</span>
             </p>
           </div>
-          <div className="flex items-center justify-end gap-2 bg-[#f8fafc] px-5 py-4">
-            {["Share", "Edit Job", "Actions"].map((label) => (
+          <div className="flex items-center justify-end gap-2 bg-[#fbfcfd] px-5 py-4">
+            {[
+              ["Share", "navigate"],
+              ["Edit Job", "brief"],
+              ["Actions", "settings"],
+            ].map(([label, iconName]) => (
               <span
                 key={label}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 shadow-sm"
+                className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold shadow-sm ${
+                  label === "Actions"
+                    ? "border-blue-600 bg-blue-600 text-white"
+                    : "border-slate-200 bg-white text-slate-700"
+                }`}
               >
-                {label} placeholder
+                {renderPulseIcon(iconName as PulseIconName, "h-3.5 w-3.5")}
+                {label}
               </span>
             ))}
           </div>
@@ -1572,13 +1644,31 @@ function JobDetailDesktopWorkbenchV2({
 
       <section
         data-v2-zone="status-summary-strip"
-        className="grid gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_20px_48px_-44px_rgba(15,23,42,0.42)] xl:grid-cols-7"
+        className="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_42px_-40px_rgba(15,23,42,0.38)] xl:grid-cols-7"
       >
-        {pulseStatusItems.map(([label, value, meta]) => (
-          <div key={label} className="rounded-xl bg-slate-50 px-3 py-2.5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
-            <div className="mt-1 text-sm font-semibold text-slate-950">{value}</div>
-            <div className="mt-0.5 text-xs text-slate-500">{meta}</div>
+        {pulseStatusItems.map(([label, value, meta, tone, iconName]) => (
+          <div key={label} className="min-w-0 border-b border-r border-slate-100 px-4 py-3 last:border-r-0 xl:border-b-0">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              {renderPulseIcon(iconName, "h-3.5 w-3.5")}
+              <span>{label}</span>
+            </div>
+            <div className="mt-1 flex items-center gap-2 text-sm font-semibold text-slate-950">
+              <span
+                className={`h-2.5 w-2.5 rounded-full ${
+                  tone === "emerald"
+                    ? "bg-emerald-500"
+                    : tone === "red"
+                    ? "bg-red-500"
+                    : tone === "amber"
+                    ? "bg-orange-500"
+                    : tone === "blue"
+                    ? "bg-blue-500"
+                    : "bg-slate-400"
+                }`}
+              />
+              <span className="truncate">{value}</span>
+            </div>
+            <div className="mt-0.5 truncate text-xs text-slate-500">{meta}</div>
           </div>
         ))}
       </section>
@@ -1587,51 +1677,102 @@ function JobDetailDesktopWorkbenchV2({
         <main className="min-w-0 space-y-4">
           <section
             data-v2-zone="job-pulse"
-            className="overflow-hidden rounded-3xl border border-blue-200 bg-[linear-gradient(135deg,#eef6ff_0%,#ffffff_46%,#ecfeff_100%)] shadow-[0_38px_92px_-62px_rgba(37,99,235,0.62)]"
+            className="overflow-hidden rounded-2xl border border-[#0f2a4f] bg-[#06182d] text-white shadow-[0_38px_92px_-62px_rgba(15,31,53,0.78)]"
           >
-            <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_17rem]">
-              <div className="p-5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700">Current pulse</div>
-                <div className="mt-2 flex flex-wrap items-end justify-between gap-5">
+            <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_18rem]">
+              <div className="relative overflow-hidden p-5">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_55%_20%,rgba(37,99,235,0.32),transparent_34%),linear-gradient(115deg,rgba(15,31,53,0.96),rgba(6,24,45,0.96))]" />
+                <div className="relative">
+                <div className="inline-flex items-center gap-2 rounded-full border border-blue-300/20 bg-blue-400/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-100">
+                  {renderPulseIcon("activity", "h-3.5 w-3.5")}
+                  Job Pulse
+                </div>
+                <div className="mt-4 flex flex-wrap items-start justify-between gap-5">
                   <div>
-                    <h2 className="text-3xl font-semibold text-slate-950">Primary next action / active state</h2>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-                      Hero panel reserved for the active office decision, field stage, and workflow momentum.
+                    <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-100">
+                      {renderPulseIcon("navigate", "h-4 w-4")}
+                      <span>Next Move</span>
+                    </div>
+                    <h2 className="mt-1 text-3xl font-semibold tracking-normal text-white">Complete Field Work</h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-5 text-slate-200">
+                      On site and in progress. Finish diagnostics, verify repairs, capture required photos, and complete checklist items.
                     </p>
                   </div>
-                  <div className="rounded-2xl border border-blue-200 bg-white/85 px-4 py-3 text-right shadow-sm">
-                    <div className="text-[10px] font-semibold uppercase text-blue-700">Pulse strength</div>
-                    <div className="mt-1 text-2xl font-semibold text-slate-950">82%</div>
-                    <div className="text-xs text-slate-500">placeholder</div>
+                  <div className="rounded-xl border border-white/15 bg-white/8 px-4 py-3 shadow-[0_18px_42px_-36px_rgba(0,0,0,0.65)]">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
+                      <span className="h-2.5 w-2.5 rounded-full bg-emerald-400" />
+                      On Site
+                    </div>
+                    <div className="mt-1 text-xs text-slate-300">Active stage placeholder</div>
                   </div>
                 </div>
 
-                <div className="mt-6 grid gap-2 xl:grid-cols-5">
-                  {pulseTimelineStages.map((stage, index) => (
-                    <div key={stage} className="relative rounded-xl border border-white/80 bg-white/75 px-3 py-3 shadow-sm">
-                      <div className={`h-1.5 rounded-full ${index <= 2 ? "bg-blue-500" : "bg-slate-200"}`} />
-                      <div className="mt-2 text-sm font-semibold text-slate-950">{stage}</div>
-                      <div className="mt-0.5 text-xs text-slate-500">{index === 2 ? "Current stage" : "placeholder"}</div>
+                <div className="mt-7 flex items-start">
+                  {pulseTimelineStages.map(([stage, meta, complete, iconName], index) => (
+                    <div key={stage} className="relative flex min-w-0 flex-1 flex-col items-center">
+                      {index > 0 ? (
+                        <div
+                          className={`absolute left-0 top-4 h-0.5 w-1/2 ${
+                            complete ? "bg-emerald-400" : "bg-white/25"
+                          }`}
+                        />
+                      ) : null}
+                      {index < pulseTimelineStages.length - 1 ? (
+                        <div
+                          className={`absolute right-0 top-4 h-0.5 w-1/2 ${
+                            index < 2 ? "bg-emerald-400" : "bg-white/25"
+                          }`}
+                        />
+                      ) : null}
+                      <div
+                        className={`relative z-10 flex h-8 w-8 items-center justify-center rounded-full border ${
+                          index === 2
+                            ? "border-blue-200 bg-blue-600 shadow-[0_0_0_6px_rgba(37,99,235,0.24)]"
+                            : complete
+                            ? "border-emerald-300 bg-emerald-500"
+                            : "border-white/30 bg-white/10"
+                        }`}
+                      >
+                        {renderPulseIcon(iconName, "h-3.5 w-3.5 text-white")}
+                      </div>
+                      <div className="mt-2 text-center text-xs font-semibold text-white">{stage}</div>
+                      <div className="mt-0.5 text-center text-[10px] leading-4 text-slate-300">{meta}</div>
                     </div>
                   ))}
                 </div>
 
-                <div className="mt-5 flex flex-wrap gap-2">
-                  {["Technician", "Weather", "Time remaining", "Vehicle", "Office watch"].map((label) => (
-                    <span key={label} className="rounded-full border border-blue-100 bg-white/85 px-3 py-1.5 text-xs font-semibold text-slate-700">
-                      {label} context
+                <div className="mt-6 grid gap-2 rounded-xl border border-white/10 bg-white/8 p-2 xl:grid-cols-4">
+                  {[
+                    ["Est. time remaining", "2h 15m", "clock"],
+                    ["Technician", "John Davis", "team"],
+                    ["Vehicle", "Van 27", "navigate"],
+                    ["Weather", "68F Sunny", "activity"],
+                  ].map(([label, value, iconName]) => (
+                    <span key={label} className="rounded-lg border border-white/10 bg-[#071f3a]/70 px-3 py-2">
+                      <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-100">
+                        {renderPulseIcon(iconName as PulseIconName, "h-3 w-3")}
+                        <span>{label}</span>
+                      </span>
+                      <span className="mt-0.5 block text-xs font-semibold text-white">{value}</span>
                     </span>
                   ))}
                 </div>
+                </div>
               </div>
 
-              <div className="border-t border-blue-100 bg-white/68 p-5 xl:border-l xl:border-t-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Site snapshot</div>
-                <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-100">
-                  <div className="h-40 bg-[linear-gradient(135deg,#cbd5e1,#eff6ff_52%,#d1fae5)]" />
-                  <div className="border-t border-slate-200 bg-white px-3 py-3">
-                    <div className="text-sm font-semibold text-slate-950">Service location placeholder</div>
-                    <div className="mt-1 text-xs leading-5 text-slate-600">House/photo and address context stays visible but secondary to the pulse.</div>
+              <div className="border-t border-white/10 bg-[#081d35] p-4 xl:border-l xl:border-t-0">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-100">
+                  {renderPulseIcon("location", "h-3.5 w-3.5")}
+                  <span>Site snapshot</span>
+                </div>
+                <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
+                  <div className="h-36 bg-[linear-gradient(135deg,#b6c6d8,#eff6ff_48%,#d7f2df)]" />
+                  <div className="border-t border-white/10 bg-[#06182d]/80 px-3 py-3">
+                    <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-white">
+                      {renderPulseIcon("location", "h-3.5 w-3.5")}
+                      <span>Service location placeholder</span>
+                    </div>
+                    <div className="mt-1 text-xs leading-5 text-slate-300">Site card stays visible without taking over the pulse.</div>
                   </div>
                 </div>
               </div>
@@ -1642,20 +1783,40 @@ function JobDetailDesktopWorkbenchV2({
             data-v2-zone="operational-card-grid"
             className="grid gap-3 xl:grid-cols-4"
           >
-            {pulseOperationalCards.map(([title, body], index) => (
+            {pulseOperationalCards.map(([title, eyebrow, body, action, iconName], index) => (
               <div
                 key={title}
-                className={`min-h-36 rounded-2xl border p-4 shadow-[0_18px_42px_-38px_rgba(15,23,42,0.42)] ${
+                className={`min-h-32 rounded-xl border p-3.5 shadow-[0_18px_42px_-38px_rgba(15,23,42,0.42)] ${
                   index === 0
-                    ? "border-blue-200 bg-blue-50/80"
+                    ? "border-blue-200 bg-blue-50/70"
                     : index === 2
-                    ? "border-emerald-200 bg-emerald-50/70"
+                    ? "border-emerald-200 bg-emerald-50/60"
                     : "border-slate-200 bg-white"
                 }`}
               >
-                <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Inert zone</div>
-                <h3 className="mt-1 text-base font-semibold text-slate-950">{title}</h3>
-                <p className="mt-2 text-sm leading-5 text-slate-600">{body}</p>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      {renderPulseIcon(iconName, "h-3.5 w-3.5")}
+                      <span>{title}</span>
+                    </div>
+                    <h3 className="mt-1 text-sm font-semibold text-slate-950">{eyebrow}</h3>
+                  </div>
+                  <span className="shrink-0 text-[10px] font-semibold text-blue-700">{action}</span>
+                </div>
+                <p className="mt-2 text-xs leading-5 text-slate-600">{body}</p>
+                {index === 2 ? (
+                  <div className="mt-2 grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
+                    <div className="h-14 rounded-lg bg-[linear-gradient(135deg,#cbd5e1,#f0fdf4)]" />
+                    <div className="text-xs leading-5 text-slate-600">
+                      <div className="font-semibold text-slate-900">Site Access</div>
+                      <div className="inline-flex items-center gap-1">
+                        {renderPulseIcon("navigate", "h-3 w-3")}
+                        <span>Main entrance placeholder.</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </div>
             ))}
           </section>
@@ -1663,43 +1824,87 @@ function JobDetailDesktopWorkbenchV2({
 
         <aside
           data-v2-zone="job-memory"
-          className="rounded-2xl border border-amber-200 bg-[#fffbeb] p-4 text-amber-950 shadow-[0_26px_64px_-52px_rgba(180,83,9,0.46)]"
+          className="rounded-2xl border border-slate-200 bg-white p-4 text-slate-950 shadow-[0_26px_64px_-52px_rgba(15,23,42,0.42)]"
         >
           <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">Activity / Memory</div>
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                {renderPulseIcon("activity", "h-3.5 w-3.5")}
+                <span>Activity</span>
+              </div>
               <h2 className="mt-1 text-lg font-semibold">Live job memory stream</h2>
             </div>
-            <span className="rounded-full border border-amber-200 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase text-amber-800">
-              Inert
+            <span className="text-xs font-semibold text-blue-700">
+              View all
             </span>
           </div>
+          <div className="mt-3 flex flex-wrap gap-1.5">
+            {["All", "Notes", "Status", "Activity"].map((label, index) => (
+              <span
+                key={label}
+                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                  index === 0 ? "bg-blue-600 text-white" : "bg-slate-100 text-slate-600"
+                }`}
+              >
+                {label}
+              </span>
+            ))}
+          </div>
           <div className="mt-4 space-y-3">
-            {pulseActivityItems.map(([label, body, meta]) => (
-              <div key={`${label}-${meta}`} className="rounded-xl bg-white/75 px-3 py-3 shadow-[inset_3px_0_0_rgba(217,119,6,0.18)]">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase text-amber-800">{label}</div>
-                  <div className="text-[10px] font-semibold uppercase text-slate-400">{meta}</div>
+            {pulseActivityItems.map(([label, body, meta, tone, iconName]) => (
+              <div key={`${label}-${meta}`} className="relative border-l border-slate-200 pb-1 pl-4">
+                <span
+                  className={`absolute -left-[0.6875rem] top-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full border-2 border-white text-white ${
+                    tone === "amber"
+                      ? "bg-amber-400"
+                      : tone === "green"
+                      ? "bg-emerald-400"
+                      : tone === "violet"
+                      ? "bg-violet-400"
+                      : "bg-blue-400"
+                  }`}
+                >
+                  {renderPulseIcon(iconName, "h-3 w-3")}
+                </span>
+                <div className="rounded-xl bg-slate-50 px-3 py-2.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-xs font-semibold text-slate-950">{label}</div>
+                    <div className="text-[10px] font-semibold uppercase text-slate-400">{meta}</div>
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-slate-600">{body}</p>
                 </div>
-                <p className="mt-1 text-xs leading-5 text-slate-700">{body}</p>
               </div>
             ))}
+          </div>
+          <div className="mt-4 rounded-lg border border-slate-200 bg-white px-3 py-2 text-center text-xs font-semibold text-blue-700">
+            View full timeline placeholder
           </div>
         </aside>
       </div>
 
       <section
         data-v2-zone="records-workspace"
-        className="rounded-2xl border border-slate-200 bg-[#fbfcfd] px-4 py-3 shadow-[0_22px_56px_-50px_rgba(15,23,42,0.42)]"
+        className="sticky bottom-3 rounded-2xl border border-slate-200 bg-white/95 px-4 py-2.5 shadow-[0_22px_56px_-42px_rgba(15,23,42,0.36)] backdrop-blur"
       >
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Records dock</div>
-            <div className="mt-0.5 text-sm font-semibold text-slate-950">Secondary workspaces remain available below the pulse.</div>
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              {renderPulseIcon("files", "h-3.5 w-3.5")}
+              <span>Records dock</span>
+            </div>
+            <div className="mt-0.5 text-xs font-semibold text-slate-950">Persistent placeholder navigation</div>
           </div>
           <div className="grid flex-1 gap-2 md:grid-cols-5 xl:grid-cols-9">
-            {pulseRecordsDockItems.map((label) => (
-              <div key={label} className="rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-center text-xs font-semibold text-slate-700">
+            {pulseRecordsDockItems.map(([label, iconName], index) => (
+              <div
+                key={label}
+                className={`flex items-center justify-center gap-1.5 rounded-lg px-2.5 py-2 text-center text-xs font-semibold ${
+                  index === 0
+                    ? "border border-blue-200 bg-blue-50 text-blue-700"
+                    : "border border-slate-200 bg-white text-slate-700"
+                }`}
+              >
+                {renderPulseIcon(iconName, "h-3.5 w-3.5")}
                 {label}
               </div>
             ))}
