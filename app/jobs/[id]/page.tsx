@@ -1028,19 +1028,151 @@ function JobDetailDesktopLegacyLayout({ children }: { children: ReactNode }) {
 }
 
 function JobDetailDesktopWorkbenchV2({ children: _children }: { children: ReactNode }) {
+  const previewZoneClass =
+    "min-h-36 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_14px_32px_-30px_rgba(15,23,42,0.42)]";
+  const previewZoneEyebrowClass =
+    "text-[11px] font-semibold uppercase text-slate-500";
+  const previewZoneTitleClass =
+    "mt-1 text-base font-semibold text-slate-950";
+  const previewZoneBodyClass =
+    "mt-2 text-sm leading-6 text-slate-600";
+  const primaryZones = [
+    {
+      key: "job-brief",
+      title: "Job Brief",
+      body: "Visit reason, customer concern, intake notes, work summary, and service details will land here in a later content migration.",
+    },
+    {
+      key: "primary-work",
+      title: "Primary Work",
+      body: "Work items, companion service items, and work capture entry points will be placed here without changing their source of truth.",
+    },
+    {
+      key: "billing-closeout",
+      title: "Billing / Closeout",
+      body: "Invoice state, payment state, field billing, and closeout blockers will be grouped here after parity checks.",
+    },
+    {
+      key: "follow-up-service-chain",
+      title: "Follow-up / Service Chain",
+      body: "Return visits, callbacks, service-plan effects, workflow guidance, and linked visit continuity will be staged here.",
+    },
+  ];
+  const railZones = [
+    {
+      key: "job-memory",
+      title: "Job Memory / Notes Hub",
+      body: "Internal notes, shared notes, correction context, and communication memory placeholders only.",
+    },
+    {
+      key: "people-responsibility",
+      title: "People & Responsibility",
+      body: "Customer, contacts, contractor, assignments, and responsibility context will be grouped here later.",
+    },
+    {
+      key: "place-work",
+      title: "Place & Work",
+      body: "Service location, address controls, and safe location-change affordances will live here.",
+    },
+    {
+      key: "ecc-compliance",
+      title: "ECC / Compliance",
+      body: "Permit, tests, certs, retest, and correction review surfaces will be reserved here when applicable.",
+    },
+  ];
+
   return (
-    <div className="hidden space-y-5 lg:block">
-      <section className="rounded-2xl border border-dashed border-slate-300 bg-white px-5 py-5 text-slate-900 shadow-sm">
-        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-          Desktop Workbench V2 Preview
-        </div>
-        <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
-          Shell only
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
-          This preview switch is wired, but the V2 desktop layout has not been implemented yet.
+    <div className="hidden space-y-5 lg:block" data-desktop-layout-preview="v2">
+      <section
+        data-v2-zone="global-alert-strip"
+        className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-[0_14px_32px_-30px_rgba(180,83,9,0.45)]"
+      >
+        <div className={previewZoneEyebrowClass}>V2 Preview Placeholder</div>
+        <div className="mt-1 font-semibold">Global alert strip</div>
+        <p className="mt-1 leading-6">
+          Route-level banners and action feedback will remain above the workbench. No banner behavior is wired here yet.
         </p>
       </section>
+
+      <section
+        data-v2-zone="header-primary-action-bar"
+        className="rounded-2xl border border-slate-200 bg-[#f8fafc] p-5 shadow-[0_22px_56px_-44px_rgba(15,23,42,0.5)]"
+      >
+        <div className="flex items-start justify-between gap-6">
+          <div className="min-w-0">
+            <div className={previewZoneEyebrowClass}>Desktop Workbench V2</div>
+            <h1 className="mt-2 text-2xl font-semibold text-slate-950">
+              Header and primary action bar
+            </h1>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              Job identity, status, schedule context, and primary lifecycle actions will be arranged here after the content migration.
+            </p>
+          </div>
+          <div className="w-80 shrink-0 space-y-3">
+            <div>
+              <div className="text-xs font-semibold text-slate-500">Status</div>
+              <div className="mt-1 h-2 rounded bg-slate-300" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-slate-500">Next Action</div>
+              <div className="mt-1 h-2 rounded bg-blue-300" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.72fr)]">
+        <main className="min-w-0 space-y-5">
+          <div className="grid gap-5 2xl:grid-cols-2">
+            {primaryZones.map((zone) => (
+              <section key={zone.key} data-v2-zone={zone.key} className={previewZoneClass}>
+                <div className={previewZoneEyebrowClass}>V2 Preview Placeholder</div>
+                <h2 className={previewZoneTitleClass}>{zone.title}</h2>
+                <p className={previewZoneBodyClass}>{zone.body}</p>
+              </section>
+            ))}
+          </div>
+
+          <section
+            data-v2-zone="records-workspace"
+            className="min-h-48 rounded-xl border border-slate-200 bg-white p-4 shadow-[0_14px_32px_-30px_rgba(15,23,42,0.42)]"
+          >
+            <div className={previewZoneEyebrowClass}>V2 Preview Placeholder</div>
+            <h2 className={previewZoneTitleClass}>Records Workspace</h2>
+            <p className={previewZoneBodyClass}>
+              Timeline, attachments, equipment, follow-up history, service chain, notes history, and existing hash-target panels will be preserved here later.
+            </p>
+            <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 lg:grid-cols-3">
+              {["Job Controls", "Work Records", "Activity Records"].map((label) => (
+                <div key={label} className="text-sm font-semibold text-slate-600">
+                  {label}
+                </div>
+              ))}
+            </div>
+          </section>
+        </main>
+
+        <aside className="space-y-5">
+          {railZones.map((zone) => (
+            <section key={zone.key} data-v2-zone={zone.key} className={previewZoneClass}>
+              <div className={previewZoneEyebrowClass}>V2 Preview Placeholder</div>
+              <h2 className={previewZoneTitleClass}>{zone.title}</h2>
+              <p className={previewZoneBodyClass}>{zone.body}</p>
+            </section>
+          ))}
+
+          <section
+            data-v2-zone="admin-danger-zone"
+            className="min-h-32 rounded-xl border border-red-200 bg-red-50 p-4 text-red-950 shadow-[0_14px_32px_-30px_rgba(185,28,28,0.42)]"
+          >
+            <div className="text-[11px] font-semibold uppercase text-red-700">V2 Preview Placeholder</div>
+            <h2 className="mt-1 text-base font-semibold">Admin / Danger Zone</h2>
+            <p className="mt-2 text-sm leading-6 text-red-900">
+              Destructive and admin-only controls will stay isolated here when migrated. No live controls are rendered in this preview shell.
+            </p>
+          </section>
+        </aside>
+      </div>
     </div>
   );
 }
