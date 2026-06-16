@@ -1085,6 +1085,8 @@ type PulseHeroChip = {
   label: string;
   value: string;
   iconName: PulseIconName;
+  extraCount?: number;
+  tooltip?: string;
 };
 
 type PulseHeroContent = {
@@ -1105,6 +1107,8 @@ function JobDetailDesktopWorkbenchV2({
   pulseHeaderContent,
   pulseStatusItems: pulseStatusItemsOverride,
   pulseHeroContent,
+  pulseSiteSnapshotContent,
+  pulseServiceLocationCardContent,
   variant = "v2-pulse",
 }: {
   children: ReactNode;
@@ -1113,6 +1117,8 @@ function JobDetailDesktopWorkbenchV2({
   pulseHeaderContent?: PulseHeaderContent;
   pulseStatusItems?: PulseStatusItem[];
   pulseHeroContent?: PulseHeroContent;
+  pulseSiteSnapshotContent?: ReactNode;
+  pulseServiceLocationCardContent?: ReactNode;
   variant?: string;
 }) {
   const selectedVariant =
@@ -1756,7 +1762,7 @@ function JobDetailDesktopWorkbenchV2({
                   {renderPulseIcon("activity", "h-3.5 w-3.5")}
                   Job Pulse
                 </div>
-                <div className="mt-4 flex flex-wrap items-start justify-between gap-5">
+                <div className="mt-4">
                   <div>
                     <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-blue-100">
                       {renderPulseIcon("navigate", "h-4 w-4")}
@@ -1766,25 +1772,6 @@ function JobDetailDesktopWorkbenchV2({
                     <p className="mt-2 max-w-2xl text-sm leading-5 text-slate-200">
                       {pulseHero.body}
                     </p>
-                  </div>
-                  <div className="rounded-xl border border-white/15 bg-white/8 px-4 py-3 shadow-[0_18px_42px_-36px_rgba(0,0,0,0.65)]">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-white">
-                      <span
-                        className={`h-2.5 w-2.5 rounded-full ${
-                          pulseHero.stateTone === "emerald"
-                            ? "bg-emerald-400"
-                            : pulseHero.stateTone === "blue"
-                            ? "bg-blue-400"
-                            : pulseHero.stateTone === "amber"
-                            ? "bg-amber-400"
-                            : pulseHero.stateTone === "red"
-                            ? "bg-red-400"
-                            : "bg-slate-300"
-                        }`}
-                      />
-                      {pulseHero.stateLabel}
-                    </div>
-                    <div className="mt-1 text-xs text-slate-300">{pulseHero.stateMeta}</div>
                   </div>
                 </div>
 
@@ -1823,13 +1810,24 @@ function JobDetailDesktopWorkbenchV2({
                 </div>
 
                 <div className="mt-6 grid gap-2 rounded-xl border border-white/10 bg-white/8 p-2 xl:grid-cols-4">
-                  {pulseHero.chips.map(({ label, value, iconName }) => (
+                  {pulseHero.chips.map(({ label, value, iconName, extraCount, tooltip }) => (
                     <span key={label} className="rounded-lg border border-white/10 bg-[#071f3a]/70 px-3 py-2">
                       <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-100">
                         {renderPulseIcon(iconName, "h-3 w-3")}
                         <span>{label}</span>
                       </span>
-                      <span className="mt-0.5 block text-xs font-semibold text-white">{value}</span>
+                      <span className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-white">
+                        <span className="min-w-0 truncate">{value}</span>
+                        {extraCount ? (
+                          <span
+                            tabIndex={0}
+                            title={tooltip}
+                            className="inline-flex shrink-0 rounded-full border border-white/15 bg-white/10 px-1.5 py-0.5 text-[10px] text-blue-100"
+                          >
+                            +{extraCount}
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
                   ))}
                 </div>
@@ -1841,15 +1839,37 @@ function JobDetailDesktopWorkbenchV2({
                   {renderPulseIcon("location", "h-3.5 w-3.5")}
                   <span>Site snapshot</span>
                 </div>
-                <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
-                  <div className="h-36 bg-[linear-gradient(135deg,#b6c6d8,#eff6ff_48%,#d7f2df)]" />
-                  <div className="border-t border-white/10 bg-[#06182d]/80 px-3 py-3">
-                    <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-white">
-                      {renderPulseIcon("location", "h-3.5 w-3.5")}
-                      <span>Service location placeholder</span>
+                {pulseSiteSnapshotContent ?? (
+                  <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
+                    <div className="h-36 bg-[linear-gradient(135deg,#b6c6d8,#eff6ff_48%,#d7f2df)]" />
+                    <div className="border-t border-white/10 bg-[#06182d]/80 px-3 py-3">
+                      <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-white">
+                        {renderPulseIcon("location", "h-3.5 w-3.5")}
+                        <span>Service location placeholder</span>
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-slate-300">Site card stays visible without taking over the pulse.</div>
                     </div>
-                    <div className="mt-1 text-xs leading-5 text-slate-300">Site card stays visible without taking over the pulse.</div>
                   </div>
+                )}
+                <div className="mt-3 rounded-xl border border-blue-200/25 bg-white/12 px-3 py-3 shadow-[0_16px_42px_-30px_rgba(59,130,246,0.85)]">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-100">
+                    <span
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        pulseHero.stateTone === "emerald"
+                          ? "bg-emerald-400"
+                          : pulseHero.stateTone === "blue"
+                          ? "bg-blue-400"
+                          : pulseHero.stateTone === "amber"
+                          ? "bg-amber-400"
+                          : pulseHero.stateTone === "red"
+                          ? "bg-red-400"
+                          : "bg-slate-300"
+                      }`}
+                    />
+                    <span>Current Status</span>
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-white">{pulseHero.stateLabel}</div>
+                  <div className="mt-0.5 text-xs leading-5 text-slate-300">{pulseHero.stateMeta}</div>
                 </div>
               </div>
             </div>
@@ -1860,40 +1880,44 @@ function JobDetailDesktopWorkbenchV2({
             className="grid gap-3 xl:grid-cols-4"
           >
             {pulseOperationalCards.map(([title, eyebrow, body, action, iconName], index) => (
-              <div
-                key={title}
-                className={`min-h-32 rounded-xl border p-3.5 shadow-[0_18px_42px_-38px_rgba(15,23,42,0.42)] ${
-                  index === 0
-                    ? "border-blue-200 bg-blue-50/70"
-                    : index === 2
-                    ? "border-emerald-200 bg-emerald-50/60"
-                    : "border-slate-200 bg-white"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      {renderPulseIcon(iconName, "h-3.5 w-3.5")}
-                      <span>{title}</span>
+              title === "Service Location" && pulseServiceLocationCardContent ? (
+                <div key={title}>{pulseServiceLocationCardContent}</div>
+              ) : (
+                <div
+                  key={title}
+                  className={`min-h-32 rounded-xl border p-3.5 shadow-[0_18px_42px_-38px_rgba(15,23,42,0.42)] ${
+                    index === 0
+                      ? "border-blue-200 bg-blue-50/70"
+                      : index === 2
+                      ? "border-emerald-200 bg-emerald-50/60"
+                      : "border-slate-200 bg-white"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        {renderPulseIcon(iconName, "h-3.5 w-3.5")}
+                        <span>{title}</span>
+                      </div>
+                      <h3 className="mt-1 text-sm font-semibold text-slate-950">{eyebrow}</h3>
                     </div>
-                    <h3 className="mt-1 text-sm font-semibold text-slate-950">{eyebrow}</h3>
+                    <span className="shrink-0 text-[10px] font-semibold text-blue-700">{action}</span>
                   </div>
-                  <span className="shrink-0 text-[10px] font-semibold text-blue-700">{action}</span>
-                </div>
-                <p className="mt-2 text-xs leading-5 text-slate-600">{body}</p>
-                {index === 2 ? (
-                  <div className="mt-2 grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
-                    <div className="h-14 rounded-lg bg-[linear-gradient(135deg,#cbd5e1,#f0fdf4)]" />
-                    <div className="text-xs leading-5 text-slate-600">
-                      <div className="font-semibold text-slate-900">Site Access</div>
-                      <div className="inline-flex items-center gap-1">
-                        {renderPulseIcon("navigate", "h-3 w-3")}
-                        <span>Main entrance placeholder.</span>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">{body}</p>
+                  {index === 2 ? (
+                    <div className="mt-2 grid grid-cols-[4.5rem_minmax(0,1fr)] gap-2">
+                      <div className="h-14 rounded-lg bg-[linear-gradient(135deg,#cbd5e1,#f0fdf4)]" />
+                      <div className="text-xs leading-5 text-slate-600">
+                        <div className="font-semibold text-slate-900">Site Access</div>
+                        <div className="inline-flex items-center gap-1">
+                          {renderPulseIcon("navigate", "h-3 w-3")}
+                          <span>Main entrance placeholder.</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : null}
-              </div>
+                  ) : null}
+                </div>
+              )
             ))}
           </section>
         </main>
@@ -4302,11 +4326,14 @@ const pulseLifecycleTone: PulseStatusItem["tone"] =
     ? "emerald"
     : "blue";
 const pulsePrimaryAssignee = assignedTeam.find((assignee) => assignee.is_primary) ?? assignedTeam[0] ?? null;
+const pulseAssignedTeamNames = assignedTeam
+  .map((assignee) => formatPersonNamePart(assignee.display_name))
+  .filter((name) => name && name !== "â€”");
 const pulseAssignedTeamValue = pulsePrimaryAssignee
   ? formatPersonNamePart(pulsePrimaryAssignee.display_name)
   : "Awaiting assignment";
 const pulseAssignedTeamMeta = assignedTeam.length > 0
-  ? `${assignedTeam.length} assigned${pulsePrimaryAssignee?.is_primary ? " - primary set" : ""}`
+  ? `${assignedTeam.length} assigned`
   : "No team assigned";
 const pulseCustomerValue = customerDisplayName !== "â€”" ? customerDisplayName : "Customer not set";
 const pulseCustomerMeta = customerPhone !== "â€”"
@@ -4386,21 +4413,31 @@ const pulseStageState =
     : "needs_schedule";
 const pulseHeroTitle =
   isJobClosed
-    ? "Job Closed"
+    ? "Job Complete"
+    : isFailedUnresolved
+    ? "Retest or Review Needed"
     : isFieldComplete || normalizedJobStatus === "completed"
-    ? "Review Closeout Requirements"
+    ? closeoutNeeds.needsInvoice && closeoutNeeds.needsCerts
+      ? "Billing / Certs Required"
+      : closeoutNeeds.needsInvoice
+      ? "Billing Required"
+      : closeoutNeeds.needsCerts
+      ? "Certs Required"
+      : "Closeout in Progress"
     : normalizedOpsStatus === "need_to_schedule"
-    ? "Schedule This Job"
+    ? "Needs Scheduling"
     : normalizedJobStatus === "in_process"
-    ? "Complete Field Work"
+    ? "Field Work Active"
     : normalizedJobStatus === "on_the_way" || normalizedOpsStatus === "on_the_way"
-    ? "Technician En Route"
+    ? "Team En Route"
     : job.scheduled_date || normalizedOpsStatus === "scheduled"
-    ? "Scheduled / On Deck"
+    ? "Waiting to Begin"
     : "Schedule / Dispatch Job";
 const pulseHeroBody =
   isJobClosed
     ? "This job is closed. Review records, billing, service chain, and audit history from the lower workspaces."
+    : isFailedUnresolved
+    ? "Resolve this failure through retest readiness, correction review, or the existing legacy failure-resolution controls."
     : isFieldComplete || normalizedJobStatus === "completed"
     ? primaryCloseoutMessage
     : normalizedOpsStatus === "need_to_schedule"
@@ -4422,10 +4459,17 @@ const pulseHeroStateLabel =
     : isCloseoutPending
     ? "Closeout"
     : pulseLifecycleValue;
+const pulseHeroSchedulePosture = job.scheduled_date || normalizedOpsStatus === "scheduled" ? "Scheduled" : "Needs scheduling";
+const pulseHeroFieldPosture = isFieldComplete ? "Field complete" : "Field open";
+const pulseHeroCloseoutPosture = isJobClosed
+  ? "Closed"
+  : isCloseoutPending
+  ? "Closeout pending"
+  : isFieldComplete || normalizedJobStatus === "completed"
+  ? "Closeout ready"
+  : "Closeout not ready";
 const pulseHeroStateMeta =
-  isFieldComplete || normalizedJobStatus === "completed"
-    ? primaryCloseoutMessage
-    : jobStatusSummaryText;
+  `${pulseHeroSchedulePosture} - ${pulseHeroFieldPosture} - ${pulseHeroCloseoutPosture}`;
 const pulseHeroStateTone: PulseHeroContent["stateTone"] =
   isJobClosed
     ? "slate"
@@ -4482,9 +4526,11 @@ const pulseHeroChips: PulseHeroChip[] = [
     iconName: "schedule",
   },
   {
-    label: "Assigned lead",
+    label: "Assigned Techs",
     value: pulseAssignedTeamValue,
     iconName: "team",
+    extraCount: pulseAssignedTeamNames.length > 1 ? pulseAssignedTeamNames.length - 1 : undefined,
+    tooltip: pulseAssignedTeamNames.length > 1 ? pulseAssignedTeamNames.join(", ") : undefined,
   },
   {
     label: "Last Visit",
@@ -5571,6 +5617,90 @@ const failureResolutionPathCount =
       </div>
     </section>
   );
+  const pulseSiteSnapshotContent = (
+    <div className="mt-3 overflow-hidden rounded-2xl border border-white/10 bg-white/10">
+      <Suspense
+        fallback={
+          <JobLocationPreviewFallback
+            addressLine1={serviceAddressLine1}
+            addressLine2={serviceAddressLine2}
+            city={serviceCity}
+            state={serviceState}
+            zip={serviceZip}
+            className="[&>div:first-child>div:first-child]:h-36 [&>div:last-child]:hidden"
+          />
+        }
+      >
+        <TimedJobLocationPreview
+          addressLine1={serviceAddressLine1}
+          addressLine2={serviceAddressLine2}
+          city={serviceCity}
+          state={serviceState}
+          zip={serviceZip}
+          className="[&_a:first-child]:rounded-xl [&_img]:h-36 [&>div:last-child]:hidden"
+          timingEnabled={timingEnabled}
+          onPhaseTiming={recordBlockingPhase}
+        />
+      </Suspense>
+      <div className="border-t border-white/10 bg-[#06182d]/80 px-3 py-3">
+        <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-white">
+          <MapPinIcon className="h-3.5 w-3.5" />
+          <span className="break-words">{serviceAddressDisplay}</span>
+        </div>
+      </div>
+    </div>
+  );
+  const pulseServiceLocationCardContent = (
+    <div
+      data-v2-zone="pulse-service-location-card"
+      className="min-h-32 rounded-xl border border-emerald-200 bg-emerald-50/60 p-3.5 shadow-[0_18px_42px_-38px_rgba(15,23,42,0.42)]"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+            <MapPinIcon className="h-3.5 w-3.5" />
+            <span>Service Location</span>
+          </div>
+          <h3 className="mt-1 break-words text-sm font-semibold text-slate-950">
+            {serviceAddressDisplay}
+          </h3>
+        </div>
+        <span className="shrink-0 text-[10px] font-semibold text-blue-700">Real site</span>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-600">
+        Address and site context for this job. Change-location form remains deferred.
+      </p>
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {mobileNavigateHref ? (
+          <a
+            href={mobileNavigateHref}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-2 py-1 text-[10px] font-semibold text-emerald-800"
+          >
+            <NavigateIcon className="h-3 w-3" />
+            Navigate
+          </a>
+        ) : null}
+        {isInternalUser && serviceLocationEditHref ? (
+          <Link
+            href={serviceLocationEditHref}
+            className="inline-flex rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
+          >
+            Correct address
+          </Link>
+        ) : null}
+        {isInternalUser && customerId ? (
+          <Link
+            href={`/customers/${customerId}?tab=locations-contacts`}
+            className="inline-flex rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
+          >
+            Add location
+          </Link>
+        ) : null}
+      </div>
+    </div>
+  );
   const jobBriefServiceCaseKindLabel = formatJobBriefDisplayLabel((serviceCase as any)?.case_kind ?? "reactive");
   const jobBriefVisitTypeLabel = formatJobBriefDisplayLabel(job.service_visit_type ?? "diagnostic");
   const jobBriefVisitOutcomeLabel = formatJobBriefDisplayLabel(job.service_visit_outcome ?? "follow_up_required");
@@ -5674,6 +5804,8 @@ const failureResolutionPathCount =
         pulseHeaderContent={pulseHeaderContent}
         pulseStatusItems={pulseStatusStripItems}
         pulseHeroContent={pulseHeroContent}
+        pulseSiteSnapshotContent={pulseSiteSnapshotContent}
+        pulseServiceLocationCardContent={pulseServiceLocationCardContent}
         variant={desktopLayout}
       >
         {children}

@@ -148,3 +148,85 @@ Note: a broader `job-tests-page-wiring.test.ts` run was attempted and the releva
 - `npx.cmd tsc --noEmit`
 - `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
 - `git diff --check`
+
+## Slice: V2 Pulse Service Location / Site Card
+
+### Items reviewed
+
+| Service-location item | Status | Notes |
+|---|---|---|
+| Service location visual/preview | Migrated to V2 Pulse preview | The Pulse hero site snapshot now renders one compact `TimedJobLocationPreview` with the existing `Suspense` fallback behavior. |
+| Address display | Migrated to V2 Pulse preview | Uses existing `serviceAddressDisplay` and route-derived service address parts. |
+| Compact operational Service Location card | Migrated to V2 Pulse preview | The Pulse operational grid now uses real address/site context for the Service Location card while other cards remain placeholders. |
+| Navigation affordance | Migrated where available | Uses the existing route-derived maps/navigation href when an address is available. |
+| Correct address link | Migrated as safe navigation | Reuses existing `serviceLocationEditHref` and internal-user gate; no mutation form is introduced. |
+| Add new location link | Migrated as safe navigation | Reuses existing `customerId` and internal-user gate to open customer location/contact management. |
+| Change Service Location form | Deferred | This remains a live mutation form and is intentionally not moved into Pulse in this slice. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- The Pulse site snapshot reuses existing route-loaded service location/address data.
+- Pulse renders a single compact location preview in the hero site snapshot; the operational card is address/navigation-only to avoid duplicate preview work.
+- Existing `Suspense` and `TimedJobLocationPreview` behavior is preserved.
+- Notes, timeline, attachments, invoice detail, ECC detail, service-chain body, and other deferred/heavy sections were not rendered.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/actions/__tests__/job-service-location-change.test.ts lib/actions/__tests__/job-location-regression-guards.test.ts lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`
+
+## Slice: V2 Pulse Hero/Site/Assignment Cleanup
+
+### Items reviewed
+
+| Item | Status | Notes |
+|---|---|---|
+| `Job Pulse` eyebrow | Retained | The small hero identity label remains in the dark hero band. |
+| Hero headline language | Refined | Uses current operational-step copy from already-loaded schedule/lifecycle/field/closeout/failure state: `Needs Scheduling`, `Waiting to Begin`, `Team En Route`, `Field Work Active`, closeout blocker language, `Retest or Review Needed`, or `Job Complete`. |
+| Progress bubbles / tracker | Retained | Lifecycle tracker remains separate from the hero headline so the tracker shows progression while the headline names the current operational step. |
+| Duplicate hero status card | Refined | The floating status card was removed from the main hero copy area and replaced with a compact `Current Step` card under the right-side site area. |
+| Site image address overlay | Removed | The site image is now image-only. Address remains visible in the status strip and Service Location card. |
+| User-facing placeholder/helper language in real site areas | Removed | Real site/location surfaces no longer describe themselves as preview/route-loaded placeholders. |
+| Assignment wording | Refined | Removed `Assigned Lead`; V2 Pulse now uses `Assigned Techs` and the first assigned user when available. |
+| Assigned count tooltip | Implemented | Desktop V2 Pulse shows a read-only `+N` count with a focusable/title tooltip containing the full assigned list when multiple users are assigned. No assignment controls were added. |
+| Hero controls | Deferred | No live buttons, links, forms, submit buttons, server actions, or mutation paths were introduced. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- Assignment display uses the already-loaded `assignedTeam` data.
+- No heavy/deferred components were added.
+- No new content zones were migrated in this cleanup slice.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`
+
+## Slice: V2 Pulse Right Column Status Micro-Cleanup
+
+### Items reviewed
+
+| Item | Status | Notes |
+|---|---|---|
+| Faint lower-left current step card | Removed | The extra status card was removed from the lower-left hero area so the hero is led by the headline, progress tracker, and chip row. |
+| Right-side status placement | Refined | The same already-derived status concept now appears as `Current Status` under the right-side site snapshot/address area. |
+| Status card legibility | Refined | The card uses stronger contrast and the existing Pulse hero tone dot instead of the faint disabled-looking treatment. |
+| Site image helper text | Removed | User-facing helper copy below the real site image/address was removed. |
+| Site image and address | Retained | The site preview remains image-only, and the service location/address line remains visible directly beneath it. |
+| Hero controls | Deferred | No live buttons, links, forms, submit buttons, server actions, or mutation paths were introduced. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- Current Status uses the already-derived Pulse hero state.
+- No heavy/deferred components or additional content zones were added.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`
