@@ -187,6 +187,15 @@ function isStripeSourcedPayment(payment: InternalInvoicePaymentRow) {
   );
 }
 
+function stripePaymentReceivedCopy(payment: InternalInvoicePaymentRow, invoiceReference: string) {
+  const amount = formatCurrencyFromCents(payment.amount_cents);
+  return {
+    title: "Payment received",
+    summary: `${amount} received for ${invoiceReference}.`,
+    detail: "Stripe confirmed this payment. Payout timing is handled by Stripe.",
+  };
+}
+
 function bannerMessage(value?: string | null) {
   const key = String(value ?? "").trim().toLowerCase();
   const messages: Record<string, string> = {
@@ -764,6 +773,8 @@ export default async function InternalInvoiceWorkspacePage({
   const recordedInternalInvoicePaymentRows = internalInvoicePaymentRows.filter(
     (payment) => payment.payment_status === "recorded",
   );
+  const latestStripeReceivedPayment =
+    recordedInternalInvoicePaymentRows.find((payment) => isStripeSourcedPayment(payment)) ?? null;
   const nonRecordedInternalInvoicePaymentRows = internalInvoicePaymentRows.filter(
     (payment) => payment.payment_status !== "recorded",
   );
@@ -795,6 +806,10 @@ export default async function InternalInvoiceWorkspacePage({
         invoiceId: invoice.id,
       })
     : "Start Internal Invoice";
+  const latestStripeReceivedCopy =
+    latestStripeReceivedPayment && invoice
+      ? stripePaymentReceivedCopy(latestStripeReceivedPayment, invoiceHeaderReference)
+      : null;
   const supplementalReasonLabel = formatSupplementalReasonLabel(invoice?.supplemental_reason);
 
   return (
@@ -859,6 +874,19 @@ export default async function InternalInvoiceWorkspacePage({
         {bannerText ? (
           <div className="mt-4 rounded-xl border border-blue-200 bg-blue-50/80 px-4 py-3 text-sm text-blue-900">
             {bannerText}
+          </div>
+        ) : null}
+
+        {latestStripeReceivedPayment && latestStripeReceivedCopy ? (
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/85 px-4 py-3 text-sm text-emerald-950">
+            <div className="font-semibold">{latestStripeReceivedCopy.title}</div>
+            <div className="mt-1">{latestStripeReceivedCopy.summary}</div>
+            <div className="mt-1 text-xs leading-5 text-emerald-800">
+              {latestStripeReceivedCopy.detail}
+              {latestStripeReceivedPayment.paid_at
+                ? ` Received ${formatTimestampDateDisplayLA(latestStripeReceivedPayment.paid_at)}.`
+                : ""}
+            </div>
           </div>
         ) : null}
 
@@ -1351,12 +1379,13 @@ export default async function InternalInvoiceWorkspacePage({
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-slate-500">
                           <span>{formatPaymentMethodLabel(payment.payment_method)}</span>
                           <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-emerald-800">
-                            Recorded
+                            {isStripeSourcedPayment(payment) ? "Payment received" : "Recorded"}
                           </span>
                         </div>
                         {isStripeSourcedPayment(payment) ? (
-                          <div className="mt-2 text-xs text-amber-800">
-                            Online Stripe payment. This screen cannot reverse or refund Stripe charges.
+                          <div className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50/80 px-2.5 py-2 text-xs leading-5 text-emerald-900">
+                            <div className="font-semibold text-emerald-950">Stripe confirmed this payment.</div>
+                            <div>Payout timing is handled by Stripe. This screen cannot reverse or refund Stripe charges.</div>
                           </div>
                         ) : (
                           <form action={reverseInternalInvoicePaymentFromForm} className="mt-2 space-y-2 rounded-lg border border-amber-200 bg-amber-50/70 p-2.5">

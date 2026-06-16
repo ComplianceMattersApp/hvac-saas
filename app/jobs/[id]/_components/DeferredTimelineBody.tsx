@@ -170,7 +170,16 @@ function formatTimelineDetail(type?: string | null, meta?: any, message?: string
     const amountDisplay = summarizePlainText(String(meta?.amount_display ?? ""), 24);
     const paymentMethod = summarizePlainText(String(meta?.payment_method ?? "").replace(/_/g, " "), 48);
     const invoiceNumber = summarizePlainText(String(meta?.invoice_number ?? ""), 48);
-    return [amountDisplay ? `$${amountDisplay}` : "", paymentMethod, invoiceNumber].filter(Boolean).join(" - ");
+    const paymentStatus = String(meta?.payment_status ?? "").trim().toLowerCase();
+    const source = String(meta?.source ?? "").trim().toLowerCase();
+    const isStripeReceived =
+      paymentStatus === "recorded" &&
+      (paymentMethod === "card stripe online" || source.includes("stripe"));
+    const parts = [amountDisplay ? `$${amountDisplay}` : "", paymentMethod, invoiceNumber].filter(Boolean);
+    if (isStripeReceived) {
+      parts.push("Stripe confirmed this payment. Payout timing is handled by Stripe.");
+    }
+    return parts.join(" - ");
   }
 
   if (type === "companion_scope_promoted") {
@@ -213,6 +222,20 @@ function formatTimelineEvent(type?: string | null, meta?: any, message?: string 
     return "Contractor report sent";
   }
 
+  if (eventType === "payment_recorded") {
+    const paymentStatus = String(meta?.payment_status ?? "").trim().toLowerCase();
+    const paymentMethod = String(meta?.payment_method ?? "").trim();
+    const source = String(meta?.source ?? "").trim().toLowerCase();
+    if (
+      paymentStatus === "recorded" &&
+      (paymentMethod === "card_stripe_online" || source.includes("stripe"))
+    ) {
+      return "Payment received";
+    }
+    if (paymentStatus === "failed") return "Payment failed";
+    return "Payment recorded";
+  }
+
   const map: Record<string, string> = {
     job_created: "Job created",
     intake_submitted: "Intake submitted",
@@ -248,7 +271,6 @@ function formatTimelineEvent(type?: string | null, meta?: any, message?: string 
     internal_invoice_email_sent: "Internal invoice emailed",
     internal_invoice_email_resent: "Internal invoice emailed again",
     internal_invoice_email_failed: "Internal invoice email failed",
-    payment_recorded: "Payment recorded",
     companion_scope_promoted: "Companion scope promoted",
     created_from_companion_scope: "Service job created from companion scope",
   };

@@ -236,6 +236,16 @@ function formatCurrencyFromCents(cents?: number | null) {
   }).format(Number.isFinite(amount) ? amount : 0);
 }
 
+function isStripeSourcedPayment(payment: InternalInvoicePaymentRow) {
+  return (
+    String(payment.payment_method ?? "").trim() === "card_stripe_online" ||
+    String(payment.processor_name ?? "").trim().toLowerCase() === "stripe" ||
+    String(payment.stripe_event_id ?? "").trim().length > 0 ||
+    String(payment.stripe_checkout_session_id ?? "").trim().length > 0 ||
+    String(payment.stripe_payment_intent_id ?? "").trim().length > 0
+  );
+}
+
 function formatCentsForInput(cents?: number | null) {
   const amount = Number(cents ?? 0);
   if (!Number.isFinite(amount)) return "0.00";
@@ -700,7 +710,16 @@ function formatTimelineDetail(type?: string | null, meta?: any, message?: string
     const amountDisplay = summarizePlainText(String(meta?.amount_display ?? ""), 24);
     const paymentMethod = summarizePlainText(String(meta?.payment_method ?? "").replace(/_/g, " "), 48);
     const invoiceNumber = summarizePlainText(String(meta?.invoice_number ?? ""), 48);
-    return [amountDisplay ? `$${amountDisplay}` : "", paymentMethod, invoiceNumber].filter(Boolean).join(" - ");
+    const paymentStatus = String(meta?.payment_status ?? "").trim().toLowerCase();
+    const source = String(meta?.source ?? "").trim().toLowerCase();
+    const isStripeReceived =
+      paymentStatus === "recorded" &&
+      (paymentMethod === "card stripe online" || source.includes("stripe"));
+    const parts = [amountDisplay ? `$${amountDisplay}` : "", paymentMethod, invoiceNumber].filter(Boolean);
+    if (isStripeReceived) {
+      parts.push("Stripe confirmed this payment. Payout timing is handled by Stripe.");
+    }
+    return parts.join(" - ");
   }
 
   if (type === "companion_scope_promoted") {
@@ -716,81 +735,91 @@ function formatTimelineDetail(type?: string | null, meta?: any, message?: string
   return cleanMessage;
 }
 
-
-
 function formatTimelineEvent(type?: string | null, meta?: any, message?: string | null) {
   const eventType = String(type ?? "");
   if (eventType === "attachment_added") {
-  const count = Number(
-    meta?.count ??
-      meta?.attachment_ids?.length ??
-      meta?.file_names?.length ??
-      0
-  );
+    const count = Number(
+      meta?.count ??
+        meta?.attachment_ids?.length ??
+        meta?.file_names?.length ??
+        0
+    );
 
-  const actor =
-    meta?.source === "internal"
-      ? "Internal user"
-      : meta?.source === "contractor"
-      ? "Contractor"
-      : "User";
+    const actor =
+      meta?.source === "internal"
+        ? "Internal user"
+        : meta?.source === "contractor"
+        ? "Contractor"
+        : "User";
 
-  return `${actor} uploaded ${count} attachment${count === 1 ? "" : "s"}`;
-}
+    return `${actor} uploaded ${count} attachment${count === 1 ? "" : "s"}`;
+  }
 
- const map: Record<string, string> = {
-  job_created: "Job created",
-  intake_submitted: "Intake submitted",
-  scheduled: "Job scheduled",
-  unscheduled: "Schedule removed",
-  schedule_updated:
-    meta?.source === "auto_schedule_on_the_way"
-      ? "Schedule auto-filled from field action"
-      : "Schedule updated",
+  if (eventType === "payment_recorded") {
+    const paymentStatus = String(meta?.payment_status ?? "").trim().toLowerCase();
+    const paymentMethod = String(meta?.payment_method ?? "").trim();
+    const source = String(meta?.source ?? "").trim().toLowerCase();
+    if (
+      paymentStatus === "recorded" &&
+      (paymentMethod === "card_stripe_online" || source.includes("stripe"))
+    ) {
+      return "Payment received";
+    }
+    if (paymentStatus === "failed") return "Payment failed";
+    return "Payment recorded";
+  }
 
-  on_my_way: "Technician marked On the Way",
-  on_the_way_reverted: "On the Way was reverted",
-  job_started: "Technician started work",
-  job_completed: "Technician completed the visit",
+  const map: Record<string, string> = {
+    job_created: "Job created",
+    intake_submitted: "Intake submitted",
+    scheduled: "Job scheduled",
+    unscheduled: "Schedule removed",
+    schedule_updated:
+      meta?.source === "auto_schedule_on_the_way"
+        ? "Schedule auto-filled from field action"
+        : "Schedule updated",
 
-  job_failed: "Job failed",
-  job_passed: "Job passed",
+    on_my_way: "Technician marked On the Way",
+    on_the_way_reverted: "On the Way was reverted",
+    job_started: "Technician started work",
+    job_completed: "Technician completed the visit",
 
-  retest_created: "Retest created",
-  retest_scheduled: "Retest scheduled",
-  retest_started: "Retest started",
-  retest_passed: "Retest passed",
-  retest_failed: "Retest failed",
-  failure_resolved_by_correction_review: "Failure resolved by correction review",
+    job_failed: "Job failed",
+    job_passed: "Job passed",
 
-  customer_attempt: "Customer contact attempt",
-  status_changed: "Status changed",
+    retest_created: "Retest created",
+    retest_scheduled: "Retest scheduled",
+    retest_started: "Retest started",
+    retest_passed: "Retest passed",
+    retest_failed: "Retest failed",
+    failure_resolved_by_correction_review: "Failure resolved by correction review",
 
-  contractor_note: "Contractor note added",
-  contractor_correction_submission: "Contractor submitted corrections",
-  ops_update: "Ops updated",
-  internal_invoice_drafted: "Internal invoice drafted",
-  internal_invoice_issued: "Internal invoice issued",
-  internal_invoice_voided: "Internal invoice voided",
-  internal_invoice_email_sent: "Internal invoice emailed",
-  internal_invoice_email_resent: "Internal invoice emailed again",
-  internal_invoice_email_failed: "Internal invoice email failed",
-  payment_recorded: "Payment recorded",
-  companion_scope_promoted: "Companion scope promoted",
-  created_from_companion_scope: "Service job created from companion scope",
-};
+    customer_attempt: "Customer contact attempt",
+    status_changed: "Status changed",
 
-if (eventType === "ops_update") {
-  return String(
-    message ??
-    meta?.message ??
-    meta?.note ??
-    "Ops updated"
-  ).trim();
-}
+    contractor_note: "Contractor note added",
+    contractor_correction_submission: "Contractor submitted corrections",
+    ops_update: "Ops updated",
+    internal_invoice_drafted: "Internal invoice drafted",
+    internal_invoice_issued: "Internal invoice issued",
+    internal_invoice_voided: "Internal invoice voided",
+    internal_invoice_email_sent: "Internal invoice emailed",
+    internal_invoice_email_resent: "Internal invoice emailed again",
+    internal_invoice_email_failed: "Internal invoice email failed",
+    companion_scope_promoted: "Companion scope promoted",
+    created_from_companion_scope: "Service job created from companion scope",
+  };
 
-return map[eventType] ?? eventType.replaceAll("_", " ");
+  if (eventType === "ops_update") {
+    return String(
+      message ??
+      meta?.message ??
+      meta?.note ??
+      "Ops updated"
+    ).trim();
+  }
 
+  return map[eventType] ?? eventType.replaceAll("_", " ");
 }
 
 
@@ -3466,6 +3495,16 @@ const failureResolutionPathCount =
         : internalInvoicePaymentSummary.paymentStatus === "partial"
           ? "border-amber-200 bg-amber-50 text-amber-800"
           : "border-slate-200 bg-slate-50 text-slate-700";
+    const recordedInternalInvoicePaymentRows = internalInvoicePaymentRows.filter(
+      (payment) => payment.payment_status === "recorded",
+    );
+    const latestStripeReceivedPayment =
+      recordedInternalInvoicePaymentRows.find((payment) => isStripeSourcedPayment(payment)) ?? null;
+    const latestStripeReceivedPaymentSummary = latestStripeReceivedPayment
+      ? `${formatCurrencyFromCents(latestStripeReceivedPayment.amount_cents)} received for ${
+          internalInvoice?.invoice_display_number || internalInvoice?.invoice_number || "this invoice"
+        }.`
+      : "";
     const fieldBillingInvoiceSnapshot = internalInvoice
       ? {
           id: internalInvoice.id,
@@ -3940,17 +3979,39 @@ const failureResolutionPathCount =
                         </SubmitButton>
                       </form>
 
+                      {latestStripeReceivedPayment ? (
+                        <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50/85 px-3.5 py-3 text-sm leading-6 text-emerald-950">
+                          <div className="font-semibold">Payment received</div>
+                          <div className="mt-1">{latestStripeReceivedPaymentSummary}</div>
+                          <div className="mt-1 text-xs leading-5 text-emerald-800">
+                            Stripe confirmed this payment. Payout timing is handled by Stripe.
+                            {latestStripeReceivedPayment.paid_at
+                              ? ` Received ${formatDateTimeLAFromIso(latestStripeReceivedPayment.paid_at)}.`
+                              : ""}
+                          </div>
+                        </div>
+                      ) : null}
+
                       {internalInvoicePaymentRows.length > 0 ? (
                         <div className="mt-3 space-y-2">
                           {internalInvoicePaymentRows.slice(0, 6).map((payment) => (
                             <div key={payment.id} className="rounded-lg border border-slate-200/80 bg-white/90 px-3 py-2.5 text-sm text-slate-700">
                               <div className="flex flex-wrap items-center justify-between gap-2">
-                                <div className="font-semibold text-slate-900">Payment recorded</div>
+                                <div className="font-semibold text-slate-900">
+                                  {isStripeSourcedPayment(payment) && payment.payment_status === "recorded"
+                                    ? "Payment received"
+                                    : "Payment recorded"}
+                                </div>
                                 <div className="text-xs text-slate-500">{formatDateTimeLAFromIso(payment.paid_at)}</div>
                               </div>
                               <div className="mt-1">
                                 {formatCurrencyFromCents(payment.amount_cents)} • {String(payment.payment_method).replace(/_/g, " ")}
                               </div>
+                              {isStripeSourcedPayment(payment) && payment.payment_status === "recorded" ? (
+                                <div className="mt-1 text-xs leading-5 text-emerald-800">
+                                  Stripe confirmed this payment. Payout timing is handled by Stripe.
+                                </div>
+                              ) : null}
                               {payment.received_reference ? (
                                 <div className="mt-1 text-xs text-slate-500">Reference: {payment.received_reference}</div>
                               ) : null}
