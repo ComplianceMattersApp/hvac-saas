@@ -65,7 +65,7 @@ export default function TenantInvoicePaymentLinkPanel({
     }
 
     await navigator.clipboard.writeText(checkoutSessionUrl);
-    setCopyMessage("Checkout URL copied.");
+    setCopyMessage("Payment URL copied.");
   }
 
   return (
@@ -98,14 +98,14 @@ export default function TenantInvoicePaymentLinkPanel({
             <div className="font-semibold">Payment link ready</div>
             <div>{state.message}</div>
             <div className="space-y-2 rounded-xl border border-emerald-200 bg-white/85 p-3 text-slate-700">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Checkout URL</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Payment URL</div>
               <input readOnly value={checkoutSessionUrl} className={inputClass} />
               <div className="flex flex-wrap gap-2">
                 <button type="button" onClick={copyCheckoutUrl} className={secondaryButtonClass}>
                   Copy URL
                 </button>
                 <a href={checkoutSessionUrl} target="_blank" rel="noreferrer" className={secondaryButtonClass}>
-                  Open Stripe page
+                  Open payment page
                 </a>
               </div>
               {copyMessage ? <div className="text-xs text-emerald-800">{copyMessage}</div> : null}

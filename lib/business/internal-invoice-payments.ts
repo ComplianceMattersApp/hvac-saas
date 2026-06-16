@@ -1,4 +1,5 @@
 import type Stripe from "stripe";
+import { createHmac, timingSafeEqual } from "crypto";
 import {
   getStripeServerClient,
   resolvePlatformBillingAppUrl,
@@ -75,6 +76,28 @@ export type TenantInvoiceCheckoutSessionResult = {
   balanceDueCents: number;
 };
 
+export type TenantInvoicePaymentLinkResult = {
+  paymentLinkUrl: string;
+  paymentLinkToken: string;
+  connectedAccountId: string;
+  balanceDueCents: number;
+};
+
+export type TenantInvoicePaymentLinkPayload = {
+  v: 1;
+  accountOwnerUserId: string;
+  jobId: string;
+  invoiceId: string;
+  balanceDueCents: number;
+  createdAt: string;
+};
+
+export type TenantInvoiceCheckoutSessionExpirationResult = {
+  attempted: number;
+  expired: number;
+  skipped: number;
+};
+
 function buildPublicTenantInvoiceCheckoutReturnPath(params: {
   status: "success" | "cancelled";
   jobId: string;
@@ -86,6 +109,115 @@ function buildPublicTenantInvoiceCheckoutReturnPath(params: {
     invoice_id: params.invoiceId,
   });
   return `/payments/checkout-complete?${search.toString()}`;
+}
+
+function buildPublicTenantInvoicePaymentPath(token: string) {
+  return `/payments/invoice/${encodeURIComponent(token)}`;
+}
+
+function resolvePaymentLinkSigningSecret(explicitSecret?: string | null) {
+  const secret = String(
+    explicitSecret ??
+      process.env.TENANT_INVOICE_PAYMENT_LINK_SECRET ??
+      process.env.AUTH_SECRET ??
+      process.env.NEXTAUTH_SECRET ??
+      process.env.STRIPE_WEBHOOK_SECRET ??
+      "",
+  ).trim();
+
+  if (!secret) {
+    throw new Error("Payment link signing secret is not configured.");
+  }
+
+  return secret;
+}
+
+function encodeBase64Url(value: string) {
+  return Buffer.from(value, "utf8").toString("base64url");
+}
+
+function decodeBase64Url(value: string) {
+  return Buffer.from(value, "base64url").toString("utf8");
+}
+
+function signTokenBody(body: string, secret: string) {
+  return createHmac("sha256", secret).update(body).digest("base64url");
+}
+
+export function signTenantInvoicePaymentLinkPayload(
+  payload: TenantInvoicePaymentLinkPayload,
+  signingSecret?: string | null,
+) {
+  const body = encodeBase64Url(JSON.stringify(payload));
+  const signature = signTokenBody(body, resolvePaymentLinkSigningSecret(signingSecret));
+  return `${body}.${signature}`;
+}
+
+export function verifyTenantInvoicePaymentLinkToken(
+  token: string,
+  signingSecret?: string | null,
+): TenantInvoicePaymentLinkPayload | null {
+  const [body, signature, extra] = String(token ?? "").trim().split(".");
+  if (!body || !signature || extra !== undefined) return null;
+
+  const expectedSignature = signTokenBody(body, resolvePaymentLinkSigningSecret(signingSecret));
+  const expected = Buffer.from(expectedSignature);
+  const actual = Buffer.from(signature);
+  if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null;
+
+  try {
+    const parsed = JSON.parse(decodeBase64Url(body)) as Partial<TenantInvoicePaymentLinkPayload>;
+    const accountOwnerUserId = String(parsed.accountOwnerUserId ?? "").trim();
+    const jobId = String(parsed.jobId ?? "").trim();
+    const invoiceId = String(parsed.invoiceId ?? "").trim();
+    const balanceDueCents = Number(parsed.balanceDueCents ?? 0);
+    const createdAt = String(parsed.createdAt ?? "").trim();
+
+    if (
+      parsed.v !== 1 ||
+      !accountOwnerUserId ||
+      !jobId ||
+      !invoiceId ||
+      !Number.isFinite(balanceDueCents) ||
+      balanceDueCents <= 0 ||
+      !createdAt
+    ) {
+      return null;
+    }
+
+    return {
+      v: 1,
+      accountOwnerUserId,
+      jobId,
+      invoiceId,
+      balanceDueCents: Math.round(balanceDueCents),
+      createdAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function resolveJobBlocksOnlineInvoicePayment(params: {
+  accountOwnerUserId: string;
+  jobId: string;
+  supabase: any;
+}): Promise<boolean> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  const jobId = String(params.jobId ?? "").trim();
+  if (!accountOwnerUserId || !jobId) return false;
+
+  const { data, error } = await params.supabase
+    .from("jobs")
+    .select("id, invoice_complete, billing_disposition")
+    .eq("id", jobId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .maybeSingle();
+
+  if (error || !data?.id) return false;
+
+  const disposition = String(data.billing_disposition ?? "").trim().toLowerCase();
+  return Boolean(data.invoice_complete) && (disposition === "externally_billed" || disposition === "no_charge");
 }
 
 const INTERNAL_INVOICE_PAYMENT_SELECT = [
@@ -420,6 +552,10 @@ export async function createTenantInvoiceCheckoutSession(params: {
     throw new Error("Invoice not found for checkout session.");
   }
 
+  if (await resolveJobBlocksOnlineInvoicePayment({ accountOwnerUserId, jobId, supabase: params.supabase })) {
+    throw new Error("Invoice already paid or resolved outside online payment.");
+  }
+
   const paymentSummary = await resolveInvoiceCollectedPaymentSummary(
     accountOwnerUserId,
     invoiceId,
@@ -509,10 +645,187 @@ export async function createTenantInvoiceCheckoutSession(params: {
     throw new Error("Stripe checkout session response was missing id or url.");
   }
 
+  const { error: pendingInsertErr } = await params.supabase
+    .from("internal_invoice_payments")
+    .insert({
+      account_owner_user_id: accountOwnerUserId,
+      invoice_id: invoiceId,
+      job_id: jobId,
+      payment_status: "pending",
+      payment_method: "card_stripe_online",
+      amount_cents: balanceDueCents,
+      paid_at: new Date().toISOString(),
+      received_reference: checkoutSessionId,
+      notes: `Pending Stripe checkout session ${checkoutSessionId}`,
+      recorded_by_user_id: accountOwnerUserId,
+      processor_name: "stripe",
+      processor_payment_reference: checkoutSessionId,
+      stripe_checkout_session_id: checkoutSessionId,
+    });
+
+  if (pendingInsertErr) {
+    try {
+      await stripe.checkout.sessions.expire(
+        checkoutSessionId,
+        {},
+        { stripeAccount: readiness.connectedAccountId },
+      );
+    } catch (error) {
+      console.warn("Stripe checkout session could not be expired after pending row insert failure", {
+        accountOwnerUserId,
+        invoiceId,
+        checkoutSessionId,
+        message: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
+    throw new Error(`Failed to store pending Stripe checkout session: ${pendingInsertErr.message ?? "unknown error"}`);
+  }
+
   return {
     checkoutSessionId,
     checkoutSessionUrl,
     connectedAccountId: readiness.connectedAccountId,
     balanceDueCents,
+  };
+}
+
+export async function createTenantInvoicePaymentLink(params: {
+  accountOwnerUserId: string;
+  jobId: string;
+  invoiceId: string;
+  supabase: any;
+  appUrl?: string | null;
+  signingSecret?: string | null;
+}): Promise<TenantInvoicePaymentLinkResult> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  const jobId = String(params.jobId ?? "").trim();
+  const invoiceId = String(params.invoiceId ?? "").trim();
+
+  if (!accountOwnerUserId || !jobId || !invoiceId) {
+    throw new Error("accountOwnerUserId, jobId, and invoiceId are required.");
+  }
+
+  const { data: invoice, error: invoiceErr } = await params.supabase
+    .from("internal_invoices")
+    .select("id, account_owner_user_id, job_id, invoice_number, status, total_cents, billing_email")
+    .eq("id", invoiceId)
+    .eq("account_owner_user_id", accountOwnerUserId)
+    .eq("job_id", jobId)
+    .maybeSingle();
+
+  if (invoiceErr) {
+    throw new Error(`Failed to load invoice for payment link: ${invoiceErr.message ?? "unknown error"}`);
+  }
+
+  if (!invoice?.id) {
+    throw new Error("Invoice not found for payment link.");
+  }
+
+  if (await resolveJobBlocksOnlineInvoicePayment({ accountOwnerUserId, jobId, supabase: params.supabase })) {
+    throw new Error("Invoice already paid or resolved outside online payment.");
+  }
+
+  const paymentSummary = await resolveInvoiceCollectedPaymentSummary(
+    accountOwnerUserId,
+    invoiceId,
+    params.supabase,
+  );
+
+  const eligibility = validateInvoiceEligibleForOnlinePayment(invoice, paymentSummary);
+  if (!eligibility.eligible) {
+    throw new Error(eligibility.reason ?? "Invoice is not eligible for online payment.");
+  }
+
+  const readiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, params.supabase);
+  if (!readiness.isReady || !readiness.connectedAccountId) {
+    throw new Error("Tenant Stripe Connect account is not ready for payment link creation.");
+  }
+
+  const appUrl = String(params.appUrl ?? resolvePlatformBillingAppUrl() ?? "").trim().replace(/\/$/, "");
+  if (!appUrl) {
+    throw new Error("APP_URL is not configured.");
+  }
+
+  const balanceDueCents = paymentSummary.balanceDueCents;
+  const paymentLinkToken = signTenantInvoicePaymentLinkPayload(
+    {
+      v: 1,
+      accountOwnerUserId,
+      jobId,
+      invoiceId,
+      balanceDueCents,
+      createdAt: new Date().toISOString(),
+    },
+    params.signingSecret,
+  );
+
+  return {
+    paymentLinkUrl: `${appUrl}${buildPublicTenantInvoicePaymentPath(paymentLinkToken)}`,
+    paymentLinkToken,
+    connectedAccountId: readiness.connectedAccountId,
+    balanceDueCents,
+  };
+}
+
+export async function expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice(params: {
+  accountOwnerUserId: string;
+  invoiceId: string;
+  supabase: any;
+  stripe?: Stripe;
+}): Promise<TenantInvoiceCheckoutSessionExpirationResult> {
+  const accountOwnerUserId = String(params.accountOwnerUserId ?? "").trim();
+  const invoiceId = String(params.invoiceId ?? "").trim();
+
+  if (!accountOwnerUserId || !invoiceId) {
+    return { attempted: 0, expired: 0, skipped: 0 };
+  }
+
+  const paymentRows = await listInvoicePaymentRows(accountOwnerUserId, invoiceId, params.supabase);
+  const checkoutSessionIds = Array.from(
+    new Set(
+      paymentRows
+        .filter((row) => row.payment_status === "pending")
+        .filter((row) => row.payment_method === "card_stripe_online" || String(row.processor_name ?? "").toLowerCase() === "stripe")
+        .map((row) => String(row.stripe_checkout_session_id ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (checkoutSessionIds.length === 0) {
+    return { attempted: 0, expired: 0, skipped: 0 };
+  }
+
+  const readiness = await resolveTenantStripeConnectReadiness(accountOwnerUserId, params.supabase);
+  if (!readiness.isReady || !readiness.connectedAccountId) {
+    return { attempted: 0, expired: 0, skipped: checkoutSessionIds.length };
+  }
+
+  const stripe = params.stripe ?? getStripeServerClient();
+  let expired = 0;
+  let skipped = 0;
+
+  for (const checkoutSessionId of checkoutSessionIds) {
+    try {
+      await stripe.checkout.sessions.expire(
+        checkoutSessionId,
+        {},
+        { stripeAccount: readiness.connectedAccountId },
+      );
+      expired += 1;
+    } catch (error) {
+      skipped += 1;
+      console.warn("Stored Stripe checkout session could not be expired", {
+        accountOwnerUserId,
+        invoiceId,
+        checkoutSessionId,
+        message: error instanceof Error ? error.message : "unknown_error",
+      });
+    }
+  }
+
+  return {
+    attempted: checkoutSessionIds.length,
+    expired,
+    skipped,
   };
 }

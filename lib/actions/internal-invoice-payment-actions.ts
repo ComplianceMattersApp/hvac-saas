@@ -16,7 +16,9 @@ import { resolveBillingModeByAccountOwnerId } from '@/lib/business/internal-busi
 import { resolveOperationalMutationEntitlementAccess } from '@/lib/business/platform-entitlement';
 import { resolveInternalInvoiceById, resolveInternalInvoiceByJobId } from '@/lib/business/internal-invoice';
 import {
+  createTenantInvoicePaymentLink,
   createTenantInvoiceCheckoutSession,
+  expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice,
   INTERNAL_INVOICE_PAYMENT_METHODS,
   resolveInvoiceCollectedPaymentSummary,
 } from '@/lib/business/internal-invoice-payments';
@@ -391,6 +393,12 @@ export async function recordInternalInvoicePaymentFromForm(formData: FormData) {
     recordedByUserId: userId,
   });
 
+  await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    invoiceId: invoice.id,
+  });
+
   await insertJobEvent({
     supabase,
     jobId,
@@ -485,12 +493,22 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
   }
 
   try {
-    const checkoutSession = await createTenantInvoiceCheckoutSession({
-      accountOwnerUserId: internalUser.account_owner_user_id,
-      jobId,
-      invoiceId: invoice.id,
-      supabase,
-    });
+    const paymentLink = redirectToCheckout
+      ? null
+      : await createTenantInvoicePaymentLink({
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          jobId,
+          invoiceId: invoice.id,
+          supabase,
+        });
+    const checkoutSession = redirectToCheckout
+      ? await createTenantInvoiceCheckoutSession({
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          jobId,
+          invoiceId: invoice.id,
+          supabase,
+        })
+      : null;
 
     revalidatePath(`/jobs/${jobId}`);
     revalidatePath(`/jobs/${jobId}/invoice`);
@@ -501,12 +519,12 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
     if (noRedirect) {
       return {
         ok: true,
-        checkoutSessionId: checkoutSession.checkoutSessionId,
-        checkoutSessionUrl: checkoutSession.checkoutSessionUrl,
+        checkoutSessionId: checkoutSession?.checkoutSessionId ?? null,
+        checkoutSessionUrl: checkoutSession?.checkoutSessionUrl ?? paymentLink?.paymentLinkUrl ?? null,
       } as const;
     }
 
-    if (redirectToCheckout) {
+    if (redirectToCheckout && checkoutSession) {
       redirect(checkoutSession.checkoutSessionUrl);
     }
 
@@ -516,8 +534,8 @@ export async function createTenantInvoiceCheckoutSessionFromForm(formData: FormD
         tab,
         banner: 'internal_invoice_payment_checkout_session_created',
         returnTo,
-        checkoutSessionId: checkoutSession.checkoutSessionId,
-        checkoutSessionUrl: checkoutSession.checkoutSessionUrl,
+        checkoutSessionId: checkoutSession?.checkoutSessionId ?? null,
+        checkoutSessionUrl: checkoutSession?.checkoutSessionUrl ?? paymentLink?.paymentLinkUrl ?? null,
       }),
     );
   } catch (error) {
@@ -1184,6 +1202,12 @@ export async function verifyFieldPaymentCollectionReportFromForm(formData: FormD
     receivedReference: getOptionalText(reportRow.reference),
     notes: getOptionalText(reportRow.note),
     recordedByUserId: userId,
+  });
+
+  await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+    invoiceId: invoice.id,
   });
 
   const nowIso = new Date().toISOString();

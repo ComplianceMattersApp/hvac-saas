@@ -7,6 +7,7 @@ const mockIsStripePaymentAlreadyRecorded = vi.fn();
 const mockResolveInvoiceCollectedPaymentSummary = vi.fn();
 const mockValidateInvoiceEligibleForOnlinePayment = vi.fn();
 const mockBuildStripePaymentReference = vi.fn();
+const mockResolveJobBlocksOnlineInvoicePayment = vi.fn();
 const mockResolveTenantStripeConnectReadiness = vi.fn();
 const mockInsertJobEvent = vi.fn(async () => null);
 const mockGetStripeServerClient = vi.fn();
@@ -27,6 +28,7 @@ vi.mock('@/lib/business/internal-invoice-payments', () => ({
   validateInvoiceEligibleForOnlinePayment: (...args: unknown[]) =>
     mockValidateInvoiceEligibleForOnlinePayment(...args),
   buildStripePaymentReference: (...args: unknown[]) => mockBuildStripePaymentReference(...args),
+  resolveJobBlocksOnlineInvoicePayment: (...args: unknown[]) => mockResolveJobBlocksOnlineInvoicePayment(...args),
 }));
 
 vi.mock('@/lib/business/tenant-stripe-connect-readiness', () => ({
@@ -108,9 +110,11 @@ function makeAdminInsertSuccess(opts?: {
   const select = vi.fn(() => ({ single }));
   const insert = vi.fn(() => ({ select }));
   const updateMaybeSingle = vi.fn(async () => ({ data: { id: 'payment-existing' }, error: null }));
-  const updateSelect = vi.fn(() => ({ maybeSingle: updateMaybeSingle }));
-  const updateEq = vi.fn(() => ({ select: updateSelect }));
-  const update = vi.fn(() => ({ eq: updateEq }));
+  const updateQuery: any = {
+    eq: vi.fn(() => updateQuery),
+    select: vi.fn(() => ({ maybeSingle: updateMaybeSingle })),
+  };
+  const update = vi.fn(() => updateQuery);
   const from = vi.fn((table: string) => {
     if (table === 'internal_invoices') {
       const query: any = {
@@ -236,6 +240,7 @@ describe('tenant invoice Stripe webhook handlers', () => {
       paymentStatus: 'unpaid',
     });
     mockValidateInvoiceEligibleForOnlinePayment.mockReturnValue({ eligible: true });
+    mockResolveJobBlocksOnlineInvoicePayment.mockResolvedValue(false);
     mockBuildStripePaymentReference.mockReturnValue({
       processor_name: 'stripe',
       processor_payment_reference: 'ch_test_1',
@@ -808,6 +813,7 @@ describe('tenant invoice Stripe webhook handlers', () => {
         },
         identityRowsByCall: [
           [],
+          [],
           [
             makeIdentityRow({
               id: 'payment-canonical',
@@ -1105,6 +1111,68 @@ describe('tenant invoice Stripe webhook handlers', () => {
 
       expect(result.recorded).toBe(false);
       expect(result.reason).toContain('exceeds balance due');
+    });
+
+    it('rejects late Stripe charge after external billing resolved the job', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert } = makeAdminInsertSuccess();
+
+      mockResolveJobBlocksOnlineInvoicePayment.mockResolvedValueOnce(true);
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_external_resolved',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(false);
+      expect(result.reason).toContain('resolved outside online payment');
+      expect(insert).not.toHaveBeenCalled();
+    });
+
+    it('promotes a stored pending checkout session row to recorded on confirmed Stripe charge', async () => {
+      const { recordTenantInvoicePaymentFromStripeCharge } = await import(
+        '@/lib/business/tenant-invoice-stripe-webhooks'
+      );
+      const { admin, insert, update } = makeAdminInsertSuccess({
+        identityRows: [
+          makeIdentityRow({
+            id: 'payment-pending-1',
+            payment_status: 'pending',
+            stripe_checkout_session_id: 'cs_123',
+            stripe_payment_intent_id: 'pi_test_1',
+            processor_charge_id: null,
+          }),
+        ],
+      });
+
+      mockIsStripePaymentAlreadyRecorded.mockResolvedValueOnce(true);
+
+      const result = await recordTenantInvoicePaymentFromStripeCharge({
+        charge: baseCharge(),
+        eventId: 'evt_pending_promote',
+        connectedAccountId: 'acct_connected_1',
+        admin,
+      });
+
+      expect(result.recorded).toBe(true);
+      expect(result.paymentId).toBe('payment-existing');
+      expect(insert).not.toHaveBeenCalled();
+      expect(update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          payment_status: 'recorded',
+          stripe_event_id: 'evt_pending_promote',
+          stripe_identity_dedupe_scope: 'recorded_v1',
+        }),
+      );
+      expect(mockResolveManualSavedMethodAttemptFromWebhook).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolvedInternalInvoicePaymentId: 'payment-existing',
+        }),
+      );
     });
 
     it('requires metadata for failed payment handler', async () => {

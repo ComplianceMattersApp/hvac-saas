@@ -11,6 +11,8 @@ const evaluateJobOpsStatusMock = vi.fn();
 const healStalePaperworkOpsStatusMock = vi.fn();
 const reconcileServiceCaseStatusAfterJobChangeMock = vi.fn();
 const revalidatePathMock = vi.fn();
+const createTenantInvoicePaymentLinkMock = vi.fn();
+const expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock = vi.fn();
 
 vi.mock("next/navigation", () => ({
   redirect: (url: string) => {
@@ -52,6 +54,13 @@ vi.mock("@/lib/business/internal-invoice", async () => {
     resolveInternalInvoiceById: vi.fn(async () => null),
   };
 });
+
+vi.mock("@/lib/business/internal-invoice-payments", () => ({
+  createTenantInvoicePaymentLink: (...args: unknown[]) =>
+    createTenantInvoicePaymentLinkMock(...args),
+  expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice: (...args: unknown[]) =>
+    expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock(...args),
+}));
 
 vi.mock("@/lib/business/platform-entitlement", () => ({
   resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
@@ -241,6 +250,10 @@ describe("internal invoice billing disposition actions", () => {
     healStalePaperworkOpsStatusMock.mockResolvedValue(false);
     reconcileServiceCaseStatusAfterJobChangeMock.mockResolvedValue(undefined);
     insertJobEventMock.mockResolvedValue(undefined);
+    expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock.mockResolvedValue({
+      expiredSessionIds: [],
+      skippedSessionIds: [],
+    });
   });
 
   it("marks a zero-dollar draft invoice as no charge without fake charges or payments", async () => {
@@ -302,6 +315,11 @@ describe("internal invoice billing disposition actions", () => {
       }),
     );
     expect(fixture.forbiddenWrites).toHaveLength(0);
+    expect(expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock).toHaveBeenCalledWith({
+      accountOwnerUserId: "owner-1",
+      invoiceId: "invoice-1",
+      supabase: fixture.supabase,
+    });
   });
 
   it("denies billing disposition when the invoice has a positive total", async () => {

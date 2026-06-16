@@ -11,6 +11,7 @@ import { applyExternalBillingCompletionMutation } from "@/lib/actions/external-b
 import { reconcileServiceCaseStatusAfterJobChange } from "@/lib/actions/service-case-reconciliation";
 import { autoCountMaintenanceAgreementVisitsForCompletedServiceJob } from "@/lib/maintenance-agreements/agreement-actions";
 import { resolveBillingModeByAccountOwnerId } from "@/lib/business/internal-business-profile";
+import { expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice } from "@/lib/business/internal-invoice-payments";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -326,6 +327,31 @@ export async function markInvoiceSent(jobIdOrFormData: string | FormData, return
   const completedAt = completionResult.completedAt;
   const invoiceCompleteChanged = completionResult.invoiceCompleteChanged;
   const dataEntryCompletedChanged = completionResult.dataEntryCompletedChanged;
+
+  try {
+    const { data: invoiceRows, error: invoiceRowsError } = await supabase
+      .from("internal_invoices")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("account_owner_user_id", internalUser.account_owner_user_id);
+
+    if (invoiceRowsError) throw new Error(invoiceRowsError.message);
+
+    for (const invoiceRow of Array.isArray(invoiceRows) ? invoiceRows : []) {
+      const invoiceId = String(invoiceRow?.id ?? "").trim();
+      if (!invoiceId) continue;
+      await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        invoiceId,
+      });
+    }
+  } catch (error) {
+    console.warn("[EXTERNAL_BILLING_STRIPE_SESSION_EXPIRATION_BEST_EFFORT_FAILED]", {
+      jobId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 
   const result = await setOpsStatusIfNotManual(jobId, "closed");
 

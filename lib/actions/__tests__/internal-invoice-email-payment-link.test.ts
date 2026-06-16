@@ -11,7 +11,7 @@ const resolveInternalInvoiceByIdMock = vi.fn();
 const resolveOperationalTenantIdentityMock = vi.fn();
 const sendEmailMock = vi.fn();
 const resolveNotificationAccountOwnerUserIdMock = vi.fn();
-const createTenantInvoiceCheckoutSessionMock = vi.fn();
+const createTenantInvoicePaymentLinkMock = vi.fn();
 const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
 
@@ -74,8 +74,8 @@ vi.mock('@/lib/notifications/account-owner', () => ({
 }));
 
 vi.mock('@/lib/business/internal-invoice-payments', () => ({
-  createTenantInvoiceCheckoutSession: (...args: unknown[]) =>
-    createTenantInvoiceCheckoutSessionMock(...args),
+  createTenantInvoicePaymentLink: (...args: unknown[]) =>
+    createTenantInvoicePaymentLinkMock(...args),
 }));
 
 vi.mock('@/lib/actions/job-actions', () => ({
@@ -343,9 +343,9 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
     resolveNotificationAccountOwnerUserIdMock.mockResolvedValue('owner-1');
     sendEmailMock.mockResolvedValue(undefined);
     insertJobEventMock.mockResolvedValue(undefined);
-    createTenantInvoiceCheckoutSessionMock.mockResolvedValue({
-      checkoutSessionId: 'cs_test_123',
-      checkoutSessionUrl: 'https://checkout.stripe.com/c/pay/cs_test_123',
+    createTenantInvoicePaymentLinkMock.mockResolvedValue({
+      paymentLinkToken: 'signed-token',
+      paymentLinkUrl: 'https://app.example/payments/invoice/signed-token',
       connectedAccountId: 'acct_123',
       balanceDueCents: 9900,
     });
@@ -361,7 +361,7 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
       'banner=internal_invoice_email_sent',
     );
 
-    expect(createTenantInvoiceCheckoutSessionMock).toHaveBeenCalledWith(
+    expect(createTenantInvoicePaymentLinkMock).toHaveBeenCalledWith(
       expect.objectContaining({
         accountOwnerUserId: 'owner-1',
         jobId: 'job-1',
@@ -559,7 +559,7 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
   it('sends without payment link when checkout helper reports zero balance', async () => {
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
-    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+    createTenantInvoicePaymentLinkMock.mockRejectedValueOnce(
       new Error('Invoice balance must be greater than zero'),
     );
 
@@ -612,7 +612,7 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
   it('sends without payment link when connect readiness is not ready', async () => {
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
-    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+    createTenantInvoicePaymentLinkMock.mockRejectedValueOnce(
       new Error('Tenant Stripe Connect account is not ready for checkout session creation.'),
     );
 
@@ -696,7 +696,7 @@ describe('sendInternalInvoiceEmailFromForm payment link behavior', () => {
       'banner=internal_invoice_send_requires_issued',
     );
 
-    expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
+    expect(createTenantInvoicePaymentLinkMock).not.toHaveBeenCalled();
     expect(sendEmailMock).not.toHaveBeenCalled();
   });
 });

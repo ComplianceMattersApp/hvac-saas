@@ -9,6 +9,7 @@ const setOpsStatusIfNotManualMock = vi.fn();
 const reconcileServiceCaseStatusAfterJobChangeMock = vi.fn();
 const revalidatePathMock = vi.fn();
 const autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock = vi.fn();
+const expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock = vi.fn();
 
 vi.mock("next/cache", () => ({
   revalidatePath: (...args: unknown[]) => revalidatePathMock(...args),
@@ -42,6 +43,11 @@ vi.mock("@/lib/business/internal-business-profile", () => ({
 vi.mock("@/lib/business/platform-entitlement", () => ({
   resolveOperationalMutationEntitlementAccess: (...args: unknown[]) =>
     resolveOperationalMutationEntitlementAccessMock(...args),
+}));
+
+vi.mock("@/lib/business/internal-invoice-payments", () => ({
+  expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice: (...args: unknown[]) =>
+    expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock(...args),
 }));
 
 vi.mock("@/lib/actions/ops-status", () => ({
@@ -109,6 +115,20 @@ function makeServiceCloseoutSupabaseFixture(config: FixtureConfig = {}) {
         };
       }
 
+      if (table === "internal_invoices") {
+        const query: any = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+        };
+        query.eq
+          .mockReturnValueOnce(query)
+          .mockImplementationOnce(async () => ({
+            data: [{ id: "inv-1" }],
+            error: null,
+          }));
+        return query;
+      }
+
       throw new Error(`Unexpected table ${table}`);
     },
   };
@@ -142,6 +162,11 @@ describe("markInvoiceSent - canonical external billing completion contract", () 
     });
 
     reconcileServiceCaseStatusAfterJobChangeMock.mockResolvedValue(undefined);
+    expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock.mockResolvedValue({
+      attempted: 0,
+      expired: 0,
+      skipped: 0,
+    });
     resolveBillingModeByAccountOwnerIdMock.mockResolvedValue("external_billing");
     autoCountMaintenanceAgreementVisitsForCompletedServiceJobMock.mockResolvedValue({
       evaluatedLinks: 1,
@@ -270,6 +295,12 @@ describe("markInvoiceSent - canonical external billing completion contract", () 
       fixture.jobUpdates.some((row) => Object.prototype.hasOwnProperty.call(row, "data_entry_completed_at")),
     ).toBe(true);
     expect(setOpsStatusIfNotManualMock).toHaveBeenCalledWith("job-1", "closed");
+    expect(expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: "owner-1",
+        invoiceId: "inv-1",
+      }),
+    );
 
     expect(fixture.jobEvents).toHaveLength(1);
     expect(fixture.jobEvents[0]).toEqual(

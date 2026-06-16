@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTenantInvoiceCheckoutSession } from "@/lib/business/internal-invoice-payments";
+import {
+  createTenantInvoiceCheckoutSession,
+  createTenantInvoicePaymentLink,
+  expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice,
+  verifyTenantInvoicePaymentLinkToken,
+} from "@/lib/business/internal-invoice-payments";
 
 const resolveTenantStripeConnectReadinessMock = vi.fn();
 
@@ -14,6 +19,8 @@ type SupabaseFixtureOptions = {
   invoiceNumber?: string;
   billingEmail?: string | null;
   paymentRows?: Array<Record<string, unknown>>;
+  jobInvoiceComplete?: boolean;
+  jobBillingDisposition?: string | null;
 };
 
 function buildSupabaseFixture(options: SupabaseFixtureOptions = {}) {
@@ -22,6 +29,8 @@ function buildSupabaseFixture(options: SupabaseFixtureOptions = {}) {
   const invoiceNumber = options.invoiceNumber ?? "INV-1001";
   const billingEmail = options.billingEmail ?? "billing@example.com";
   const paymentRows = options.paymentRows ?? [];
+  const jobInvoiceComplete = options.jobInvoiceComplete ?? false;
+  const jobBillingDisposition = options.jobBillingDisposition ?? null;
 
   const writes: Array<{ table: string; op: string; payload?: unknown }> = [];
 
@@ -64,6 +73,22 @@ function buildSupabaseFixture(options: SupabaseFixtureOptions = {}) {
           .mockReturnValueOnce(query)
           .mockImplementationOnce(async () => ({ data: paymentRows, error: null }));
 
+        return query;
+      }
+
+      if (table === "jobs") {
+        const query: any = {
+          select: vi.fn(() => query),
+          eq: vi.fn(() => query),
+          maybeSingle: vi.fn(async () => ({
+            data: {
+              id: "job-1",
+              invoice_complete: jobInvoiceComplete,
+              billing_disposition: jobBillingDisposition,
+            },
+            error: null,
+          })),
+        };
         return query;
       }
 
@@ -350,7 +375,7 @@ describe("createTenantInvoiceCheckoutSession", () => {
     expect(payload.payment_intent_data?.application_fee_amount).toBeUndefined();
   });
 
-  it("does not insert local payment rows during checkout session creation", async () => {
+  it("stores a pending Stripe payment row during checkout session creation", async () => {
     const fixture = buildSupabaseFixture();
     const createMock = vi.fn(async () => ({ id: "cs_test_3", url: "https://checkout.stripe.com/c/pay/cs_test_3" }));
 
@@ -363,7 +388,19 @@ describe("createTenantInvoiceCheckoutSession", () => {
       appUrl: "http://localhost:3000",
     });
 
-    expect(fixture.writes.some((write) => write.table === "internal_invoice_payments" && write.op === "insert")).toBe(false);
+    const pendingWrite = fixture.writes.find((write) => write.table === "internal_invoice_payments" && write.op === "insert");
+    expect(pendingWrite?.payload).toEqual(
+      expect.objectContaining({
+        account_owner_user_id: "owner-1",
+        invoice_id: "inv-1",
+        job_id: "job-1",
+        payment_status: "pending",
+        payment_method: "card_stripe_online",
+        amount_cents: 10000,
+        processor_name: "stripe",
+        stripe_checkout_session_id: "cs_test_3",
+      }),
+    );
   });
 
   it("never creates platform-context checkout session without stripeAccount option", async () => {
@@ -382,5 +419,231 @@ describe("createTenantInvoiceCheckoutSession", () => {
     expect(createMock).toHaveBeenCalledTimes(1);
     const firstCall = createMock.mock.calls[0] as unknown as Array<Record<string, unknown>>;
     expect(firstCall[1]).toEqual(expect.objectContaining({ stripeAccount: "acct_connected_1" }));
+  });
+
+  it("externally billed resolved jobs block checkout session creation", async () => {
+    const fixture = buildSupabaseFixture({
+      jobInvoiceComplete: true,
+      jobBillingDisposition: "externally_billed",
+    });
+    const createMock = vi.fn();
+
+    await expect(
+      createTenantInvoiceCheckoutSession({
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        invoiceId: "inv-1",
+        supabase: fixture.supabase,
+        stripe: { checkout: { sessions: { create: createMock, expire: vi.fn() } } } as any,
+        appUrl: "http://localhost:3000",
+      }),
+    ).rejects.toThrow("resolved outside online payment");
+
+    expect(createMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("createTenantInvoicePaymentLink", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    resolveTenantStripeConnectReadinessMock.mockResolvedValue({
+      connectedAccountId: "acct_connected_1",
+      onboardingStatus: "complete",
+      chargesEnabled: true,
+      payoutsEnabled: true,
+      detailsSubmitted: true,
+      disabledReason: null,
+      lastSyncedAt: "2026-05-19T00:00:00.000Z",
+      isReady: true,
+    });
+  });
+
+  it("creates an app-controlled signed payment URL without creating a Stripe Checkout Session", async () => {
+    const fixture = buildSupabaseFixture();
+
+    const result = await createTenantInvoicePaymentLink({
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      invoiceId: "inv-1",
+      supabase: fixture.supabase,
+      appUrl: "https://app.example",
+      signingSecret: "test-secret",
+    });
+
+    expect(result.paymentLinkUrl).toMatch(/^https:\/\/app\.example\/payments\/invoice\//);
+    expect(result.balanceDueCents).toBe(10000);
+    expect(fixture.writes.some((write) => write.table === "internal_invoice_payments")).toBe(false);
+
+    const payload = verifyTenantInvoicePaymentLinkToken(result.paymentLinkToken, "test-secret");
+    expect(payload).toEqual(
+      expect.objectContaining({
+        v: 1,
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        invoiceId: "inv-1",
+        balanceDueCents: 10000,
+      }),
+    );
+  });
+
+  it("uses the current remaining balance for partial manual payment links", async () => {
+    const fixture = buildSupabaseFixture({
+      invoiceTotalCents: 10000,
+      paymentRows: [
+        {
+          id: "p1",
+          account_owner_user_id: "owner-1",
+          invoice_id: "inv-1",
+          job_id: "job-1",
+          payment_status: "recorded",
+          payment_method: "cash",
+          amount_cents: 2500,
+          paid_at: "2026-05-19T00:00:00Z",
+          received_reference: null,
+          notes: null,
+          recorded_by_user_id: "u1",
+          created_at: "2026-05-19T00:00:00Z",
+          updated_at: "2026-05-19T00:00:00Z",
+        },
+      ],
+    });
+
+    const result = await createTenantInvoicePaymentLink({
+      accountOwnerUserId: "owner-1",
+      jobId: "job-1",
+      invoiceId: "inv-1",
+      supabase: fixture.supabase,
+      appUrl: "https://app.example",
+      signingSecret: "test-secret",
+    });
+
+    const payload = verifyTenantInvoicePaymentLinkToken(result.paymentLinkToken, "test-secret");
+
+    expect(result.balanceDueCents).toBe(7500);
+    expect(payload?.balanceDueCents).toBe(7500);
+  });
+
+  it("blocks paid invoices from creating new app payment links", async () => {
+    const fixture = buildSupabaseFixture({
+      invoiceTotalCents: 10000,
+      paymentRows: [
+        {
+          id: "p1",
+          account_owner_user_id: "owner-1",
+          invoice_id: "inv-1",
+          job_id: "job-1",
+          payment_status: "recorded",
+          payment_method: "check",
+          amount_cents: 10000,
+          paid_at: "2026-05-19T00:00:00Z",
+          received_reference: null,
+          notes: null,
+          recorded_by_user_id: "u1",
+          created_at: "2026-05-19T00:00:00Z",
+          updated_at: "2026-05-19T00:00:00Z",
+        },
+      ],
+    });
+
+    await expect(
+      createTenantInvoicePaymentLink({
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        invoiceId: "inv-1",
+        supabase: fixture.supabase,
+        appUrl: "https://app.example",
+        signingSecret: "test-secret",
+      }),
+    ).rejects.toThrow("greater than zero");
+  });
+
+  it("externally billed resolved jobs block new app payment links", async () => {
+    const fixture = buildSupabaseFixture({
+      jobInvoiceComplete: true,
+      jobBillingDisposition: "externally_billed",
+    });
+
+    await expect(
+      createTenantInvoicePaymentLink({
+        accountOwnerUserId: "owner-1",
+        jobId: "job-1",
+        invoiceId: "inv-1",
+        supabase: fixture.supabase,
+        appUrl: "https://app.example",
+        signingSecret: "test-secret",
+      }),
+    ).rejects.toThrow("resolved outside online payment");
+  });
+});
+
+describe("expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    resolveTenantStripeConnectReadinessMock.mockResolvedValue({
+      connectedAccountId: "acct_connected_1",
+      onboardingStatus: "complete",
+      chargesEnabled: true,
+      payoutsEnabled: true,
+      detailsSubmitted: true,
+      disabledReason: null,
+      lastSyncedAt: "2026-05-19T00:00:00.000Z",
+      isReady: true,
+    });
+  });
+
+  it("expires pending stored Stripe checkout sessions with the tenant connected account", async () => {
+    const fixture = buildSupabaseFixture({
+      paymentRows: [
+        {
+          id: "pending-1",
+          account_owner_user_id: "owner-1",
+          invoice_id: "inv-1",
+          job_id: "job-1",
+          payment_status: "pending",
+          payment_method: "card_stripe_online",
+          amount_cents: 10000,
+          paid_at: "2026-05-19T00:00:00Z",
+          received_reference: null,
+          notes: null,
+          recorded_by_user_id: "owner-1",
+          created_at: "2026-05-19T00:00:00Z",
+          updated_at: "2026-05-19T00:00:00Z",
+          stripe_checkout_session_id: "cs_test_open_1",
+        },
+        {
+          id: "recorded-1",
+          account_owner_user_id: "owner-1",
+          invoice_id: "inv-1",
+          job_id: "job-1",
+          payment_status: "recorded",
+          payment_method: "card_stripe_online",
+          amount_cents: 10000,
+          paid_at: "2026-05-19T00:00:00Z",
+          received_reference: null,
+          notes: null,
+          recorded_by_user_id: "owner-1",
+          created_at: "2026-05-19T00:00:00Z",
+          updated_at: "2026-05-19T00:00:00Z",
+          stripe_checkout_session_id: "cs_test_paid_1",
+        },
+      ],
+    });
+    const expireMock = vi.fn(async () => ({ id: "cs_test_open_1" }));
+
+    const result = await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
+      accountOwnerUserId: "owner-1",
+      invoiceId: "inv-1",
+      supabase: fixture.supabase,
+      stripe: { checkout: { sessions: { expire: expireMock } } } as any,
+    });
+
+    expect(result).toEqual({ attempted: 1, expired: 1, skipped: 0 });
+    expect(expireMock).toHaveBeenCalledWith(
+      "cs_test_open_1",
+      {},
+      { stripeAccount: "acct_connected_1" },
+    );
   });
 });

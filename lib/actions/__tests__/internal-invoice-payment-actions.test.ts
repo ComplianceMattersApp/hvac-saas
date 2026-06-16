@@ -9,6 +9,8 @@ const resolveInternalInvoiceByIdMock = vi.fn();
 const resolveInternalInvoiceByJobIdMock = vi.fn();
 const resolveInvoiceCollectedPaymentSummaryMock = vi.fn();
 const createTenantInvoiceCheckoutSessionMock = vi.fn();
+const createTenantInvoicePaymentLinkMock = vi.fn();
+const expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock = vi.fn();
 const upsertInvoicePaymentAllocationForPaymentRowMock = vi.fn();
 const insertJobEventMock = vi.fn();
 const revalidatePathMock = vi.fn();
@@ -78,6 +80,10 @@ vi.mock('@/lib/business/internal-invoice-payments', () => ({
     resolveInvoiceCollectedPaymentSummaryMock(...args),
   createTenantInvoiceCheckoutSession: (...args: unknown[]) =>
     createTenantInvoiceCheckoutSessionMock(...args),
+  createTenantInvoicePaymentLink: (...args: unknown[]) =>
+    createTenantInvoicePaymentLinkMock(...args),
+  expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice: (...args: unknown[]) =>
+    expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock(...args),
 }));
 
 vi.mock('@/lib/actions/job-actions', () => ({
@@ -397,6 +403,17 @@ describe('recordInternalInvoicePaymentFromForm', () => {
       connectedAccountId: 'acct_123',
       balanceDueCents: 8000,
     });
+    createTenantInvoicePaymentLinkMock.mockResolvedValue({
+      paymentLinkUrl: 'https://app.example/payments/invoice/signed-token',
+      paymentLinkToken: 'signed-token',
+      connectedAccountId: 'acct_123',
+      balanceDueCents: 8000,
+    });
+    expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock.mockResolvedValue({
+      attempted: 0,
+      expired: 0,
+      skipped: 0,
+    });
     upsertInvoicePaymentAllocationForPaymentRowMock.mockResolvedValue({
       ok: true,
       status: 'created',
@@ -457,6 +474,12 @@ describe('recordInternalInvoicePaymentFromForm', () => {
           amount_cents: 2500,
           payment_status: 'recorded',
         }),
+      }),
+    );
+    expect(expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: 'owner-1',
+        invoiceId: 'inv-1',
       }),
     );
     expect(insertJobEventMock).toHaveBeenCalledWith(
@@ -868,7 +891,7 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
   });
 
-  it('allows structural owner to create checkout session even when role is office', async () => {
+  it('allows structural owner to create app-controlled payment link even when role is office', async () => {
     requireInternalUserMock.mockResolvedValueOnce({
       userId: 'owner-1',
       internalUser: {
@@ -886,12 +909,13 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     ).resolves.toEqual(
       expect.objectContaining({
         ok: true,
-        checkoutSessionId: 'cs_123',
+        checkoutSessionId: null,
+        checkoutSessionUrl: 'https://app.example/payments/invoice/signed-token',
       }),
     );
   });
 
-  it('allows billing role to create checkout session', async () => {
+  it('allows billing role to create app-controlled payment link', async () => {
     requireInternalUserMock.mockResolvedValueOnce({
       userId: 'billing-1',
       internalUser: {
@@ -909,7 +933,8 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     ).resolves.toEqual(
       expect.objectContaining({
         ok: true,
-        checkoutSessionId: 'cs_123',
+        checkoutSessionId: null,
+        checkoutSessionUrl: 'https://app.example/payments/invoice/signed-token',
       }),
     );
   });
@@ -956,7 +981,7 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     expect(resolveOperationalMutationEntitlementAccessMock).not.toHaveBeenCalled();
   });
 
-  it('passes correct account/job/invoice context to helper', async () => {
+  it('passes correct account/job/invoice context to payment link helper', async () => {
     const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
 
     await expect(
@@ -964,17 +989,18 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     ).resolves.toEqual(
       expect.objectContaining({
         ok: true,
-        checkoutSessionId: 'cs_123',
+        checkoutSessionUrl: 'https://app.example/payments/invoice/signed-token',
       }),
     );
 
-    expect(createTenantInvoiceCheckoutSessionMock).toHaveBeenCalledWith(
+    expect(createTenantInvoicePaymentLinkMock).toHaveBeenCalledWith(
       expect.objectContaining({
         accountOwnerUserId: 'owner-1',
         jobId: 'job-1',
         invoiceId: 'inv-1',
       }),
     );
+    expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
   });
 
   it('issued invoice with ready connect redirects success with session details', async () => {
@@ -1002,8 +1028,8 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
   });
 
   it('not-ready connect maps to safe notice', async () => {
-    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
-      new Error('Tenant Stripe Connect account is not ready for checkout session creation.'),
+    createTenantInvoicePaymentLinkMock.mockRejectedValueOnce(
+      new Error('Tenant Stripe Connect account is not ready for payment link creation.'),
     );
 
     const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
@@ -1016,14 +1042,14 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
   it('draft/void/paid helper errors map to safe notices', async () => {
     const { createTenantInvoiceCheckoutSessionFromForm } = await import('@/lib/actions/internal-invoice-payment-actions');
 
-    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+    createTenantInvoicePaymentLinkMock.mockRejectedValueOnce(
       new Error('Invoice must be issued to accept online payment'),
     );
     await expect(createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData())).rejects.toThrow(
       'banner=internal_invoice_payment_requires_issued',
     );
 
-    createTenantInvoiceCheckoutSessionMock.mockRejectedValueOnce(
+    createTenantInvoicePaymentLinkMock.mockRejectedValueOnce(
       new Error('Invoice balance must be greater than zero'),
     );
     await expect(createTenantInvoiceCheckoutSessionFromForm(buildCheckoutFormData())).rejects.toThrow(
@@ -1031,7 +1057,7 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     );
   });
 
-  it('does not insert payment rows via checkout action', async () => {
+  it('does not insert payment rows or create Stripe sessions via payment link action', async () => {
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
 
@@ -1043,6 +1069,7 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
 
     expect(fixture.writes.some((w) => w.table === 'internal_invoice_payments' && w.op === 'insert')).toBe(false);
     expect(insertJobEventMock).not.toHaveBeenCalled();
+    expect(createTenantInvoiceCheckoutSessionMock).not.toHaveBeenCalled();
   });
 
   it('does not insert payment rows or mark paid for direct checkout redirect action', async () => {
@@ -1059,7 +1086,7 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     expect(insertJobEventMock).not.toHaveBeenCalled();
   });
 
-  it('action-state wrapper forces no-redirect and returns checkout URL state', async () => {
+  it('action-state wrapper forces no-redirect and returns app payment URL state', async () => {
     const { createTenantInvoiceCheckoutSessionFromFormState } = await import('@/lib/actions/internal-invoice-payment-actions');
 
     await expect(
@@ -1075,8 +1102,8 @@ describe('createTenantInvoiceCheckoutSessionFromForm', () => {
     ).resolves.toEqual(
       expect.objectContaining({
         status: 'success',
-        checkoutSessionId: 'cs_123',
-        checkoutSessionUrl: 'https://checkout.stripe.com/c/pay/cs_123',
+        checkoutSessionId: null,
+        checkoutSessionUrl: 'https://app.example/payments/invoice/signed-token',
       }),
     );
   });
@@ -1691,6 +1718,12 @@ describe('verifyFieldPaymentCollectionReportFromForm', () => {
           payment_status: 'recorded',
           amount_cents: 2500,
         }),
+      }),
+    );
+    expect(expireStoredOpenTenantInvoiceCheckoutSessionsForInvoiceMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        accountOwnerUserId: 'owner-1',
+        invoiceId: 'inv-1',
       }),
     );
 

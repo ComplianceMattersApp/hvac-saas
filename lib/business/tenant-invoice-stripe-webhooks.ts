@@ -9,6 +9,7 @@ import {
   validateInvoiceEligibleForOnlinePayment,
   buildStripePaymentReference,
   resolveInvoiceCollectedPaymentSummary,
+  resolveJobBlocksOnlineInvoicePayment,
 } from '@/lib/business/internal-invoice-payments';
 import { upsertInvoicePaymentAllocationForPaymentRow } from '@/lib/business/payment-allocations';
 import {
@@ -248,6 +249,51 @@ async function enrichCanonicalStripePaymentIdentity(params: {
     updated: !error,
     id: toCleanString(data?.id) || toCleanString(row.id),
   };
+}
+
+async function promotePendingStripePaymentToRecorded(params: {
+  admin: any;
+  row: StripePaymentIdentityRow;
+  amountCents: number;
+  processorPaymentReference: string;
+  processorChargeId?: string | null;
+  stripeCheckoutSessionId?: string | null;
+  stripePaymentIntentId?: string | null;
+  stripeChargedAt?: string | null;
+  stripeEventId: string;
+  paidAtIso: string;
+  note: string;
+}) {
+  const rowId = toCleanString(params.row.id);
+  if (!rowId || params.row.payment_status !== 'pending') return null;
+
+  const { data, error } = await params.admin
+    .from('internal_invoice_payments')
+    .update({
+      payment_status: 'recorded',
+      amount_cents: params.amountCents,
+      paid_at: params.paidAtIso,
+      received_reference: params.processorPaymentReference,
+      notes: params.note,
+      processor_name: 'stripe',
+      processor_payment_reference: params.processorPaymentReference,
+      processor_charge_id: toCleanString(params.processorChargeId) || null,
+      stripe_checkout_session_id: toCleanString(params.stripeCheckoutSessionId) || null,
+      stripe_event_id: params.stripeEventId,
+      stripe_payment_intent_id: toCleanString(params.stripePaymentIntentId) || null,
+      stripe_charged_at: toCleanString(params.stripeChargedAt) || null,
+      stripe_identity_dedupe_scope: 'recorded_v1',
+    })
+    .eq('id', rowId)
+    .eq('payment_status', 'pending')
+    .select('id')
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(`Failed to promote pending Stripe payment: ${error.message ?? 'unknown error'}`);
+  }
+
+  return toCleanString(data?.id) || null;
 }
 
 async function resolveStripePaymentIdByEventId(params: {
@@ -510,6 +556,19 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     };
   }
 
+  if (
+    await resolveJobBlocksOnlineInvoicePayment({
+      accountOwnerUserId,
+      jobId: invoiceJobId || jobIdFromMetadata || '',
+      supabase: admin,
+    })
+  ) {
+    return {
+      recorded: false,
+      reason: 'Invoice already paid or resolved outside online payment',
+    };
+  }
+
   const paymentSummary = await resolveInvoiceCollectedPaymentSummary(
     accountOwnerUserId,
     invoiceId,
@@ -569,6 +628,9 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     }
   }
 
+  const processorPaymentReference =
+    processorChargeId || paymentIntentId || checkoutSessionId || `checkout_event_${eventId}`;
+
   const paymentAlreadyRecorded = await isStripePaymentAlreadyRecorded({
     accountOwnerUserId,
     invoiceId,
@@ -589,6 +651,66 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     });
 
     const existingPaymentId = toCleanString(canonicalExistingPayment?.id) || null;
+
+    if (canonicalExistingPayment?.payment_status === 'pending' && existingPaymentId) {
+      const promotedPaymentId = await promotePendingStripePaymentToRecorded({
+        admin,
+        row: canonicalExistingPayment,
+        amountCents: sessionAmountCents,
+        processorPaymentReference,
+        processorChargeId,
+        stripeCheckoutSessionId: checkoutSessionId || null,
+        stripePaymentIntentId: paymentIntentId || null,
+        stripeChargedAt: chargedAtIso,
+        stripeEventId: eventId,
+        paidAtIso: new Date().toISOString(),
+        note: `Stripe checkout session ${checkoutSessionId || 'unknown session'}`,
+      });
+
+      if (promotedPaymentId) {
+        await attemptAllocationWebhookDualWrite({
+          admin,
+          paymentRow: {
+            id: promotedPaymentId,
+            account_owner_user_id: accountOwnerUserId,
+            invoice_id: invoiceId,
+            amount_cents: sessionAmountCents,
+            payment_status: 'recorded',
+          },
+          logContext: {
+            webhookKind: 'checkout_session',
+            eventId,
+            invoiceId,
+            jobId: invoiceJobId || jobIdFromMetadata || '',
+          },
+        });
+
+        await insertPaymentRecordedJobEventIfMissing({
+          admin,
+          jobId: invoiceJobId || jobIdFromMetadata || '',
+          paymentId: promotedPaymentId,
+          meta: {
+            invoice_id: invoiceId,
+            invoice_number: invoice.invoice_number,
+            payment_id: promotedPaymentId,
+            payment_status: 'recorded',
+            payment_method: 'card_stripe_online',
+            amount_cents: sessionAmountCents,
+            amount_display: (sessionAmountCents / 100).toFixed(2),
+            source: 'stripe_checkout_session_webhook',
+            stripe_checkout_session_id: checkoutSessionId || null,
+            stripe_payment_intent_id: paymentIntentId || null,
+            stripe_charge_id: processorChargeId,
+            stripe_event_id: eventId,
+          },
+        });
+
+        return {
+          recorded: true,
+          paymentId: promotedPaymentId,
+        };
+      }
+    }
 
     if (canonicalExistingPayment && existingPaymentId) {
       await enrichCanonicalStripePaymentIdentity({
@@ -624,8 +746,74 @@ export async function recordTenantInvoicePaymentFromCheckoutSession(params: {
     };
   }
 
-  const processorPaymentReference =
-    processorChargeId || paymentIntentId || checkoutSessionId || `checkout_event_${eventId}`;
+  const canonicalPendingPayment = await resolveCanonicalStripePaymentByIdentity({
+    admin,
+    accountOwnerUserId,
+    invoiceId,
+    stripeCheckoutSessionId: checkoutSessionId || null,
+    stripePaymentIntentId: paymentIntentId || null,
+    processorChargeId,
+  });
+
+  if (canonicalPendingPayment?.payment_status === 'pending') {
+    const promotedPaymentId = await promotePendingStripePaymentToRecorded({
+      admin,
+      row: canonicalPendingPayment,
+      amountCents: sessionAmountCents,
+      processorPaymentReference,
+      processorChargeId,
+      stripeCheckoutSessionId: checkoutSessionId || null,
+      stripePaymentIntentId: paymentIntentId || null,
+      stripeChargedAt: chargedAtIso,
+      stripeEventId: eventId,
+      paidAtIso: new Date().toISOString(),
+      note: `Stripe checkout session ${checkoutSessionId || 'unknown session'}`,
+    });
+
+    if (promotedPaymentId) {
+      await attemptAllocationWebhookDualWrite({
+        admin,
+        paymentRow: {
+          id: promotedPaymentId,
+          account_owner_user_id: accountOwnerUserId,
+          invoice_id: invoiceId,
+          amount_cents: sessionAmountCents,
+          payment_status: 'recorded',
+        },
+        logContext: {
+          webhookKind: 'checkout_session',
+          eventId,
+          invoiceId,
+          jobId: invoiceJobId || jobIdFromMetadata || '',
+        },
+      });
+
+      await insertPaymentRecordedJobEventIfMissing({
+        admin,
+        jobId: invoiceJobId || jobIdFromMetadata || '',
+        paymentId: promotedPaymentId,
+        meta: {
+          invoice_id: invoiceId,
+          invoice_number: invoice.invoice_number,
+          payment_id: promotedPaymentId,
+          payment_status: 'recorded',
+          payment_method: 'card_stripe_online',
+          amount_cents: sessionAmountCents,
+          amount_display: (sessionAmountCents / 100).toFixed(2),
+          source: 'stripe_checkout_session_webhook',
+          stripe_checkout_session_id: checkoutSessionId || null,
+          stripe_payment_intent_id: paymentIntentId || null,
+          stripe_charge_id: processorChargeId,
+          stripe_event_id: eventId,
+        },
+      });
+
+      return {
+        recorded: true,
+        paymentId: promotedPaymentId,
+      };
+    }
+  }
 
   const canonicalBeforeInsert = await resolveCanonicalStripePaymentByIdentity({
     admin,
@@ -941,6 +1129,19 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     };
   }
 
+  if (
+    await resolveJobBlocksOnlineInvoicePayment({
+      accountOwnerUserId,
+      jobId: effectiveJobId,
+      supabase: admin,
+    })
+  ) {
+    return {
+      recorded: false,
+      reason: 'Invoice already paid or resolved outside online payment',
+    };
+  }
+
   // Validate invoice status and balance
   const paymentSummary = await resolveInvoiceCollectedPaymentSummary(
     accountOwnerUserId,
@@ -995,6 +1196,77 @@ export async function recordTenantInvoicePaymentFromStripeCharge(params: {
     });
 
     const existingPaymentId = toCleanString(canonicalExistingPayment?.id) || null;
+
+    if (canonicalExistingPayment?.payment_status === 'pending' && existingPaymentId) {
+      const promotedPaymentId = await promotePendingStripePaymentToRecorded({
+        admin,
+        row: canonicalExistingPayment,
+        amountCents: chargeAmountCents,
+        processorPaymentReference: stripeRef.processor_payment_reference || stripeRef.processor_charge_id || eventId,
+        processorChargeId: stripeRef.processor_charge_id,
+        stripeCheckoutSessionId: toCleanString(charge.metadata?.checkout_session_id) || null,
+        stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+        stripeChargedAt: stripeRef.stripe_charged_at,
+        stripeEventId: eventId,
+        paidAtIso: new Date(charge.created * 1000).toISOString(),
+        note: `Stripe charge ${stripeRef.processor_charge_id}`,
+      });
+
+      if (promotedPaymentId) {
+        await attemptAllocationWebhookDualWrite({
+          admin,
+          paymentRow: {
+            id: promotedPaymentId,
+            account_owner_user_id: accountOwnerUserId,
+            invoice_id: invoiceId,
+            amount_cents: chargeAmountCents,
+            payment_status: 'recorded',
+          },
+          logContext: {
+            webhookKind: 'charge_succeeded',
+            eventId,
+            invoiceId,
+            jobId: effectiveJobId,
+          },
+        });
+
+        await resolveManualSavedMethodAttemptFromWebhook({
+          admin,
+          accountOwnerUserId,
+          invoiceId,
+          stripePaymentIntentId: stripeRef.stripe_payment_intent_id,
+          stripeChargeId: stripeRef.processor_charge_id,
+          stripeEventId: eventId,
+          attemptIdFromMetadata,
+          outcome: 'succeeded',
+          resolvedInternalInvoicePaymentId: promotedPaymentId,
+        });
+
+        await insertPaymentRecordedJobEventIfMissing({
+          admin,
+          jobId: effectiveJobId,
+          paymentId: promotedPaymentId,
+          meta: {
+            invoice_id: invoiceId,
+            invoice_number: invoice.invoice_number,
+            payment_id: promotedPaymentId,
+            payment_status: 'recorded',
+            payment_method: 'card_stripe_online',
+            amount_cents: chargeAmountCents,
+            amount_display: (chargeAmountCents / 100).toFixed(2),
+            source: 'stripe_charge_webhook',
+            stripe_payment_intent_id: stripeRef.stripe_payment_intent_id,
+            stripe_charge_id: stripeRef.processor_charge_id,
+            stripe_event_id: eventId,
+          },
+        });
+
+        return {
+          recorded: true,
+          paymentId: promotedPaymentId,
+        };
+      }
+    }
 
     if (canonicalExistingPayment && existingPaymentId) {
       await enrichCanonicalStripePaymentIdentity({

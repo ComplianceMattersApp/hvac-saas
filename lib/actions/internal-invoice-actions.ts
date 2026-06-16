@@ -33,7 +33,10 @@ import {
   resolveInternalInvoiceByJobId,
   type InternalInvoiceRecord,
 } from '@/lib/business/internal-invoice';
-import { createTenantInvoiceCheckoutSession } from '@/lib/business/internal-invoice-payments';
+import {
+  createTenantInvoicePaymentLink,
+  expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice,
+} from '@/lib/business/internal-invoice-payments';
 import { evaluateJobOpsStatus, healStalePaperworkOpsStatus } from '@/lib/actions/job-evaluator';
 import {
   applyExternalBillingCompletionMutation,
@@ -1077,14 +1080,14 @@ async function resolveInvoicePaymentLinkForEmail(params: {
   if (String(params.invoice.status ?? '').trim().toLowerCase() !== 'issued') return null;
 
   try {
-    const checkoutSession = await createTenantInvoiceCheckoutSession({
+    const paymentLink = await createTenantInvoicePaymentLink({
       accountOwnerUserId: params.accountOwnerUserId,
       jobId: params.jobId,
       invoiceId: params.invoice.id,
       supabase: params.supabase,
     });
 
-    return String(checkoutSession.checkoutSessionUrl ?? '').trim() || null;
+    return String(paymentLink.paymentLinkUrl ?? '').trim() || null;
   } catch (error) {
     console.warn('Invoice email payment link unavailable', {
       accountOwnerUserId: params.accountOwnerUserId,
@@ -1848,6 +1851,12 @@ async function markInternalInvoiceBillingDispositionFromForm(
     billingDispositionNote: note,
     billingDispositionByUserId: context.userId,
     billingDispositionAt: appliedAt,
+  });
+
+  await expireStoredOpenTenantInvoiceCheckoutSessionsForInvoice({
+    accountOwnerUserId: context.internalUser.account_owner_user_id,
+    invoiceId: context.invoice.id,
+    supabase: context.supabase,
   });
 
   await insertJobEvent({
