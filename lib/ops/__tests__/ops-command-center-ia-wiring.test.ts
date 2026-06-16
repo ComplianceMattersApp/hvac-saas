@@ -137,8 +137,17 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows);");
     expect(opsPageSource).toContain("const effectiveBoardReasonFilter = boardReasonFilter && workspaceReasonOptions.some");
     expect(opsPageSource).toContain("previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter)");
+    expect(opsPageSource).toContain("visibleWorkspaceSections.map((section)");
+    expect(opsPageSource).toContain("{section.label}");
     expect(opsPageSource).toContain('<input type="hidden" name="sort" value={boardSort} />');
     expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={boardBucketFilter} />');
+  });
+
+  it("uses the same reason helper for options, filtering, and visible row reason", () => {
+    expect(opsPageSource).toContain("getOpsBoardReasonLabel");
+    expect(opsPageSource).toContain("function workspaceVisibleReason(job: any, queueKey: string)");
+    expect(opsPageSource).toContain("return getOpsBoardReasonLabel(job)?.label ?? wsStatusReason(job, queueKey);");
+    expect(opsPageSource).toContain("{workspaceVisibleReason(job, section.key)}");
   });
 
   it("shows clear filters and empty filtered state for unmatched board filters", () => {

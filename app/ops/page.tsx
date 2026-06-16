@@ -71,6 +71,7 @@ import {
 import {
   buildOpsBoardReasonOptions,
   filterOpsBoardRowsByReason,
+  getOpsBoardReasonLabel,
   normalizeOpsBoardReason,
 } from "@/lib/ops/ops-board-reasons";
 import {
@@ -596,6 +597,10 @@ function subtractBusinessDays(date: Date, days: number) {
     return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
   }
 
+  function workspaceVisibleReason(job: any, queueKey: string) {
+    return getOpsBoardReasonLabel(job)?.label ?? wsStatusReason(job, queueKey);
+  }
+
   function workspaceFailedReason(job: any) {
     const opsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
     if (opsStatus === "retest_needed") return "Retest Needed";
@@ -1052,7 +1057,7 @@ function subtractBusinessDays(date: Date, days: number) {
                     {boardBucketFilter === "all" ? (
                       <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
                         <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600">{section.label}</div>
-                        <div className="text-xs font-semibold text-slate-500">{section.count} jobs</div>
+                        <div className="text-xs font-semibold text-slate-500">{section.previewRows.length} jobs</div>
                       </div>
                     ) : null}
                     {section.previewRows.length === 0 ? (
@@ -1076,7 +1081,7 @@ function subtractBusinessDays(date: Date, days: number) {
 
                           <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-3 sm:text-[11px] sm:leading-4">
                             <div>
-                              <span className="font-medium text-slate-500">Status/Reason:</span> {wsStatusReason(job, section.key)}
+                              <span className="font-medium text-slate-500">Status/Reason:</span> {workspaceVisibleReason(job, section.key)}
                             </div>
                             <div>
                               <span className="font-medium text-slate-500">Days Aging:</span>{" "}

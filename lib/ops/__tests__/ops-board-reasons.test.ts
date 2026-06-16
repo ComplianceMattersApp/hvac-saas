@@ -56,6 +56,19 @@ describe("Operations Board reason mapping", () => {
     expect(getOpsBoardReasonLabel({ ops_status: "on_hold", on_hold_reason: "Customer asked to pause" })?.label).toBe("On hold");
   });
 
+  it("keeps stronger failed ECC reasons above generic hold text", () => {
+    const row = {
+      id: "failed-ecc-on-hold-text",
+      job_type: "ecc",
+      ops_status: "failed",
+      on_hold_reason: "Customer asked to pause",
+    };
+
+    expect(getOpsBoardReasonLabel(row)?.label).toBe("Failed ECC test");
+    expect(filterOpsBoardRowsByReason([row], "failed_ecc_test").map((item) => item.id)).toEqual(["failed-ecc-on-hold-text"]);
+    expect(filterOpsBoardRowsByReason([row], "on_hold")).toEqual([]);
+  });
+
   it("builds friendly reason options from loaded rows without raw enum labels", () => {
     const options = buildOpsBoardReasonOptions([
       { ops_status: "need_to_schedule" },
@@ -65,10 +78,10 @@ describe("Operations Board reason mapping", () => {
     ]);
 
     expect(options.map((option) => option.label)).toEqual([
-      "Needs scheduling",
-      "Waiting on approval",
-      "Failed ECC test",
       "Needs invoice",
+      "Failed ECC test",
+      "Waiting on approval",
+      "Needs scheduling",
     ]);
     expect(options.map((option) => option.label)).not.toContain("ops_status");
     expect(options.map((option) => option.label)).not.toContain("invoice_required");
@@ -86,5 +99,16 @@ describe("Operations Board reason mapping", () => {
     expect(filterOpsBoardRowsByReason(rows, "needs_certs").map((row) => row.id)).toEqual(["certs"]);
     expect(filterOpsBoardRowsByReason(rows, "needs_invoice_and_certs").map((row) => row.id)).toEqual(["both"]);
     expect(filterOpsBoardRowsByReason(rows, "waiting_on_parts").map((row) => row.id)).toEqual(["parts"]);
+  });
+
+  it("keeps on hold rows out of failed ECC filters", () => {
+    const rows = [
+      { id: "hold", job_type: "ecc", ops_status: "on_hold", on_hold_reason: "Failed test on hold" },
+      { id: "failed", job_type: "ecc", ops_status: "failed", on_hold_reason: "On hold note remains" },
+    ];
+
+    expect(getOpsBoardReasonLabel(rows[0])?.label).toBe("On hold");
+    expect(getOpsBoardReasonLabel(rows[1])?.label).toBe("Failed ECC test");
+    expect(filterOpsBoardRowsByReason(rows, "failed_ecc_test").map((row) => row.id)).toEqual(["failed"]);
   });
 });
