@@ -183,14 +183,6 @@ const OPS_TABS: { key: BucketKey; label: string }[] = [
 
 type OpsBoardFilterBucket = "all" | "pending" | "waiting" | "exceptions" | "closeout";
 
-const OPS_BOARD_BUCKET_FILTERS: Array<{ key: OpsBoardFilterBucket; label: string }> = [
-  { key: "all", label: "All" },
-  { key: "pending", label: "Pending" },
-  { key: "waiting", label: "Waiting" },
-  { key: "exceptions", label: "Exceptions" },
-  { key: "closeout", label: "Closeout" },
-];
-
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "need_to_schedule") return "pending";
@@ -307,10 +299,11 @@ export default async function OpsPage({
   
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const boardBucketFilter = normalizeOpsBoardFilterBucket(sp.bucket);
+  const activeBoardBucketFilter = boardBucketFilter === "all" ? "pending" : boardBucketFilter;
   const bucket = (
-    boardBucketFilter === "pending"
+    activeBoardBucketFilter === "pending"
       ? "need_to_schedule"
-      : boardBucketFilter === "closeout"
+      : activeBoardBucketFilter === "closeout"
       ? "closeout"
       : "workflow_all"
   ) as BucketKey;
@@ -758,10 +751,7 @@ function subtractBusinessDays(date: Date, days: number) {
       closeout: "closeout",
     };
     const coreBoardWorkspaceKeys = ["need_to_schedule", "waiting", "exceptions", "closeout"];
-    const requestedWorkspaceKeys =
-      boardBucketFilter === "all"
-        ? coreBoardWorkspaceKeys
-        : [boardBucketWorkspaceKeyMap[boardBucketFilter]];
+    const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[activeBoardBucketFilter]];
 
     async function loadWithoutTechPreviewRows() {
       const withoutTechPreviewIds = (scheduledWithoutTechSnapshot.preview ?? [])
@@ -848,23 +838,12 @@ function subtractBusinessDays(date: Date, days: number) {
       ...section,
       previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter),
     }));
-    const selectedWorkspaceKey =
-      boardBucketFilter === "all" ? "all" : requestedWorkspaceKeys[0];
+    const selectedWorkspaceKey = requestedWorkspaceKeys[0];
     const selectedPreviewRows = visibleWorkspaceSections.flatMap((section) => section.previewRows);
-    const selectedWorkspaceTab =
-      boardBucketFilter === "all"
-        ? {
-            key: "all",
-            label: "All",
-            count: selectedPreviewRows.length,
-            href: "/ops#ops-workspace",
-          }
-        : { ...visibleWorkspaceSections[0], count: selectedPreviewRows.length };
-    const mobileSelectedWorkspaceKey =
-      boardBucketFilter === "all" ? requestedWorkspaceKeys[0] : requestedWorkspaceKeys[0];
-    const mobileSelectedWorkspaceSection =
-      visibleWorkspaceSections.find((section) => section.key === mobileSelectedWorkspaceKey) ?? visibleWorkspaceSections[0];
-    const mobileWorkspaceBucketChips = coreBoardWorkspaceKeys.map((workspaceKey) => {
+    const selectedWorkspaceTab = { ...visibleWorkspaceSections[0], count: selectedPreviewRows.length };
+    const selectedWorkspaceSection =
+      visibleWorkspaceSections.find((section) => section.key === selectedWorkspaceKey) ?? visibleWorkspaceSections[0];
+    const workspaceQueueChips = coreBoardWorkspaceKeys.map((workspaceKey) => {
       const section =
         visibleWorkspaceSections.find((item) => item.key === workspaceKey) ??
         workspaceTabs.find((item) => item.key === workspaceKey) ??
@@ -880,7 +859,7 @@ function subtractBusinessDays(date: Date, days: number) {
           ? "closeout"
           : "all";
       const previewRows = "previewRows" in section && Array.isArray(section.previewRows) ? section.previewRows : [];
-      const isSelected = workspaceKey === mobileSelectedWorkspaceSection?.key;
+      const isSelected = workspaceKey === selectedWorkspaceSection?.key;
       return {
         ...section,
         bucket: chipBucket,
@@ -895,7 +874,7 @@ function subtractBusinessDays(date: Date, days: number) {
       };
     });
     const clearOpsBoardFiltersHref = `/ops${buildQueryString({
-      bucket: boardBucketFilter === "all" ? "" : boardBucketFilter,
+      bucket: activeBoardBucketFilter,
       sort: boardSort === "oldest" ? "" : boardSort,
     })}#ops-workspace`;
     const hasActiveOpsBoardFilters = Boolean(contractorScopeFilter) || Boolean(effectiveBoardReasonFilter);
@@ -991,8 +970,8 @@ function subtractBusinessDays(date: Date, days: number) {
             </div>
           </div>
 
-          <div className="mb-3 flex gap-2 overflow-x-auto pb-1 md:hidden" aria-label="Operations bucket selector">
-            {mobileWorkspaceBucketChips.map((chip) => (
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Operations queue selector">
+            {workspaceQueueChips.map((chip) => (
               <Link
                 key={chip.key}
                 href={chip.href}
@@ -1007,7 +986,7 @@ function subtractBusinessDays(date: Date, days: number) {
             ))}
           </div>
 
-          <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
+          <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
             {showWorkspaceContractorFilter ? (
               <ContractorFilter contractors={workspaceContractors} selectedId={contractorScopeFilter ?? ""} />
             ) : (
@@ -1016,29 +995,10 @@ function subtractBusinessDays(date: Date, days: number) {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-500">All contractors</div>
               </div>
             )}
-            <form action="/ops" method="get" className="hidden gap-1 md:grid">
-              <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Bucket</label>
-              <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
-              <input type="hidden" name="sort" value={boardSort} />
-              <select
-                name="bucket"
-                defaultValue={boardBucketFilter}
-                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
-              >
-                {OPS_BOARD_BUCKET_FILTERS.map((option) => (
-                  <option key={option.key} value={option.key}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
-                Apply
-              </button>
-            </form>
             <form action="/ops" method="get" className="grid gap-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Reason</label>
               <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
-              <input type="hidden" name="bucket" value={boardBucketFilter} />
+              <input type="hidden" name="bucket" value={activeBoardBucketFilter} />
               <input type="hidden" name="sort" value={boardSort} />
               <select
                 name="reason"
@@ -1059,7 +1019,7 @@ function subtractBusinessDays(date: Date, days: number) {
             <form action="/ops" method="get" className="grid gap-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Sort</label>
               <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
-              <input type="hidden" name="bucket" value={boardBucketFilter} />
+              <input type="hidden" name="bucket" value={activeBoardBucketFilter} />
               <input type="hidden" name="reason" value={effectiveBoardReasonFilter ?? ""} />
               <select
                 name="sort"
@@ -1083,16 +1043,16 @@ function subtractBusinessDays(date: Date, days: number) {
             ) : null}
           </div>
 
-          <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5 md:hidden">
+          <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
-                <div className="text-[15px] font-semibold tracking-tight text-slate-950">{mobileSelectedWorkspaceSection?.label ?? selectedWorkspaceTab.label}</div>
-                <div className="text-xs text-slate-600">{mobileSelectedWorkspaceSection?.previewRows.length ?? 0} jobs</div>
+                <div className="text-[15px] font-semibold tracking-tight text-slate-950">{selectedWorkspaceSection?.label ?? selectedWorkspaceTab.label}</div>
+                <div className="text-xs text-slate-600">{selectedWorkspaceSection?.previewRows.length ?? 0} jobs</div>
               </div>
             </div>
 
-            {!mobileSelectedWorkspaceSection || mobileSelectedWorkspaceSection.previewRows.length === 0 ? (
+            {!selectedWorkspaceSection || selectedWorkspaceSection.previewRows.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                 <div>{hasActiveOpsBoardFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
                 {hasActiveOpsBoardFilters ? (
@@ -1103,7 +1063,7 @@ function subtractBusinessDays(date: Date, days: number) {
               </div>
             ) : (
               <div className="space-y-2">
-                {mobileSelectedWorkspaceSection.previewRows.map((job: any) => (
+                {selectedWorkspaceSection.previewRows.map((job: any) => (
                   <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div className="min-w-0">
@@ -1119,7 +1079,7 @@ function subtractBusinessDays(date: Date, days: number) {
 
                     <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600">
                       <div>
-                        <span className="font-medium text-slate-500">Status/Reason:</span> {workspaceVisibleReason(job, mobileSelectedWorkspaceSection.key)}
+                        <span className="font-medium text-slate-500">Status/Reason:</span> {workspaceVisibleReason(job, selectedWorkspaceSection.key)}
                       </div>
                       <div>
                         <span className="font-medium text-slate-500">Days Aging:</span>{" "}
@@ -1136,84 +1096,6 @@ function subtractBusinessDays(date: Date, days: number) {
                         </div>
                       ) : null}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </article>
-
-          <article className="hidden rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5 md:block">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
-                <div className="text-[15px] font-semibold tracking-tight text-slate-950">{selectedWorkspaceTab.label}</div>
-                <div className="text-xs text-slate-600">{selectedWorkspaceTab.count} jobs</div>
-              </div>
-              <Link href={selectedWorkspaceTab.href} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
-                View on board
-              </Link>
-            </div>
-
-            {selectedPreviewRows.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                <div>{hasActiveOpsBoardFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
-                {hasActiveOpsBoardFilters ? (
-                  <Link href={clearOpsBoardFiltersHref} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
-                    Clear filters
-                  </Link>
-                ) : null}
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {visibleWorkspaceSections.map((section) => (
-                  <div key={section.key} className="space-y-2">
-                    {boardBucketFilter === "all" ? (
-                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
-                        <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600">{section.label}</div>
-                        <div className="text-xs font-semibold text-slate-500">{section.previewRows.length} jobs</div>
-                      </div>
-                    ) : null}
-                    {section.previewRows.length === 0 ? (
-                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                        No jobs match these filters.
-                      </div>
-                    ) : (
-                      section.previewRows.map((job: any) => (
-                        <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                          <div className="flex flex-wrap items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <Link href={`/jobs/${job.id}?tab=ops`} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
-                                {workspaceTitle(job)}
-                              </Link>
-                              <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700 sm:text-[11px] sm:leading-4">{workspaceCustomerLocation(job)}</div>
-                            </div>
-                            <Link href={`/jobs/${job.id}?tab=ops`} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
-                              Open Job
-                            </Link>
-                          </div>
-
-                          <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-3 sm:text-[11px] sm:leading-4">
-                            <div>
-                              <span className="font-medium text-slate-500">Status/Reason:</span> {workspaceVisibleReason(job, section.key)}
-                            </div>
-                            <div>
-                              <span className="font-medium text-slate-500">Days Aging:</span>{" "}
-                              {workspaceAgeLabel(job)}
-                            </div>
-                            <div>
-                              <span className="font-medium text-slate-500">Assignment:</span>{" "}
-                              {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
-                            </div>
-                            {workspaceContractorName(job) ? (
-                              <div>
-                                <span className="font-medium text-slate-500">Contractor:</span>{" "}
-                                {workspaceContractorName(job)}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      ))
-                    )}
                   </div>
                 ))}
               </div>
