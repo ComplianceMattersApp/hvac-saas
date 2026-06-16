@@ -32,6 +32,11 @@ const opsBoardSortingSource = readFileSync(
   "utf-8",
 );
 
+const opsBoardReasonsSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-board-reasons.ts"),
+  "utf-8",
+);
+
 function assertFound(label: string, index: number) {
   expect(index, `${label} marker should exist in the Full Ops branch`).toBeGreaterThan(-1);
 }
@@ -89,6 +94,19 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsBoardSortingSource).not.toContain("Recently updated");
   });
 
+  it("renders compact reason controls on the primary Ops board", () => {
+    expect(opsPageSource).toContain("buildOpsBoardReasonOptions");
+    expect(opsPageSource).toContain("filterOpsBoardRowsByReason");
+    expect(opsPageSource).toContain("normalizeOpsBoardReason(sp.reason)");
+    expect(opsPageSource).toContain('name="reason"');
+    expect(opsPageSource).toContain("All reasons");
+    expect(opsBoardReasonsSource).toContain("Needs invoice");
+    expect(opsBoardReasonsSource).toContain("Needs certs");
+    expect(opsBoardReasonsSource).toContain("Needs invoice and certs");
+    expect(opsBoardReasonsSource).toContain("Failed ECC test");
+    expect(opsBoardReasonsSource).not.toContain("ops_status:");
+  });
+
   it("maps bucket filters to existing Ops board queue categories", () => {
     expect(opsPageSource).toContain("boardBucketWorkspaceKeyMap");
     expect(opsPageSource).toContain('pending: "need_to_schedule"');
@@ -96,7 +114,6 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('exceptions: "exceptions"');
     expect(opsPageSource).toContain('closeout: "closeout"');
     expect(opsPageSource).toContain('const coreBoardWorkspaceKeys = ["need_to_schedule", "waiting", "exceptions", "closeout"];');
-    expect(opsPageSource).not.toContain("reason filter");
   });
 
   it("applies contractor filtering to visible board rows without changing row actions", () => {
@@ -111,6 +128,16 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("const boardSort = normalizeOpsBoardSort(sp.sort);");
     expect(opsPageSource).toContain('<input type="hidden" name="sort" value={boardSort} />');
     expect(opsPageSource).toContain('<input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />');
+    expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={boardBucketFilter} />');
+    expect(opsPageSource).toContain('<input type="hidden" name="reason" value={effectiveBoardReasonFilter ?? ""} />');
+  });
+
+  it("keeps reason filtering combined with Contractor, Bucket, and Sort", () => {
+    expect(opsPageSource).toContain("const boardReasonFilter = normalizeOpsBoardReason(sp.reason);");
+    expect(opsPageSource).toContain("const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows);");
+    expect(opsPageSource).toContain("const effectiveBoardReasonFilter = boardReasonFilter && workspaceReasonOptions.some");
+    expect(opsPageSource).toContain("previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter)");
+    expect(opsPageSource).toContain('<input type="hidden" name="sort" value={boardSort} />');
     expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={boardBucketFilter} />');
   });
 

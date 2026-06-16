@@ -69,6 +69,11 @@ import {
   sortOpsBoardRows,
 } from "@/lib/ops/ops-board-sorting";
 import {
+  buildOpsBoardReasonOptions,
+  filterOpsBoardRowsByReason,
+  normalizeOpsBoardReason,
+} from "@/lib/ops/ops-board-reasons";
+import {
   formatAssignmentSummaryForJob,
   formatFailedEccQueueReasonFromRun,
   getOpsQueueCardStatusReason,
@@ -293,6 +298,7 @@ export default async function OpsPage({
   notice?: string;
   q?: string;
   sort?: string;
+  reason?: string;
   signal?: string;
   panel?: string;
 }>;
@@ -312,6 +318,7 @@ export default async function OpsPage({
   const q = (sp.q ?? "").trim() || null;
   const sort = (sp.sort ?? "").trim() || "default";
   const boardSort = normalizeOpsBoardSort(sp.sort);
+  const boardReasonFilter = normalizeOpsBoardReason(sp.reason);
   const panel = (sp.panel ?? "").trim().toLowerCase();
 
   const opsTimingEnabled = process.env.OPS_TIMING_DEBUG === "true";
@@ -604,7 +611,7 @@ function subtractBusinessDays(date: Date, days: number) {
 
   if (panel !== "full_board") {
     const workspaceSelect =
-      "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, field_complete_at, contractor_id, contractors(name), created_at";
+      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, field_complete, field_complete_at, invoice_complete, certs_complete, contractor_id, contractors(name), created_at";
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start";
 
@@ -820,26 +827,35 @@ function subtractBusinessDays(date: Date, days: number) {
       requestedWorkspaceKeys.map(async (workspaceKey) => [workspaceKey, await loadWorkspacePreviewRows(workspaceKey)] as const),
     );
     const workspacePreviewRowsByKey = new Map<string, any[]>(workspacePreviewEntries);
-    const visibleWorkspaceSections = requestedWorkspaceKeys.map((workspaceKey) => {
+    const reasonSourceWorkspaceSections = requestedWorkspaceKeys.map((workspaceKey) => {
       const tab = workspaceTabs.find((item) => item.key === workspaceKey) ?? workspaceTabs[0];
       return {
         ...tab,
         previewRows: workspacePreviewRowsByKey.get(workspaceKey) ?? [],
       };
     });
+    const reasonSourceRows = reasonSourceWorkspaceSections.flatMap((section) => section.previewRows);
+    const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows);
+    const effectiveBoardReasonFilter = boardReasonFilter && workspaceReasonOptions.some((option) => option.key === boardReasonFilter)
+      ? boardReasonFilter
+      : null;
+    const visibleWorkspaceSections = reasonSourceWorkspaceSections.map((section) => ({
+      ...section,
+      previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter),
+    }));
     const selectedWorkspaceKey =
       boardBucketFilter === "all" ? "all" : requestedWorkspaceKeys[0];
+    const selectedPreviewRows = visibleWorkspaceSections.flatMap((section) => section.previewRows);
     const selectedWorkspaceTab =
       boardBucketFilter === "all"
         ? {
             key: "all",
             label: "All",
-            count: visibleWorkspaceSections.reduce((sum, section) => sum + section.count, 0),
+            count: selectedPreviewRows.length,
             href: "/ops#ops-workspace",
           }
-        : visibleWorkspaceSections[0];
-    const selectedPreviewRows = visibleWorkspaceSections.flatMap((section) => section.previewRows);
-    const hasActiveOpsBoardFilters = boardBucketFilter !== "all" || Boolean(contractorScopeFilter);
+        : { ...visibleWorkspaceSections[0], count: selectedPreviewRows.length };
+    const hasActiveOpsBoardFilters = boardBucketFilter !== "all" || Boolean(contractorScopeFilter) || Boolean(effectiveBoardReasonFilter);
 
     if (opsTimingEnabled) {
       console.log(`[ops:workspace:countsAndPreview] ${Date.now() - _t_workspaceCounts}ms`);
@@ -884,6 +900,7 @@ function subtractBusinessDays(date: Date, days: number) {
       contractor: contractorScopeFilter ?? "",
       q: q ?? "",
       sort,
+      reason: effectiveBoardReasonFilter ?? "",
       signal,
     })}#ops-workspace`;
 
@@ -931,7 +948,7 @@ function subtractBusinessDays(date: Date, days: number) {
             </div>
           </div>
 
-          <div className="mb-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+          <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
             {showWorkspaceContractorFilter ? (
               <ContractorFilter contractors={workspaceContractors} selectedId={contractorScopeFilter ?? ""} />
             ) : (
@@ -960,9 +977,31 @@ function subtractBusinessDays(date: Date, days: number) {
               </button>
             </form>
             <form action="/ops" method="get" className="grid gap-1">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Reason</label>
+              <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
+              <input type="hidden" name="bucket" value={boardBucketFilter} />
+              <input type="hidden" name="sort" value={boardSort} />
+              <select
+                name="reason"
+                defaultValue={effectiveBoardReasonFilter ?? ""}
+                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+              >
+                <option value="">All reasons</option>
+                {workspaceReasonOptions.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
+                Apply
+              </button>
+            </form>
+            <form action="/ops" method="get" className="grid gap-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Sort</label>
               <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
               <input type="hidden" name="bucket" value={boardBucketFilter} />
+              <input type="hidden" name="reason" value={effectiveBoardReasonFilter ?? ""} />
               <select
                 name="sort"
                 defaultValue={boardSort}
