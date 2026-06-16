@@ -284,3 +284,30 @@ Note: a broader `job-tests-page-wiring.test.ts` run was attempted and the releva
 - `npx.cmd vitest run lib/jobs/__tests__/job-detail-v2-brief-card.test.ts lib/jobs/__tests__/job-detail-v2-pulse-brief-wiring.test.ts`
 - `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
 - `git diff --check`
+
+## Slice: V2 Pulse Work to Perform / Visit Scope Read-Only Card
+
+### Items reviewed
+
+| Work scope item | Status | Notes |
+|---|---|---|
+| Structured Visit Scope items | Migrated to V2 Pulse | Uses already-sanitized route-loaded `visitScopeItems`. The Pulse card shows the item count, up to three item titles/details, and `+N more` when applicable. |
+| Primary vs companion work | Preserved | Primary items are preferred for the preview; companion-service items are used only when no primary items exist. No promotion/edit controls were moved. |
+| Visit Scope summary | Migrated as fallback/context | Uses existing route-loaded `visitScopeSummary` as card context when structured items exist, and as the text-only body when no structured items exist. |
+| Empty state | Migrated | Empty work/scope displays `No work scope recorded.` |
+| `View scope` action | Deferred | The V2 Pulse card is read-only. No link, form, submit button, server action, mutation path, expansion, checkbox, drag/drop, or ordering behavior was added. |
+| Legacy Work Items editor | Deferred | `VisitScopeJobDetailForm` and legacy/mobile edit forms remain in their existing legacy/mobile surfaces and anchors. |
+| Billing/ECC truth | Untouched | Invoice charges, field billing, ECC results, notes, attachments, timeline, records dock, and service chain remain outside this slice. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- The V2 Pulse Work to Perform card uses only existing route-loaded `visit_scope_summary` and `visit_scope_items`.
+- No heavy/deferred components were rendered.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-v2-work-card.test.ts lib/jobs/__tests__/job-detail-v2-pulse-work-wiring.test.ts`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`
