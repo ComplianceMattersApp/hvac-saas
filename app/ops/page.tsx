@@ -181,12 +181,19 @@ const OPS_TABS: { key: BucketKey; label: string }[] = [
   { key: "recent_closed", label: "Recently Closed" },
 ];
 
-type OpsBoardFilterBucket = "all" | "pending" | "waiting" | "exceptions" | "closeout";
+type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout";
 
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "need_to_schedule") return "pending";
-  if (normalized === "pending" || normalized === "waiting" || normalized === "exceptions" || normalized === "closeout") {
+  if (normalized === "scheduled") return "field_work";
+  if (
+    normalized === "pending" ||
+    normalized === "field_work" ||
+    normalized === "waiting" ||
+    normalized === "exceptions" ||
+    normalized === "closeout"
+  ) {
     return normalized;
   }
   return "all";
@@ -303,6 +310,8 @@ export default async function OpsPage({
   const bucket = (
     activeBoardBucketFilter === "pending"
       ? "need_to_schedule"
+      : activeBoardBucketFilter === "field_work"
+      ? "scheduled"
       : activeBoardBucketFilter === "closeout"
       ? "closeout"
       : "workflow_all"
@@ -746,11 +755,12 @@ function subtractBusinessDays(date: Date, days: number) {
 
     const boardBucketWorkspaceKeyMap: Record<Exclude<OpsBoardFilterBucket, "all">, string> = {
       pending: "need_to_schedule",
+      field_work: "field_work",
       waiting: "waiting",
       exceptions: "exceptions",
       closeout: "closeout",
     };
-    const coreBoardWorkspaceKeys = ["need_to_schedule", "waiting", "exceptions", "closeout"];
+    const coreBoardWorkspaceKeys = ["need_to_schedule", "field_work", "waiting", "exceptions", "closeout"];
     const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[activeBoardBucketFilter]];
 
     async function loadWithoutTechPreviewRows() {
@@ -851,6 +861,8 @@ function subtractBusinessDays(date: Date, days: number) {
       const chipBucket =
         workspaceKey === "need_to_schedule"
           ? "pending"
+          : workspaceKey === "field_work"
+          ? "field_work"
           : workspaceKey === "waiting"
           ? "waiting"
           : workspaceKey === "exceptions"
@@ -863,6 +875,11 @@ function subtractBusinessDays(date: Date, days: number) {
       return {
         ...section,
         bucket: chipBucket,
+        mobileLabel: workspaceKey === "need_to_schedule"
+          ? "Scheduling"
+          : workspaceKey === "waiting"
+          ? "Waiting"
+          : section.label,
         isSelected,
         previewRows,
         count: previewRows.length || section.count,
@@ -970,18 +987,20 @@ function subtractBusinessDays(date: Date, days: number) {
             </div>
           </div>
 
-          <div className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Operations queue selector">
+          <div className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector">
             {workspaceQueueChips.map((chip) => (
               <Link
                 key={chip.key}
                 href={chip.href}
-                className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+                aria-current={chip.isSelected ? "page" : undefined}
+                className={`inline-flex min-h-10 flex-[1_1_calc(50%-0.5rem)] items-center justify-center rounded-full border px-2.5 py-2 text-center text-[11px] font-semibold leading-tight transition-colors sm:min-h-9 sm:flex-none sm:px-3 sm:text-xs ${
                   chip.isSelected
                     ? "border-slate-900 bg-slate-900 text-white"
                     : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
-                {chip.label} · {chip.count}
+                <span className="sm:hidden">{chip.mobileLabel} · {chip.count}</span>
+                <span className="hidden sm:inline">{chip.label} · {chip.count}</span>
               </Link>
             ))}
           </div>

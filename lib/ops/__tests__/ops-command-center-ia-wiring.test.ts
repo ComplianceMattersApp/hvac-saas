@@ -106,19 +106,41 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('const activeBoardBucketFilter = boardBucketFilter === "all" ? "pending" : boardBucketFilter;');
     expect(opsPageSource).toContain("boardBucketWorkspaceKeyMap");
     expect(opsPageSource).toContain('pending: "need_to_schedule"');
+    expect(opsPageSource).toContain('field_work: "field_work"');
     expect(opsPageSource).toContain('waiting: "waiting"');
     expect(opsPageSource).toContain('exceptions: "exceptions"');
     expect(opsPageSource).toContain('closeout: "closeout"');
-    expect(opsPageSource).toContain('const coreBoardWorkspaceKeys = ["need_to_schedule", "waiting", "exceptions", "closeout"];');
+    expect(opsPageSource).toContain('const coreBoardWorkspaceKeys = ["need_to_schedule", "field_work", "waiting", "exceptions", "closeout"];');
     expect(opsPageSource).toContain("const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[activeBoardBucketFilter]];");
   });
 
   it("restores fixed queue chips as the primary Ops queue selector", () => {
     expect(opsPageSource).toContain('aria-label="Operations queue selector"');
+    expect(opsPageSource).toContain('aria-current={chip.isSelected ? "page" : undefined}');
     expect(opsPageSource).toContain("workspaceQueueChips.map");
     expect(opsPageSource).toContain("coreBoardWorkspaceKeys.map");
     expect(opsPageSource).toContain("bucket: chipBucket");
+    expect(opsPageSource).toContain('key: "field_work"');
+    expect(opsPageSource).toContain('label: "Field Work"');
+    expect(opsPageSource).toContain("{chip.mobileLabel} · {chip.count}");
     expect(opsPageSource).toContain("{chip.label} · {chip.count}");
+  });
+
+  it("keeps mobile fixed queue chips visible without hidden horizontal overflow", () => {
+    expect(opsPageSource).toContain('className="mb-3 flex flex-wrap gap-2" aria-label="Operations queue selector"');
+    expect(opsPageSource).not.toContain('className="mb-3 flex gap-2 overflow-x-auto pb-1" aria-label="Operations queue selector"');
+    expect(opsPageSource).toContain("flex-[1_1_calc(50%-0.5rem)]");
+    expect(opsPageSource).toContain("min-h-10");
+  });
+
+  it("restores Field Work through the existing scheduled field-work read model", () => {
+    expect(opsPageSource).toContain('type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout";');
+    expect(opsPageSource).toContain('if (normalized === "scheduled") return "field_work";');
+    expect(opsPageSource).toContain('} else if (workspaceKey === "field_work") {');
+    expect(opsPageSource).toContain('.eq("field_complete", false)');
+    expect(opsPageSource).toContain('.gte("scheduled_date", wsStartTodayUtc)');
+    expect(opsPageSource).toContain('.lt("scheduled_date", wsStartTomorrowUtc)');
+    expect(opsPageSource).toContain('if (queueKey === "field_work")');
   });
 
   it("renders one active queue section refined by filters and sort", () => {
