@@ -311,6 +311,30 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).not.toContain('{normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}');
   });
 
+  it("keeps the mobile schedule editor mounted in visible overflow containers", () => {
+    const mobileScheduleStart = jobPageSource.indexOf('id="mobile-when-panel"');
+    const mobileScheduleEnd = jobPageSource.indexOf('id="mobile-ecc-permit-needed-action"', mobileScheduleStart);
+    const mobileScheduleSlice =
+      mobileScheduleStart > -1 && mobileScheduleEnd > mobileScheduleStart
+        ? jobPageSource.slice(mobileScheduleStart, mobileScheduleEnd)
+        : "";
+
+    expect(mobileScheduleStart).toBeGreaterThan(-1);
+    expect(jobPageSource).toContain(
+      '<section className="overflow-visible rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_48px_-34px_rgba(15,23,42,0.36)] ring-1 ring-blue-100/35">',
+    );
+    expect(mobileScheduleSlice).toContain('className="group relative self-start overflow-visible rounded-xl');
+    expect(mobileScheduleSlice).toContain('group-open:block');
+    expect(mobileScheduleSlice).toContain('form action={updateJobScheduleFromForm}');
+    expect(mobileScheduleSlice).toContain('name="scheduled_date"');
+    expect(mobileScheduleSlice).toContain('name="window_start"');
+    expect(mobileScheduleSlice).toContain('name="window_end"');
+    expect(mobileScheduleSlice).toContain("Save Scheduling");
+    expect(mobileScheduleSlice).toContain("<UnscheduleButton");
+    expect(mobileScheduleSlice).toContain("Close");
+    expect(mobileScheduleSlice).not.toContain('className="group relative self-start overflow-hidden');
+  });
+
   it("keeps visit reason and intake notes below the location preview", () => {
     expect(jobPageSource).toContain("Visit Reason");
     expect(jobPageSource).toContain("const visitReasonText =");
