@@ -311,3 +311,86 @@ Note: a broader `job-tests-page-wiring.test.ts` run was attempted and the releva
 - `npx.cmd vitest run lib/jobs/__tests__/job-detail-v2-work-card.test.ts lib/jobs/__tests__/job-detail-v2-pulse-work-wiring.test.ts`
 - `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
 - `git diff --check`
+
+## Slice: V2 Pulse People / Contacts / Responsibility Read-Only Card
+
+### Items reviewed
+
+| People/responsibility item | Status | Notes |
+|---|---|---|
+| Customer / account | Migrated to V2 Pulse | Uses existing route-loaded `customerDisplayName`, `customerPhone`, and `customerEmail`. Empty state is `No contacts recorded.` / `No phone or email saved`. |
+| Assigned Techs | Migrated to V2 Pulse | Uses existing route-loaded `assignedTeam` display data. Shows first assigned user plus read-only `+N` tooltip when multiple users are assigned. |
+| Assignment language | Refined | Uses `Assigned Techs`; does not introduce `Assigned Lead`, `Primary`, or `Team Lead` language in the Pulse card. |
+| Role contacts | Migrated when available | Uses existing job/location/customer role-contact arrays already loaded by the route and displays up to two internal-display role contacts. |
+| Contact log / contact attempts | Deferred | Full contact log, latest attempt UI, and contact attempt forms remain outside this slice for a later Activity/Memory migration. |
+| Assignment controls | Deferred | Add/remove/set-primary assignment controls remain in legacy/mobile surfaces only. No controls were moved into Pulse. |
+| Contact actions | Deferred | No click-to-call, SMS, mailto, copy, edit, contact-log, form, submit button, server action, or mutation path was added to the Pulse card. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- The V2 Pulse People card uses only existing route-loaded customer/contact/assignment data.
+- No heavy/deferred components were rendered.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-v2-people-card.test.ts lib/jobs/__tests__/job-detail-v2-pulse-people-wiring.test.ts`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`
+
+## Slice: V2 Pulse Duplicate Display Cleanup
+
+### Items reviewed
+
+| Display surface | Status | Notes |
+|---|---|---|
+| Top status strip assignment | Retained | `Assigned Team` stays in the strip as global at-a-glance context. |
+| Hero chip assignment | Removed | `Assigned Techs` was removed from the Pulse hero chip row because it duplicated the strip and People card without adding a distinct purpose. |
+| People card assignment | Retained | `Assigned Techs` remains in People & Contacts as the detailed responsibility view with the read-only `+N` tooltip. |
+| Hero chip replacement | Refined | The hero chip slot now uses `Field Status`, derived from existing `isFieldComplete` / `formatStatus(job.status)` route values. |
+| Service location repetition | Intentionally retained | Service Location remains in the strip and site/location card because one is global glance and one is site detail. |
+| Status/progress repetition | Intentionally retained | Status remains in the strip while the hero/tracker express current operating state and workflow progression. |
+| Schedule / closeout repetition | Reviewed / retained | Schedule and Closeout remain in the hero chip row as operational state cues distinct from domain cards. |
+| Placeholder helper copy | Reviewed | No new helper copy, live controls, or content zones were added. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- The replacement `Field Status` chip uses existing route-loaded/derived display values only.
+- No heavy/deferred components were rendered.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-v2-pulse-duplicate-display.test.ts`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`
+
+## Slice: V2 Pulse Assignment Placement Correction
+
+### Items reviewed
+
+| Assignment placement item | Status | Notes |
+|---|---|---|
+| Prior duplicate cleanup | Corrected | The prior cleanup overcorrected by moving assigned-tech detail out of the hero chip row. |
+| Hero chip assignment | Restored | `Assigned Techs` is back in the Pulse hero chip row using already-loaded `assignedTeam` display data. |
+| Desktop assigned tooltip | Retained | The hero chip uses the existing read-only `extraCount` / `tooltip` chip pattern: first assigned user is visible, `+N` appears for additional users, and the title/focus tooltip contains the full assigned-name list only. |
+| No-assignment fallback | Retained | The hero chip shows `Awaiting assignment` with no `+N` or tooltip when nobody is assigned. |
+| Field Status hero chip | Removed | `Field Status` was removed from the hero chip row because field status is already visible in the strip/current-status surfaces. |
+| People & Contacts assignment block | Removed | The separate People-card assigned-tech block was removed so the card focuses on customer/account and role contacts. |
+| Top strip assignment | Retained | `Assigned Team` remains in the top strip as global at-a-glance context. |
+| Assignment controls | Deferred | No edit controls, assignment buttons, links, forms, server actions, or mutations were added. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- The restored hero chip uses only existing route-loaded assignment display data.
+- No new tooltip library or heavy/deferred component was added.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-v2-assigned-tech-chip.test.ts lib/jobs/__tests__/job-detail-v2-pulse-duplicate-display.test.ts lib/jobs/__tests__/job-detail-v2-people-card.test.ts lib/jobs/__tests__/job-detail-v2-pulse-people-wiring.test.ts`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`
