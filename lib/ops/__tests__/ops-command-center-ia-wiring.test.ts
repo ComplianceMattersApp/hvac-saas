@@ -116,6 +116,23 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('const coreBoardWorkspaceKeys = ["need_to_schedule", "waiting", "exceptions", "closeout"];');
   });
 
+  it("renders a mobile bucket selector that drives the selected Ops bucket", () => {
+    expect(opsPageSource).toContain('aria-label="Operations bucket selector"');
+    expect(opsPageSource).toContain("mobileWorkspaceBucketChips.map");
+    expect(opsPageSource).toContain("coreBoardWorkspaceKeys.map");
+    expect(opsPageSource).toContain("bucket: chipBucket");
+    expect(opsPageSource).toContain("{chip.label} · {chip.count}");
+    expect(opsPageSource).toContain("md:hidden");
+  });
+
+  it("keeps mobile to one selected bucket while desktop can render grouped sections", () => {
+    expect(opsPageSource).toContain("const mobileSelectedWorkspaceSection =");
+    expect(opsPageSource).toContain("mobileSelectedWorkspaceSection.previewRows.map");
+    expect(opsPageSource).toContain("hidden rounded-2xl");
+    expect(opsPageSource).toContain("md:block");
+    expect(opsPageSource).toContain("visibleWorkspaceSections.map((section)");
+  });
+
   it("applies contractor filtering to visible board rows without changing row actions", () => {
     expect(opsPageSource).toContain("if (contractorScopeFilter) queueQ = queueQ.eq(\"contractor_id\", contractorScopeFilter);");
     expect(opsPageSource).toContain("return sortOpsBoardRows(queueRes.data ?? [], boardSort);");
@@ -151,7 +168,9 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("shows clear filters and empty filtered state for unmatched board filters", () => {
-    expect(opsPageSource).toContain("hasActiveOpsBoardFilters");
+    expect(opsPageSource).toContain("const hasActiveOpsBoardFilters = Boolean(contractorScopeFilter) || Boolean(effectiveBoardReasonFilter);");
+    expect(opsPageSource).toContain("clearOpsBoardFiltersHref");
+    expect(opsPageSource).toContain('bucket: boardBucketFilter === "all" ? "" : boardBucketFilter');
     expect(opsPageSource).toContain('boardSort === "oldest" ? "" : boardSort');
     expect(opsPageSource).toContain("Clear filters");
     expect(opsPageSource).toContain("No jobs match these filters.");

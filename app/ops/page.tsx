@@ -860,7 +860,45 @@ function subtractBusinessDays(date: Date, days: number) {
             href: "/ops#ops-workspace",
           }
         : { ...visibleWorkspaceSections[0], count: selectedPreviewRows.length };
-    const hasActiveOpsBoardFilters = boardBucketFilter !== "all" || Boolean(contractorScopeFilter) || Boolean(effectiveBoardReasonFilter);
+    const mobileSelectedWorkspaceKey =
+      boardBucketFilter === "all" ? requestedWorkspaceKeys[0] : requestedWorkspaceKeys[0];
+    const mobileSelectedWorkspaceSection =
+      visibleWorkspaceSections.find((section) => section.key === mobileSelectedWorkspaceKey) ?? visibleWorkspaceSections[0];
+    const mobileWorkspaceBucketChips = coreBoardWorkspaceKeys.map((workspaceKey) => {
+      const section =
+        visibleWorkspaceSections.find((item) => item.key === workspaceKey) ??
+        workspaceTabs.find((item) => item.key === workspaceKey) ??
+        workspaceTabs[0];
+      const chipBucket =
+        workspaceKey === "need_to_schedule"
+          ? "pending"
+          : workspaceKey === "waiting"
+          ? "waiting"
+          : workspaceKey === "exceptions"
+          ? "exceptions"
+          : workspaceKey === "closeout"
+          ? "closeout"
+          : "all";
+      const previewRows = "previewRows" in section && Array.isArray(section.previewRows) ? section.previewRows : [];
+      const isSelected = workspaceKey === mobileSelectedWorkspaceSection?.key;
+      return {
+        ...section,
+        bucket: chipBucket,
+        isSelected,
+        previewRows,
+        count: previewRows.length || section.count,
+        href: `/ops${buildQueryString({
+          bucket: chipBucket,
+          contractor: contractorScopeFilter ?? "",
+          sort: boardSort === "oldest" ? "" : boardSort,
+        })}#ops-workspace`,
+      };
+    });
+    const clearOpsBoardFiltersHref = `/ops${buildQueryString({
+      bucket: boardBucketFilter === "all" ? "" : boardBucketFilter,
+      sort: boardSort === "oldest" ? "" : boardSort,
+    })}#ops-workspace`;
+    const hasActiveOpsBoardFilters = Boolean(contractorScopeFilter) || Boolean(effectiveBoardReasonFilter);
 
     if (opsTimingEnabled) {
       console.log(`[ops:workspace:countsAndPreview] ${Date.now() - _t_workspaceCounts}ms`);
@@ -953,6 +991,22 @@ function subtractBusinessDays(date: Date, days: number) {
             </div>
           </div>
 
+          <div className="mb-3 flex gap-2 overflow-x-auto pb-1 md:hidden" aria-label="Operations bucket selector">
+            {mobileWorkspaceBucketChips.map((chip) => (
+              <Link
+                key={chip.key}
+                href={chip.href}
+                className={`shrink-0 rounded-full border px-3 py-2 text-xs font-semibold transition-colors ${
+                  chip.isSelected
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                }`}
+              >
+                {chip.label} · {chip.count}
+              </Link>
+            ))}
+          </div>
+
           <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
             {showWorkspaceContractorFilter ? (
               <ContractorFilter contractors={workspaceContractors} selectedId={contractorScopeFilter ?? ""} />
@@ -962,7 +1016,7 @@ function subtractBusinessDays(date: Date, days: number) {
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-500">All contractors</div>
               </div>
             )}
-            <form action="/ops" method="get" className="grid gap-1">
+            <form action="/ops" method="get" className="hidden gap-1 md:grid">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Bucket</label>
               <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
               <input type="hidden" name="sort" value={boardSort} />
@@ -1023,13 +1077,72 @@ function subtractBusinessDays(date: Date, days: number) {
               </button>
             </form>
             {hasActiveOpsBoardFilters ? (
-              <Link href={`/ops${buildQueryString({ sort: boardSort === "oldest" ? "" : boardSort })}#ops-workspace`} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50">
+              <Link href={clearOpsBoardFiltersHref} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50">
                 Clear filters
               </Link>
             ) : null}
           </div>
 
-          <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
+          <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5 md:hidden">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
+              <div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
+                <div className="text-[15px] font-semibold tracking-tight text-slate-950">{mobileSelectedWorkspaceSection?.label ?? selectedWorkspaceTab.label}</div>
+                <div className="text-xs text-slate-600">{mobileSelectedWorkspaceSection?.previewRows.length ?? 0} jobs</div>
+              </div>
+            </div>
+
+            {!mobileSelectedWorkspaceSection || mobileSelectedWorkspaceSection.previewRows.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                <div>{hasActiveOpsBoardFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
+                {hasActiveOpsBoardFilters ? (
+                  <Link href={clearOpsBoardFiltersHref} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
+                    Clear filters
+                  </Link>
+                ) : null}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {mobileSelectedWorkspaceSection.previewRows.map((job: any) => (
+                  <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <Link href={`/jobs/${job.id}?tab=ops`} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
+                          {workspaceTitle(job)}
+                        </Link>
+                        <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700">{workspaceCustomerLocation(job)}</div>
+                      </div>
+                      <Link href={`/jobs/${job.id}?tab=ops`} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]">
+                        Open Job
+                      </Link>
+                    </div>
+
+                    <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600">
+                      <div>
+                        <span className="font-medium text-slate-500">Status/Reason:</span> {workspaceVisibleReason(job, mobileSelectedWorkspaceSection.key)}
+                      </div>
+                      <div>
+                        <span className="font-medium text-slate-500">Days Aging:</span>{" "}
+                        {workspaceAgeLabel(job)}
+                      </div>
+                      <div>
+                        <span className="font-medium text-slate-500">Assignment:</span>{" "}
+                        {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
+                      </div>
+                      {workspaceContractorName(job) ? (
+                        <div>
+                          <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                          {workspaceContractorName(job)}
+                        </div>
+                      ) : null}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </article>
+
+          <article className="hidden rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5 md:block">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
@@ -1045,7 +1158,7 @@ function subtractBusinessDays(date: Date, days: number) {
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                 <div>{hasActiveOpsBoardFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
                 {hasActiveOpsBoardFilters ? (
-                  <Link href={`/ops${buildQueryString({ sort: boardSort === "oldest" ? "" : boardSort })}#ops-workspace`} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
+                  <Link href={clearOpsBoardFiltersHref} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
                     Clear filters
                   </Link>
                 ) : null}
