@@ -27,6 +27,11 @@ const contractorFilterSource = readFileSync(
   "utf-8",
 );
 
+const opsBoardSortingSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-board-sorting.ts"),
+  "utf-8",
+);
+
 function assertFound(label: string, index: number) {
   expect(index, `${label} marker should exist in the Full Ops branch`).toBeGreaterThan(-1);
 }
@@ -72,6 +77,18 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('{ key: "closeout", label: "Closeout" }');
   });
 
+  it("renders compact sort controls on the primary Ops board", () => {
+    expect(opsPageSource).toContain("OPS_BOARD_SORT_OPTIONS");
+    expect(opsPageSource).toContain('name="sort"');
+    expect(opsPageSource).toContain("defaultValue={boardSort}");
+    expect(opsBoardSortingSource).toContain("Oldest first");
+    expect(opsBoardSortingSource).toContain("Newest first");
+    expect(opsBoardSortingSource).toContain("Scheduled soonest");
+    expect(opsBoardSortingSource).toContain("Contractor A-Z");
+    expect(opsBoardSortingSource).toContain("Customer A-Z");
+    expect(opsBoardSortingSource).not.toContain("Recently updated");
+  });
+
   it("maps bucket filters to existing Ops board queue categories", () => {
     expect(opsPageSource).toContain("boardBucketWorkspaceKeyMap");
     expect(opsPageSource).toContain('pending: "need_to_schedule"');
@@ -84,14 +101,22 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("applies contractor filtering to visible board rows without changing row actions", () => {
     expect(opsPageSource).toContain("if (contractorScopeFilter) queueQ = queueQ.eq(\"contractor_id\", contractorScopeFilter);");
+    expect(opsPageSource).toContain("return sortOpsBoardRows(queueRes.data ?? [], boardSort);");
     expect(opsPageSource).toContain("workspaceContractorName(job)");
     expect(opsPageSource).toContain('href={`/jobs/${job.id}?tab=ops`}');
     expect(opsPageSource).toContain("Open Job");
   });
 
+  it("keeps sorting combined with Contractor and Bucket filters", () => {
+    expect(opsPageSource).toContain("const boardSort = normalizeOpsBoardSort(sp.sort);");
+    expect(opsPageSource).toContain('<input type="hidden" name="sort" value={boardSort} />');
+    expect(opsPageSource).toContain('<input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />');
+    expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={boardBucketFilter} />');
+  });
+
   it("shows clear filters and empty filtered state for unmatched board filters", () => {
     expect(opsPageSource).toContain("hasActiveOpsBoardFilters");
-    expect(opsPageSource).toContain('href="/ops#ops-workspace"');
+    expect(opsPageSource).toContain('boardSort === "oldest" ? "" : boardSort');
     expect(opsPageSource).toContain("Clear filters");
     expect(opsPageSource).toContain("No jobs match these filters.");
   });

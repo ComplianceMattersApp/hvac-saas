@@ -64,6 +64,11 @@ import {
 } from "@/lib/ops/recent-attempt-display";
 import { buildScheduledWithoutTechSnapshot } from "@/lib/ops/scheduled-without-tech-snapshot";
 import {
+  OPS_BOARD_SORT_OPTIONS,
+  normalizeOpsBoardSort,
+  sortOpsBoardRows,
+} from "@/lib/ops/ops-board-sorting";
+import {
   formatAssignmentSummaryForJob,
   formatFailedEccQueueReasonFromRun,
   getOpsQueueCardStatusReason,
@@ -306,6 +311,7 @@ export default async function OpsPage({
   const notice = (sp.notice ?? "").trim().toLowerCase();
   const q = (sp.q ?? "").trim() || null;
   const sort = (sp.sort ?? "").trim() || "default";
+  const boardSort = normalizeOpsBoardSort(sp.sort);
   const panel = (sp.panel ?? "").trim().toLowerCase();
 
   const opsTimingEnabled = process.env.OPS_TIMING_DEBUG === "true";
@@ -807,7 +813,7 @@ function subtractBusinessDays(date: Date, days: number) {
       if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
       const queueRes = await queueQ;
       if (queueRes.error) throw queueRes.error;
-      return queueRes.data ?? [];
+      return sortOpsBoardRows(queueRes.data ?? [], boardSort);
     }
 
     const workspacePreviewEntries = await Promise.all(
@@ -925,7 +931,7 @@ function subtractBusinessDays(date: Date, days: number) {
             </div>
           </div>
 
-          <div className="mb-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+          <div className="mb-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
             {showWorkspaceContractorFilter ? (
               <ContractorFilter contractors={workspaceContractors} selectedId={contractorScopeFilter ?? ""} />
             ) : (
@@ -937,6 +943,7 @@ function subtractBusinessDays(date: Date, days: number) {
             <form action="/ops" method="get" className="grid gap-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Bucket</label>
               <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
+              <input type="hidden" name="sort" value={boardSort} />
               <select
                 name="bucket"
                 defaultValue={boardBucketFilter}
@@ -952,8 +959,27 @@ function subtractBusinessDays(date: Date, days: number) {
                 Apply
               </button>
             </form>
+            <form action="/ops" method="get" className="grid gap-1">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Sort</label>
+              <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
+              <input type="hidden" name="bucket" value={boardBucketFilter} />
+              <select
+                name="sort"
+                defaultValue={boardSort}
+                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+              >
+                {OPS_BOARD_SORT_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
+                Apply
+              </button>
+            </form>
             {hasActiveOpsBoardFilters ? (
-              <Link href="/ops#ops-workspace" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50">
+              <Link href={`/ops${buildQueryString({ sort: boardSort === "oldest" ? "" : boardSort })}#ops-workspace`} className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50">
                 Clear filters
               </Link>
             ) : null}
@@ -975,7 +1001,7 @@ function subtractBusinessDays(date: Date, days: number) {
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                 <div>{hasActiveOpsBoardFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
                 {hasActiveOpsBoardFilters ? (
-                  <Link href="/ops#ops-workspace" className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
+                  <Link href={`/ops${buildQueryString({ sort: boardSort === "oldest" ? "" : boardSort })}#ops-workspace`} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
                     Clear filters
                   </Link>
                 ) : null}
