@@ -230,3 +230,57 @@ Note: a broader `job-tests-page-wiring.test.ts` run was attempted and the releva
 - `npx.cmd tsc --noEmit`
 - `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
 - `git diff --check`
+
+## Slice: V2 Pulse Job Brief / Reason for Visit Read-Only Card
+
+### Items reviewed
+
+| Job Brief item | Status | Notes |
+|---|---|---|
+| Visit Reason | Migrated to V2 Pulse | Uses existing route-loaded `serviceVisitReasonText`, with the same route-local fallback order to job title and visit-scope lead text. Empty state is `No visit reason recorded.` |
+| Customer Concern | Migrated when distinct | Uses existing `jobTitleText` only when it differs from the Visit Reason display source. |
+| Intake Notes | Migrated when distinct | Uses existing `jobNotesText` only when it differs from the Visit Reason display source. |
+| Work Summary | Migrated when distinct | Uses existing route-loaded `visitScopeSummary` only when it differs from Visit Reason and Intake Notes. |
+| Service Details display | Migrated as compact metadata | Uses existing route-derived job type, service type/case kind, visit type, and service case context labels. |
+| `View full brief` action | Deferred | No live link, edit affordance, form, server action, or mutation path was added. The Pulse card is read-only. |
+| Work Items editor / Visit Scope form | Deferred | Work Items and `VisitScopeJobDetailForm` remain outside this slice. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- The V2 Pulse Job Brief card uses only existing route-loaded fields and existing route-derived display labels.
+- No heavy/deferred components were rendered.
+- People, Work to Perform, Billing, ECC, Activity, Notes, Records Dock, Timeline, Attachments, Equipment, Invoices, Payments, History, Audit Log, and Service Chain remain unmigrated in this slice.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`
+
+## Slice: V2 Pulse Job Brief Card Cleanup
+
+### Items reviewed
+
+| Job Brief cleanup item | Status | Notes |
+|---|---|---|
+| Solid/accent card treatment | Refined | The Pulse Job Brief card now renders as one solid blue statement block instead of nested shaded rows or metadata chips. |
+| Primary reason line | Refined | Builds a single read-only primary line from the existing Visit Reason/job-title/visit-scope fallback. |
+| Contractor inline display | Migrated | Uses already-loaded `contractorName` and appends it inline as `for {contractor}` when available and not already included. |
+| Generated city suffix | Removed from Job Brief only | The display helper strips a trailing generated city suffix such as `- Stockton` or `— Stockton` using the already-loaded service city. Site/address context stays in the Service Location surfaces. |
+| Prior-visit/service-case context | Migrated conservatively | Uses already-loaded service-case visit count, ECC failure/retest state, field outcome, and linked-retest state. No last-visit detail read was added. |
+| Address and site controls | Untouched | Service Location/Site card remains separate and retains address/navigation/correct-address affordances. |
+| Work Items / invoice charge truth | Untouched | Work to Perform, Visit Scope, invoice, billing, and ECC truth remain outside this slice. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- The cleanup uses only existing route-loaded fields and existing route-derived state.
+- No heavy/deferred components were rendered.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-v2-brief-card.test.ts lib/jobs/__tests__/job-detail-v2-pulse-brief-wiring.test.ts`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`

@@ -102,6 +102,10 @@ import {
   resolveJobInvoiceStateLabel,
 } from "@/lib/jobs/job-invoice-action";
 import { shouldShowInternalInvoiceRequiredBanner } from "@/lib/jobs/job-detail-invoice-banner";
+import {
+  buildV2PulseJobBriefContinuityLine,
+  buildV2PulseJobBriefPrimaryLine,
+} from "@/lib/jobs/job-detail-v2-brief-card";
 import { listFieldChargeProposalsForJob } from "@/lib/business/field-charge-proposals";
 import {
   addInternalInvoiceLineItemFromForm,
@@ -1108,6 +1112,7 @@ function JobDetailDesktopWorkbenchV2({
   pulseStatusItems: pulseStatusItemsOverride,
   pulseHeroContent,
   pulseSiteSnapshotContent,
+  pulseJobBriefCardContent,
   pulseServiceLocationCardContent,
   variant = "v2-pulse",
 }: {
@@ -1118,6 +1123,7 @@ function JobDetailDesktopWorkbenchV2({
   pulseStatusItems?: PulseStatusItem[];
   pulseHeroContent?: PulseHeroContent;
   pulseSiteSnapshotContent?: ReactNode;
+  pulseJobBriefCardContent?: ReactNode;
   pulseServiceLocationCardContent?: ReactNode;
   variant?: string;
 }) {
@@ -1652,7 +1658,7 @@ function JobDetailDesktopWorkbenchV2({
     ["Service Case Created", "SC-025811", "Apr 28", "violet", "service"],
   ];
   const pulseOperationalCards: Array<[string, string, string, string, PulseIconName]> = [
-    ["Job Brief", "Reason for Visit", "System not cooling. Customer reported poor cooling in building.", "View full brief", "brief"],
+    ["Job Brief", "Reason for Visit", "Job brief read-only display is supplied by the Pulse card override.", "Read only", "brief"],
     ["People & Contact", "Primary Contact", "Jim Williams, Facilities Manager. On-site team and billing contacts stay separate.", "View all", "contact"],
     ["Service Location", "123 Main Street", "Compact site card keeps address, access, and photo context visible.", "View map", "location"],
     ["Work to Perform", "5 placeholder items", "Diagnose cooling issue, inspect compressor, verify airflow, and confirm performance.", "View scope", "work"],
@@ -1880,7 +1886,9 @@ function JobDetailDesktopWorkbenchV2({
             className="grid gap-3 xl:grid-cols-4"
           >
             {pulseOperationalCards.map(([title, eyebrow, body, action, iconName], index) => (
-              title === "Service Location" && pulseServiceLocationCardContent ? (
+              title === "Job Brief" && pulseJobBriefCardContent ? (
+                <div key={title}>{pulseJobBriefCardContent}</div>
+              ) : title === "Service Location" && pulseServiceLocationCardContent ? (
                 <div key={title}>{pulseServiceLocationCardContent}</div>
               ) : (
                 <div
@@ -5710,6 +5718,48 @@ const failureResolutionPathCount =
     ...(shouldShowIntakeNotes ? [{ label: "Intake Notes", value: jobNotesText }] : []),
     ...(shouldShowWorkSummary ? [{ label: "Work Summary", value: visitScopeSummary ?? "" }] : []),
   ];
+  const pulseJobBriefReasonText =
+    firstNonEmpty(serviceVisitReasonText, jobTitleText, visitScopeLeadText) ?? "No visit reason recorded.";
+  const pulseJobBriefPrimaryLine = buildV2PulseJobBriefPrimaryLine({
+    reason: pulseJobBriefReasonText,
+    contractorName,
+    city: serviceCity,
+  });
+  const pulseJobBriefContinuityLine = buildV2PulseJobBriefContinuityLine({
+    serviceCaseVisitCount,
+    jobType: job.job_type,
+    opsStatus: job.ops_status,
+    serviceVisitOutcome: job.service_visit_outcome,
+    hasLinkedRetestVisit: showLinkedRetestCreated,
+  });
+  const pulseJobBriefCardContent = (
+    <div
+      data-v2-zone="pulse-job-brief-card"
+      className="min-h-32 rounded-xl border border-blue-300 bg-blue-600 p-3.5 text-white shadow-[0_20px_48px_-34px_rgba(37,99,235,0.8)]"
+    >
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-blue-100">
+            <ClipboardIcon className="h-3.5 w-3.5" />
+            <span>Job Brief</span>
+          </div>
+          <h3 className="mt-1 text-sm font-semibold text-white/85">Reason for Visit</h3>
+        </div>
+        <span className="shrink-0 rounded-full border border-white/25 bg-white/10 px-2 py-1 text-[10px] font-semibold uppercase text-blue-50">
+          Read only
+        </span>
+      </div>
+
+      <p className="mt-3 whitespace-normal break-words text-lg font-semibold leading-7 text-white">
+        {pulseJobBriefPrimaryLine}
+      </p>
+      {pulseJobBriefContinuityLine ? (
+        <p className="mt-2 text-sm font-medium leading-6 text-blue-50">
+          {pulseJobBriefContinuityLine}
+        </p>
+      ) : null}
+    </div>
+  );
   const jobBriefContent = (
     <div data-v2-zone="job-brief" className="min-w-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -5805,6 +5855,7 @@ const failureResolutionPathCount =
         pulseStatusItems={pulseStatusStripItems}
         pulseHeroContent={pulseHeroContent}
         pulseSiteSnapshotContent={pulseSiteSnapshotContent}
+        pulseJobBriefCardContent={pulseJobBriefCardContent}
         pulseServiceLocationCardContent={pulseServiceLocationCardContent}
         variant={desktopLayout}
       >
