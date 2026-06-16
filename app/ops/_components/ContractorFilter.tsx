@@ -37,7 +37,7 @@ export default function ContractorFilter({
         value={selectedId}
         onChange={handleChange}
       >
-        <option value="">All Work</option>
+        <option value="">All contractors</option>
         {contractors.map((c) => (
           <option key={c.id} value={c.id}>
             {c.name}

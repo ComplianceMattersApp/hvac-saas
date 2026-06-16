@@ -170,6 +170,25 @@ const OPS_TABS: { key: BucketKey; label: string }[] = [
   { key: "recent_closed", label: "Recently Closed" },
 ];
 
+type OpsBoardFilterBucket = "all" | "pending" | "waiting" | "exceptions" | "closeout";
+
+const OPS_BOARD_BUCKET_FILTERS: Array<{ key: OpsBoardFilterBucket; label: string }> = [
+  { key: "all", label: "All" },
+  { key: "pending", label: "Pending" },
+  { key: "waiting", label: "Waiting" },
+  { key: "exceptions", label: "Exceptions" },
+  { key: "closeout", label: "Closeout" },
+];
+
+function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "need_to_schedule") return "pending";
+  if (normalized === "pending" || normalized === "waiting" || normalized === "exceptions" || normalized === "closeout") {
+    return normalized;
+  }
+  return "all";
+}
+
 function startOfTodayLocalISO() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -275,7 +294,14 @@ export default async function OpsPage({
 }) {
   
   const sp = (searchParams ? await searchParams : {}) ?? {};
-  const bucket = (sp.bucket ?? "need_to_schedule") as BucketKey;
+  const boardBucketFilter = normalizeOpsBoardFilterBucket(sp.bucket);
+  const bucket = (
+    boardBucketFilter === "pending"
+      ? "need_to_schedule"
+      : boardBucketFilter === "closeout"
+      ? "closeout"
+      : "workflow_all"
+  ) as BucketKey;
   const contractor = (sp.contractor ?? "").trim() || null;
   const notice = (sp.notice ?? "").trim().toLowerCase();
   const q = (sp.q ?? "").trim() || null;
@@ -707,32 +733,19 @@ function subtractBusinessDays(date: Date, days: number) {
       },
     ] as const;
 
-    const priorityOrder = [
-      "exceptions",
-      "waiting",
-      "without_tech",
-      "need_to_schedule",
-      "closeout",
-      "field_work",
-      "updates",
-    ];
+    const boardBucketWorkspaceKeyMap: Record<Exclude<OpsBoardFilterBucket, "all">, string> = {
+      pending: "need_to_schedule",
+      waiting: "waiting",
+      exceptions: "exceptions",
+      closeout: "closeout",
+    };
+    const coreBoardWorkspaceKeys = ["need_to_schedule", "waiting", "exceptions", "closeout"];
+    const requestedWorkspaceKeys =
+      boardBucketFilter === "all"
+        ? coreBoardWorkspaceKeys
+        : [boardBucketWorkspaceKeyMap[boardBucketFilter]];
 
-    const requestedWorkspaceKey = String(sp.bucket ?? "").trim().toLowerCase();
-    const fallbackWorkspaceKey =
-      priorityOrder.find((key) => (workspaceTabs.find((tab) => tab.key === key)?.count ?? 0) > 0) ??
-      "need_to_schedule";
-
-    const selectedWorkspaceKey = workspaceTabs.some((tab) => tab.key === requestedWorkspaceKey)
-      ? requestedWorkspaceKey
-      : fallbackWorkspaceKey;
-
-    const selectedWorkspaceTab =
-      workspaceTabs.find((tab) => tab.key === selectedWorkspaceKey) ?? workspaceTabs[0];
-
-    let selectedPreviewRows: any[] = [];
-
-    let withoutTechPreviewRows: any[] = [];
-    if (selectedWorkspaceKey === "without_tech") {
+    async function loadWithoutTechPreviewRows() {
       const withoutTechPreviewIds = (scheduledWithoutTechSnapshot.preview ?? [])
         .map((job: any) => String(job?.id ?? "").trim())
         .filter(Boolean);
@@ -751,87 +764,76 @@ function subtractBusinessDays(date: Date, days: number) {
           (withoutTechPreviewRes.data ?? []).map((row: any) => [String(row?.id ?? "").trim(), row])
         );
 
-        withoutTechPreviewRows = withoutTechPreviewIds
+        return withoutTechPreviewIds
           .map((id) => withoutTechRowsById.get(id))
           .filter(Boolean) as any[];
       }
+
+      return [];
     }
 
-    if (selectedWorkspaceKey === "need_to_schedule") {
+    async function loadWorkspacePreviewRows(workspaceKey: string) {
+      if (workspaceKey === "without_tech") {
+        return loadWithoutTechPreviewRows();
+      }
+
       let queueQ = supabase
         .from("jobs")
         .select(workspaceSelect)
         .is("deleted_at", null)
         .neq("status", "cancelled")
-        .eq("status", "open")
-        .eq("ops_status", "need_to_schedule")
         .order("created_at", { ascending: true })
         .limit(10);
+
+      if (workspaceKey === "need_to_schedule") {
+        queueQ = queueQ.eq("status", "open").eq("ops_status", "need_to_schedule");
+      } else if (workspaceKey === "field_work") {
+        queueQ = queueQ
+          .neq("ops_status", "closed")
+          .eq("field_complete", false)
+          .gte("scheduled_date", wsStartTodayUtc)
+          .lt("scheduled_date", wsStartTomorrowUtc)
+          .order("window_start", { ascending: true });
+      } else if (workspaceKey === "waiting") {
+        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"]);
+      } else if (workspaceKey === "exceptions") {
+        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
+      } else if (workspaceKey === "closeout") {
+        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["invoice_required", "paperwork_required"]);
+      } else {
+        return [];
+      }
+
       if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
       const queueRes = await queueQ;
       if (queueRes.error) throw queueRes.error;
-      selectedPreviewRows = queueRes.data ?? [];
-    } else if (selectedWorkspaceKey === "field_work") {
-      let queueQ = supabase
-        .from("jobs")
-        .select(workspaceSelect)
-        .is("deleted_at", null)
-        .neq("status", "cancelled")
-        .neq("ops_status", "closed")
-        .eq("field_complete", false)
-        .gte("scheduled_date", wsStartTodayUtc)
-        .lt("scheduled_date", wsStartTomorrowUtc)
-        .order("window_start", { ascending: true })
-        .limit(10);
-      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
-      const queueRes = await queueQ;
-      if (queueRes.error) throw queueRes.error;
-      selectedPreviewRows = queueRes.data ?? [];
-    } else if (selectedWorkspaceKey === "without_tech") {
-      selectedPreviewRows = withoutTechPreviewRows;
-    } else if (selectedWorkspaceKey === "waiting") {
-      let queueQ = supabase
-        .from("jobs")
-        .select(workspaceSelect)
-        .is("deleted_at", null)
-        .neq("status", "cancelled")
-        .neq("ops_status", "closed")
-        .in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"])
-        .order("created_at", { ascending: true })
-        .limit(10);
-      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
-      const queueRes = await queueQ;
-      if (queueRes.error) throw queueRes.error;
-      selectedPreviewRows = queueRes.data ?? [];
-    } else if (selectedWorkspaceKey === "exceptions") {
-      let queueQ = supabase
-        .from("jobs")
-        .select(workspaceSelect)
-        .is("deleted_at", null)
-        .neq("status", "cancelled")
-        .neq("ops_status", "closed")
-        .in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"])
-        .order("created_at", { ascending: true })
-        .limit(10);
-      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
-      const queueRes = await queueQ;
-      if (queueRes.error) throw queueRes.error;
-      selectedPreviewRows = queueRes.data ?? [];
-    } else if (selectedWorkspaceKey === "closeout") {
-      let queueQ = supabase
-        .from("jobs")
-        .select(workspaceSelect)
-        .is("deleted_at", null)
-        .neq("status", "cancelled")
-        .neq("ops_status", "closed")
-        .in("ops_status", ["invoice_required", "paperwork_required"])
-        .order("created_at", { ascending: true })
-        .limit(10);
-      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
-      const queueRes = await queueQ;
-      if (queueRes.error) throw queueRes.error;
-      selectedPreviewRows = queueRes.data ?? [];
+      return queueRes.data ?? [];
     }
+
+    const workspacePreviewEntries = await Promise.all(
+      requestedWorkspaceKeys.map(async (workspaceKey) => [workspaceKey, await loadWorkspacePreviewRows(workspaceKey)] as const),
+    );
+    const workspacePreviewRowsByKey = new Map<string, any[]>(workspacePreviewEntries);
+    const visibleWorkspaceSections = requestedWorkspaceKeys.map((workspaceKey) => {
+      const tab = workspaceTabs.find((item) => item.key === workspaceKey) ?? workspaceTabs[0];
+      return {
+        ...tab,
+        previewRows: workspacePreviewRowsByKey.get(workspaceKey) ?? [],
+      };
+    });
+    const selectedWorkspaceKey =
+      boardBucketFilter === "all" ? "all" : requestedWorkspaceKeys[0];
+    const selectedWorkspaceTab =
+      boardBucketFilter === "all"
+        ? {
+            key: "all",
+            label: "All",
+            count: visibleWorkspaceSections.reduce((sum, section) => sum + section.count, 0),
+            href: "/ops#ops-workspace",
+          }
+        : visibleWorkspaceSections[0];
+    const selectedPreviewRows = visibleWorkspaceSections.flatMap((section) => section.previewRows);
+    const hasActiveOpsBoardFilters = boardBucketFilter !== "all" || Boolean(contractorScopeFilter);
 
     if (opsTimingEnabled) {
       console.log(`[ops:workspace:countsAndPreview] ${Date.now() - _t_workspaceCounts}ms`);
@@ -863,6 +865,14 @@ function subtractBusinessDays(date: Date, days: number) {
     primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
 
     const operationalTenantIdentity = await operationalTenantIdentityPromise;
+    const workspaceContractorsRes = await supabase
+      .from("contractors")
+      .select("id, name")
+      .eq("lifecycle_state", "active")
+      .order("name", { ascending: true });
+    if (workspaceContractorsRes.error) throw workspaceContractorsRes.error;
+    const workspaceContractors = workspaceContractorsRes.data ?? [];
+    const showWorkspaceContractorFilter = workspaceContractors.length > 0 && !isHvacServiceMode;
     const activeWorkspaceHref = `/ops${buildQueryString({
       bucket,
       contractor: contractorScopeFilter ?? "",
@@ -907,38 +917,46 @@ function subtractBusinessDays(date: Date, days: number) {
         <section id="ops-workspace" className="rounded-3xl border border-slate-300/80 bg-white p-3.5 shadow-[0_20px_48px_-34px_rgba(15,23,42,0.42)] ring-1 ring-slate-200/70 sm:p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Queue Switcher</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Board Filters</div>
               <div className="text-lg font-semibold tracking-tight text-slate-950">Operations workbench</div>
             </div>
             <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-500">
-              {workspaceTabs.reduce((sum, tab) => sum + tab.count, 0)} active jobs
+              {selectedWorkspaceTab.count} visible jobs
             </div>
           </div>
 
-          <div className="mb-3 flex flex-wrap gap-1.5">
-            {workspaceTabs.map((tab) => {
-              const isActive = tab.key === selectedWorkspaceKey;
-              return (
-                <Link
-                  key={tab.key}
-                  href={`/ops${buildQueryString({
-                    bucket: tab.key,
-                    contractor: contractorScopeFilter ?? "",
-                    sort,
-                    panel: "",
-                  })}#ops-workspace`}
-                  className={[
-                    "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium leading-5 shadow-sm transition-colors sm:py-1 sm:text-[11px] sm:leading-none",
-                    isActive
-                      ? "border-blue-700 bg-blue-700 text-white shadow-[0_10px_22px_-16px_rgba(37,99,235,0.45)]"
-                      : "border-slate-300 bg-slate-50/90 text-slate-700 hover:bg-white",
-                  ].join(" ")}
-                >
-                  <span className={isActive ? "text-slate-200" : "text-current/80"}>{tab.label}</span>
-                  <span className="font-semibold tabular-nums">{tab.count}</span>
-                </Link>
-              );
-            })}
+          <div className="mb-3 grid gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+            {showWorkspaceContractorFilter ? (
+              <ContractorFilter contractors={workspaceContractors} selectedId={contractorScopeFilter ?? ""} />
+            ) : (
+              <div className="grid gap-1">
+                <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Contractor</label>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-500">All contractors</div>
+              </div>
+            )}
+            <form action="/ops" method="get" className="grid gap-1">
+              <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Bucket</label>
+              <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
+              <select
+                name="bucket"
+                defaultValue={boardBucketFilter}
+                className="w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200"
+              >
+                {OPS_BOARD_BUCKET_FILTERS.map((option) => (
+                  <option key={option.key} value={option.key}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button type="submit" className="mt-1 inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-white">
+                Apply
+              </button>
+            </form>
+            {hasActiveOpsBoardFilters ? (
+              <Link href="/ops#ops-workspace" className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-colors hover:bg-slate-50">
+                Clear filters
+              </Link>
+            ) : null}
           </div>
 
           <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
@@ -953,63 +971,66 @@ function subtractBusinessDays(date: Date, days: number) {
               </Link>
             </div>
 
-            {selectedWorkspaceKey === "updates" ? (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor Updates</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{unreadContractorUpdates.length}</div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">New Work Requests</div>
-                  <div className="mt-1 text-lg font-semibold text-slate-900 tabular-nums">{unreadNewWorkRequests.length}</div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Notification Link</div>
-                  <Link href="/ops/notifications?state=unread" className="mt-1 inline-flex text-sm font-semibold text-blue-700 hover:text-blue-800 hover:underline">
-                    Open notifications
+            {selectedPreviewRows.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                <div>{hasActiveOpsBoardFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
+                {hasActiveOpsBoardFilters ? (
+                  <Link href="/ops#ops-workspace" className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
+                    Clear filters
                   </Link>
-                </div>
-              </div>
-            ) : selectedPreviewRows.length === 0 ? (
-              <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/60 px-2.5 py-2 text-[12px] font-medium leading-5 text-emerald-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.6)] sm:py-1.5 sm:text-[11px] sm:leading-4">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden="true" />
-                <span>No jobs in this queue right now.</span>
+                ) : null}
               </div>
             ) : (
-              <div className="space-y-2">
-                {selectedPreviewRows.map((job: any) => (
-                  <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <Link href={`/jobs/${job.id}?tab=ops`} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
-                          {workspaceTitle(job)}
-                        </Link>
-                        <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700 sm:text-[11px] sm:leading-4">{workspaceCustomerLocation(job)}</div>
+              <div className="space-y-3">
+                {visibleWorkspaceSections.map((section) => (
+                  <div key={section.key} className="space-y-2">
+                    {boardBucketFilter === "all" ? (
+                      <div className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5">
+                        <div className="text-xs font-semibold uppercase tracking-[0.1em] text-slate-600">{section.label}</div>
+                        <div className="text-xs font-semibold text-slate-500">{section.count} jobs</div>
                       </div>
-                      <Link href={`/jobs/${job.id}?tab=ops`} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
-                        Open Job
-                      </Link>
-                    </div>
+                    ) : null}
+                    {section.previewRows.length === 0 ? (
+                      <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        No jobs match these filters.
+                      </div>
+                    ) : (
+                      section.previewRows.map((job: any) => (
+                        <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <Link href={`/jobs/${job.id}?tab=ops`} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
+                                {workspaceTitle(job)}
+                              </Link>
+                              <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700 sm:text-[11px] sm:leading-4">{workspaceCustomerLocation(job)}</div>
+                            </div>
+                            <Link href={`/jobs/${job.id}?tab=ops`} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
+                              Open Job
+                            </Link>
+                          </div>
 
-                    <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-3 sm:text-[11px] sm:leading-4">
-                      <div>
-                        <span className="font-medium text-slate-500">Status/Reason:</span> {wsStatusReason(job, selectedWorkspaceKey)}
-                      </div>
-                      <div>
-                        <span className="font-medium text-slate-500">Days Aging:</span>{" "}
-                        {workspaceAgeLabel(job)}
-                      </div>
-                      <div>
-                        <span className="font-medium text-slate-500">Assignment:</span>{" "}
-                        {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
-                      </div>
-                      {workspaceContractorName(job) ? (
-                        <div>
-                          <span className="font-medium text-slate-500">Contractor:</span>{" "}
-                          {workspaceContractorName(job)}
+                          <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-3 sm:text-[11px] sm:leading-4">
+                            <div>
+                              <span className="font-medium text-slate-500">Status/Reason:</span> {wsStatusReason(job, section.key)}
+                            </div>
+                            <div>
+                              <span className="font-medium text-slate-500">Days Aging:</span>{" "}
+                              {workspaceAgeLabel(job)}
+                            </div>
+                            <div>
+                              <span className="font-medium text-slate-500">Assignment:</span>{" "}
+                              {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
+                            </div>
+                            {workspaceContractorName(job) ? (
+                              <div>
+                                <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                                {workspaceContractorName(job)}
+                              </div>
+                            ) : null}
+                          </div>
                         </div>
-                      ) : null}
-                    </div>
+                      ))
+                    )}
                   </div>
                 ))}
               </div>
