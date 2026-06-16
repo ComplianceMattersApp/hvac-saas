@@ -123,3 +123,28 @@ Note: a broader `job-tests-page-wiring.test.ts` run was attempted and the releva
 - `npx.cmd tsc --noEmit`
 - `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
 - `git diff --check`
+
+## Slice: V2 Pulse Top Strip Spacing + Hero Copy Cleanup
+
+### Items reviewed
+
+| Item | Status | Notes |
+|---|---|---|
+| Priority strip tile | Removed / deferred | No route-loaded priority source exists yet, so the placeholder tile was removed instead of showing fake priority. |
+| Status strip fields | Retained | Status, Aging, Schedule, Service Location, Customer, and Assigned Team remain in the strip. |
+| Strip spacing | Refined | The strip now uses six columns with extra width for Service Location, Customer, and Assigned Team to reduce truncation. |
+| Hero scheduling copy | Refined | `need_to_schedule` now takes precedence over field lifecycle `in_process` for V2 Pulse hero title/body, preventing "Complete Field Work" from contradicting a scheduling-needed status. |
+| Hero in-process/closeout/closed copy | Retained | Existing read-only state rules remain for field-active, closeout, and closed posture. |
+| Hero controls | Deferred | No live buttons, links, forms, submit buttons, server actions, or mutation paths were introduced. |
+
+### Performance notes
+
+- No new database reads were introduced.
+- No heavy/deferred components were rendered.
+- This slice only changes V2 Pulse display spacing/copy; no additional content zones were migrated.
+
+### Validation
+
+- `npx.cmd tsc --noEmit`
+- `npx.cmd vitest run lib/jobs/__tests__/job-detail-job-type-switch-hidden.test.ts lib/jobs/__tests__/job-detail-service-address-edit-affordance.test.ts lib/jobs/__tests__/job-detail-field-outcome-panel-wiring.test.ts lib/jobs/__tests__/job-detail-invoice-banner.test.ts lib/jobs/__tests__/job-detail-ecc-retest-bridge-wiring.test.ts lib/jobs/__tests__/job-detail-header-reference-wiring.test.ts lib/actions/__tests__/return-visit-action-wiring.test.ts`
+- `git diff --check`

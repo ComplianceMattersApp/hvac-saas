@@ -1713,7 +1713,7 @@ function JobDetailDesktopWorkbenchV2({
 
       <section
         data-v2-zone="status-summary-strip"
-        className="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_42px_-40px_rgba(15,23,42,0.38)] xl:grid-cols-7"
+        className="grid overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_42px_-40px_rgba(15,23,42,0.38)] xl:grid-cols-[0.9fr_0.8fr_1fr_minmax(15rem,1.55fr)_minmax(13rem,1.25fr)_minmax(13rem,1.25fr)]"
       >
         {pulseStatusItems.map(({ label, value, meta, tone, iconName }) => (
           <div key={label} className="min-w-0 border-b border-r border-slate-100 px-4 py-3 last:border-r-0 xl:border-b-0">
@@ -4335,13 +4335,6 @@ const pulseStatusStripItems: PulseStatusItem[] = [
     iconName: "activity",
   },
   {
-    label: "Priority",
-    value: "Priority deferred",
-    meta: "No loaded priority source",
-    tone: "slate",
-    iconName: "warning",
-  },
-  {
     label: "Aging",
     value: pulseAgingValue,
     meta: pulseCreatedDateLabel,
@@ -4382,6 +4375,8 @@ const pulseStageState =
     ? "invoiced"
     : isFieldComplete || normalizedJobStatus === "completed"
     ? "complete"
+    : normalizedOpsStatus === "need_to_schedule"
+    ? "needs_schedule"
     : normalizedJobStatus === "in_process"
     ? "on_site"
     : normalizedJobStatus === "on_the_way" || normalizedOpsStatus === "on_the_way"
@@ -4394,6 +4389,8 @@ const pulseHeroTitle =
     ? "Job Closed"
     : isFieldComplete || normalizedJobStatus === "completed"
     ? "Review Closeout Requirements"
+    : normalizedOpsStatus === "need_to_schedule"
+    ? "Schedule This Job"
     : normalizedJobStatus === "in_process"
     ? "Complete Field Work"
     : normalizedJobStatus === "on_the_way" || normalizedOpsStatus === "on_the_way"
@@ -4406,6 +4403,8 @@ const pulseHeroBody =
     ? "This job is closed. Review records, billing, service chain, and audit history from the lower workspaces."
     : isFieldComplete || normalizedJobStatus === "completed"
     ? primaryCloseoutMessage
+    : normalizedOpsStatus === "need_to_schedule"
+    ? "This job needs scheduling before it can move through dispatch and field work. Pulse actions remain deferred in this preview."
     : completionActionAttentionBanner
     ? String(completionActionAttentionBanner.title)
     : nextActionPreview
@@ -4432,11 +4431,11 @@ const pulseHeroStateTone: PulseHeroContent["stateTone"] =
     ? "slate"
     : isFieldComplete || normalizedJobStatus === "completed" || isCloseoutPending
     ? "amber"
+    : normalizedOpsStatus === "need_to_schedule"
+    ? "blue"
     : normalizedJobStatus === "in_process" || normalizedJobStatus === "on_the_way"
     ? "emerald"
     : job.scheduled_date || normalizedOpsStatus === "scheduled"
-    ? "blue"
-    : normalizedOpsStatus === "need_to_schedule"
     ? "blue"
     : "slate";
 const pulseHeroStages: PulseHeroStage[] = [
