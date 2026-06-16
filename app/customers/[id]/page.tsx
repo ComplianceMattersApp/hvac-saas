@@ -17,6 +17,13 @@ import {
   addLocationRoleContactFromForm,
 } from "@/lib/actions/contact-recipient-actions";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
+import {
+  compareCustomerWorkJobsLatestFirst,
+  deriveCustomerWorkCaseRollup,
+  formatCustomerWorkAddress,
+  formatCustomerWorkFailureReason,
+  formatCustomerWorkPersonName,
+} from "@/lib/customers/customer-work-display";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { listEstimatesByAccount, type EstimateListItem } from "@/lib/estimates/estimate-read";
 import { requireInternalUser, isInternalAccessError } from "@/lib/auth/internal-user";
@@ -68,6 +75,7 @@ import RoleContactsCard from "@/components/RoleContactsCard";
 import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/lib/reports/payments-register";
 import { canManageInvoiceLifecycle, canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
+import { getActiveJobAssignmentDisplayMap, type ActiveJobAssignmentDisplay } from "@/lib/staffing/human-layer";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 
 
@@ -118,13 +126,19 @@ type LocationRow = {
 
 type JobRow = {
   id: string;
+  job_display_number?: string | number | null;
   title: string | null;
   status: string | null;
+  job_type?: string | null;
+  service_visit_reason?: string | null;
+  service_visit_outcome?: string | null;
   job_address: string | null;
   city: string | null;
   scheduled_date: string | null;
   created_at: string | null;
   ops_status: string | null;
+  pending_info_reason?: string | null;
+  on_hold_reason?: string | null;
   contractor_id: string | null;
   service_case_id: string | null;
   parent_job_id: string | null;
@@ -427,6 +441,23 @@ function opsBadgeClass(v?: string | null) {
   return "border-slate-200 bg-slate-50 text-slate-700";
 }
 
+function caseRollupBadgeClass(state: "open" | "closed" | "cancelled" | "needs_review") {
+  if (state === "closed") return "border-slate-300 bg-white text-slate-700";
+  if (state === "cancelled") return "border-slate-300 bg-slate-100 text-slate-700";
+  if (state === "needs_review") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-emerald-200 bg-emerald-50 text-emerald-800";
+}
+
+function customerWorkJobStatusLabel(job: Pick<JobRow, "status" | "ops_status" | "deleted_at">) {
+  if (job.deleted_at) return "Archived";
+  const lifecycle = normalizeLifecycleStatus(job.status);
+  if (lifecycle === "cancelled") return "Cancelled";
+  if (lifecycle === "completed" || lifecycle === "closed" || normalizeOpsStatus(job.ops_status) === "closed") {
+    return "Closed";
+  }
+  return opsStatusLabel(job.ops_status);
+}
+
 const BILLING_PERIOD_BILLING_CADENCES = ["monthly", "quarterly", "semi_annual", "annual"] as const;
 const BILLING_PERIOD_STATUSES = [
   "draft",
@@ -570,14 +601,21 @@ export default async function CustomerDetailPage(props: {
     .select(
       `
       id,
+      job_display_number,
       title,
       status,
+      job_type,
+      service_visit_reason,
+      service_visit_outcome,
       job_address,
       city,
       scheduled_date,
       created_at,
       ops_status,
+      pending_info_reason,
+      on_hold_reason,
       contractor_id,
+      contractors(name),
       service_case_id,
       parent_job_id,
       location_id,
@@ -590,6 +628,12 @@ export default async function CustomerDetailPage(props: {
 
   if (jobsErr) throw jobsErr;
   jobs = (jobsData ?? []) as JobRow[];
+
+  const workJobIds = jobs.map((job) => String(job.id ?? "").trim()).filter(Boolean);
+  const activeAssignmentDisplayMap: Record<string, ActiveJobAssignmentDisplay[]> = await getActiveJobAssignmentDisplayMap({
+    supabase,
+    jobIds: workJobIds,
+  }).catch(() => ({}));
 
   if (!customerData) {
     return (
@@ -713,6 +757,11 @@ export default async function CustomerDetailPage(props: {
       ungroupedJobs.push(job);
     }
   }
+
+  for (const caseJobs of caseGroups.values()) {
+    caseJobs.sort(compareCustomerWorkJobsLatestFirst);
+  }
+  ungroupedJobs.sort(compareCustomerWorkJobsLatestFirst);
 
   // Sort case IDs by creation date (earliest case first)
   const sortedCaseIds = Array.from(caseGroups.keys()).sort((aId, bId) => {
@@ -2324,104 +2373,119 @@ export default async function CustomerDetailPage(props: {
           ) : (
             <div className="space-y-6">
               {sortedCaseIds.map((caseId) => {
-                const serviceCase = serviceCasesById.get(caseId);
                 const caseJobs = caseGroups.get(caseId) ?? [];
-                const caseStatusNorm = String(serviceCase?.status ?? "").toLowerCase();
-                const isCaseResolved = caseStatusNorm === "resolved";
+                const caseRollup = deriveCustomerWorkCaseRollup(caseJobs);
+                const latestCaseJob = caseJobs[0] ?? null;
+                const latestActivityLabel = latestCaseJob
+                  ? formatDate(latestCaseJob.scheduled_date ?? latestCaseJob.created_at)
+                  : null;
+                const visitCount = serviceCaseVisitCounts.get(caseId) ?? caseJobs.length;
 
                 return (
                   <div
                     key={caseId}
-                    className="space-y-3 rounded-2xl border border-slate-300 bg-white p-3 shadow-sm sm:p-4"
+                    className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm"
                   >
-                    <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Service Case</span>
-                          <span className="font-mono text-xs text-slate-500">{String(caseId).slice(0, 8)}</span>
-                          <span
-                            className={[
-                              "inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium",
-                              isCaseResolved
-                                ? "border border-slate-200 bg-slate-100 text-slate-700"
-                                : "border border-emerald-200 bg-emerald-50 text-emerald-700",
-                            ].join(" ")}
-                          >
-                            {isCaseResolved ? "Resolved" : "Open"}
-                          </span>
-                          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
-                            {caseJobs.length} visit{caseJobs.length === 1 ? "" : "s"}
-                          </span>
-                        </div>
+                    <div className="flex flex-col gap-2 border-b border-slate-200 bg-slate-50/80 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Service Case</span>
+                        <span className="font-mono text-xs font-semibold text-slate-700">{String(caseId).slice(0, 8)}</span>
+                        <span
+                          className={[
+                            "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                            caseRollupBadgeClass(caseRollup.state),
+                          ].join(" ")}
+                        >
+                          {caseRollup.label}
+                        </span>
+                        <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                          {visitCount} visit{visitCount === 1 ? "" : "s"}
+                        </span>
                       </div>
+                      {latestActivityLabel ? (
+                        <div className="text-xs font-medium text-slate-500">Latest {latestActivityLabel}</div>
+                      ) : null}
                     </div>
 
-                    <div className="space-y-3 border-l-2 border-slate-200 pl-3 sm:ml-4 sm:pl-5">
+                    <div className="relative space-y-1.5 px-2 py-2 before:absolute before:bottom-2 before:left-4 before:top-2 before:w-px before:bg-slate-200 sm:px-3">
                       {caseJobs.map((job) => {
                         const isArchived = Boolean(job.deleted_at);
                         const isCancelled = normalizeLifecycleStatus(job.status) === "cancelled";
-                        const address = [job.job_address, job.city]
-                          .map((v) => String(v ?? "").trim())
-                          .filter(Boolean)
-                          .join(", ");
+                        const address = formatCustomerWorkAddress(job);
                         const jobReference = formatJobDisplayReference({
-                          jobDisplayNumber: null,
+                          jobDisplayNumber: job.job_display_number ?? null,
                           jobId: job.id,
                         });
+                        const jobStatusLabel = customerWorkJobStatusLabel(job);
+                        const contractorName = String(
+                          (job.contractors as any)?.name ?? (job.contractors as any)?.[0]?.name ?? "",
+                        ).trim();
+                        const assignedTeam = activeAssignmentDisplayMap[String(job.id ?? "")] ?? [];
+                        const primaryAssignee = assignedTeam.find((assignee) => assignee.is_primary) ?? assignedTeam[0] ?? null;
+                        const failureReason = formatCustomerWorkFailureReason(job);
 
                         return (
                           <div
                             key={job.id}
                             className={[
-                              "rounded-xl border p-4",
+                              "relative ml-3 rounded-lg border px-3 py-2.5 sm:ml-4 sm:min-h-[72px] sm:px-3.5",
                               isArchived || isCancelled
-                                ? "border-slate-200 bg-slate-100/70"
-                                : "border-slate-200 bg-slate-50",
+                                ? "border-slate-200 bg-slate-50/80"
+                                : "border-slate-200 bg-white hover:border-slate-300",
                             ].join(" ")}
                           >
-                            <div className="flex flex-col gap-2.5 xl:flex-row xl:items-start xl:justify-between">
-                              <div className="min-w-0 space-y-1.5">
-                                <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
-                                  <span className="font-medium text-slate-800">{formatDate(job.scheduled_date)}</span>
+                            <span className="absolute -left-[21px] top-4 h-2 w-2 rounded-full border border-slate-300 bg-white sm:-left-[25px]" />
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                              <div className="min-w-0 space-y-1">
+                                <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-900">
+                                  <span>{formatDate(job.scheduled_date ?? job.created_at)}</span>
                                   <span className="text-slate-300">&middot;</span>
-                                  <span className="font-medium text-slate-800">{jobReference}</span>
+                                  <span>{jobReference}</span>
                                   <span className="text-slate-300">&middot;</span>
+                                  <span className="break-words">{normalizeRetestLinkedJobTitle(job.title) || "Untitled Job"}</span>
                                   <span
                                     className={[
-                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
                                       opsBadgeClass(job.ops_status),
                                     ].join(" ")}
                                   >
-                                    {opsStatusLabel(job.ops_status)}
+                                    {jobStatusLabel}
                                   </span>
-                                  {isCancelled && !isArchived ? (
-                                    <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
-                                      Cancelled
-                                    </span>
-                                  ) : null}
-                                  {isArchived ? (
-                                    <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
-                                      Archived
-                                    </span>
-                                  ) : null}
                                 </div>
 
-                                <div className="text-sm font-semibold text-slate-900">
-                                  {normalizeRetestLinkedJobTitle(job.title) || jobReference}
-                                </div>
                                 <div className="text-sm text-slate-600">
                                   {address || "Location unavailable"}
                                 </div>
+
+                                <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                                  {contractorName ? (
+                                    <span>Contractor: {contractorName}</span>
+                                  ) : null}
+                                  {contractorName && primaryAssignee ? <span className="text-slate-300">&middot;</span> : null}
+                                  {primaryAssignee ? (
+                                    <span>Assigned: {formatCustomerWorkPersonName(primaryAssignee.display_name)}</span>
+                                  ) : null}
+                                  {failureReason ? (
+                                    <span
+                                      className={[
+                                        "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                                        normalizeOpsStatus(job.ops_status) === "pending_office_review"
+                                          ? "border-cyan-200 bg-cyan-50 text-cyan-800"
+                                          : "border-red-200 bg-red-50 text-red-800",
+                                      ].join(" ")}
+                                    >
+                                      {failureReason}
+                                    </span>
+                                  ) : null}
+                                </div>
                               </div>
 
-                              <div className="flex flex-wrap gap-2 xl:pt-0.5">
-                                <Link
-                                  href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
-                                  className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
-                                >
-                                  Open Job
-                                </Link>
-                              </div>
+                              <Link
+                                href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
+                                className="inline-flex shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 sm:mt-0.5"
+                              >
+                                Open Job
+                              </Link>
                             </div>
                           </div>
                         );
@@ -2432,80 +2496,93 @@ export default async function CustomerDetailPage(props: {
               })}
 
               {ungroupedJobs.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="rounded-xl border border-slate-200 bg-gradient-to-r from-slate-50 to-slate-50 p-4">
-                    <div className="space-y-1">
+                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                  <div className="border-b border-slate-200 bg-slate-50/80 px-3 py-2.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <div className="text-sm font-semibold text-slate-900">Other Visits</div>
-                      <div className="text-sm text-slate-500">Jobs not connected to a service case yet.</div>
+                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                        {ungroupedJobs.length} visit{ungroupedJobs.length === 1 ? "" : "s"}
+                      </span>
                     </div>
+                    <div className="mt-0.5 text-xs text-slate-500">Jobs not connected to a service case yet.</div>
                   </div>
 
-                  <div className="space-y-2 pl-2">
+                  <div className="space-y-1.5 px-2 py-2 sm:px-3">
                     {ungroupedJobs.map((job) => {
                       const isArchived = Boolean(job.deleted_at);
                       const isCancelled = normalizeLifecycleStatus(job.status) === "cancelled";
-                      const address = [job.job_address, job.city]
-                        .map((v) => String(v ?? "").trim())
-                        .filter(Boolean)
-                        .join(", ");
+                      const address = formatCustomerWorkAddress(job);
                       const jobReference = formatJobDisplayReference({
-                        jobDisplayNumber: null,
+                        jobDisplayNumber: job.job_display_number ?? null,
                         jobId: job.id,
                       });
+                      const jobStatusLabel = customerWorkJobStatusLabel(job);
+                      const contractorName = String(
+                        (job.contractors as any)?.name ?? (job.contractors as any)?.[0]?.name ?? "",
+                      ).trim();
+                      const assignedTeam = activeAssignmentDisplayMap[String(job.id ?? "")] ?? [];
+                      const primaryAssignee = assignedTeam.find((assignee) => assignee.is_primary) ?? assignedTeam[0] ?? null;
+                      const failureReason = formatCustomerWorkFailureReason(job);
 
                       return (
                         <div
                           key={job.id}
                           className={[
-                            "rounded-xl border p-4",
+                            "rounded-lg border px-3 py-2.5 sm:min-h-[72px] sm:px-3.5",
                             isArchived || isCancelled
-                              ? "border-slate-200 bg-slate-100/70"
-                              : "border-slate-200 bg-slate-50",
+                              ? "border-slate-200 bg-slate-50/80"
+                              : "border-slate-200 bg-white hover:border-slate-300",
                           ].join(" ")}
                         >
-                          <div className="flex flex-col gap-2.5 xl:flex-row xl:items-start xl:justify-between">
-                            <div className="min-w-0 space-y-1.5">
-                              <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-600">
-                                <span className="font-medium text-slate-800">{formatDate(job.scheduled_date)}</span>
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="min-w-0 space-y-1">
+                              <div className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-900">
+                                <span>{formatDate(job.scheduled_date ?? job.created_at)}</span>
                                 <span className="text-slate-300">&middot;</span>
-                                <span className="font-medium text-slate-800">{jobReference}</span>
+                                <span>{jobReference}</span>
                                 <span className="text-slate-300">&middot;</span>
+                                <span className="break-words">{normalizeRetestLinkedJobTitle(job.title) || "Untitled Job"}</span>
                                 <span
                                   className={[
-                                    "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-medium",
+                                    "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
                                     opsBadgeClass(job.ops_status),
                                   ].join(" ")}
                                 >
-                                  {opsStatusLabel(job.ops_status)}
+                                  {jobStatusLabel}
                                 </span>
-                                {isCancelled && !isArchived ? (
-                                  <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
-                                    Cancelled
-                                  </span>
-                                ) : null}
-                                {isArchived ? (
-                                  <span className="inline-flex items-center rounded-full border border-slate-300 bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
-                                    Archived
-                                  </span>
-                                ) : null}
                               </div>
 
-                              <div className="text-sm font-semibold text-slate-900">
-                                {normalizeRetestLinkedJobTitle(job.title) || jobReference}
-                              </div>
                               <div className="text-sm text-slate-600">
                                 {address || "Location unavailable"}
                               </div>
+
+                              <div className="flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+                                {contractorName ? <span>Contractor: {contractorName}</span> : null}
+                                {contractorName && primaryAssignee ? <span className="text-slate-300">&middot;</span> : null}
+                                {primaryAssignee ? (
+                                  <span>Assigned: {formatCustomerWorkPersonName(primaryAssignee.display_name)}</span>
+                                ) : null}
+                                {failureReason ? (
+                                  <span
+                                    className={[
+                                      "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold",
+                                      normalizeOpsStatus(job.ops_status) === "pending_office_review"
+                                        ? "border-cyan-200 bg-cyan-50 text-cyan-800"
+                                        : "border-red-200 bg-red-50 text-red-800",
+                                    ].join(" ")}
+                                  >
+                                    {failureReason}
+                                  </span>
+                                ) : null}
+                              </div>
                             </div>
 
-                            <div className="flex flex-wrap gap-2 xl:pt-0.5">
-                              <Link
-                                href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
-                                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-100"
-                              >
-                                Open Job
-                              </Link>
-                            </div>
+                            <Link
+                              href={isInternalViewer ? `/jobs/${job.id}` : `/portal/jobs/${job.id}`}
+                              className="inline-flex shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50 sm:mt-0.5"
+                            >
+                              Open Job
+                            </Link>
                           </div>
                         </div>
                       );
