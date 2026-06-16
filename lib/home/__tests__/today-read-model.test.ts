@@ -131,7 +131,7 @@ describe("selectNextBestAction", () => {
     expect(result.kind).toBe("dispatcher_schedule");
     expect(result.headline).toContain("unassigned");
     expect(result.primaryLabel).toBe("Assign Technicians");
-    expect(result.primaryHref).toBe("/ops/queues/without-tech");
+    expect(result.primaryHref).toBe("/ops");
   });
 
   it("office: critical exceptions outrank everything else", () => {
@@ -142,7 +142,7 @@ describe("selectNextBestAction", () => {
       openInvoiceCount: 9,
     }));
     expect(result.kind).toBe("compliance_exception");
-    expect(result.primaryHref).toBe("/ops/queues/exceptions");
+    expect(result.primaryHref).toBe("/ops");
   });
 
   it("billing: prioritizes open invoices", () => {
@@ -281,7 +281,7 @@ describe("buildPriorityChips", () => {
     const withoutTech = chips.find((c) => c.key === "without_tech");
     expect(withoutTech?.count).toBe(3);
     expect(withoutTech?.urgent).toBe(true);
-    expect(withoutTech?.href).toBe("/ops/queues/without-tech");
+    expect(withoutTech?.href).toBe("/ops");
   });
 
   it("flags exceptions chip as urgent", () => {
@@ -296,7 +296,7 @@ describe("buildPriorityChips", () => {
     const exceptions = chips.find((c) => c.key === "exceptions");
     expect(exceptions?.urgent).toBe(true);
     expect(exceptions?.tone).toBe("danger");
-    expect(exceptions?.href).toBe("/ops/queues/exceptions");
+    expect(exceptions?.href).toBe("/ops");
   });
 
   it("maps waiting and on-hold chips to the waiting queue", () => {
@@ -308,8 +308,8 @@ describe("buildPriorityChips", () => {
       openInvoiceCount: 0,
       canViewBusinessPulse: false,
     });
-    expect(chips.find((c) => c.key === "waiting")?.href).toBe("/ops/queues/waiting");
-    expect(chips.find((c) => c.key === "on_hold")?.href).toBe("/ops/queues/waiting");
+    expect(chips.find((c) => c.key === "waiting")?.href).toBe("/ops");
+    expect(chips.find((c) => c.key === "on_hold")?.href).toBe("/ops");
   });
 });
 
@@ -481,7 +481,7 @@ describe("buildFollowUpGroups", () => {
     expect(groups.find((g) => g.key === "payments")?.label).toBe("Payment Follow-Up");
   });
 
-  it("maps waiting, exceptions, and without-tech groups to focused queue routes", () => {
+  it("maps waiting, exceptions, and without-tech groups to the main Ops board", () => {
     const groups = buildFollowUpGroups({
       role: "admin",
       followUps: [
@@ -505,9 +505,9 @@ describe("buildFollowUpGroups", () => {
       canViewBusinessPulse: false,
     });
 
-    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops/queues/without-tech");
-    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops/queues/waiting");
-    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops/queues/exceptions");
+    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops");
+    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops");
+    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops");
   });
 
   it("labels service plan group as follow-up", () => {
@@ -523,7 +523,7 @@ describe("buildFollowUpGroups", () => {
     expect(groups.find((g) => g.key === "service_plans")?.label).toBe("Service Plan Follow-Up");
   });
 
-  it("maps waiting, exceptions, and without-tech groups to focused queue routes", () => {
+  it("keeps repeated waiting, exceptions, and without-tech groups on the main Ops board", () => {
     const groups = buildFollowUpGroups({
       role: "admin",
       followUps: [
@@ -547,9 +547,9 @@ describe("buildFollowUpGroups", () => {
       canViewBusinessPulse: false,
     });
 
-    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops/queues/without-tech");
-    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops/queues/waiting");
-    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops/queues/exceptions");
+    expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops");
+    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops");
+    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops");
   });
 
   it("labels service plan group as follow-up", () => {

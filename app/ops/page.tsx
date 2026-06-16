@@ -679,19 +679,19 @@ function subtractBusinessDays(date: Date, days: number) {
         key: "without_tech",
         label: "Without Tech",
         count: scheduledWithoutTechSnapshot.count,
-        href: `/ops/queues/without-tech${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+        href: `/ops${buildQueryString({ bucket: "without_tech", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
       },
       {
         key: "waiting",
         label: "Waiting / Pending Info",
         count: waitingCount,
-        href: `/ops/queues/waiting${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+        href: `/ops${buildQueryString({ bucket: "waiting", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
       },
       {
         key: "exceptions",
         label: "Exceptions",
         count: exceptionCount,
-        href: `/ops/queues/exceptions${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+        href: `/ops${buildQueryString({ bucket: "exceptions", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
       },
       {
         key: "closeout",
@@ -863,7 +863,7 @@ function subtractBusinessDays(date: Date, days: number) {
     primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
 
     const operationalTenantIdentity = await operationalTenantIdentityPromise;
-    const focusedQueueHref = `/ops${buildQueryString({
+    const activeWorkspaceHref = `/ops${buildQueryString({
       bucket,
       contractor: contractorScopeFilter ?? "",
       q: q ?? "",
@@ -897,8 +897,8 @@ function subtractBusinessDays(date: Date, days: number) {
               <Link href="/today" className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
                 Go to Today
               </Link>
-              <Link href={focusedQueueHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
-                Open focused queue
+              <Link href={activeWorkspaceHref} className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-1 sm:text-[11px]">
+                View on board
               </Link>
             </div>
           </div>
@@ -949,7 +949,7 @@ function subtractBusinessDays(date: Date, days: number) {
                 <div className="text-xs text-slate-600">{selectedWorkspaceTab.count} jobs</div>
               </div>
               <Link href={selectedWorkspaceTab.href} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:py-0.5 sm:text-[11px]">
-                Open focused queue
+                View on board
               </Link>
             </div>
 
@@ -3335,21 +3335,21 @@ const workspaceQueues: Array<{
     key: "without_tech",
     label: "Without Tech",
     count: scheduledWithoutTechSnapshot.count,
-    fullHref: `/ops/queues/without-tech${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    fullHref: `/ops${buildQueryString({ bucket: "without_tech", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
     previewJobs: withoutTechPreviewJobs,
   },
   {
     key: "waiting",
     label: "Waiting / Pending Info",
     count: waitingPendingInfoCount,
-    fullHref: `/ops/queues/waiting${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    fullHref: `/ops${buildQueryString({ bucket: "waiting", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
     previewJobs: waitingPreviewJobs,
   },
   {
     key: "exceptions",
     label: "Exceptions",
     count: exceptionCount,
-    fullHref: `/ops/queues/exceptions${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
+    fullHref: `/ops${buildQueryString({ bucket: "exceptions", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
     previewJobs: sortedExceptionJobs,
   },
   {
@@ -3458,7 +3458,7 @@ if (panel !== "full_board") {
               Go to Today
             </Link>
             <Link href={selectedWorkspaceQueue.fullHref} className={sectionActionLinkClass}>
-              Open focused queue
+              View active queue
             </Link>
           </div>
         </div>
@@ -3599,7 +3599,7 @@ if (panel !== "full_board") {
               <div className="text-xs text-slate-600">{selectedWorkspaceQueue.count} jobs</div>
             </div>
             <Link href={selectedWorkspaceQueue.fullHref} className={inlineSectionLinkClass}>
-              Open focused queue
+              View on board
             </Link>
           </div>
 
@@ -3680,7 +3680,7 @@ if (panel !== "full_board") {
                 <div className="text-[15px] font-semibold tracking-tight text-slate-950">Team coverage and workload</div>
               </div>
               <Link
-                href={`/ops/queues/without-tech${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`}
+                href={`/ops${buildQueryString({ bucket: "without_tech", contractor: contractorScopeFilter ?? "" })}#ops-workspace`}
                 className={inlineSectionLinkClass}
               >
                 Without tech: {scheduledWithoutTechSnapshot.count}

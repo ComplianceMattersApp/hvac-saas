@@ -1103,7 +1103,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
         productMode === "ecc_hers"
           ? "Compliance exceptions are blocking clean throughput."
           : "Failed or escalated jobs are blocking throughput.",
-      primaryHref: "/ops/queues/exceptions",
+      primaryHref: "/ops",
       primaryLabel: "Review Exceptions",
       focusKey: "exceptions",
     };
@@ -1114,7 +1114,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       kind: "dispatcher_schedule",
       headline: `${priorityCounts.scheduledTodayWithoutTech} scheduled ${priorityCounts.scheduledTodayWithoutTech === 1 ? "visit is" : "visits are"} unassigned`,
       detail: "Dispatch coverage is missing for work already on today’s board.",
-      primaryHref: "/ops/queues/without-tech",
+      primaryHref: "/ops",
       primaryLabel: "Assign Technicians",
       focusKey: "without_tech",
     };
@@ -1147,7 +1147,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       kind: "follow_up",
       headline: `${waitingCount} waiting item${waitingCount === 1 ? "" : "s"} need follow-up`,
       detail: "Pending info and on-hold work need office attention.",
-      primaryHref: "/ops/queues/waiting",
+      primaryHref: "/ops",
       primaryLabel: "Review Waiting Work",
       focusKey: "waiting",
     };
@@ -1326,7 +1326,7 @@ export function buildFollowUpGroups(params: {
       key: "without_tech",
       label: "Without Tech",
       count: withoutTechCount,
-      href: "/ops/queues/without-tech",
+      href: "/ops",
       preview: [],
       summary: `${withoutTechCount} scheduled ${withoutTechCount === 1 ? "job is" : "jobs are"} missing assignment.`,
     });
@@ -1361,7 +1361,7 @@ export function buildFollowUpGroups(params: {
       key: "waiting",
       label: "Waiting / Pending Info",
       count: waitingCount > 0 ? waitingCount : waitingItems.length,
-      href: "/ops/queues/waiting",
+      href: "/ops",
       preview: waitingItems.slice(0, 3),
       summary: null,
     });
@@ -1373,7 +1373,7 @@ export function buildFollowUpGroups(params: {
       key: "exceptions",
       label: "Exceptions",
       count: exceptionCount > 0 ? exceptionCount : exceptionItems.length,
-      href: "/ops/queues/exceptions",
+      href: "/ops",
       preview: exceptionItems.slice(0, 3),
       summary: null,
     });
@@ -1447,7 +1447,7 @@ export function buildPriorityChips(params: {
       key: "without_tech",
       label: "Without Tech",
       count: params.priorityCounts.scheduledTodayWithoutTech ?? 0,
-      href: "/ops/queues/without-tech",
+      href: "/ops",
       tone: "warn",
       urgent: true,
     });
@@ -1458,7 +1458,7 @@ export function buildPriorityChips(params: {
       key: "exceptions",
       label: "Needs Attention",
       count: params.priorityCounts.failed ?? 0,
-      href: "/ops/queues/exceptions",
+      href: "/ops",
       tone: "danger",
       urgent: true,
     });
@@ -1469,7 +1469,7 @@ export function buildPriorityChips(params: {
       key: "waiting",
       label: "Waiting on Info",
       count: params.priorityCounts.pendingInfo ?? 0,
-      href: "/ops/queues/waiting",
+      href: "/ops",
       tone: "neutral",
       urgent: false,
     });
@@ -1480,7 +1480,7 @@ export function buildPriorityChips(params: {
       key: "on_hold",
       label: "On Hold",
       count: params.priorityCounts.onHold ?? 0,
-      href: "/ops/queues/waiting",
+      href: "/ops",
       tone: "neutral",
       urgent: false,
     });
@@ -1612,7 +1612,7 @@ function buildRoleAwarePulse(params: {
       label: "WAITING / PENDING",
       value: waitingCount,
       valueDetail: null,
-      href: "/ops/queues/waiting",
+      href: "/ops",
       context: "Office follow-up",
       tone: waitingCount > 0 ? "warn" : "neutral",
     });
@@ -1630,7 +1630,7 @@ function buildRoleAwarePulse(params: {
       label: "WITHOUT TECH",
       value: params.priorityCounts.scheduledTodayWithoutTech ?? 0,
       valueDetail: null,
-      href: "/ops/queues/without-tech",
+      href: "/ops",
       context: "Dispatch coverage",
       tone: (params.priorityCounts.scheduledTodayWithoutTech ?? 0) > 0 ? "warn" : "neutral",
     });

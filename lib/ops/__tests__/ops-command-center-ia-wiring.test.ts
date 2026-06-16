@@ -7,6 +7,21 @@ const opsPageSource = readFileSync(
   "utf-8",
 );
 
+const waitingQueuePageSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/queues/waiting/page.tsx"),
+  "utf-8",
+);
+
+const exceptionsQueuePageSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/queues/exceptions/page.tsx"),
+  "utf-8",
+);
+
+const withoutTechQueuePageSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/queues/without-tech/page.tsx"),
+  "utf-8",
+);
+
 function assertFound(label: string, index: number) {
   expect(index, `${label} marker should exist in the Full Ops branch`).toBeGreaterThan(-1);
 }
@@ -18,7 +33,7 @@ describe("/ops Full Ops command center IA wiring", () => {
 
     const heroSource = opsPageSource.slice(heroStart, heroStart + 1200);
     expect(heroSource).toContain("Start with the queue that needs attention now.");
-    expect(heroSource).toContain("focusedQueueHref");
+    expect(heroSource).toContain("activeWorkspaceHref");
     expect(heroSource).not.toContain("Full operations board");
   });
 
@@ -32,9 +47,27 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('href={`/ops${buildQueryString({');
   });
 
-  it("keeps the focused queue preview compact and reachable", () => {
+  it("keeps the board queue preview compact with job actions still reachable", () => {
     expect(opsPageSource).toContain("Active Queue");
-    expect(opsPageSource).toContain("Open focused queue");
+    expect(opsPageSource).toContain("View on board");
     expect(opsPageSource).toContain("Open Job");
+  });
+
+  it("removes visible focused queue route entry points from the main Ops surface", () => {
+    expect(opsPageSource).not.toContain("/ops/queues/waiting");
+    expect(opsPageSource).not.toContain("/ops/queues/exceptions");
+    expect(opsPageSource).not.toContain("/ops/queues/without-tech");
+    expect(opsPageSource).not.toContain("Open focused queue");
+    expect(opsPageSource).toContain('href={`/ops${buildQueryString({');
+    expect(opsPageSource).toContain('bucket: queue.key');
+  });
+
+  it("leaves direct focused queue route files renderable with return navigation", () => {
+    expect(waitingQueuePageSource).toContain("No waiting work right now.");
+    expect(waitingQueuePageSource).toContain('href="/ops"');
+    expect(exceptionsQueuePageSource).toContain("No exceptions are waiting right now.");
+    expect(exceptionsQueuePageSource).toContain('href="/ops"');
+    expect(withoutTechQueuePageSource).toContain("No coverage gaps right now.");
+    expect(withoutTechQueuePageSource).toContain('href="/ops"');
   });
 });
