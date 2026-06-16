@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import type { DispatchCalendarBlockEvent, DispatchJob, DispatchViewMode } from "@/lib/actions/calendar";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatCalendarDisplayStatus, getCalendarDisplayStatus } from "./calendar-status";
@@ -600,40 +600,8 @@ export default function CalendarDispatchGrid(props: Props) {
               const workContextLabel = String(job.work_context_label ?? "").trim();
               const statusBadgeLabel = lifecycle === "cancelled" || lifecycle === "on_my_way" || lifecycle === "in_progress" ? formatCalendarDisplayStatus(lifecycle) : null;
               const statusBadgeClass = lifecycle === "cancelled" ? "border-slate-300 bg-slate-200 text-slate-600" : lifecycle === "on_my_way" ? "border-blue-300 bg-blue-100 text-blue-950" : "border-indigo-300 bg-indigo-100 text-indigo-900";
-
-              return (
-                <Link
-                  key={`job-${row.id}`}
-                  href={buildCalendarHref(currentView, date, { job: job.id, tech })}
-                  draggable={lifecycle !== "cancelled"}
-                  onDragStart={(event) => {
-                    if (lifecycle === "cancelled") {
-                      event.preventDefault();
-                      return;
-                    }
-                    const payload = buildDragPayload({
-                      jobId: job.id,
-                      windowStart: job.window_start,
-                      windowEnd: job.window_end,
-                      title: shortTitle(job),
-                      city: job.city,
-                      assigneeSummary,
-                      hasNoTechAssigned: !job.assignments || job.assignments.length === 0,
-                    });
-                    event.dataTransfer.setData("application/x-cm-job", serializeDragPayload(payload));
-                    event.dataTransfer.setData("application/x-cm-job-id", payload.jobId);
-                    event.dataTransfer.effectAllowed = "move";
-                  }}
-                  scroll={false}
-                  className={`absolute left-1 right-1 rounded-lg border py-1 pr-2 pl-5 shadow-sm shadow-slate-950/5 transition hover:cursor-pointer hover:-translate-y-px hover:shadow-md hover:brightness-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${dispatchBlockClass(lifecycle)} ${lifecycle === "cancelled" ? "cursor-default opacity-70" : "cursor-grab active:cursor-grabbing"} ${isSelected ? "ring-2 ring-slate-800/45 border-slate-700 shadow-md" : ""}`}
-                  style={{
-                    top: `${top}px`,
-                    height: `${height}px`,
-                    left: `calc(${laneLeftPct}% + ${laneGapPx}px)`,
-                    width: `calc(${laneWidthPct}% - ${laneGapPx * 2}px)`,
-                    right: "auto",
-                  }}
-                >
+              const jobCardBody = (
+                <>
                   <div className="absolute inset-y-1 left-1 flex items-start gap-0.5">
                     {colorBars.map((assignment) => (
                       <span key={`${job.id}-${assignment.user_id}-bar`} className={`inline-block rounded-sm ${colorClassForUserId(assignment.user_id)} ${isSelected ? "w-1.5" : "w-1"} h-full`} title={assignment.display_name} />
@@ -650,7 +618,54 @@ export default function CalendarDispatchGrid(props: Props) {
                     <p className="truncate rounded-full bg-white/55 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-700/90">{blockTimeLabel(row.start, row.end)}</p>
                     {initials ? <p className="truncate text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-700/70">{initials}</p> : null}
                   </div>
-                </Link>
+                </>
+              );
+              const jobCardClass = `absolute left-1 right-1 rounded-lg border py-1 pr-2 pl-5 shadow-sm shadow-slate-950/5 transition hover:cursor-pointer hover:-translate-y-px hover:shadow-md hover:brightness-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${dispatchBlockClass(lifecycle)} ${lifecycle === "cancelled" ? "cursor-default opacity-70" : "cursor-grab active:cursor-grabbing"} ${isSelected ? "ring-2 ring-slate-800/45 border-slate-700 shadow-md" : ""}`;
+              const jobCardStyle = {
+                top: `${top}px`,
+                height: `${height}px`,
+                left: `calc(${laneLeftPct}% + ${laneGapPx}px)`,
+                width: `calc(${laneWidthPct}% - ${laneGapPx * 2}px)`,
+                right: "auto",
+              };
+
+              return (
+                <Fragment key={`job-${row.id}`}>
+                  <Link
+                    href={`/jobs/${job.id}`}
+                    className={`${jobCardClass} xl:hidden`}
+                    style={jobCardStyle}
+                  >
+                    {jobCardBody}
+                  </Link>
+                  <Link
+                    href={buildCalendarHref(currentView, date, { job: job.id, tech })}
+                    draggable={lifecycle !== "cancelled"}
+                    onDragStart={(event) => {
+                      if (lifecycle === "cancelled") {
+                        event.preventDefault();
+                        return;
+                      }
+                      const payload = buildDragPayload({
+                        jobId: job.id,
+                        windowStart: job.window_start,
+                        windowEnd: job.window_end,
+                        title: shortTitle(job),
+                        city: job.city,
+                        assigneeSummary,
+                        hasNoTechAssigned: !job.assignments || job.assignments.length === 0,
+                      });
+                      event.dataTransfer.setData("application/x-cm-job", serializeDragPayload(payload));
+                      event.dataTransfer.setData("application/x-cm-job-id", payload.jobId);
+                      event.dataTransfer.effectAllowed = "move";
+                    }}
+                    scroll={false}
+                    className={`${jobCardClass} hidden xl:block`}
+                    style={jobCardStyle}
+                  >
+                    {jobCardBody}
+                  </Link>
+                </Fragment>
               );
             })}
 

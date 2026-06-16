@@ -6,6 +6,7 @@ import { buildDragPayload, serializeDragPayload } from "./calendar-dnd";
 
 type Props = {
   href: string;
+  mobileHref?: string;
   title?: string;
   className: string;
   jobId: string;
@@ -23,6 +24,7 @@ type Props = {
 export default function CalendarDragJobLink(props: Props) {
   const {
     href,
+    mobileHref,
     title,
     className,
     jobId,
@@ -37,13 +39,29 @@ export default function CalendarDragJobLink(props: Props) {
     children,
   } = props;
 
+  const linkBody = (
+    <>
+      {children}
+    </>
+  );
+
   return (
+    <>
+      {mobileHref ? (
+        <Link
+          href={mobileHref}
+          title={title}
+          className={`${className} xl:hidden`}
+        >
+          {linkBody}
+        </Link>
+      ) : null}
     <Link
       href={href}
       title={title}
       draggable={draggable}
       scroll={scroll}
-      className={className}
+      className={mobileHref ? `${className} hidden xl:block` : className}
       onDragStart={(event) => {
         if (!draggable) {
           event.preventDefault();
@@ -67,7 +85,8 @@ export default function CalendarDragJobLink(props: Props) {
         event.dataTransfer.effectAllowed = "move";
       }}
     >
-      {children}
+      {linkBody}
     </Link>
+    </>
   );
 }

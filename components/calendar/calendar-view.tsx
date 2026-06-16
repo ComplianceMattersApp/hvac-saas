@@ -8,6 +8,7 @@ import CalendarDispatchGrid from './CalendarDispatchGrid';
 import CalendarDragJobLink from './CalendarDragJobLink';
 import CalendarOpenJobButton from './CalendarOpenJobButton';
 import CalendarMobileListAnchor from './CalendarMobileListAnchor';
+import CalendarResponsiveJobLink from './CalendarResponsiveJobLink';
 import { CALENDAR_STATUS_LEGEND, calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
 import {
   CALENDAR_TECH_FILTER_UNASSIGNED,
@@ -453,9 +454,10 @@ function AgendaList(props: {
               const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
 
               return (
-                <Link
+                <CalendarResponsiveJobLink
                   key={job.id}
-                  href={buildCalendarHref('list', date, { job: job.id, tech })}
+                  mobileHref={`/jobs/${job.id}`}
+                  desktopHref={buildCalendarHref('list', date, { job: job.id, tech })}
                   title={calendarJobTooltip(job)}
                   scroll={false}
                   className={`block rounded-xl border border-l-4 ${agendaJobLeftRailClass(lifecycle)} border-slate-200/80 bg-white px-3.5 py-3 shadow-[0_8px_22px_-18px_rgba(15,31,53,0.3)] transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${faded}`}
@@ -482,7 +484,7 @@ function AgendaList(props: {
                       <div className="mt-1 truncate text-[11px] text-slate-500">{job.job_address || customerName(job) || job.job_type || normalizeRetestLinkedJobTitle(job.title)}</div>
                     </div>
                   </div>
-                </Link>
+                </CalendarResponsiveJobLink>
               );
             })}
 
@@ -969,6 +971,7 @@ async function CalendarQueueSidebar(props: {
                 <CalendarDragJobLink
                   key={`hidden-scheduled-${job.id}`}
                   href={buildCalendarHref(props.uiView, job.scheduled_date ?? props.anchorDate, { job: job.id, tech: props.activeTech })}
+                  mobileHref={`/jobs/${job.id}`}
                   title={calendarJobTooltip(job)}
                   draggable={!isCancelledJob}
                   jobId={job.id}
@@ -1022,6 +1025,7 @@ async function CalendarQueueSidebar(props: {
                 <CalendarDragJobLink
                   key={`unassigned-${job.id}`}
                   href={buildCalendarHref(props.uiView, props.anchorDate, { job: job.id, tech: props.activeTech })}
+                  mobileHref={`/jobs/${job.id}`}
                   title={calendarJobTooltip(job)}
                   draggable
                   jobId={job.id}
@@ -1719,6 +1723,7 @@ export async function CalendarView(props: Props) {
                     <CalendarDragJobLink
                       key={`hidden-scheduled-${job.id}`}
                       href={buildCalendarHref(uiView, job.scheduled_date ?? data.anchorDate, { job: job.id, tech: activeTech })}
+                      mobileHref={`/jobs/${job.id}`}
                       title={calendarJobTooltip(job)}
                       draggable={!isCancelledJob}
                       jobId={job.id}

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, isSameMonth, isToday, parseISO, startOfWeek } from 'date-fns';
 import type { DispatchCalendarBlockEvent, DispatchJob } from '@/lib/actions/calendar';
 import Link from 'next/link';
+import CalendarDragJobLink from './CalendarDragJobLink';
 import { normalizeRetestLinkedJobTitle } from '@/lib/utils/job-title-display';
 import { displayWindowLA } from '@/lib/utils/schedule-la';
 import { calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
@@ -206,17 +207,17 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
 
                   return (
                     <div key={job.id} className="group relative overflow-visible">
-                      <Link
+                      <CalendarDragJobLink
                         href={buildCalendarHref('month', ymd, { job: job.id, tech })}
+                        mobileHref={`/jobs/${job.id}`}
                         draggable={!isCancelledJob}
-                        onDragStart={(event) => {
-                          if (isCancelledJob) {
-                            event.preventDefault();
-                            return;
-                          }
-                          event.dataTransfer.setData('application/x-cm-job-id', job.id);
-                          event.dataTransfer.effectAllowed = 'move';
-                        }}
+                        jobId={job.id}
+                        windowStart={job.window_start}
+                        windowEnd={job.window_end}
+                        jobTitle={shortTitle(job)}
+                        jobCity={job.city}
+                        assigneeSummary={Array.isArray(job.assignments) ? job.assignments.map((a) => a.display_name).filter(Boolean).join(', ') : null}
+                        hasNoTechAssigned={!job.assignments || job.assignments.length === 0}
                         className={`flex min-h-[36px] min-w-0 items-start gap-2 overflow-hidden rounded-xl border border-slate-200/80 bg-white px-2.5 py-1.5 text-xs shadow-[0_4px_12px_-8px_rgba(15,31,53,0.25)] transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
                         scroll={false}
                       >
@@ -236,7 +237,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                             No tech assigned
                           </span>
                         ) : null}
-                      </Link>
+                      </CalendarDragJobLink>
 
                       <div className={`pointer-events-none absolute z-30 w-72 max-w-[min(18rem,calc(100vw-1.5rem))] rounded-xl border border-slate-200 bg-white p-3 text-xs text-slate-900 opacity-0 shadow-xl shadow-slate-950/10 invisible translate-y-1 transition duration-150 ease-out group-hover:visible group-hover:translate-y-0 group-hover:opacity-100 group-focus-within:visible group-focus-within:translate-y-0 group-focus-within:opacity-100 ${tooltipHorizontalClass} ${tooltipVerticalClass}`}>
                         <div className="mb-1 font-semibold">{normalizeRetestLinkedJobTitle(job.title) || shortTitle(job)}</div>

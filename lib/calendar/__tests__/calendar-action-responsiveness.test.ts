@@ -12,6 +12,21 @@ const openJobButtonSource = readFileSync(
   "utf-8",
 );
 
+const dispatchGridSource = readFileSync(
+  resolve(__dirname, "../../../components/calendar/CalendarDispatchGrid.tsx"),
+  "utf-8",
+);
+
+const dragJobLinkSource = readFileSync(
+  resolve(__dirname, "../../../components/calendar/CalendarDragJobLink.tsx"),
+  "utf-8",
+);
+
+const responsiveJobLinkSource = readFileSync(
+  resolve(__dirname, "../../../components/calendar/CalendarResponsiveJobLink.tsx"),
+  "utf-8",
+);
+
 describe("calendar action responsiveness", () => {
   it("uses a dedicated client open-job button in calendar inspector", () => {
     expect(calendarViewSource).toContain("CalendarOpenJobButton");
@@ -26,6 +41,29 @@ describe("calendar action responsiveness", () => {
   it("open-job button renders pending feedback label", () => {
     expect(openJobButtonSource).toContain('loadingLabel = "Opening..."');
     expect(openJobButtonSource).toContain("isPending ? loadingLabel : children");
+  });
+
+  it("keeps desktop calendar job clicks wired to the inspector command center", () => {
+    expect(calendarViewSource).toContain("buildCalendarHref('list', date, { job: job.id, tech })");
+    expect(dispatchGridSource).toContain("buildCalendarHref(currentView, date, { job: job.id, tech })");
+    expect(calendarViewSource).toContain("const showDesktopInspectorColumn = inspectorOpen");
+  });
+
+  it("renders mobile calendar jobs as direct job-detail links", () => {
+    expect(calendarViewSource).toContain("CalendarResponsiveJobLink");
+    expect(calendarViewSource).toContain('mobileHref={`/jobs/${job.id}`}');
+    expect(dispatchGridSource).toContain('href={`/jobs/${job.id}`}');
+    expect(responsiveJobLinkSource).toContain("xl:hidden");
+    expect(responsiveJobLinkSource).toContain("hidden xl:block");
+  });
+
+  it("mobile job links do not open the calendar inspector first", () => {
+    expect(responsiveJobLinkSource).toContain("mobileHref");
+    expect(responsiveJobLinkSource).toContain("desktopHref");
+    expect(responsiveJobLinkSource).not.toContain("inspector");
+    expect(dragJobLinkSource).toContain("mobileHref");
+    expect(dragJobLinkSource).toContain("xl:hidden");
+    expect(dragJobLinkSource).toContain("hidden xl:block");
   });
 
   it("calendar schedule actions remain wired to updateJobScheduleFromForm", () => {
