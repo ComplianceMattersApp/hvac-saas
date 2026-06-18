@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DualContextAccess } from "@/lib/auth/dual-context-access";
 import { landingPathForDualContextAccess } from "@/lib/auth/dual-context-access";
+import { portalAccessFallbackPathForAccess } from "@/lib/auth/portal-route-guard";
 
 function resolveOpsGuardRedirect(access: DualContextAccess, hasUser = true) {
   if (!hasUser) return "/login";
@@ -28,6 +29,28 @@ function portalAccess(): DualContextAccess {
   };
 }
 
+function activeInternalAccess(): DualContextAccess {
+  return {
+    user: { id: "user-1" },
+    hasInternalMembership: true,
+    hasActiveAppAccess: true,
+    hasExpiredOrInactiveAppAccess: false,
+    hasPortalAccess: false,
+    isDualContextUser: false,
+    availableContexts: ["app"],
+    preferredLandingContext: "app",
+    internalUser: {
+      userId: "user-1",
+      role: "admin",
+      isActive: true,
+      accountOwnerUserId: "owner-1",
+      createdBy: null,
+    },
+    portal: null,
+    appAccessBlockedReason: null,
+  };
+}
+
 describe("portal / ops redirect loop prevention", () => {
   it("sends portal-only /ops visits to /portal as a terminal portal state", () => {
     expect(resolveOpsGuardRedirect(portalAccess())).toBe("/portal");
@@ -40,5 +63,13 @@ describe("portal / ops redirect loop prevention", () => {
 
     expect(firstHop).toBe("/portal");
     expect(secondHop).not.toBe("/ops");
+  });
+
+  it("allows paid/internal users through the /ops guard", () => {
+    expect(resolveOpsGuardRedirect(activeInternalAccess())).toBeNull();
+  });
+
+  it("does not create /portal -> /today -> /portal for portal access", () => {
+    expect(portalAccessFallbackPathForAccess(portalAccess())).toBe("/portal");
   });
 });

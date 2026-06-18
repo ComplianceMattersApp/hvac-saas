@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { AppAccessCtaCard } from "@/components/AppAccessCtaCard";
 import { createClient } from "@/lib/supabase/server";
 import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
+import { portalAccessFallbackPathForAccess } from "@/lib/auth/portal-route-guard";
 import {
   loadAppAccessCtaEntitlementSnapshot,
   resolveAppAccessCta,
@@ -106,7 +107,7 @@ export default async function PortalPage({
         redirect("/login");
       }
       if (code === "NOT_CONTRACTOR") {
-        redirect("/ops");
+        redirect(portalAccessFallbackPathForAccess(access));
       }
       if (code === "CONTRACTOR_ARCHIVED") {
         redirect("/login?err=contractor_archived");

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { revalidatePath } from "next/cache";
 import { notFound, redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
+import { portalAccessFallbackPathForAccess } from "@/lib/auth/portal-route-guard";
 import {
   appendContractorIntakeProposalPortalComment,
   getContractorIntakeProposalPortalDetail,
@@ -48,6 +50,10 @@ export default async function PortalIntakeSubmissionDetailPage({
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
+  const access = await resolveDualContextAccess({
+    supabase,
+    user: userData.user,
+  });
 
   const portalContext = await (async () => {
     try {
@@ -58,7 +64,7 @@ export default async function PortalIntakeSubmissionDetailPage({
         redirect("/login");
       }
       if (code === "NOT_CONTRACTOR") {
-        redirect("/ops");
+        redirect(portalAccessFallbackPathForAccess(access));
       }
       if (code === "CONTRACTOR_ARCHIVED") {
         redirect("/login?err=contractor_archived");
@@ -129,7 +135,8 @@ export default async function PortalIntakeSubmissionDetailPage({
         redirect("/login");
       }
       if (error instanceof Error && error.message === "NOT_CONTRACTOR") {
-        redirect("/ops");
+        const actionAccess = await resolveDualContextAccess({ supabase });
+        redirect(portalAccessFallbackPathForAccess(actionAccess));
       }
       throw error;
     }
