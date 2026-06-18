@@ -133,7 +133,7 @@ function parseKind(value: string): PricebookImportItemType | null {
   if (normalized === "service") return "service";
   if (normalized === "labor") return "service";
   if (normalized === "material") return "material";
-  if (normalized === "fee") return "service";
+  if (normalized === "fee") return "adjustment";
   return null;
 }
 

@@ -607,6 +607,12 @@ export async function submitSelfServeOnboardingForm(
         productMode: selectedProductMode,
         status: provisioning.status,
         errorCodes: provisioning.errors.map((error) => error.code),
+        errors: provisioning.errors.map((error) => ({
+          code: error.code,
+          stage: error.stage,
+          message: error.message,
+        })),
+        productModeCapture: provisioning.productModeCapture,
       });
 
       if (selectedProductMode) {

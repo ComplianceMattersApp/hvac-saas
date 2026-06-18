@@ -62,7 +62,7 @@ describe("pricebook CSV import", () => {
       expect.objectContaining({ item_type: "service", unit_label: "job", is_active: true }),
       expect.objectContaining({ item_type: "service", unit_label: "hr", is_active: true }),
       expect.objectContaining({ item_type: "material", unit_label: "each", is_active: true }),
-      expect.objectContaining({ item_type: "service", unit_label: "each", is_active: false }),
+      expect.objectContaining({ item_type: "adjustment", unit_label: "each", is_active: false }),
       expect.objectContaining({ item_type: "service", unit_label: "flat", is_active: false }),
     ]);
   });

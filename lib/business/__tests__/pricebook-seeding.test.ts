@@ -1625,6 +1625,32 @@ describe('PricebookSeeding', () => {
       });
     });
 
+    it('uses only supported internal item_type values for Cleaning seeds', () => {
+      const supportedItemTypes = new Set(['service', 'material', 'diagnostic', 'adjustment']);
+      const byName = new Map(STARTER_KIT_CLEANING_SEEDS.map((seed) => [seed.item_name, seed]));
+
+      STARTER_KIT_CLEANING_SEEDS.forEach((seed) => {
+        expect(supportedItemTypes.has(seed.item_type)).toBe(true);
+      });
+
+      expect(byName.get('Extra Labor Hour')).toEqual(
+        expect.objectContaining({
+          item_type: 'service',
+          category: 'Labor',
+          unit_label: 'hr',
+        }),
+      );
+      expect(byName.get('Supplies / Consumables')).toEqual(
+        expect.objectContaining({ item_type: 'material' }),
+      );
+      expect(byName.get('Heavy Soil / Excessive Buildup Fee')).toEqual(
+        expect.objectContaining({ item_type: 'adjustment', is_active: false }),
+      );
+      expect(byName.get('After-Hours Service')).toEqual(
+        expect.objectContaining({ item_type: 'adjustment', is_active: false }),
+      );
+    });
+
     it('avoids HVAC/ECC starter names and schema-backed checklist claims', () => {
       const combinedCopy = STARTER_KIT_CLEANING_SEEDS
         .flatMap((seed) => [seed.item_name, seed.default_description ?? ''])
@@ -1659,6 +1685,42 @@ describe('PricebookSeeding', () => {
       expect(result.inserted_count).toBe(0);
       expect(result.skipped_count).toBe(STARTER_KIT_CLEANING_SEEDS.length);
       expect(insertSeedRowsMock).not.toHaveBeenCalled();
+    });
+
+    it('inserts Cleaning rows using supported internal item_type values', async () => {
+      const insertSeedRowsMock = vi.fn().mockResolvedValue({ error: null });
+      const mockStore: PricebookSeedingStore = {
+        listExistingSeedRows: vi.fn().mockResolvedValue({
+          data: [],
+          error: null,
+        }),
+        insertSeedRows: insertSeedRowsMock,
+      };
+
+      const result = await applyPricebookSeeding(
+        mockStore,
+        'cleaning-owner-id',
+        STARTER_KIT_CLEANING_SEEDS,
+      );
+
+      const insertRows = insertSeedRowsMock.mock.calls[0]?.[0] ?? [];
+      const supportedItemTypes = new Set(['service', 'material', 'diagnostic', 'adjustment']);
+
+      expect(result.inserted_count).toBe(STARTER_KIT_CLEANING_SEEDS.length);
+      expect(
+        insertRows.every((row: { item_type: string }) => supportedItemTypes.has(row.item_type)),
+      ).toBe(true);
+      expect(insertRows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ item_name: 'Extra Labor Hour', item_type: 'service' }),
+          expect.objectContaining({ item_name: 'Supplies / Consumables', item_type: 'material' }),
+          expect.objectContaining({
+            item_name: 'Heavy Soil / Excessive Buildup Fee',
+            item_type: 'adjustment',
+          }),
+          expect.objectContaining({ item_name: 'After-Hours Service', item_type: 'adjustment' }),
+        ]),
+      );
     });
   });
 

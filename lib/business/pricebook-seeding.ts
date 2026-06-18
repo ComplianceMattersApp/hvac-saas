@@ -952,6 +952,7 @@ export const STARTER_KIT_CLEANING_SEEDS: PricebookStarterSeedDefinition[] = [
   createCleaningStarterSeed({
     seed_key: 'starter_cleaning_v1.optional.heavy_soil_excessive_buildup_fee',
     item_name: 'Heavy Soil / Excessive Buildup Fee',
+    item_type: 'adjustment',
     category: 'Fees',
     default_description: 'Optional fee for unusually heavy soil conditions; review before use.',
     is_active: false,
@@ -959,6 +960,7 @@ export const STARTER_KIT_CLEANING_SEEDS: PricebookStarterSeedDefinition[] = [
   createCleaningStarterSeed({
     seed_key: 'starter_cleaning_v1.optional.after_hours_service',
     item_name: 'After-Hours Service',
+    item_type: 'adjustment',
     category: 'Fees',
     default_description: 'Optional after-hours service placeholder; review before billing.',
     is_active: false,

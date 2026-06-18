@@ -311,6 +311,7 @@ Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 - `/signup/cleaning` provisions `cleaning_services` and receives the Cleaning starter Pricebook kit (`cleaning_v1`) when no explicit operator starter-kit override is supplied.
 - Cleaning starter kit closeout: active defaults are General Cleaning, Deep Cleaning, Move-In / Move-Out Cleaning, Post-Construction Cleaning, Office / Commercial Cleaning, Restroom Detail / Sanitizing, Floor Cleaning, Window Cleaning, Trash / Debris Removal, Emergency / Same-Day Cleanup, Extra Labor Hour, and Supplies / Consumables.
 - Cleaning inactive/deferred add-ons are Carpet Spot Treatment, Carpet Cleaning, Floor Strip / Wax / Polish, Heavy Soil / Excessive Buildup Fee, After-Hours Service, and Biohazard / Hazardous Cleanup Review.
+- Cleaning fee-style starter add-ons use the existing supported internal Pricebook `adjustment` item type; `Extra Labor Hour` remains an internal `service` with Labor category/hour unit, and `Supplies / Consumables` remains internal `material`.
 - High Dusting, Wall Spot Cleaning, Interior Glass Cleaning, Refrigerator Interior Cleaning, Oven Interior Cleaning, and Cabinet Interior Cleaning are intentionally omitted from this lean starter kit and remain future detail/checklist/appliance-detail work.
 - Product-mode write/capture failure prevents product-specific signup from presenting a ready/success state.
 - No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, contractor authority, report dataset/calculation behavior, or Product Mode schema changed. First Owner Provisioning behavior changed only for omitted starter-kit selection, which is now product-mode-aware.
@@ -319,6 +320,7 @@ Pricebook CSV Import V1 closeout snapshot:
 
 - Admin Pricebook now includes `Import services and add-ons`.
 - The downloadable CSV template uses friendly headers: `Service Name,Category,Kind,Unit,Price,Active,Description`.
+- Friendly CSV `Kind` values map to existing internal Pricebook types: Service and Labor import as `service`, Material imports as `material`, and Fee imports as `adjustment`.
 - CSV import is shared across product modes and is not Cleaning-only.
 - Import preview groups rows as `Ready to add`, `Already exists`, and `Needs review`.
 - Confirm import inserts only valid new rows, re-checks duplicates by normalized Service Name, and skips existing items.

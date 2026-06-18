@@ -285,6 +285,19 @@ describe("submitSelfServeOnboardingForm", () => {
 
     expect(result.status).toBe("error");
     expect(result.message).toContain("product setup");
+    expect(deps.log).toHaveBeenCalledWith(
+      "self-serve onboarding provisioning failed",
+      expect.objectContaining({
+        errorCodes: ["ACCOUNT_SETTINGS_WRITE_FAILED"],
+        errors: [
+          {
+            code: "ACCOUNT_SETTINGS_WRITE_FAILED",
+            stage: "account_settings",
+            message: "Failed to write account_settings product mode.",
+          },
+        ],
+      }),
+    );
     expect(deps.invite).not.toHaveBeenCalled();
     expect(deps.notifyPlatformOwnerSignup).not.toHaveBeenCalled();
   });
