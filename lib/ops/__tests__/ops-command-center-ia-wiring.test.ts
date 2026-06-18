@@ -182,13 +182,15 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("uses the same reason helper for options, filtering, and visible row reason", () => {
-    expect(opsPageSource).toContain("getOpsBoardVisibleReasonLabel");
-    expect(opsPageSource).toContain("function workspaceVisibleReason(job: any, queueKey: string)");
-    expect(opsPageSource).toContain("return getOpsBoardVisibleReasonLabel(job, () => wsStatusReason(job, queueKey), { queueKey });");
+    expect(opsPageSource).toContain("getOpsBoardVisibleReason");
+    expect(opsPageSource).toContain("formatOpsBoardVisibleReasonText");
+    expect(opsPageSource).toContain("function workspaceVisibleReasonDisplay(job: any, queueKey: string): OpsBoardVisibleReason");
+    expect(opsPageSource).toContain("return getOpsBoardVisibleReason(workspaceReasonInput(job), () => wsStatusReason(job, queueKey), { queueKey });");
     expect(opsPageSource).toContain("function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey)");
-    expect(opsPageSource).toContain("return getOpsBoardVisibleReasonLabel(");
-    expect(opsPageSource).toContain("{workspaceVisibleReason(job, selectedWorkspaceSection.key)}");
-    expect(opsPageSource).toContain("{workspaceStatusReason(job, selectedWorkspaceQueue.key)}");
+    expect(opsPageSource).toContain("const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);");
+    expect(opsPageSource).toContain("const visibleReason = getOpsBoardVisibleReason(");
+    expect(opsPageSource).toContain("{visibleReason.label}");
+    expect(opsPageSource).toContain("{visibleReason.detail}");
   });
 
   it("loads the Closeout chip from status-shaped candidates plus the narrow permit exception", () => {

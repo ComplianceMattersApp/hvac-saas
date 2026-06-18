@@ -24,6 +24,7 @@ export type OpsBoardReasonKey =
   | "needs_invoice_and_certs";
 
 export type OpsBoardReasonOption = { key: OpsBoardReasonKey; label: string };
+export type OpsBoardVisibleReason = { label: string; detail: string | null; source: "mapped" | "fallback" };
 
 export const OPS_BOARD_REASON_OPTIONS: OpsBoardReasonOption[] = [
   { key: "needs_invoice_and_certs", label: "Needs invoice and certs" },
@@ -56,6 +57,7 @@ type OpsBoardReasonJob = {
   ops_status?: string | null;
   pending_info_reason?: string | null;
   on_hold_reason?: string | null;
+  ops_board_failure_detail?: string | null;
   permit_number?: string | null;
   field_complete?: boolean | null;
   invoice_complete?: boolean | null;
@@ -110,6 +112,86 @@ function closeoutReasonLabel(job: OpsBoardReasonJob, requireQueueEligibility = f
   return null;
 }
 
+function cleanVisibleReasonDetail(value: unknown): string {
+  const text = String(value ?? "").replace(/\s+/g, " ").trim();
+  if (!text) return "";
+
+  const normalized = text.toLowerCase();
+  if (/^[a-z_]+$/.test(normalized) && normalized.includes("_")) return "";
+  if (
+    [
+      "pending_info",
+      "on_hold",
+      "waiting",
+      "failed",
+      "retest_needed",
+      "pending_office_review",
+      "paperwork_required",
+      "invoice_required",
+      "need_to_schedule",
+      "scheduled",
+      "closed",
+    ].includes(normalized)
+  ) {
+    return "";
+  }
+
+  for (const prefix of [
+    "Materials Needed",
+    "Approval Needed",
+    "Other",
+    "Waiting on part",
+    "Waiting on parts",
+    "Waiting on customer approval",
+    "Waiting on approval",
+    "Waiting on information",
+    "Waiting on info",
+    "Waiting on access",
+  ]) {
+    const marker = `${prefix}:`;
+    if (normalized.startsWith(marker.toLowerCase())) {
+      return text.slice(marker.length).trim();
+    }
+  }
+
+  return text;
+}
+
+function normalizeVisibleText(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isDuplicateVisibleReasonDetail(label: string, detail: string): boolean {
+  const normalizedLabel = normalizeVisibleText(label);
+  const normalizedDetail = normalizeVisibleText(detail);
+  if (!normalizedLabel || !normalizedDetail) return false;
+  if (normalizedLabel === normalizedDetail) return true;
+  if (normalizedLabel.startsWith("needs ") && normalizedLabel.replace(/^needs /, "") === normalizedDetail) return true;
+  if (normalizedLabel.startsWith("waiting on ") && normalizedLabel.replace(/^waiting on /, "") === normalizedDetail) return true;
+  return false;
+}
+
+function visibleDetailFromJob(job: OpsBoardReasonJob, mappedReason: OpsBoardReasonOption | null, context: OpsBoardReasonContext): string | null {
+  if (!mappedReason) return null;
+  if (context.queueKey === "closeout" && mappedReason.key.startsWith("needs_")) return null;
+
+  const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+  const rawDetail =
+    mappedReason.key === "failed_ecc_test"
+      ? job.ops_board_failure_detail ?? job.pending_info_reason ?? job.on_hold_reason
+      : opsStatus === "on_hold"
+      ? job.on_hold_reason ?? job.pending_info_reason
+      : job.pending_info_reason ?? job.on_hold_reason;
+  const detail = cleanVisibleReasonDetail(rawDetail);
+  if (!detail || isDuplicateVisibleReasonDetail(mappedReason.label, detail)) return null;
+  return detail;
+}
+
 export function getOpsBoardReasonLabel(
   job: OpsBoardReasonJob,
   context: OpsBoardReasonContext = {},
@@ -154,9 +236,57 @@ export function getOpsBoardVisibleReasonLabel(
   fallback: OpsBoardVisibleReasonFallback,
   context: OpsBoardReasonContext = {},
 ): string {
+  return getOpsBoardVisibleReason(job, fallback, context).label;
+}
+
+export function getOpsBoardVisibleReason(
+  job: OpsBoardReasonJob,
+  fallback: OpsBoardVisibleReasonFallback,
+  context: OpsBoardReasonContext = {},
+): OpsBoardVisibleReason {
+  const mappedReason = getOpsBoardReasonLabel(job, context);
+  if (mappedReason) {
+    return {
+      label: mappedReason.label,
+      detail: visibleDetailFromJob(job, mappedReason, context),
+      source: "mapped",
+    };
+  }
+
+  const fallbackLabel = typeof fallback === "function" ? fallback() : fallback;
+  const fallbackParts = splitFallbackVisibleReason(fallbackLabel);
+  return {
+    label: fallbackParts.label,
+    detail: fallbackParts.detail,
+    source: "fallback",
+  };
+}
+
+function splitFallbackVisibleReason(value: string): { label: string; detail: string | null } {
+  const text = String(value ?? "").trim();
+  if (!text) return { label: "Operational Update", detail: null };
+  const separatorIndex = text.indexOf(":");
+  if (separatorIndex < 0) return { label: text, detail: null };
+
+  const label = text.slice(0, separatorIndex).trim() || "Operational Update";
+  const detail = cleanVisibleReasonDetail(text.slice(separatorIndex + 1));
+  return {
+    label,
+    detail: detail && !isDuplicateVisibleReasonDetail(label, detail) ? detail : null,
+  };
+}
+
+export function formatOpsBoardVisibleReasonText(reason: OpsBoardVisibleReason): string {
+  return reason.detail ? `${reason.label}: ${reason.detail}` : reason.label;
+}
+
+export function getOpsBoardVisibleReasonDetail(
+  job: OpsBoardReasonJob,
+  context: OpsBoardReasonContext = {},
+): string | null {
   const mappedLabel = getOpsBoardReasonLabel(job, context)?.label;
-  if (mappedLabel) return mappedLabel;
-  return typeof fallback === "function" ? fallback() : fallback;
+  if (!mappedLabel) return null;
+  return getOpsBoardVisibleReason(job, "", context).detail;
 }
 
 export function buildOpsBoardReasonOptions(

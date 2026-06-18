@@ -4,6 +4,8 @@ import {
   buildOpsBoardReasonOptions,
   filterOpsBoardRowsByReason,
   getOpsBoardReasonLabel,
+  getOpsBoardVisibleReason,
+  getOpsBoardVisibleReasonDetail,
   getOpsBoardVisibleReasonLabel,
   normalizeOpsBoardReason,
 } from "@/lib/ops/ops-board-reasons";
@@ -231,6 +233,93 @@ describe("Operations Board reason mapping", () => {
     ).toBe("Waiting on parts");
   });
 
+  it("adds captured pending-info detail to visible card reasons", () => {
+    expect(
+      getOpsBoardVisibleReason(
+        { ops_status: "pending_info", pending_info_reason: "Materials Needed: Need 45/5 capacitor" },
+        "Needs information",
+      ),
+    ).toEqual({
+      label: "Waiting on parts",
+      detail: "Need 45/5 capacitor",
+      source: "mapped",
+    });
+  });
+
+  it("adds captured on-hold detail to visible card reasons", () => {
+    expect(
+      getOpsBoardVisibleReason(
+        { ops_status: "on_hold", on_hold_reason: "Status interrupt state test" },
+        "Blocked",
+      ),
+    ).toEqual({
+      label: "On hold",
+      detail: "Status interrupt state test",
+      source: "mapped",
+    });
+  });
+
+  it("does not duplicate visible detail when it matches the mapped label", () => {
+    expect(
+      getOpsBoardVisibleReason(
+        { ops_status: "on_hold", on_hold_reason: "On hold" },
+        "Blocked",
+      ),
+    ).toEqual({
+      label: "On hold",
+      detail: null,
+      source: "mapped",
+    });
+  });
+
+  it("does not expose raw enum-style detail values", () => {
+    expect(
+      getOpsBoardVisibleReason(
+        { ops_status: "pending_info", pending_info_reason: "pending_info" },
+        "Needs information",
+      ),
+    ).toEqual({
+      label: "Needs information",
+      detail: null,
+      source: "mapped",
+    });
+  });
+
+  it("keeps failed ECC label while adding loaded failure detail", () => {
+    expect(
+      getOpsBoardVisibleReason(
+        { job_type: "ecc", ops_status: "failed", ops_board_failure_detail: "Duct Leakage failed" },
+        "Failed",
+      ),
+    ).toEqual({
+      label: "Failed ECC test",
+      detail: "Duct Leakage failed",
+      source: "mapped",
+    });
+  });
+
+  it("keeps waiting-parts label while adding captured detail", () => {
+    expect(
+      getOpsBoardVisibleReasonDetail({
+        ops_status: "pending_info",
+        pending_info_reason: "Waiting on part: Compressor lead time",
+      }),
+    ).toBe("Compressor lead time");
+  });
+
+  it("keeps permit-needed label while adding permit reason detail", () => {
+    expect(
+      getOpsBoardVisibleReason(
+        { ops_status: "problem", pending_info_reason: "Permit Needed" },
+        "Blocked",
+      ),
+    ).toEqual({
+      label: "Needs permit",
+      detail: "Permit Needed",
+      source: "mapped",
+    });
+  });
+
   it("keeps closeout visible reasons actionable and respects permit-blocked cert rows", () => {
     expect(
       getOpsBoardVisibleReasonLabel(
@@ -245,6 +334,25 @@ describe("Operations Board reason mapping", () => {
         { queueKey: "closeout" },
       ),
     ).toBe("Needs invoice");
+
+    expect(
+      getOpsBoardVisibleReason(
+        {
+          job_type: "ecc",
+          ops_status: "pending_info",
+          pending_info_reason: "Permit Missing",
+          field_complete: true,
+          invoice_complete: false,
+          certs_complete: true,
+        },
+        "Closeout work queue",
+        { queueKey: "closeout" },
+      ),
+    ).toEqual({
+      label: "Needs invoice",
+      detail: null,
+      source: "mapped",
+    });
 
     expect(
       getOpsBoardVisibleReasonLabel(

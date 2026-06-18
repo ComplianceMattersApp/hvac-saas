@@ -80,8 +80,10 @@ import {
 import {
   buildOpsBoardReasonOptions,
   filterOpsBoardRowsByReason,
-  getOpsBoardVisibleReasonLabel,
+  formatOpsBoardVisibleReasonText,
+  getOpsBoardVisibleReason,
   normalizeOpsBoardReason,
+  type OpsBoardVisibleReason,
 } from "@/lib/ops/ops-board-reasons";
 import {
   formatAssignmentSummaryForJob,
@@ -631,8 +633,16 @@ function subtractBusinessDays(date: Date, days: number) {
     return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
   }
 
-  function workspaceVisibleReason(job: any, queueKey: string) {
-    return getOpsBoardVisibleReasonLabel(job, () => wsStatusReason(job, queueKey), { queueKey });
+  function workspaceReasonInput(job: any) {
+    const jobId = String(job?.id ?? "").trim();
+    return {
+      ...job,
+      ops_board_failure_detail: jobId ? primaryFailureReasonByJob.get(jobId) ?? null : null,
+    };
+  }
+
+  function workspaceVisibleReasonDisplay(job: any, queueKey: string): OpsBoardVisibleReason {
+    return getOpsBoardVisibleReason(workspaceReasonInput(job), () => wsStatusReason(job, queueKey), { queueKey });
   }
 
   function workspaceFailedReason(job: any) {
@@ -2173,41 +2183,47 @@ function subtractBusinessDays(date: Date, days: number) {
               </div>
             ) : (
               <div className="space-y-2">
-                {selectedWorkspaceSection.previewRows.map((job: any) => (
-                  <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <Link href={`/jobs/${job.id}?tab=ops`} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
-                          {workspaceTitle(job)}
-                        </Link>
-                        <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700">{workspaceCustomerLocation(job)}</div>
-                      </div>
-                      <Link href={`/jobs/${job.id}?tab=ops`} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]">
-                        Open Job
-                      </Link>
-                    </div>
-
-                    <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600">
-                      <div>
-                        <span className="font-medium text-slate-500">Status/Reason:</span> {workspaceVisibleReason(job, selectedWorkspaceSection.key)}
-                      </div>
-                      <div>
-                        <span className="font-medium text-slate-500">Days Aging:</span>{" "}
-                        {workspaceAgeLabel(job)}
-                      </div>
-                      <div>
-                        <span className="font-medium text-slate-500">Assignment:</span>{" "}
-                        {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
-                      </div>
-                      {workspaceContractorName(job) ? (
-                        <div>
-                          <span className="font-medium text-slate-500">Contractor:</span>{" "}
-                          {workspaceContractorName(job)}
+                {selectedWorkspaceSection.previewRows.map((job: any) => {
+                  const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);
+                  return (
+                    <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <Link href={`/jobs/${job.id}?tab=ops`} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
+                            {workspaceTitle(job)}
+                          </Link>
+                          <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700">{workspaceCustomerLocation(job)}</div>
                         </div>
-                      ) : null}
+                        <Link href={`/jobs/${job.id}?tab=ops`} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]">
+                          Open Job
+                        </Link>
+                      </div>
+
+                      <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600">
+                        <div>
+                          <span className="font-medium text-slate-500">Status/Reason:</span> {visibleReason.label}
+                          {visibleReason.detail ? (
+                            <div className="pl-[84px] text-slate-700">{visibleReason.detail}</div>
+                          ) : null}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-500">Days Aging:</span>{" "}
+                          {workspaceAgeLabel(job)}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-500">Assignment:</span>{" "}
+                          {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
+                        </div>
+                        {workspaceContractorName(job) ? (
+                          <div>
+                            <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                            {workspaceContractorName(job)}
+                          </div>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </article>
@@ -3947,7 +3963,7 @@ function contractorResponseBadgeLabelForJob(jobId: string) {
   return "New Update";
 }
 
-function compactRow(j: any, showDate = false, note?: string, emphasize = false) {
+function compactRow(j: any, showDate = false, note?: string, emphasize = false, queueKey?: string) {
   const jobId = String(j?.id ?? "");
   const displayTitle = displayOpsCardTitle(j?.title);
   const contractorResponseBadgeLabel = contractorResponseBadgeLabelForJob(jobId);
@@ -4043,18 +4059,15 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
     : "";
   const rawFailureReason = String(primaryFailureReasonByJob.get(jobId) ?? "").trim();
   const normalizedFailureReason = rawFailureReason.replace(/^failed\s*[-:]\s*/i, "").trim();
-  const failedReasonText = normalizedFailureReason || "Test requirement not met";
-  const failedStatusLabel = isPendingOfficeReview
-    ? "Corrections Submitted / Under Review"
-    : retestState === "scheduled"
-    ? "Retest Scheduled"
-    : retestState === "pending_scheduling"
-    ? "Retest Pending Scheduling"
-    : opsStatus === "retest_needed"
-    ? "Retest Ready"
-    : isRetestChild
-    ? "Failed Retest"
-    : "Failed / Correction Required";
+  const visibleReason = getOpsBoardVisibleReason(
+    {
+      ...j,
+      ops_board_failure_detail: normalizedFailureReason || rawFailureReason || null,
+    },
+    () => noteText || queueStatusReasonDisplay,
+    { queueKey },
+  );
+  const failedReasonText = visibleReason.detail || normalizedFailureReason || "Test requirement not met";
   const failedSupportText = isPendingOfficeReview
     ? "Corrections submitted. Internal review is in progress."
     : retestState === "scheduled"
@@ -4087,7 +4100,7 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         labelTone: "text-rose-700",
         bodyTone: "text-rose-900",
         supportTone: "text-rose-900/80",
-        label: `${failedStatusLabel}${statusAgeSuffix}`,
+        label: `${visibleReason.label}${statusAgeSuffix}`,
         message: failedReasonText,
         support: failedSupportText,
       }
@@ -4097,8 +4110,8 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         labelTone: "text-amber-700",
         bodyTone: "text-amber-900",
         supportTone: "text-amber-900/80",
-        label: `${queueStatusReasonParts.label}${statusAgeSuffix}`,
-        message: queueStatusReasonParts.message || pendingInfoContext,
+        label: `${visibleReason.label}${statusAgeSuffix}`,
+        message: visibleReason.detail || queueStatusReasonParts.message || pendingInfoContext,
         support: "",
       }
     : showOnHoldBanner
@@ -4107,8 +4120,8 @@ function compactRow(j: any, showDate = false, note?: string, emphasize = false) 
         labelTone: "text-slate-600",
         bodyTone: "text-slate-800",
         supportTone: "text-slate-700/80",
-        label: queueStatusReasonParts.label,
-        message: queueStatusReasonParts.message || onHoldContext,
+        label: visibleReason.label,
+        message: visibleReason.detail || queueStatusReasonParts.message || onHoldContext,
         support: "",
       }
     : null;
@@ -4591,8 +4604,12 @@ const selectedWorkspaceQueue =
   workspaceQueues.find((queue) => queue.key === selectedWorkspaceKey) ?? workspaceQueues[0];
 
 function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
-  return getOpsBoardVisibleReasonLabel(
-    job,
+  const jobId = String(job?.id ?? "").trim();
+  const reason = getOpsBoardVisibleReason(
+    {
+      ...job,
+      ops_board_failure_detail: jobId ? primaryFailureReasonByJob.get(jobId) ?? null : null,
+    },
     () => {
       const specificFailureReason = workspaceFailedReason(job);
       if (queueKey === "need_to_schedule") return "Awaiting scheduling";
@@ -4608,6 +4625,7 @@ function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
     },
     { queueKey },
   );
+  return formatOpsBoardVisibleReasonText(reason);
 }
 
 function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {
@@ -4827,7 +4845,16 @@ if (panel !== "full_board") {
             quietSectionEmptyState("No jobs in this queue right now.", "success")
           ) : (
             <div className="space-y-2">
-              {selectedWorkspaceQueue.previewJobs.slice(0, 10).map((job: any) => (
+              {selectedWorkspaceQueue.previewJobs.slice(0, 10).map((job: any) => {
+                const visibleReason = getOpsBoardVisibleReason(
+                  {
+                    ...job,
+                    ops_board_failure_detail: primaryFailureReasonByJob.get(String(job?.id ?? "").trim()) ?? null,
+                  },
+                  () => workspaceStatusReason(job, selectedWorkspaceQueue.key),
+                  { queueKey: selectedWorkspaceQueue.key },
+                );
+                return (
                 <div
                   key={String(job?.id ?? "")}
                   className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2"
@@ -4852,7 +4879,10 @@ if (panel !== "full_board") {
                   <div className={`mt-1.5 grid gap-1 text-[12px] text-slate-600 sm:grid-cols-3 ${opsSupportTextClass}`}>
                     <div>
                       <span className="font-medium text-slate-500">Status/Reason:</span>{" "}
-                      {workspaceStatusReason(job, selectedWorkspaceQueue.key)}
+                      {visibleReason.label}
+                      {visibleReason.detail ? (
+                        <div className="text-slate-700">{visibleReason.detail}</div>
+                      ) : null}
                     </div>
                     <div>
                       <span className="font-medium text-slate-500">Days Aging:</span>{" "}
@@ -4870,7 +4900,8 @@ if (panel !== "full_board") {
                     ) : null}
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </article>
@@ -5492,7 +5523,7 @@ return (
           {exceptionVisibleJobs.map((j: any) => {
             const meta = exceptionMetaById.get(String(j?.id ?? ""));
             const note = meta ? `${meta.reason} | ${meta.aging}` : "Exception";
-            return compactRow(j, true, note, true);
+            return compactRow(j, true, note, true, "exceptions");
           })}
         </div>
       )}
@@ -5537,7 +5568,7 @@ return (
           quietSectionEmptyState("Field work complete for today.", "success")
         ) : (
           <div className="space-y-2">
-            {fieldWorkVisibleJobs.map((j: any) => compactRow(j, true, undefined, true))}
+            {fieldWorkVisibleJobs.map((j: any) => compactRow(j, true, undefined, true, "field_work"))}
           </div>
         )}
       </div>
@@ -5576,7 +5607,7 @@ return (
         {callListVisibleJobs.length === 0 ? (
           quietSectionEmptyState("No unscheduled work right now.")
         ) : (
-          <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true))}</div>
+          <div className="space-y-2">{callListVisibleJobs.map((j: any) => compactRow(j, false, undefined, true, "need_to_schedule"))}</div>
         )}
       </div>
 
@@ -5628,7 +5659,7 @@ return (
           quietSectionEmptyState("No closeout work is waiting right now.")
         ) : (
           <div className="space-y-2">
-            {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j), true))}
+            {closeoutVisibleJobs.map((j: any) => compactRow(j, false, closeoutLabel(j), true, "closeout"))}
           </div>
         )}
       </div>
@@ -5788,7 +5819,7 @@ return (
                   })
                 : queueReason(j, bucket);
 
-              return compactRow(j, true, note || undefined);
+              return compactRow(j, true, note || undefined, false, bucket);
             })}
           </div>
         )}
