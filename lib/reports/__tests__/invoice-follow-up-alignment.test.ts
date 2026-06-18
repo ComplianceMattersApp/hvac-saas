@@ -174,6 +174,8 @@ function makeExternalBillingProjection(job: JobFixture) {
     field_complete: Boolean(job.field_complete),
     job_type: job.job_type ?? null,
     ops_status: job.ops_status ?? null,
+    pending_info_reason: null,
+    on_hold_reason: null,
     invoice_complete: Boolean(job.invoice_complete),
     certs_complete: Boolean(job.certs_complete),
     billingState: {
@@ -325,6 +327,8 @@ describe("invoice_required_backlog — internal invoicing billing-truth", () => 
             field_complete: true,
             job_type: "service",
             ops_status: "invoice_required",
+            pending_info_reason: null,
+            on_hold_reason: null,
             invoice_complete: false,
             certs_complete: true,
             billingState: {
@@ -366,6 +370,8 @@ describe("invoice_required_backlog — internal invoicing billing-truth", () => 
             field_complete: true,
             job_type: "service",
             ops_status: "invoice_required",
+            pending_info_reason: null,
+            on_hold_reason: null,
             invoice_complete: true, // billing-truth: issued internal invoice overrides DB column
             certs_complete: true,
             billingState: {

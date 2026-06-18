@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildBillingTruthCloseoutProjectionMap,
   buildJobBillingStateReadModel,
   formatJobBillingDispositionLabel,
 } from "@/lib/business/job-billing-state";
@@ -39,5 +40,31 @@ describe("job billing state read model", () => {
     expect(state.statusLabel).toBe("Externally Billed");
     expect(state.statusTone).toBe("emerald");
     expect(formatJobBillingDispositionLabel("externally_billed")).toBe("Externally Billed");
+  });
+
+  it("preserves waiting reasons when building closeout billing truth projections", async () => {
+    const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
+      supabase: {},
+      accountOwnerUserId: null,
+      jobs: [
+        {
+          id: "permit-missing-needs-invoice",
+          field_complete: true,
+          job_type: "ecc",
+          ops_status: "pending_info",
+          pending_info_reason: "Permit Needed",
+          on_hold_reason: null,
+          invoice_complete: false,
+          certs_complete: false,
+        },
+      ],
+    });
+
+    expect(projectionsByJobId.get("permit-missing-needs-invoice")).toMatchObject({
+      pending_info_reason: "Permit Needed",
+      on_hold_reason: null,
+      invoice_complete: false,
+      certs_complete: false,
+    });
   });
 });

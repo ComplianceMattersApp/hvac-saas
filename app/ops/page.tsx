@@ -2763,6 +2763,8 @@ const recentServiceWindowCutoffIso = new Date(
     field_complete: job?.field_complete,
     job_type: job?.job_type,
     ops_status: job?.ops_status,
+    pending_info_reason: job?.pending_info_reason,
+    on_hold_reason: job?.on_hold_reason,
     invoice_complete: job?.invoice_complete,
     billing_disposition: job?.billing_disposition,
     certs_complete: job?.certs_complete,

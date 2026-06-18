@@ -2820,6 +2820,8 @@ const closeoutProjectionJob = {
   field_complete: job.field_complete,
   job_type: job.job_type,
   ops_status: job.ops_status,
+  pending_info_reason: (job as any).pending_info_reason ?? null,
+  on_hold_reason: (job as any).on_hold_reason ?? null,
   invoice_complete: billingState.billedTruthSatisfied,
   certs_complete: job.certs_complete,
 };
@@ -2859,8 +2861,10 @@ const showPrimaryCloseoutBlockers =
   isInternalUser &&
   (isFieldComplete || job.status === "completed") &&
   (isCloseoutPending || closeoutNeeds.isFailureFlow) &&
-  !isServiceFieldFollowUpPendingInfo &&
-  !isEccPermitNeededActive;
+  !isServiceFieldFollowUpPendingInfo;
+
+const showCertsPermitRequiredBlocker =
+  closeoutNeeds.needsCerts && isEccPermitNeededActive;
 
 const hasActionHeavyPrimaryNextAction =
   showPrimaryCloseoutBlockers ||
@@ -4679,7 +4683,7 @@ const failureResolutionPathCount =
                     </Link>
                   ) : null}
                 </div>
-              ) : isEccPermitNeededActive ? (
+              ) : isEccPermitNeededActive && !showPrimaryCloseoutBlockers ? (
                 <div
                   id="mobile-ecc-permit-needed-action"
                   className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/90 px-3.5 py-3 text-sm text-amber-950"
@@ -5013,6 +5017,11 @@ const failureResolutionPathCount =
                           ✓ Certs Sent
                         </ImmediateSubmitButton>
                       </form>
+                    ) : null}
+                    {showCertsPermitRequiredBlocker ? (
+                      <span className="inline-flex min-h-12 w-full items-center justify-start rounded-xl border border-amber-200 bg-white/90 px-4 py-2.5 text-left text-sm font-semibold text-amber-950">
+                        Permit number required before certs can be sent
+                      </span>
                     ) : null}
                   </div>
                 </div>
@@ -6351,6 +6360,11 @@ const failureResolutionPathCount =
                       ✓ Certs Sent
                     </ImmediateSubmitButton>
                   </form>
+                ) : null}
+                {showCertsPermitRequiredBlocker ? (
+                  <span className="inline-flex min-h-11 items-center justify-center rounded-lg border border-amber-200 bg-white/90 px-4 py-2 text-sm font-semibold text-amber-950">
+                    Permit number required before certs can be sent
+                  </span>
                 ) : null}
               </div>
             </div>

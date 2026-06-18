@@ -242,7 +242,8 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('name="permit_number"');
     expect(jobDetailSource).toContain('name="jurisdiction"');
     expect(jobDetailSource).toContain('name="permit_date"');
-    expect(jobDetailSource).toContain("!isEccPermitNeededActive");
+    expect(jobDetailSource).toContain("const showCertsPermitRequiredBlocker =");
+    expect(jobDetailSource).toContain("closeoutNeeds.needsCerts && isEccPermitNeededActive");
     expect(jobDetailSource).toContain('banner === "permit_needed"');
     expect(jobDetailSource).toContain('banner === "permit_available_saved"');
   });
@@ -251,10 +252,14 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("const showPrimaryCloseoutBlockers =");
     expect(jobDetailSource).toContain("isCloseoutPending");
     expect(jobDetailSource).toContain("(isCloseoutPending || closeoutNeeds.isFailureFlow)");
+    expect(jobDetailSource).not.toContain("!isServiceFieldFollowUpPendingInfo &&\n  !isEccPermitNeededActive");
     expect(jobDetailSource).toContain("getJobDetailCloseoutReadinessMessage(closeoutProjectionJob)");
     expect(jobDetailSource).toContain('href={`/jobs/${job.id}/invoice#invoice-workspace`}');
     expect(jobDetailSource).toContain("{jobPageInvoiceNextAction}");
     expect(jobDetailSource).toContain("form action={markCertsCompleteFromForm}");
+    expect(jobDetailSource).toContain("Permit number required before certs can be sent");
+    expect(jobDetailSource).toContain("pending_info_reason: (job as any).pending_info_reason ?? null");
+    expect(jobDetailSource).toContain("on_hold_reason: (job as any).on_hold_reason ?? null");
     expect(jobDetailSource).toContain("✓ Certs Sent");
     expect(jobDetailSource).toContain("invoice_complete: billingState.billedTruthSatisfied");
     expect(jobDetailSource).toContain('banner === "certs_closeout_closed"');

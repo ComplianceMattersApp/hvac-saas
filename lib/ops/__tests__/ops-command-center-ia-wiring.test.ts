@@ -194,6 +194,8 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('.in("ops_status", ["pending_info", "on_hold"])');
     expect(opsPageSource).toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
     expect(opsPageSource).toContain("buildBillingTruthCloseoutProjectionMap");
+    expect(opsPageSource).toContain("pending_info_reason: job?.pending_info_reason");
+    expect(opsPageSource).toContain("on_hold_reason: job?.on_hold_reason");
     expect(opsPageSource).toContain("listCloseoutQueueJobs(");
     expect(opsPageSource).toContain("buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
     expect(opsPageSource).toContain("filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter, { queueKey: section.key })");
