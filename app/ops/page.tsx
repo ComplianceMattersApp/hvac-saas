@@ -1095,13 +1095,6 @@ function subtractBusinessDays(date: Date, days: number) {
         : selectedWorkspaceSection?.previewRows.length ?? 0;
     const selectedWorkspaceItemNoun =
       selectedWorkspaceKey === "permits" ? "permit requests" : "jobs";
-    const permitRequestCreateHref = `/ops${buildQueryString({
-      bucket: "permits",
-      create: "permit_request",
-      contractor: contractorScopeFilter ?? "",
-      sort: boardSort === "oldest" ? "" : boardSort,
-      reason: effectiveBoardReasonFilter ?? "",
-    })}#permit-request-create`;
     const shouldExpandPermitCreateForm =
       selectedWorkspaceKey === "permits" && createIntent === "permit_request";
     const selectedPermitAttachmentResult = selectedPermitRows.length
@@ -1451,9 +1444,6 @@ function subtractBusinessDays(date: Date, days: number) {
               selectedPermitRows.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                   <div>No active permit requests.</div>
-                  <Link href={permitRequestCreateHref} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
-                    + New Permit Request
-                  </Link>
                 </div>
               ) : (
                 <div className="space-y-2">

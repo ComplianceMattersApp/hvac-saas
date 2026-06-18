@@ -46,7 +46,6 @@ describe("Ops workspace permit queue wiring", () => {
     expect(opsPageSource).toContain("+ New Permit Request");
     expect(opsPageSource).toContain("Create one from a text, phone call, email, or photo request.");
     expect(opsPageSource).toContain("shouldExpandPermitCreateForm");
-    expect(opsPageSource).toContain("permitRequestCreateHref");
     expect(opsPageSource).toContain('name="contractor_id"');
     expect(opsPageSource).toContain('name="request_label"');
     expect(opsPageSource).toContain('name="intake_note"');
@@ -55,10 +54,9 @@ describe("Ops workspace permit queue wiring", () => {
 
   it("keeps the full create form collapsed by default and only opens from the create intent", () => {
     expect(opsPageSource).toContain("createIntent");
-    expect(opsPageSource).toContain('create: "permit_request"');
     expect(opsPageSource).toContain("open={shouldExpandPermitCreateForm}");
     expect(opsPageSource).toContain('id="permit-request-create"');
-    expect(opsPageSource).toContain('href={permitRequestCreateHref}');
+    expect(opsPageSource).not.toContain('No active permit requests.</div>\n                  <Link href=');
   });
 
   it("renders active-state permit controls with the mark-created completion entry point", () => {
