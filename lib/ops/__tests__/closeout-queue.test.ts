@@ -14,6 +14,7 @@ describe("listCloseoutQueueJobs", () => {
         status: "open",
         job_type: "ecc",
         ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
         field_complete: true,
         certs_complete: false,
         invoice_complete: false,
@@ -137,6 +138,31 @@ describe("listCloseoutQueueJobs", () => {
     ], (job) => job);
 
     expect(rows.map((row) => row.id)).toEqual(["permit-missing-needs-invoice-and-certs"]);
+  });
+
+  it("excludes permit-placeholder cert-only rows while keeping permit-present cert rows", () => {
+    const rows = listCloseoutQueueJobs([
+      {
+        id: "permit-placeholder-certs-only",
+        job_type: "ecc",
+        ops_status: "paperwork_required",
+        permit_number: "PENDING",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: true,
+      },
+      {
+        id: "permit-present-certs-only",
+        job_type: "ecc",
+        ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: true,
+      },
+    ], (job) => job);
+
+    expect(rows.map((row) => row.id)).toEqual(["permit-present-certs-only"]);
   });
 });
 

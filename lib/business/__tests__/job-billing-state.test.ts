@@ -54,6 +54,7 @@ describe("job billing state read model", () => {
           ops_status: "pending_info",
           pending_info_reason: "Permit Needed",
           on_hold_reason: null,
+          permit_number: "PENDING",
           invoice_complete: false,
           certs_complete: false,
         },
@@ -63,6 +64,7 @@ describe("job billing state read model", () => {
     expect(projectionsByJobId.get("permit-missing-needs-invoice")).toMatchObject({
       pending_info_reason: "Permit Needed",
       on_hold_reason: null,
+      permit_number: "PENDING",
       invoice_complete: false,
       certs_complete: false,
     });

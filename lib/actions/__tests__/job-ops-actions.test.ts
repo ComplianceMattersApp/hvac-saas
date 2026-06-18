@@ -579,6 +579,44 @@ describe("releaseAndReevaluate", () => {
     expect(jobUpdates).not.toContainEqual({ certs_complete: true });
   });
 
+  it("blocks ECC cert closeout when permit number is a placeholder", async () => {
+    const { supabase, jobUpdates } = makeSupabaseForCertPermitBlocker({
+      id: "job-1",
+      status: "completed",
+      job_type: "ecc",
+      field_complete: true,
+      certs_complete: false,
+      invoice_complete: false,
+      ops_status: "paperwork_required",
+      pending_info_reason: null,
+      permit_number: "PENDING",
+      scheduled_date: "2026-04-10",
+      window_start: "08:00",
+      window_end: "10:00",
+      data_entry_completed_at: null,
+      service_case_id: null,
+    });
+    createClientMock.mockResolvedValue(supabase);
+    redirectMock.mockImplementation((path: string) => {
+      throw new Error(`NEXT_REDIRECT:${path}`);
+    });
+
+    const formData = new FormData();
+    formData.set("job_id", "job-1");
+    formData.set("return_to", "/jobs/job-1?tab=ops#closeout-actions");
+
+    const { markCertsCompleteFromForm } = await import("@/lib/actions/job-ops-actions");
+
+    await expect(markCertsCompleteFromForm(formData)).rejects.toThrow("banner=permit_needed");
+    expect(jobUpdates).toEqual([
+      {
+        ops_status: "pending_info",
+        pending_info_reason: "Permit Needed",
+      },
+    ]);
+    expect(jobUpdates).not.toContainEqual({ certs_complete: true });
+  });
+
   it("marks ECC certs sent and closes out when existing internal invoice truth is satisfied", async () => {
     const { supabase, jobUpdates, jobEvents } = makeSupabaseForCertCloseout({
       job: {

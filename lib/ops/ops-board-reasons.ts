@@ -56,6 +56,7 @@ type OpsBoardReasonJob = {
   ops_status?: string | null;
   pending_info_reason?: string | null;
   on_hold_reason?: string | null;
+  permit_number?: string | null;
   field_complete?: boolean | null;
   invoice_complete?: boolean | null;
   certs_complete?: boolean | null;

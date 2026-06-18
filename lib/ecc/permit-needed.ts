@@ -12,6 +12,33 @@ function normalize(value: unknown): string {
   return String(value ?? "").trim();
 }
 
+const INVALID_PERMIT_NUMBER_VALUES = new Set([
+  "pending",
+  "not added",
+  "not-added",
+  "not_applicable",
+  "not applicable",
+  "n/a",
+  "na",
+  "none",
+  "null",
+  "tbd",
+  "to be determined",
+  "unknown",
+]);
+
+export function isValidEccPermitNumber(value: unknown): boolean {
+  const normalized = normalize(value);
+  if (!normalized) return false;
+
+  const lower = normalized.toLowerCase();
+  if (INVALID_PERMIT_NUMBER_VALUES.has(lower)) return false;
+  if (/^pending\b/.test(lower)) return false;
+  if (/^not\s+(added|available|assigned|provided|recorded|set)\b/.test(lower)) return false;
+
+  return true;
+}
+
 export function isEccPermitNeededReason(value: unknown): boolean {
   return normalize(value).toLowerCase() === ECC_PERMIT_NEEDED_REASON.toLowerCase();
 }
@@ -38,7 +65,7 @@ export function shouldApplyEccPermitNeededBlocker(input: {
   pending_info_reason?: string | null;
 }): boolean {
   if (normalize(input.job_type).toLowerCase() !== "ecc") return false;
-  if (normalize(input.permit_number)) return false;
+  if (isValidEccPermitNumber(input.permit_number)) return false;
   if (Boolean(input.certs_complete)) return false;
 
   const fieldComplete =

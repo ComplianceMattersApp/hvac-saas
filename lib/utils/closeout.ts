@@ -1,4 +1,5 @@
 import { isCloseoutBlockingQueueStatus } from "@/lib/ops/queue-status-contracts";
+import { isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
 
 export type CloseoutProjectionInput = {
   field_complete?: boolean | null;
@@ -6,6 +7,7 @@ export type CloseoutProjectionInput = {
   ops_status?: string | null;
   pending_info_reason?: string | null;
   on_hold_reason?: string | null;
+  permit_number?: string | null;
   invoice_complete?: boolean | null;
   certs_complete?: boolean | null;
 };
@@ -23,13 +25,15 @@ export function getCloseoutNeeds(job: CloseoutProjectionInput) {
   const isEcc = jobType === "ecc";
   const isFailureFlow = isEcc && ECC_FAILURE_STATUSES.has(opsStatus);
   const isBlockedForCloseout = isCloseoutBlockingQueueStatus(opsStatus);
+  const isPermitBlockingCerts = isEcc && !isValidEccPermitNumber(job.permit_number);
   // Use lifecycle completion booleans as source-of-truth for closeout queue projection.
   const needsInvoice = !Boolean(job.invoice_complete);
-  const needsCerts = isEcc && !isFailureFlow && !Boolean(job.certs_complete);
+  const needsCerts = isEcc && !isFailureFlow && !isPermitBlockingCerts && !Boolean(job.certs_complete);
 
   return {
     needsInvoice,
     needsCerts,
+    isPermitBlockingCerts,
     isService,
     isEcc,
     isFailureFlow,

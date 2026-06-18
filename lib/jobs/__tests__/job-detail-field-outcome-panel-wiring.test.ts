@@ -243,7 +243,9 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain('name="jurisdiction"');
     expect(jobDetailSource).toContain('name="permit_date"');
     expect(jobDetailSource).toContain("const showCertsPermitRequiredBlocker =");
-    expect(jobDetailSource).toContain("closeoutNeeds.needsCerts && isEccPermitNeededActive");
+    expect(jobDetailSource).toContain("isValidEccPermitNumber");
+    expect(jobDetailSource).toContain("const hasValidEccPermitNumber =");
+    expect(jobDetailSource).toContain("!hasValidEccPermitNumber");
     expect(jobDetailSource).toContain('banner === "permit_needed"');
     expect(jobDetailSource).toContain('banner === "permit_available_saved"');
   });

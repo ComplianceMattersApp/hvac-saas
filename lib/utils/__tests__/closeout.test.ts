@@ -52,6 +52,7 @@ describe("closeout queue projection", () => {
         field_complete: true,
         job_type: "ecc",
         ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
         certs_complete: false,
         invoice_complete: false,
       })
@@ -181,6 +182,7 @@ describe("closeout queue projection", () => {
       field_complete: true,
       job_type: "ecc",
       ops_status: "paperwork_required",
+      permit_number: "PERMIT-123",
       invoice_complete: true,
       certs_complete: false,
     };
@@ -192,12 +194,52 @@ describe("closeout queue projection", () => {
     expect(isInCloseoutQueue(job)).toBe(true);
   });
 
+  it("does not keep permit-placeholder cert-only rows in closeout", () => {
+    const job = {
+      field_complete: true,
+      job_type: "ecc",
+      ops_status: "paperwork_required",
+      permit_number: "PENDING",
+      invoice_complete: true,
+      certs_complete: false,
+    };
+
+    expect(getCloseoutNeeds(job)).toMatchObject({
+      needsInvoice: false,
+      needsCerts: false,
+      isPermitBlockingCerts: true,
+    });
+    expect(isInCloseoutQueue(job)).toBe(false);
+    expect(getCloseoutQueueNextStepLabel(job)).toBe("Review closeout requirements");
+  });
+
+  it("keeps permit-placeholder rows in closeout when invoice remains actionable", () => {
+    const job = {
+      field_complete: true,
+      job_type: "ecc",
+      ops_status: "pending_info",
+      pending_info_reason: "Permit Needed",
+      permit_number: "Not added",
+      invoice_complete: false,
+      certs_complete: false,
+    };
+
+    expect(getCloseoutNeeds(job)).toMatchObject({
+      needsInvoice: true,
+      needsCerts: false,
+      isPermitBlockingCerts: true,
+    });
+    expect(isInCloseoutQueue(job)).toBe(true);
+    expect(getCloseoutQueueNextStepLabel(job)).toBe("Invoice");
+  });
+
   it("uses invoice and send certs copy when both blockers remain", () => {
     expect(
       getCloseoutQueueNextStepLabel({
         field_complete: true,
         job_type: "ecc",
         ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
         invoice_complete: false,
         certs_complete: false,
       }),
@@ -210,6 +252,7 @@ describe("closeout queue projection", () => {
         field_complete: true,
         job_type: "ecc",
         ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
         invoice_complete: true,
         certs_complete: false,
       }),
@@ -270,6 +313,7 @@ describe("closeout queue projection", () => {
         field_complete: true,
         job_type: "ecc",
         ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
         invoice_complete: true,
         certs_complete: false,
       }),
@@ -282,6 +326,7 @@ describe("closeout queue projection", () => {
         field_complete: true,
         job_type: "ecc",
         ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
         invoice_complete: false,
         certs_complete: false,
       }),

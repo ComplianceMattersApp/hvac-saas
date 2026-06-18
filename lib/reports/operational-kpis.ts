@@ -23,6 +23,7 @@ type OperationalKpiJob = {
   field_complete: boolean | null;
   field_complete_at: string | null;
   job_type: string | null;
+  permit_number: string | null;
   invoice_complete: boolean | null;
   billing_disposition: string | null;
   certs_complete: boolean | null;
@@ -56,13 +57,13 @@ export async function buildOperationalKpiReadModel(params: {
     runPrimary: () =>
       params.supabase
         .from("jobs")
-        .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, billing_disposition, certs_complete")
+        .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, permit_number, invoice_complete, billing_disposition, certs_complete")
         .is("deleted_at", null)
         .in("contractor_id", accountScopeInList(contractorIds)),
     runCompat: () =>
       params.supabase
         .from("jobs")
-        .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, invoice_complete, certs_complete")
+        .select("id, status, ops_status, created_at, field_complete, field_complete_at, job_type, permit_number, invoice_complete, certs_complete")
         .is("deleted_at", null)
         .in("contractor_id", accountScopeInList(contractorIds)),
   });
@@ -78,6 +79,7 @@ export async function buildOperationalKpiReadModel(params: {
       field_complete: job.field_complete,
       job_type: job.job_type,
       ops_status: job.ops_status,
+      permit_number: job.permit_number,
       invoice_complete: job.invoice_complete,
       billing_disposition: job.billing_disposition,
       certs_complete: job.certs_complete,

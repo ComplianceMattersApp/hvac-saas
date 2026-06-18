@@ -76,7 +76,7 @@ import {
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { buildJobBillingStateReadModel, formatJobBillingDispositionLabel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
-import { isEccPermitNeededBlocker } from "@/lib/ecc/permit-needed";
+import { isEccPermitNeededBlocker, isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
 import { formatEccOpsStatusLabel, isEccJobType as isEccWorkflowJobType } from "@/lib/ecc/ecc-workflow-display";
 import {
   resolveInternalInvoiceEmailDeliveries,
@@ -2807,6 +2807,8 @@ const isEccPermitNeededActive = isEccPermitNeededBlocker({
   ops_status: job.ops_status,
   pending_info_reason: (job as any).pending_info_reason ?? null,
 });
+const hasValidEccPermitNumber =
+  job.job_type !== "ecc" || isValidEccPermitNumber(job.permit_number);
 const billingState = buildJobBillingStateReadModel({
   billingMode,
   invoiceComplete: job.invoice_complete,
@@ -2822,6 +2824,7 @@ const closeoutProjectionJob = {
   ops_status: job.ops_status,
   pending_info_reason: (job as any).pending_info_reason ?? null,
   on_hold_reason: (job as any).on_hold_reason ?? null,
+  permit_number: job.permit_number ?? null,
   invoice_complete: billingState.billedTruthSatisfied,
   certs_complete: job.certs_complete,
 };
@@ -2837,7 +2840,8 @@ const canShowCertsButton =
   job.job_type === "ecc" &&
   !job.certs_complete &&
   !isFailedUnresolved &&
-  !isEccPermitNeededActive;
+  !isEccPermitNeededActive &&
+  hasValidEccPermitNumber;
 
 const canShowInvoiceButton =
   job.job_type === "ecc" &&
@@ -2864,7 +2868,10 @@ const showPrimaryCloseoutBlockers =
   !isServiceFieldFollowUpPendingInfo;
 
 const showCertsPermitRequiredBlocker =
-  closeoutNeeds.needsCerts && isEccPermitNeededActive;
+  job.job_type === "ecc" &&
+  !job.certs_complete &&
+  !isFailedUnresolved &&
+  !hasValidEccPermitNumber;
 
 const hasActionHeavyPrimaryNextAction =
   showPrimaryCloseoutBlockers ||

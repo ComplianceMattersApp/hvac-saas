@@ -19,6 +19,7 @@ describe("Operations Board reason mapping", () => {
       getOpsBoardReasonLabel({
         job_type: "ecc",
         ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
         field_complete: true,
         invoice_complete: false,
         certs_complete: false,
@@ -39,6 +40,7 @@ describe("Operations Board reason mapping", () => {
       getOpsBoardReasonLabel({
         job_type: "ecc",
         ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
         field_complete: true,
         invoice_complete: true,
         certs_complete: false,
@@ -154,8 +156,8 @@ describe("Operations Board reason mapping", () => {
   it("filters loaded rows by selected reason", () => {
     const rows = [
       { id: "invoice", job_type: "service", ops_status: "invoice_required", invoice_complete: false },
-      { id: "certs", job_type: "ecc", ops_status: "paperwork_required", invoice_complete: true, certs_complete: false },
-      { id: "both", job_type: "ecc", ops_status: "paperwork_required", invoice_complete: false, certs_complete: false },
+      { id: "certs", job_type: "ecc", ops_status: "paperwork_required", permit_number: "PERMIT-123", invoice_complete: true, certs_complete: false },
+      { id: "both", job_type: "ecc", ops_status: "paperwork_required", permit_number: "PERMIT-123", invoice_complete: false, certs_complete: false },
       { id: "parts", ops_status: "pending_info", pending_info_reason: "Need parts" },
     ];
 
@@ -163,6 +165,35 @@ describe("Operations Board reason mapping", () => {
     expect(filterOpsBoardRowsByReason(rows, "needs_certs").map((row) => row.id)).toEqual(["certs"]);
     expect(filterOpsBoardRowsByReason(rows, "needs_invoice_and_certs").map((row) => row.id)).toEqual(["both"]);
     expect(filterOpsBoardRowsByReason(rows, "waiting_on_parts").map((row) => row.id)).toEqual(["parts"]);
+  });
+
+  it("excludes permit-placeholder cert-only rows from Needs certs filters in Closeout", () => {
+    const rows = [
+      {
+        id: "permit-placeholder-certs-only",
+        job_type: "ecc",
+        ops_status: "paperwork_required",
+        permit_number: "PENDING",
+        field_complete: true,
+        invoice_complete: true,
+        certs_complete: false,
+      },
+      {
+        id: "valid-permit-certs",
+        job_type: "ecc",
+        ops_status: "paperwork_required",
+        permit_number: "PERMIT-123",
+        field_complete: true,
+        invoice_complete: true,
+        certs_complete: false,
+      },
+    ];
+
+    expect(getOpsBoardReasonLabel(rows[0], { queueKey: "closeout" })).toBeNull();
+    expect(getOpsBoardReasonLabel(rows[1], { queueKey: "closeout" })?.label).toBe("Needs certs");
+    expect(filterOpsBoardRowsByReason(rows, "needs_certs", { queueKey: "closeout" }).map((row) => row.id)).toEqual([
+      "valid-permit-certs",
+    ]);
   });
 
   it("keeps on hold rows out of failed ECC filters", () => {

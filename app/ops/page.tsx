@@ -650,7 +650,7 @@ function subtractBusinessDays(date: Date, days: number) {
 
   if (panel !== "full_board") {
     const workspaceSelect =
-      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
+      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, permit_number, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start";
 
@@ -662,6 +662,7 @@ function subtractBusinessDays(date: Date, days: number) {
         ops_status: job?.ops_status,
         pending_info_reason: job?.pending_info_reason,
         on_hold_reason: job?.on_hold_reason,
+        permit_number: job?.permit_number,
         invoice_complete: job?.invoice_complete,
         billing_disposition: job?.billing_disposition,
         certs_complete: job?.certs_complete,
@@ -2765,6 +2766,7 @@ const recentServiceWindowCutoffIso = new Date(
     ops_status: job?.ops_status,
     pending_info_reason: job?.pending_info_reason,
     on_hold_reason: job?.on_hold_reason,
+    permit_number: job?.permit_number,
     invoice_complete: job?.invoice_complete,
     billing_disposition: job?.billing_disposition,
     certs_complete: job?.certs_complete,

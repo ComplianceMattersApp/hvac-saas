@@ -44,6 +44,7 @@ export type BillingTruthProjectionJobInput = {
   ops_status?: string | null;
   pending_info_reason?: string | null;
   on_hold_reason?: string | null;
+  permit_number?: string | null;
   invoice_complete?: boolean | null;
   certs_complete?: boolean | null;
   billing_disposition?: string | null;
@@ -56,6 +57,7 @@ export type BillingTruthCloseoutProjection = {
   ops_status: string | null;
   pending_info_reason: string | null;
   on_hold_reason: string | null;
+  permit_number: string | null;
   invoice_complete: boolean;
   certs_complete: boolean;
   billingState: JobBillingStateReadModel;
@@ -216,6 +218,7 @@ export async function buildBillingTruthCloseoutProjectionMap(params: {
       ops_status: job.ops_status ?? null,
       pending_info_reason: job.pending_info_reason ?? null,
       on_hold_reason: job.on_hold_reason ?? null,
+      permit_number: job.permit_number ?? null,
       invoice_complete: billingState.billedTruthSatisfied,
       certs_complete: Boolean(job.certs_complete),
       billingState,
