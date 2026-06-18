@@ -24,6 +24,21 @@ Date: 2026-05-08
 - Recent tactical polish and minor-fix closeouts are recorded in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md).
 - Deferred/parked items remain roadmap-visible only when they affect future sequencing or unlock criteria.
 
+## Owner-Scoped Permit Workflow V1
+
+- Status: CLOSED for the current single-account implementation lane and ACTIVE as current documented product posture.
+- Current scope is Compliance Matters owner/operator only. This is not a general tenant-wide feature and should not be marketed or operated as one.
+- Activation is fail-closed through `ENABLE_PERMIT_WORKFLOW_ACCOUNT_OWNER_IDS`; missing or empty configuration leaves the workflow disabled.
+- Current behavior is limited to allowlisted-owner contractor intake, internal manual intake, Ops permit queue tracking, explicit internal permit-created completion, and explicit post-permit ECC alteration job routing.
+- Durable workflow/source-of-truth boundaries and non-goals are locked in [Owner_Scoped_Permit_Workflow_V1_Model_Spec.md](./Owner_Scoped_Permit_Workflow_V1_Model_Spec.md).
+- Future tenant-wide rollout is explicitly parked pending review of:
+   - tenant permissions
+   - contractor portal exposure
+   - support burden
+   - product-mode fit
+   - onboarding and training
+   - whether permit tracking is broadly useful for customer accounts
+
 ## Payments / Deposits Reporting Foundation Closeout
 
 - Status: CLOSED for current reporting foundation.

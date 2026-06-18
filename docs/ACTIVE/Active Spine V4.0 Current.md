@@ -9,6 +9,9 @@ Docs workflow is locked in [Documentation_Authority_Map.md](./Documentation_Auth
 **Control-plane rule:**
 Use this Spine for current operating posture, durable source-of-truth boundaries, and short links to canonical specs. Do not add full closeout blocks, smoke evidence, tactical polish logs, implementation commit lists, or roadmap backlog detail here. Put strategic sequencing in [Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md), launch gates in [Compliance_Matters_Prelaunch_Confirmation_Checklist.md](./Compliance_Matters_Prelaunch_Confirmation_Checklist.md), tactical evidence in [Tactical_Punch_List_Closeout_Ledger.md](./Tactical_Punch_List_Closeout_Ledger.md), and broader cleanup decisions in [Documentation_Consolidation_Audit.md](./Documentation_Consolidation_Audit.md).
 
+**Owner-Scoped Permit Workflow V1:**
+Status: ACTIVE current-scope workflow. Permit Workflow V1 is a Compliance Matters owner/operator lane only, not a tenant-wide release feature. It is disabled by default and becomes available only when `ENABLE_PERMIT_WORKFLOW_ACCOUNT_OWNER_IDS` includes the current `account_owner_user_id`. Internal Ops `Permits` visibility, contractor `Request Permit` exposure, and permit mutations all fail closed outside the allowlist. Durable workflow boundaries and non-goals are locked in [Owner_Scoped_Permit_Workflow_V1_Model_Spec.md](./Owner_Scoped_Permit_Workflow_V1_Model_Spec.md). Future tenant-wide rollout remains deferred pending explicit review of permissions, contractor exposure, support burden, product-mode fit, onboarding/training, and whether permit tracking is broadly useful for customer accounts.
+
 **June 2026 Access / Portal / Location / Workflow Polish Closeout:**
 Status: CLOSED for current implementation lanes.
 

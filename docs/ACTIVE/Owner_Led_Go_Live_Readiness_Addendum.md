@@ -16,6 +16,12 @@ Current go-live approach:
 - Support is owner-led, guided, and hands-on.
 - Early adoption is intentionally controlled and high-touch.
 
+Owner-scoped permit workflow note (June 2026):
+- Permit Workflow V1 is part of the current owner-led operating posture for Compliance Matters only; it is not a tenant-wide launch feature.
+- Activation remains allowlist-only via `ENABLE_PERMIT_WORKFLOW_ACCOUNT_OWNER_IDS`, and the workflow is disabled by default when that env is missing or empty.
+- Contractor exposure, internal Ops visibility, and server actions fail closed outside the allowlisted owner account.
+- Any broader rollout remains deferred pending explicit product, permissions, support, and training review. See `docs/ACTIVE/Owner_Scoped_Permit_Workflow_V1_Model_Spec.md`.
+
 Support V0 clarification:
 - Support V0 documentation/readiness is complete.
 - Support V0 is the current manual operating support model for controlled first customers.
