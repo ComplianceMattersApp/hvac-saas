@@ -258,13 +258,22 @@ describe("job tests page wiring", () => {
 
 describe("job detail field operations board layout", () => {
   it("keeps the service location chip over the image area", () => {
-    expect(jobPageSource).toContain('className="bg-slate-100 p-3"');
-    expect(jobPageSource).toContain('Service Location');
-    expect(jobPageSource).not.toContain('bg-slate-100 p-3 pt-10');
+    const locationPanelStart = jobPageSource.indexOf('id="job-location"');
+    const locationPanelEnd = jobPageSource.indexOf("{isInternalUser ? (", locationPanelStart);
+    const locationPanelSlice =
+      locationPanelStart > -1 && locationPanelEnd > locationPanelStart
+        ? jobPageSource.slice(locationPanelStart, locationPanelEnd)
+        : "";
+
+    expect(locationPanelStart).toBeGreaterThan(-1);
+    expect(locationPanelSlice).toContain("Service Location");
+    expect(locationPanelSlice).toContain("TimedJobLocationPreview");
+    expect(locationPanelSlice).toContain("showAddressOverlay");
+    expect(jobPageSource).not.toContain("bg-slate-100 p-3 pt-10");
   });
 
   it("labels account, access, and billing context clearly", () => {
-    expect(jobPageSource).toContain("Responsible Account");
+    expect(jobPageSource).toContain("Customer / Account");
     expect(jobPageSource).toContain("Site / Access Contact");
     expect(jobPageSource).toContain("Billing");
     expect(jobPageSource).toContain("Phone:");
@@ -303,9 +312,10 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).not.toContain("Open Map");
   });
 
-  it("uses a field-first job command header instead of the job title as the main heading", () => {
+  it("uses the preferred job workbench heading fallback chain", () => {
     expect(jobPageSource).toContain("const fieldHeaderTitle =");
-    expect(jobPageSource).toContain("{fieldHeaderTitle}");
+    expect(jobPageSource).toContain("const jobWorkbenchTitle = firstNonEmpty(jobTitleText, visitScopeLeadText, fieldHeaderTitle) ?? \"Job Detail\";");
+    expect(jobPageSource).toContain("{jobWorkbenchTitle}");
     expect(jobPageSource).toContain("primarySiteAccessName");
     expect(jobPageSource).toContain("?? \"Job Detail\"");
     expect(jobPageSource).not.toContain('{normalizeRetestLinkedJobTitle(job.title) || "Operational job workspace"}');
@@ -350,7 +360,7 @@ describe("job detail field operations board layout", () => {
   });
 
   it("does not duplicate intake note in right notes card and keeps honest empty-state copy", () => {
-    const jobNotesCardStart = jobPageSource.indexOf("<ChatIcon className=\"h-3.5 w-3.5\" />{rightRailNotesTitle}</div>");
+    const jobNotesCardStart = jobPageSource.indexOf('id="internal-notes"');
     const jobNotesCardEnd = jobPageSource.indexOf('id="next-service-action"', jobNotesCardStart);
     const jobNotesCardSlice =
       jobNotesCardStart > -1 && jobNotesCardEnd > jobNotesCardStart
@@ -360,7 +370,9 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain("Intake Notes");
     expect(jobNotesCardSlice).not.toContain("Intake note");
     expect(jobPageSource).toContain("const rightRailNotesEmptyText = isEccJobType ? \"No shared or internal notes yet.\" : \"No notes yet.\";");
-    expect(jobPageSource).toContain("<ChatIcon className=\"h-3.5 w-3.5\" />{rightRailNotesTitle}</div>");
+    expect(jobNotesCardSlice).toContain("ChatIcon");
+    expect(jobNotesCardSlice).toContain("{rightRailNotesTitle}");
+    expect(jobNotesCardSlice).toContain("{rightRailNotesEmptyText}");
     expect(jobPageSource).not.toContain("Notes & Comments");
     expect(jobNotesCardSlice).not.toContain("Follow-up note");
     expect(jobPageSource).toContain("View / Add Notes");
@@ -464,7 +476,7 @@ describe("job detail field operations board layout", () => {
   });
 
   it("deduplicates mobile Service Location address and navigation actions", () => {
-    const mobileLocationStart = jobPageSource.indexOf("<span>Service Location</span>");
+    const mobileLocationStart = jobPageSource.indexOf('<div className="text-sm font-semibold text-[#0f1f35]">Service Location</div>');
     const mobileLocationEnd = jobPageSource.indexOf('id="mobile-work-scope"', mobileLocationStart);
     const mobileLocationSlice =
       mobileLocationStart > -1 && mobileLocationEnd > mobileLocationStart
@@ -486,11 +498,13 @@ describe("job detail field operations board layout", () => {
   });
 
   it("keeps permit quick reference in the top rail", () => {
-    const permitQuickRefIndex = jobPageSource.indexOf("><ClipboardIcon className=\"h-3.5 w-3.5\" />Permit Quick Ref</div>");
+    const permitQuickRefIndex = jobPageSource.indexOf("Permit Quick Ref");
+    const permitNumberIndex = jobPageSource.indexOf("Permit number", permitQuickRefIndex);
 
     expect(jobPageSource).toContain("Permit Quick Ref");
     expect(jobPageSource).toContain("Permit number");
     expect(permitQuickRefIndex).toBeGreaterThan(-1);
+    expect(permitNumberIndex).toBeGreaterThan(permitQuickRefIndex);
   });
 
   it("restores ECC summary, permit details, and equipment inside lower job records section", () => {
@@ -521,7 +535,7 @@ describe("job detail field operations board layout", () => {
   });
 
   it("keeps notes rail action near top with no follow-up shortcut", () => {
-    const jobNotesCardStart = jobPageSource.indexOf("<ChatIcon className=\"h-3.5 w-3.5\" />{rightRailNotesTitle}</div>");
+    const jobNotesCardStart = jobPageSource.indexOf('id="internal-notes"');
     const jobNotesCardEnd = jobPageSource.indexOf('id="next-service-action"', jobNotesCardStart);
     const jobNotesCardSlice =
       jobNotesCardStart > -1 && jobNotesCardEnd > jobNotesCardStart
@@ -557,13 +571,21 @@ describe("job detail field operations board layout", () => {
 
   it("keeps Next Service Action separate from Work & Invoice", () => {
     const workInvoiceIndex = jobPageSource.indexOf("Work & Invoice");
-    const nextServiceIndex = jobPageSource.indexOf('id="next-service-action"');
     const workInvoiceSectionEnd = jobPageSource.indexOf("{/* Right: quick reference rail */}", workInvoiceIndex);
+    const lowerNextServiceIndex = jobPageSource.indexOf('id="next-service-action"', workInvoiceSectionEnd);
+    const lowerNextServiceEnd = jobPageSource.indexOf('id="job-details-records"', lowerNextServiceIndex);
+    const lowerNextServiceSlice =
+      lowerNextServiceIndex > -1 && lowerNextServiceEnd > lowerNextServiceIndex
+        ? jobPageSource.slice(lowerNextServiceIndex, lowerNextServiceEnd)
+        : "";
+    const nextServiceAnchorCount = jobPageSource.match(/id="next-service-action"/g)?.length ?? 0;
 
     expect(workInvoiceIndex).toBeGreaterThan(-1);
-    expect(nextServiceIndex).toBeGreaterThan(workInvoiceSectionEnd);
-    expect(jobPageSource).toContain("Next Service Action");
-    expect(jobPageSource).toContain("Create Return Visit");
+    expect(workInvoiceSectionEnd).toBeGreaterThan(workInvoiceIndex);
+    expect(lowerNextServiceIndex).toBeGreaterThan(workInvoiceSectionEnd);
+    expect(lowerNextServiceSlice).toContain("Next Service Action");
+    expect(lowerNextServiceSlice).toContain("Create Return Visit");
+    expect(nextServiceAnchorCount).toBeGreaterThan(1);
   });
 
   it("consolidates Job Details and Job Status inside the Job Details & Records grid", () => {
@@ -647,12 +669,12 @@ describe("job detail field operations board layout", () => {
         : "";
 
     expect(jobStatusPanelSlice).toContain("Current lifecycle");
-    expect(jobStatusPanelSlice).toContain("{formatOpsStatusLabel(job.ops_status)}");
+    expect(jobStatusPanelSlice).toContain("{formatOpsStatusLabel(job.ops_status, job.job_type)}");
     expect(jobStatusPanelSlice).toContain("InterruptStateFields");
     expect(jobStatusPanelSlice).toContain("initialInterruptState={currentInterruptState");
     expect(jobStatusPanelSlice).toContain("initialStatusReason={initialInterruptReason}");
     expect(jobStatusPanelSlice).toContain('className="space-y-4 rounded-xl border border-slate-200/80 bg-white/96 p-4"');
-    expect(jobStatusPanelSlice).toContain('className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-200/80 pt-3"');
+    expect(jobStatusPanelSlice).toContain('className={`${recordActionRowEndClass} border-t border-slate-200/80 pt-3`}');
     expect(jobStatusPanelSlice).toContain("Save Interrupt State");
     expect(jobStatusPanelSlice).not.toContain("TimedServiceStatusActions");
     expect(jobStatusPanelSlice).not.toContain("Service Closeout");
