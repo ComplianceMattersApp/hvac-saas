@@ -37,6 +37,7 @@ type SubmissionRow = {
 const sameContractorContext = {
   contractorId: "contractor-1",
   contractorName: "Alpha Heating",
+  accountOwnerUserId: "owner-1",
   userId: "contractor-user-1",
 };
 

@@ -3,6 +3,7 @@ import { createAdminClient, createClient } from "@/lib/supabase/server";
 export type CurrentContractorPortalContext = {
   contractorId: string;
   contractorName: string | null;
+  accountOwnerUserId: string;
   userId: string;
 };
 
@@ -48,7 +49,7 @@ export async function requireCurrentContractorPortalContext(input?: {
 
   const { data: contractorUser, error: contractorErr } = await supabase
     .from("contractor_users")
-    .select("contractor_id, contractors ( id, name, lifecycle_state )")
+    .select("contractor_id, contractors ( id, name, lifecycle_state, owner_user_id )")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -62,9 +63,13 @@ export async function requireCurrentContractorPortalContext(input?: {
     throw resolvePortalAccessError("CONTRACTOR_ARCHIVED");
   }
 
+  const accountOwnerUserId = normalizeText((contractorUser as any)?.contractors?.owner_user_id);
+  if (!accountOwnerUserId) throw resolvePortalAccessError("NOT_CONTRACTOR");
+
   return {
     contractorId,
     contractorName: normalizeText((contractorUser as any)?.contractors?.name) || null,
+    accountOwnerUserId,
     userId,
   };
 }

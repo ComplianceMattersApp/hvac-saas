@@ -39,6 +39,15 @@ import {
   listInternalNewWorkRequestAwareness,
 } from "@/lib/actions/notification-read-actions";
 import {
+  acceptInternalPermitRequest,
+  createJobFromPermitRequestAndMarkCreated,
+  createInternalManualPermitRequest,
+  holdInternalPermitRequest,
+  markInternalPermitCreated,
+  resumeInternalPermitRequest,
+  updateInternalPermitRequestIntake,
+} from "@/lib/actions/internal-permit-request-actions";
+import {
   buildOpsStatusEnteredAtByJob,
   resolveLifecycleDaysAgingLabel,
 } from "@/lib/utils/lifecycle-aging";
@@ -79,6 +88,12 @@ import {
   formatFailedEccQueueReasonFromRun,
   getOpsQueueCardStatusReason,
 } from "@/lib/ops/focused-queues";
+import {
+  listActivePermitRequestQueueRowsIfAvailable,
+  type PermitRequestQueueRow,
+} from "@/lib/permits/permit-requests-read-model";
+import { listInternalPermitRequestAttachmentsForAccount } from "@/lib/permits/permit-request-attachments-read-model";
+import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 import {
   buildServiceFollowUpProgressState,
 } from "@/lib/jobs/service-follow-up-progress";
@@ -166,6 +181,17 @@ type BucketKey =
   | "closeout"
   | "recent_closed";
 
+type PermitJobCustomerOption = {
+  id: string;
+  label: string;
+};
+
+type PermitJobLocationOption = {
+  id: string;
+  customerId: string;
+  label: string;
+};
+
 const OPS_TABS: { key: BucketKey; label: string }[] = [
   { key: "workflow_all", label: "Workflow View All" },
   { key: "attention", label: "Needs Attention" },
@@ -181,7 +207,7 @@ const OPS_TABS: { key: BucketKey; label: string }[] = [
   { key: "recent_closed", label: "Recently Closed" },
 ];
 
-type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout";
+type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout" | "permits";
 
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
@@ -192,7 +218,8 @@ function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
     normalized === "field_work" ||
     normalized === "waiting" ||
     normalized === "exceptions" ||
-    normalized === "closeout"
+    normalized === "closeout" ||
+    normalized === "permits"
   ) {
     return normalized;
   }
@@ -301,6 +328,7 @@ export default async function OpsPage({
   reason?: string;
   signal?: string;
   panel?: string;
+  permit_error?: string;
 }>;
 }) {
   
@@ -323,6 +351,7 @@ export default async function OpsPage({
   const boardSort = normalizeOpsBoardSort(sp.sort);
   const boardReasonFilter = normalizeOpsBoardReason(sp.reason);
   const panel = (sp.panel ?? "").trim().toLowerCase();
+  const permitActionError = (sp.permit_error ?? "").trim();
 
   const opsTimingEnabled = process.env.OPS_TIMING_DEBUG === "true";
   const _t_total = opsTimingEnabled ? Date.now() : 0;
@@ -463,6 +492,7 @@ export default async function OpsPage({
   const productMode: ProductMode = await resolvedProductModePromise;
   const isHvacServiceMode = productMode === "hvac_service";
   const contractorScopeFilter = isHvacServiceMode ? null : contractor;
+  const permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(internalUser.account_owner_user_id);
 
   const _t_businessIdentity = opsTimingEnabled ? Date.now() : 0;
   const operationalTenantIdentityPromise = resolveOperationalTenantIdentity({
@@ -656,12 +686,20 @@ function subtractBusinessDays(date: Date, days: number) {
 
     if (contractorScopeFilter) scheduledOpenRowsQ = scheduledOpenRowsQ.eq("contractor_id", contractorScopeFilter);
 
-    const [countsResWs, fieldWorkCountRes, scheduledOpenRowsRes, unreadContractorUpdates, unreadNewWorkRequests] = await Promise.all([
+    const [countsResWs, fieldWorkCountRes, scheduledOpenRowsRes, unreadContractorUpdates, unreadNewWorkRequests, activePermitRequestsResult] = await Promise.all([
       countsQ,
       fieldWorkCountQ,
       scheduledOpenRowsQ,
       listInternalContractorUpdateAwareness({ limit: 100, onlyUnread: true }),
       listInternalNewWorkRequestAwareness({ limit: 100, onlyUnread: true }),
+      permitWorkflowEnabled
+        ? listActivePermitRequestQueueRowsIfAvailable({
+            supabase: supabase as any,
+            accountOwnerUserId: internalUser.account_owner_user_id,
+            contractorId: contractorScopeFilter,
+            limit: 50,
+          })
+        : Promise.resolve({ schemaAvailable: true, rows: [] as PermitRequestQueueRow[] }),
     ]);
 
     if (countsResWs.error) throw countsResWs.error;
@@ -707,6 +745,12 @@ function subtractBusinessDays(date: Date, days: number) {
     const closeoutCount =
       (countsWs.get("invoice_required") ?? 0) +
       (countsWs.get("paperwork_required") ?? 0);
+    const permitRequestsSchemaAvailable = permitWorkflowEnabled && activePermitRequestsResult.schemaAvailable;
+    const activePermitRequestRows = activePermitRequestsResult.rows;
+    const effectiveBoardBucketFilter =
+      activeBoardBucketFilter === "permits" && !permitRequestsSchemaAvailable
+        ? "pending"
+        : activeBoardBucketFilter;
 
     const workspaceTabs = [
       {
@@ -745,6 +789,14 @@ function subtractBusinessDays(date: Date, days: number) {
         count: closeoutCount,
         href: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
       },
+      ...(permitRequestsSchemaAvailable
+        ? [{
+            key: "permits",
+            label: "Permits",
+            count: activePermitRequestRows.length,
+            href: `/ops${buildQueryString({ bucket: "permits", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
+          }]
+        : []),
       {
         key: "updates",
         label: "Updates",
@@ -759,9 +811,17 @@ function subtractBusinessDays(date: Date, days: number) {
       waiting: "waiting",
       exceptions: "exceptions",
       closeout: "closeout",
+      permits: "permits",
     };
-    const coreBoardWorkspaceKeys = ["need_to_schedule", "field_work", "waiting", "exceptions", "closeout"];
-    const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[activeBoardBucketFilter]];
+    const coreBoardWorkspaceKeys = [
+      "need_to_schedule",
+      "field_work",
+      "waiting",
+      "exceptions",
+      "closeout",
+      ...(permitRequestsSchemaAvailable ? ["permits"] : []),
+    ];
+    const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter]];
 
     async function loadWithoutTechPreviewRows() {
       const withoutTechPreviewIds = (scheduledWithoutTechSnapshot.preview ?? [])
@@ -818,6 +878,8 @@ function subtractBusinessDays(date: Date, days: number) {
         queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
       } else if (workspaceKey === "closeout") {
         queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["invoice_required", "paperwork_required"]);
+      } else if (workspaceKey === "permits") {
+        return [];
       } else {
         return [];
       }
@@ -849,10 +911,17 @@ function subtractBusinessDays(date: Date, days: number) {
       previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter),
     }));
     const selectedWorkspaceKey = requestedWorkspaceKeys[0];
-    const selectedPreviewRows = visibleWorkspaceSections.flatMap((section) => section.previewRows);
-    const selectedWorkspaceTab = { ...visibleWorkspaceSections[0], count: selectedPreviewRows.length };
     const selectedWorkspaceSection =
       visibleWorkspaceSections.find((section) => section.key === selectedWorkspaceKey) ?? visibleWorkspaceSections[0];
+    const selectedPermitRows = selectedWorkspaceKey === "permits" ? activePermitRequestRows : [];
+    const selectedPreviewRows =
+      selectedWorkspaceKey === "permits"
+        ? []
+        : visibleWorkspaceSections.flatMap((section) => section.previewRows);
+    const selectedWorkspaceTab = {
+      ...visibleWorkspaceSections[0],
+      count: selectedWorkspaceKey === "permits" ? selectedPermitRows.length : selectedPreviewRows.length,
+    };
     const workspaceQueueChips = coreBoardWorkspaceKeys.map((workspaceKey) => {
       const section =
         visibleWorkspaceSections.find((item) => item.key === workspaceKey) ??
@@ -869,6 +938,8 @@ function subtractBusinessDays(date: Date, days: number) {
           ? "exceptions"
           : workspaceKey === "closeout"
           ? "closeout"
+          : workspaceKey === "permits"
+          ? "permits"
           : "all";
       const previewRows = "previewRows" in section && Array.isArray(section.previewRows) ? section.previewRows : [];
       const isSelected = workspaceKey === selectedWorkspaceSection?.key;
@@ -879,6 +950,8 @@ function subtractBusinessDays(date: Date, days: number) {
           ? "Scheduling"
           : workspaceKey === "waiting"
           ? "Waiting"
+          : workspaceKey === "permits"
+          ? "Permits"
           : section.label,
         isSelected,
         previewRows,
@@ -891,7 +964,7 @@ function subtractBusinessDays(date: Date, days: number) {
       };
     });
     const clearOpsBoardFiltersHref = `/ops${buildQueryString({
-      bucket: activeBoardBucketFilter,
+      bucket: effectiveBoardBucketFilter,
       sort: boardSort === "oldest" ? "" : boardSort,
     })}#ops-workspace`;
     const hasActiveOpsBoardFilters = Boolean(contractorScopeFilter) || Boolean(effectiveBoardReasonFilter);
@@ -934,14 +1007,200 @@ function subtractBusinessDays(date: Date, days: number) {
     if (workspaceContractorsRes.error) throw workspaceContractorsRes.error;
     const workspaceContractors = workspaceContractorsRes.data ?? [];
     const showWorkspaceContractorFilter = workspaceContractors.length > 0 && !isHvacServiceMode;
+    const shouldLoadPermitJobOptions = selectedWorkspaceKey === "permits";
+    const [permitJobCustomersRes, permitJobLocationsRes] = shouldLoadPermitJobOptions
+      ? await Promise.all([
+          supabase
+            .from("customers")
+            .select("id, full_name, first_name, last_name, phone")
+            .eq("owner_user_id", internalUser.account_owner_user_id)
+            .order("last_name", { ascending: true })
+            .limit(200),
+          supabase
+            .from("locations")
+            .select("id, customer_id, address_line1, city, state, zip, postal_code")
+            .eq("owner_user_id", internalUser.account_owner_user_id)
+            .order("address_line1", { ascending: true })
+            .limit(500),
+        ])
+      : [
+          { data: [] as any[], error: null },
+          { data: [] as any[], error: null },
+        ];
+
+    if (permitJobCustomersRes.error) throw permitJobCustomersRes.error;
+    if (permitJobLocationsRes.error) throw permitJobLocationsRes.error;
+
+    const permitJobCustomerOptions: PermitJobCustomerOption[] = (permitJobCustomersRes.data ?? [])
+      .map((customer: any) => {
+        const id = String(customer?.id ?? "").trim();
+        const name =
+          String(customer?.full_name ?? "").trim() ||
+          [customer?.first_name, customer?.last_name]
+            .map((part) => String(part ?? "").trim())
+            .filter(Boolean)
+            .join(" ") ||
+          id;
+        const phone = String(customer?.phone ?? "").trim();
+        return id
+          ? {
+              id,
+              label: phone ? `${name} - ${phone}` : name,
+            }
+          : null;
+      })
+      .filter(Boolean) as PermitJobCustomerOption[];
+
+    const permitCustomerLabelById = new Map(
+      permitJobCustomerOptions.map((customer) => [customer.id, customer.label]),
+    );
+    const permitJobLocationOptions: PermitJobLocationOption[] = (permitJobLocationsRes.data ?? [])
+      .map((location: any) => {
+        const id = String(location?.id ?? "").trim();
+        const customerId = String(location?.customer_id ?? "").trim();
+        const address = String(location?.address_line1 ?? "").trim() || "Address";
+        const cityStateZip = [
+          String(location?.city ?? "").trim(),
+          [String(location?.state ?? "").trim(), String(location?.zip ?? location?.postal_code ?? "").trim()]
+            .filter(Boolean)
+            .join(" "),
+        ]
+          .filter(Boolean)
+          .join(", ");
+        const customerLabel = permitCustomerLabelById.get(customerId);
+        const label = [address, cityStateZip].filter(Boolean).join(", ");
+        return id && customerId
+          ? {
+              id,
+              customerId,
+              label: customerLabel ? `${label || id} - ${customerLabel}` : label || id,
+            }
+          : null;
+      })
+      .filter(Boolean) as PermitJobLocationOption[];
     const activeWorkspaceHref = `/ops${buildQueryString({
-      bucket,
+      bucket: effectiveBoardBucketFilter,
       contractor: contractorScopeFilter ?? "",
       q: q ?? "",
       sort,
       reason: effectiveBoardReasonFilter ?? "",
       signal,
     })}#ops-workspace`;
+    const selectedWorkspaceItemCount =
+      selectedWorkspaceKey === "permits"
+        ? selectedPermitRows.length
+        : selectedWorkspaceSection?.previewRows.length ?? 0;
+    const selectedWorkspaceItemNoun =
+      selectedWorkspaceKey === "permits" ? "permit requests" : "jobs";
+    const selectedPermitAttachmentResult = selectedPermitRows.length
+      ? await listInternalPermitRequestAttachmentsForAccount({
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          permitRequestIds: selectedPermitRows.map((row) => row.id),
+        })
+      : { schemaAvailable: true, attachmentsByPermitRequestId: {} };
+    const permitAttachmentsByRequestId = selectedPermitAttachmentResult.attachmentsByPermitRequestId;
+
+    function formatPermitQueueTimestamp(value: string | null | undefined) {
+      const normalized = String(value ?? "").trim();
+      if (!normalized) return "Not available";
+      const parsed = new Date(normalized);
+      if (Number.isNaN(parsed.getTime())) return "Not available";
+
+      return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(parsed);
+    }
+
+    function permitQueueContext(row: PermitRequestQueueRow) {
+      const parts = [
+        row.jobContext?.title,
+        row.jobContext?.customerName,
+        row.jobContext?.location,
+      ]
+        .map((part) => String(part ?? "").trim())
+        .filter(Boolean);
+
+      return parts.length ? parts.join(" · ") : "Permit paperwork request";
+    }
+
+    function formatPermitAttachmentType(contentType: string | null | undefined, fileName: string | null | undefined) {
+      const normalizedType = String(contentType ?? "").trim();
+      if (normalizedType) return normalizedType;
+      const normalizedName = String(fileName ?? "").trim();
+      const extension = normalizedName.includes(".") ? normalizedName.split(".").pop() : "";
+      return extension ? extension.toUpperCase() : "File";
+    }
+
+    function formatPermitAttachmentSize(fileSize: number | null | undefined) {
+      if (!Number.isFinite(fileSize ?? NaN) || !fileSize) return null;
+      if (fileSize < 1024) return `${fileSize} B`;
+      if (fileSize < 1024 * 1024) return `${Math.round(fileSize / 1024)} KB`;
+      return `${(fileSize / (1024 * 1024)).toFixed(1)} MB`;
+    }
+
+    async function createManualPermitRequestFromOps(formData: FormData) {
+      "use server";
+
+      await createInternalManualPermitRequest(formData);
+      redirect("/ops?bucket=permits#ops-workspace");
+    }
+
+    async function acceptPermitRequestFromOps(formData: FormData) {
+      "use server";
+
+      await acceptInternalPermitRequest(formData);
+      redirect("/ops?bucket=permits#ops-workspace");
+    }
+
+    async function holdPermitRequestFromOps(formData: FormData) {
+      "use server";
+
+      await holdInternalPermitRequest(formData);
+      redirect("/ops?bucket=permits#ops-workspace");
+    }
+
+    async function resumePermitRequestFromOps(formData: FormData) {
+      "use server";
+
+      await resumeInternalPermitRequest(formData);
+      redirect("/ops?bucket=permits#ops-workspace");
+    }
+
+    async function updatePermitRequestIntakeFromOps(formData: FormData) {
+      "use server";
+
+      await updateInternalPermitRequestIntake(formData);
+      redirect("/ops?bucket=permits#ops-workspace");
+    }
+
+    async function markPermitCreatedFromOps(formData: FormData) {
+      "use server";
+
+      try {
+        await markInternalPermitCreated(formData);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Permit could not be marked created.";
+        redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
+      }
+
+      redirect("/ops?bucket=permits#ops-workspace");
+    }
+
+    async function createJobAndMarkPermitCreatedFromOps(formData: FormData) {
+      "use server";
+
+      try {
+        await createJobFromPermitRequestAndMarkCreated(formData);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Permit job could not be created.";
+        redirect(`/ops?bucket=permits&permit_error=${encodeURIComponent(message)}#ops-workspace`);
+      }
+
+      redirect("/ops?bucket=permits#ops-workspace");
+    }
 
     return (
       <div className="mx-auto max-w-[92rem] space-y-3 p-2.5 text-gray-900 sm:space-y-4 sm:p-4 xl:px-6">
@@ -1017,7 +1276,7 @@ function subtractBusinessDays(date: Date, days: number) {
             <form action="/ops" method="get" className="grid gap-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Reason</label>
               <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
-              <input type="hidden" name="bucket" value={activeBoardBucketFilter} />
+              <input type="hidden" name="bucket" value={effectiveBoardBucketFilter} />
               <input type="hidden" name="sort" value={boardSort} />
               <select
                 name="reason"
@@ -1038,7 +1297,7 @@ function subtractBusinessDays(date: Date, days: number) {
             <form action="/ops" method="get" className="grid gap-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Sort</label>
               <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
-              <input type="hidden" name="bucket" value={activeBoardBucketFilter} />
+              <input type="hidden" name="bucket" value={effectiveBoardBucketFilter} />
               <input type="hidden" name="reason" value={effectiveBoardReasonFilter ?? ""} />
               <select
                 name="sort"
@@ -1067,11 +1326,650 @@ function subtractBusinessDays(date: Date, days: number) {
               <div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
                 <div className="text-[15px] font-semibold tracking-tight text-slate-950">{selectedWorkspaceSection?.label ?? selectedWorkspaceTab.label}</div>
-                <div className="text-xs text-slate-600">{selectedWorkspaceSection?.previewRows.length ?? 0} jobs</div>
+                <div className="text-xs text-slate-600">
+                  {selectedWorkspaceItemCount} {selectedWorkspaceItemNoun}
+                </div>
               </div>
             </div>
 
-            {!selectedWorkspaceSection || selectedWorkspaceSection.previewRows.length === 0 ? (
+            {selectedWorkspaceKey === "permits" ? (
+              <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
+                <div className="text-[13px] font-semibold text-slate-950">New Permit Request</div>
+                <div className="mt-0.5 text-xs text-slate-600">
+                  Internal intake for phone, text, email, or photo requests.
+                </div>
+                <form action={createManualPermitRequestFromOps} className="mt-3 grid gap-2 lg:grid-cols-2">
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    Contractor
+                    <select
+                      name="contractor_id"
+                      required
+                      disabled={workspaceContractors.length === 0}
+                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 disabled:bg-slate-100 disabled:text-slate-500"
+                    >
+                      <option value="">Select contractor</option>
+                      {workspaceContractors.map((contractor: { id: string; name: string | null }) => (
+                        <option key={contractor.id} value={contractor.id}>
+                          {contractor.name || contractor.id}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    Short request label
+                    <input
+                      name="request_label"
+                      maxLength={160}
+                      placeholder="Permit needed for signed contract"
+                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    Customer first name
+                    <input
+                      name="customer_first_name"
+                      maxLength={120}
+                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    Customer last name
+                    <input
+                      name="customer_last_name"
+                      maxLength={120}
+                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    Service address
+                    <input
+                      name="service_address_text"
+                      maxLength={500}
+                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                    Jurisdiction
+                    <input
+                      name="jurisdiction"
+                      maxLength={160}
+                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                    />
+                  </label>
+                  <label className="grid gap-1 text-xs font-semibold text-slate-600 lg:col-span-2">
+                    Intake note
+                    <textarea
+                      name="intake_note"
+                      rows={3}
+                      maxLength={4000}
+                      placeholder="What did Compliance Matters receive?"
+                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                    />
+                  </label>
+                  <div className="flex flex-wrap items-center justify-between gap-2 lg:col-span-2">
+                    <div className="text-xs text-slate-500">Add a short label or note to create the request.</div>
+                    <button
+                      type="submit"
+                      disabled={workspaceContractors.length === 0}
+                      className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+                    >
+                      Create Permit Request
+                    </button>
+                  </div>
+                </form>
+              </div>
+            ) : null}
+
+            {selectedWorkspaceKey === "permits" ? (
+              selectedPermitRows.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                  No active permit requests.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {permitActionError ? (
+                    <div className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-[13px] font-medium text-rose-900">
+                      {permitActionError}
+                    </div>
+                  ) : null}
+                  {selectedPermitRows.map((permitRequest) => {
+                    const permitAttachments = permitAttachmentsByRequestId[permitRequest.id] ?? [];
+
+                    return (
+                    <div
+                      key={permitRequest.id}
+                      className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <div className="text-[14px] font-semibold leading-5 text-slate-950">
+                            {permitRequest.requestLabel || permitRequest.internalStatusLabel}
+                          </div>
+                          <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700">
+                            {permitQueueContext(permitRequest)}
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                          {permitRequest.status === "permit_request" ? (
+                            <form action={acceptPermitRequestFromOps}>
+                              <input type="hidden" name="permit_request_id" value={permitRequest.id} />
+                              <button
+                                type="submit"
+                                className="inline-flex min-h-8 items-center rounded-md border border-emerald-200 bg-emerald-50 px-2 py-1 text-[12px] font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+                              >
+                                Accept / Start Permit
+                              </button>
+                            </form>
+                          ) : null}
+                          {permitRequest.status === "permit_request" || permitRequest.status === "accepted_in_process" ? (
+                            <form action={holdPermitRequestFromOps}>
+                              <input type="hidden" name="permit_request_id" value={permitRequest.id} />
+                              <button
+                                type="submit"
+                                className="inline-flex min-h-8 items-center rounded-md border border-amber-200 bg-amber-50 px-2 py-1 text-[12px] font-semibold text-amber-800 transition-colors hover:bg-amber-100"
+                              >
+                                Put On Hold
+                              </button>
+                            </form>
+                          ) : null}
+                          {permitRequest.status === "on_hold_additional_info_needed" ? (
+                            <form action={resumePermitRequestFromOps}>
+                              <input type="hidden" name="permit_request_id" value={permitRequest.id} />
+                              <button
+                                type="submit"
+                                className="inline-flex min-h-8 items-center rounded-md border border-blue-200 bg-blue-50 px-2 py-1 text-[12px] font-semibold text-blue-800 transition-colors hover:bg-blue-100"
+                              >
+                                Resume / In Process
+                              </button>
+                            </form>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      <details className="mt-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
+                        <summary className="cursor-pointer text-[12px] font-semibold text-blue-700">
+                          Edit Permit Intake
+                        </summary>
+                        <form action={updatePermitRequestIntakeFromOps} className="mt-2 grid gap-2 md:grid-cols-2">
+                          <input type="hidden" name="permit_request_id" value={permitRequest.id} />
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Request label
+                            <input
+                              name="request_label"
+                              defaultValue={permitRequest.requestLabel ?? ""}
+                              maxLength={160}
+                              className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Jurisdiction
+                            <input
+                              name="jurisdiction"
+                              defaultValue={permitRequest.jurisdiction ?? ""}
+                              maxLength={160}
+                              className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Customer first name
+                            <input
+                              name="customer_first_name_snapshot"
+                              defaultValue={permitRequest.customerFirstNameSnapshot ?? ""}
+                              maxLength={120}
+                              className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Customer last name
+                            <input
+                              name="customer_last_name_snapshot"
+                              defaultValue={permitRequest.customerLastNameSnapshot ?? ""}
+                              maxLength={120}
+                              className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                            Service address
+                            <input
+                              name="service_address_text_snapshot"
+                              defaultValue={permitRequest.serviceAddressTextSnapshot ?? ""}
+                              maxLength={500}
+                              className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Permit number
+                            <input
+                              name="permit_number"
+                              defaultValue={permitRequest.permitNumber ?? ""}
+                              maxLength={160}
+                              className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                            Permit date
+                            <input
+                              type="date"
+                              name="permit_date"
+                              defaultValue={permitRequest.permitDate ?? ""}
+                              className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                            Internal intake note
+                            <textarea
+                              name="internal_intake_note"
+                              defaultValue={permitRequest.internalIntakeNote ?? ""}
+                              rows={3}
+                              maxLength={4000}
+                              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                            Contractor note
+                            <textarea
+                              name="contractor_note"
+                              defaultValue={permitRequest.contractorNote ?? ""}
+                              rows={3}
+                              maxLength={4000}
+                              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                            />
+                          </label>
+                          <div className="flex justify-end md:col-span-2">
+                            <button
+                              type="submit"
+                              className="inline-flex min-h-9 items-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
+                            >
+                              Save Intake Details
+                            </button>
+                          </div>
+                        </form>
+                        <div className="mt-3 border-t border-slate-200 pt-2">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <div className="text-[12px] font-semibold text-slate-700">Submitted files</div>
+                            <div className="text-[11px] font-medium text-slate-500">
+                              {permitAttachments.length} {permitAttachments.length === 1 ? "file" : "files"}
+                            </div>
+                          </div>
+                          {permitAttachments.length === 0 ? (
+                            <div className="mt-1 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-2.5 py-2 text-xs text-slate-500">
+                              No files attached.
+                            </div>
+                          ) : (
+                            <div className="mt-1 space-y-1.5">
+                              {permitAttachments.map((attachment) => {
+                                const sizeLabel = formatPermitAttachmentSize(attachment.fileSize);
+                                const typeLabel = formatPermitAttachmentType(attachment.contentType, attachment.fileName);
+                                return (
+                                  <div
+                                    key={attachment.id}
+                                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs"
+                                  >
+                                    <div className="min-w-0">
+                                      <div className="truncate font-semibold text-slate-800" title={attachment.fileName}>
+                                        {attachment.fileName}
+                                      </div>
+                                      <div className="mt-0.5 text-slate-500">
+                                        {[typeLabel, sizeLabel, formatPermitQueueTimestamp(attachment.createdAt)].filter(Boolean).join(" · ")}
+                                      </div>
+                                    </div>
+                                    {attachment.signedUrl ? (
+                                      <a
+                                        href={attachment.signedUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex min-h-8 items-center rounded-md border border-slate-300 bg-slate-50 px-2 py-1 font-semibold text-slate-700 transition-colors hover:bg-white"
+                                      >
+                                        Open
+                                      </a>
+                                    ) : (
+                                      <span className="text-[11px] font-medium text-slate-400">Unavailable</span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </details>
+
+                      <details className="mt-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
+                        <summary className="cursor-pointer text-[12px] font-semibold text-emerald-700">
+                          Mark Permit Created
+                        </summary>
+                        {permitRequest.jobId ? (
+                          <form action={markPermitCreatedFromOps} className="mt-2 grid gap-2 md:grid-cols-2">
+                            <input type="hidden" name="permit_request_id" value={permitRequest.id} />
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Permit number
+                              <input
+                                name="permit_number"
+                                defaultValue={permitRequest.permitNumber ?? ""}
+                                maxLength={160}
+                                required
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Permit date
+                              <input
+                                type="date"
+                                name="permit_date"
+                                defaultValue={permitRequest.permitDate ?? ""}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Jurisdiction
+                              <input
+                                name="jurisdiction"
+                                defaultValue={permitRequest.jurisdiction ?? ""}
+                                maxLength={160}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              What happens next?
+                              <select
+                                name="post_permit_route"
+                                required
+                                defaultValue=""
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              >
+                                <option value="" disabled>Select next step</option>
+                                <option value="ready_for_testing">Ready for Testing</option>
+                                <option value="pending_install">Pending Install</option>
+                              </select>
+                            </label>
+                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
+                              <div>
+                                <span className="font-semibold text-slate-700">Ready for Testing:</span>{" "}
+                                Moves the linked job toward scheduling if it is not already scheduled.
+                              </div>
+                              <div>
+                                <span className="font-semibold text-slate-700">Pending Install:</span>{" "}
+                                Moves the linked job to Waiting / On Hold — Pending Install.
+                              </div>
+                            </div>
+                            <div className="flex justify-end md:col-span-2">
+                              <button
+                                type="submit"
+                                className="inline-flex min-h-9 items-center rounded-md border border-emerald-700 bg-emerald-700 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-emerald-800"
+                              >
+                                Mark Permit Created
+                              </button>
+                            </div>
+                          </form>
+                        ) : (
+                          <form action={createJobAndMarkPermitCreatedFromOps} className="mt-2 grid gap-2 md:grid-cols-2">
+                            <input type="hidden" name="permit_request_id" value={permitRequest.id} />
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-[12.5px] font-medium leading-5 text-amber-950 md:col-span-2">
+                              No job is linked yet. Create the testing job from this permit request when the permit is ready.
+                            </div>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Permit number
+                              <input
+                                name="permit_number"
+                                defaultValue={permitRequest.permitNumber ?? ""}
+                                maxLength={160}
+                                required
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Permit date
+                              <input
+                                type="date"
+                                name="permit_date"
+                                defaultValue={permitRequest.permitDate ?? ""}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Jurisdiction
+                              <input
+                                name="jurisdiction"
+                                defaultValue={permitRequest.jurisdiction ?? ""}
+                                maxLength={160}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              What happens next?
+                              <select
+                                name="post_permit_route"
+                                required
+                                defaultValue=""
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              >
+                                <option value="" disabled>Select next step</option>
+                                <option value="ready_for_testing">Ready for Testing</option>
+                                <option value="pending_install">Pending Install</option>
+                              </select>
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                              Job title / request label
+                              <input
+                                name="job_title"
+                                defaultValue={permitRequest.requestLabel ?? ""}
+                                maxLength={160}
+                                placeholder="ECC Alteration Test"
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                              Customer/location mode
+                              <select
+                                name="customer_location_mode"
+                                required
+                                defaultValue=""
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              >
+                                <option value="" disabled>Select customer/location mode</option>
+                                <option value="existing_existing">Existing customer + existing location</option>
+                                <option value="existing_new">Existing customer + new location</option>
+                                <option value="new_new">New customer + new location</option>
+                              </select>
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Existing customer
+                              <select
+                                name="existing_customer_id"
+                                defaultValue=""
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              >
+                                <option value="">Select existing customer</option>
+                                {permitJobCustomerOptions.map((customer) => (
+                                  <option key={customer.id} value={customer.id}>
+                                    {customer.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Existing location
+                              <select
+                                name="existing_location_id"
+                                defaultValue=""
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              >
+                                <option value="">Select existing location</option>
+                                {permitJobLocationOptions.map((location) => (
+                                  <option key={location.id} value={location.id}>
+                                    {location.label}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Customer first name
+                              <input
+                                name="customer_first_name"
+                                defaultValue={permitRequest.customerFirstNameSnapshot ?? ""}
+                                maxLength={120}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Customer last name
+                              <input
+                                name="customer_last_name"
+                                defaultValue={permitRequest.customerLastNameSnapshot ?? ""}
+                                maxLength={120}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Customer email
+                              <input
+                                type="email"
+                                name="customer_email"
+                                maxLength={240}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Customer phone
+                              <input
+                                name="customer_phone"
+                                maxLength={80}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600 md:col-span-2">
+                              New location address line 1
+                              <input
+                                name="address_line1"
+                                maxLength={240}
+                                placeholder={permitRequest.serviceAddressTextSnapshot ?? "Street address"}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                              {permitRequest.serviceAddressTextSnapshot ? (
+                                <span className="text-[11px] font-medium text-slate-500">
+                                  Intake hint: {permitRequest.serviceAddressTextSnapshot}
+                                </span>
+                              ) : null}
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              City
+                              <input
+                                name="city"
+                                maxLength={120}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              State
+                              <input
+                                name="state"
+                                defaultValue="CA"
+                                maxLength={40}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Zip
+                              <input
+                                name="zip"
+                                maxLength={40}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                              Location nickname
+                              <input
+                                name="location_nickname"
+                                maxLength={160}
+                                className="min-h-9 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm font-medium text-slate-900"
+                              />
+                            </label>
+                            <div className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-2 text-[12px] leading-5 text-slate-600 md:col-span-2">
+                              <div>
+                                <span className="font-semibold text-slate-700">Ready for Testing:</span>{" "}
+                                Creates an unscheduled ECC testing job and moves it to Scheduling.
+                              </div>
+                              <div>
+                                <span className="font-semibold text-slate-700">Pending Install:</span>{" "}
+                                Creates an ECC testing job and places it On Hold — Pending Install.
+                              </div>
+                              <div>
+                                Existing customer/location selections are account-scoped. New location fields are explicit and are not parsed from the intake address hint.
+                              </div>
+                            </div>
+                            <div className="flex justify-end md:col-span-2">
+                              <button
+                                type="submit"
+                                className="inline-flex min-h-9 items-center rounded-md border border-emerald-700 bg-emerald-700 px-3 py-1.5 text-[12px] font-semibold text-white transition-colors hover:bg-emerald-800"
+                              >
+                                Create Job & Mark Permit Created
+                              </button>
+                            </div>
+                          </form>
+                        )}
+                      </details>
+
+                      <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-2">
+                        {permitRequest.requestLabel ? (
+                          <div className="sm:col-span-2">
+                            <span className="font-medium text-slate-500">Request:</span>{" "}
+                            {permitRequest.requestLabel}
+                          </div>
+                        ) : null}
+                        {permitRequest.customerFirstNameSnapshot || permitRequest.customerLastNameSnapshot ? (
+                          <div>
+                            <span className="font-medium text-slate-500">Customer:</span>{" "}
+                            {[permitRequest.customerFirstNameSnapshot, permitRequest.customerLastNameSnapshot].filter(Boolean).join(" ")}
+                          </div>
+                        ) : null}
+                        {permitRequest.serviceAddressTextSnapshot ? (
+                          <div>
+                            <span className="font-medium text-slate-500">Address:</span>{" "}
+                            {permitRequest.serviceAddressTextSnapshot}
+                          </div>
+                        ) : null}
+                        <div>
+                          <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                          {permitRequest.contractorName || permitRequest.contractorId}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-500">Submitted:</span>{" "}
+                          {permitRequest.submittedAgeDays} days ago · {formatPermitQueueTimestamp(permitRequest.createdAt)}
+                        </div>
+                        {permitRequest.jurisdiction ? (
+                          <div>
+                            <span className="font-medium text-slate-500">Jurisdiction:</span>{" "}
+                            {permitRequest.jurisdiction}
+                          </div>
+                        ) : null}
+                        {permitRequest.permitNumber ? (
+                          <div>
+                            <span className="font-medium text-slate-500">Permit #:</span>{" "}
+                            {permitRequest.permitNumber}
+                          </div>
+                        ) : null}
+                        <div>
+                          <span className="font-medium text-slate-500">Updated:</span>{" "}
+                          {formatPermitQueueTimestamp(permitRequest.updatedAt)}
+                        </div>
+                        {permitRequest.contractorNote ? (
+                          <div className="sm:col-span-2">
+                            <span className="font-medium text-slate-500">Contractor note:</span>{" "}
+                            {permitRequest.contractorNote}
+                          </div>
+                        ) : null}
+                        {permitRequest.internalIntakeNote ? (
+                          <div className="sm:col-span-2">
+                            <span className="font-medium text-slate-500">Internal note:</span>{" "}
+                            {permitRequest.internalIntakeNote}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                    );
+                  })}
+                </div>
+              )
+            ) : !selectedWorkspaceSection || selectedWorkspaceSection.previewRows.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
                 <div>{hasActiveOpsBoardFilters ? "No jobs match these filters." : "No jobs in this queue right now."}</div>
                 {hasActiveOpsBoardFilters ? (

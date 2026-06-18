@@ -43,6 +43,7 @@ import {
   portalSecondaryButtonClass,
 } from "@/components/portal/PortalChrome";
 import { listPartnerWorkSourceLabelMapForJobs } from "@/lib/portal/partner-work-read-model";
+import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 
 function formatDateLA(iso: string) {
   return new Intl.DateTimeFormat("en-US", {
@@ -116,6 +117,7 @@ export default async function PortalPage({
   const contractorId = portalContext.contractorId;
   const contractorName =
     portalContext.contractorName ?? (contractorId ? "Contractor" : null);
+  const permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(portalContext.accountOwnerUserId);
 
   const pendingIntakeProposals = await listPendingContractorIntakeProposalsForContractor({
     contractorId,
@@ -496,6 +498,14 @@ export default async function PortalPage({
             >
               Send Work to Compliance Matters
             </Link>
+            {permitWorkflowEnabled ? (
+              <Link
+                href="/portal/permit-request"
+                className={portalSecondaryButtonClass}
+              >
+                Request Permit
+              </Link>
+            ) : null}
             <div className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">
               {activeResolvedJobs.length} portal jobs
             </div>
