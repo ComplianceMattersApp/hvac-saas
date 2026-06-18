@@ -310,6 +310,34 @@ describe("contractor portal intake proposal scope hardening", () => {
     });
   });
 
+  it("resolves valid active contractor membership into the portal context used by routing", async () => {
+    const supabase = makeContractorPortalSupabaseFixture();
+
+    const { requireCurrentContractorPortalContext } = await import(
+      "@/lib/portal/intake-proposal-read-model"
+    );
+
+    await expect(requireCurrentContractorPortalContext({ supabase })).resolves.toEqual({
+      contractorId: "contractor-1",
+      contractorName: "Alpha Heating",
+      accountOwnerUserId: "owner-1",
+      userId: "contractor-user-1",
+    });
+  });
+
+  it("denies portal context when contractor membership has no readable contractor row", async () => {
+    const supabase = makeContractorPortalSupabaseFixture({
+      contractorId: "contractor-1",
+      contractorName: null,
+    });
+
+    const { requireCurrentContractorPortalContext } = await import(
+      "@/lib/portal/intake-proposal-read-model"
+    );
+
+    await expect(requireCurrentContractorPortalContext({ supabase })).rejects.toThrow("NOT_CONTRACTOR");
+  });
+
   it("allows same-contractor proposal detail reads and contractor addendum reads", async () => {
     const fixture = makeAdminFixture();
 
