@@ -34,16 +34,31 @@ describe("Ops workspace permit queue wiring", () => {
     expect(branch).toContain("No active permit requests.");
     expect(branch).toContain("permitRequest.internalStatusLabel");
     expect(branch).toContain("permitQueueContext(permitRequest)");
+    expect(branch).toContain("permitRequest.contractorName || permitRequest.contractorId");
+    expect(branch).toContain("permitRequest.submittedAgeDays");
+    expect(branch).toContain("permitRequest.serviceAddressTextSnapshot");
+    expect(branch).toContain("permitRequest.jurisdiction");
   });
 
   it("renders a small internal manual intake entry point for permits", () => {
     expect(opsPageSource).toContain("createInternalManualPermitRequest");
     expect(opsPageSource).toContain("createManualPermitRequestFromOps");
-    expect(opsPageSource).toContain("New Permit Request");
+    expect(opsPageSource).toContain("+ New Permit Request");
+    expect(opsPageSource).toContain("Create one from a text, phone call, email, or photo request.");
+    expect(opsPageSource).toContain("shouldExpandPermitCreateForm");
+    expect(opsPageSource).toContain("permitRequestCreateHref");
     expect(opsPageSource).toContain('name="contractor_id"');
     expect(opsPageSource).toContain('name="request_label"');
     expect(opsPageSource).toContain('name="intake_note"');
     expect(opsPageSource).toContain("Create Permit Request");
+  });
+
+  it("keeps the full create form collapsed by default and only opens from the create intent", () => {
+    expect(opsPageSource).toContain("createIntent");
+    expect(opsPageSource).toContain('create: "permit_request"');
+    expect(opsPageSource).toContain("open={shouldExpandPermitCreateForm}");
+    expect(opsPageSource).toContain('id="permit-request-create"');
+    expect(opsPageSource).toContain('href={permitRequestCreateHref}');
   });
 
   it("renders active-state permit controls with the mark-created completion entry point", () => {

@@ -10,6 +10,7 @@ type Props = {
   isInternalUser: boolean;
   isAdmin: boolean;
   isEstimatesEnabled: boolean;
+  showPermitRequestCreateItem: boolean;
   servicePlansEnabled: boolean;
   showOperationalNotificationAwareness: boolean;
   showPartnerWorkMenuItem: boolean;
@@ -40,6 +41,7 @@ export default function MobileShellMenu({
   isInternalUser,
   isAdmin,
   isEstimatesEnabled,
+  showPermitRequestCreateItem,
   servicePlansEnabled,
   showOperationalNotificationAwareness,
   showPartnerWorkMenuItem,
@@ -107,6 +109,11 @@ export default function MobileShellMenu({
               <Link href="/jobs/new?create_customer=1" onClick={closeMenu} className={mobileMenuItemClass()}>
                 New Customer
               </Link>
+              {showPermitRequestCreateItem ? (
+                <Link href="/ops?bucket=permits&create=permit_request#permit-request-create" onClick={closeMenu} className={mobileMenuItemClass()}>
+                  Permit Request
+                </Link>
+              ) : null}
               {isEstimatesEnabled ? (
                 <Link href="/estimates/new" onClick={closeMenu} className={mobileMenuItemClass()}>
                   New Estimate

@@ -14,6 +14,7 @@ import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
+import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 import { shouldShowPartnerWorkMenuItem } from "@/lib/portal/partner-work-access";
 import { createClient } from "@/lib/supabase/server";
 import { resolveHumanDisplayName } from "@/lib/utils/identity-display";
@@ -82,6 +83,7 @@ export default async function RootLayout({
   let unreadNotificationCount = 0;
   let productMode: ProductMode = "hybrid";
   let hasPartnerWorkAccess = false;
+  let permitWorkflowEnabled = false;
 
   if (access.preferredLandingContext === "portal") {
     homeHref = "/portal";
@@ -96,6 +98,7 @@ export default async function RootLayout({
     });
 
     hasPartnerWorkAccess = access.hasPortalAccess;
+    permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(accountOwnerUserId);
 
     productMode = await resolveProductModeForAccountOwnerId({
       supabase,
@@ -117,6 +120,14 @@ export default async function RootLayout({
       href: "/jobs/new",
       description: "Start a new job or service visit.",
     });
+
+    if (permitWorkflowEnabled) {
+      createMenuItems.push({
+        label: "Permit Request",
+        href: "/ops?bucket=permits&create=permit_request#permit-request-create",
+        description: "Create an internal permit request and return to the permit queue.",
+      });
+    }
   }
 
   if (isInternalUser) {
@@ -259,6 +270,7 @@ export default async function RootLayout({
                       isInternalUser={isInternalUser}
                       isAdmin={isAdmin}
                       isEstimatesEnabled={estimatesEnabled}
+                      showPermitRequestCreateItem={permitWorkflowEnabled}
                       showOperationalNotificationAwareness={showOperationalNotificationAwareness}
                       showPartnerWorkMenuItem={showPartnerWorkMenuItem}
                       unreadNotificationCount={unreadNotificationCount}

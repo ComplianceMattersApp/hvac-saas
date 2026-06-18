@@ -321,6 +321,7 @@ export default async function OpsPage({
 }: {
   searchParams?: Promise<{
   bucket?: string;
+  create?: string;
   contractor?: string;
   notice?: string;
   q?: string;
@@ -352,6 +353,7 @@ export default async function OpsPage({
   const boardReasonFilter = normalizeOpsBoardReason(sp.reason);
   const panel = (sp.panel ?? "").trim().toLowerCase();
   const permitActionError = (sp.permit_error ?? "").trim();
+  const createIntent = (sp.create ?? "").trim().toLowerCase();
 
   const opsTimingEnabled = process.env.OPS_TIMING_DEBUG === "true";
   const _t_total = opsTimingEnabled ? Date.now() : 0;
@@ -1080,6 +1082,7 @@ function subtractBusinessDays(date: Date, days: number) {
       .filter(Boolean) as PermitJobLocationOption[];
     const activeWorkspaceHref = `/ops${buildQueryString({
       bucket: effectiveBoardBucketFilter,
+      create: "",
       contractor: contractorScopeFilter ?? "",
       q: q ?? "",
       sort,
@@ -1092,6 +1095,15 @@ function subtractBusinessDays(date: Date, days: number) {
         : selectedWorkspaceSection?.previewRows.length ?? 0;
     const selectedWorkspaceItemNoun =
       selectedWorkspaceKey === "permits" ? "permit requests" : "jobs";
+    const permitRequestCreateHref = `/ops${buildQueryString({
+      bucket: "permits",
+      create: "permit_request",
+      contractor: contractorScopeFilter ?? "",
+      sort: boardSort === "oldest" ? "" : boardSort,
+      reason: effectiveBoardReasonFilter ?? "",
+    })}#permit-request-create`;
+    const shouldExpandPermitCreateForm =
+      selectedWorkspaceKey === "permits" && createIntent === "permit_request";
     const selectedPermitAttachmentResult = selectedPermitRows.length
       ? await listInternalPermitRequestAttachmentsForAccount({
           accountOwnerUserId: internalUser.account_owner_user_id,
@@ -1333,97 +1345,115 @@ function subtractBusinessDays(date: Date, days: number) {
             </div>
 
             {selectedWorkspaceKey === "permits" ? (
-              <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3">
-                <div className="text-[13px] font-semibold text-slate-950">New Permit Request</div>
-                <div className="mt-0.5 text-xs text-slate-600">
-                  Internal intake for phone, text, email, or photo requests.
-                </div>
-                <form action={createManualPermitRequestFromOps} className="mt-3 grid gap-2 lg:grid-cols-2">
-                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                    Contractor
-                    <select
-                      name="contractor_id"
-                      required
-                      disabled={workspaceContractors.length === 0}
-                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 disabled:bg-slate-100 disabled:text-slate-500"
-                    >
-                      <option value="">Select contractor</option>
-                      {workspaceContractors.map((contractor: { id: string; name: string | null }) => (
-                        <option key={contractor.id} value={contractor.id}>
-                          {contractor.name || contractor.id}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                    Short request label
-                    <input
-                      name="request_label"
-                      maxLength={160}
-                      placeholder="Permit needed for signed contract"
-                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                    Customer first name
-                    <input
-                      name="customer_first_name"
-                      maxLength={120}
-                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                    Customer last name
-                    <input
-                      name="customer_last_name"
-                      maxLength={120}
-                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                    Service address
-                    <input
-                      name="service_address_text"
-                      maxLength={500}
-                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-semibold text-slate-600">
-                    Jurisdiction
-                    <input
-                      name="jurisdiction"
-                      maxLength={160}
-                      className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
-                    />
-                  </label>
-                  <label className="grid gap-1 text-xs font-semibold text-slate-600 lg:col-span-2">
-                    Intake note
-                    <textarea
-                      name="intake_note"
-                      rows={3}
-                      maxLength={4000}
-                      placeholder="What did Compliance Matters receive?"
-                      className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
-                    />
-                  </label>
-                  <div className="flex flex-wrap items-center justify-between gap-2 lg:col-span-2">
-                    <div className="text-xs text-slate-500">Add a short label or note to create the request.</div>
-                    <button
-                      type="submit"
-                      disabled={workspaceContractors.length === 0}
-                      className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
-                    >
-                      Create Permit Request
-                    </button>
+              <details
+                id="permit-request-create"
+                open={shouldExpandPermitCreateForm}
+                className="mb-3 overflow-hidden rounded-2xl border border-slate-200 bg-slate-50/70"
+              >
+                <summary className="list-none cursor-pointer px-3 py-3 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-[13px] font-semibold text-blue-700">+ New Permit Request</div>
+                      <div className="mt-0.5 text-xs text-slate-600">
+                        Create one from a text, phone call, email, or photo request.
+                      </div>
+                    </div>
+                    <div className="inline-flex min-h-8 items-center rounded-full border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600">
+                      Open form
+                    </div>
                   </div>
-                </form>
-              </div>
+                </summary>
+                <div className="border-t border-slate-200 px-3 pb-3 pt-3">
+                  <form action={createManualPermitRequestFromOps} className="grid gap-2 lg:grid-cols-2">
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Contractor
+                      <select
+                        name="contractor_id"
+                        required
+                        disabled={workspaceContractors.length === 0}
+                        className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900 disabled:bg-slate-100 disabled:text-slate-500"
+                      >
+                        <option value="">Select contractor</option>
+                        {workspaceContractors.map((contractor: { id: string; name: string | null }) => (
+                          <option key={contractor.id} value={contractor.id}>
+                            {contractor.name || contractor.id}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Short request label
+                      <input
+                        name="request_label"
+                        maxLength={160}
+                        placeholder="Permit needed for signed contract"
+                        className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Customer first name
+                      <input
+                        name="customer_first_name"
+                        maxLength={120}
+                        className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Customer last name
+                      <input
+                        name="customer_last_name"
+                        maxLength={120}
+                        className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Service address
+                      <input
+                        name="service_address_text"
+                        maxLength={500}
+                        className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600">
+                      Jurisdiction
+                      <input
+                        name="jurisdiction"
+                        maxLength={160}
+                        className="min-h-10 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                      />
+                    </label>
+                    <label className="grid gap-1 text-xs font-semibold text-slate-600 lg:col-span-2">
+                      Intake note
+                      <textarea
+                        name="intake_note"
+                        rows={3}
+                        maxLength={4000}
+                        placeholder="What did Compliance Matters receive?"
+                        className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-medium text-slate-900"
+                      />
+                    </label>
+                    <div className="flex flex-wrap items-center justify-between gap-2 lg:col-span-2">
+                      <div className="text-xs text-slate-500">Add a short label or note to create the request.</div>
+                      <button
+                        type="submit"
+                        disabled={workspaceContractors.length === 0}
+                        className="inline-flex min-h-10 items-center justify-center rounded-xl border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-slate-800 disabled:border-slate-300 disabled:bg-slate-200 disabled:text-slate-500"
+                      >
+                        Create Permit Request
+                      </button>
+                    </div>
+                  </form>
+                </div>
+              </details>
             ) : null}
 
             {selectedWorkspaceKey === "permits" ? (
               selectedPermitRows.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                  No active permit requests.
+                  <div>No active permit requests.</div>
+                  <Link href={permitRequestCreateHref} className="mt-2 inline-flex font-semibold text-blue-700 underline-offset-2 hover:underline">
+                    + New Permit Request
+                  </Link>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -1442,8 +1472,54 @@ function subtractBusinessDays(date: Date, days: number) {
                     >
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="text-[14px] font-semibold leading-5 text-slate-950">
-                            {permitRequest.requestLabel || permitRequest.internalStatusLabel}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex min-h-6 items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                              {permitRequest.internalStatusLabel}
+                            </span>
+                            {permitRequest.requestLabel ? (
+                              <span className="text-[14px] font-semibold leading-5 text-slate-950">
+                                {permitRequest.requestLabel}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="mt-1 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-2">
+                            <div>
+                              <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                              {permitRequest.contractorName || permitRequest.contractorId}
+                            </div>
+                            <div>
+                              <span className="font-medium text-slate-500">Submitted:</span>{" "}
+                              {permitRequest.submittedAgeDays} days ago · {formatPermitQueueTimestamp(permitRequest.createdAt)}
+                            </div>
+                            {permitRequest.customerFirstNameSnapshot || permitRequest.customerLastNameSnapshot ? (
+                              <div>
+                                <span className="font-medium text-slate-500">Customer:</span>{" "}
+                                {[permitRequest.customerFirstNameSnapshot, permitRequest.customerLastNameSnapshot].filter(Boolean).join(" ")}
+                              </div>
+                            ) : null}
+                            {permitRequest.serviceAddressTextSnapshot ? (
+                              <div>
+                                <span className="font-medium text-slate-500">Address:</span>{" "}
+                                {permitRequest.serviceAddressTextSnapshot}
+                              </div>
+                            ) : null}
+                            {permitRequest.jurisdiction ? (
+                              <div>
+                                <span className="font-medium text-slate-500">Jurisdiction:</span>{" "}
+                                {permitRequest.jurisdiction}
+                              </div>
+                            ) : null}
+                            {permitRequest.contractorNote ? (
+                              <div className="sm:col-span-2">
+                                <span className="font-medium text-slate-500">Note:</span>{" "}
+                                {permitRequest.contractorNote}
+                              </div>
+                            ) : permitRequest.internalIntakeNote ? (
+                              <div className="sm:col-span-2">
+                                <span className="font-medium text-slate-500">Note:</span>{" "}
+                                {permitRequest.internalIntakeNote}
+                              </div>
+                            ) : null}
                           </div>
                           <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700">
                             {permitQueueContext(permitRequest)}
