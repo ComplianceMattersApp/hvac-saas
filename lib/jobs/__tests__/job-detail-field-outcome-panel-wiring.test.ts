@@ -251,6 +251,12 @@ describe("job detail field outcome panel wiring", () => {
   });
 
   it("surfaces closeout blockers and actions in Primary Next Action after field completion", () => {
+    const permitBlockerStart = jobDetailSource.indexOf("const showCertsPermitRequiredBlocker =");
+    const permitBlockerSlice =
+      permitBlockerStart > -1
+        ? jobDetailSource.slice(permitBlockerStart, permitBlockerStart + 550)
+        : "";
+
     expect(jobDetailSource).toContain("const showPrimaryCloseoutBlockers =");
     expect(jobDetailSource).toContain("isCloseoutPending");
     expect(jobDetailSource).toContain("(isCloseoutPending || closeoutNeeds.isFailureFlow)");
@@ -260,6 +266,7 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("{jobPageInvoiceNextAction}");
     expect(jobDetailSource).toContain("form action={markCertsCompleteFromForm}");
     expect(jobDetailSource).toContain("Permit number required before certs can be sent");
+    expect(permitBlockerSlice).toContain("!hasValidEccPermitNumber");
     expect(jobDetailSource).toContain("pending_info_reason: (job as any).pending_info_reason ?? null");
     expect(jobDetailSource).toContain("on_hold_reason: (job as any).on_hold_reason ?? null");
     expect(jobDetailSource).toContain("✓ Certs Sent");

@@ -193,6 +193,33 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("{visibleReason.detail}");
   });
 
+  it("guards Ops card reason rendering from bypassing the structured visible reason helper", () => {
+    const fullCardRenderStart = opsPageSource.indexOf("selectedWorkspaceSection.previewRows.map");
+    const fullCardRenderEnd = opsPageSource.indexOf("workspaceAgeLabel(job)", fullCardRenderStart);
+    const fullCardRenderSource =
+      fullCardRenderStart > -1 && fullCardRenderEnd > fullCardRenderStart
+        ? opsPageSource.slice(fullCardRenderStart, fullCardRenderEnd)
+        : "";
+
+    const compactRowStart = opsPageSource.indexOf("function compactRow(");
+    const compactRowEnd = opsPageSource.indexOf("const metaItems =", compactRowStart);
+    const compactRowSource =
+      compactRowStart > -1 && compactRowEnd > compactRowStart
+        ? opsPageSource.slice(compactRowStart, compactRowEnd)
+        : "";
+
+    expect(fullCardRenderSource).toContain("workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key)");
+    expect(fullCardRenderSource).toContain("{visibleReason.label}");
+    expect(fullCardRenderSource).toContain("{visibleReason.detail}");
+    expect(fullCardRenderSource).not.toContain("wsStatusReason(job");
+    expect(fullCardRenderSource).not.toContain("workspaceStatusReason(job");
+
+    expect(compactRowSource).toContain("const visibleReason = getOpsBoardVisibleReason(");
+    expect(compactRowSource).toContain("ops_board_failure_detail");
+    expect(compactRowSource).toContain("label: `${visibleReason.label}${statusAgeSuffix}`");
+    expect(compactRowSource).toContain("message: visibleReason.detail ||");
+  });
+
   it("loads the Closeout chip from status-shaped candidates plus the narrow permit exception", () => {
     expect(opsPageSource).toContain("async function loadCloseoutWorkspaceRows()");
     expect(opsPageSource).toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
@@ -204,6 +231,23 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("listCloseoutQueueJobs(");
     expect(opsPageSource).toContain("buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
     expect(opsPageSource).toContain("filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter, { queueKey: section.key })");
+  });
+
+  it("guards Closeout loading against broad field-complete candidate expansion", () => {
+    const loaderStart = opsPageSource.indexOf("async function loadCloseoutWorkspaceRows()");
+    const loaderEnd = opsPageSource.indexOf("async function loadWorkspacePreviewRows", loaderStart);
+    const loaderSource =
+      loaderStart > -1 && loaderEnd > loaderStart
+        ? opsPageSource.slice(loaderStart, loaderEnd)
+        : "";
+
+    expect(loaderSource).toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
+    expect(loaderSource).toContain('.in("ops_status", ["pending_info", "on_hold"])');
+    expect(loaderSource).toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
+    expect(loaderSource).toContain("buildBillingTruthCloseoutProjectionMap");
+    expect(loaderSource).toContain("listCloseoutQueueJobs(");
+    expect(loaderSource).not.toContain('.neq("ops_status", "closed")');
+    expect(loaderSource).not.toContain('.not("ops_status"');
   });
 
   it("shows clear filters and empty filtered state for unmatched board filters", () => {

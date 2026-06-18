@@ -124,6 +124,67 @@ describe("listCloseoutQueueJobs", () => {
     expect(rows[0]?.pending_info_reason).toBe("Permit Missing");
   });
 
+  it("does not treat field-complete unresolved jobs as closeout rows without actionable closeout work", () => {
+    const rows = listCloseoutQueueJobs([
+      {
+        id: "generic-pending-info",
+        job_type: "service",
+        ops_status: "pending_info",
+        pending_info_reason: "Approval Needed: Customer approval required",
+        field_complete: true,
+        invoice_complete: false,
+      },
+      {
+        id: "generic-on-hold",
+        job_type: "service",
+        ops_status: "on_hold",
+        on_hold_reason: "Status interrupt state test",
+        field_complete: true,
+        invoice_complete: false,
+      },
+      {
+        id: "need-to-schedule",
+        job_type: "service",
+        ops_status: "need_to_schedule",
+        field_complete: true,
+        invoice_complete: false,
+      },
+      {
+        id: "failed",
+        job_type: "ecc",
+        ops_status: "failed",
+        field_complete: true,
+        invoice_complete: false,
+        certs_complete: false,
+      },
+      {
+        id: "retest",
+        job_type: "ecc",
+        ops_status: "retest_needed",
+        field_complete: true,
+        invoice_complete: false,
+        certs_complete: false,
+      },
+      {
+        id: "correction-review",
+        job_type: "ecc",
+        ops_status: "pending_office_review",
+        field_complete: true,
+        invoice_complete: false,
+        certs_complete: false,
+      },
+      {
+        id: "actual-invoice-closeout",
+        job_type: "service",
+        ops_status: "invoice_required",
+        field_complete: true,
+        invoice_complete: false,
+      },
+    ], (job) => job);
+
+    expect(rows.map((row) => row.id)).toEqual(["actual-invoice-closeout"]);
+  });
+
   it("includes permit-missing jobs with combined invoice and cert closeout work", () => {
     const rows = listCloseoutQueueJobs([
       {

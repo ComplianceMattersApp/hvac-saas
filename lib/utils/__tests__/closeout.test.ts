@@ -155,6 +155,84 @@ describe("closeout queue projection", () => {
         certs_complete: false,
       }),
     ).toBe(false);
+
+    expect(
+      isInCloseoutQueue({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "pending_office_review",
+        invoice_complete: false,
+        certs_complete: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("does not broaden closeout to every field-complete unresolved job", () => {
+    const rows = [
+      {
+        label: "generic pending info with invoice incomplete",
+        job: {
+          field_complete: true,
+          job_type: "service",
+          ops_status: "pending_info",
+          pending_info_reason: "Approval Needed: Customer approval required",
+          invoice_complete: false,
+        },
+      },
+      {
+        label: "generic on hold with invoice incomplete",
+        job: {
+          field_complete: true,
+          job_type: "service",
+          ops_status: "on_hold",
+          on_hold_reason: "Status interrupt state test",
+          invoice_complete: false,
+        },
+      },
+      {
+        label: "needs scheduling with invoice incomplete",
+        job: {
+          field_complete: true,
+          job_type: "service",
+          ops_status: "need_to_schedule",
+          invoice_complete: false,
+        },
+      },
+      {
+        label: "failed ECC with invoice incomplete",
+        job: {
+          field_complete: true,
+          job_type: "ecc",
+          ops_status: "failed",
+          invoice_complete: false,
+          certs_complete: false,
+        },
+      },
+      {
+        label: "retest needed with invoice incomplete",
+        job: {
+          field_complete: true,
+          job_type: "ecc",
+          ops_status: "retest_needed",
+          invoice_complete: false,
+          certs_complete: false,
+        },
+      },
+      {
+        label: "correction review with invoice incomplete",
+        job: {
+          field_complete: true,
+          job_type: "ecc",
+          ops_status: "pending_office_review",
+          invoice_complete: false,
+          certs_complete: false,
+        },
+      },
+    ];
+
+    for (const row of rows) {
+      expect(isInCloseoutQueue(row.job), row.label).toBe(false);
+    }
   });
 
   it("preserves external billing completion tracking semantics through invoice_complete", () => {
