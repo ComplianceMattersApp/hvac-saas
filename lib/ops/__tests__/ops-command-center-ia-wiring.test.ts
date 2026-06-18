@@ -182,10 +182,13 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("uses the same reason helper for options, filtering, and visible row reason", () => {
-    expect(opsPageSource).toContain("getOpsBoardReasonLabel");
+    expect(opsPageSource).toContain("getOpsBoardVisibleReasonLabel");
     expect(opsPageSource).toContain("function workspaceVisibleReason(job: any, queueKey: string)");
-    expect(opsPageSource).toContain("return getOpsBoardReasonLabel(job, { queueKey })?.label ?? wsStatusReason(job, queueKey);");
+    expect(opsPageSource).toContain("return getOpsBoardVisibleReasonLabel(job, () => wsStatusReason(job, queueKey), { queueKey });");
+    expect(opsPageSource).toContain("function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey)");
+    expect(opsPageSource).toContain("return getOpsBoardVisibleReasonLabel(");
     expect(opsPageSource).toContain("{workspaceVisibleReason(job, selectedWorkspaceSection.key)}");
+    expect(opsPageSource).toContain("{workspaceStatusReason(job, selectedWorkspaceQueue.key)}");
   });
 
   it("loads the Closeout chip from status-shaped candidates plus the narrow permit exception", () => {

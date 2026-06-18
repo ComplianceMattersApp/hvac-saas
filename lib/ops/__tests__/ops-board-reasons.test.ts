@@ -4,6 +4,7 @@ import {
   buildOpsBoardReasonOptions,
   filterOpsBoardRowsByReason,
   getOpsBoardReasonLabel,
+  getOpsBoardVisibleReasonLabel,
   normalizeOpsBoardReason,
 } from "@/lib/ops/ops-board-reasons";
 
@@ -205,5 +206,74 @@ describe("Operations Board reason mapping", () => {
     expect(getOpsBoardReasonLabel(rows[0])?.label).toBe("On hold");
     expect(getOpsBoardReasonLabel(rows[1])?.label).toBe("Failed ECC test");
     expect(filterOpsBoardRowsByReason(rows, "failed_ecc_test").map((row) => row.id)).toEqual(["failed"]);
+  });
+
+  it("uses mapped reason labels before fallback text for visible card reason", () => {
+    expect(
+      getOpsBoardVisibleReasonLabel(
+        { job_type: "ecc", ops_status: "failed", on_hold_reason: "Customer requested hold" },
+        "On hold",
+      ),
+    ).toBe("Failed ECC test");
+
+    expect(
+      getOpsBoardVisibleReasonLabel(
+        { ops_status: "on_hold", on_hold_reason: "Customer requested hold" },
+        "Blocked",
+      ),
+    ).toBe("On hold");
+
+    expect(
+      getOpsBoardVisibleReasonLabel(
+        { ops_status: "pending_info", pending_info_reason: "Materials Needed: capacitor" },
+        "Needs information",
+      ),
+    ).toBe("Waiting on parts");
+  });
+
+  it("keeps closeout visible reasons actionable and respects permit-blocked cert rows", () => {
+    expect(
+      getOpsBoardVisibleReasonLabel(
+        {
+          job_type: "service",
+          ops_status: "invoice_required",
+          field_complete: true,
+          invoice_complete: false,
+          certs_complete: true,
+        },
+        "Closeout work queue",
+        { queueKey: "closeout" },
+      ),
+    ).toBe("Needs invoice");
+
+    expect(
+      getOpsBoardVisibleReasonLabel(
+        {
+          job_type: "ecc",
+          ops_status: "paperwork_required",
+          permit_number: "PERMIT-123",
+          field_complete: true,
+          invoice_complete: false,
+          certs_complete: false,
+        },
+        "Closeout work queue",
+        { queueKey: "closeout" },
+      ),
+    ).toBe("Needs invoice and certs");
+
+    expect(
+      getOpsBoardVisibleReasonLabel(
+        {
+          job_type: "ecc",
+          ops_status: "paperwork_required",
+          permit_number: "PENDING",
+          field_complete: true,
+          invoice_complete: true,
+          certs_complete: false,
+        },
+        "Closeout work queue",
+        { queueKey: "closeout" },
+      ),
+    ).toBe("Closeout work queue");
   });
 });

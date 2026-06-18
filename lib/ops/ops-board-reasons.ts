@@ -66,6 +66,8 @@ type OpsBoardReasonContext = {
   queueKey?: string | null;
 };
 
+type OpsBoardVisibleReasonFallback = string | (() => string);
+
 export function normalizeOpsBoardReason(value: unknown): OpsBoardReasonKey | null {
   const normalized = String(value ?? "").trim().toLowerCase();
   return OPTION_BY_KEY.has(normalized as OpsBoardReasonKey) ? (normalized as OpsBoardReasonKey) : null;
@@ -145,6 +147,16 @@ export function getOpsBoardReasonLabel(
   if (opsStatus === "problem") return OPTION_BY_KEY.get(exceptionReasonFromText(text) ?? "blocked") ?? null;
 
   return null;
+}
+
+export function getOpsBoardVisibleReasonLabel(
+  job: OpsBoardReasonJob,
+  fallback: OpsBoardVisibleReasonFallback,
+  context: OpsBoardReasonContext = {},
+): string {
+  const mappedLabel = getOpsBoardReasonLabel(job, context)?.label;
+  if (mappedLabel) return mappedLabel;
+  return typeof fallback === "function" ? fallback() : fallback;
 }
 
 export function buildOpsBoardReasonOptions(

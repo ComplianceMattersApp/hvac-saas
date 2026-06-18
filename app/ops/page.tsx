@@ -80,7 +80,7 @@ import {
 import {
   buildOpsBoardReasonOptions,
   filterOpsBoardRowsByReason,
-  getOpsBoardReasonLabel,
+  getOpsBoardVisibleReasonLabel,
   normalizeOpsBoardReason,
 } from "@/lib/ops/ops-board-reasons";
 import {
@@ -632,7 +632,7 @@ function subtractBusinessDays(date: Date, days: number) {
   }
 
   function workspaceVisibleReason(job: any, queueKey: string) {
-    return getOpsBoardReasonLabel(job, { queueKey })?.label ?? wsStatusReason(job, queueKey);
+    return getOpsBoardVisibleReasonLabel(job, () => wsStatusReason(job, queueKey), { queueKey });
   }
 
   function workspaceFailedReason(job: any) {
@@ -4591,17 +4591,23 @@ const selectedWorkspaceQueue =
   workspaceQueues.find((queue) => queue.key === selectedWorkspaceKey) ?? workspaceQueues[0];
 
 function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey) {
-  const specificFailureReason = workspaceFailedReason(job);
-  if (queueKey === "need_to_schedule") return "Awaiting scheduling";
-  if (queueKey === "field_work") {
-    const lifecycle = String(job?.status ?? "").toLowerCase();
-    if (lifecycle === "on_the_way") return "On the way";
-    if (lifecycle === "in_progress") return "In progress";
-    return "Scheduled field work";
-  }
-  if (queueKey === "without_tech") return "Scheduled without active tech assignment";
-  if (specificFailureReason) return specificFailureReason;
-  return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
+  return getOpsBoardVisibleReasonLabel(
+    job,
+    () => {
+      const specificFailureReason = workspaceFailedReason(job);
+      if (queueKey === "need_to_schedule") return "Awaiting scheduling";
+      if (queueKey === "field_work") {
+        const lifecycle = String(job?.status ?? "").toLowerCase();
+        if (lifecycle === "on_the_way") return "On the way";
+        if (lifecycle === "in_progress") return "In progress";
+        return "Scheduled field work";
+      }
+      if (queueKey === "without_tech") return "Scheduled without active tech assignment";
+      if (specificFailureReason) return specificFailureReason;
+      return getOpsQueueCardStatusReason(withServiceFollowUpProgress(job));
+    },
+    { queueKey },
+  );
 }
 
 function workspaceAgeTime(job: any, queueKey: WorkspaceQueueKey) {
