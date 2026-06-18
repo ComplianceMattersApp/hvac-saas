@@ -33,6 +33,11 @@ function resolvePortalAccessError(code: string) {
   return new Error(code);
 }
 
+function pickRelatedObject<T extends Record<string, unknown>>(value: T | T[] | null | undefined): T | null {
+  if (Array.isArray(value)) return value[0] ?? null;
+  return value ?? null;
+}
+
 function resolveProposalReadAdmin(inputAdmin?: any) {
   return inputAdmin ?? createAdminClient();
 }
@@ -58,17 +63,18 @@ export async function requireCurrentContractorPortalContext(input?: {
   const contractorId = normalizeText(contractorUser?.contractor_id);
   if (!contractorId) throw resolvePortalAccessError("NOT_CONTRACTOR");
 
-  const lifecycleState = normalizeText((contractorUser as any)?.contractors?.lifecycle_state).toLowerCase();
+  const contractor = pickRelatedObject((contractorUser as any)?.contractors);
+  const lifecycleState = normalizeText((contractor as any)?.lifecycle_state).toLowerCase();
   if (lifecycleState && lifecycleState !== "active") {
     throw resolvePortalAccessError("CONTRACTOR_ARCHIVED");
   }
 
-  const accountOwnerUserId = normalizeText((contractorUser as any)?.contractors?.owner_user_id);
+  const accountOwnerUserId = normalizeText((contractor as any)?.owner_user_id);
   if (!accountOwnerUserId) throw resolvePortalAccessError("NOT_CONTRACTOR");
 
   return {
     contractorId,
-    contractorName: normalizeText((contractorUser as any)?.contractors?.name) || null,
+    contractorName: normalizeText((contractor as any)?.name) || null,
     accountOwnerUserId,
     userId,
   };

@@ -3,14 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import {
-  normalizeAuthReturnPath,
-  resolveSafeAuthReturnPath,
-} from "@/lib/auth/auth-return-path";
-import {
-  landingPathForDualContextAccess,
-  resolveDualContextAccess,
-} from "@/lib/auth/dual-context-access";
+import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
+import { resolvePostLoginDestination } from "@/lib/auth/post-login-destination";
 
 async function waitForSessionCommit(supabase: ReturnType<typeof createClient>) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -214,39 +208,14 @@ async function routeByRole(
     return;
   }
 
-  const normalizedNext = normalizeAuthReturnPath(nextPath);
+  const destination = resolvePostLoginDestination({ access, nextPath });
 
-  if (access.hasActiveAppAccess) {
+  if (destination.kind === "redirect") {
     setStatus("Redirecting...");
-    if (access.hasPortalAccess && normalizedNext?.startsWith("/portal")) {
-      router.push(normalizedNext);
-      return;
-    }
-    const resumePath = resolveSafeAuthReturnPath({
-      actorKind: "internal",
-      candidateNext: nextPath,
-      fallbackPath: "/today",
-    });
-    router.push(resumePath);
+    router.push(destination.path);
     return;
   }
 
-  if (access.hasPortalAccess) {
-    setStatus("Redirecting...");
-    const resumePath = resolveSafeAuthReturnPath({
-      actorKind: "contractor",
-      candidateNext: nextPath,
-      fallbackPath: "/portal",
-    });
-    router.push(resumePath);
-    return;
-  }
-
-  if (access.hasExpiredOrInactiveAppAccess) {
-    setStatus("Redirecting...");
-    router.push(landingPathForDualContextAccess(access));
-  } else {
-    setStatus("This account is not configured for portal or internal access. Redirecting to login...");
-    setTimeout(() => router.push("/login"), 1500);
-  }
+  setStatus(`${destination.message} Redirecting to login...`);
+  setTimeout(() => router.push("/login"), 1500);
 }

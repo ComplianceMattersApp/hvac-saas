@@ -17,11 +17,10 @@ describe("dual-context routing wiring", () => {
     expect(rootPage).not.toContain(".from(\"contractor_users\")");
 
     expect(authCallback).toContain("resolveDualContextAccess");
-    expect(authCallback).toContain("access.hasActiveAppAccess");
-    expect(authCallback).toContain("access.hasPortalAccess");
+    expect(authCallback).toContain("resolvePostLoginDestination");
 
     expect(loginPage).toContain("resolveDualContextAccess");
-    expect(loginPage).toContain("landingPathForDualContextAccess");
+    expect(loginPage).toContain("resolvePostLoginDestination");
   });
 
   it("gates normal shell create and nav by active internal app context", () => {

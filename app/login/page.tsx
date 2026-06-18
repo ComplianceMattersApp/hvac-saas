@@ -5,14 +5,8 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createClient } from "../../lib/supabase/client";
-import {
-  normalizeAuthReturnPath,
-  resolveSafeAuthReturnPath,
-} from "@/lib/auth/auth-return-path";
-import {
-  landingPathForDualContextAccess,
-  resolveDualContextAccess,
-} from "@/lib/auth/dual-context-access";
+import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
+import { resolvePostLoginDestination } from "@/lib/auth/post-login-destination";
 import { AuthCommandCenterLayout } from "@/components/auth/AuthCommandCenterLayout";
 
 function resolvePasswordResetRedirect() {
@@ -133,35 +127,14 @@ export default function LoginPage() {
       }
 
       const access = await resolveDualContextAccess({ supabase, user });
-      const destination = landingPathForDualContextAccess(access);
+      const destination = resolvePostLoginDestination({ access, nextPath });
 
-      if (destination === "/login") {
-        setErrorMsg("This account is not configured for portal or internal access.");
+      if (destination.kind === "no_access") {
+        setErrorMsg(destination.message);
         return;
       }
 
-      const normalizedNext = normalizeAuthReturnPath(nextPath);
-      let resumePath = destination;
-
-      if (access.hasActiveAppAccess) {
-        if (access.hasPortalAccess && normalizedNext?.startsWith("/portal")) {
-          resumePath = normalizedNext;
-        } else {
-          resumePath = resolveSafeAuthReturnPath({
-            actorKind: "internal",
-            candidateNext: nextPath,
-            fallbackPath: "/today",
-          });
-        }
-      } else if (access.hasPortalAccess) {
-        resumePath = resolveSafeAuthReturnPath({
-          actorKind: "contractor",
-          candidateNext: nextPath,
-          fallbackPath: "/portal",
-        });
-      }
-
-      window.location.href = resumePath;
+      window.location.href = destination.path;
     } catch (error) {
       setErrorMsg(error instanceof Error ? error.message : "We could not complete sign-in.");
     } finally {

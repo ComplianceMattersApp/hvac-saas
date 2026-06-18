@@ -69,11 +69,21 @@ function makeContractorPortalSupabaseFixture(options?: {
   userId?: string;
   contractorId?: string | null;
   contractorName?: string | null;
+  contractorsAsArray?: boolean;
 }) {
   const userId = options?.userId ?? "contractor-user-1";
   const contractorId = options?.contractorId === undefined ? "contractor-1" : options.contractorId;
   const contractorName =
     options?.contractorName === undefined ? "Alpha Heating" : options.contractorName;
+
+  const contractorRow = contractorId && contractorName
+    ? {
+        id: contractorId,
+        name: contractorName,
+        lifecycle_state: "active",
+        owner_user_id: "owner-1",
+      }
+    : null;
 
   return {
     auth: {
@@ -93,7 +103,7 @@ function makeContractorPortalSupabaseFixture(options?: {
           data: contractorId
             ? {
                 contractor_id: contractorId,
-                contractors: contractorName ? { id: contractorId, name: contractorName } : null,
+                contractors: options?.contractorsAsArray && contractorRow ? [contractorRow] : contractorRow,
               }
             : null,
           error: null,
@@ -283,6 +293,21 @@ describe("contractor portal intake proposal scope hardening", () => {
     ).rejects.toThrow("NOT_CONTRACTOR");
 
     expect(createAdminClientMock).not.toHaveBeenCalled();
+  });
+
+  it("accepts contractor relation rows returned as an array for portal context", async () => {
+    const supabase = makeContractorPortalSupabaseFixture({ contractorsAsArray: true });
+
+    const { requireCurrentContractorPortalContext } = await import(
+      "@/lib/portal/intake-proposal-read-model"
+    );
+
+    await expect(requireCurrentContractorPortalContext({ supabase })).resolves.toEqual({
+      contractorId: "contractor-1",
+      contractorName: "Alpha Heating",
+      accountOwnerUserId: "owner-1",
+      userId: "contractor-user-1",
+    });
   });
 
   it("allows same-contractor proposal detail reads and contractor addendum reads", async () => {
