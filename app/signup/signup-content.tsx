@@ -5,7 +5,7 @@ import { INITIAL_SELF_SERVE_ONBOARDING_STATE } from "@/lib/actions/self-serve-on
 import { submitSelfServeOnboardingForm } from "@/lib/actions/self-serve-onboarding-actions";
 import { AuthCommandCenterLayout } from "@/components/auth/AuthCommandCenterLayout";
 
-export type SignupProductIntent = "generic" | "service" | "ecc";
+export type SignupProductIntent = "generic" | "service" | "ecc" | "cleaning";
 
 type SignupContentProps = {
   productIntent?: SignupProductIntent;
@@ -33,6 +33,12 @@ const PRODUCT_PREVIEW_ITEMS: Record<SignupProductIntent, string[]> = {
     "Correction needed",
     "Test result tracked",
     "Closeout pending",
+  ],
+  cleaning: [
+    "One-off cleaning scheduled",
+    "Crew notes captured",
+    "Checklist planned",
+    "Follow-up tracked",
   ],
 };
 
@@ -85,7 +91,7 @@ const SIGNUP_COPY: Record<
       },
       {
         title: "Keep office and field aligned",
-        copy: "Give dispatch and techs a shared view of what needs attention.",
+        copy: "Give dispatch and field users a shared view of what needs attention.",
       },
       {
         title: "Follow up without losing track",
@@ -122,6 +128,31 @@ const SIGNUP_COPY: Record<
     formIntro:
       "Tell us who should own the account. We'll email a secure setup link so you can finish creating your ECC / Compliance Testing trial.",
   },
+  cleaning: {
+    eyebrow: "Cleaning / Janitorial Trial",
+    title: "Start Your Cleaning / Janitorial Trial",
+    intro:
+      "Manage one-off cleaning jobs today while preparing for recurring services, crews, checklists, allotted hours, and follow-up.",
+    details: "We'll send a secure setup link so you can finish creating your Cleaning / Janitorial trial.",
+    cards: [
+      {
+        title: "Track one-off cleaning jobs",
+        copy: "Schedule work, capture notes, and keep follow-up clear.",
+      },
+      {
+        title: "Prepare for crews and recurring service",
+        copy: "Start with simple jobs now and grow into repeat service routines.",
+      },
+      {
+        title: "Keep checklist work visible",
+        copy: "Organize task expectations and office follow-up without losing context.",
+      },
+    ],
+    trialGoal:
+      "Your first 30 days: enter a few real cleaning jobs, schedule the team, and confirm the workflow before expanding into recurring services, crews, and checklists.",
+    formIntro:
+      "Tell us who should own the account. We'll email a secure setup link so you can finish creating your Cleaning / Janitorial trial.",
+  },
 };
 
 const SIGNUP_FIELD_CLASS =
@@ -135,7 +166,9 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
       ? "Service preview"
       : productIntent === "ecc"
         ? "ECC preview"
-        : "Success Guide preview";
+        : productIntent === "cleaning"
+          ? "Cleaning preview"
+          : "Success Guide preview";
   const [state, action, isPending] = useActionState(
     submitSelfServeOnboardingForm,
     INITIAL_SELF_SERVE_ONBOARDING_STATE,
@@ -154,9 +187,9 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
             <img
               src="/cm-logo.png"
               alt="Compliance Matters logo"
-              width={40}
-              height={40}
-              className="h-10 w-10 rounded-xl border border-slate-200 shadow-sm"
+              width={44}
+              height={44}
+              className="rounded-xl border border-slate-200 shadow-sm"
             />
             <div>
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Compliance Matters</p>

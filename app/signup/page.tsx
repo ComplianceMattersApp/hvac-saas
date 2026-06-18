@@ -1,5 +1,5 @@
-import { SignupProductChoiceLanding } from "@/app/signup/product-choice-landing";
+import { redirect } from "next/navigation";
 
 export default function SignupPage() {
-  return <SignupProductChoiceLanding />;
+  redirect("/login?signup=1");
 }

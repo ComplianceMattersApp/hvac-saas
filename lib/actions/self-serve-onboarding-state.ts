@@ -43,8 +43,8 @@ export type SelfServeOnboardingDeps = {
     companyName: string;
     ownerEmail: string;
     ownerDisplayName: string | null;
-    signupPath: "generic" | "service" | "ecc";
-    productMode: "hybrid" | "hvac_service" | "ecc_hers" | null;
+    signupPath: "generic" | "service" | "ecc" | "cleaning";
+    productMode: "hybrid" | "hvac_service" | "ecc_hers" | "cleaning_services" | null;
     billingMode: string | null;
     entitlementStatus: string | null;
     planKey: string | null;

@@ -12,6 +12,11 @@ type FieldOutcomePanelProps = {
   tab: string;
   isEccJob: boolean;
   showDifferentIssueFoundOutcome?: boolean;
+  labels?: {
+    partsNeeded?: string;
+    approvalNeeded?: string;
+    unableToComplete?: string;
+  };
   className?: string;
   anchorId?: string;
 };
@@ -27,6 +32,7 @@ export default function FieldOutcomePanel(props: FieldOutcomePanelProps) {
         currentStatus={props.currentStatus}
         tab={props.tab}
         showDifferentIssueFoundOutcome={props.showDifferentIssueFoundOutcome}
+        labels={props.labels}
         partsNeededAction={markJobPartsNeededFromForm}
         approvalNeededAction={markJobApprovalNeededFromForm}
         unableToCompleteAction={markJobUnableToCompleteFromForm}

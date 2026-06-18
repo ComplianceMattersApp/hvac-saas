@@ -324,11 +324,11 @@ function normalizeIntakeJobType(value: unknown): "ecc" | "service" | null {
 
 function lockInternalIntakeJobTypeForProductMode(params: {
   requestedJobType: "ecc" | "service";
-  productMode: "hybrid" | "ecc_hers" | "hvac_service";
+  productMode: "hybrid" | "ecc_hers" | "hvac_service" | "cleaning_services";
   isContractorUser: boolean;
 }): "ecc" | "service" {
   if (params.isContractorUser) return params.requestedJobType;
-  if (params.productMode === "hvac_service") return "service";
+  if (params.productMode === "hvac_service" || params.productMode === "cleaning_services") return "service";
   if (params.productMode === "ecc_hers") return "ecc";
   return params.requestedJobType;
 }

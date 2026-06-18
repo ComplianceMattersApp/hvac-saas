@@ -28,6 +28,7 @@ import {
   resolveProductModeForAccountOwnerId,
   type ProductMode,
 } from "@/lib/business/product-mode-defaults";
+import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { resolveOperationalTenantIdentity } from "@/lib/email/operational-tenant-branding";
 import {
   getCurrentInternalUserClockState,
@@ -269,10 +270,11 @@ export function canViewBusinessPulseForRole(role: InternalRole): boolean {
 }
 
 function roleLabelFor(role: InternalRole, productMode: ProductMode): string {
+  const surfaceProfile = resolveProductSurfaceProfile(productMode);
   if (role === "admin") return productMode === "ecc_hers" ? "Owner / Compliance Lead" : "Owner / Admin";
   if (role === "billing") return "Billing";
   if (role === "office") return "Dispatcher / Office";
-  if (role === "tech") return "Technician";
+  if (role === "tech") return surfaceProfile.labels.fieldUser;
   return "Internal";
 }
 
@@ -1046,6 +1048,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
     servicePlansOverdue,
     resumeRecentCount,
   } = inputs;
+  const surfaceProfile = resolveProductSurfaceProfile(productMode);
 
   const inProgress = todayJobs.find(
     (j) => j.status === "on_the_way" || j.status === "in_process",
@@ -1115,7 +1118,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       headline: `${priorityCounts.scheduledTodayWithoutTech} scheduled ${priorityCounts.scheduledTodayWithoutTech === 1 ? "visit is" : "visits are"} unassigned`,
       detail: "Dispatch coverage is missing for work already on today’s board.",
       primaryHref: "/ops",
-      primaryLabel: "Assign Technicians",
+      primaryLabel: `Assign ${surfaceProfile.labels.fieldUser}s`,
       focusKey: "without_tech",
     };
   }
@@ -1242,12 +1245,14 @@ function techJobDetail(job: TodayJobSummary): string | null {
 
 export function buildDailyBriefing(params: {
   role: InternalRole;
+  productMode?: ProductMode;
   todayJobsCount: number;
   priorityCounts: NextBestActionInputs["priorityCounts"];
   openInvoiceCount: number | null;
   servicePlansOverdue: number | null;
   followUpsCount: number;
 }): string {
+  const surfaceProfile = resolveProductSurfaceProfile(params.productMode ?? "hybrid");
   const scheduled = params.priorityCounts.scheduledToday ?? params.todayJobsCount;
   const withoutTech = params.priorityCounts.scheduledTodayWithoutTech ?? 0;
   const needScheduling = params.priorityCounts.needScheduling ?? 0;
@@ -1276,7 +1281,7 @@ export function buildDailyBriefing(params: {
   }
 
   if (scheduled > 0 && withoutTech > 0) {
-    return `You have ${scheduled} scheduled ${scheduled === 1 ? "visit" : "visits"} today, and ${withoutTech} ${withoutTech === 1 ? "is" : "are"} missing technician coverage.`;
+    return `You have ${scheduled} scheduled ${scheduled === 1 ? "visit" : "visits"} today, and ${withoutTech} ${withoutTech === 1 ? "is" : "are"} missing ${surfaceProfile.labels.fieldUser.toLowerCase()} coverage.`;
   }
 
   if (needScheduling > 0) {
@@ -1301,12 +1306,14 @@ export function buildDailyBriefing(params: {
 
 export function buildFollowUpGroups(params: {
   role: InternalRole;
+  productMode?: ProductMode;
   followUps: FollowUpItem[];
   priorityCounts: NextBestActionInputs["priorityCounts"];
   servicePlansOverdue: number | null;
   openInvoiceCount: number | null;
   canViewBusinessPulse: boolean;
 }): FollowUpGroup[] {
+  const surfaceProfile = resolveProductSurfaceProfile(params.productMode ?? "hybrid");
   if (params.role === "tech") {
     return [];
   }
@@ -1324,7 +1331,7 @@ export function buildFollowUpGroups(params: {
   if (withoutTechCount > 0 && params.role !== "billing") {
     groups.push({
       key: "without_tech",
-      label: "Without Tech",
+      label: `Without ${surfaceProfile.labels.fieldUser}`,
       count: withoutTechCount,
       href: "/ops",
       preview: [],
@@ -1417,6 +1424,7 @@ export function buildPriorityChips(params: {
   canViewBusinessPulse: boolean;
   primaryFocusKey?: NextBestAction["focusKey"];
 }): PriorityChip[] {
+  const surfaceProfile = resolveProductSurfaceProfile(params.productMode);
   if (params.role === "tech") {
     return [];
   }
@@ -1445,7 +1453,7 @@ export function buildPriorityChips(params: {
   if (params.role !== "billing" && (params.priorityCounts.scheduledTodayWithoutTech ?? 0) > 0) {
     pushChip({
       key: "without_tech",
-      label: "Without Tech",
+      label: `Without ${surfaceProfile.labels.fieldUser}`,
       count: params.priorityCounts.scheduledTodayWithoutTech ?? 0,
       href: "/ops",
       tone: "warn",
@@ -1528,6 +1536,7 @@ export function buildPriorityChips(params: {
 
 function buildRoleAwarePulse(params: {
   role: InternalRole;
+  productMode: ProductMode;
   canViewBusinessPulse: boolean;
   canViewConfirmPaymentAttention: boolean;
   canViewFailedPaymentAttention: boolean;
@@ -1539,6 +1548,7 @@ function buildRoleAwarePulse(params: {
   failedPaymentsOpenCount: number | null;
   failedPaymentsBalanceAtRiskCents: number | null;
 }): RoleAwarePulse {
+  const surfaceProfile = resolveProductSurfaceProfile(params.productMode);
   const waitingCount =
     (params.priorityCounts.pendingInfo ?? 0) +
     (params.priorityCounts.onHold ?? 0);
@@ -1627,7 +1637,7 @@ function buildRoleAwarePulse(params: {
     });
     pushTile({
       key: "without_tech",
-      label: "WITHOUT TECH",
+      label: `WITHOUT ${surfaceProfile.labels.fieldUser.toUpperCase()}`,
       value: params.priorityCounts.scheduledTodayWithoutTech ?? 0,
       valueDetail: null,
       href: "/ops",
@@ -2070,6 +2080,7 @@ async function buildTodayReadModelForInternalActor(
 
   const followUpGroups = buildFollowUpGroups({
     role,
+    productMode,
     followUps,
     priorityCounts,
     servicePlansOverdue,
@@ -2079,6 +2090,7 @@ async function buildTodayReadModelForInternalActor(
 
   const dailyBriefing = buildDailyBriefing({
     role,
+    productMode,
     todayJobsCount: todayJobs.length,
     priorityCounts,
     openInvoiceCount: openInvoice.count,
@@ -2138,6 +2150,7 @@ async function buildTodayReadModelForInternalActor(
 
   const roleAwarePulse = buildRoleAwarePulse({
     role,
+    productMode,
     canViewBusinessPulse,
     canViewConfirmPaymentAttention,
     canViewFailedPaymentAttention,

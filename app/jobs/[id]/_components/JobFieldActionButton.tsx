@@ -10,6 +10,8 @@ type JobFieldActionButtonProps = {
   tab: string;
   hasFullSchedule: boolean;
   variant?: "default" | "fieldMode" | "commandBar";
+  completeLabel?: string;
+  completedLabel?: string;
 };
 
 function FieldActionSubmitButton({
@@ -61,6 +63,8 @@ export function JobFieldActionButton({
   tab,
   hasFullSchedule,
   variant = "default",
+  completeLabel = "Complete Field Work",
+  completedLabel = "Field visit complete",
 }: JobFieldActionButtonProps) {
   const [submitted, setSubmitted] = useState(false);
   const isDone = ["completed", "failed", "cancelled"].includes(currentStatus);
@@ -71,7 +75,7 @@ export function JobFieldActionButton({
       : currentStatus === "on_the_way"
       ? "Mark In Progress"
       : currentStatus === "in_process"
-      ? "Complete Field Work"
+      ? completeLabel
       : "—";
 
   const pendingLabel =
@@ -86,7 +90,7 @@ export function JobFieldActionButton({
   if (isDone) {
     return (
       <span className={variant === "fieldMode" ? "inline-flex min-h-14 w-full items-center justify-center whitespace-nowrap rounded-xl border border-emerald-700 bg-emerald-700 px-5 py-3 text-base font-semibold text-white shadow-[0_18px_34px_-24px_rgba(4,120,87,0.45)]" : "inline-flex min-h-10 w-full items-center justify-center whitespace-nowrap rounded-lg border border-emerald-600 bg-emerald-600 px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_24px_-18px_rgba(5,150,105,0.34)] sm:w-auto"}>
-        ✓ Field visit complete
+        ✓ {completedLabel}
       </span>
     );
   }

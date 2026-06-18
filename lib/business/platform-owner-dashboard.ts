@@ -9,6 +9,7 @@ function normalizeProductMode(value: unknown): ProductMode | null {
   if (normalized === "hybrid") return "hybrid";
   if (normalized === "hvac_service") return "hvac_service";
   if (normalized === "ecc_hers") return "ecc_hers";
+  if (normalized === "cleaning_services") return "cleaning_services";
   return null;
 }
 
@@ -60,6 +61,7 @@ export type PlatformOwnerDashboardSummary = {
   totalAccounts: number;
   hvacServiceAccounts: number;
   eccAccounts: number;
+  cleaningServicesAccounts: number;
   hybridAccounts: number;
   unknownModeAccounts: number;
   trialAccounts: number;
@@ -155,6 +157,7 @@ export function formatProductModeLabel(params: {
   }
   if (params.row.productMode === "hvac_service") return "Service";
   if (params.row.productMode === "ecc_hers") return "ECC";
+  if (params.row.productMode === "cleaning_services") return "Cleaning";
   if (params.row.productMode === "hybrid") return "Hybrid";
   return "Not Set";
 }
@@ -435,6 +438,7 @@ export function buildPlatformOwnerDashboardModel(input: {
     totalAccounts: rows.length,
     hvacServiceAccounts: rows.filter((row) => row.productMode === "hvac_service").length,
     eccAccounts: rows.filter((row) => row.productMode === "ecc_hers").length,
+    cleaningServicesAccounts: rows.filter((row) => row.productMode === "cleaning_services").length,
     hybridAccounts: rows.filter((row) => row.productMode === "hybrid").length,
     unknownModeAccounts: rows.filter((row) => row.productMode === null).length,
     trialAccounts: rows.filter((row) => statusInSet(row.entitlementStatus, ["trial"])) .length,

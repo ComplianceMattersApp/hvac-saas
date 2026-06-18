@@ -74,6 +74,7 @@ import {
   resolveInternalBusinessIdentityByAccountOwnerId,
 } from "@/lib/business/internal-business-profile";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
+import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { buildJobBillingStateReadModel, formatJobBillingDispositionLabel, normalizeJobBillingDisposition } from "@/lib/business/job-billing-state";
 import { buildServiceFollowUpProgressState } from "@/lib/jobs/service-follow-up-progress";
 import { isEccPermitNeededBlocker, isValidEccPermitNumber } from "@/lib/ecc/permit-needed";
@@ -1569,6 +1570,7 @@ export default async function JobDetailPage({
   internalBusinessDisplayName = internalBusinessIdentity.display_name;
   billingMode = resolvedBillingMode;
   productMode = resolvedProductMode;
+  const surfaceProfile = resolveProductSurfaceProfile(productMode);
   const explicitFieldBillingCapabilities = await timedPhase("fieldBillingExplicitCapabilitiesRead", () =>
     loadFieldBillingExplicitCapabilitiesForUser({
       supabase: supabase as any,
@@ -2806,9 +2808,9 @@ const isEccPermitNeededActive = isEccPermitNeededBlocker({
   job_type: job.job_type,
   ops_status: job.ops_status,
   pending_info_reason: (job as any).pending_info_reason ?? null,
-});
+}) && surfaceProfile.surfaces.permits;
 const hasValidEccPermitNumber =
-  job.job_type !== "ecc" || isValidEccPermitNumber(job.permit_number);
+  !surfaceProfile.surfaces.permits || job.job_type !== "ecc" || isValidEccPermitNumber(job.permit_number);
 const billingState = buildJobBillingStateReadModel({
   billingMode,
   invoiceComplete: job.invoice_complete,
@@ -2831,12 +2833,13 @@ const closeoutProjectionJob = {
 
 const isAdminComplete =
   (job.job_type === "service" && billingState.billedTruthSatisfied) ||
-  (job.job_type === "ecc" && billingState.billedTruthSatisfied && job.certs_complete);
+  (job.job_type === "ecc" && billingState.billedTruthSatisfied && (!surfaceProfile.surfaces.certs || job.certs_complete));
 
 const closeoutNeeds = getCloseoutNeeds(closeoutProjectionJob);
 const isCloseoutPending = isInCloseoutQueue(closeoutProjectionJob);
 
 const canShowCertsButton =
+  surfaceProfile.surfaces.certs &&
   job.job_type === "ecc" &&
   !job.certs_complete &&
   !isFailedUnresolved &&
@@ -2868,6 +2871,8 @@ const showPrimaryCloseoutBlockers =
   !isServiceFieldFollowUpPendingInfo;
 
 const showCertsPermitRequiredBlocker =
+  surfaceProfile.surfaces.certs &&
+  surfaceProfile.surfaces.permits &&
   job.job_type === "ecc" &&
   !job.certs_complete &&
   !isFailedUnresolved &&
@@ -2876,7 +2881,8 @@ const showCertsPermitRequiredBlocker =
 const hasActionHeavyPrimaryNextAction =
   showPrimaryCloseoutBlockers ||
   isEccPermitNeededActive ||
-  (job.job_type === "ecc" &&
+  (surfaceProfile.surfaces.retest &&
+    job.job_type === "ecc" &&
     !parentJobId &&
     !Boolean((activeRetestChild as any)?.id) &&
     ["failed", "pending_office_review", "retest_needed"].includes(String(job.ops_status ?? "").trim().toLowerCase())) ||
@@ -3282,6 +3288,7 @@ const sharedNotesTitle = hasDirectNarrativeChain ? "Shared Notes Across Job Chai
 const internalNotesTitle = hasDirectNarrativeChain ? "Internal Notes Across Job Chain" : "Internal Notes";
 const timelineTitle = hasDirectNarrativeChain ? "Job Chain Timeline" : "Timeline";
 const isHvacServiceMode = productMode === "hvac_service";
+const isCleaningMode = productMode === "cleaning_services";
 const jobTitleText = normalizeRetestLinkedJobTitle(job.title);
 const serviceVisitReasonText = String(job.service_visit_reason ?? "").trim();
 const jobNotesText = String(job.job_notes ?? "").trim();
@@ -3319,9 +3326,9 @@ const headerJobTypeLabel = String(job.job_type ?? "service")
   .filter(Boolean)
   .map((part) => part.charAt(0).toUpperCase() + part.slice(1).toLowerCase())
   .join(" ");
-const showSharedNotesCard = !isHvacServiceMode;
-const showEccSummaryCard = job.job_type === "ecc";
-const showJobRecordsPermitCard = showEccSummaryCard || hasPermitDetails;
+const showSharedNotesCard = !isHvacServiceMode && !isCleaningMode;
+const showEccSummaryCard = surfaceProfile.surfaces.eccTests && job.job_type === "ecc";
+const showJobRecordsPermitCard = surfaceProfile.surfaces.permits && (showEccSummaryCard || hasPermitDetails);
 const lowerGridCardCount =
   7 +
   (showSharedNotesCard ? 1 : 0) +
@@ -3354,7 +3361,7 @@ const activeRetestChildScheduled = Boolean(
     (activeRetestChild as any)?.window_start ||
     (activeRetestChild as any)?.window_end,
 );
-const showLinkedRetestCreated = job.job_type === "ecc" && hasActiveRetestChild && !parentJobId;
+const showLinkedRetestCreated = surfaceProfile.surfaces.retest && job.job_type === "ecc" && hasActiveRetestChild && !parentJobId;
 const linkedRetestPassiveHeading = linkedRetestChildClosed
   ? "Linked Retest Completed"
   : activeRetestChildScheduled
@@ -3372,16 +3379,19 @@ const linkedRetestPassiveMeta = linkedRetestChildClosed
   : "Linked retest active";
 const showConfirmRetestReady =
   isInternalUser &&
+  surfaceProfile.surfaces.retest &&
   job.job_type === "ecc" &&
   !hasActiveRetestChild &&
   ["failed", "pending_office_review"].includes(normalizedJobOpsStatus);
 const showRetestSection =
   isInternalUser &&
+  surfaceProfile.surfaces.retest &&
   job.job_type === "ecc" &&
   !hasActiveRetestChild &&
   normalizedJobOpsStatus === "retest_needed";
 const showCorrectionReviewResolution =
   isInternalUser &&
+  surfaceProfile.surfaces.retest &&
   job.job_type === "ecc" &&
   !hasActiveRetestChild &&
   ["failed", "pending_office_review"].includes(normalizedJobOpsStatus);
@@ -4333,7 +4343,7 @@ const failureResolutionPathCount =
       ? `Scheduling: ${mobileOpsStatusLabel}`
       : null;
   const mobileCustomerHref = job.customer_id ? `/customers/${job.customer_id}` : null;
-  const showMobileEccTestAction = job.job_type === "ecc";
+  const showMobileEccTestAction = surfaceProfile.surfaces.eccTests && job.job_type === "ecc";
   const mobileInvoiceActionRelevant =
     job.job_type === "service" &&
     (showInternalInvoicingPlaceholder || Boolean(internalInvoiceTruth) || showExternalDataEntryPrompt || (isCloseoutPending && closeoutNeeds.needsInvoice));
@@ -4342,7 +4352,8 @@ const failureResolutionPathCount =
   const showMobileInvoiceOpenAttention =
     job.job_type === "service" && Boolean(internalInvoiceTruth) && !showInternalInvoicingPlaceholder;
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
-  const showMobileContractorContext = job.job_type === "ecc" && Boolean(contractorId);
+  const showMobileContractorContext =
+    surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
 
   return (
     <div className="mx-auto w-full min-w-0 max-w-[104rem] space-y-5 overflow-x-hidden bg-slate-50/45 p-0 lg:p-6">
@@ -4537,7 +4548,7 @@ const failureResolutionPathCount =
           ) : null}
 
           {banner === "visit_scope_saved" ? (
-            <FlashBanner type="success" message="Work Items saved." />
+            <FlashBanner type="success" message={`${surfaceProfile.labels.workItems} saved.`} />
           ) : null}
 
           {banner === "callback_report_recorded" ? (
@@ -4550,7 +4561,7 @@ const failureResolutionPathCount =
           {banner === "callback_visit_created" ? (
             <FlashBanner
               type="success"
-              message="Callback visit created. This is an unscheduled office/dispatch item and will not appear in technician My Work until scheduled and assigned."
+              message={`Callback visit created. This is an unscheduled office/dispatch item and will not appear in ${surfaceProfile.labels.fieldUser.toLowerCase()} My Work until scheduled and assigned.`}
             />
           ) : null}
 
@@ -4670,6 +4681,8 @@ const failureResolutionPathCount =
                     tab={tab}
                     hasFullSchedule={hasFullSchedule}
                     variant="fieldMode"
+                    completeLabel={surfaceProfile.labels.finishComplete}
+                    completedLabel={surfaceProfile.labels.finishComplete}
                   />
                   {showFieldOutcomePanel ? (
                     <FieldOutcomePanel
@@ -4679,9 +4692,13 @@ const failureResolutionPathCount =
                       tab={tab}
                       isEccJob={job.job_type === "ecc"}
                       showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}
+                      labels={{
+                        partsNeeded: surfaceProfile.labels.needParts,
+                        approvalNeeded: isCleaningMode ? "Office / Client Approval Needed" : "Approval Needed",
+                      }}
                     />
                   ) : null}
-                  {job.job_type === "ecc" ? (
+                  {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" ? (
                     <Link
                       href={`/jobs/${job.id}/tests`}
                       className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
@@ -5037,7 +5054,7 @@ const failureResolutionPathCount =
                   <span className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-center text-base font-semibold text-emerald-900">
                     {primaryCloseoutMessage}
                   </span>
-                  {job.job_type === "ecc" ? (
+                  {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" ? (
                     <Link
                       href={`/jobs/${job.id}/tests`}
                       className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
@@ -5107,12 +5124,21 @@ const failureResolutionPathCount =
                 </span>
               )}
 
-              <Link href={`/jobs/${job.id}/info?f=equipment`} className={mobileFieldActionClass}>
-                <span className="inline-flex items-center gap-2">
-                  <ToolIcon className="h-4.5 w-4.5" />
-                  <span>Equipment</span>
-                </span>
-              </Link>
+              {surfaceProfile.surfaces.equipment ? (
+                <Link href={`/jobs/${job.id}/info?f=equipment`} className={mobileFieldActionClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <ToolIcon className="h-4.5 w-4.5" />
+                    <span>Equipment</span>
+                  </span>
+                </Link>
+              ) : (
+                <a href="#mobile-work-scope" className={mobileFieldActionClass}>
+                  <span className="inline-flex items-center gap-2">
+                    <ToolIcon className="h-4.5 w-4.5" />
+                    <span>{surfaceProfile.labels.visitScope}</span>
+                  </span>
+                </a>
+              )}
 
               {showMobileEccTestAction ? (
                 <Link href={`/jobs/${job.id}/tests`} className={mobileFieldActionClass}>
@@ -5246,6 +5272,23 @@ const failureResolutionPathCount =
             </Suspense>
               </div>
 
+              {isCleaningMode ? (
+                <div className="grid gap-2">
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2.5 text-sm leading-6 text-emerald-950">
+                    <div className="font-semibold">Checklist</div>
+                    <p className="mt-0.5 text-emerald-900">Cleaning checklist support is coming next. Use Cleaning Tasks and notes for this rollout.</p>
+                  </div>
+                  <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-2.5 text-sm leading-6 text-slate-700">
+                    <div className="font-semibold text-slate-900">Site Instructions</div>
+                    <p className="mt-0.5">Use location notes and job notes for access, alarm, parking, and supply details.</p>
+                  </div>
+                  <div className="rounded-xl border border-blue-100 bg-blue-50/50 px-3 py-2.5 text-sm leading-6 text-blue-950">
+                    <div className="font-semibold">Quality Review</div>
+                    <p className="mt-0.5 text-blue-900">Use notes/photos for quality issues until inspection support is added.</p>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="rounded-xl border border-slate-200/80 bg-white px-3 py-3 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.24)]">
                 <div className="mb-2 flex items-center gap-2 border-b border-slate-200/70 pb-2">
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100">
@@ -5270,8 +5313,8 @@ const failureResolutionPathCount =
               <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <div>
-                    <div className="text-sm font-semibold text-[#0f1f35]">Team Assignment</div>
-                    <div className="text-xs text-slate-500">Technicians assigned to the job.</div>
+                    <div className="text-sm font-semibold text-[#0f1f35]">{surfaceProfile.labels.fieldTeam} Assignment</div>
+                    <div className="text-xs text-slate-500">{surfaceProfile.labels.fieldUser}s assigned to the job.</div>
                   </div>
                   <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">
                     {assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}
@@ -5715,7 +5758,7 @@ const failureResolutionPathCount =
                       </div>
                     </details>
                   ) : null}
-                  {job.job_type === "ecc" && !showMobileEccTestAction ? (
+                  {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" && !showMobileEccTestAction ? (
                     <Link href={`/jobs/${job.id}/tests`} className={mobileToolLinkClass}>ECC Test</Link>
                   ) : null}
                   {!showMobileServiceInvoiceFieldAction && showInternalInvoicePanel && mobileInvoiceActionRelevant ? (
@@ -5740,6 +5783,7 @@ const failureResolutionPathCount =
 
               <div className="inline-flex items-center gap-1.5 pt-1 text-sm font-semibold tracking-[0.08em] text-slate-600"><SettingsIcon className="h-4 w-4" />Admin</div>
 
+              {surfaceProfile.surfaces.permits ? (
               <details id="mobile-permit-info" className="group">
                 <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
                   <span className="inline-flex items-center gap-2"><ClipboardIcon className="h-4.5 w-4.5" />Permit Information</span>
@@ -5822,6 +5866,7 @@ const failureResolutionPathCount =
                   </details>
                 </div>
               </details>
+              ) : null}
 
               <details className="group">
                 <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
@@ -5868,7 +5913,7 @@ const failureResolutionPathCount =
 
               <details className="group">
                 <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
-                  <span className="inline-flex items-center gap-2"><UserIcon className="h-4.5 w-4.5" />Assigned Team</span>
+                  <span className="inline-flex items-center gap-2"><UserIcon className="h-4.5 w-4.5" />Assigned {surfaceProfile.labels.fieldTeam}</span>
                 </summary>
                 <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
                   {assignedTeam.length > 0 ? (
@@ -6008,8 +6053,10 @@ const failureResolutionPathCount =
               tab={tab}
               hasFullSchedule={hasFullSchedule}
               variant="commandBar"
+              completeLabel={surfaceProfile.labels.finishComplete}
+              completedLabel={surfaceProfile.labels.finishComplete}
             />
-            {job.job_type === "ecc" ? (
+            {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" ? (
               <Link
                 href={`/jobs/${job.id}/tests`}
                 className={`${compactWorkspaceActionButtonClass} min-h-11 shrink-0 px-4 shadow-[0_12px_24px_-20px_rgba(15,31,53,0.35)]`}
@@ -6026,6 +6073,10 @@ const failureResolutionPathCount =
             tab={tab}
             isEccJob={job.job_type === "ecc"}
             showDifferentIssueFoundOutcome={showDifferentIssueFoundOutcome}
+            labels={{
+              partsNeeded: surfaceProfile.labels.needParts,
+              approvalNeeded: isCleaningMode ? "Office / Client Approval Needed" : "Approval Needed",
+            }}
             className="hidden w-full sm:block"
           />
         ) : null}
@@ -6410,7 +6461,7 @@ const failureResolutionPathCount =
               </Link>
             ) : null}
 
-            {job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
+            {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
               <Link
                 href={`/jobs/${job.id}/tests`}
                 className={`${compactWorkspaceActionButtonClass} shadow-[0_8px_18px_-18px_rgba(15,23,42,0.28)]`}
@@ -6442,7 +6493,7 @@ const failureResolutionPathCount =
               </Link>
             ) : null}
 
-            {job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
+            {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" && !showFieldOutcomePanel && !isEccPermitNeededActive && (isFieldComplete || job.status === "completed") ? (
               <Link href={`/jobs/${job.id}/tests`} className={compactWorkspaceActionButtonClass}>
                 Open Tests Workspace
               </Link>
@@ -6608,7 +6659,9 @@ const failureResolutionPathCount =
       </div>
     </div>
     <div className="inline-flex rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em] text-blue-800 sm:px-2.5 sm:py-1 sm:text-[10px] sm:tracking-[0.1em]">
-      {equipmentCount} equipment / {assignedTeam.length} assigned
+      {surfaceProfile.surfaces.equipment
+        ? `${equipmentCount} equipment / ${assignedTeam.length} assigned`
+        : `${assignedTeam.length} ${surfaceProfile.labels.fieldUser.toLowerCase()}${assignedTeam.length === 1 ? "" : "s"} assigned`}
     </div>
   </div>
 
@@ -6812,7 +6865,7 @@ const failureResolutionPathCount =
             <UserIcon className="h-3.5 w-3.5" />
           </span>
           <div>
-            <div className="text-sm font-semibold text-[#0f1f35]">Team Assignment</div>
+            <div className="text-sm font-semibold text-[#0f1f35]">{surfaceProfile.labels.fieldTeam} Assignment</div>
             <div className="text-xs text-slate-500">Field ownership for this visit.</div>
           </div>
         </div>
@@ -6821,8 +6874,8 @@ const failureResolutionPathCount =
       <div id="assigned-team" className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 sm:px-3 sm:py-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
-            <div className="text-sm font-semibold text-slate-900">Assigned Team</div>
-            <div className="mt-0.5 text-xs text-slate-600">Technicians assigned to the job.</div>
+            <div className="text-sm font-semibold text-slate-900">Assigned {surfaceProfile.labels.fieldTeam}</div>
+            <div className="mt-0.5 text-xs text-slate-600">{surfaceProfile.labels.fieldUser}s assigned to the job.</div>
           </div>
           <div className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9.5px] font-semibold text-slate-600 sm:px-2.5 sm:py-1 sm:text-[10px]">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
         </div>
@@ -7033,7 +7086,7 @@ const failureResolutionPathCount =
                 href="#visit-scope-section"
                 className="hidden shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-700 shadow-[0_8px_18px_-18px_rgba(15,23,42,0.24)] transition-colors hover:border-blue-200 hover:bg-white hover:text-blue-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-200 sm:inline-flex"
               >
-                Work Items
+                {surfaceProfile.labels.workItems}
               </a>
             ) : null}
           </div>
@@ -7088,17 +7141,17 @@ const failureResolutionPathCount =
         <div className="space-y-3">
           {job.job_type === "service" && visitScopeCount === 0 ? (
             <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900 shadow-[inset_3px_0_0_rgba(217,119,6,0.22)]">
-              Add Work Items before closeout or billing.
+              Add {surfaceProfile.labels.workItems} before closeout or billing.
             </div>
           ) : null}
 
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0f1f35]"><span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100"><ToolIcon className="h-3.5 w-3.5" /></span>Work & Invoice</div>
+                <div className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-[#0f1f35]"><span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700 ring-1 ring-blue-100"><ToolIcon className="h-3.5 w-3.5" /></span>{surfaceProfile.labels.workItems} & Invoice</div>
                 {job.job_type === "service" ? (
                   <span className="hidden rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-800 sm:inline-flex">
-                    {visitScopeCount > 0 ? "Work Items Set" : "No Work Items Yet"}
+                    {visitScopeCount > 0 ? `${surfaceProfile.labels.workItems} Set` : `No ${surfaceProfile.labels.workItems} Yet`}
                   </span>
                 ) : null}
               </div>
@@ -7136,7 +7189,7 @@ const failureResolutionPathCount =
                   <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-400">Ready-to-invoice total</div>
                   <div className="mt-0.5 text-sm font-semibold text-slate-950">{formatCurrencyFromCents(internalInvoiceTruth?.total_cents ?? visitScopeReadyTotalCents)}</div>
                   <div className="mt-0.5 text-[11px] leading-4 text-slate-500">
-                    {internalInvoiceTruth ? "From invoice charges" : "From priced Work Items"}
+                    {internalInvoiceTruth ? "From invoice charges" : `From priced ${surfaceProfile.labels.workItems}`}
                   </div>
                 </div>
                 <div className="flex flex-col gap-2 lg:items-end">
@@ -7172,7 +7225,7 @@ const failureResolutionPathCount =
             <div className="space-y-3.5">
               {primaryVisitScopeItems.length > 0 ? (
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">Work Items</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-blue-900/55">{surfaceProfile.labels.workItems}</div>
                   <div className="mt-2 space-y-2.5">
                     {primaryVisitScopeItems.map((item, index) => (
                       <div key={`primary-${index}-${item.title}`} className="space-y-1 rounded-xl border border-slate-200/80 bg-slate-50/72 px-3 py-2.5 shadow-[inset_3px_0_0_rgba(37,99,235,0.12)]">
@@ -7219,7 +7272,7 @@ const failureResolutionPathCount =
                           {item.details ? (
                             <div className="text-sm leading-6 text-slate-600">{item.details}</div>
                           ) : null}
-                          {job.job_type === "ecc" ? (
+                  {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" ? (
                             <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-slate-600">
                               {isVisitScopeItemPromoted(item) && item.promoted_service_job_id ? (
                                 <>
@@ -7270,7 +7323,7 @@ const failureResolutionPathCount =
 
     {/* Right: quick reference rail */}
     <div className="space-y-3 xl:order-3 xl:flex xl:h-full xl:self-stretch xl:flex-col xl:space-y-0 xl:gap-3">
-      {job.job_type === "ecc" ? (
+      {surfaceProfile.surfaces.permits && job.job_type === "ecc" ? (
         <div className={`${workspaceSubtleCardClass} relative overflow-hidden border-slate-200/70 p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.24)] ${hasPermitDetails ? "bg-white" : "bg-slate-50/88"}`}>
           <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
                 <div className="mb-3 flex items-start justify-between gap-3">
@@ -7288,6 +7341,32 @@ const failureResolutionPathCount =
           <div className="rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.14)]">
             <div className="text-[10px] font-semibold uppercase tracking-[0.1em] text-blue-900/55">Number</div>
             <div className="mt-0.5 text-sm font-semibold text-slate-900">{permitNumber || "Not added"}</div>
+          </div>
+        </div>
+      ) : null}
+
+      {isCleaningMode ? (
+        <div className="grid gap-3">
+          <div className={`${workspaceSubtleCardClass} relative overflow-hidden border-emerald-100 bg-emerald-50/70 p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.18)]`}>
+            <span className="absolute inset-x-0 top-0 h-[3px] bg-emerald-500/70" />
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-900">
+              <ClipboardIcon className="h-3.5 w-3.5" />Checklist
+            </div>
+            <p className="mt-2 text-sm leading-6 text-emerald-950">Cleaning checklist support is coming next. Use Cleaning Tasks and notes for this rollout.</p>
+          </div>
+          <div className={`${workspaceSubtleCardClass} relative overflow-hidden border-slate-200/70 bg-white p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.18)]`}>
+            <span className="absolute inset-x-0 top-0 h-[3px] bg-slate-400/60" />
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0f1f35]">
+              <MapPinIcon className="h-3.5 w-3.5 text-blue-700" />Site Instructions
+            </div>
+            <p className="mt-2 text-sm leading-6 text-slate-700">Use location notes and job notes for access, alarm, parking, and supply details.</p>
+          </div>
+          <div className={`${workspaceSubtleCardClass} relative overflow-hidden border-blue-100 bg-blue-50/50 p-4 shadow-[0_18px_40px_-34px_rgba(15,23,42,0.18)]`}>
+            <span className="absolute inset-x-0 top-0 h-[3px] bg-blue-600/70" />
+            <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-900">
+              <WarningIcon className="h-3.5 w-3.5" />Quality Review
+            </div>
+            <p className="mt-2 text-sm leading-6 text-blue-950">Use notes/photos for quality issues until inspection support is added.</p>
           </div>
         </div>
       ) : null}
@@ -7476,7 +7555,7 @@ const failureResolutionPathCount =
         </p>
         <p className="text-xs leading-5 text-slate-600">
           This records the customer report and creates a new unscheduled office/dispatch callback item.
-          It will not appear in technician My Work until it is scheduled and assigned.
+          It will not appear in {surfaceProfile.labels.fieldUser.toLowerCase()} My Work until it is scheduled and assigned.
         </p>
 
           <form action={createCallbackVisitFromForm} className="mt-2 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
@@ -7969,21 +8048,21 @@ const failureResolutionPathCount =
       {banner === "internal_invoice_visit_scope_line_item_added" && (
         <FlashBanner
           type="success"
-          message="Selected Work Items were added to the draft invoice as invoice charges."
+          message={`Selected ${surfaceProfile.labels.workItems} were added to the draft invoice as invoice charges.`}
         />
       )}
 
       {banner === "internal_invoice_visit_scope_line_item_partial_added" && (
         <FlashBanner
           type="warning"
-          message="Some selected Work Items were already added. New selections were added to the draft invoice."
+          message={`Some selected ${surfaceProfile.labels.workItems} were already added. New selections were added to the draft invoice.`}
         />
       )}
 
       {banner === "internal_invoice_visit_scope_line_item_duplicate" && (
         <FlashBanner
           type="warning"
-          message="Selected Work Items were already on this draft invoice."
+          message={`Selected ${surfaceProfile.labels.workItems} were already on this draft invoice.`}
         />
       )}
 
@@ -7992,7 +8071,7 @@ const failureResolutionPathCount =
         banner === "internal_invoice_visit_scope_item_not_found") && (
         <FlashBanner
           type="warning"
-          message="Select valid Work Items from this job to add them to the draft invoice as invoice charges."
+          message={`Select valid ${surfaceProfile.labels.workItems} from this job to add them to the draft invoice as invoice charges.`}
         />
       )}
 
@@ -8027,14 +8106,14 @@ const failureResolutionPathCount =
       {banner === "visit_scope_saved" && (
         <FlashBanner
           type="success"
-          message="Work Items saved."
+          message={`${surfaceProfile.labels.workItems} saved.`}
         />
       )}
 
       {banner === "visit_scope_already_saved" && (
         <FlashBanner
           type="warning"
-          message="Work Items were already up to date."
+          message={`${surfaceProfile.labels.workItems} were already up to date.`}
         />
       )}
 
@@ -8048,28 +8127,28 @@ const failureResolutionPathCount =
       {banner === "visit_scope_payload_invalid" && (
         <FlashBanner
           type="warning"
-          message="Work Items could not be read from the form submission."
+          message={`${surfaceProfile.labels.workItems} could not be read from the form submission.`}
         />
       )}
 
       {banner === "visit_scope_job_read_failed" && (
         <FlashBanner
           type="warning"
-          message="Could not load the job before saving Work Items."
+          message={`Could not load the job before saving ${surfaceProfile.labels.workItems}.`}
         />
       )}
 
       {banner === "visit_scope_job_update_failed" && (
         <FlashBanner
           type="warning"
-          message="Work Items could not be saved to the job record."
+          message={`${surfaceProfile.labels.workItems} could not be saved to the job record.`}
         />
       )}
 
       {banner === "visit_scope_update_failed" && (
         <FlashBanner
           type="warning"
-          message="Work Items could not be saved."
+          message={`${surfaceProfile.labels.workItems} could not be saved.`}
         />
       )}
 
@@ -8097,7 +8176,7 @@ const failureResolutionPathCount =
       {banner === "callback_visit_created" && (
         <FlashBanner
           type="success"
-          message="Callback visit created. This is an unscheduled office/dispatch item and will not appear in technician My Work until scheduled and assigned."
+          message={`Callback visit created. This is an unscheduled office/dispatch item and will not appear in ${surfaceProfile.labels.fieldUser.toLowerCase()} My Work until scheduled and assigned.`}
         />
       )}
 
@@ -8821,15 +8900,17 @@ const failureResolutionPathCount =
           </details>
         ) : null}
 
-                <a href="#job-record-equipment" data-record-launcher="job-record-equipment" className={recordLauncherClass}>
-          <CollapsibleHeader
+        {surfaceProfile.surfaces.equipment ? (
+          <a href="#job-record-equipment" data-record-launcher="job-record-equipment" className={recordLauncherClass}>
+            <CollapsibleHeader
               title="Equipment"
               subtitle="Latest equipment items recorded for this job."
               meta={`${equipmentCount} item${equipmentCount === 1 ? "" : "s"}`}
               icon={<ToolIcon className="h-4 w-4" />}
               compactOnMobile
             />
-        </a>
+          </a>
+        ) : null}
 
         {/* Attachments */}
                 <a href="#job-record-attachments" data-record-launcher="job-record-attachments" className={recordLauncherClass}>
@@ -9022,6 +9103,7 @@ const failureResolutionPathCount =
                 </form>
               </div>
 
+              {surfaceProfile.surfaces.permits ? (
               <details
                 open
                 className="group mt-4 rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_10px_28px_-26px_rgba(15,23,42,0.35)] [&[open]_.disclosure-icon]:rotate-90"
@@ -9080,6 +9162,7 @@ const failureResolutionPathCount =
                     </SubmitButton>
                   </form>
               </details>
+              ) : null}
 
               <div
                 className={`mt-4 grid grid-cols-1 gap-3 ${
@@ -9147,18 +9230,20 @@ const failureResolutionPathCount =
                       <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=info`} />
 
                       <div className="rounded-lg border border-blue-200/80 bg-blue-50/70 px-3 py-2 text-xs leading-5 text-blue-900">
-                        Service details classify the visit. Work Items tell the team what work belongs to this trip.
+                        {isCleaningMode
+                          ? `${surfaceProfile.labels.siteDetails} classify the visit. ${surfaceProfile.labels.workItems} tell the crew what work belongs to this trip.`
+                          : `Service details classify the visit. ${surfaceProfile.labels.workItems} tell the team what work belongs to this trip.`}
                       </div>
 
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <label className={workspaceFieldLabelClass}>Service Type</label>
+                          <label className={workspaceFieldLabelClass}>{isCleaningMode ? "Cleaning Type" : "Service Type"}</label>
                           <select
                             name="service_case_kind"
                             defaultValue={String((serviceCase as any)?.case_kind ?? "reactive")}
                             className={workspaceInputClass}
                           >
-                            <option value="reactive">Standard Service</option>
+                            <option value="reactive">{isCleaningMode ? "Standard Cleaning" : "Standard Service"}</option>
                             <option value="callback">Callback</option>
                             <option value="warranty">Warranty</option>
                             <option value="maintenance">Maintenance</option>
@@ -9166,21 +9251,23 @@ const failureResolutionPathCount =
                         </div>
 
                         <div className="space-y-1">
-                          <label className={workspaceFieldLabelClass}>Visit Type</label>
+                          <label className={workspaceFieldLabelClass}>{isCleaningMode ? "Cleaning Visit Type" : "Visit Type"}</label>
                           <select
                             name="service_visit_type"
                             defaultValue={String(job.service_visit_type ?? "diagnostic")}
                             className={workspaceInputClass}
                           >
-                            <option value="diagnostic">Diagnostic</option>
-                            <option value="repair">Repair</option>
-                            <option value="install">Install</option>
+                            <option value="diagnostic">{isCleaningMode ? "Initial Cleaning Visit" : "Diagnostic"}</option>
+                            <option value="repair">{isCleaningMode ? "Cleaning Work Visit" : "Repair"}</option>
+                            <option value="install">{isCleaningMode ? "Deep Cleaning Visit" : "Install"}</option>
                             <option value="return_visit">Return Visit</option>
                             <option value="callback">Callback</option>
                             <option value="maintenance">Maintenance</option>
                           </select>
                           <p className="text-[11px] leading-5 text-slate-500">
-                            Category of visit, such as diagnostic, repair, install, return visit, callback, or maintenance.
+                            {isCleaningMode
+                              ? "Category of visit, such as initial cleaning, cleaning work, deep cleaning, return visit, callback, or maintenance."
+                              : "Category of visit, such as diagnostic, repair, install, return visit, callback, or maintenance."}
                           </p>
                         </div>
                       </div>
@@ -9294,7 +9381,7 @@ const failureResolutionPathCount =
             Waiting
           </div>
           <div className="mt-2 text-xs leading-5 text-amber-900/90">
-            Waiting State explains why progress is paused. It does not replace Work Items / Visit Scope.
+            Waiting State explains why progress is paused. It does not replace {surfaceProfile.labels.workItems} / {surfaceProfile.labels.visitScope}.
           </div>
           {activeWaitingState.blockerReason ? (
             <div className="mt-2 text-sm text-amber-900">{activeWaitingState.blockerReason}</div>
@@ -9335,7 +9422,7 @@ const failureResolutionPathCount =
     <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3.5 py-3 text-sm text-slate-700">
       <div className="font-semibold text-slate-900">Current Interrupt Detail</div>
       <div className="mt-1 text-xs leading-5 text-slate-600">
-        This pause reason is operational context only and does not replace Work Items / Visit Scope.
+        This pause reason is operational context only and does not replace {surfaceProfile.labels.workItems} / {surfaceProfile.labels.visitScope}.
       </div>
       <div className="mt-1">
         {currentInterruptReasonText
@@ -9366,6 +9453,7 @@ const failureResolutionPathCount =
 
           </div>
         </section>
+        {surfaceProfile.surfaces.equipment ? (
         <section id="job-record-equipment" data-record-panel="job-record-equipment" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -9419,6 +9507,7 @@ const failureResolutionPathCount =
           </div>
           </div>
         </section>
+        ) : null}
         <section id="job-record-attachments" data-record-panel="job-record-attachments" className={recordPanelClass} tabIndex={-1}>
           <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
@@ -9661,7 +9750,7 @@ const failureResolutionPathCount =
       <div className={workspaceSoftCardClass}>
         <div className="mb-2 text-sm font-semibold text-slate-950">Resolve by Correction Review</div>
         <div className="mb-3 text-sm leading-6 text-slate-600">
-          Use this only when submitted correction notes/photos are sufficient to resolve the failure without sending a technician back out for a physical retest.
+          Use this only when submitted correction notes/photos are sufficient to resolve the failure without sending a {surfaceProfile.labels.fieldUser.toLowerCase()} back out for a physical retest.
         </div>
 
         <form action={resolveFailureByCorrectionReviewFromForm} className="space-y-3">

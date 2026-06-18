@@ -181,11 +181,14 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
         : "v3";
 
   const productMode =
-    productModeRaw === "hvac_service" || productModeRaw === "ecc_hers" || productModeRaw === "hybrid"
+    productModeRaw === "hvac_service" ||
+    productModeRaw === "ecc_hers" ||
+    productModeRaw === "hybrid" ||
+    productModeRaw === "cleaning_services"
       ? productModeRaw
       : productModeRaw
         ? (() => {
-            throw new Error("Invalid --product-mode (expected: hvac_service|ecc_hers|hybrid)");
+            throw new Error("Invalid --product-mode (expected: hvac_service|ecc_hers|hybrid|cleaning_services)");
           })()
         : undefined;
 
@@ -215,7 +218,7 @@ export async function runProvisionFirstOwnerScript(
   if (!args.productMode) {
     productModeReadinessIssues.push({
       code: "PRODUCT_MODE_REQUIRED_FOR_APPLY",
-      message: "Apply readiness requires --product-mode (hvac_service|ecc_hers|hybrid).",
+      message: "Apply readiness requires --product-mode (hvac_service|ecc_hers|hybrid|cleaning_services).",
     });
   }
 

@@ -185,10 +185,19 @@ describe("parseProvisionFirstOwnerArgs", () => {
       "--product-mode",
       "hybrid",
     ]);
+    const cleaning = parseProvisionFirstOwnerArgs([
+      "--email",
+      "owner@example.com",
+      "--business-display-name",
+      "My Company",
+      "--product-mode",
+      "cleaning_services",
+    ]);
 
     expect(hvac.productMode).toBe("hvac_service");
     expect(ecc.productMode).toBe("ecc_hers");
     expect(hybrid.productMode).toBe("hybrid");
+    expect(cleaning.productMode).toBe("cleaning_services");
   });
 
   it("rejects invalid --product-mode", () => {
@@ -201,7 +210,7 @@ describe("parseProvisionFirstOwnerArgs", () => {
         "--product-mode",
         "invalid",
       ]),
-    ).toThrow("Invalid --product-mode (expected: hvac_service|ecc_hers|hybrid)");
+    ).toThrow("Invalid --product-mode (expected: hvac_service|ecc_hers|hybrid|cleaning_services)");
   });
 
   it("throws if required args are missing", () => {
@@ -409,11 +418,11 @@ describe("runProvisionFirstOwnerScript", () => {
   it("dry-run with product mode passes selected value to helper", async () => {
     const deps = makeDeps();
 
-    await runProvisionFirstOwnerScript({ ...baseArgs, productMode: "ecc_hers", apply: false }, deps);
+    await runProvisionFirstOwnerScript({ ...baseArgs, productMode: "cleaning_services", apply: false }, deps);
 
     expect(deps.provision).toHaveBeenCalledWith(
       expect.objectContaining({
-        productMode: "ecc_hers",
+        productMode: "cleaning_services",
         dryRun: true,
       }),
     );

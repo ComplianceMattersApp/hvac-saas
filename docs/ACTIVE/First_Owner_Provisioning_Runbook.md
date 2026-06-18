@@ -30,6 +30,7 @@ Supported product mode values for --product-mode:
 - hvac_service
 - ecc_hers
 - hybrid
+- cleaning_services
 
 Supported starter kit selector values for --starter-kit-version:
 - v1 (explicit legacy/manual option)
@@ -488,7 +489,7 @@ Product mode capture is now supported in the operator provisioning flow as the f
 
 Current script behavior:
 
-- Accepts `--product-mode` with allowed values: `hvac_service`, `ecc_hers`, `hybrid`.
+- Accepts `--product-mode` with allowed values: `hvac_service`, `ecc_hers`, `hybrid`, `cleaning_services`.
 - Parser rejects invalid values.
 - Apply mode requires valid `--product-mode`; missing value blocks apply.
 - During apply, `account_settings.product_mode` is upserted after owner identity resolution and before invite orchestration.
@@ -504,6 +505,8 @@ Operator usage examples:
   - `--entitlement-preset internal_comped --product-mode hybrid`
 - Standard service-company pattern:
   - `--entitlement-preset standard --product-mode hvac_service`
+- Standard cleaning-company pattern:
+  - `--entitlement-preset standard --product-mode cleaning_services`
 
 ### 11.2 Precedence and fallback rules
 
@@ -529,6 +532,7 @@ These parameters remain independent in Slice 1 implementation and later phases.
 Public signup at `/signup` will eventually support:
 - HVAC Service (`hvac_service`)
 - ECC (`ecc_hers`, customer-facing label "ECC")
+- Cleaning / Janitorial (`cleaning_services`)
 - Hybrid (`hybrid`) remains manual/internal/sales-assisted only
 
 Possible signup routes (not yet decided):

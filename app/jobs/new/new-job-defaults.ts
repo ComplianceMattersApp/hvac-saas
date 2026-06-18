@@ -1,8 +1,8 @@
 export type JobTypeDefault = "ecc" | "service";
-export type ProductMode = "hybrid" | "ecc_hers" | "hvac_service";
+export type ProductMode = "hybrid" | "ecc_hers" | "hvac_service" | "cleaning_services";
 
 function resolveLockedInternalJobType(productMode: ProductMode): JobTypeDefault | null {
-  if (productMode === "hvac_service") return "service";
+  if (productMode === "hvac_service" || productMode === "cleaning_services") return "service";
   if (productMode === "ecc_hers") return "ecc";
   return null;
 }

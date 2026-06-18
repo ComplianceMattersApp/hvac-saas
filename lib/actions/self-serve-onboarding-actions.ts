@@ -39,12 +39,14 @@ function resolveProductModeFromSignupIntent(value: unknown): ProductMode | null 
   if (!intent) return null;
   if (intent === "service") return "hvac_service";
   if (intent === "ecc") return "ecc_hers";
+  if (intent === "cleaning") return "cleaning_services";
   return "invalid";
 }
 
-function resolveSignupPath(value: ProductMode | null): "generic" | "service" | "ecc" {
+function resolveSignupPath(value: ProductMode | null): "generic" | "service" | "ecc" | "cleaning" {
   if (value === "hvac_service") return "service";
   if (value === "ecc_hers") return "ecc";
+  if (value === "cleaning_services") return "cleaning";
   return "generic";
 }
 

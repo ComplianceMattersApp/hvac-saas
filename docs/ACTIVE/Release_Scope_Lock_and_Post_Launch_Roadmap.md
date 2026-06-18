@@ -884,8 +884,8 @@ Product Mode V2 sandbox row validation closeout note:
 Product Mode Provisioning Capture Planning note:
 
 - Product mode capture should be phased, with First Owner Provisioning as the first implementation surface (before public signup capture).
-- Phase 1 (First Owner Provisioning): script should require `--product-mode hvac_service|ecc_hers|hybrid` and write to account_settings during apply. Missing/invalid values should block apply only (not user/account functionality).
-- Phase 2 (Public signup): `/signup` will eventually support two paths (HVAC Service, ECC). Hybrid remains manual/internal/sales-assisted only. Customer-facing "ECC" maps to internal `ecc_hers` until future rename/migration.
+- Phase 1 (First Owner Provisioning): script should require `--product-mode hvac_service|ecc_hers|hybrid|cleaning_services` and write to account_settings during apply. Missing/invalid values should block apply only (not user/account functionality).
+- Phase 2 (Public signup): `/signup` supports three paths (HVAC Service, ECC, Cleaning / Janitorial). Hybrid remains manual/internal/sales-assisted only. Customer-facing "ECC" maps to internal `ecc_hers` until future rename/migration.
 - Phase 3 (Admin configuration): read-only display first; edit UI later and guarded.
 - Separation: product_mode controls workflow relevance/defaults only; plan_tier controls package level; entitlements/add-ons control feature availability; billing_mode controls invoice workflow; feature_flags control rollout safety. These remain independent.
 - Safety: missing product_mode continues to fall back safely (signal-based defaults); missing product_mode must not block login/signup/invites/reports.
@@ -897,7 +897,7 @@ Product Mode Provisioning Capture Planning note:
 
 Product Mode Provisioning Capture Slice 1 closeout note:
 
-- First Owner Provisioning script now supports `--product-mode hvac_service|ecc_hers|hybrid`.
+- First Owner Provisioning script now supports `--product-mode hvac_service|ecc_hers|hybrid|cleaning_services`.
 - Apply mode requires valid `--product-mode` and blocks when missing/invalid.
 - Apply path writes `account_settings.product_mode` after owner identity resolution and before invite orchestration.
 - Dry-run remains non-mutating and reports apply-readiness plus create/patch/confirm preview for account_settings capture.
@@ -1272,16 +1272,18 @@ Product Mode Signup Links V1 is implemented as a surgical signup-entry follow-up
 
 - `/signup/service` maps to `hvac_service`.
 - `/signup/ecc` maps to `ecc_hers`.
-- `/signup` is now a product-choice landing page with SERVICE and ECC cards.
+- `/signup/cleaning` maps to `cleaning_services`.
+- `/signup` is now a product-choice landing page with SERVICE, ECC, and CLEANING cards.
 - Hybrid / All-in-One remains manual/operator-only; no public Hybrid signup path was added.
 - Product-mode capture uses the existing first-owner provisioning path and writes `account_settings.product_mode` after owner creation.
 - No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, contractor authority, report dataset/calculation behavior, Product Mode schema, or First Owner Provisioning command behavior changed.
 
 Product Choice Signup Landing V1 closeout note:
 
-- Public `/signup` now presents a product-choice landing with two clear card paths: SERVICE and ECC.
+- Public `/signup` now presents a product-choice landing with three clear card paths: SERVICE, ECC, and CLEANING.
 - SERVICE card routes to `/signup/service` and keeps existing HVAC Service signup behavior.
 - ECC card routes to `/signup/ecc` and keeps existing ECC signup behavior.
+- CLEANING card routes to `/signup/cleaning` and captures `cleaning_services` while cleaning-specific workflows remain deferred.
 - Hybrid remains manual/operator-only and is not exposed as a public signup route.
 - No tier/add-on, billing/payment/QBO, security/RLS, or contractor-authority behavior changed.
 
@@ -1307,9 +1309,10 @@ The following implementation groups have been closed as of May 2026.
 
 ### Group 2 — Signup Front Door / Product Choice (CLOSED)
 
-- `/signup` shows SERVICE and ECC product-choice cards.
+- `/signup` shows SERVICE, ECC, and CLEANING product-choice cards.
 - `/signup/service` maps to internal `hvac_service`.
 - `/signup/ecc` maps to internal `ecc_hers`.
+- `/signup/cleaning` maps to internal `cleaning_services`.
 - Hybrid / All-in-One remains manual/operator-assisted only; no public Hybrid signup path exists.
 - Signup behavior, provisioning paths, and product-mode capture boundaries are documented in `docs/ACTIVE/Product_Mode_Signup_Spec.md`.
 

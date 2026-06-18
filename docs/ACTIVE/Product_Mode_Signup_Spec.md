@@ -7,10 +7,11 @@ Date: 2026-05-08
 
 ## 1. Purpose
 
-This spec defines two signup/onboarding versions on one shared Compliance Matters platform engine:
+This spec defines three signup/onboarding versions on one shared Compliance Matters platform engine:
 
 1. ECC/HERS Compliance Testing version
 2. HVAC Service Company version
+3. Cleaning / Janitorial version
 
 This is not a second app and not a codebase split.
 
@@ -18,10 +19,11 @@ This spec is a planning contract for future product-mode/account setup work and 
 
 ## 2. Signup Versions
 
-The product supports two onboarding choices for new companies:
+The product supports three onboarding choices for new companies:
 
 1. ECC/HERS Compliance Testing
 2. HVAC Service Company
+3. Cleaning / Janitorial
 
 Both choices provision into the same shared platform with different defaults and presentation emphasis.
 
@@ -103,11 +105,22 @@ Tier/add-on clarification (future implementation):
 - HVAC Service should hide contractor portal/intake by default unless a future entitlement explicitly enables a compatible workflow.
 - Estimates, SMS, tenant customer payments, and recurring-service capabilities should be controlled by tier/add-on policy rather than product mode identity alone.
 
+## 5A. Cleaning / Janitorial Signup Defaults
+
+When a company signs up as Cleaning / Janitorial, default posture should be:
+
+- product mode: Cleaning / Janitorial
+- job creation default: Service / Work Order
+- one-off cleaning jobs emphasized first
+- recurring services, crews, checklists, allotted hours, and follow-up positioned as future cleaning-side modules
+- contractor/ECC workflows hidden/de-emphasized by default unless explicitly enabled by future design
+- cleaning starter kit when starter kits become mode-aware
+
 ## 6. Future Account-Level Product Mode
 
 Future implementation can introduce an account-level identity setting concept such as:
 
-- `product_mode = "ecc_hers" | "hvac_service" | "hybrid"`
+- `product_mode = "ecc_hers" | "hvac_service" | "cleaning_services" | "hybrid"`
 
 Clarifications:
 
@@ -127,6 +140,7 @@ V2 storage decision:
    - `hybrid`
    - `hvac_service`
    - `ecc_hers`
+   - `cleaning_services`
 - `product_mode` remains nullable in first implementation for safe rollout.
 
 Resolver order decision:
@@ -174,7 +188,7 @@ Product Mode V2 Slice 1 facts (implemented):
 
 - Added account-level `account_settings` migration file.
 - Added nullable `product_mode`.
-- Allowed values remain `hybrid`, `hvac_service`, `ecc_hers`.
+- Allowed values remain `hybrid`, `hvac_service`, `ecc_hers`, `cleaning_services`.
 - Resolver now reads `account_settings.product_mode` first.
 - Resolver fallback order is:
    1. real account setting
@@ -185,6 +199,7 @@ Product Mode V2 Slice 1 facts (implemented):
    - `hybrid` -> ECC default
    - `ecc_hers` -> ECC default
    - `hvac_service` -> Service default
+   - `cleaning_services` -> Service default
 - Contractor mode is unchanged.
 - Draft `jobType` still wins.
 - ECC and Service remain selectable.
@@ -288,6 +303,7 @@ Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 - Product-specific public signup entry links are implemented.
 - `/signup/service` maps the public Service signup path to internal `hvac_service`.
 - `/signup/ecc` maps the public ECC / Compliance Testing signup path to internal `ecc_hers`.
+- `/signup/cleaning` maps the public Cleaning / Janitorial signup path to internal `cleaning_services`.
 - Generic `/signup` remains available and keeps existing broad self-serve behavior.
 - Hybrid / All-in-One remains manual/operator-only; no public `/signup/hybrid` route is exposed.
 - Product-mode capture happens through the existing first-owner provisioning helper and writes `account_settings.product_mode` after owner creation.
@@ -297,9 +313,9 @@ Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 Product Choice Signup Landing V1 closeout snapshot (2026-05-10):
 
 - Public `/signup` now shows a product-choice landing instead of an ambiguous generic signup form.
-- Two public cards are exposed: SERVICE and ECC.
-- SERVICE routes to `/signup/service`; ECC routes to `/signup/ecc`.
-- Existing `/signup/service` and `/signup/ecc` behavior remains unchanged.
+- Three public cards are exposed: SERVICE, ECC, and CLEANING.
+- SERVICE routes to `/signup/service`; ECC routes to `/signup/ecc`; CLEANING routes to `/signup/cleaning`.
+- Existing `/signup/service`, `/signup/ecc`, and `/signup/cleaning` behavior remains unchanged.
 - Hybrid remains manual/operator-only and no public `/signup/hybrid` signup path is exposed.
 - No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, or contractor-authority behavior changed.
 
@@ -445,7 +461,7 @@ Product mode capture should be phased, with the first implementation surface bei
 Current implementation status:
 
 1. **Phase 1: First Owner Provisioning (implemented)**
-   - First Owner Provisioning script supports `--product-mode` with allowed values `hvac_service`, `ecc_hers`, `hybrid`
+   - First Owner Provisioning script supports `--product-mode` with allowed values `hvac_service`, `ecc_hers`, `hybrid`, `cleaning_services`
    - Invalid `--product-mode` is rejected by parser
    - Apply mode requires valid `--product-mode` and blocks apply when missing
    - Product mode is written to `account_settings.product_mode` during provisioning apply, after owner/account identity is resolved and before invite send
@@ -455,13 +471,15 @@ Current implementation status:
    - See `docs/ACTIVE/First_Owner_Provisioning_Runbook.md` section 11 for operational details
 
 2. **Phase 2: Public signup capture (later)**
-   - Public signup at `/signup` will eventually support two customer paths:
+   - Public signup at `/signup` supports three customer paths:
      - HVAC Service (`hvac_service`)
      - ECC (`ecc_hers`, customer-facing as "ECC")
+     - Cleaning / Janitorial (`cleaning_services`)
    - Hybrid (`hybrid`) remains manual/internal/sales-assisted only during this phase
    - Signup routing may eventually be:
-     - `/signup/hvac-service`
+     - `/signup/service`
      - `/signup/ecc`
+     - `/signup/cleaning`
      - or single `/signup` with choice page
    - Customer-facing "ECC" label maps to internal stored value `ecc_hers` until future internal rename/migration phase
 
@@ -694,9 +712,10 @@ These references are for planning alignment only and do not activate implementat
 
 Group 2 is closed.
 
-- `/signup` product-choice landing is live with SERVICE and ECC cards.
+- `/signup` product-choice landing is live with SERVICE, ECC, and CLEANING cards.
 - `/signup/service` routes to `hvac_service` provisioning path.
 - `/signup/ecc` routes to `ecc_hers` provisioning path.
+- `/signup/cleaning` routes to `cleaning_services` provisioning path.
 - Hybrid / All-in-One remains manual/operator-only with no public signup route.
 - All provisioning, product-mode capture, and notification behaviors are documented in sections 6.x above.
 - No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, or contractor-authority behavior changed.

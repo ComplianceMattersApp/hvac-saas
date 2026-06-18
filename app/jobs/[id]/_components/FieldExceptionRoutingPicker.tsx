@@ -12,6 +12,11 @@ type FieldExceptionRoutingPickerProps = {
   currentStatus: string;
   tab: string;
   showDifferentIssueFoundOutcome?: boolean;
+  labels?: {
+    partsNeeded?: string;
+    approvalNeeded?: string;
+    unableToComplete?: string;
+  };
   partsNeededAction: ServerFormAction;
   approvalNeededAction: ServerFormAction;
   unableToCompleteAction: ServerFormAction;
@@ -30,6 +35,11 @@ const submitButtonClass =
 export default function FieldExceptionRoutingPicker(props: FieldExceptionRoutingPickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [selectedReason, setSelectedReason] = useState<ExceptionReason | null>(null);
+  const partsNeededLabel = props.labels?.partsNeeded ?? "Materials Needed";
+  const approvalNeededLabel = props.labels?.approvalNeeded ?? "Approval Needed";
+  const unableToCompleteLabel = props.labels?.unableToComplete ?? "Other";
+  const partsNeededPlaceholder =
+    partsNeededLabel === "Supplies Needed" ? "What supplies are needed?" : "What materials are needed?";
 
   const closePanel = () => {
     setSelectedReason(null);
@@ -70,13 +80,13 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-3">
                 <button type="button" onClick={() => setSelectedReason("parts")} className={choiceButtonClass}>
-                  Materials Needed
+                  {partsNeededLabel}
                 </button>
                 <button type="button" onClick={() => setSelectedReason("approval")} className={choiceButtonClass}>
-                  Approval Needed
+                  {approvalNeededLabel}
                 </button>
                 <button type="button" onClick={() => setSelectedReason("unable")} className={choiceButtonClass}>
-                  Other
+                  {unableToCompleteLabel}
                 </button>
               </div>
               <div className="mt-3 flex border-t border-amber-100 pt-3">
@@ -91,8 +101,8 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
             <form action={props.partsNeededAction} className="space-y-3.5">
               {commonInputs}
               <div>
-                <p className="text-sm font-semibold text-amber-950">Materials Needed</p>
-                <p className="mt-1 text-xs leading-5 text-amber-900/90">Complete today&apos;s visit and hold follow-up for materials.</p>
+                <p className="text-sm font-semibold text-amber-950">{partsNeededLabel}</p>
+                <p className="mt-1 text-xs leading-5 text-amber-900/90">Complete today&apos;s visit and hold follow-up for {partsNeededLabel.toLowerCase()}.</p>
               </div>
               <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
                 Reason
@@ -103,7 +113,7 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
                   rows={3}
                   maxLength={280}
                   className="w-full rounded-lg border border-amber-200 bg-white px-3 py-2.5 text-sm font-normal text-slate-900 shadow-sm outline-none transition focus-visible:ring-2 focus-visible:ring-amber-200"
-                  placeholder="What materials are needed?"
+                  placeholder={partsNeededPlaceholder}
                 />
               </label>
               <div className="flex flex-col gap-2 border-t border-amber-100 pt-3 sm:flex-row sm:flex-wrap">
@@ -124,7 +134,7 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
             <form action={props.approvalNeededAction} className="space-y-3.5">
               {commonInputs}
               <div>
-                <p className="text-sm font-semibold text-amber-950">Approval Needed</p>
+                <p className="text-sm font-semibold text-amber-950">{approvalNeededLabel}</p>
                 <p className="mt-1 text-xs leading-5 text-amber-900/90">Complete today&apos;s visit and hold follow-up for approval.</p>
               </div>
               <label className="grid gap-1.5 text-xs font-semibold text-slate-700">
@@ -157,7 +167,7 @@ export default function FieldExceptionRoutingPicker(props: FieldExceptionRouting
             <form action={props.unableToCompleteAction} className="space-y-3.5">
               {commonInputs}
               <div>
-                <p className="text-sm font-semibold text-amber-950">Other</p>
+                <p className="text-sm font-semibold text-amber-950">{unableToCompleteLabel}</p>
                 <p className="mt-1 text-xs leading-5 text-amber-900/90">Complete today&apos;s visit and hold follow-up for office review.</p>
               </div>
               <label className="grid gap-1.5 text-xs font-semibold text-slate-700">

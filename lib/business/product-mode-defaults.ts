@@ -1,6 +1,6 @@
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 
-export type ProductMode = "hybrid" | "ecc_hers" | "hvac_service";
+export type ProductMode = "hybrid" | "ecc_hers" | "hvac_service" | "cleaning_services";
 export type JobTypeDefault = "ecc" | "service";
 
 const DEFAULT_INTERNAL_BUSINESS_DISPLAY_NAME = "Compliance Matters";
@@ -19,6 +19,7 @@ export function normalizeProductMode(value: unknown): ProductMode | null {
   if (normalized === "hybrid") return "hybrid";
   if (normalized === "ecc_hers") return "ecc_hers";
   if (normalized === "hvac_service") return "hvac_service";
+  if (normalized === "cleaning_services") return "cleaning_services";
   return null;
 }
 
@@ -52,7 +53,7 @@ export function resolveProductModeFromSignals(params: {
 }
 
 export function resolveJobTypeDefaultForProductMode(mode: ProductMode): JobTypeDefault {
-  return mode === "hvac_service" ? "service" : "ecc";
+  return mode === "hvac_service" || mode === "cleaning_services" ? "service" : "ecc";
 }
 
 export async function readProductModeSettingForAccountOwnerId(params: {

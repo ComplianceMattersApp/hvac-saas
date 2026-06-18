@@ -122,6 +122,7 @@ describe("product mode defaults", () => {
 
   it("normalizes invalid product mode values to null", () => {
     expect(normalizeProductMode("hvac_service")).toBe("hvac_service");
+    expect(normalizeProductMode("cleaning_services")).toBe("cleaning_services");
     expect(normalizeProductMode("unknown_mode")).toBeNull();
   });
 
@@ -252,5 +253,6 @@ describe("product mode defaults", () => {
     expect(resolveJobTypeDefaultForProductMode("hybrid")).toBe("ecc");
     expect(resolveJobTypeDefaultForProductMode("ecc_hers")).toBe("ecc");
     expect(resolveJobTypeDefaultForProductMode("hvac_service")).toBe("service");
+    expect(resolveJobTypeDefaultForProductMode("cleaning_services")).toBe("service");
   });
 });

@@ -134,6 +134,16 @@ describe("selectNextBestAction", () => {
     expect(result.primaryHref).toBe("/ops");
   });
 
+  it("office: uses cleaning field-user language for unassigned work", () => {
+    const result = selectNextBestAction(nbaInput({
+      role: "office",
+      productMode: "cleaning_services",
+      priorityCounts: { ...baseCounts, scheduledTodayWithoutTech: 2 },
+    }));
+
+    expect(result.primaryLabel).toBe("Assign Cleaners");
+  });
+
   it("office: critical exceptions outrank everything else", () => {
     const result = selectNextBestAction(nbaInput({
       role: "office",
@@ -422,6 +432,24 @@ describe("buildDailyBriefing", () => {
     expect(text).toContain("assigned route");
     expect(text).not.toContain("scheduled");
     expect(text).not.toContain("invoice");
+  });
+
+  it("uses cleaner coverage language for cleaning accounts", () => {
+    const text = buildDailyBriefing({
+      role: "admin",
+      productMode: "cleaning_services",
+      todayJobsCount: 2,
+      priorityCounts: {
+        ...baseCounts,
+        scheduledToday: 2,
+        scheduledTodayWithoutTech: 1,
+      },
+      openInvoiceCount: 0,
+      servicePlansOverdue: 0,
+      followUpsCount: 0,
+    });
+
+    expect(text).toContain("missing cleaner coverage");
   });
 
   it("keeps billing briefing focused on money/closeout", () => {

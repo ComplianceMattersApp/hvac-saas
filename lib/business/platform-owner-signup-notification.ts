@@ -2,7 +2,7 @@ import type { ProductMode } from "@/lib/business/product-mode-defaults";
 import { resolvePlatformOwnerSignupNotificationRecipient } from "@/lib/business/platform-owner-access";
 import { sendEmail } from "@/lib/email/sendEmail";
 
-type SignupPath = "generic" | "service" | "ecc";
+type SignupPath = "generic" | "service" | "ecc" | "cleaning";
 
 export type PlatformOwnerSignupNotificationInput = {
   companyName: string;
@@ -26,6 +26,7 @@ function toCleanString(value: unknown) {
 function signupPathLabel(path: SignupPath) {
   if (path === "service") return "/signup/service";
   if (path === "ecc") return "/signup/ecc";
+  if (path === "cleaning") return "/signup/cleaning";
   return "/signup";
 }
 

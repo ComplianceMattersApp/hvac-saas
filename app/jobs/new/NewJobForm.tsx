@@ -29,6 +29,7 @@ import {
   resolveRestoredDraftJobType,
 } from "./new-job-defaults";
 import type { ProductMode } from "@/lib/business/product-mode-defaults";
+import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
 import { formatPersonDisplayName } from "@/lib/utils/identity-display";
 import {
@@ -418,7 +419,10 @@ export default function NewJobForm({
   const isInternalMode = !isContractorMode;
   const forceServicePrefillMode = Boolean(maintenanceAgreementPrefill && isInternalMode);
   const isHybridProductMode = productMode === "hybrid";
-  const isHvacServiceInternalMode = isInternalMode && productMode === "hvac_service";
+  const surfaceProfile = useMemo(() => resolveProductSurfaceProfile(productMode), [productMode]);
+  const isCleaningMode = productMode === "cleaning_services";
+  const isServiceSurfaceMode = productMode === "hvac_service" || isCleaningMode;
+  const isHvacServiceInternalMode = isInternalMode && isServiceSurfaceMode;
   const hasSeededCustomer = Boolean(existingCustomer?.id);
   const isCustomerContextInternalMode =
     isInternalMode && customerContextMode && Boolean(existingCustomer?.id);
@@ -685,6 +689,8 @@ const [billingRecipient, setBillingRecipient] = useState<
 
   const internalPageTitle = productMode === "hvac_service"
     ? "New Work Order"
+    : productMode === "cleaning_services"
+      ? "New Cleaning Job"
     : productMode === "ecc_hers"
       ? "New ECC Job"
       : "New Job";
@@ -695,43 +701,55 @@ const [billingRecipient, setBillingRecipient] = useState<
       ? "Select the responsible account and service location, define the compliance work, then create the job."
       : "Select the responsible account, choose the work, then create the job.";
   const internalModeHint =
-    isHvacServiceMode
+    isCleaningMode
+      ? "Cleaning accounts use the Cleaning Job family by default and presentation."
+      : isHvacServiceMode
       ? "Service accounts use the Service / Work Order family by default and presentation."
       : productMode === "ecc_hers"
         ? "ECC/HERS accounts use the ECC / Compliance Test family by default and presentation."
         : "Hybrid keeps both workflows available. Choose ECC or Service based on the visit you are creating.";
-  const jobFamilyStepTitle = isHvacServiceMode
+  const jobFamilyStepTitle = isCleaningMode
+    ? "Cleaning Job Setup"
+    : isHvacServiceMode
     ? "Work Order Setup"
     : productMode === "ecc_hers"
       ? "ECC Job Setup"
       : "Job Type";
-  const jobFamilyStepDescription = isHvacServiceMode
+  const jobFamilyStepDescription = isCleaningMode
+    ? "These fields classify the cleaning visit. Cleaning tasks are added below."
+    : isHvacServiceMode
     ? "These fields classify the visit. Work instructions are added below."
     : productMode === "ecc_hers"
       ? "ECC / Compliance is locked for this account. Review the compliance details below before continuing."
       : "What kind of job are you creating?";
-  const jobFamilyControlLabel = isHvacServiceMode ? "Service / Work Order" : "Job Type";
-  const serviceJobFamilyDescription = isHvacServiceMode
-    ? "Locked to Service"
+  const jobFamilyControlLabel = isServiceSurfaceMode ? surfaceProfile.labels.job : "Job Type";
+  const serviceJobFamilyDescription = isServiceSurfaceMode
+    ? `Locked to ${surfaceProfile.labels.job}`
     : "Standard service visit workflow";
-  const eccJobFamilyDescription = isHvacServiceMode
+  const eccJobFamilyDescription = isServiceSurfaceMode
     ? "Advanced compliance testing workflow"
     : "Energy code test workflow";
-  const createSectionTitle = isHvacServiceMode
+  const createSectionTitle = isCleaningMode
+    ? "Create Cleaning Job"
+    : isHvacServiceMode
     ? "Create Work Order"
     : productMode === "ecc_hers"
       ? "Create ECC Job"
       : "Create Work Order";
-  const createSectionDescription = isHvacServiceMode
+  const createSectionDescription = isCleaningMode
+    ? "Review the cleaning job summary, then create it when the required intake details are ready."
+    : isHvacServiceMode
     ? "Review the work order summary, then create it when the required intake details are ready."
     : productMode === "ecc_hers"
       ? "Review the compliance job summary, then create it when the required intake details are ready."
       : "Review the work order summary, then create it when the required intake details are ready.";
-  const createReadyLabel = productMode === "ecc_hers" ? "Ready to create this ECC job." : "Ready to create this work order.";
+  const createReadyLabel = productMode === "ecc_hers" ? "Ready to create this ECC job." : `Ready to create this ${surfaceProfile.labels.job.toLowerCase()}.`;
   const createPendingLabel = productMode === "ecc_hers"
     ? "Complete the required intake details to create this ECC job."
-    : "Complete the required intake details to create this work order.";
-  const customerSectionDescription = isHvacServiceMode
+    : `Complete the required intake details to create this ${surfaceProfile.labels.job.toLowerCase()}.`;
+  const customerSectionDescription = isCleaningMode
+    ? "Select the customer / responsible account and confirm where the cleaning job should happen."
+    : isHvacServiceMode
     ? "Select the customer / responsible account and confirm where the work order should happen."
     : productMode === "ecc_hers"
       ? "Select the customer / responsible account and confirm where the compliance job should happen."
@@ -1811,10 +1829,10 @@ const [billingRecipient, setBillingRecipient] = useState<
 
           {jobType === "service" ? (
             <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
-              <label className="block text-sm font-medium text-slate-900">Service Details</label>
+              <label className="block text-sm font-medium text-slate-900">{isCleaningMode ? "Cleaning Details" : "Service Details"}</label>
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">{isCleaningMode ? "Cleaning Type" : "Service Type"}</label>
                   <select
                     name="service_case_kind"
                     className="w-full rounded-md border border-slate-300 bg-white p-2"
@@ -1825,7 +1843,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                       )
                     }
                   >
-                    <option value="reactive">Standard Service</option>
+                    <option value="reactive">{isCleaningMode ? "Standard Cleaning" : "Standard Service"}</option>
                     <option value="callback">Callback</option>
                     <option value="warranty">Warranty</option>
                     <option value="maintenance">Maintenance</option>
@@ -1833,7 +1851,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
 
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-slate-700">Visit Type</label>
+                  <label className="mb-1 block text-xs font-medium text-slate-700">{isCleaningMode ? "Cleaning Visit Type" : "Visit Type"}</label>
                   <select
                     name="service_visit_type"
                     className="w-full rounded-md border border-slate-300 bg-white p-2"
@@ -1850,9 +1868,9 @@ const [billingRecipient, setBillingRecipient] = useState<
                       )
                     }
                   >
-                    <option value="diagnostic">Diagnostic</option>
-                    <option value="repair">Repair</option>
-                    <option value="install">Install</option>
+                    <option value="diagnostic">{isCleaningMode ? "Initial Cleaning" : "Diagnostic"}</option>
+                    <option value="repair">{isCleaningMode ? "Cleaning Work" : "Repair"}</option>
+                    <option value="install">{isCleaningMode ? "Deep Cleaning" : "Install"}</option>
                     <option value="return_visit">Return Visit</option>
                     <option value="callback">Callback</option>
                     <option value="maintenance">Maintenance</option>
@@ -1863,6 +1881,7 @@ const [billingRecipient, setBillingRecipient] = useState<
             </div>
           ) : null}
 
+          {surfaceProfile.surfaces.permits ? (
           <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
             <label className="block text-sm font-medium text-slate-900">Permit Information</label>
             <div className="space-y-1">
@@ -1893,6 +1912,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               </div>
             </div>
           </div>
+          ) : null}
         </section>
         ) : null}
 
@@ -2527,10 +2547,10 @@ const [billingRecipient, setBillingRecipient] = useState<
           </div>
         </section>
 
-        {isInternalMode && internalResolutionReady && isHvacServiceMode ? (
+        {isInternalMode && internalResolutionReady && isServiceSurfaceMode ? (
           <input type="hidden" name="job_type" value={modeSafeJobType} />
         ) : null}
-        {isInternalMode && internalResolutionReady && !isHvacServiceMode ? (
+        {isInternalMode && internalResolutionReady && !isServiceSurfaceMode ? (
           <section className={guidedSectionShellClass}>
             {renderGuidedSectionIntro({
               icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
@@ -2628,8 +2648,8 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <div className={`${guidedSectionInsetClass} space-y-3`}>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
-                      <p className="mb-1.5 text-[11px] leading-5 text-slate-500">Case/business context for this service relationship.</p>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">{isCleaningMode ? "Cleaning Type" : "Service Type"}</label>
+                      <p className="mb-1.5 text-[11px] leading-5 text-slate-500">{isCleaningMode ? "Case/business context for this cleaning relationship." : "Case/business context for this service relationship."}</p>
                       <select
                         name="service_case_kind"
                         className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
@@ -2640,7 +2660,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                           )
                         }
                       >
-                        <option value="reactive">Standard Service</option>
+                        <option value="reactive">{isCleaningMode ? "Standard Cleaning" : "Standard Service"}</option>
                         <option value="callback">Callback</option>
                         <option value="warranty">Warranty</option>
                         <option value="maintenance">Maintenance</option>
@@ -2648,8 +2668,8 @@ const [billingRecipient, setBillingRecipient] = useState<
                     </div>
 
                     <div>
-                      <label className="mb-1 block text-xs font-medium text-slate-700">Visit Type</label>
-                      <p className="mb-1.5 text-[11px] leading-5 text-slate-500">Trip purpose for this specific field visit.</p>
+                      <label className="mb-1 block text-xs font-medium text-slate-700">{isCleaningMode ? "Cleaning Visit Type" : "Visit Type"}</label>
+                      <p className="mb-1.5 text-[11px] leading-5 text-slate-500">Purpose for this specific field visit.</p>
                       <select
                         name="service_visit_type"
                         className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
@@ -2666,9 +2686,9 @@ const [billingRecipient, setBillingRecipient] = useState<
                           )
                         }
                       >
-                        <option value="diagnostic">Initial / Diagnostic Visit</option>
-                        <option value="repair">Service Work Visit</option>
-                        <option value="install">Install Visit</option>
+                        <option value="diagnostic">{isCleaningMode ? "Initial Cleaning Visit" : "Initial / Diagnostic Visit"}</option>
+                        <option value="repair">{isCleaningMode ? "Cleaning Work Visit" : "Service Work Visit"}</option>
+                        <option value="install">{isCleaningMode ? "Deep Cleaning Visit" : "Install Visit"}</option>
                         <option value="return_visit">Return Visit</option>
                         <option value="callback">Callback Visit</option>
                         <option value="maintenance">Maintenance Visit</option>
@@ -2678,6 +2698,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                 </div>
               ) : null}
 
+              {surfaceProfile.surfaces.permits ? (
               <div className={`${guidedSectionInsetClass} space-y-3`}>
                 <label className="block text-sm font-medium text-slate-900">Permit Information</label>
                 <div className="space-y-1">
@@ -2708,6 +2729,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   </div>
                 </div>
               </div>
+              ) : null}
             </div>
           </section>
         ) : null}
@@ -2728,11 +2750,13 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <div className={guidedSectionShellClass} ref={visitScopeSectionRef}>
                   {renderGuidedSectionIntro({
                     icon: <ClipboardList className="h-4 w-4" aria-hidden="true" />,
-                    title: isHvacServiceMode ? "Work Order Details" : "Work To Perform & Job Scope",
+                    title: isCleaningMode ? "Cleaning Scope" : isHvacServiceMode ? "Work Order Details" : "Work To Perform & Job Scope",
                     description: isServicePlanQuickScheduleMode
                       ? "Service Plan visit defaults to quick scheduling. Review included work only when needed."
                       : isServicePlanPrefillFlow && jobType === "service"
                       ? "Service Plan work is included by default. Schedule first, then review work items only when needed."
+                      : isCleaningMode
+                      ? "What needs to be cleaned, checked, or followed up on during this visit?"
                       : isHvacServiceMode
                       ? "What kind of visit is this, and what work needs to be done?"
                       : jobType === "service"
@@ -2744,24 +2768,26 @@ const [billingRecipient, setBillingRecipient] = useState<
                   <div className={guidedSectionBodyClass}>
                   {isHybridProductMode ? (
                     <p className="text-xs text-slate-500">
-                      Job type controls workflow/testing. Visit Scope can include additional work performed during the same visit.
+                      Job type controls workflow. {surfaceProfile.labels.visitScope} can include additional work performed during the same visit.
                     </p>
                   ) : null}
                   <div className={`space-y-3 ${visitScopeError ? "rounded-2xl border border-red-300 bg-red-50/40 p-4 ring-2 ring-red-100" : ""}`}>
                     {!isServicePlanQuickScheduleMode ? (
                       <div>
-                        <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; Job Scope</h3>
+                        <h3 className="text-base font-semibold text-slate-900">Visit Summary &amp; {surfaceProfile.labels.visitScope}</h3>
                         <p className="mt-1 text-sm text-slate-500">
-                          {jobType === "service"
+                          {isCleaningMode
+                            ? "Reason for Visit sets the cleaning job title, then add at least one cleaning task for the field work."
+                            : jobType === "service"
                             ? "Reason for Visit sets the visit title, then add at least one scope item for the field work."
                             : "ECC jobs don't require job scope. Add companion scope only if this visit includes service work."}
                         </p>
                       </div>
                     ) : null}
-                    {isHvacServiceMode && jobType === "service" && !isServicePlanQuickScheduleMode ? (
+                    {isServiceSurfaceMode && jobType === "service" && !isServicePlanQuickScheduleMode ? (
                       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-slate-700">Service Type</label>
+                          <label className="mb-1 block text-xs font-medium text-slate-700">{isCleaningMode ? "Cleaning Type" : "Service Type"}</label>
                           <select
                             name="service_case_kind"
                             className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
@@ -2772,14 +2798,14 @@ const [billingRecipient, setBillingRecipient] = useState<
                               )
                             }
                           >
-                            <option value="reactive">Standard Service</option>
+                            <option value="reactive">{isCleaningMode ? "Standard Cleaning" : "Standard Service"}</option>
                             <option value="callback">Callback</option>
                             <option value="warranty">Warranty</option>
                             <option value="maintenance">Maintenance</option>
                           </select>
                         </div>
                         <div>
-                          <label className="mb-1 block text-xs font-medium text-slate-700">Visit Type</label>
+                          <label className="mb-1 block text-xs font-medium text-slate-700">{isCleaningMode ? "Cleaning Visit Type" : "Visit Type"}</label>
                           <select
                             name="service_visit_type"
                             className="w-full rounded-xl border border-slate-300 bg-white p-2.5"
@@ -2796,9 +2822,9 @@ const [billingRecipient, setBillingRecipient] = useState<
                               )
                             }
                           >
-                            <option value="diagnostic">Initial / Diagnostic Visit</option>
-                            <option value="repair">Service Work Visit</option>
-                            <option value="install">Install Visit</option>
+                            <option value="diagnostic">{isCleaningMode ? "Initial Cleaning Visit" : "Initial / Diagnostic Visit"}</option>
+                            <option value="repair">{isCleaningMode ? "Cleaning Work Visit" : "Service Work Visit"}</option>
+                            <option value="install">{isCleaningMode ? "Deep Cleaning Visit" : "Install Visit"}</option>
                             <option value="return_visit">Return Visit</option>
                             <option value="callback">Callback Visit</option>
                             <option value="maintenance">Maintenance Visit</option>
@@ -3336,8 +3362,10 @@ const [billingRecipient, setBillingRecipient] = useState<
             <section className={guidedSectionShellClass}>
               {renderGuidedSectionIntro({
                 icon: <BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />,
-                title: isContractorMode ? "Equipment" : "Additional Details",
-                description: isContractorMode
+                title: isCleaningMode ? "Site Details" : isContractorMode ? "Equipment" : "Additional Details",
+                description: isCleaningMode
+                  ? "Add site instructions, photos, and extra comments when they help the crew prepare."
+                  : isContractorMode
                   ? "Add equipment now so Compliance Matters has the system details before the job is reviewed."
                   : productMode === "ecc_hers"
                   ? "Supporting information only. Add it when it helps the compliance job move forward."
@@ -3349,8 +3377,8 @@ const [billingRecipient, setBillingRecipient] = useState<
               {isServicePlanQuickScheduleMode ? (
                 <div className={`${guidedSectionInsetClass} flex flex-wrap items-center justify-between gap-3`}>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">Advanced Job Details</p>
-                    <p className="mt-1 text-sm text-slate-600">Permit, equipment, photos, and extra comments.</p>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-600">{isCleaningMode ? "Site Instructions" : "Advanced Job Details"}</p>
+                    <p className="mt-1 text-sm text-slate-600">{isCleaningMode ? "Crew notes, photos, and extra comments." : "Permit, equipment, photos, and extra comments."}</p>
                   </div>
                   <button
                     type="button"
@@ -3364,7 +3392,7 @@ const [billingRecipient, setBillingRecipient] = useState<
               ) : null}
               {!isServicePlanQuickScheduleMode || showServicePlanAdvancedDetails ? (
                 <>
-              {isHvacServiceMode ? (
+              {isHvacServiceMode && surfaceProfile.surfaces.permits ? (
                 <details className={`${guidedSectionInsetClass} group`}>
                   <summary className="list-none cursor-pointer [&::-webkit-details-marker]:hidden">
                     {renderSupportingSectionHeader({
@@ -3410,6 +3438,7 @@ const [billingRecipient, setBillingRecipient] = useState<
                   </div>
                 </details>
               ) : null}
+              {surfaceProfile.surfaces.equipment ? (
               <div className={`${guidedSectionInsetClass} space-y-3`}>
           {renderSupportingSectionHeader({
             icon: <Wrench className="h-4 w-4" aria-hidden="true" />,
@@ -3587,13 +3616,27 @@ const [billingRecipient, setBillingRecipient] = useState<
               {/* equipment_json payload */}
               <input type="hidden" name="equipment_json" value={equipmentJson} />
               </div>
+              ) : (
+                <div className={`${guidedSectionInsetClass} space-y-3`}>
+                  {renderSupportingSectionHeader({
+                    icon: <MapPinned className="h-4 w-4" aria-hidden="true" />,
+                    title: "Site Instructions",
+                    description: "Capture access, supply, checklist, or crew handoff notes in Additional Comments for now.",
+                    trailing: <span className={supportingSectionMetaClass}>Optional</span>,
+                  })}
+                  <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-3 py-2 text-sm leading-6 text-emerald-900">
+                    Cleaning checklists and crew-specific fields are planned later. Use photos and comments in this slice.
+                  </div>
+                  <input type="hidden" name="equipment_json" value="[]" />
+                </div>
+              )}
               {isInternalMode ? (
                 <>
               <div className={`${guidedSectionInsetClass} space-y-3`}>
                 {renderSupportingSectionHeader({
                   icon: <Camera className="h-4 w-4" aria-hidden="true" />,
                   title: "Photos",
-                  description: "Equipment photos, permit copies, or site images. JPG, PNG, WEBP, or PDF.",
+                  description: isCleaningMode ? "Site photos, access images, or cleaning context. JPG, PNG, WEBP, or PDF." : "Equipment photos, permit copies, or site images. JPG, PNG, WEBP, or PDF.",
                   trailing: <span className={supportingSectionMetaClass}>Optional</span>,
                 })}
                 <input
@@ -3632,7 +3675,9 @@ const [billingRecipient, setBillingRecipient] = useState<
                 <div>
                 <h2 className="text-base font-semibold text-slate-900">Photos (optional)</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
-                  Equipment photos, permit copies, or site images. JPG, PNG, WEBP, or PDF.
+                  {isCleaningMode
+                    ? "Site photos, access images, or cleaning context. JPG, PNG, WEBP, or PDF."
+                    : "Equipment photos, permit copies, or site images. JPG, PNG, WEBP, or PDF."}
                   {isContractorMode ? " Files upload after proposal submit." : ""}
                 </p>
                 </div>

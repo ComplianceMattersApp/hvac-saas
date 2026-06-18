@@ -4,6 +4,7 @@ import { SignupContent, type SignupProductIntent } from "@/app/signup/signup-con
 const PRODUCT_INTENTS: Record<string, SignupProductIntent> = {
   service: "service",
   ecc: "ecc",
+  cleaning: "cleaning",
 };
 
 export default async function ProductSignupPage({

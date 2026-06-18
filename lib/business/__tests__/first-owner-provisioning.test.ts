@@ -1109,4 +1109,27 @@ describe("provisionFirstOwnerAccount", () => {
     expect(store.entitlementsByOwnerId[ownerId]?.entitlement_status).toBe("trial");
     expect(store.accountSettingsByOwnerId[ownerId]?.product_mode).toBe("hvac_service");
   });
+
+  it("captures cleaning_services as a supported product mode", async () => {
+    const store = createStore();
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: {
+        targetEmail: "owner@example.com",
+        productMode: "cleaning_services",
+      },
+    });
+
+    const ownerId = result.accountOwnerUserId as string;
+    expect(result.status).toBe("provisioned");
+    expect(result.productModeCapture).toEqual(
+      expect.objectContaining({
+        selectedProductMode: "cleaning_services",
+        applyReady: true,
+      }),
+    );
+    expect(store.accountSettingsByOwnerId[ownerId]?.product_mode).toBe("cleaning_services");
+  });
 });

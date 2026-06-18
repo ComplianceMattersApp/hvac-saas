@@ -111,6 +111,12 @@ export default async function OpsAdminPage() {
       peopleCopy:
         "Start with People & Access, then use Internal Team. Contractor tools stay optional for outside collaboration.",
     },
+    cleaning_services: {
+      badge: "Cleaning",
+      heroHint: "Cleaning workspace. Service job tools stay primary while cleaning workflows mature.",
+      peopleCopy:
+        "Start with People & Access, then use Internal Team. Contractor tools stay optional for outside collaboration.",
+    },
     ecc_hers: {
       badge: "ECC/HERS",
       heroHint: "Compliance and contractor collaboration remain relevant in this workspace.",

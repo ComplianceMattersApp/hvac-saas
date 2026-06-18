@@ -182,6 +182,40 @@ describe("submitSelfServeOnboardingForm", () => {
     );
   });
 
+  it("passes Cleaning signup intent into provisioning as cleaning_services", async () => {
+    const deps = makeDeps({
+      provision: vi.fn(async () =>
+        makeProvisioningResult({
+          productModeCapture: {
+            selectedProductMode: "cleaning_services",
+            applyReady: true,
+            action: "created",
+            issues: [],
+          },
+        }),
+      ),
+    });
+
+    await submitSelfServeOnboardingForm(
+      INITIAL_SELF_SERVE_ONBOARDING_STATE,
+      makeProductFormData("cleaning"),
+      deps,
+    );
+
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productMode: "cleaning_services",
+      }),
+    );
+    expect(deps.invite).toHaveBeenCalled();
+    expect(deps.notifyPlatformOwnerSignup).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signupPath: "cleaning",
+        productMode: "cleaning_services",
+      }),
+    );
+  });
+
   it("does not pass product mode for generic signup", async () => {
     const deps = makeDeps();
 

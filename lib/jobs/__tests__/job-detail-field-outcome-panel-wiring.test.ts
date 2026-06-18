@@ -131,10 +131,10 @@ describe("job detail field outcome panel wiring", () => {
     expect(panelSource).toContain("differentIssueFoundAction={markJobDifferentIssueFoundFromForm}");
     expect(exceptionPickerSource).not.toContain("form action={props.differentIssueFoundAction}");
     expect(exceptionPickerSource).not.toContain("name=\"different_issue_note\"");
-    expect(exceptionPickerSource).toContain("Complete today&apos;s visit and hold follow-up for materials.");
+    expect(exceptionPickerSource).toContain("Complete today&apos;s visit and hold follow-up for {partsNeededLabel.toLowerCase()}.");
     expect(exceptionPickerSource).toContain("Complete today&apos;s visit and hold follow-up for approval.");
     expect(exceptionPickerSource).toContain("Complete today&apos;s visit and hold follow-up for office review.");
-    expect(exceptionPickerSource).toContain("placeholder=\"What materials are needed?\"");
+    expect(exceptionPickerSource).toContain('partsNeededLabel === "Supplies Needed" ? "What supplies are needed?" : "What materials are needed?"');
     expect(exceptionPickerSource).toContain("placeholder=\"Example: customer approval for repair, owner approval for added work\"");
     expect(exceptionPickerSource).toContain("placeholder=\"Why does office or dispatch need to follow up?\"");
     expect(exceptionPickerSource).toContain("Complete Visit & Hold for Follow-Up");

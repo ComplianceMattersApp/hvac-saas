@@ -340,6 +340,7 @@ function normalizeProductMode(value: unknown): ProductMode | null {
   if (v === "hybrid") return "hybrid";
   if (v === "ecc_hers") return "ecc_hers";
   if (v === "hvac_service") return "hvac_service";
+  if (v === "cleaning_services") return "cleaning_services";
   return null;
 }
 
@@ -441,7 +442,7 @@ export async function provisionFirstOwnerAccount(params: {
               : [
                   {
                     code: "PRODUCT_MODE_REQUIRED_FOR_APPLY",
-                    message: "Apply readiness requires --product-mode (hvac_service|ecc_hers|hybrid).",
+                    message: "Apply readiness requires --product-mode (hvac_service|ecc_hers|hybrid|cleaning_services).",
                   },
                 ],
           },
@@ -660,7 +661,7 @@ export async function provisionFirstOwnerAccount(params: {
         issues: [
           {
             code: "PRODUCT_MODE_REQUIRED_FOR_APPLY",
-            message: "Apply readiness requires --product-mode (hvac_service|ecc_hers|hybrid).",
+            message: "Apply readiness requires --product-mode (hvac_service|ecc_hers|hybrid|cleaning_services).",
           },
         ],
       };

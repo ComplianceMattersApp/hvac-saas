@@ -128,7 +128,11 @@ export default async function TodayPage() {
         <FollowUpSection groups={model.followUpGroups.slice(0, 3)} />
 
         {model.teamCoverage.visible ? (
-          <TeamCoverageSection coverage={model.teamCoverage} mobile />
+          <TeamCoverageSection
+            coverage={model.teamCoverage}
+            label={model.productMode === "cleaning_services" ? "Crew Coverage" : "Team Coverage"}
+            mobile
+          />
         ) : null}
 
         <ResumeRecentSection
@@ -179,7 +183,10 @@ export default async function TodayPage() {
 
           <div className="space-y-5">
             {model.teamCoverage.visible ? (
-              <TeamCoverageSection coverage={model.teamCoverage} />
+              <TeamCoverageSection
+                coverage={model.teamCoverage}
+                label={model.productMode === "cleaning_services" ? "Crew Coverage" : "Team Coverage"}
+              />
             ) : null}
             <ResumeRecentSection
               items={model.resumeRecentWork}
@@ -654,16 +661,18 @@ function FollowUpSection({
 
 function TeamCoverageSection({
   coverage,
+  label = "Team Coverage",
   mobile = false,
 }: {
   coverage: TeamCoverage;
+  label?: string;
   mobile?: boolean;
 }) {
   return (
     <section className={CARD_SHELL}>
       <div className="flex items-end justify-between gap-3">
         <div>
-          <SectionEyebrow label="Team Coverage" />
+          <SectionEyebrow label={label} />
           <h2 className={SECTION_HEADING_TEXT}>Who's assigned today</h2>
           <p className="mt-1 text-xs text-slate-600">{coverage.summaryLabel}</p>
         </div>

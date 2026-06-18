@@ -198,12 +198,12 @@ export default function LoginPage() {
   return (
     <AuthCommandCenterLayout
       eyebrow="Field Operations Desk"
-      headline="Run your day, from dispatch to closeout."
-      subhead="Compliance Matters brings service calls, dispatch, ECC testing, closeout, and follow-up into a single, organized view — built for teams that live in the field."
+      headline="Run your day, from first job to follow-up."
+      subhead="Compliance Matters brings jobs, scheduling, field notes, closeout, and follow-up into a single, organized view for teams that work in the field."
       highlights={[
-        "Schedule and dispatch from one queue",
+        "Schedule field work from one queue",
         "Track jobs from first call to closeout",
-        "Keep field notes and tests connected",
+        "Keep field notes and job details connected",
         "See invoices and payments at a glance",
       ]}
     >
@@ -217,7 +217,7 @@ export default function LoginPage() {
             </div>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-slate-500">
-            Run service work, ECC testing, scheduling, and follow-up from one organized place.
+            Run field work, scheduling, closeout, and follow-up from one organized place.
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -298,7 +298,7 @@ export default function LoginPage() {
             </span>
           </div>
 
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-3">
             <Link
               href="/signup/service"
               className="group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-blue-400/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/50"
@@ -316,10 +316,19 @@ export default function LoginPage() {
               <span className="mt-2 text-sm font-semibold text-white">Start ECC / Compliance Trial</span>
               <span className="mt-1 text-xs leading-5 text-slate-400">For ECC jobs, tests, corrections, and closeout.</span>
             </Link>
+
+            <Link
+              href="/signup/cleaning"
+              className="group flex min-h-24 flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.05] p-4 text-left shadow-sm transition-[transform,border-color,background-color] hover:-translate-y-0.5 hover:border-emerald-400/30 hover:bg-white/[0.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
+            >
+              <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-300">Cleaning / Janitorial</span>
+              <span className="mt-2 text-sm font-semibold text-white">Start Cleaning Trial</span>
+              <span className="mt-1 text-xs leading-5 text-slate-400">For cleaning jobs, crews, checklists, recurring service, and follow-up.</span>
+            </Link>
           </div>
 
           <p className="mt-3 text-[11px] leading-5 text-slate-500">
-            Both paths start with a 30-day guided setup and no payment details.
+            Trial paths start with a 30-day guided setup and no payment details.
           </p>
         </div>
 
