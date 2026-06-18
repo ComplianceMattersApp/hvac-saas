@@ -77,6 +77,31 @@ describe("Operations Board reason mapping", () => {
     ]);
   });
 
+  it("does not map generic blocked rows to closeout reasons in Closeout context", () => {
+    const rows = [
+      {
+        id: "approval",
+        job_type: "service",
+        ops_status: "pending_info",
+        pending_info_reason: "Approval Needed: Customer must approve",
+        field_complete: true,
+        invoice_complete: false,
+      },
+      {
+        id: "hold",
+        job_type: "service",
+        ops_status: "on_hold",
+        on_hold_reason: "Status interrupt state test",
+        field_complete: true,
+        invoice_complete: false,
+      },
+    ];
+
+    expect(getOpsBoardReasonLabel(rows[0], { queueKey: "closeout" })?.label).toBe("Waiting on approval");
+    expect(getOpsBoardReasonLabel(rows[1], { queueKey: "closeout" })?.label).toBe("On hold");
+    expect(filterOpsBoardRowsByReason(rows, "needs_invoice", { queueKey: "closeout" })).toEqual([]);
+  });
+
   it("builds Closeout reason options from contextual closeout work instead of permit text", () => {
     const options = buildOpsBoardReasonOptions(
       [

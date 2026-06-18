@@ -81,6 +81,32 @@ describe("listCloseoutQueueJobs", () => {
         invoice_complete: false,
       },
       {
+        id: "generic-approval-needs-invoice",
+        job_type: "service",
+        ops_status: "pending_info",
+        pending_info_reason: "Approval Needed: Test Approval Needed",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+      },
+      {
+        id: "generic-on-hold-needs-invoice",
+        job_type: "service",
+        ops_status: "on_hold",
+        on_hold_reason: "Status interrupt state test",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+      },
+      {
+        id: "need-to-schedule-needs-invoice",
+        job_type: "service",
+        ops_status: "need_to_schedule",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+      },
+      {
         id: "permit-missing-no-closeout-blocker",
         job_type: "ecc",
         ops_status: "pending_info",
@@ -95,6 +121,22 @@ describe("listCloseoutQueueJobs", () => {
 
     expect(rows.map((row) => row.id)).toEqual(["permit-missing-needs-invoice"]);
     expect(rows[0]?.pending_info_reason).toBe("Permit Missing");
+  });
+
+  it("includes permit-missing jobs with combined invoice and cert closeout work", () => {
+    const rows = listCloseoutQueueJobs([
+      {
+        id: "permit-missing-needs-invoice-and-certs",
+        job_type: "ecc",
+        ops_status: "pending_info",
+        pending_info_reason: "Permit Needed",
+        field_complete: true,
+        certs_complete: false,
+        invoice_complete: false,
+      },
+    ], (job) => job);
+
+    expect(rows.map((row) => row.id)).toEqual(["permit-missing-needs-invoice-and-certs"]);
   });
 });
 

@@ -188,9 +188,11 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("{workspaceVisibleReason(job, selectedWorkspaceSection.key)}");
   });
 
-  it("loads the Closeout chip from field-complete candidates before applying canonical closeout projection", () => {
-    expect(opsPageSource).toContain('} else if (workspaceKey === "closeout") {');
-    expect(opsPageSource).toContain('queueQ = queueQ.neq("ops_status", "closed").eq("field_complete", true).limit(100);');
+  it("loads the Closeout chip from status-shaped candidates plus the narrow permit exception", () => {
+    expect(opsPageSource).toContain("async function loadCloseoutWorkspaceRows()");
+    expect(opsPageSource).toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
+    expect(opsPageSource).toContain('.in("ops_status", ["pending_info", "on_hold"])');
+    expect(opsPageSource).toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
     expect(opsPageSource).toContain("buildBillingTruthCloseoutProjectionMap");
     expect(opsPageSource).toContain("listCloseoutQueueJobs(");
     expect(opsPageSource).toContain("buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");

@@ -650,9 +650,32 @@ function subtractBusinessDays(date: Date, days: number) {
 
   if (panel !== "full_board") {
     const workspaceSelect =
-      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, field_complete, field_complete_at, invoice_complete, certs_complete, contractor_id, contractors(name), created_at";
+      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start";
+
+    function closeoutProjectionInputs(rows: any[]) {
+      return (rows ?? []).map((job: any) => ({
+        id: String(job?.id ?? "").trim(),
+        field_complete: job?.field_complete,
+        job_type: job?.job_type,
+        ops_status: job?.ops_status,
+        pending_info_reason: job?.pending_info_reason,
+        on_hold_reason: job?.on_hold_reason,
+        invoice_complete: job?.invoice_complete,
+        billing_disposition: job?.billing_disposition,
+        certs_complete: job?.certs_complete,
+      }));
+    }
+
+    function mergeRowsById(...rowSets: any[][]) {
+      const rowsById = new Map<string, any>();
+      for (const row of rowSets.flat()) {
+        const id = String(row?.id ?? "").trim();
+        if (id && !rowsById.has(id)) rowsById.set(id, row);
+      }
+      return Array.from(rowsById.values());
+    }
 
     const _t_workspaceCounts = opsTimingEnabled ? Date.now() : 0;
     let countsQ = supabase
@@ -694,17 +717,31 @@ function subtractBusinessDays(date: Date, days: number) {
       .is("deleted_at", null)
       .neq("status", "cancelled")
       .eq("field_complete", true)
-      .neq("ops_status", "closed")
+      .in("ops_status", ["invoice_required", "paperwork_required"])
       .order("created_at", { ascending: false })
       .limit(500);
 
     if (contractorScopeFilter) closeoutCountRowsQ = closeoutCountRowsQ.eq("contractor_id", contractorScopeFilter);
+
+    let closeoutPermitExceptionRowsQ = supabase
+      .from("jobs")
+      .select(workspaceSelect)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("field_complete", true)
+      .in("ops_status", ["pending_info", "on_hold"])
+      .or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")
+      .order("created_at", { ascending: false })
+      .limit(50);
+
+    if (contractorScopeFilter) closeoutPermitExceptionRowsQ = closeoutPermitExceptionRowsQ.eq("contractor_id", contractorScopeFilter);
 
     const [
       countsResWs,
       fieldWorkCountRes,
       scheduledOpenRowsRes,
       closeoutCountRowsRes,
+      closeoutPermitExceptionRowsRes,
       unreadContractorUpdates,
       unreadNewWorkRequests,
       activePermitRequestsResult,
@@ -713,6 +750,7 @@ function subtractBusinessDays(date: Date, days: number) {
       fieldWorkCountQ,
       scheduledOpenRowsQ,
       closeoutCountRowsQ,
+      closeoutPermitExceptionRowsQ,
       listInternalContractorUpdateAwareness({ limit: 100, onlyUnread: true }),
       listInternalNewWorkRequestAwareness({ limit: 100, onlyUnread: true }),
       permitWorkflowEnabled
@@ -729,6 +767,7 @@ function subtractBusinessDays(date: Date, days: number) {
     if (fieldWorkCountRes.error) throw fieldWorkCountRes.error;
     if (scheduledOpenRowsRes.error) throw scheduledOpenRowsRes.error;
     if (closeoutCountRowsRes.error) throw closeoutCountRowsRes.error;
+    if (closeoutPermitExceptionRowsRes.error) throw closeoutPermitExceptionRowsRes.error;
 
     const countsWs = new Map<string, number>();
     for (const row of countsResWs.data ?? []) {
@@ -766,19 +805,14 @@ function subtractBusinessDays(date: Date, days: number) {
       (countsWs.get("pending_office_review") ?? 0) +
       (countsWs.get("problem") ?? 0);
 
-    const closeoutCountSourceRows = closeoutCountRowsRes.data ?? [];
+    const closeoutCountSourceRows = mergeRowsById(
+      closeoutCountRowsRes.data ?? [],
+      closeoutPermitExceptionRowsRes.data ?? [],
+    );
     const { projectionsByJobId: closeoutCountProjectionByJobId } = await buildBillingTruthCloseoutProjectionMap({
       supabase,
       accountOwnerUserId: internalUser.account_owner_user_id,
-      jobs: closeoutCountSourceRows.map((job: any) => ({
-        id: String(job?.id ?? "").trim(),
-        field_complete: job?.field_complete,
-        job_type: job?.job_type,
-        ops_status: job?.ops_status,
-        invoice_complete: job?.invoice_complete,
-        billing_disposition: job?.billing_disposition,
-        certs_complete: job?.certs_complete,
-      })),
+      jobs: closeoutProjectionInputs(closeoutCountSourceRows),
     });
     const closeoutCount = listCloseoutQueueJobs(
       closeoutCountSourceRows,
@@ -889,9 +923,66 @@ function subtractBusinessDays(date: Date, days: number) {
       return [];
     }
 
+    async function loadCloseoutWorkspaceRows() {
+      const baseStatusQuery = () => {
+        let q = supabase
+          .from("jobs")
+          .select(workspaceSelect)
+          .is("deleted_at", null)
+          .neq("status", "cancelled")
+          .eq("field_complete", true)
+          .in("ops_status", ["invoice_required", "paperwork_required"])
+          .order("created_at", { ascending: true })
+          .limit(50);
+        if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
+        return q;
+      };
+
+      const permitExceptionQuery = () => {
+        let q = supabase
+          .from("jobs")
+          .select(workspaceSelect)
+          .is("deleted_at", null)
+          .neq("status", "cancelled")
+          .eq("field_complete", true)
+          .in("ops_status", ["pending_info", "on_hold"])
+          .or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")
+          .order("created_at", { ascending: true })
+          .limit(50);
+        if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
+        return q;
+      };
+
+      const [statusRowsRes, permitRowsRes] = await Promise.all([
+        baseStatusQuery(),
+        permitExceptionQuery(),
+      ]);
+      if (statusRowsRes.error) throw statusRowsRes.error;
+      if (permitRowsRes.error) throw permitRowsRes.error;
+
+      const closeoutSourceRows = mergeRowsById(statusRowsRes.data ?? [], permitRowsRes.data ?? []);
+      const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
+        supabase,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        jobs: closeoutProjectionInputs(closeoutSourceRows),
+      });
+
+      return sortOpsBoardRows(
+        listCloseoutQueueJobs(
+          closeoutSourceRows,
+          (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job,
+        ),
+        boardSort,
+      ).slice(0, 10);
+    }
+
     async function loadWorkspacePreviewRows(workspaceKey: string) {
       if (workspaceKey === "without_tech") {
         return loadWithoutTechPreviewRows();
+      }
+
+      if (workspaceKey === "closeout") {
+        return loadCloseoutWorkspaceRows();
       }
 
       let queueQ = supabase
@@ -915,8 +1006,6 @@ function subtractBusinessDays(date: Date, days: number) {
         queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["pending_info", "on_hold", "waiting", "pending_office_review"]);
       } else if (workspaceKey === "exceptions") {
         queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
-      } else if (workspaceKey === "closeout") {
-        queueQ = queueQ.neq("ops_status", "closed").eq("field_complete", true).limit(100);
       } else if (workspaceKey === "permits") {
         return [];
       } else {
@@ -926,29 +1015,6 @@ function subtractBusinessDays(date: Date, days: number) {
       if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
       const queueRes = await queueQ;
       if (queueRes.error) throw queueRes.error;
-      if (workspaceKey === "closeout") {
-        const closeoutSourceRows = queueRes.data ?? [];
-        const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
-          supabase,
-          accountOwnerUserId: internalUser.account_owner_user_id,
-          jobs: closeoutSourceRows.map((job: any) => ({
-            id: String(job?.id ?? "").trim(),
-            field_complete: job?.field_complete,
-            job_type: job?.job_type,
-            ops_status: job?.ops_status,
-            invoice_complete: job?.invoice_complete,
-            billing_disposition: job?.billing_disposition,
-            certs_complete: job?.certs_complete,
-          })),
-        });
-        return sortOpsBoardRows(
-          listCloseoutQueueJobs(
-            closeoutSourceRows,
-            (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job,
-          ),
-          boardSort,
-        ).slice(0, 10);
-      }
       return sortOpsBoardRows(queueRes.data ?? [], boardSort);
     }
 

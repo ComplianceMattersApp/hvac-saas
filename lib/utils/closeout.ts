@@ -4,6 +4,8 @@ export type CloseoutProjectionInput = {
   field_complete?: boolean | null;
   job_type?: string | null;
   ops_status?: string | null;
+  pending_info_reason?: string | null;
+  on_hold_reason?: string | null;
   invoice_complete?: boolean | null;
   certs_complete?: boolean | null;
 };
@@ -35,6 +37,12 @@ export function getCloseoutNeeds(job: CloseoutProjectionInput) {
   };
 }
 
+function isPermitMissingCloseoutReason(job: CloseoutProjectionInput): boolean {
+  const text = `${job.pending_info_reason ?? ""} ${job.on_hold_reason ?? ""}`.toLowerCase();
+  if (!text.includes("permit")) return false;
+  return /\b(missing|needed|need|required|require|blank|number|#)\b/.test(text);
+}
+
 export function isInCloseoutQueue(job: CloseoutProjectionInput) {
   if (!job.field_complete) return false;
 
@@ -42,8 +50,12 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
   if (opsStatus === "closed") return false;
 
   const needs = getCloseoutNeeds(job);
+  const hasCloseoutWork = needs.needsInvoice || needs.needsCerts;
+  if (!hasCloseoutWork) return false;
 
-  return needs.needsInvoice || needs.needsCerts;
+  if (opsStatus === "invoice_required" || opsStatus === "paperwork_required") return true;
+
+  return needs.isBlockedForCloseout && isPermitMissingCloseoutReason(job);
 }
 
 export function getCloseoutQueueNextStepLabel(job: CloseoutProjectionInput) {

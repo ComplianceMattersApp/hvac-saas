@@ -1,4 +1,4 @@
-import { getCloseoutNeeds } from "@/lib/utils/closeout";
+import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
 
 export type OpsBoardReasonKey =
   | "needs_scheduling"
@@ -98,7 +98,7 @@ function exceptionReasonFromText(text: string): OpsBoardReasonKey | null {
 
 function closeoutReasonLabel(job: OpsBoardReasonJob, requireQueueEligibility = false): OpsBoardReasonOption | null {
   const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
-  if (requireQueueEligibility && (!job.field_complete || opsStatus === "closed")) return null;
+  if (requireQueueEligibility && (!isInCloseoutQueue(job) || opsStatus === "closed")) return null;
 
   const needs = getCloseoutNeeds(job);
   if (needs.needsInvoice && needs.needsCerts) return OPTION_BY_KEY.get("needs_invoice_and_certs") ?? null;

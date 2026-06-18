@@ -23,8 +23,10 @@ describe("/ops closeout queue alignment", () => {
     expect(opsPageSource).toContain('.order("created_at", { ascending: false })');
   });
 
-  it("does not limit active Closeout chip rows to closeout ops_status values before projection", () => {
-    expect(opsPageSource).toContain('queueQ = queueQ.neq("ops_status", "closed").eq("field_complete", true).limit(100);');
-    expect(opsPageSource).not.toContain('queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["invoice_required", "paperwork_required"])');
+  it("keeps active Closeout chip rows status-shaped with a narrow permit exception", () => {
+    expect(opsPageSource).toContain('.in("ops_status", ["invoice_required", "paperwork_required"])');
+    expect(opsPageSource).toContain('.in("ops_status", ["pending_info", "on_hold"])');
+    expect(opsPageSource).toContain('.or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")');
+    expect(opsPageSource).not.toContain('queueQ = queueQ.neq("ops_status", "closed").eq("field_complete", true).limit(100);');
   });
 });

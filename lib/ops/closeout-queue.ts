@@ -7,6 +7,8 @@ type CloseoutQueueJob = {
   field_complete?: boolean | null;
   job_type?: string | null;
   ops_status?: string | null;
+  pending_info_reason?: string | null;
+  on_hold_reason?: string | null;
   invoice_complete?: boolean | null;
   certs_complete?: boolean | null;
 };

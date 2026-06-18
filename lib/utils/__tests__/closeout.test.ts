@@ -14,7 +14,7 @@ const failedEccJob = {
 };
 
 describe("closeout queue projection", () => {
-  it("keeps failed ECC jobs with unsent invoices in the closeout queue", () => {
+  it("keeps failed ECC jobs out of the closeout queue unless they have a closeout status", () => {
     const job = {
       ...failedEccJob,
       invoice_complete: false,
@@ -25,7 +25,7 @@ describe("closeout queue projection", () => {
       needsCerts: false,
       isFailureFlow: true,
     });
-    expect(isInCloseoutQueue(job)).toBe(true);
+    expect(isInCloseoutQueue(job)).toBe(false);
   });
 
   it("removes failed ECC jobs from the closeout queue after invoice is sent", () => {
@@ -68,11 +68,12 @@ describe("closeout queue projection", () => {
     ).toBe(false);
   });
 
-  it("keeps permit-missing jobs in closeout when invoice remains pending", () => {
+  it("keeps generic pending info jobs out of closeout when invoice remains pending", () => {
     const job = {
       field_complete: true,
       job_type: "ecc",
       ops_status: "pending_info",
+      pending_info_reason: "Approval Needed: customer approval required",
       invoice_complete: false,
       certs_complete: true,
     };
@@ -82,7 +83,33 @@ describe("closeout queue projection", () => {
       needsCerts: false,
       isBlockedForCloseout: true,
     });
+    expect(isInCloseoutQueue(job)).toBe(false);
+  });
+
+  it("keeps permit-missing jobs in closeout when invoice remains pending", () => {
+    const job = {
+      field_complete: true,
+      job_type: "ecc",
+      ops_status: "pending_info",
+      pending_info_reason: "Permit Missing",
+      invoice_complete: false,
+      certs_complete: true,
+    };
+
     expect(isInCloseoutQueue(job)).toBe(true);
+  });
+
+  it("keeps permit-missing on-hold jobs in closeout when invoice remains pending", () => {
+    expect(
+      isInCloseoutQueue({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "on_hold",
+        on_hold_reason: "Permit required before closeout",
+        invoice_complete: false,
+        certs_complete: true,
+      }),
+    ).toBe(true);
   });
 
   it("keeps permit-missing jobs out of closeout when no closeout blocker remains", () => {
@@ -91,8 +118,40 @@ describe("closeout queue projection", () => {
         field_complete: true,
         job_type: "ecc",
         ops_status: "pending_info",
+        pending_info_reason: "Permit Missing",
         invoice_complete: true,
         certs_complete: true,
+      }),
+    ).toBe(false);
+  });
+
+  it("keeps generic on-hold, need-to-schedule, and retest rows out of closeout", () => {
+    expect(
+      isInCloseoutQueue({
+        field_complete: true,
+        job_type: "service",
+        ops_status: "on_hold",
+        on_hold_reason: "Status interrupt state test",
+        invoice_complete: false,
+      }),
+    ).toBe(false);
+
+    expect(
+      isInCloseoutQueue({
+        field_complete: true,
+        job_type: "service",
+        ops_status: "need_to_schedule",
+        invoice_complete: false,
+      }),
+    ).toBe(false);
+
+    expect(
+      isInCloseoutQueue({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "retest_needed",
+        invoice_complete: false,
+        certs_complete: false,
       }),
     ).toBe(false);
   });
