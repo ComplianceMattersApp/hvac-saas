@@ -96,8 +96,8 @@ export function resolveAppAccessCta(input: {
     return {
       kind: "start_trial",
       heading: "Want to run your own jobs in Compliance Matters?",
-      helper: "Start with a 14-day trial when you're ready.",
-      buttonLabel: "Start 14-day trial",
+      helper: "Start with a 30-day trial when you're ready.",
+      buttonLabel: "Start 30-day trial",
       target: { mode: "link", href: "/signup/service" },
     };
   }

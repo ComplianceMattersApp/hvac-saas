@@ -291,7 +291,7 @@ export default function LoginPage() {
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <p className="text-sm font-medium text-white">New to Compliance Matters?</p>
-              <p className="mt-1 text-xs leading-5 text-slate-400">Start a 14-day guided setup. No payment details needed.</p>
+              <p className="mt-1 text-xs leading-5 text-slate-400">Start a 30-day guided setup. No payment details needed.</p>
             </div>
             <span className="inline-flex h-fit items-center rounded-full border border-blue-400/25 bg-blue-400/10 px-2.5 py-1 text-[11px] font-semibold text-blue-200">
               Guided trial
@@ -319,7 +319,7 @@ export default function LoginPage() {
           </div>
 
           <p className="mt-3 text-[11px] leading-5 text-slate-500">
-            Both paths start with a 14-day guided setup and no payment details.
+            Both paths start with a 30-day guided setup and no payment details.
           </p>
         </div>
 

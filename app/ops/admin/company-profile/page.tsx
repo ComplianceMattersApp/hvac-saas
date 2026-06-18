@@ -290,7 +290,7 @@ export default async function AdminCompanyProfilePage({
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-slate-900">14-day trial: Day 1 essentials</div>
+          <div className="font-semibold text-slate-900">30-day trial: Day 1 essentials</div>
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
             {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
           </div>
@@ -375,7 +375,7 @@ export default async function AdminCompanyProfilePage({
 
         <div className="mt-3 text-xs leading-5 text-slate-600">
           {entitlement.entitlementStatus === "trial"
-            ? "Use your 14-day trial to prove the daily routine."
+            ? "Use your 30-day trial to prove the daily routine."
             : "Use this guide to train your team or tighten your daily routine."}
         </div>
       </div>
@@ -1127,7 +1127,7 @@ const PLAN_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  trial: "14-day trial",
+  trial: "30-day trial",
   active: "Active",
   grace: "Grace period",
   suspended: "Suspended",
@@ -1221,7 +1221,7 @@ function PlatformAccountSection({
         <div className="border-t border-slate-100 bg-white px-5 py-3 text-sm leading-6 text-slate-700">
           {trialEndsLabel ? (
             <div>
-              14-day trial ends:{" "}
+              30-day trial ends:{" "}
               <span className="font-medium text-slate-900">{trialEndsLabel}</span>
             </div>
           ) : null}

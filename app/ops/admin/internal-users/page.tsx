@@ -300,7 +300,7 @@ export default async function AdminInternalUsersPage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Internal Team</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Invite your office team and at least one tech so you can run your first 14-day trial jobs.
+              Invite your office team and at least one tech so you can run your first 30-day trial jobs.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
               Internal Team is for people inside your company.
@@ -360,7 +360,7 @@ export default async function AdminInternalUsersPage({
       ) : null}
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
-        <div className="font-semibold text-slate-900">Start here for your 14-day trial</div>
+        <div className="font-semibold text-slate-900">Start here for your 30-day trial</div>
         <p className="mt-1 leading-6">
           Invite dispatch/office and one tech first. Then create your first customer, create your first job, schedule and assign it, capture job notes, and close out to invoice.
         </p>

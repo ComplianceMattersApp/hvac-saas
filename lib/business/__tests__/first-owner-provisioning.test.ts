@@ -502,7 +502,7 @@ describe("provisionFirstOwnerAccount", () => {
       expect(store.entitlementsByOwnerId[ownerId]?.plan_key).toBe("starter");
       expect(store.entitlementsByOwnerId[ownerId]?.entitlement_status).toBe("trial");
       expect(store.entitlementsByOwnerId[ownerId]?.trial_ends_at).toBe(
-        "2026-05-14T00:00:00.000Z",
+        "2026-05-30T00:00:00.000Z",
       );
       expect(store.entitlementsByOwnerId[ownerId]?.trial_ends_at).not.toBeNull();
     } finally {

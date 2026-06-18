@@ -93,8 +93,9 @@ Durable truth to keep in the model specs:
 
 Preserved evidence category:
 
-- Platform application fee foundation locked default fee math to `25` basis points (`0.25%`) with explicit skip guards and rounding behavior.
-- Wiring smoke validated Checkout and saved-card/manual plus scheduled-autopay PaymentIntent submit paths with `1750` cents gross charge and `4` cents application fee.
+- Platform application fee foundation locked default fee math to `50` basis points (`0.50%`) with explicit skip guards and rounding behavior.
+- Platform application fee policy was updated from 25 basis points (0.25%) to 50 basis points (0.50%). Source-of-truth boundaries remain unchanged: app payment truth remains gross customer payment truth, platform application fee remains Stripe/platform revenue only, no customer-facing surcharge line item is introduced, and invoice paid/balance truth is not distorted.
+- Wiring smoke validated Checkout and saved-card/manual plus scheduled-autopay PaymentIntent submit paths with `1750` cents gross charge and `9` cents application fee.
 
 Durable truth to keep in the model specs:
 

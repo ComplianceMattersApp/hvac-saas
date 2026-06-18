@@ -278,15 +278,15 @@ End-of-trial checks:
 
 ## 7) 14-Day Trial Copy Rules
 
-- Runtime trial is 14 days
-- Public and user-facing copy should clearly say "14-day trial"
-- Any old 30-day trial wording in ACTIVE docs should be corrected to 14-day where trial duration is being described
+- Runtime trial is 30 days
+- Public and user-facing copy should clearly say "30-day trial"
+- Standard new-account trial policy updated from 15 days to 30 days for newly created trial entitlements. Existing entitlement truth is not retroactively changed by code; the one known active trial was extended separately by controlled operator action.
 - This slice does not change runtime trial logic
 
 Suggested user-facing copy lines:
-- "Start your 14-day trial"
-- "Your 14-day trial ends on [date]"
-- "In this 14-day trial, focus on daily job flow first"
+- "Start your 30-day trial"
+- "Your 30-day trial ends on [date]"
+- "In this 30-day trial, focus on daily job flow first"
 
 ## 8) Suggested Doc/Page Titles
 

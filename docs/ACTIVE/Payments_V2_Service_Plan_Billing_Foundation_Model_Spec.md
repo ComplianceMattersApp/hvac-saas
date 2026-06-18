@@ -909,7 +909,7 @@ Platform application fee is placeholder-only in this phase.
 Must remain true:
 
 - Future-only; no implementation now.
-- Conservative early idea may be around 0.25% but not hardcoded and not approved by this spec.
+- Current platform application fee policy is 0.50%, but this spec still does not add service-plan billing `application_fee_amount` wiring.
 - Do not add application_fee_amount now.
 - Do not alter Stripe checkout/session behavior now.
 

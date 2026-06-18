@@ -9,7 +9,7 @@ describe("company profile day 1 essentials wiring", () => {
   it("renders compact day 1 guidance copy", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain("14-day trial: Day 1 essentials");
+    expect(pageSource).toContain("30-day trial: Day 1 essentials");
     expect(pageSource).toContain("Start with these areas first.");
     expect(pageSource).toContain("create your first customer, create your first job");
   });

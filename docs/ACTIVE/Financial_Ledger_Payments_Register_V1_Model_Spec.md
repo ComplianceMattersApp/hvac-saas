@@ -21,18 +21,19 @@ Duplicated closeout sections may be shortened against the evidence ledger when t
 
 ## Phase 6J-A Note (Platform Application Fee Foundation)
 
-- A foundation helper now locks default platform application fee math to `25` basis points (`0.25%`) with explicit skip guards and rounding behavior.
+- A foundation helper now locks default platform application fee math to `50` basis points (`0.50%`) with explicit skip guards and rounding behavior.
+- Platform application fee policy was updated from 25 basis points (0.25%) to 50 basis points (0.50%). Source-of-truth boundaries remain unchanged: app payment truth remains gross customer payment truth, platform application fee remains Stripe/platform revenue only, no customer-facing surcharge line item is introduced, and invoice paid/balance truth is not distorted.
 - This model note does not authorize payment register mutation, allocation mutation, invoice truth mutation, or Stripe create-call mutation in this phase.
 - Register truth boundaries remain unchanged: collected-money truth is still webhook-confirmed `internal_invoice_payments`; allocation truth remains `internal_invoice_payment_allocations`; failed rows remain non-collected.
 
 ## Phase 6J-E2 Note (Platform Application Fee Wiring + Smoke Closeout)
 
-- Phase A/B foundation is complete with default fee policy locked to `25` basis points (`0.25%`).
+- Phase A/B foundation is complete with default fee policy locked to `50` basis points (`0.50%`).
 - Phase C wiring is complete for invoice Checkout application fee.
 - Phase D wiring is complete for shared saved-card/manual plus scheduled-autopay PaymentIntent submit path.
 - Phase E/E2 sandbox smoke is complete for current intended scope:
-- Checkout path: `1750` cents gross charge with `4` cents application fee.
-- Saved-card/manual path: `1750` cents gross charge with `4` cents application fee.
+- Checkout path: `1750` cents gross charge with `9` cents application fee.
+- Saved-card/manual path: `1750` cents gross charge with `9` cents application fee.
 - Register model lock remains unchanged: platform application fee is Stripe/platform revenue only and does not create customer-facing surcharge line items.
 - Collected-money projection lock remains unchanged: invoice paid/balance truth remains gross-payment-derived with no paid/balance distortion.
 - Failed-payment lock remains unchanged: failed rows remain non-collected and must not inflate collected totals.

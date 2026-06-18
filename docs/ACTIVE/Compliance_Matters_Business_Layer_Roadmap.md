@@ -18,18 +18,19 @@
 
 ## Phase 6J-A Note (Platform Fee Foundation Locked)
 
-- Platform fee model foundation is locked at default `25` basis points (`0.25%`) as configurable business-layer policy.
+- Platform fee model foundation is locked at default `50` basis points (`0.50%`) as configurable business-layer policy.
+- Platform application fee policy was updated from 25 basis points (0.25%) to 50 basis points (0.50%). Source-of-truth boundaries remain unchanged: app payment truth remains gross customer payment truth, platform application fee remains Stripe/platform revenue only, no customer-facing surcharge line item is introduced, and invoice paid/balance truth is not distorted.
 - Current phase scope is calculation/config only. Stripe Checkout/PaymentIntent mutation, webhook behavior changes, and payment/invoice/allocation truth changes remain deferred.
 - Fee is platform revenue (`application_fee_amount`) for Stripe Connect flows when enabled, not a customer invoice line item or surcharge in this phase.
 
 ## Phase 6J-E2 Note (Platform Fee Wiring + Smoke Closeout)
 
-- Phase A/B foundation is complete and remains locked to default `25` basis points (`0.25%`).
+- Phase A/B foundation is complete and remains locked to default `50` basis points (`0.50%`).
 - Phase C is complete: invoice Checkout flow now applies Stripe `application_fee_amount` under the guarded platform-fee policy.
 - Phase D is complete: saved-card/manual and scheduled-autopay shared PaymentIntent submit path now applies the same guarded `application_fee_amount` policy.
 - Phase E/E2 sandbox smoke is complete:
-- Checkout smoke evidence: `1750` cents gross with `4` cents application fee.
-- Saved-card/manual smoke evidence: `1750` cents gross with `4` cents application fee.
+- Checkout smoke evidence: `1750` cents gross with `9` cents application fee.
+- Saved-card/manual smoke evidence: `1750` cents gross with `9` cents application fee.
 - Business-layer truth lock remains unchanged: platform fee is platform revenue only, not customer-facing surcharge.
 - Invoice/payment truth lock remains unchanged: gross payment truth is preserved with no invoice paid/balance distortion.
 - Failed-payment handling lock remains unchanged: failed attempts remain non-collected.

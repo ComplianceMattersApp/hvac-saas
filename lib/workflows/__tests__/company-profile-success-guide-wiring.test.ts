@@ -21,22 +21,22 @@ describe("company profile success guide wiring", () => {
     expect(pageSource).toContain("Use Today/Ops each morning");
   });
 
-  it("renders This can wait guidance and avoids stale 30-day trial copy", () => {
+  it("renders This can wait guidance and avoids stale 14-day trial copy", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
     expect(pageSource).toContain("This can wait");
     expect(pageSource).toContain("service plans unless you use them now");
     expect(pageSource).toContain("payment automation");
     expect(pageSource).toContain("contractor collaboration");
-    expect(pageSource).not.toContain("30-day trial");
-    expect(pageSource).not.toContain("30 day trial");
+    expect(pageSource).not.toContain("14-day trial");
+    expect(pageSource).not.toContain("14 day trial");
   });
 
   it("shows trial-specific helper only behind trial status and keeps non-trial helper", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
     expect(pageSource).toContain('entitlement.entitlementStatus === "trial"');
-    expect(pageSource).toContain("Use your 14-day trial to prove the daily routine.");
+    expect(pageSource).toContain("Use your 30-day trial to prove the daily routine.");
     expect(pageSource).toContain("Use this guide to train your team or tighten your daily routine.");
   });
 

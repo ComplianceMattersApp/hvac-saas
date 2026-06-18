@@ -18,7 +18,7 @@ describe("app access CTA wiring", () => {
     expect(portalPage).toContain("<AppAccessCtaCard cta={appAccessCta} />");
 
     expect(helper).toContain("Want to run your own jobs in Compliance Matters?");
-    expect(helper).toContain("Start 14-day trial");
+    expect(helper).toContain("Start 30-day trial");
     expect(helper).toContain("Resume app access");
     expect(helper).toContain("Reactivate app access");
     expect(helper).toContain("Open app");

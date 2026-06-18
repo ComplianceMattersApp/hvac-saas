@@ -54,7 +54,7 @@ describe("resolveAppAccessCta", () => {
     });
 
     expect(cta.kind).toBe("start_trial");
-    expect(cta.buttonLabel).toBe("Start 14-day trial");
+    expect(cta.buttonLabel).toBe("Start 30-day trial");
     expect(cta.target).toEqual({ mode: "link", href: "/signup/service" });
   });
 

@@ -1,4 +1,4 @@
-export const DEFAULT_PLATFORM_APPLICATION_FEE_BASIS_POINTS = 25;
+export const DEFAULT_PLATFORM_APPLICATION_FEE_BASIS_POINTS = 50;
 
 export type PlatformApplicationFeeSkippedReason =
   | "platform_fee_disabled"

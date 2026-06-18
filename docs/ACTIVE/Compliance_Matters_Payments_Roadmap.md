@@ -17,7 +17,7 @@ Phase 6J platform-fee smoke and wiring evidence is preserved in [Domain_Model_Cl
 
 Current roadmap status:
 
-- Default platform fee math is locked at `25` basis points (`0.25%`).
+- Default platform fee math is locked at `50` basis points (`0.50%`).
 - Stripe Connect `application_fee_amount` is the platform-fee mechanism where explicitly enabled.
 - Platform fee is Stripe/platform revenue only and must not create a customer-facing invoice surcharge line item.
 - Invoice paid/balance truth remains gross-payment-derived with no paid/balance distortion.

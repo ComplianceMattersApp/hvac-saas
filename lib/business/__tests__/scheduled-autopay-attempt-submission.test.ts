@@ -553,7 +553,7 @@ describe("scheduled autopay attempt submission", () => {
     const payload = firstCall[0];
     const requestOptions = firstCall[1];
     expect(payload.amount).toBe(5000);
-    expect(payload.application_fee_amount).toBe(13);
+    expect(payload.application_fee_amount).toBe(25);
     expect(Number(payload.application_fee_amount)).toBeLessThan(Number(payload.amount));
     expect(payload.metadata).toEqual(
       expect.objectContaining({
@@ -570,7 +570,7 @@ describe("scheduled autopay attempt submission", () => {
     );
   });
 
-  it("scheduled autopay amount 17.50 calculates 4-cent application fee", async () => {
+  it("scheduled autopay amount 17.50 calculates 9-cent application fee", async () => {
     const ctx = makeAdmin([makeAttemptRow({ amount_cents_snapshot: 1750 })]);
     const stripeCreate = vi.fn(async () => ({
       id: "pi_fee_1750",
@@ -613,7 +613,7 @@ describe("scheduled autopay attempt submission", () => {
     const firstCall = stripeCreate.mock.calls[0] as unknown as Array<Record<string, unknown>>;
     const payload = firstCall[0];
     expect(payload.amount).toBe(1750);
-    expect(payload.application_fee_amount).toBe(4);
+    expect(payload.application_fee_amount).toBe(9);
     expect(Number(payload.application_fee_amount)).toBeLessThan(1750);
   });
 

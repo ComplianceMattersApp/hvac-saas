@@ -300,7 +300,7 @@ describe("createTenantInvoiceCheckoutSession", () => {
     const payload = firstCall[0];
 
     expect(payload.line_items[0].price_data.unit_amount).toBe(7500);
-    expect(payload.payment_intent_data?.application_fee_amount).toBe(19);
+    expect(payload.payment_intent_data?.application_fee_amount).toBe(38);
     expect(payload.payment_intent_data?.application_fee_amount).toBeLessThan(
       payload.line_items[0].price_data.unit_amount,
     );
@@ -322,7 +322,7 @@ describe("createTenantInvoiceCheckoutSession", () => {
     );
   });
 
-  it("calculates 4-cent application fee for 17.50 checkout amount", async () => {
+  it("calculates 9-cent application fee for 17.50 checkout amount", async () => {
     const fixture = buildSupabaseFixture({
       invoiceTotalCents: 1750,
       paymentRows: [],
@@ -345,7 +345,7 @@ describe("createTenantInvoiceCheckoutSession", () => {
     const payload = firstCall[0];
 
     expect(payload.line_items[0].price_data.unit_amount).toBe(1750);
-    expect(payload.payment_intent_data?.application_fee_amount).toBe(4);
+    expect(payload.payment_intent_data?.application_fee_amount).toBe(9);
     expect(payload.payment_intent_data?.application_fee_amount).toBeLessThan(1750);
   });
 

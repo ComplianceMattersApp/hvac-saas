@@ -25,7 +25,7 @@ function ProductChoiceCard(props: ProductChoiceCardProps) {
       <div className="flex items-center justify-between gap-3">
         <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${accentText}`}>{props.title}</p>
         <span className="inline-flex rounded-full border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-medium text-slate-300">
-          14-day guided trial
+          30-day guided trial
         </span>
       </div>
 
@@ -56,7 +56,7 @@ export function SignupProductChoiceLanding() {
   return (
     <AuthCommandCenterLayout
       eyebrow="Field Operations Desk"
-      headline="Start a 14-day guided trial."
+      headline="Start a 30-day guided trial."
       subhead="Choose the path that fits your company. You can finish account setup on the next step — no payment details needed. Hybrid / All-in-One setup is handled manually by operator support when needed."
     >
       <div className="space-y-5">
@@ -85,7 +85,7 @@ export function SignupProductChoiceLanding() {
         <div className="rounded-[24px] border border-white/10 bg-white/[0.03] p-5 text-sm leading-6 text-slate-300">
           <p className="font-medium text-white">What happens next</p>
           <div className="mt-3 grid gap-2 sm:grid-cols-3">
-            {["Enter your email", "Get your setup link", "Try real jobs for 14 days"].map((step, index) => (
+            {["Enter your email", "Get your setup link", "Try real jobs for 30 days"].map((step, index) => (
               <div key={step} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
                   <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-500 text-[11px] text-white">

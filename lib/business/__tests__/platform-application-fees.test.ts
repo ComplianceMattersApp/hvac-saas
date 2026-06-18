@@ -11,8 +11,8 @@ vi.mock("@/lib/business/platform-billing-stripe", () => ({
 }));
 
 describe("platform-application-fees", () => {
-  it("defaults to 25 basis points and calculates expected common amounts", () => {
-    expect(DEFAULT_PLATFORM_APPLICATION_FEE_BASIS_POINTS).toBe(25);
+  it("defaults to 50 basis points and calculates expected common amounts", () => {
+    expect(DEFAULT_PLATFORM_APPLICATION_FEE_BASIS_POINTS).toBe(50);
 
     const onTenDollars = calculatePlatformApplicationFeeAmountCents({
       amountCents: 1000,
@@ -23,21 +23,21 @@ describe("platform-application-fees", () => {
       enabled: true,
     });
 
-    expect(onTenDollars.applicationFeeAmountCents).toBe(3);
-    expect(onHundredDollars.applicationFeeAmountCents).toBe(25);
+    expect(onTenDollars.applicationFeeAmountCents).toBe(5);
+    expect(onHundredDollars.applicationFeeAmountCents).toBe(50);
     expect(onTenDollars.skippedReason).toBeNull();
     expect(onHundredDollars.skippedReason).toBeNull();
   });
 
-  it("rounds 1750 cents at 25 bps predictably", () => {
+  it("rounds 1750 cents at 50 bps predictably", () => {
     const result = calculatePlatformApplicationFeeAmountCents({
       amountCents: 1750,
-      feeBasisPoints: 25,
+      feeBasisPoints: 50,
       enabled: true,
     });
 
-    // 1750 * 25 / 10000 = 4.375 -> 4 via Math.round
-    expect(result.applicationFeeAmountCents).toBe(4);
+    // 1750 * 50 / 10000 = 8.75 -> 9 via Math.round
+    expect(result.applicationFeeAmountCents).toBe(9);
     expect(result.skippedReason).toBeNull();
   });
 
@@ -58,12 +58,12 @@ describe("platform-application-fees", () => {
   it("returns zero for zero or negative charge amounts", () => {
     const zeroResult = calculatePlatformApplicationFeeAmountCents({
       amountCents: 0,
-      feeBasisPoints: 25,
+      feeBasisPoints: 50,
       enabled: true,
     });
     const negativeResult = calculatePlatformApplicationFeeAmountCents({
       amountCents: -1,
-      feeBasisPoints: 25,
+      feeBasisPoints: 50,
       enabled: true,
     });
 
@@ -105,7 +105,7 @@ describe("platform-application-fees", () => {
   it("handles very small charges that round to zero safely", () => {
     const result = calculatePlatformApplicationFeeAmountCents({
       amountCents: 1,
-      feeBasisPoints: 25,
+      feeBasisPoints: 50,
       enabled: true,
     });
 
@@ -116,12 +116,12 @@ describe("platform-application-fees", () => {
   it("stays integer-safe for high but safe charge amounts", () => {
     const result = calculatePlatformApplicationFeeAmountCents({
       amountCents: 2_000_000_000,
-      feeBasisPoints: 25,
+      feeBasisPoints: 50,
       enabled: true,
     });
 
     expect(Number.isSafeInteger(result.applicationFeeAmountCents)).toBe(true);
-    expect(result.applicationFeeAmountCents).toBe(5_000_000);
+    expect(result.applicationFeeAmountCents).toBe(10_000_000);
     expect(result.skippedReason).toBeNull();
   });
 
@@ -130,7 +130,7 @@ describe("platform-application-fees", () => {
 
     calculatePlatformApplicationFeeAmountCents({
       amountCents: 1750,
-      feeBasisPoints: 25,
+      feeBasisPoints: 50,
       enabled: true,
     });
 
@@ -140,7 +140,7 @@ describe("platform-application-fees", () => {
   it("does not mutate payment/invoice/allocation-like input state", () => {
     const payload = Object.freeze({
       amountCents: 1750,
-      feeBasisPoints: 25,
+      feeBasisPoints: 50,
       enabled: true,
       invoice: {
         id: "inv_1",
@@ -162,7 +162,7 @@ describe("platform-application-fees", () => {
       enabled: payload.enabled,
     });
 
-    expect(result.applicationFeeAmountCents).toBe(4);
+    expect(result.applicationFeeAmountCents).toBe(9);
     expect(payload.invoice.amountPaidCents).toBe(0);
     expect(payload.payment.status).toBe("pending");
     expect(payload.allocation.status).toBe("inactive");

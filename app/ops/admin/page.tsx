@@ -250,7 +250,7 @@ export default async function OpsAdminPage() {
           <div>
             <div className="text-xs font-semibold text-slate-500">Admin Center</div>
             <h1 className="mt-1 text-2xl font-semibold text-slate-950 sm:text-3xl">
-              Start your 14-day trial with real work.
+              Start your 30-day trial with real work.
             </h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
               Start here, set up your team, and run one real job from customer to invoice.
@@ -298,7 +298,7 @@ export default async function OpsAdminPage() {
               <AdminSectionHeader
                 eyebrow="Account setup"
                 title={readiness.isOperationallyReady ? "Ready for operations" : "Needs setup"}
-                description="This checks your 14-day trial start path, not just whether fields are filled in."
+                description="This checks your 30-day trial start path, not just whether fields are filled in."
               />
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">
                 <div className="text-2xl font-semibold text-slate-950">{readinessPercent}%</div>
@@ -313,7 +313,7 @@ export default async function OpsAdminPage() {
             </div>
 
             <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
-              <div className="text-xs font-semibold">Start here in your 14-day trial</div>
+              <div className="text-xs font-semibold">Start here in your 30-day trial</div>
               <p className="mt-1 leading-6">
                 Follow this path first: customer to job, then schedule, field notes, closeout, and invoice. Use Today/Ops each morning to keep work moving.
               </p>

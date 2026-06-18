@@ -36,6 +36,8 @@ Current source-of-truth boundaries: `internal_invoice_payments` remains collecte
 
 Current product posture: read-only payments/deposits reporting, manual saved-card charge, scheduled-autopay attempt/attention visibility, failed-payment reconciliation visibility, and platform-fee handling are closed for their current intended scopes where already implemented. Refunds, disputes, ACH, customer portal payment self-service, automated customer failed-payment messaging, broader QBO/accounting sync, and deeper Payments V2 expansion remain deferred or gated in the roadmap.
 
+Current billing policy: platform application fee policy is `50` basis points (`0.50%`). Source-of-truth boundaries remain unchanged: app payment truth remains gross customer payment truth, platform application fee remains Stripe/platform revenue only, no customer-facing surcharge line item is introduced, and invoice paid/balance truth is not distorted. Standard new-account trial policy is `30` days for newly created trial entitlements. Existing entitlement truth is not retroactively changed by code; the one known active trial was extended separately by controlled operator action.
+
 **Note on Product Modes:**
 See [Compliance_Matters_Business_Layer_Roadmap.md � 3 Product Mode Matrix](./Compliance_Matters_Business_Layer_Roadmap.md#3-product-mode-matrix--eccherms-version-vs-hvac-service-version) for architectural guidance on the two product configurations (ECC/HERS and HVAC Service). Future development should respect product-mode separation to prevent buyer-story drift.
 

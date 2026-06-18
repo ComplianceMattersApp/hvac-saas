@@ -288,7 +288,7 @@ describe("tenant saved-method payment attempts", () => {
     const payload = firstCall[0];
     const requestOptions = firstCall[1];
     expect(payload.amount).toBe(2500);
-    expect(payload.application_fee_amount).toBe(6);
+    expect(payload.application_fee_amount).toBe(13);
     expect(Number(payload.application_fee_amount)).toBeLessThan(Number(payload.amount));
     expect(payload.metadata).toEqual(
       expect.objectContaining({
@@ -309,7 +309,7 @@ describe("tenant saved-method payment attempts", () => {
     expect(ctx.writes.some((w) => w.table === "internal_invoice_payment_allocations")).toBe(false);
   });
 
-  it("calculates 4-cent application fee for 17.50 manual saved-card charge", async () => {
+  it("calculates 9-cent application fee for 17.50 manual saved-card charge", async () => {
     const ctx = makeAdmin({ balanceDueCents: 1750 });
     ctx.setupMocks();
 
@@ -340,7 +340,7 @@ describe("tenant saved-method payment attempts", () => {
     const firstCall = stripe.paymentIntents.create.mock.calls[0] as unknown as Array<Record<string, unknown>>;
     const payload = firstCall[0];
     expect(payload.amount).toBe(1750);
-    expect(payload.application_fee_amount).toBe(4);
+    expect(payload.application_fee_amount).toBe(9);
     expect(Number(payload.application_fee_amount)).toBeLessThan(Number(payload.amount));
   });
 

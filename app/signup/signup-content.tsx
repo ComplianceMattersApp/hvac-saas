@@ -68,7 +68,7 @@ const SIGNUP_COPY: Record<
         copy: "Keep job notes, status, and next steps easier to find.",
       },
     ],
-    trialGoal: "Your first 14 days: try a few real jobs and see how the routine feels for your team.",
+    trialGoal: "Your first 30 days: try a few real jobs and see how the routine feels for your team.",
     formIntro:
       "Tell us who should own the account. We'll email a secure setup link so you can finish creating your trial.",
   },
@@ -93,7 +93,7 @@ const SIGNUP_COPY: Record<
       },
     ],
     trialGoal:
-      "Your first 14 days: enter a few real customers and service jobs, try the dispatch flow, and see whether it helps your office and field team stay on the same page.",
+      "Your first 30 days: enter a few real customers and service jobs, try the dispatch flow, and see whether it helps your office and field team stay on the same page.",
     formIntro:
       "Tell us who should own the account. We'll email a secure setup link so you can finish creating your Service trial.",
   },
@@ -118,7 +118,7 @@ const SIGNUP_COPY: Record<
       },
     ],
     trialGoal:
-      "Your first 14 days: enter a few real ECC jobs, walk through test tracking, and confirm whether the flow fits how your team handles closeout.",
+      "Your first 30 days: enter a few real ECC jobs, walk through test tracking, and confirm whether the flow fits how your team handles closeout.",
     formIntro:
       "Tell us who should own the account. We'll email a secure setup link so you can finish creating your ECC / Compliance Testing trial.",
   },
@@ -171,7 +171,7 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
               {[
                 "Enter your email",
                 "Get your setup link",
-                "Try real jobs for 14 days",
+                "Try real jobs for 30 days",
               ].map((step, index) => (
                 <div key={step} className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
