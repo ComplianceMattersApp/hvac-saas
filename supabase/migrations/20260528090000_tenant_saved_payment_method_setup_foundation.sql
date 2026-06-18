@@ -367,7 +367,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_saved_payment_method_setups (
     CHECK (stripe_setup_intent_id IS NULL OR stripe_setup_intent_id ~ '^seti_[A-Za-z0-9]+$'),
 
   CONSTRAINT tenant_saved_payment_method_setups_checkout_session_id_format_chk
-    CHECK (stripe_checkout_session_id IS NULL OR stripe_checkout_session_id ~ '^cs_[A-Za-z0-9]+$'),
+    CHECK (stripe_checkout_session_id IS NULL OR stripe_checkout_session_id ~ '^cs_(test|live)_[A-Za-z0-9]+$'),
 
   CONSTRAINT tenant_saved_payment_method_setups_payment_method_id_format_chk
     CHECK (stripe_payment_method_id IS NULL OR stripe_payment_method_id ~ '^pm_[A-Za-z0-9]+$'),

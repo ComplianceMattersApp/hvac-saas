@@ -3,6 +3,13 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireInternalRole } from "@/lib/auth/internal-user";
+import {
+  buildPricebookImportPreview,
+  importPricebookRows,
+  type PricebookImportPreview,
+  type PricebookImportResult,
+  type PricebookImportStore,
+} from "@/lib/business/pricebook-import";
 import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/platform-entitlement";
 import {
   parsePricebookCategory,
@@ -11,6 +18,7 @@ import {
 import { createClient } from "@/lib/supabase/server";
 
 const ITEM_TYPES = new Set(["service", "material", "diagnostic", "adjustment"]);
+const MAX_IMPORT_FILE_BYTES = 256 * 1024;
 
 type PricebookNotice =
   | "created"
@@ -24,6 +32,14 @@ type PricebookNotice =
   | "negative_only_for_adjustment"
   | "not_found"
   | "save_failed";
+
+export type PricebookImportActionState = {
+  status: "idle" | "preview" | "imported" | "error";
+  message?: string;
+  csvText?: string;
+  preview?: PricebookImportPreview;
+  result?: PricebookImportResult;
+};
 
 function withNotice(notice: PricebookNotice) {
   return `/ops/admin/pricebook?notice=${encodeURIComponent(notice)}`;
@@ -106,6 +122,139 @@ async function requirePricebookMutationContext() {
   }
 
   return { supabase, accountOwnerUserId };
+}
+
+function createPricebookImportStore(supabase: Awaited<ReturnType<typeof createClient>>): PricebookImportStore {
+  return {
+    async listExistingPricebookItems(accountOwnerUserId) {
+      const { data, error } = await supabase
+        .from("pricebook_items")
+        .select("item_name")
+        .eq("account_owner_user_id", accountOwnerUserId);
+
+      return {
+        data: data ? (data as Array<{ item_name: string | null }>) : null,
+        error: error ? { message: error.message } : null,
+      };
+    },
+    async insertPricebookItems(rows) {
+      const { error } = await supabase.from("pricebook_items").insert(rows);
+      return { error: error ? { message: error.message } : null };
+    },
+  };
+}
+
+function isCsvFile(file: File) {
+  const name = String(file.name ?? "").toLowerCase();
+  const type = String(file.type ?? "").toLowerCase();
+  return name.endsWith(".csv") || type === "text/csv" || type === "application/vnd.ms-excel";
+}
+
+async function readCsvFileFromForm(formData: FormData): Promise<
+  | { ok: true; csvText: string }
+  | { ok: false; message: string }
+> {
+  const file = formData.get("csv_file");
+  if (!(file instanceof File) || file.size === 0) {
+    return { ok: false, message: "Choose a CSV file to upload." };
+  }
+
+  if (!isCsvFile(file)) {
+    return { ok: false, message: "Upload a CSV file." };
+  }
+
+  if (file.size > MAX_IMPORT_FILE_BYTES) {
+    return { ok: false, message: "Use a CSV file smaller than 256 KB." };
+  }
+
+  try {
+    return { ok: true, csvText: await file.text() };
+  } catch {
+    return { ok: false, message: "We could not read that CSV file. Please try again." };
+  }
+}
+
+export async function previewPricebookImportFromForm(
+  _previousState: PricebookImportActionState,
+  formData: FormData,
+): Promise<PricebookImportActionState> {
+  const { supabase, accountOwnerUserId } = await requirePricebookMutationContext();
+  const fileResult = await readCsvFileFromForm(formData);
+
+  if (!fileResult.ok) {
+    return { status: "error", message: fileResult.message };
+  }
+
+  const preview = await buildPricebookImportPreview({
+    csv: fileResult.csvText,
+    accountOwnerUserId,
+    store: createPricebookImportStore(supabase),
+  });
+
+  if (preview.errors.length > 0) {
+    return {
+      status: "error",
+      message: preview.errors[0] ?? "We could not preview this CSV.",
+      csvText: fileResult.csvText,
+      preview,
+    };
+  }
+
+  if (preview.missingHeaders.length > 0) {
+    return {
+      status: "error",
+      message: `Missing required columns: ${preview.missingHeaders.join(", ")}.`,
+      csvText: fileResult.csvText,
+      preview,
+    };
+  }
+
+  return {
+    status: "preview",
+    message: "Preview ready. Review the rows before importing.",
+    csvText: fileResult.csvText,
+    preview,
+  };
+}
+
+export async function confirmPricebookImportFromForm(
+  _previousState: PricebookImportActionState,
+  formData: FormData,
+): Promise<PricebookImportActionState> {
+  const { supabase, accountOwnerUserId } = await requirePricebookMutationContext();
+  await requireOperationalPricebookMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId,
+  });
+
+  const csvText = normalizeText(formData.get("csv_text"));
+  if (!csvText) {
+    return { status: "error", message: "Upload and preview a CSV before importing." };
+  }
+
+  const result = await importPricebookRows({
+    csv: csvText,
+    accountOwnerUserId,
+    store: createPricebookImportStore(supabase),
+  });
+
+  if (result.errors.length > 0) {
+    return {
+      status: "error",
+      message: result.errors[0] ?? "Could not import services. Please try again.",
+      csvText,
+      result,
+    };
+  }
+
+  revalidatePath("/ops/admin");
+  revalidatePath("/ops/admin/pricebook");
+
+  return {
+    status: "imported",
+    message: "Import complete.",
+    result,
+  };
 }
 
 export async function createPricebookItemFromForm(formData: FormData) {

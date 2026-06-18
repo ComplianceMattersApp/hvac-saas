@@ -315,6 +315,17 @@ Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 - Product-mode write/capture failure prevents product-specific signup from presenting a ready/success state.
 - No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, contractor authority, report dataset/calculation behavior, or Product Mode schema changed. First Owner Provisioning behavior changed only for omitted starter-kit selection, which is now product-mode-aware.
 
+Pricebook CSV Import V1 closeout snapshot:
+
+- Admin Pricebook now includes `Import services and add-ons`.
+- The downloadable CSV template uses friendly headers: `Service Name,Category,Kind,Unit,Price,Active,Description`.
+- CSV import is shared across product modes and is not Cleaning-only.
+- Import preview groups rows as `Ready to add`, `Already exists`, and `Needs review`.
+- Confirm import inserts only valid new rows, re-checks duplicates by normalized Service Name, and skips existing items.
+- Imported rows are normal account-owned custom Pricebook items: `is_starter=false`, no starter `seed_key`.
+- The import does not create jobs, invoices, charges, payments, checklist tasks, recurring services, crews, or dispatch records.
+- No schema, RLS/auth/security, billing/payment, reporting, entitlement, or product-mode logic changes were introduced.
+
 Product Choice Signup Landing V1 closeout snapshot (2026-05-10):
 
 - Public `/signup` now shows a product-choice landing instead of an ambiguous generic signup form.

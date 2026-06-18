@@ -16,6 +16,7 @@ import {
   isKnownPricebookUnitLabel,
 } from "@/lib/business/pricebook-options";
 import { createClient } from "@/lib/supabase/server";
+import { PricebookImportPanel } from "./PricebookImportPanel";
 
 type SearchParams = Promise<{ notice?: string; view?: string; q?: string; category?: string }>;
 
@@ -414,6 +415,8 @@ export default async function AdminPricebookPage({
             : `Showing ${filteredRows.length} of ${rows.length} items${selectedCategory ? ` in ${selectedCategory}` : ""}.`}
         </p>
       </section>
+
+      <PricebookImportPanel />
 
       <section className="rounded-[24px] border border-slate-200/80 bg-white/90 p-5 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] sm:p-6">
         <div className="space-y-2">
