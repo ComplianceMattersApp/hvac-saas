@@ -110,8 +110,13 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('waiting: "waiting"');
     expect(opsPageSource).toContain('exceptions: "exceptions"');
     expect(opsPageSource).toContain('closeout: "closeout"');
-    expect(opsPageSource).toContain('const coreBoardWorkspaceKeys = ["need_to_schedule", "field_work", "waiting", "exceptions", "closeout"];');
-    expect(opsPageSource).toContain("const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[activeBoardBucketFilter]];");
+    expect(opsPageSource).toContain("const coreBoardWorkspaceKeys = [");
+    expect(opsPageSource).toContain('"need_to_schedule",');
+    expect(opsPageSource).toContain('"field_work",');
+    expect(opsPageSource).toContain('"waiting",');
+    expect(opsPageSource).toContain('"exceptions",');
+    expect(opsPageSource).toContain('"closeout",');
+    expect(opsPageSource).toContain("const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter]];");
   });
 
   it("restores fixed queue chips as the primary Ops queue selector", () => {
@@ -134,7 +139,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("restores Field Work through the existing scheduled field-work read model", () => {
-    expect(opsPageSource).toContain('type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout";');
+    expect(opsPageSource).toContain('type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout" | "permits";');
     expect(opsPageSource).toContain('if (normalized === "scheduled") return "field_work";');
     expect(opsPageSource).toContain('} else if (workspaceKey === "field_work") {');
     expect(opsPageSource).toContain('.eq("field_complete", false)');
@@ -146,7 +151,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   it("renders one active queue section refined by filters and sort", () => {
     expect(opsPageSource).toContain("const selectedWorkspaceSection =");
     expect(opsPageSource).toContain("selectedWorkspaceSection.previewRows.map");
-    expect(opsPageSource).toContain("const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows);");
+    expect(opsPageSource).toContain("const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
     expect(opsPageSource).toContain("return sortOpsBoardRows(queueRes.data ?? [], boardSort);");
     expect(opsPageSource).not.toContain("visibleWorkspaceSections.map((section)");
   });
@@ -163,30 +168,39 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("const boardSort = normalizeOpsBoardSort(sp.sort);");
     expect(opsPageSource).toContain('<input type="hidden" name="sort" value={boardSort} />');
     expect(opsPageSource).toContain('<input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />');
-    expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={activeBoardBucketFilter} />');
+    expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={effectiveBoardBucketFilter} />');
     expect(opsPageSource).toContain('<input type="hidden" name="reason" value={effectiveBoardReasonFilter ?? ""} />');
   });
 
   it("keeps reason filtering combined with Contractor, selected queue, and Sort", () => {
     expect(opsPageSource).toContain("const boardReasonFilter = normalizeOpsBoardReason(sp.reason);");
-    expect(opsPageSource).toContain("const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows);");
+    expect(opsPageSource).toContain("const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
     expect(opsPageSource).toContain("const effectiveBoardReasonFilter = boardReasonFilter && workspaceReasonOptions.some");
-    expect(opsPageSource).toContain("previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter)");
+    expect(opsPageSource).toContain("previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter, { queueKey: section.key })");
     expect(opsPageSource).toContain('<input type="hidden" name="sort" value={boardSort} />');
-    expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={activeBoardBucketFilter} />');
+    expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={effectiveBoardBucketFilter} />');
   });
 
   it("uses the same reason helper for options, filtering, and visible row reason", () => {
     expect(opsPageSource).toContain("getOpsBoardReasonLabel");
     expect(opsPageSource).toContain("function workspaceVisibleReason(job: any, queueKey: string)");
-    expect(opsPageSource).toContain("return getOpsBoardReasonLabel(job)?.label ?? wsStatusReason(job, queueKey);");
+    expect(opsPageSource).toContain("return getOpsBoardReasonLabel(job, { queueKey })?.label ?? wsStatusReason(job, queueKey);");
     expect(opsPageSource).toContain("{workspaceVisibleReason(job, selectedWorkspaceSection.key)}");
+  });
+
+  it("loads the Closeout chip from field-complete candidates before applying canonical closeout projection", () => {
+    expect(opsPageSource).toContain('} else if (workspaceKey === "closeout") {');
+    expect(opsPageSource).toContain('queueQ = queueQ.neq("ops_status", "closed").eq("field_complete", true).limit(100);');
+    expect(opsPageSource).toContain("buildBillingTruthCloseoutProjectionMap");
+    expect(opsPageSource).toContain("listCloseoutQueueJobs(");
+    expect(opsPageSource).toContain("buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });");
+    expect(opsPageSource).toContain("filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter, { queueKey: section.key })");
   });
 
   it("shows clear filters and empty filtered state for unmatched board filters", () => {
     expect(opsPageSource).toContain("const hasActiveOpsBoardFilters = Boolean(contractorScopeFilter) || Boolean(effectiveBoardReasonFilter);");
     expect(opsPageSource).toContain("clearOpsBoardFiltersHref");
-    expect(opsPageSource).toContain("bucket: activeBoardBucketFilter");
+    expect(opsPageSource).toContain("bucket: effectiveBoardBucketFilter");
     expect(opsPageSource).toContain('boardSort === "oldest" ? "" : boardSort');
     expect(opsPageSource).toContain("Clear filters");
     expect(opsPageSource).toContain("No jobs match these filters.");

@@ -61,6 +61,10 @@ type OpsBoardReasonJob = {
   certs_complete?: boolean | null;
 };
 
+type OpsBoardReasonContext = {
+  queueKey?: string | null;
+};
+
 export function normalizeOpsBoardReason(value: unknown): OpsBoardReasonKey | null {
   const normalized = String(value ?? "").trim().toLowerCase();
   return OPTION_BY_KEY.has(normalized as OpsBoardReasonKey) ? (normalized as OpsBoardReasonKey) : null;
@@ -92,17 +96,32 @@ function exceptionReasonFromText(text: string): OpsBoardReasonKey | null {
   return null;
 }
 
-export function getOpsBoardReasonLabel(job: OpsBoardReasonJob): OpsBoardReasonOption | null {
+function closeoutReasonLabel(job: OpsBoardReasonJob, requireQueueEligibility = false): OpsBoardReasonOption | null {
+  const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
+  if (requireQueueEligibility && (!job.field_complete || opsStatus === "closed")) return null;
+
+  const needs = getCloseoutNeeds(job);
+  if (needs.needsInvoice && needs.needsCerts) return OPTION_BY_KEY.get("needs_invoice_and_certs") ?? null;
+  if (needs.needsInvoice) return OPTION_BY_KEY.get("needs_invoice") ?? null;
+  if (needs.needsCerts) return OPTION_BY_KEY.get("needs_certs") ?? null;
+  return null;
+}
+
+export function getOpsBoardReasonLabel(
+  job: OpsBoardReasonJob,
+  context: OpsBoardReasonContext = {},
+): OpsBoardReasonOption | null {
   const opsStatus = String(job.ops_status ?? "").trim().toLowerCase();
   const jobType = String(job.job_type ?? "").trim().toLowerCase();
   const text = reasonText(job);
 
+  if (context.queueKey === "closeout") {
+    const closeoutReason = closeoutReasonLabel(job, true);
+    if (closeoutReason) return closeoutReason;
+  }
+
   if (opsStatus === "invoice_required" || opsStatus === "paperwork_required") {
-    const needs = getCloseoutNeeds(job);
-    if (needs.needsInvoice && needs.needsCerts) return OPTION_BY_KEY.get("needs_invoice_and_certs") ?? null;
-    if (needs.needsInvoice) return OPTION_BY_KEY.get("needs_invoice") ?? null;
-    if (needs.needsCerts) return OPTION_BY_KEY.get("needs_certs") ?? null;
-    return null;
+    return closeoutReasonLabel(job);
   }
 
   if (opsStatus === "need_to_schedule") return OPTION_BY_KEY.get("needs_scheduling") ?? null;
@@ -127,10 +146,13 @@ export function getOpsBoardReasonLabel(job: OpsBoardReasonJob): OpsBoardReasonOp
   return null;
 }
 
-export function buildOpsBoardReasonOptions(rows: OpsBoardReasonJob[]): OpsBoardReasonOption[] {
+export function buildOpsBoardReasonOptions(
+  rows: OpsBoardReasonJob[],
+  context: OpsBoardReasonContext = {},
+): OpsBoardReasonOption[] {
   const keys = new Set<OpsBoardReasonKey>();
   for (const row of rows ?? []) {
-    const reason = getOpsBoardReasonLabel(row);
+    const reason = getOpsBoardReasonLabel(row, context);
     if (reason) keys.add(reason.key);
   }
 
@@ -140,7 +162,8 @@ export function buildOpsBoardReasonOptions(rows: OpsBoardReasonJob[]): OpsBoardR
 export function filterOpsBoardRowsByReason<T extends OpsBoardReasonJob>(
   rows: T[],
   reason: OpsBoardReasonKey | null,
+  context: OpsBoardReasonContext = {},
 ): T[] {
   if (!reason) return rows ?? [];
-  return (rows ?? []).filter((row) => getOpsBoardReasonLabel(row)?.key === reason);
+  return (rows ?? []).filter((row) => getOpsBoardReasonLabel(row, context)?.key === reason);
 }

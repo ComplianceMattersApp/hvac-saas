@@ -42,7 +42,6 @@ export function isInCloseoutQueue(job: CloseoutProjectionInput) {
   if (opsStatus === "closed") return false;
 
   const needs = getCloseoutNeeds(job);
-  if (needs.isBlockedForCloseout) return false;
 
   return needs.needsInvoice || needs.needsCerts;
 }

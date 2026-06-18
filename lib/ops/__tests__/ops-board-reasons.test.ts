@@ -56,6 +56,45 @@ describe("Operations Board reason mapping", () => {
     expect(getOpsBoardReasonLabel({ ops_status: "on_hold", on_hold_reason: "Customer asked to pause" })?.label).toBe("On hold");
   });
 
+  it("uses closeout blockers as the primary reason in Closeout context without losing permit derivation elsewhere", () => {
+    const row = {
+      id: "permit-missing-needs-invoice",
+      job_type: "ecc",
+      ops_status: "pending_info",
+      pending_info_reason: "Permit Missing",
+      field_complete: true,
+      invoice_complete: false,
+      certs_complete: true,
+    };
+
+    expect(getOpsBoardReasonLabel(row)?.label).toBe("Waiting on permit");
+    expect(getOpsBoardReasonLabel(row, { queueKey: "closeout" })?.label).toBe("Needs invoice");
+    expect(filterOpsBoardRowsByReason([row], "needs_invoice", { queueKey: "closeout" }).map((item) => item.id)).toEqual([
+      "permit-missing-needs-invoice",
+    ]);
+    expect(filterOpsBoardRowsByReason([row], "waiting_on_permit").map((item) => item.id)).toEqual([
+      "permit-missing-needs-invoice",
+    ]);
+  });
+
+  it("builds Closeout reason options from contextual closeout work instead of permit text", () => {
+    const options = buildOpsBoardReasonOptions(
+      [
+        {
+          job_type: "ecc",
+          ops_status: "pending_info",
+          pending_info_reason: "Permit Missing",
+          field_complete: true,
+          invoice_complete: false,
+          certs_complete: true,
+        },
+      ],
+      { queueKey: "closeout" },
+    );
+
+    expect(options.map((option) => option.label)).toEqual(["Needs invoice"]);
+  });
+
   it("keeps stronger failed ECC reasons above generic hold text", () => {
     const row = {
       id: "failed-ecc-on-hold-text",

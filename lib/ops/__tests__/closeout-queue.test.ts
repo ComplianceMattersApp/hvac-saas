@@ -68,6 +68,34 @@ describe("listCloseoutQueueJobs", () => {
     expect(rows.map((row) => row.id)).toEqual(["job-a", "job-c"]);
     expect(count).toBe(2);
   });
+
+  it("includes permit-missing jobs when invoice closeout is still needed", () => {
+    const jobs = [
+      {
+        id: "permit-missing-needs-invoice",
+        job_type: "ecc",
+        ops_status: "pending_info",
+        pending_info_reason: "Permit Missing",
+        field_complete: true,
+        certs_complete: true,
+        invoice_complete: false,
+      },
+      {
+        id: "permit-missing-no-closeout-blocker",
+        job_type: "ecc",
+        ops_status: "pending_info",
+        pending_info_reason: "Permit Missing",
+        field_complete: true,
+        certs_complete: true,
+        invoice_complete: true,
+      },
+    ];
+
+    const rows = listCloseoutQueueJobs(jobs, (job) => job);
+
+    expect(rows.map((row) => row.id)).toEqual(["permit-missing-needs-invoice"]);
+    expect(rows[0]?.pending_info_reason).toBe("Permit Missing");
+  });
 });
 
 describe("canShowExternalInvoiceSentAction", () => {

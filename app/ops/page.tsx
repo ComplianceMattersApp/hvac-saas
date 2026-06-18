@@ -632,7 +632,7 @@ function subtractBusinessDays(date: Date, days: number) {
   }
 
   function workspaceVisibleReason(job: any, queueKey: string) {
-    return getOpsBoardReasonLabel(job)?.label ?? wsStatusReason(job, queueKey);
+    return getOpsBoardReasonLabel(job, { queueKey })?.label ?? wsStatusReason(job, queueKey);
   }
 
   function workspaceFailedReason(job: any) {
@@ -688,10 +688,31 @@ function subtractBusinessDays(date: Date, days: number) {
 
     if (contractorScopeFilter) scheduledOpenRowsQ = scheduledOpenRowsQ.eq("contractor_id", contractorScopeFilter);
 
-    const [countsResWs, fieldWorkCountRes, scheduledOpenRowsRes, unreadContractorUpdates, unreadNewWorkRequests, activePermitRequestsResult] = await Promise.all([
+    let closeoutCountRowsQ = supabase
+      .from("jobs")
+      .select(workspaceSelect)
+      .is("deleted_at", null)
+      .neq("status", "cancelled")
+      .eq("field_complete", true)
+      .neq("ops_status", "closed")
+      .order("created_at", { ascending: false })
+      .limit(500);
+
+    if (contractorScopeFilter) closeoutCountRowsQ = closeoutCountRowsQ.eq("contractor_id", contractorScopeFilter);
+
+    const [
+      countsResWs,
+      fieldWorkCountRes,
+      scheduledOpenRowsRes,
+      closeoutCountRowsRes,
+      unreadContractorUpdates,
+      unreadNewWorkRequests,
+      activePermitRequestsResult,
+    ] = await Promise.all([
       countsQ,
       fieldWorkCountQ,
       scheduledOpenRowsQ,
+      closeoutCountRowsQ,
       listInternalContractorUpdateAwareness({ limit: 100, onlyUnread: true }),
       listInternalNewWorkRequestAwareness({ limit: 100, onlyUnread: true }),
       permitWorkflowEnabled
@@ -707,6 +728,7 @@ function subtractBusinessDays(date: Date, days: number) {
     if (countsResWs.error) throw countsResWs.error;
     if (fieldWorkCountRes.error) throw fieldWorkCountRes.error;
     if (scheduledOpenRowsRes.error) throw scheduledOpenRowsRes.error;
+    if (closeoutCountRowsRes.error) throw closeoutCountRowsRes.error;
 
     const countsWs = new Map<string, number>();
     for (const row of countsResWs.data ?? []) {
@@ -744,9 +766,24 @@ function subtractBusinessDays(date: Date, days: number) {
       (countsWs.get("pending_office_review") ?? 0) +
       (countsWs.get("problem") ?? 0);
 
-    const closeoutCount =
-      (countsWs.get("invoice_required") ?? 0) +
-      (countsWs.get("paperwork_required") ?? 0);
+    const closeoutCountSourceRows = closeoutCountRowsRes.data ?? [];
+    const { projectionsByJobId: closeoutCountProjectionByJobId } = await buildBillingTruthCloseoutProjectionMap({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      jobs: closeoutCountSourceRows.map((job: any) => ({
+        id: String(job?.id ?? "").trim(),
+        field_complete: job?.field_complete,
+        job_type: job?.job_type,
+        ops_status: job?.ops_status,
+        invoice_complete: job?.invoice_complete,
+        billing_disposition: job?.billing_disposition,
+        certs_complete: job?.certs_complete,
+      })),
+    });
+    const closeoutCount = listCloseoutQueueJobs(
+      closeoutCountSourceRows,
+      (job: any) => closeoutCountProjectionByJobId.get(String(job?.id ?? "").trim()) ?? job,
+    ).length;
     const permitRequestsSchemaAvailable = permitWorkflowEnabled && activePermitRequestsResult.schemaAvailable;
     const activePermitRequestRows = activePermitRequestsResult.rows;
     const effectiveBoardBucketFilter =
@@ -879,7 +916,7 @@ function subtractBusinessDays(date: Date, days: number) {
       } else if (workspaceKey === "exceptions") {
         queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["failed", "retest_needed", "pending_office_review", "problem"]);
       } else if (workspaceKey === "closeout") {
-        queueQ = queueQ.neq("ops_status", "closed").in("ops_status", ["invoice_required", "paperwork_required"]);
+        queueQ = queueQ.neq("ops_status", "closed").eq("field_complete", true).limit(100);
       } else if (workspaceKey === "permits") {
         return [];
       } else {
@@ -889,6 +926,29 @@ function subtractBusinessDays(date: Date, days: number) {
       if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
       const queueRes = await queueQ;
       if (queueRes.error) throw queueRes.error;
+      if (workspaceKey === "closeout") {
+        const closeoutSourceRows = queueRes.data ?? [];
+        const { projectionsByJobId } = await buildBillingTruthCloseoutProjectionMap({
+          supabase,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          jobs: closeoutSourceRows.map((job: any) => ({
+            id: String(job?.id ?? "").trim(),
+            field_complete: job?.field_complete,
+            job_type: job?.job_type,
+            ops_status: job?.ops_status,
+            invoice_complete: job?.invoice_complete,
+            billing_disposition: job?.billing_disposition,
+            certs_complete: job?.certs_complete,
+          })),
+        });
+        return sortOpsBoardRows(
+          listCloseoutQueueJobs(
+            closeoutSourceRows,
+            (job: any) => projectionsByJobId.get(String(job?.id ?? "").trim()) ?? job,
+          ),
+          boardSort,
+        ).slice(0, 10);
+      }
       return sortOpsBoardRows(queueRes.data ?? [], boardSort);
     }
 
@@ -903,16 +963,16 @@ function subtractBusinessDays(date: Date, days: number) {
         previewRows: workspacePreviewRowsByKey.get(workspaceKey) ?? [],
       };
     });
+    const selectedWorkspaceKey = requestedWorkspaceKeys[0];
     const reasonSourceRows = reasonSourceWorkspaceSections.flatMap((section) => section.previewRows);
-    const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows);
+    const workspaceReasonOptions = buildOpsBoardReasonOptions(reasonSourceRows, { queueKey: selectedWorkspaceKey });
     const effectiveBoardReasonFilter = boardReasonFilter && workspaceReasonOptions.some((option) => option.key === boardReasonFilter)
       ? boardReasonFilter
       : null;
     const visibleWorkspaceSections = reasonSourceWorkspaceSections.map((section) => ({
       ...section,
-      previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter),
+      previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter, { queueKey: section.key }),
     }));
-    const selectedWorkspaceKey = requestedWorkspaceKeys[0];
     const selectedWorkspaceSection =
       visibleWorkspaceSections.find((section) => section.key === selectedWorkspaceKey) ?? visibleWorkspaceSections[0];
     const selectedPermitRows = selectedWorkspaceKey === "permits" ? activePermitRequestRows : [];

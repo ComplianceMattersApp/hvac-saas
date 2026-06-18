@@ -68,6 +68,35 @@ describe("closeout queue projection", () => {
     ).toBe(false);
   });
 
+  it("keeps permit-missing jobs in closeout when invoice remains pending", () => {
+    const job = {
+      field_complete: true,
+      job_type: "ecc",
+      ops_status: "pending_info",
+      invoice_complete: false,
+      certs_complete: true,
+    };
+
+    expect(getCloseoutNeeds(job)).toMatchObject({
+      needsInvoice: true,
+      needsCerts: false,
+      isBlockedForCloseout: true,
+    });
+    expect(isInCloseoutQueue(job)).toBe(true);
+  });
+
+  it("keeps permit-missing jobs out of closeout when no closeout blocker remains", () => {
+    expect(
+      isInCloseoutQueue({
+        field_complete: true,
+        job_type: "ecc",
+        ops_status: "pending_info",
+        invoice_complete: true,
+        certs_complete: true,
+      }),
+    ).toBe(false);
+  });
+
   it("preserves external billing completion tracking semantics through invoice_complete", () => {
     expect(
       isInCloseoutQueue({
