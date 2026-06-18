@@ -2,8 +2,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
-import { portalAccessFallbackPathForAccess } from "@/lib/auth/portal-route-guard";
+import PortalAccessIssue from "@/components/portal/PortalAccessIssue";
 import FlashBanner from "@/components/ui/FlashBanner";
 import PortalJobListItem from "@/components/portal/PortalJobListItem";
 import {
@@ -73,10 +72,6 @@ export default async function PortalAllJobsPage({
 
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
-  const access = await resolveDualContextAccess({
-    supabase,
-    user: userData.user,
-  });
 
   const portalContext = await (async () => {
     try {
@@ -87,7 +82,7 @@ export default async function PortalAllJobsPage({
         redirect("/login");
       }
       if (code === "NOT_CONTRACTOR") {
-        redirect(portalAccessFallbackPathForAccess(access));
+        return null;
       }
       if (code === "CONTRACTOR_ARCHIVED") {
         redirect("/login?err=contractor_archived");
@@ -95,6 +90,7 @@ export default async function PortalAllJobsPage({
       throw error;
     }
   })();
+  if (!portalContext) return <PortalAccessIssue />;
   const contractorId = portalContext.contractorId;
   const contractorName =
     portalContext.contractorName ?? (contractorId ? "Contractor" : null);

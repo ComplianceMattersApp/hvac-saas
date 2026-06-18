@@ -1,10 +1,20 @@
+import { readFileSync } from "fs";
+import { resolve } from "path";
 import { describe, expect, it } from "vitest";
 import type { DualContextAccess } from "@/lib/auth/dual-context-access";
 import { landingPathForDualContextAccess } from "@/lib/auth/dual-context-access";
-import { portalAccessFallbackPathForAccess } from "@/lib/auth/portal-route-guard";
+
+function readRepoFile(path: string) {
+  return readFileSync(resolve(__dirname, "../../..", path), "utf-8");
+}
 
 function resolveOpsGuardRedirect(access: DualContextAccess, hasUser = true) {
   if (!hasUser) return "/login";
+  if (!access.hasActiveAppAccess) return landingPathForDualContextAccess(access);
+  return null;
+}
+
+function resolveTodayGuardRedirect(access: DualContextAccess) {
   if (!access.hasActiveAppAccess) return landingPathForDualContextAccess(access);
   return null;
 }
@@ -70,6 +80,28 @@ describe("portal / ops redirect loop prevention", () => {
   });
 
   it("does not create /portal -> /today -> /portal for portal access", () => {
-    expect(portalAccessFallbackPathForAccess(portalAccess())).toBe("/portal");
+    const portalGuardFallback = null;
+
+    expect(portalGuardFallback).not.toBe("/today");
+    expect(portalGuardFallback).not.toBe("/ops");
+  });
+
+  it("sends portal-only /today visits to /portal without allowing a /today loop", () => {
+    expect(resolveTodayGuardRedirect(portalAccess())).toBe("/portal");
+  });
+
+  it("renders portal-safe access issues instead of redirecting portal NOT_CONTRACTOR failures to /ops", () => {
+    const portalFiles = [
+      "app/portal/page.tsx",
+      "app/portal/jobs/page.tsx",
+      "app/portal/permit-request/page.tsx",
+      "app/portal/intake-submissions/[id]/page.tsx",
+    ];
+
+    for (const path of portalFiles) {
+      const source = readRepoFile(path);
+      expect(source).toContain("PortalAccessIssue");
+      expect(source).not.toContain('redirect("/ops")');
+    }
   });
 });

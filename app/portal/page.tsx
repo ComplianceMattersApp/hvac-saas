@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { AppAccessCtaCard } from "@/components/AppAccessCtaCard";
 import { createClient } from "@/lib/supabase/server";
 import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
-import { portalAccessFallbackPathForAccess } from "@/lib/auth/portal-route-guard";
+import PortalAccessIssue from "@/components/portal/PortalAccessIssue";
 import {
   loadAppAccessCtaEntitlementSnapshot,
   resolveAppAccessCta,
@@ -107,7 +107,7 @@ export default async function PortalPage({
         redirect("/login");
       }
       if (code === "NOT_CONTRACTOR") {
-        redirect(portalAccessFallbackPathForAccess(access));
+        return null;
       }
       if (code === "CONTRACTOR_ARCHIVED") {
         redirect("/login?err=contractor_archived");
@@ -115,6 +115,7 @@ export default async function PortalPage({
       throw error;
     }
   })();
+  if (!portalContext) return <PortalAccessIssue />;
   const contractorId = portalContext.contractorId;
   const contractorName =
     portalContext.contractorName ?? (contractorId ? "Contractor" : null);

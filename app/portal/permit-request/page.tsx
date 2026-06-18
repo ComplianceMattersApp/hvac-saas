@@ -1,8 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
-import { portalAccessFallbackPathForAccess } from "@/lib/auth/portal-route-guard";
+import PortalAccessIssue from "@/components/portal/PortalAccessIssue";
 import {
   portalNarrowPageClass,
   portalPanelClass,
@@ -17,10 +16,6 @@ export default async function ContractorPermitRequestPage() {
   const supabase = await createClient();
   const { data: userData } = await supabase.auth.getUser();
   if (!userData?.user) redirect("/login");
-  const access = await resolveDualContextAccess({
-    supabase,
-    user: userData.user,
-  });
 
   const availability = await (async () => {
     try {
@@ -28,11 +23,12 @@ export default async function ContractorPermitRequestPage() {
     } catch (error) {
       const code = String((error as Error)?.message ?? "").trim().toUpperCase();
       if (code === "NOT_AUTHENTICATED") redirect("/login");
-      if (code === "NOT_CONTRACTOR") redirect(portalAccessFallbackPathForAccess(access));
+      if (code === "NOT_CONTRACTOR") return null;
       if (code === "CONTRACTOR_ARCHIVED") redirect("/login?err=contractor_archived");
       throw error;
     }
   })();
+  if (!availability) return <PortalAccessIssue />;
 
   return (
     <div className={portalNarrowPageClass}>
