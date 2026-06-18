@@ -93,7 +93,7 @@ describe("submitSelfServeOnboardingForm", () => {
     expect(deps.invite).not.toHaveBeenCalled();
   });
 
-  it("calls provisioning with public-safe standard preset and v3 starter settings", async () => {
+  it("calls provisioning with public-safe standard preset and product-aware starter defaulting", async () => {
     const deps = makeDeps();
 
     await submitSelfServeOnboardingForm(
@@ -108,8 +108,12 @@ describe("submitSelfServeOnboardingForm", () => {
         ownerDisplayName: "Owner User",
         businessDisplayName: "Owner Business",
         entitlementPreset: "standard",
-        starterKitVersion: "v3",
         dryRun: false,
+      }),
+    );
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        starterKitVersion: expect.anything(),
       }),
     );
   });
@@ -205,6 +209,11 @@ describe("submitSelfServeOnboardingForm", () => {
     expect(deps.provision).toHaveBeenCalledWith(
       expect.objectContaining({
         productMode: "cleaning_services",
+      }),
+    );
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.not.objectContaining({
+        starterKitVersion: expect.anything(),
       }),
     );
     expect(deps.invite).toHaveBeenCalled();

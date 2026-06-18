@@ -3,6 +3,7 @@ import {
   STARTER_KIT_V1_SEEDS,
   STARTER_KIT_V2_SEEDS,
   STARTER_KIT_V3_SEEDS,
+  STARTER_KIT_CLEANING_SEEDS,
   applyExistingAccountStarterKitBackfill,
   applyPricebookSeeding,
   createPricebookSeedingStoreFromSupabase,
@@ -10,6 +11,7 @@ import {
   planExistingAccountStarterKitBackfill,
   type PricebookSeedingStore,
   resolveStarterKitSeeds,
+  resolveStarterKitSeedsForProductMode,
   validateSeedDefinitions,
   PricebookStarterSeedDefinition,
 } from '../pricebook-seeding';
@@ -233,6 +235,31 @@ describe('PricebookSeeding', () => {
       expect(selection.seedCount).toBe(STARTER_KIT_V3_SEEDS.length);
       expect(selection.activeCount).toBe(STARTER_KIT_V3_SEEDS.filter((seed) => seed.is_active).length);
       expect(selection.inactiveCount).toBe(STARTER_KIT_V3_SEEDS.filter((seed) => !seed.is_active).length);
+    });
+  });
+
+  describe('resolveStarterKitSeedsForProductMode', () => {
+    it('returns the cleaning starter kit when Cleaning mode omits an explicit version', () => {
+      const selection = resolveStarterKitSeedsForProductMode('cleaning_services');
+
+      expect(selection.starterKitVersion).toBe('cleaning_v1');
+      expect(selection.seeds).toBe(STARTER_KIT_CLEANING_SEEDS);
+      expect(selection.seedCount).toBe(18);
+      expect(selection.activeCount).toBe(12);
+      expect(selection.inactiveCount).toBe(6);
+    });
+
+    it('keeps non-cleaning product modes on the broad v3 default', () => {
+      expect(resolveStarterKitSeedsForProductMode('hvac_service').starterKitVersion).toBe('v3');
+      expect(resolveStarterKitSeedsForProductMode('ecc_hers').starterKitVersion).toBe('v3');
+      expect(resolveStarterKitSeedsForProductMode('hybrid').starterKitVersion).toBe('v3');
+    });
+
+    it('honors explicit legacy starter kit versions for Cleaning mode', () => {
+      const selection = resolveStarterKitSeedsForProductMode('cleaning_services', 'v2');
+
+      expect(selection.starterKitVersion).toBe('v2');
+      expect(selection.seeds).toBe(STARTER_KIT_V2_SEEDS);
     });
   });
 
@@ -1514,6 +1541,124 @@ describe('PricebookSeeding', () => {
 
       expect(activeCount).toBeGreaterThan(0);
       expect(inactiveCount).toBeGreaterThanOrEqual(0);
+    });
+  });
+
+  describe('STARTER_KIT_CLEANING_SEEDS constants', () => {
+    it('has active one-off defaults and inactive optional rows', () => {
+      expect(STARTER_KIT_CLEANING_SEEDS).toHaveLength(18);
+      expect(STARTER_KIT_CLEANING_SEEDS.filter((seed) => seed.is_active)).toHaveLength(12);
+      expect(STARTER_KIT_CLEANING_SEEDS.filter((seed) => !seed.is_active)).toHaveLength(6);
+    });
+
+    it('includes the intended active Cleaning defaults', () => {
+      const activeNames = STARTER_KIT_CLEANING_SEEDS
+        .filter((seed) => seed.is_active)
+        .map((seed) => seed.item_name);
+
+      expect(activeNames).toEqual([
+        'General Cleaning',
+        'Deep Cleaning',
+        'Move-In / Move-Out Cleaning',
+        'Post-Construction Cleaning',
+        'Office / Commercial Cleaning',
+        'Restroom Detail / Sanitizing',
+        'Floor Cleaning',
+        'Window Cleaning',
+        'Trash / Debris Removal',
+        'Emergency / Same-Day Cleanup',
+        'Extra Labor Hour',
+        'Supplies / Consumables',
+      ]);
+    });
+
+    it('includes the intended inactive Cleaning add-ons', () => {
+      const inactiveNames = STARTER_KIT_CLEANING_SEEDS
+        .filter((seed) => !seed.is_active)
+        .map((seed) => seed.item_name);
+
+      expect(inactiveNames).toEqual([
+        'Carpet Spot Treatment',
+        'Carpet Cleaning',
+        'Floor Strip / Wax / Polish',
+        'Heavy Soil / Excessive Buildup Fee',
+        'After-Hours Service',
+        'Biohazard / Hazardous Cleanup Review',
+      ]);
+    });
+
+    it('intentionally omits detail/appliance optional add-ons from the lean first Cleaning kit', () => {
+      const omittedOptionalNames = [
+        'High Dusting',
+        'Wall Spot Cleaning',
+        'Interior Glass Cleaning',
+        'Refrigerator Interior Cleaning',
+        'Oven Interior Cleaning',
+        'Cabinet Interior Cleaning',
+      ];
+      const seededNames = new Set(STARTER_KIT_CLEANING_SEEDS.map((seed) => seed.item_name));
+
+      omittedOptionalNames.forEach((name) => {
+        expect(seededNames.has(name)).toBe(false);
+      });
+    });
+
+    it('validates with unique seed keys and starter metadata', () => {
+      const errors = validateSeedDefinitions(STARTER_KIT_CLEANING_SEEDS);
+      const keys = STARTER_KIT_CLEANING_SEEDS.map((seed) => seed.seed_key);
+
+      expect(errors).toEqual([]);
+      expect(new Set(keys).size).toBe(keys.length);
+      expect(keys.every((key) => key.startsWith('starter_cleaning_v1.'))).toBe(true);
+      expect(
+        STARTER_KIT_CLEANING_SEEDS.every((seed) => seed.starter_version === 'starter_cleaning_v1'),
+      ).toBe(true);
+    });
+
+    it('uses only controlled category and unit values', () => {
+      const allowedCategories = new Set<string>(PRICEBOOK_CATEGORY_OPTIONS);
+      const allowedUnitLabels = new Set<string>(PRICEBOOK_UNIT_LABEL_OPTIONS);
+
+      STARTER_KIT_CLEANING_SEEDS.forEach((seed) => {
+        expect(allowedCategories.has(String(seed.category ?? ''))).toBe(true);
+        expect(allowedUnitLabels.has(String(seed.unit_label ?? ''))).toBe(true);
+      });
+    });
+
+    it('avoids HVAC/ECC starter names and schema-backed checklist claims', () => {
+      const combinedCopy = STARTER_KIT_CLEANING_SEEDS
+        .flatMap((seed) => [seed.item_name, seed.default_description ?? ''])
+        .join(' ')
+        .toLowerCase();
+
+      ['hvac', 'ecc', 'title 24', 'hers', 'duct leakage', 'permit', 'cert'].forEach((term) => {
+        expect(combinedCopy).not.toContain(term);
+      });
+      expect(combinedCopy).not.toContain('checklist');
+    });
+
+    it('is idempotent by cleaning seed_key', async () => {
+      const insertSeedRowsMock = vi.fn().mockResolvedValue({ error: null });
+      const mockStore: PricebookSeedingStore = {
+        listExistingSeedRows: vi.fn().mockResolvedValue({
+          data: STARTER_KIT_CLEANING_SEEDS.map((seed) => ({
+            seed_key: seed.seed_key,
+            item_name: seed.item_name,
+          })),
+          error: null,
+        }),
+        insertSeedRows: insertSeedRowsMock,
+      };
+
+      const result = await applyPricebookSeeding(
+        mockStore,
+        'cleaning-owner-id',
+        STARTER_KIT_CLEANING_SEEDS,
+      );
+
+      expect(result.inserted_count).toBe(0);
+      expect(result.skipped_count).toBe(STARTER_KIT_CLEANING_SEEDS.length);
+      expect(insertSeedRowsMock).not.toHaveBeenCalled();
     });
   });
 

@@ -13,6 +13,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { ProductMode } from '@/lib/business/product-mode-defaults';
 
 /**
  * Definition of a starter Pricebook item.
@@ -34,10 +35,11 @@ export interface PricebookStarterSeedDefinition {
 }
 
 export type StarterKitVersion = 'v1' | 'v2' | 'v3';
+export type StarterKitSelectionKey = StarterKitVersion | 'cleaning_v1';
 export type BackfillStarterKitVersion = Exclude<StarterKitVersion, 'v1'>;
 
 export type StarterKitSeedSelection = {
-  starterKitVersion: StarterKitVersion;
+  starterKitVersion: StarterKitSelectionKey;
   seeds: PricebookStarterSeedDefinition[];
   seedCount: number;
   activeCount: number;
@@ -65,7 +67,7 @@ export interface PricebookSeedResult {
   /** Errors or validation notes. */
   errors?: string[];
   /** Starter kit metadata for preview/apply reporting. */
-  starter_kit_version?: StarterKitVersion;
+  starter_kit_version?: StarterKitSelectionKey;
   seed_count?: number;
   active_seed_count?: number;
   inactive_seed_count?: number;
@@ -839,6 +841,137 @@ export const STARTER_KIT_V3_SEEDS: PricebookStarterSeedDefinition[] = [
   createStarterV3Seed({ seed_key: 'starter_v3.replacement.crane_service_placeholder', item_name: 'Crane Service Placeholder', item_type: 'service', category: 'Other', default_description: 'Placeholder line for equipment crane coordination.', default_unit_price: 0, unit_label: 'job', is_active: false }),
 ];
 
+function createCleaningStarterSeed(params: {
+  seed_key: string;
+  item_name: string;
+  item_type?: PricebookStarterSeedDefinition['item_type'];
+  category?: string;
+  default_description: string;
+  default_unit_price?: number;
+  unit_label?: string;
+  is_active?: boolean;
+}): PricebookStarterSeedDefinition {
+  return {
+    seed_key: params.seed_key,
+    starter_version: 'starter_cleaning_v1',
+    item_name: params.item_name,
+    item_type: params.item_type ?? 'service',
+    category: params.category ?? 'Other',
+    default_description: params.default_description,
+    default_unit_price: params.default_unit_price ?? 0,
+    unit_label: params.unit_label ?? 'job',
+    is_active: params.is_active ?? true,
+    is_starter: true,
+  };
+}
+
+export const STARTER_KIT_CLEANING_SEEDS: PricebookStarterSeedDefinition[] = [
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.general_cleaning',
+    item_name: 'General Cleaning',
+    default_description: 'Standard cleaning visit or one-off cleaning job.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.deep_cleaning',
+    item_name: 'Deep Cleaning',
+    default_description: 'Detailed cleaning for heavier first-time or reset work.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.move_in_move_out',
+    item_name: 'Move-In / Move-Out Cleaning',
+    default_description: 'Cleaning for turnover, move-in, or move-out jobs.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.post_construction_cleaning',
+    item_name: 'Post-Construction Cleaning',
+    default_description: 'One-off cleaning after construction or renovation work.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.office_commercial_cleaning',
+    item_name: 'Office / Commercial Cleaning',
+    default_description: 'Office, workplace, or commercial cleaning job.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.restroom_detail_sanitizing',
+    item_name: 'Restroom Detail / Sanitizing',
+    default_description: 'Restroom detail cleaning and sanitizing job.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.floor_cleaning',
+    item_name: 'Floor Cleaning',
+    default_description: 'General floor cleaning job.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.window_cleaning',
+    item_name: 'Window Cleaning',
+    default_description: 'Window or glass cleaning job.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.trash_debris_removal',
+    item_name: 'Trash / Debris Removal',
+    default_description: 'Trash, debris, or cleanup removal job.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.emergency_same_day_cleanup',
+    item_name: 'Emergency / Same-Day Cleanup',
+    default_description: 'Same-day or urgent cleaning job placeholder.',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.extra_labor_hour',
+    item_name: 'Extra Labor Hour',
+    default_description: 'Additional cleaner labor time.',
+    category: 'Labor',
+    unit_label: 'hr',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.core.supplies_consumables',
+    item_name: 'Supplies / Consumables',
+    item_type: 'material',
+    category: 'Parts',
+    default_description: 'Cleaning supplies, consumables, or restock allowance.',
+    unit_label: 'each',
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.optional.carpet_spot_treatment',
+    item_name: 'Carpet Spot Treatment',
+    default_description: 'Optional spot treatment placeholder; review before quoting.',
+    is_active: false,
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.optional.carpet_cleaning',
+    item_name: 'Carpet Cleaning',
+    default_description: 'Optional carpet cleaning placeholder; review before quoting.',
+    is_active: false,
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.optional.floor_strip_wax_polish',
+    item_name: 'Floor Strip / Wax / Polish',
+    default_description: 'Optional floor finish work placeholder; scope before quoting.',
+    is_active: false,
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.optional.heavy_soil_excessive_buildup_fee',
+    item_name: 'Heavy Soil / Excessive Buildup Fee',
+    category: 'Fees',
+    default_description: 'Optional fee for unusually heavy soil conditions; review before use.',
+    is_active: false,
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.optional.after_hours_service',
+    item_name: 'After-Hours Service',
+    category: 'Fees',
+    default_description: 'Optional after-hours service placeholder; review before billing.',
+    is_active: false,
+  }),
+  createCleaningStarterSeed({
+    seed_key: 'starter_cleaning_v1.optional.biohazard_hazardous_cleanup_review',
+    item_name: 'Biohazard / Hazardous Cleanup Review',
+    default_description:
+      'Review-only placeholder for hazardous cleanup requests; confirm scope, training, and policy before quoting.',
+    is_active: false,
+  }),
+];
+
 export function normalizeStarterKitVersion(value: unknown): StarterKitVersion {
   const normalized = String(value ?? '').trim().toLowerCase();
   if (normalized === 'v3') return 'v3';
@@ -864,6 +997,32 @@ export function resolveStarterKitSeeds(version?: unknown): StarterKitSeedSelecti
     activeCount,
     inactiveCount,
   };
+}
+
+export function resolveStarterKitSeedsForProductMode(
+  productMode: ProductMode | null | undefined,
+  version?: unknown,
+): StarterKitSeedSelection {
+  const rawVersion = String(version ?? '').trim();
+
+  if (rawVersion) {
+    return resolveStarterKitSeeds(rawVersion);
+  }
+
+  if (productMode === 'cleaning_services') {
+    const activeCount = STARTER_KIT_CLEANING_SEEDS.filter((seed) => seed.is_active).length;
+    const inactiveCount = STARTER_KIT_CLEANING_SEEDS.length - activeCount;
+
+    return {
+      starterKitVersion: 'cleaning_v1',
+      seeds: STARTER_KIT_CLEANING_SEEDS,
+      seedCount: STARTER_KIT_CLEANING_SEEDS.length,
+      activeCount,
+      inactiveCount,
+    };
+  }
+
+  return resolveStarterKitSeeds('v3');
 }
 
 /**

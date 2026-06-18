@@ -11,16 +11,20 @@ import {
   STARTER_KIT_V1_SEEDS,
   STARTER_KIT_V2_SEEDS,
   STARTER_KIT_V3_SEEDS,
+  STARTER_KIT_CLEANING_SEEDS,
 } from "../../lib/business/pricebook-seeding";
 
-function seedsForVersion(version: "v1" | "v2" | "v3") {
+type TestStarterKitVersion = "v1" | "v2" | "v3" | "cleaning_v1";
+
+function seedsForVersion(version: TestStarterKitVersion) {
   if (version === "v1") return STARTER_KIT_V1_SEEDS;
   if (version === "v2") return STARTER_KIT_V2_SEEDS;
+  if (version === "cleaning_v1") return STARTER_KIT_CLEANING_SEEDS;
   return STARTER_KIT_V3_SEEDS;
 }
 
 function makeProvisioningSuccess(
-  version: "v1" | "v2" | "v3" = "v3",
+  version: TestStarterKitVersion = "v3",
   overrides?: Partial<FirstOwnerProvisioningResult>,
 ): FirstOwnerProvisioningResult {
   const seeds = seedsForVersion(version);
@@ -76,6 +80,8 @@ function makeDeps(overrides?: Partial<Parameters<typeof runProvisionFirstOwnerSc
       makeProvisioningSuccess(
         input.starterKitVersion === "v1" || input.starterKitVersion === "v2" || input.starterKitVersion === "v3"
           ? input.starterKitVersion
+          : input.productMode === "cleaning_services"
+            ? "cleaning_v1"
           : "v3",
       ),
     ),
@@ -131,7 +137,7 @@ describe("parseProvisionFirstOwnerArgs", () => {
     ]);
 
     expect(parsed.entitlementPreset).toBe("standard");
-    expect(parsed.starterKitVersion).toBe("v3");
+    expect(parsed.starterKitVersion).toBeUndefined();
   });
 
   it("accepts explicit starter kit v1", () => {
@@ -285,7 +291,7 @@ describe("runProvisionFirstOwnerScript", () => {
     );
   });
 
-  it("omitted starter kit arg resolves to v3 in dry-run metadata", async () => {
+  it("omitted starter kit arg is defaulted by the provisioning helper", async () => {
     const deps = makeDeps();
     const parsed = parseProvisionFirstOwnerArgs([
       "--email",
@@ -298,9 +304,9 @@ describe("runProvisionFirstOwnerScript", () => {
 
     const result = await runProvisionFirstOwnerScript(parsed, deps);
 
-    expect(parsed.starterKitVersion).toBe("v3");
+    expect(parsed.starterKitVersion).toBeUndefined();
     expect(deps.provision).toHaveBeenCalledWith(
-      expect.objectContaining({ starterKitVersion: "v3", dryRun: true }),
+      expect.objectContaining({ starterKitVersion: undefined, dryRun: true }),
     );
     expect(result.pricebookSeeding).toEqual(
       expect.objectContaining({
@@ -424,6 +430,37 @@ describe("runProvisionFirstOwnerScript", () => {
       expect.objectContaining({
         productMode: "cleaning_services",
         dryRun: true,
+      }),
+    );
+  });
+
+  it("omitted starter kit arg allows Cleaning mode to preview the cleaning starter kit", async () => {
+    const deps = makeDeps();
+    const parsed = parseProvisionFirstOwnerArgs([
+      "--email",
+      "owner@example.com",
+      "--business-display-name",
+      "My Company",
+      "--product-mode",
+      "cleaning_services",
+    ]);
+
+    const result = await runProvisionFirstOwnerScript(parsed, deps);
+
+    expect(parsed.starterKitVersion).toBeUndefined();
+    expect(deps.provision).toHaveBeenCalledWith(
+      expect.objectContaining({
+        productMode: "cleaning_services",
+        starterKitVersion: undefined,
+        dryRun: true,
+      }),
+    );
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({
+        starter_kit_version: "cleaning_v1",
+        seed_count: STARTER_KIT_CLEANING_SEEDS.length,
+        active_seed_count: 12,
+        inactive_seed_count: 6,
       }),
     );
   });

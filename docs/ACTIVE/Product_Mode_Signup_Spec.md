@@ -114,7 +114,7 @@ When a company signs up as Cleaning / Janitorial, default posture should be:
 - one-off cleaning jobs emphasized first
 - recurring services, crews, checklists, allotted hours, and follow-up positioned as future cleaning-side modules
 - contractor/ECC workflows hidden/de-emphasized by default unless explicitly enabled by future design
-- cleaning starter kit when starter kits become mode-aware
+- Cleaning starter kit (`cleaning_v1`) for omitted starter-kit selection during first-owner provisioning and public Cleaning signup
 
 ## 6. Future Account-Level Product Mode
 
@@ -307,8 +307,13 @@ Product Mode Signup Links V1 closeout snapshot (2026-05-10):
 - Generic `/signup` remains available and keeps existing broad self-serve behavior.
 - Hybrid / All-in-One remains manual/operator-only; no public `/signup/hybrid` route is exposed.
 - Product-mode capture happens through the existing first-owner provisioning helper and writes `account_settings.product_mode` after owner creation.
+- Public signup no longer passes a hard-coded HVAC/ECC starter-kit selector; the provisioning helper chooses the product-mode default.
+- `/signup/cleaning` provisions `cleaning_services` and receives the Cleaning starter Pricebook kit (`cleaning_v1`) when no explicit operator starter-kit override is supplied.
+- Cleaning starter kit closeout: active defaults are General Cleaning, Deep Cleaning, Move-In / Move-Out Cleaning, Post-Construction Cleaning, Office / Commercial Cleaning, Restroom Detail / Sanitizing, Floor Cleaning, Window Cleaning, Trash / Debris Removal, Emergency / Same-Day Cleanup, Extra Labor Hour, and Supplies / Consumables.
+- Cleaning inactive/deferred add-ons are Carpet Spot Treatment, Carpet Cleaning, Floor Strip / Wax / Polish, Heavy Soil / Excessive Buildup Fee, After-Hours Service, and Biohazard / Hazardous Cleanup Review.
+- High Dusting, Wall Spot Cleaning, Interior Glass Cleaning, Refrigerator Interior Cleaning, Oven Interior Cleaning, and Cabinet Interior Cleaning are intentionally omitted from this lean starter kit and remain future detail/checklist/appliance-detail work.
 - Product-mode write/capture failure prevents product-specific signup from presenting a ready/success state.
-- No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, contractor authority, report dataset/calculation behavior, Product Mode schema, or First Owner Provisioning command behavior changed.
+- No tier/add-on enforcement, billing/payment/QBO behavior, security/RLS authority, contractor authority, report dataset/calculation behavior, or Product Mode schema changed. First Owner Provisioning behavior changed only for omitted starter-kit selection, which is now product-mode-aware.
 
 Product Choice Signup Landing V1 closeout snapshot (2026-05-10):
 
@@ -501,6 +506,7 @@ Separation of concerns:
 - `entitlements` / `add-ons` control feature availability and write access (e.g., estimates, SMS, contractor portal)
 - `billing_mode` controls invoice workflow behavior (internal_invoicing vs external_billing)
 - `feature_flags` control rollout safety and optional behavior gates
+- Starter-kit selection is product-mode-aware only at provisioning default time: `cleaning_services` defaults to `cleaning_v1`; `hvac_service`, `ecc_hers`, `hybrid`, and missing product mode continue to default to v3. Explicit operator `--starter-kit-version v1|v2|v3` still overrides the default.
 - None of these concepts are equivalent and must remain separate in both planning and implementation
 
 Special case: Angkor Heating and Air

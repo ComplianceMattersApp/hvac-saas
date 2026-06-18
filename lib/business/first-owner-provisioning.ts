@@ -9,7 +9,7 @@ import {
   type PricebookSeedingStore,
   type StarterKitSeedSelection,
   type StarterKitVersion,
-  resolveStarterKitSeeds,
+  resolveStarterKitSeedsForProductMode,
 } from "@/lib/business/pricebook-seeding";
 import type { ProductMode } from "@/lib/business/product-mode-defaults";
 
@@ -211,7 +211,6 @@ export type FirstOwnerProvisioningClient = {
 const DEFAULT_BUSINESS_NAME = "Compliance Matters";
 const DEFAULT_PLAN_KEY: PlatformPlanKey = "starter";
 const DEFAULT_ENTITLEMENT_STATUS: EntitlementStatus = "trial";
-const DEFAULT_FIRST_OWNER_STARTER_KIT_VERSION: StarterKitVersion = "v3";
 const STANDARD_TRIAL_DURATION_DAYS = 30;
 
 function buildSeedPreviewForNewAccount(selection: StarterKitSeedSelection): PricebookSeedResult {
@@ -401,8 +400,9 @@ export async function provisionFirstOwnerAccount(params: {
   const entitlementPreset = normalizeEntitlementPreset(input.entitlementPreset);
   const selectedProductMode = normalizeProductMode(input.productMode);
   const entitlementPresetValues = buildEntitlementPresetValues(entitlementPreset);
-  const starterKitSelection = resolveStarterKitSeeds(
-    input.starterKitVersion ?? DEFAULT_FIRST_OWNER_STARTER_KIT_VERSION,
+  const starterKitSelection = resolveStarterKitSeedsForProductMode(
+    selectedProductMode,
+    input.starterKitVersion,
   );
   const pricebookSeedStore = createPricebookSeedingStore(client);
 

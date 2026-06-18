@@ -594,7 +594,6 @@ export async function submitSelfServeOnboardingForm(
       businessDisplayName,
       entitlementPreset: "standard",
       ...(selectedProductMode ? { productMode: selectedProductMode } : {}),
-      starterKitVersion: "v3",
       dryRun: false,
       operatorMetadata: {
         requestedBy: "public_self_serve_signup",

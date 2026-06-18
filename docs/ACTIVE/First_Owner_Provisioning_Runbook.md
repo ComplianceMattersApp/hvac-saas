@@ -35,14 +35,16 @@ Supported product mode values for --product-mode:
 Supported starter kit selector values for --starter-kit-version:
 - v1 (explicit legacy/manual option)
 - v2 (explicit legacy/manual option)
-- v3 (default when omitted, also explicit)
+- v3 (explicit legacy/HVAC-ECC starter option)
 
 Default behavior:
 - If --default-billing-mode is omitted or invalid, billing mode normalizes to external_billing.
 - If --entitlement-preset is omitted, provisioning uses standard.
-- If --starter-kit-version is omitted, provisioning uses starter kit v3.
+- If --starter-kit-version is omitted, provisioning uses the product-mode default:
+  - `cleaning_services` uses the Cleaning starter kit (`cleaning_v1`, 18 rows: 12 active, 6 inactive/deferred).
+  - `hvac_service`, `ecc_hers`, `hybrid`, and missing product mode use starter kit v3.
 - Starter kit v1 and v2 remain supported only when explicitly selected.
-- Starter kit v3 is supported explicitly and also matches the omitted-selector default.
+- Starter kit v3 is supported explicitly and remains the omitted-selector default for non-Cleaning modes.
 - Invalid `--starter-kit-version` values are rejected before provisioning executes.
 
 Entitlement preset behavior:
@@ -130,15 +132,26 @@ Expected dry-run behavior:
 - No writes are committed
 - Output lists what would be created/confirmed/patched
 - Output now includes structured `pricebookSeeding` preview
-- For a new account with omitted selector, dry-run should preview the V3 starter set (`97` rows)
+- For a new non-Cleaning account with omitted selector, dry-run should preview the V3 starter set (`97` rows)
+- For a new Cleaning account with omitted selector, dry-run should preview the Cleaning starter set (`18` rows)
 - With `--starter-kit-version v1`, dry-run should preview the V1 starter set (`12` rows)
 - With `--starter-kit-version v2`, dry-run should preview the V2 starter set (`23` rows)
 - With `--starter-kit-version v3`, dry-run should preview the V3 starter set (`97` rows)
-- For omitted selector, expected V3 metadata is:
+- For omitted selector in non-Cleaning mode, expected V3 metadata is:
   - `starter_kit_version = v3`
   - `seed_count = 97`
   - `active_seed_count = 91`
   - `inactive_seed_count = 6`
+- For omitted selector in Cleaning mode, expected Cleaning metadata is:
+  - `starter_kit_version = cleaning_v1`
+  - `seed_count = 18`
+  - `active_seed_count = 12`
+  - `inactive_seed_count = 6`
+- Cleaning starter kit closeout:
+  - Active defaults: General Cleaning; Deep Cleaning; Move-In / Move-Out Cleaning; Post-Construction Cleaning; Office / Commercial Cleaning; Restroom Detail / Sanitizing; Floor Cleaning; Window Cleaning; Trash / Debris Removal; Emergency / Same-Day Cleanup; Extra Labor Hour; Supplies / Consumables.
+  - Inactive/deferred add-ons: Carpet Spot Treatment; Carpet Cleaning; Floor Strip / Wax / Polish; Heavy Soil / Excessive Buildup Fee; After-Hours Service; Biohazard / Hazardous Cleanup Review.
+  - Optional add-ons intentionally omitted from this lean first kit: High Dusting; Wall Spot Cleaning; Interior Glass Cleaning; Refrigerator Interior Cleaning; Oven Interior Cleaning; Cabinet Interior Cleaning. These remain deferred because this slice is one-off readiness only and does not introduce detail-room, appliance-detail, checklist, or recurring workflow truth.
+  - Checklist tasks are not seeded as Pricebook rows.
 - Dry-run output includes selected starter kit metadata (`starter_kit_version`, `seed_count`, `active_seed_count`, `inactive_seed_count`)
 - Dry-run output includes structured product-mode capture readiness (`selectedProductMode`, `applyReady`, `action`, `issues`)
 - Dry-run remains non-mutating and must not send invites
@@ -521,7 +534,7 @@ Operator usage examples:
 Product mode is separate from:
 - `--entitlement-preset`: controls trial vs. comped entitlement status
 - `--default-billing-mode`: controls invoice workflow (internal_invoicing vs. external_billing)
-- `--starter-kit-version`: controls pricebook seeding (v1, v2, v3)
+- `--starter-kit-version`: explicitly overrides pricebook seeding to v1, v2, or v3; when omitted, product mode chooses the default starter kit.
 - Tier (`plan_key`): business package level
 - Feature flags: rollout safety gates
 

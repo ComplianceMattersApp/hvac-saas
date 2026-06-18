@@ -4,6 +4,7 @@ import {
   STARTER_KIT_V1_SEEDS,
   STARTER_KIT_V2_SEEDS,
   STARTER_KIT_V3_SEEDS,
+  STARTER_KIT_CLEANING_SEEDS,
   type PricebookSeedInsertRow,
 } from "@/lib/business/pricebook-seeding";
 
@@ -1131,5 +1132,47 @@ describe("provisionFirstOwnerAccount", () => {
       }),
     );
     expect(store.accountSettingsByOwnerId[ownerId]?.product_mode).toBe("cleaning_services");
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({
+        starter_kit_version: "cleaning_v1",
+        seed_count: STARTER_KIT_CLEANING_SEEDS.length,
+        active_seed_count: 12,
+        inactive_seed_count: 6,
+      }),
+    );
+    expect(store.pricebookSeedRowsByOwnerId[ownerId]).toHaveLength(STARTER_KIT_CLEANING_SEEDS.length);
+    expect(
+      store.pricebookSeedRowsByOwnerId[ownerId]?.some((row) =>
+        row.seed_key.startsWith("starter_cleaning_v1."),
+      ),
+    ).toBe(true);
+  });
+
+  it("honors explicit legacy starter kit overrides for cleaning_services", async () => {
+    const store = createStore();
+    const client = createMockClient(store);
+
+    const result = await provisionFirstOwnerAccount({
+      client,
+      input: {
+        targetEmail: "owner@example.com",
+        productMode: "cleaning_services",
+        starterKitVersion: "v3",
+      },
+    });
+
+    const ownerId = result.accountOwnerUserId as string;
+    expect(result.status).toBe("provisioned");
+    expect(result.pricebookSeeding).toEqual(
+      expect.objectContaining({
+        starter_kit_version: "v3",
+        seed_count: STARTER_KIT_V3_SEEDS.length,
+      }),
+    );
+    expect(
+      store.pricebookSeedRowsByOwnerId[ownerId]?.every((row) =>
+        row.seed_key.startsWith("starter_v3."),
+      ),
+    ).toBe(true);
   });
 });

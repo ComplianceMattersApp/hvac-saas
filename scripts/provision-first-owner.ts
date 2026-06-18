@@ -22,7 +22,7 @@ type ParsedArgs = {
   defaultBillingMode?: string;
   productMode?: ProductMode;
   entitlementPreset: "standard" | "internal_comped";
-  starterKitVersion: "v1" | "v2" | "v3";
+  starterKitVersion?: "v1" | "v2" | "v3";
   resendInvite: boolean;
   apply: boolean;
 };
@@ -178,7 +178,7 @@ export function parseProvisionFirstOwnerArgs(argv: string[]): ParsedArgs {
         ? (() => {
             throw new Error("Invalid --starter-kit-version (expected: v1|v2|v3)");
           })()
-        : "v3";
+        : undefined;
 
   const productMode =
     productModeRaw === "hvac_service" ||
