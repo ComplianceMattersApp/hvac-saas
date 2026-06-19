@@ -1,7 +1,7 @@
 # Checklist Foundation V1 Model Spec
 
 Status: ACTIVE planning/model spec
-Mode: V1A model lock and UX contract only
+Mode: V1A model lock plus V1B dormant schema foundation
 Authority: Domain model spec subordinate to Active Spine and current product-mode docs
 Date: 2026-06-18
 
@@ -414,6 +414,24 @@ Deferred beyond V1A:
 - Preserve dormant posture: no UI/actions/runtime behavior.
 - Add schema/RLS/read-shape tests.
 
+V1B closeout status:
+
+- Complete in repository as dormant schema foundation.
+- Migration: `supabase/migrations/20260619120000_checklist_foundation_v1b.sql`.
+- Tables added:
+  - `checklist_templates`
+  - `checklist_template_sections`
+  - `checklist_template_items`
+  - `job_checklist_runs`
+  - `job_checklist_item_results`
+- The migration adds account ownership, active/archive posture, simple response/status constraints, template/run/result snapshot fields, one active checklist run per job, and one result row per run/template item where a template item is present.
+- Same-account integrity is enforced by assertion triggers for section-template, item-template/section, run-job/template, and result-run/template-item relationships.
+- RLS is enabled on all five tables with account-scoped internal SELECT/INSERT/UPDATE policies. No DELETE policies are added.
+- `photo_required_placeholder` remains model-only; no storage, upload, attachment linkage, or photo enforcement behavior is added.
+- Runtime behavior remains unchanged: no UI, server actions, seed data, job closeout gating, issue queue, recurring integration, customer report, billing/payment behavior, Pricebook behavior, job event behavior, or production migration apply.
+- Focused validation: `npx.cmd vitest run lib/checklists/__tests__/checklist-schema-foundation.test.ts` passed (`7` tests).
+- V1C remains Template Admin Read/Create/Edit. V1D remains Job Checklist Run Attach/Start.
+
 ### V1C - Template Admin Read/Create/Edit
 
 - Add Owner/Admin template management.
@@ -503,4 +521,3 @@ V1A is accepted when:
 - non-goals and deferred items are explicit
 - V1B schema acceptance criteria are locked
 - no runtime behavior changes are introduced
-
