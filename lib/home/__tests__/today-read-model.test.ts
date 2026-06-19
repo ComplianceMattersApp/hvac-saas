@@ -22,6 +22,7 @@ const baseCounts = {
   onHold: 0,
   failed: 0,
   closeoutReady: 0,
+  contractorIntake: 0,
 };
 
 function job(overrides: Partial<TodayJobSummary> = {}): TodayJobSummary {
@@ -292,6 +293,52 @@ describe("buildPriorityChips", () => {
     expect(withoutTech?.count).toBe(3);
     expect(withoutTech?.urgent).toBe(true);
     expect(withoutTech?.href).toBe("/ops");
+  });
+
+  it("adds pending contractor intake chip for admin and office", () => {
+    for (const role of ["admin", "office"] as const) {
+      const chips = buildPriorityChips({
+        productMode: "hybrid",
+        role,
+        priorityCounts: { ...baseCounts, contractorIntake: 4 },
+        servicePlansOverdue: 0,
+        openInvoiceCount: 0,
+        canViewBusinessPulse: role === "admin",
+      });
+
+      expect(chips.find((c) => c.key === "contractor_intake")).toMatchObject({
+        label: "Contractor Intake",
+        count: 4,
+        href: "/ops?bucket=contractor_intake#ops-workspace",
+        tone: "info",
+        urgent: false,
+      });
+    }
+  });
+
+  it("does not add contractor intake chip when count is zero or role is tech/billing", () => {
+    const officeEmpty = buildPriorityChips({
+      productMode: "hybrid",
+      role: "office",
+      priorityCounts: { ...baseCounts, contractorIntake: 0 },
+      servicePlansOverdue: 0,
+      openInvoiceCount: 0,
+      canViewBusinessPulse: false,
+    });
+    expect(officeEmpty.find((c) => c.key === "contractor_intake")).toBeUndefined();
+
+    for (const role of ["tech", "billing"] as const) {
+      const chips = buildPriorityChips({
+        productMode: "hybrid",
+        role,
+        priorityCounts: { ...baseCounts, contractorIntake: 4 },
+        servicePlansOverdue: 0,
+        openInvoiceCount: 0,
+        canViewBusinessPulse: role === "billing",
+      });
+
+      expect(chips.find((c) => c.key === "contractor_intake")).toBeUndefined();
+    }
   });
 
   it("flags exceptions chip as urgent", () => {

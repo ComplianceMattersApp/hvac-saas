@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Clock3 } from "lucide-react";
 import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
+import { createAdminClient } from "@/lib/supabase/server";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import {
   landingPathForDualContextAccess,
@@ -94,6 +95,12 @@ import {
   listActivePermitRequestQueueRowsIfAvailable,
   type PermitRequestQueueRow,
 } from "@/lib/permits/permit-requests-read-model";
+import {
+  CONTRACTOR_INTAKE_QUEUE_PAGE_LIMIT,
+  countPendingContractorIntakeQueueRows,
+  listPendingContractorIntakeQueueRows,
+  type ContractorIntakeQueueRow,
+} from "@/lib/ops/contractor-intake-queue";
 import { listInternalPermitRequestAttachmentsForAccount } from "@/lib/permits/permit-request-attachments-read-model";
 import { isPermitWorkflowEnabledForAccountOwner } from "@/lib/permits/permit-workflow-gate";
 import {
@@ -209,18 +216,20 @@ const OPS_TABS: { key: BucketKey; label: string }[] = [
   { key: "recent_closed", label: "Recently Closed" },
 ];
 
-type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout" | "permits";
+type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout" | "contractor_intake" | "permits";
 
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "need_to_schedule") return "pending";
   if (normalized === "scheduled") return "field_work";
+  if (normalized === "intake") return "contractor_intake";
   if (
     normalized === "pending" ||
     normalized === "field_work" ||
     normalized === "waiting" ||
     normalized === "exceptions" ||
     normalized === "closeout" ||
+    normalized === "contractor_intake" ||
     normalized === "permits"
   ) {
     return normalized;
@@ -383,6 +392,7 @@ export default async function OpsPage({
   }
 
   const internalUser = actorContext.internalUser;
+  const admin = createAdminClient();
   if (opsTimingEnabled) console.log(`[ops:requestActorContext] ${Date.now() - _t_requestActorContext}ms`);
 
   const canViewFailedPaymentAttention = canViewFinancialRegister({
@@ -753,6 +763,7 @@ function subtractBusinessDays(date: Date, days: number) {
       scheduledOpenRowsRes,
       closeoutCountRowsRes,
       closeoutPermitExceptionRowsRes,
+      contractorIntakeCount,
       unreadContractorUpdates,
       unreadNewWorkRequests,
       activePermitRequestsResult,
@@ -762,6 +773,11 @@ function subtractBusinessDays(date: Date, days: number) {
       scheduledOpenRowsQ,
       closeoutCountRowsQ,
       closeoutPermitExceptionRowsQ,
+      countPendingContractorIntakeQueueRows({
+        supabase: admin,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        contractorId: contractorScopeFilter,
+      }),
       listInternalContractorUpdateAwareness({ limit: 100, onlyUnread: true }),
       listInternalNewWorkRequestAwareness({ limit: 100, onlyUnread: true }),
       permitWorkflowEnabled
@@ -873,6 +889,12 @@ function subtractBusinessDays(date: Date, days: number) {
         count: closeoutCount,
         href: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
       },
+      {
+        key: "contractor_intake",
+        label: "Contractor Intake",
+        count: contractorIntakeCount,
+        href: `/ops${buildQueryString({ bucket: "contractor_intake", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
+      },
       ...(permitRequestsSchemaAvailable
         ? [{
             key: "permits",
@@ -895,11 +917,13 @@ function subtractBusinessDays(date: Date, days: number) {
       waiting: "waiting",
       exceptions: "exceptions",
       closeout: "closeout",
+      contractor_intake: "contractor_intake",
       permits: "permits",
     };
     const coreBoardWorkspaceKeys = [
       "need_to_schedule",
       "field_work",
+      "contractor_intake",
       "waiting",
       "exceptions",
       "closeout",
@@ -996,6 +1020,15 @@ function subtractBusinessDays(date: Date, days: number) {
         return loadCloseoutWorkspaceRows();
       }
 
+      if (workspaceKey === "contractor_intake") {
+        return listPendingContractorIntakeQueueRows({
+          supabase: admin,
+          accountOwnerUserId: internalUser.account_owner_user_id,
+          contractorId: contractorScopeFilter,
+          limit: CONTRACTOR_INTAKE_QUEUE_PAGE_LIMIT,
+        });
+      }
+
       let queueQ = supabase
         .from("jobs")
         .select(workspaceSelect)
@@ -1053,13 +1086,21 @@ function subtractBusinessDays(date: Date, days: number) {
     const selectedWorkspaceSection =
       visibleWorkspaceSections.find((section) => section.key === selectedWorkspaceKey) ?? visibleWorkspaceSections[0];
     const selectedPermitRows = selectedWorkspaceKey === "permits" ? activePermitRequestRows : [];
+    const selectedContractorIntakeRows =
+      selectedWorkspaceKey === "contractor_intake"
+        ? ((selectedWorkspaceSection?.previewRows ?? []) as ContractorIntakeQueueRow[])
+        : [];
     const selectedPreviewRows =
-      selectedWorkspaceKey === "permits"
+      selectedWorkspaceKey === "permits" || selectedWorkspaceKey === "contractor_intake"
         ? []
         : visibleWorkspaceSections.flatMap((section) => section.previewRows);
     const selectedWorkspaceTab = {
       ...visibleWorkspaceSections[0],
-      count: selectedWorkspaceKey === "permits" ? selectedPermitRows.length : selectedPreviewRows.length,
+      count: selectedWorkspaceKey === "permits"
+        ? selectedPermitRows.length
+        : selectedWorkspaceKey === "contractor_intake"
+        ? selectedContractorIntakeRows.length
+        : selectedPreviewRows.length,
     };
     const workspaceQueueChips = coreBoardWorkspaceKeys.map((workspaceKey) => {
       const section =
@@ -1077,6 +1118,8 @@ function subtractBusinessDays(date: Date, days: number) {
           ? "exceptions"
           : workspaceKey === "closeout"
           ? "closeout"
+          : workspaceKey === "contractor_intake"
+          ? "contractor_intake"
           : workspaceKey === "permits"
           ? "permits"
           : "all";
@@ -1089,6 +1132,8 @@ function subtractBusinessDays(date: Date, days: number) {
           ? "Scheduling"
           : workspaceKey === "waiting"
           ? "Waiting"
+          : workspaceKey === "contractor_intake"
+          ? "Intake"
           : workspaceKey === "permits"
           ? "Permits"
           : section.label,
@@ -1229,9 +1274,15 @@ function subtractBusinessDays(date: Date, days: number) {
     const selectedWorkspaceItemCount =
       selectedWorkspaceKey === "permits"
         ? selectedPermitRows.length
+        : selectedWorkspaceKey === "contractor_intake"
+        ? selectedContractorIntakeRows.length
         : selectedWorkspaceSection?.previewRows.length ?? 0;
     const selectedWorkspaceItemNoun =
-      selectedWorkspaceKey === "permits" ? "permit requests" : "jobs";
+      selectedWorkspaceKey === "permits"
+        ? "permit requests"
+        : selectedWorkspaceKey === "contractor_intake"
+        ? "intake submissions"
+        : "jobs";
     const shouldExpandPermitCreateForm =
       selectedWorkspaceKey === "permits" && createIntent === "permit_request";
     const selectedPermitAttachmentResult = selectedPermitRows.length
@@ -1465,14 +1516,24 @@ function subtractBusinessDays(date: Date, days: number) {
 
           <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
-              <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
-                <div className="text-[15px] font-semibold tracking-tight text-slate-950">{selectedWorkspaceSection?.label ?? selectedWorkspaceTab.label}</div>
-                <div className="text-xs text-slate-600">
-                  {selectedWorkspaceItemCount} {selectedWorkspaceItemNoun}
-                </div>
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Active Queue</div>
+              <div className="text-[15px] font-semibold tracking-tight text-slate-950">{selectedWorkspaceSection?.label ?? selectedWorkspaceTab.label}</div>
+              <div className="text-xs text-slate-600">
+                {selectedWorkspaceItemCount} {selectedWorkspaceItemNoun}
               </div>
             </div>
+            {selectedWorkspaceKey === "contractor_intake" ? (
+              <Link
+                href={`/ops/contractor-intake/export${buildQueryString({
+                  contractor: contractorScopeFilter ?? "",
+                })}`}
+                className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
+              >
+                Export CSV
+              </Link>
+            ) : null}
+          </div>
 
             {selectedWorkspaceKey === "permits" ? (
               <details
@@ -2170,6 +2231,64 @@ function subtractBusinessDays(date: Date, days: number) {
                     </div>
                     );
                   })}
+                </div>
+              )
+            ) : selectedWorkspaceKey === "contractor_intake" ? (
+              selectedContractorIntakeRows.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                  <div>No contractor-submitted work is waiting for review.</div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {selectedContractorIntakeRows.map((submission) => (
+                    <div key={submission.id} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <Link href={submission.detailHref} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
+                            {submission.proposedTitle}
+                          </Link>
+                          <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700">
+                            {submission.customerDisplay} - {submission.addressDisplay}
+                          </div>
+                        </div>
+                        <Link href={submission.detailHref} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]">
+                          Review Intake
+                        </Link>
+                      </div>
+                      <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-2">
+                        <div>
+                          <span className="font-medium text-slate-500">Contractor:</span>{" "}
+                          {submission.contractorName}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-500">Submitted:</span>{" "}
+                          {submission.submittedAgeDays} days ago - {submission.submittedAtDisplay}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-500">Proposed customer:</span>{" "}
+                          {submission.customerDisplay}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-500">Address:</span>{" "}
+                          {submission.addressDisplay}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-500">Job/project:</span>{" "}
+                          {submission.jobTypeLabel} / {submission.projectTypeLabel}
+                        </div>
+                        <div>
+                          <span className="font-medium text-slate-500">Review status:</span>{" "}
+                          {submission.reviewStatus}
+                        </div>
+                        {submission.notesPreview ? (
+                          <div className="sm:col-span-2">
+                            <span className="font-medium text-slate-500">Notes:</span>{" "}
+                            {submission.notesPreview}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )
             ) : !selectedWorkspaceSection || selectedWorkspaceSection.previewRows.length === 0 ? (

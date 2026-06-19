@@ -54,6 +54,7 @@ import {
   hasAnyActiveTechAssignment,
   isTodayWithoutTechCandidateJob,
 } from "@/lib/ops/without-tech-predicate";
+import { countPendingContractorIntakeQueueRows } from "@/lib/ops/contractor-intake-queue";
 
 // -----------------------------------------------------------------------------
 // Public types
@@ -643,6 +644,7 @@ async function safeCount(
 async function safeLoadPriorityCounts(params: {
   supabase: any;
   accountOwnerUserId: string;
+  role: InternalRole;
   today: string;
 }): Promise<{
   scheduledTodayWithoutTech: number | null;
@@ -652,6 +654,7 @@ async function safeLoadPriorityCounts(params: {
   onHold: number | null;
   failed: number | null;
   closeoutReady: number | null;
+  contractorIntake: number | null;
 }> {
   const { supabase, today } = params;
 
@@ -708,6 +711,7 @@ async function safeLoadPriorityCounts(params: {
     onHold,
     failed,
     closeoutReady,
+    contractorIntake,
   ] = await Promise.all([
     scheduledTodayWithoutTechPromise,
     safeCount(supabase, "jobs", (q) =>
@@ -728,6 +732,12 @@ async function safeLoadPriorityCounts(params: {
     safeCount(supabase, "jobs", (q) =>
       base(q).in("ops_status", ["invoice_required", "paperwork_required"]).neq("status", "cancelled"),
     ),
+    params.role === "admin" || params.role === "office"
+      ? countPendingContractorIntakeQueueRows({
+          supabase,
+          accountOwnerUserId: params.accountOwnerUserId,
+        }).catch(() => null)
+      : Promise.resolve(null),
   ]);
 
   return {
@@ -738,6 +748,7 @@ async function safeLoadPriorityCounts(params: {
     onHold,
     failed,
     closeoutReady,
+    contractorIntake,
   };
 }
 
@@ -1030,6 +1041,7 @@ export type NextBestActionInputs = {
     onHold: number | null;
     failed: number | null;
     closeoutReady: number | null;
+    contractorIntake: number | null;
   };
   openInvoiceCount: number | null;
   openInvoiceBalanceCents: number | null;
@@ -1447,6 +1459,20 @@ export function buildPriorityChips(params: {
       href: "/ops/call-list",
       tone: "warn",
       urgent: (params.priorityCounts.needScheduling ?? 0) >= 5,
+    });
+  }
+
+  if (
+    (params.role === "admin" || params.role === "office") &&
+    (params.priorityCounts.contractorIntake ?? 0) > 0
+  ) {
+    pushChip({
+      key: "contractor_intake",
+      label: "Contractor Intake",
+      count: params.priorityCounts.contractorIntake ?? 0,
+      href: "/ops?bucket=contractor_intake#ops-workspace",
+      tone: "info",
+      urgent: false,
     });
   }
 
@@ -1942,6 +1968,7 @@ async function buildTodayReadModelForInternalActor(
     safeLoadPriorityCounts({
       supabase,
       accountOwnerUserId,
+      role,
       today,
     }),
   );

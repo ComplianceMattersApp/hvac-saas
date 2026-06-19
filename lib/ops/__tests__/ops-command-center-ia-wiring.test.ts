@@ -110,9 +110,11 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('waiting: "waiting"');
     expect(opsPageSource).toContain('exceptions: "exceptions"');
     expect(opsPageSource).toContain('closeout: "closeout"');
+    expect(opsPageSource).toContain('contractor_intake: "contractor_intake"');
     expect(opsPageSource).toContain("const coreBoardWorkspaceKeys = [");
     expect(opsPageSource).toContain('"need_to_schedule",');
     expect(opsPageSource).toContain('"field_work",');
+    expect(opsPageSource).toContain('"contractor_intake",');
     expect(opsPageSource).toContain('"waiting",');
     expect(opsPageSource).toContain('"exceptions",');
     expect(opsPageSource).toContain('"closeout",');
@@ -127,6 +129,8 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("bucket: chipBucket");
     expect(opsPageSource).toContain('key: "field_work"');
     expect(opsPageSource).toContain('label: "Field Work"');
+    expect(opsPageSource).toContain('label: "Contractor Intake"');
+    expect(opsPageSource).toContain('? "Intake"');
     expect(opsPageSource).toContain("{chip.mobileLabel} · {chip.count}");
     expect(opsPageSource).toContain("{chip.label} · {chip.count}");
   });
@@ -139,7 +143,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("restores Field Work through the existing scheduled field-work read model", () => {
-    expect(opsPageSource).toContain('type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout" | "permits";');
+    expect(opsPageSource).toContain('type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout" | "contractor_intake" | "permits";');
     expect(opsPageSource).toContain('if (normalized === "scheduled") return "field_work";');
     expect(opsPageSource).toContain('} else if (workspaceKey === "field_work") {');
     expect(opsPageSource).toContain('.eq("field_complete", false)');
@@ -275,5 +279,28 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(exceptionsQueuePageSource).toContain('href="/ops"');
     expect(withoutTechQueuePageSource).toContain("No coverage gaps right now.");
     expect(withoutTechQueuePageSource).toContain('href="/ops"');
+  });
+
+  it("adds pending contractor intake as an operational queue without using notifications as truth", () => {
+    expect(opsPageSource).toContain("countPendingContractorIntakeQueueRows");
+    expect(opsPageSource).toContain("listPendingContractorIntakeQueueRows");
+    expect(opsPageSource).toContain("CONTRACTOR_INTAKE_QUEUE_PAGE_LIMIT");
+    expect(opsPageSource).toContain('if (normalized === "intake") return "contractor_intake";');
+    expect(opsPageSource).toContain('normalized === "contractor_intake"');
+    expect(opsPageSource).toContain('selectedWorkspaceKey === "contractor_intake"');
+    expect(opsPageSource).toContain('bucket: "contractor_intake"');
+    expect(opsPageSource).toContain("/ops/contractor-intake/export");
+    expect(opsPageSource).toContain("No contractor-submitted work is waiting for review.");
+    expect(opsPageSource).toContain("Review Intake");
+    expect(opsPageSource).toContain("selectedContractorIntakeRows");
+  });
+
+  it("keeps the existing Ops workbench chips in place", () => {
+    expect(opsPageSource).toContain('label: "Needs Scheduling"');
+    expect(opsPageSource).toContain('label: "Field Work"');
+    expect(opsPageSource).toContain('label: "Waiting / Pending Info"');
+    expect(opsPageSource).toContain('label: "Exceptions"');
+    expect(opsPageSource).toContain('label: "Closeout & Review"');
+    expect(opsPageSource).toContain('label: "Permits"');
   });
 });
