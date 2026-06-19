@@ -33,11 +33,14 @@ describe("product surface profile", () => {
     expect(resolveProductSurfaceProfile("hvac_service").surfaces.equipment).toBe(true);
     expect(resolveProductSurfaceProfile("hvac_service").surfaces.eccTests).toBe(false);
     expect(resolveProductSurfaceProfile("hvac_service").surfaces.permits).toBe(true);
+    expect(resolveProductSurfaceProfile("hvac_service").surfaces.contractorRaterHandoff).toBe(false);
     expect(resolveProductSurfaceProfile("ecc_hers").surfaces.eccTests).toBe(true);
     expect(resolveProductSurfaceProfile("ecc_hers").surfaces.permits).toBe(true);
     expect(resolveProductSurfaceProfile("ecc_hers").surfaces.certs).toBe(true);
+    expect(resolveProductSurfaceProfile("ecc_hers").surfaces.contractorRaterHandoff).toBe(true);
     expect(resolveProductSurfaceProfile("hybrid").surfaces.eccTests).toBe(true);
     expect(resolveProductSurfaceProfile("hybrid").surfaces.equipment).toBe(true);
     expect(resolveProductSurfaceProfile("hybrid").surfaces.permits).toBe(true);
+    expect(resolveProductSurfaceProfile("hybrid").surfaces.contractorRaterHandoff).toBe(true);
   });
 });

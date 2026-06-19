@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
+import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
 import { createClient } from "@/lib/supabase/server";
 
@@ -92,11 +93,13 @@ export default async function OpsAdminPage() {
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
+  const surfaceProfile = resolveProductSurfaceProfile(productMode);
+  const showContractorCollaboration = surfaceProfile.surfaces.contractorRaterHandoff;
   const requiredItems = readiness.items.filter((item) => item.status !== "optional");
   const incompleteRequiredItems = requiredItems.filter((item) => item.status === "incomplete");
   const optionalItems = readiness.items.filter((item) => item.status === "optional");
   const visibleOptionalItems = optionalItems.filter((item) => {
-    if (item.key === "contractor_directory" && productMode === "hvac_service") return false;
+    if (item.key === "contractor_directory" && !showContractorCollaboration) return false;
     return true;
   });
   const readinessPercent =
@@ -114,8 +117,7 @@ export default async function OpsAdminPage() {
     cleaning_services: {
       badge: "Cleaning",
       heroHint: "Cleaning workspace. Service job tools stay primary while cleaning workflows mature.",
-      peopleCopy:
-        "Start with People & Access, then use Internal Team. Contractor tools stay optional for outside collaboration.",
+      peopleCopy: "Start with People & Access, then use Internal Team for office staff, cleaners, and crew setup.",
     },
     ecc_hers: {
       badge: "ECC/HERS",
@@ -137,7 +139,10 @@ export default async function OpsAdminPage() {
       section: "people",
       eyebrow: "People",
       title: "People & Access",
-      description: "Find internal staff, contractor users, invites, and portal recovery actions.",
+      description:
+        productMode === "cleaning_services"
+          ? "Find team members, invites, and account access recovery actions."
+          : "Find internal staff, contractor users, invites, and portal recovery actions.",
       href: "/ops/admin/users",
       ctaLabel: "Open workspace",
       enabled: true,
@@ -146,7 +151,10 @@ export default async function OpsAdminPage() {
       section: "people",
       eyebrow: "People",
       title: "Internal Team",
-      description: "Manage employees, staff, and technicians inside your company.",
+      description:
+        productMode === "cleaning_services"
+          ? "Manage employees, cleaners, and crew members inside your company."
+          : "Manage employees, staff, and technicians inside your company.",
       href: "/ops/admin/internal-users",
       ctaLabel: "Open workspace",
       enabled: true,
@@ -239,10 +247,9 @@ export default async function OpsAdminPage() {
     if (card.section !== "people") return false;
     return !collaborationCardHrefs.has(card.href);
   });
-  const collaborationCards =
-    productMode === "hvac_service"
-      ? []
-      : cards.filter((card) => card.section === "people" && collaborationCardHrefs.has(card.href));
+  const collaborationCards = showContractorCollaboration
+    ? cards.filter((card) => card.section === "people" && collaborationCardHrefs.has(card.href))
+    : [];
   const organizationCards = cards.filter((card) => card.section === "organization");
   const peopleSectionDescription =
     productMode === "hvac_service"
