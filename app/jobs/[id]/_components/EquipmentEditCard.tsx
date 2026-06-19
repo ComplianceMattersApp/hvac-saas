@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useFormStatus } from "react-dom";
 import { updateJobEquipmentFromForm, deleteJobEquipmentFromForm } from "@/lib/actions/job-actions";
 import SubmitButton from "@/components/SubmitButton";
 import {
@@ -9,6 +10,25 @@ import {
   equipmentUsesRefrigerant,
   isHeatingOnlyEquipment,
 } from "@/lib/utils/equipment-display";
+
+function DeleteEquipmentSpinner() {
+  return (
+    <svg className="mr-1.5 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+    </svg>
+  );
+}
+
+function DeleteEquipmentButton({ className }: { className: string }) {
+  const { pending } = useFormStatus();
+  return (
+    <button type="submit" disabled={pending} className={className}>
+      {pending ? <DeleteEquipmentSpinner /> : null}
+      Delete
+    </button>
+  );
+}
 
 type SystemRow = { id: string; name: string | null };
 
@@ -109,12 +129,7 @@ export default function EquipmentEditCard({
             <form action={deleteJobEquipmentFromForm}>
               <input type="hidden" name="job_id" value={jobId} />
               <input type="hidden" name="equipment_id" value={eq.id} />
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100"
-              >
-                Delete
-              </button>
+              <DeleteEquipmentButton className="inline-flex items-center justify-center rounded bg-red-50 px-3 py-1.5 text-sm font-medium text-red-700 transition-colors hover:bg-red-100" />
             </form>
           </div>
         </div>

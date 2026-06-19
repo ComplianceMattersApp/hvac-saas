@@ -14,6 +14,15 @@ type ContactLoggingQuickActionsProps = {
 
 const CONTACT_LOGGING_RESTORE_KEY_PREFIX = "job-detail-contact-logging-restore:";
 
+function ContactLoggingSpinner() {
+  return (
+    <svg className="mr-1.5 h-4 w-4 animate-spin" viewBox="0 0 24 24" fill="none">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+    </svg>
+  );
+}
+
 function ContactLoggingSubmitButton(props: {
   label: string;
   buttonClassName: string;
@@ -45,6 +54,7 @@ function ContactLoggingSubmitButton(props: {
       }}
       className={`${buttonClassName} ${isActive ? "cursor-not-allowed opacity-60" : ""}`.trim()}
     >
+      {isActive ? <ContactLoggingSpinner /> : null}
       {isActive ? "Recording..." : label}
     </button>
   );

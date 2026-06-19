@@ -26,6 +26,7 @@ import {
   sendWorkflowEccMilestoneToAuthorizedRaterFromForm,
   updateWorkflowMilestoneStatusFromForm,
 } from "@/lib/workflows/actions";
+import MilestoneStatusSaveButton from "./MilestoneStatusSaveButton";
 
 type DeferredWorkflowMilestonesPanelBodyProps = {
   accountOwnerUserId: string;
@@ -211,12 +212,7 @@ function MilestoneStatusUpdateForm({
           </option>
         ))}
       </select>
-      <button
-        type="submit"
-        className="h-7 rounded-md border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50"
-      >
-        Save
-      </button>
+      <MilestoneStatusSaveButton className="h-7 rounded-md border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50" />
     </form>
   );
 }

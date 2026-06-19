@@ -21,6 +21,7 @@ import {
 } from "@/lib/ops/closeout-queue";
 import SubmitButton from "@/components/SubmitButton";
 import ContractorFilter from "./_components/ContractorFilter";
+import CloseoutSubmitButton from "./_components/CloseoutSubmitButton";
 import { getActiveJobAssignmentDisplayMap } from "@/lib/staffing/human-layer";
 import { getCloseoutNeeds, getCloseoutQueueNextStepLabel } from "@/lib/utils/closeout";
 import { formatBusinessDateUS, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
@@ -583,9 +584,9 @@ export default async function CloseoutQueuePage({
                             />
                           </label>
                           <p className="text-[10px] text-slate-600">Verify only after confirming the money was received.</p>
-                          <SubmitButton className={compactActionClass} loadingText="Verifying...">
+                          <CloseoutSubmitButton className={compactActionClass}>
                             Confirm Payment
-                          </SubmitButton>
+                          </CloseoutSubmitButton>
                         </form>
                         <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2">
                           <input type="hidden" name="field_payment_report_id" value={item.reportId} />
@@ -719,9 +720,9 @@ export default async function CloseoutQueuePage({
                           <input type="hidden" name="job_id" value={jobId} />
                           <input type="hidden" name="return_to" value={`${currentQueueHref}#job-${jobId}`} />
                           <input type="hidden" name="success_notice" value="external_billing_complete" />
-                          <SubmitButton className={compactActionClass} loadingText="Marking...">
+                          <CloseoutSubmitButton className={compactActionClass}>
                             External Billing Complete
-                          </SubmitButton>
+                          </CloseoutSubmitButton>
                         </form>
                       ) : null}
                     </div>
