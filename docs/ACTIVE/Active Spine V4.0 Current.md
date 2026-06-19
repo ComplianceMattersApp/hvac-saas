@@ -42,7 +42,10 @@ Current product posture: read-only payments/deposits reporting, manual saved-car
 Current billing policy: platform application fee policy is `50` basis points (`0.50%`). Source-of-truth boundaries remain unchanged: app payment truth remains gross customer payment truth, platform application fee remains Stripe/platform revenue only, no customer-facing surcharge line item is introduced, and invoice paid/balance truth is not distorted. Standard new-account trial policy is `30` days for newly created trial entitlements. Existing entitlement truth is not retroactively changed by code; the one known active trial was extended separately by controlled operator action.
 
 **Note on Product Modes:**
-See [Compliance_Matters_Business_Layer_Roadmap.md � 3 Product Mode Matrix](./Compliance_Matters_Business_Layer_Roadmap.md#3-product-mode-matrix--eccherms-version-vs-hvac-service-version) for architectural guidance on the two product configurations (ECC/HERS and HVAC Service). Future development should respect product-mode separation to prevent buyer-story drift.
+See [Compliance_Matters_Business_Layer_Roadmap.md � 3 Product Mode Matrix](./Compliance_Matters_Business_Layer_Roadmap.md#3-product-mode-matrix--eccherms-version-vs-hvac-service-version) for architectural guidance on product configurations and packaging separation. Current product-mode work includes ECC/HERS, HVAC Service, Hybrid, and Cleaning Services presentation/defaulting posture. Future development should respect product-mode separation to prevent buyer-story drift.
+
+**Checklist Foundation V1:**
+Cleaning-first checklist model boundaries are locked in [Checklist_Foundation_V1_Model_Spec.md](./Checklist_Foundation_V1_Model_Spec.md). Checklist is reusable task/proof structure and job-attached completion evidence; it is not Pricebook, Work Items, invoice/payment truth, recurring-service truth, crew assignment, inspection scoring, timeline, attachments, or customer-facing report truth. V1A is docs/model only and does not authorize schema, migrations, UI writes, server actions, storage behavior, or runtime checklist behavior.
 
 **Release Scope Lock (May 2026):**
 Owner-release scope is locked. See [docs/ACTIVE/Release_Scope_Lock_and_Post_Launch_Roadmap.md](./Release_Scope_Lock_and_Post_Launch_Roadmap.md) for the canonical current decision surface covering:
