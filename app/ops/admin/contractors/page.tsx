@@ -143,17 +143,32 @@ export default async function AdminContractorsPage({
     }
   }
 
+  // N+1 fix: this previously called admin.auth.admin.getUserById() once per
+  // user_id (one auth request per contractor membership). Auth users are
+  // paginated, not filterable by id, so we page through listUsers() once for
+  // the whole request and build a lookup map, then resolve each userId from
+  // that map below.
   const emailConfirmedMap = new Map<string, boolean | null>();
-  await Promise.all(
-    userIds.map(async (id) => {
-      const { data, error: userErr } = await admin.auth.admin.getUserById(id);
-      if (userErr || !data?.user) {
-        emailConfirmedMap.set(id, null);
-        return;
+  if (userIds.length > 0) {
+    const authUserById = new Map<string, boolean>();
+    const perPage = 1000;
+    let page = 1;
+    while (true) {
+      const { data, error: listErr } = await admin.auth.admin.listUsers({ page, perPage });
+      if (listErr) throw listErr;
+
+      for (const authUser of data?.users ?? []) {
+        authUserById.set(String(authUser.id), Boolean((authUser as any).email_confirmed_at));
       }
-      emailConfirmedMap.set(id, Boolean((data.user as any).email_confirmed_at));
-    }),
-  );
+
+      if (!data?.users || data.users.length < perPage) break;
+      page += 1;
+    }
+
+    for (const id of userIds) {
+      emailConfirmedMap.set(id, authUserById.has(id) ? authUserById.get(id)! : null);
+    }
+  }
 
   const membershipByContractor = new Map<
     string,
