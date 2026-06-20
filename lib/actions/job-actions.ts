@@ -1670,7 +1670,15 @@ async function notifyJobAssignmentCreated(params: {
 
 /**
  * Soft-removes an active assignment.
- * Sets is_active = false, removed_at = now(), removed_by = actor.
+ * Sets is_active = false, is_primary = false, removed_at = now(),
+ * removed_by = actor — is_primary is cleared in the SAME statement as
+ * is_active so this single atomic write can never produce a row that
+ * violates the job_assignments_primary_requires_active_chk constraint
+ * (is_primary=true requires is_active=true), regardless of whether the
+ * caller already cleared primary status first or what order multiple
+ * concurrent callers interleave in. No-op (and is_primary left untouched,
+ * which is moot since the row doesn't change) if the row is already
+ * inactive — the existing is_active filter below still gates that.
  * Targets only active rows; no-ops (no event) if the user is already inactive.
  * Emits assignment_removed only on actual row change.
  */
@@ -1686,6 +1694,7 @@ async function softRemoveJobAssignment(params: {
     .from("job_assignments")
     .update({
       is_active: false,
+      is_primary: false,
       removed_at: new Date().toISOString(),
       removed_by: removedBy,
     })
