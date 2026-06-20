@@ -3782,14 +3782,6 @@ const failureResolutionPathCount =
                       }}
                     />
                   ) : null}
-                  {surfaceProfile.surfaces.eccTests && job.job_type === "ecc" ? (
-                    <Link
-                      href={`/jobs/${job.id}/tests`}
-                      className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
-                    >
-                      Open Tests Workspace
-                    </Link>
-                  ) : null}
                 </div>
               ) : isEccPermitNeededActive && !showPrimaryCloseoutBlockers ? (
                 <div
@@ -3848,12 +3840,6 @@ const failureResolutionPathCount =
                       </div>
                     </form>
                   </details>
-                  <Link
-                    href={`/jobs/${job.id}/tests`}
-                    className={`${compactWorkspaceActionButtonClass} min-h-12 w-full`}
-                  >
-                    Open Tests Workspace
-                  </Link>
                 </div>
               ) : showConfirmRetestReady ? (
                 <div
