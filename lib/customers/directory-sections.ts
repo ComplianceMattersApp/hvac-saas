@@ -72,3 +72,9 @@ export function buildCustomerDirectorySections(
 
   return sections;
 }
+
+export function getAvailableCustomerDirectoryLetters(
+  sections: CustomerDirectorySection[],
+): CustomerDirectoryLetterKey[] {
+  return sections.map((section) => section.key);
+}

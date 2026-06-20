@@ -11,6 +11,7 @@ import { CustomerSearchPanel } from "@/app/customers/_components/CustomerSearchP
 import {
   buildCustomerDirectorySections,
   CUSTOMER_DIRECTORY_NAV_KEYS,
+  getAvailableCustomerDirectoryLetters,
   getCustomerDirectoryAnchorId,
 } from "@/lib/customers/directory-sections";
 import { formatDateOnlyDisplay, formatTimestampDateDisplayLA } from "@/lib/utils/schedule-la";
@@ -76,7 +77,8 @@ export default async function CustomersPage(props: {
     (internalUser.role === "admin" || internalUser.role === "office");
   const sortToggle = sort === "az" ? "za" : "az";
   const directorySections = buildCustomerDirectorySections(results);
-  const activeDirectoryLetters = new Set(directorySections.map((section) => section.key));
+  const availableDirectoryLetters = getAvailableCustomerDirectoryLetters(directorySections);
+  const activeDirectoryLetters = new Set(availableDirectoryLetters);
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 bg-slate-50 p-3 text-slate-900 sm:p-6">
@@ -124,9 +126,22 @@ export default async function CustomersPage(props: {
         {results.length > 0 ? (
           <nav
             aria-label="Customer directory letter navigation"
-            className="border-b border-slate-200 bg-slate-50/70 px-4 py-3 sm:px-5"
+            className="sticky top-16 z-20 border-b border-slate-200 bg-white/95 px-4 py-2 shadow-sm shadow-slate-950/5 backdrop-blur supports-[backdrop-filter]:bg-white/85 sm:px-5 lg:top-20"
           >
-            <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:pb-0">
+            <div className="-mx-1 flex gap-1 overflow-x-auto px-1 pb-1 sm:hidden">
+              {availableDirectoryLetters.map((letter) => (
+                <a
+                  key={letter}
+                  href={`#${getCustomerDirectoryAnchorId(letter)}`}
+                  aria-label={`Jump to customers starting with ${letter === "#" ? "a number or symbol" : letter}`}
+                  className="inline-flex h-10 min-w-10 shrink-0 items-center justify-center rounded-md border border-slate-300 bg-white px-2 text-sm font-semibold text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-100"
+                >
+                  {letter}
+                </a>
+              ))}
+            </div>
+
+            <div className="-mx-1 hidden gap-1 px-1 sm:flex sm:flex-wrap">
               {CUSTOMER_DIRECTORY_NAV_KEYS.map((letter) => {
                 const isActive = activeDirectoryLetters.has(letter);
                 const chipClass = isActive
@@ -179,7 +194,7 @@ export default async function CustomersPage(props: {
                 key={section.key}
                 id={section.anchorId}
                 aria-labelledby={`${section.anchorId}-heading`}
-                className="scroll-mt-24"
+                className="scroll-mt-32 lg:scroll-mt-36"
               >
                 <div className={`${sectionIndex === 0 ? "" : "border-t border-slate-200"} bg-white px-4 py-3 sm:px-5`}>
                   <h3

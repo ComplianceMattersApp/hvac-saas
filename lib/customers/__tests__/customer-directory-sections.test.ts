@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCustomerDirectorySections,
   CUSTOMER_DIRECTORY_NAV_KEYS,
+  getAvailableCustomerDirectoryLetters,
   getCustomerDirectoryAnchorId,
   getCustomerDirectoryLetterKey,
 } from "@/lib/customers/directory-sections";
@@ -54,6 +55,18 @@ describe("customer directory sections", () => {
     ]);
   });
 
+  it("returns available letters from only the current visible sections", () => {
+    const sections = buildCustomerDirectorySections([
+      customer({ customer_id: "w-1", full_name: "Wendy Watts" }),
+      customer({ customer_id: "w-2", full_name: "Westside Market" }),
+      customer({ customer_id: "b-1", full_name: "Beta Homes" }),
+      customer({ customer_id: "numeric", full_name: "123 Cooling" }),
+    ]);
+
+    expect(getAvailableCustomerDirectoryLetters(sections)).toEqual(["W", "B", "#"]);
+    expect(getAvailableCustomerDirectoryLetters([])).toEqual([]);
+  });
+
   it("uses # for numeric or missing names and the first alphanumeric letter after symbols", () => {
     expect(getCustomerDirectoryLetterKey("  123 Cooling")).toBe("#");
     expect(getCustomerDirectoryLetterKey("  - Delta Air")).toBe("D");
@@ -80,8 +93,11 @@ describe("customer directory sections", () => {
 });
 
 describe("customer directory page A-Z wiring", () => {
-  it("renders letter navigation with active anchors and disabled unavailable letters", () => {
+  it("renders sticky letter navigation with active anchors and disabled unavailable desktop letters", () => {
     expect(customersPageSource).toContain('aria-label="Customer directory letter navigation"');
+    expect(customersPageSource).toContain("sticky top-16 z-20");
+    expect(customersPageSource).toContain("bg-white/95");
+    expect(customersPageSource).toContain("getAvailableCustomerDirectoryLetters(directorySections)");
     expect(customersPageSource).toContain("CUSTOMER_DIRECTORY_NAV_KEYS.map");
     expect(customersPageSource).toContain('href={`#${getCustomerDirectoryAnchorId(letter)}`}');
     expect(customersPageSource).toContain("Jump to customers starting with");
@@ -90,10 +106,17 @@ describe("customer directory page A-Z wiring", () => {
     expect(customersPageSource).toContain('aria-disabled="true"');
   });
 
+  it("renders mobile navigation from available letters only to avoid unavailable-chip clutter", () => {
+    expect(customersPageSource).toContain("availableDirectoryLetters.map");
+    expect(customersPageSource).toContain("sm:hidden");
+    expect(customersPageSource).toContain("hidden gap-1 px-1 sm:flex sm:flex-wrap");
+    expect(customersPageSource).toContain("inline-flex h-10 min-w-10");
+  });
+
   it("renders section anchors with scroll offset while preserving row links and export/sort controls", () => {
     expect(customersPageSource).toContain("buildCustomerDirectorySections(results)");
     expect(customersPageSource).toContain("id={section.anchorId}");
-    expect(customersPageSource).toContain("scroll-mt-24");
+    expect(customersPageSource).toContain("scroll-mt-32 lg:scroll-mt-36");
     expect(customersPageSource).toContain("section.customers.map");
     expect(customersPageSource).toContain('href={`/customers/${r.customer_id}`}');
     expect(customersPageSource).toContain("Rows open the customer workspace.");
