@@ -15,6 +15,7 @@ import {
   deactivateInternalUserFromForm,
   deleteInternalUserFromForm,
   inviteInternalUserFromForm,
+  resendInternalInviteFromForm,
   updateInternalUserFieldBillingCapabilitiesFromForm,
   updateInternalUserRoleFromForm,
   updateInternalUserTimeTrackingFromListForm,
@@ -179,7 +180,12 @@ function toRoleLabel(role: string): string {
   return normalized ? normalized.charAt(0).toUpperCase() + normalized.slice(1) : "Unknown";
 }
 
-type SearchParams = Promise<{ invite_status?: string; team_confirm?: string; time_tracking_saved?: string }>;
+type SearchParams = Promise<{
+  invite_status?: string;
+  resend_status?: string;
+  team_confirm?: string;
+  time_tracking_saved?: string;
+}>;
 
 const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   invited: {
@@ -203,6 +209,10 @@ const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; m
     message:
       "Invite email limit reached. Please wait a few minutes and try again.",
   },
+  invite_send_failed: {
+    tone: "error",
+    message: "Could not send the invite email. No invite success was recorded; check email configuration and try again.",
+  },
   seat_limit_reached: {
     tone: "warn",
     message:
@@ -222,10 +232,47 @@ const INVITE_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; m
   },
 };
 
+const RESEND_STATUS_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
+  resent: {
+    tone: "success",
+    message: "Invite email resent successfully.",
+  },
+  not_pending: {
+    tone: "warn",
+    message: "That user has already accepted or is not pending invite.",
+  },
+  email_rate_limited: {
+    tone: "warn",
+    message: "Invite email limit reached. Please wait a few minutes and try again.",
+  },
+  invalid_target: {
+    tone: "error",
+    message: "Could not resolve that pending invite target.",
+  },
+  send_failed: {
+    tone: "error",
+    message: "Could not resend the invite email. Please check email configuration and try again.",
+  },
+};
+
 function bannerClass(tone: "success" | "warn" | "error") {
   if (tone === "success") return "border-emerald-200 bg-emerald-50 text-emerald-900";
   if (tone === "warn") return "border-amber-200 bg-amber-50 text-amber-900";
   return "border-red-200 bg-red-50 text-red-900";
+}
+
+function formatInviteTimestamp(value: string | null | undefined) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "Not recorded";
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 export default async function AdminInternalUsersPage({
@@ -236,6 +283,8 @@ export default async function AdminInternalUsersPage({
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const inviteStatus = String(sp.invite_status ?? "").trim().toLowerCase();
   const inviteNotice = INVITE_STATUS_TEXT[inviteStatus];
+  const resendStatus = String(sp.resend_status ?? "").trim().toLowerCase();
+  const resendNotice = RESEND_STATUS_TEXT[resendStatus];
   const teamConfirmStatus = String(sp.team_confirm ?? "").trim().toLowerCase();
   const timeTrackingSavedUserId = String(sp.time_tracking_saved ?? "").trim();
 
@@ -274,6 +323,7 @@ export default async function AdminInternalUsersPage({
   const admin = createAdminClient();
   const emailConfirmedMap = new Map<string, boolean | null>();
   const emailMap = new Map<string, string | null>();
+  const lastInviteSentMap = new Map<string, string | null>();
   await Promise.all(
     (internalUsers ?? []).map(async (row: any) => {
       const targetUserId = String(row?.user_id ?? "").trim();
@@ -286,8 +336,13 @@ export default async function AdminInternalUsersPage({
         return;
       }
 
-      emailConfirmedMap.set(targetUserId, Boolean((data.user as any).email_confirmed_at));
-      emailMap.set(targetUserId, String((data.user as any).email ?? "").trim() || null);
+      const authUser = data.user as any;
+      const metadataLastSent = String(authUser.user_metadata?.internal_invite?.last_sent_at ?? "").trim();
+      const invitedAt = String(authUser.invited_at ?? "").trim();
+
+      emailConfirmedMap.set(targetUserId, Boolean(authUser.email_confirmed_at));
+      emailMap.set(targetUserId, String(authUser.email ?? "").trim() || null);
+      lastInviteSentMap.set(targetUserId, metadataLastSent || invitedAt || null);
     }),
   );
 
@@ -329,6 +384,12 @@ export default async function AdminInternalUsersPage({
       {inviteNotice ? (
         <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass(inviteNotice.tone)}`}>
           {inviteNotice.message}
+        </div>
+      ) : null}
+
+      {resendNotice ? (
+        <div className={`rounded-2xl border px-4 py-3 text-sm shadow-sm ${bannerClass(resendNotice.tone)}`}>
+          {resendNotice.message}
         </div>
       ) : null}
 
@@ -427,6 +488,8 @@ export default async function AdminInternalUsersPage({
               return resolved && resolved !== "User" ? resolved : "Unknown User";
             })();
             const secondaryIdentifier = emailMap.get(targetUserId) || targetUserId;
+            const lastInviteSentAt = lastInviteSentMap.get(targetUserId) ?? null;
+            const canResendInvite = lifecycle === "invited" && Boolean(emailMap.get(targetUserId));
 
             return (
               <div key={row.user_id} className="px-4 py-4 sm:px-5">
@@ -455,9 +518,28 @@ export default async function AdminInternalUsersPage({
                       ) : null}
                     </div>
                     <div className="break-all text-xs text-slate-500">{secondaryIdentifier}</div>
+                    {lifecycle === "invited" ? (
+                      <div className="text-xs text-slate-500">
+                        Last invite sent: {formatInviteTimestamp(lastInviteSentAt)}
+                      </div>
+                    ) : lifecycle === "active" ? (
+                      <div className="text-xs text-slate-500">Invite accepted / active</div>
+                    ) : null}
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2">
+                    {canResendInvite ? (
+                      <form action={resendInternalInviteFromForm}>
+                        <input type="hidden" name="user_id" value={row.user_id} />
+                        <ImmediateSubmitButton
+                          pendingText="Resending..."
+                          className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-50"
+                        >
+                          Resend invite
+                        </ImmediateSubmitButton>
+                      </form>
+                    ) : null}
+
                     <Link
                       href={`/ops/admin/internal-users/${encodeURIComponent(String(row.user_id ?? ""))}`}
                       className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"

@@ -714,7 +714,7 @@ export default async function AdminUsersCommandCenterPage({
                         </form>
                       ) : null}
 
-                      {record.email && record.category === "internal" && record.role ? (
+                      {record.email && record.category === "internal" && record.role && record.lifecycle === "invited" ? (
                         <form action={resendInternalInviteFromForm}>
                           <input type="hidden" name="email" value={record.email} />
                           <input type="hidden" name="role" value={record.role} />
@@ -724,7 +724,7 @@ export default async function AdminUsersCommandCenterPage({
                             pendingText="Resending..."
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Resend Setup Link
+                            Resend invite
                           </ImmediateSubmitButton>
                         </form>
                       ) : null}

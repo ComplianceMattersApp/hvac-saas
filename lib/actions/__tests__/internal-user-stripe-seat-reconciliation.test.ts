@@ -214,6 +214,19 @@ function buildAdminFixture(options?: {
             error: null,
           };
         }),
+        getUserById: vi.fn(async () => ({
+          data: {
+            user: {
+              id: "invited-user",
+              email: "target@example.com",
+              invited_at: "2026-06-20T12:00:00.000Z",
+              email_confirmed_at: null,
+              user_metadata: {},
+            },
+          },
+          error: null,
+        })),
+        updateUserById: vi.fn(async () => ({ error: null })),
         listUsers: vi.fn(async () => ({ data: { users: [] }, error: null })),
       },
     },

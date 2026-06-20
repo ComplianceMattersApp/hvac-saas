@@ -7,6 +7,7 @@ import { resolveInviteRedirectTo } from "@/lib/utils/resolve-invite-redirect-to"
 import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 import { reconcilePlatformSubscriptionSeatQuantity } from "@/lib/business/platform-billing-stripe";
 import { parseBooleanToggleEntries } from "@/lib/time-clock/settings-controls";
+import { sendInviteEmail } from "@/lib/email/smtp";
 import {
   requireInternalRole,
   type InternalRole,
@@ -27,6 +28,14 @@ type InternalUserRecord = {
   is_active: boolean;
   account_owner_user_id: string;
   created_by: string | null;
+};
+
+type AuthUserInviteState = {
+  id: string;
+  email: string | null;
+  invitedAt: string | null;
+  emailConfirmedAt: string | null;
+  userMetadata: Record<string, unknown>;
 };
 
 function parseInternalRole(raw: FormDataEntryValue | null): InternalRole {
@@ -109,6 +118,20 @@ function isInviteRateLimitError(error: any) {
   );
 }
 
+function describeInviteError(error: unknown) {
+  if (!error) return "Unknown invite error";
+  if (error instanceof Error) {
+    const extra = error as Error & { code?: unknown; status?: unknown; details?: unknown };
+    const parts = [
+      extra.code ? `code=${String(extra.code)}` : "",
+      extra.status ? `status=${String(extra.status)}` : "",
+      extra.details ? `details=${String(extra.details)}` : "",
+    ].filter(Boolean);
+    return parts.length > 0 ? `${error.message} (${parts.join(", ")})` : error.message;
+  }
+  return String(error);
+}
+
 function normalizeInternalUserRecord(data: any): InternalUserRecord | null {
   if (!data?.user_id || !data?.account_owner_user_id) return null;
   if (
@@ -141,6 +164,28 @@ async function getInternalUserRecord(
 
   if (error) throw error;
   return normalizeInternalUserRecord(data);
+}
+
+async function getAuthUserInviteStateById(
+  admin: any,
+  userId: string,
+): Promise<AuthUserInviteState | null> {
+  const { data, error } = await admin.auth.admin.getUserById(userId);
+  if (error) throw error;
+
+  const user = (data as any)?.user;
+  if (!user?.id) return null;
+
+  return {
+    id: String(user.id),
+    email: String(user.email ?? "").trim() || null,
+    invitedAt: String(user.invited_at ?? "").trim() || null,
+    emailConfirmedAt: String(user.email_confirmed_at ?? user.confirmed_at ?? "").trim() || null,
+    userMetadata:
+      user.user_metadata && typeof user.user_metadata === "object"
+        ? (user.user_metadata as Record<string, unknown>)
+        : {},
+  };
 }
 
 async function getAuthUserIdByEmail(admin: any, email: string): Promise<string | null> {
@@ -201,6 +246,76 @@ async function requireScopedTarget(
   }
 
   return target;
+}
+
+async function sendExistingInternalSetupLink(params: {
+  admin: any;
+  email: string;
+}) {
+  const { data, error } = await params.admin.auth.admin.generateLink({
+    type: "recovery",
+    email: params.email,
+    options: {
+      redirectTo: resolveInviteRedirectTo(),
+    },
+  });
+
+  if (error) throw error;
+
+  const actionLink =
+    (data as any)?.properties?.action_link ||
+    (data as any)?.properties?.actionLink ||
+    (data as any)?.action_link;
+
+  if (!actionLink) {
+    throw new Error("INTERNAL_INVITE_SETUP_LINK_MISSING");
+  }
+
+  const html = `
+    <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height: 1.4;">
+      <h2>Complete your Compliance Matters account setup</h2>
+      <p>You have been invited to join your internal team in Compliance Matters.</p>
+      <p><a href="${actionLink}">Accept your invite</a></p>
+      <p>If the button does not work, copy and paste this link:</p>
+      <p style="word-break: break-all;">${actionLink}</p>
+    </div>
+  `;
+
+  await sendInviteEmail({
+    to: params.email,
+    subject: "You've been invited to Compliance Matters",
+    html,
+  });
+}
+
+async function markInternalInviteSentMetadata(params: {
+  admin: any;
+  user: AuthUserInviteState;
+  accountOwnerUserId: string;
+  role: InternalRole;
+  sentByUserId: string;
+}) {
+  const metadata = {
+    ...params.user.userMetadata,
+    internal_invite: {
+      account_owner_user_id: params.accountOwnerUserId,
+      role: params.role,
+      last_sent_at: new Date().toISOString(),
+      sent_by_user_id: params.sentByUserId,
+    },
+  };
+
+  const { error } = await params.admin.auth.admin.updateUserById(params.user.id, {
+    user_metadata: metadata,
+  });
+
+  if (error) {
+    console.warn("internal-user-actions: failed to update invite metadata", {
+      userId: params.user.id,
+      accountOwnerUserId: params.accountOwnerUserId,
+      error: describeInviteError(error),
+    });
+  }
 }
 
 async function assertTargetNotOwnedByDifferentAccount(params: {
@@ -587,7 +702,12 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
       redirect("/ops/admin/internal-users?invite_status=email_already_invited");
     }
   } else {
-    throw inviteError;
+    console.warn("internal-user-actions: Supabase invite send failed", {
+      email,
+      accountOwnerUserId: actorInternalUser.account_owner_user_id,
+      error: describeInviteError(inviteError),
+    });
+    redirect("/ops/admin/internal-users?invite_status=invite_send_failed");
   }
 
   if (!targetUserId) {
@@ -596,6 +716,43 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
 
   if (!targetUserId) {
     redirect("/ops/admin/internal-users?invite_status=target_auth_user_not_found");
+  }
+
+  const authInviteState = await getAuthUserInviteStateById(admin, targetUserId);
+  if (!authInviteState?.id) {
+    redirect("/ops/admin/internal-users?invite_status=target_auth_user_not_found");
+  }
+
+  if (inviteRequested) {
+    await markInternalInviteSentMetadata({
+      admin,
+      user: authInviteState,
+      accountOwnerUserId: actorInternalUser.account_owner_user_id,
+      role,
+      sentByUserId: actorUserId,
+    });
+  } else if (!authInviteState.emailConfirmedAt) {
+    try {
+      await sendExistingInternalSetupLink({
+        admin,
+        email: authInviteState.email ?? email,
+      });
+      await markInternalInviteSentMetadata({
+        admin,
+        user: authInviteState,
+        accountOwnerUserId: actorInternalUser.account_owner_user_id,
+        role,
+        sentByUserId: actorUserId,
+      });
+    } catch (error) {
+      console.warn("internal-user-actions: existing auth setup-link send failed", {
+        email,
+        targetUserId,
+        accountOwnerUserId: actorInternalUser.account_owner_user_id,
+        error: describeInviteError(error),
+      });
+      redirect("/ops/admin/internal-users?invite_status=invite_send_failed");
+    }
   }
 
   const existing = await getInternalUserRecord(admin, targetUserId);
@@ -666,6 +823,84 @@ export async function inviteInternalUserFromForm(formData: FormData): Promise<vo
       ? "/ops/admin/internal-users?invite_status=invited"
       : "/ops/admin/internal-users?invite_status=attached_existing_auth",
   );
+}
+
+export async function resendInternalInviteFromForm(formData: FormData): Promise<void> {
+  const supabase = await createClient();
+  const {
+    userId: actorUserId,
+    internalUser: actorInternalUser,
+  } = await requireInternalRole("admin", { supabase });
+
+  const admin = createAdminClient();
+  const targetUserId = String(formData.get("user_id") ?? "").trim();
+  if (!targetUserId) {
+    redirect("/ops/admin/internal-users?resend_status=invalid_target");
+  }
+
+  const target = await requireScopedTarget(
+    admin,
+    actorInternalUser.account_owner_user_id,
+    targetUserId,
+  );
+
+  const authInviteState = await getAuthUserInviteStateById(admin, targetUserId);
+  if (!authInviteState?.email) {
+    redirect("/ops/admin/internal-users?resend_status=invalid_target");
+  }
+
+  if (!target.is_active || authInviteState.emailConfirmedAt) {
+    redirect("/ops/admin/internal-users?resend_status=not_pending");
+  }
+
+  const { error: inviteError } = await admin.auth.admin.inviteUserByEmail(authInviteState.email, {
+    redirectTo: resolveInviteRedirectTo(),
+    data: {
+      internal_role: target.role,
+    },
+  });
+
+  if (!inviteError) {
+    await markInternalInviteSentMetadata({
+      admin,
+      user: authInviteState,
+      accountOwnerUserId: actorInternalUser.account_owner_user_id,
+      role: target.role,
+      sentByUserId: actorUserId,
+    });
+
+    revalidateInternalUserViews();
+    redirect("/ops/admin/internal-users?resend_status=resent");
+  }
+
+  if (isInviteRateLimitError(inviteError)) {
+    redirect("/ops/admin/internal-users?resend_status=email_rate_limited");
+  }
+
+  try {
+    await sendExistingInternalSetupLink({
+      admin,
+      email: authInviteState.email,
+    });
+    await markInternalInviteSentMetadata({
+      admin,
+      user: authInviteState,
+      accountOwnerUserId: actorInternalUser.account_owner_user_id,
+      role: target.role,
+      sentByUserId: actorUserId,
+    });
+  } catch (error) {
+    console.warn("internal-user-actions: resend setup-link send failed", {
+      targetUserId,
+      accountOwnerUserId: actorInternalUser.account_owner_user_id,
+      inviteError: describeInviteError(inviteError),
+      setupLinkError: describeInviteError(error),
+    });
+    redirect("/ops/admin/internal-users?resend_status=send_failed");
+  }
+
+  revalidateInternalUserViews();
+  redirect("/ops/admin/internal-users?resend_status=resent");
 }
 
 export async function deleteInternalUserFromForm(formData: FormData): Promise<void> {

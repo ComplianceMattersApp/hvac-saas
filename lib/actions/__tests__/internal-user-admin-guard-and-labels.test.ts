@@ -143,4 +143,17 @@ describe("internal user admin guard and role labels", () => {
       expect(form).not.toContain('name="role"');
     }
   });
+
+  it("shows internal invite resend only for pending invited users", () => {
+    const internalUsersListPage = readWorkspaceFile("app/ops/admin/internal-users/page.tsx");
+    const peopleAccessPage = readWorkspaceFile("app/ops/admin/users/page.tsx");
+
+    expect(internalUsersListPage).toContain("resendInternalInviteFromForm");
+    expect(internalUsersListPage).toContain('const canResendInvite = lifecycle === "invited"');
+    expect(internalUsersListPage).toContain("Last invite sent:");
+    expect(internalUsersListPage).toContain("Invite accepted / active");
+
+    expect(peopleAccessPage).toContain('record.lifecycle === "invited"');
+    expect(peopleAccessPage).toContain("Resend invite");
+  });
 });
