@@ -1,7 +1,7 @@
 // app/jobs/[id]/page
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { createAdminClient, createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { Suspense, type ReactNode } from "react";
 import SubmitButton from "@/components/SubmitButton";
@@ -1510,7 +1510,7 @@ export default async function JobDetailPage({
 
   const showEccNotice = notice === "ecc_test_required";
 
-  const supabase = await timedPhase("createClient", () => createClient());
+  let supabase = await timedPhase("createClient", () => createClient());
 
   const {
     data: { user },
@@ -1534,6 +1534,24 @@ export default async function JobDetailPage({
   }
 
   const internalUser = actorResolution.internalUser;
+
+  const { data: contractorShadowMembership, error: contractorShadowMembershipErr } = await timedPhase(
+    "contractorShadowMembershipRead",
+    async () =>
+      await supabase
+        .from("contractor_users")
+        .select("contractor_id")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+  );
+
+  if (contractorShadowMembershipErr) {
+    throw contractorShadowMembershipErr;
+  }
+
+  const hasContractorShadowMembership =
+    String(contractorShadowMembership?.contractor_id ?? "").trim().length > 0;
+
   const internalRole = String(internalUser.role ?? "").trim().toLowerCase();
   const canManageWorkflowGuidance = internalRole === "owner" || internalRole === "admin";
   const contractors = await timedPhase("contractorsRead", () =>
@@ -1631,6 +1649,18 @@ export default async function JobDetailPage({
     return notFound();
   }
 
+  if (hasContractorShadowMembership) {
+    // Internal users with a contractor membership can trip mutually exclusive RLS policies.
+    // Only switch to admin reads after same-account boundary preflight succeeds.
+    supabase = createAdminClient();
+    console.warn("[job-detail:dual-role-read-client] switched to admin read client", {
+      jobId,
+      userId: user.id,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      contractorId: String(contractorShadowMembership?.contractor_id ?? "").trim() || null,
+    });
+  }
+
   const { data: job, error: jobError } = await timedPhase("mainJobRead", async () => {
     const primary = await supabase
       .from("jobs")
@@ -1662,7 +1692,19 @@ export default async function JobDetailPage({
     };
   });
 
-  if (jobError) throw jobError;
+  if (jobError) {
+    console.error("[job-detail:mainJobRead] query_error", {
+      jobId,
+      userId: user.id,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      hasContractorShadowMembership,
+      code: (jobError as any)?.code ?? null,
+      message: (jobError as any)?.message ?? String(jobError),
+      details: (jobError as any)?.details ?? null,
+      hint: (jobError as any)?.hint ?? null,
+    });
+    throw jobError;
+  }
   if (!job) return notFound();
   if (job.deleted_at) redirect("/ops?saved=job_archived");
   setPhaseValue("eccPayloadReads", phaseDurationsMs.mainJobRead ?? 0);

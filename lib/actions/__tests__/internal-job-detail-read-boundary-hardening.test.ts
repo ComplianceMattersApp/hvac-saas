@@ -255,6 +255,51 @@ describe("internal job-detail read boundary hardening", () => {
     expect(result).toEqual({ kind: "contractor" });
   });
 
+  it("prefers internal actor classification for dual-role users", async () => {
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-dual",
+      internalUser: {
+        user_id: "user-dual",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+
+    const supabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => ({
+              data: { contractor_id: "contractor-1" },
+              error: null,
+            })),
+          })),
+        })),
+      })),
+    };
+
+    const { resolveJobDetailActor } = await import(
+      "@/lib/actions/internal-job-detail-read-boundary"
+    );
+
+    const result = await resolveJobDetailActor({
+      supabase,
+      userId: "user-dual",
+    });
+
+    expect(result).toEqual({
+      kind: "internal",
+      internalUser: {
+        user_id: "user-dual",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-1",
+      },
+    });
+    expect(supabase.from).not.toHaveBeenCalled();
+  });
+
   it("preserves non-internal login classification for non-contractor", async () => {
     requireInternalUserMock.mockRejectedValue(new Error("not-internal"));
     isInternalAccessErrorMock.mockReturnValue(true);
@@ -282,6 +327,98 @@ describe("internal job-detail read boundary hardening", () => {
     });
 
     expect(result).toEqual({ kind: "unauthorized" });
+  });
+
+  it("keeps cross-account denial for dual-role internal users", async () => {
+    requireInternalUserMock.mockResolvedValue({
+      userId: "user-dual-cross",
+      internalUser: {
+        user_id: "user-dual-cross",
+        role: "office",
+        is_active: true,
+        account_owner_user_id: "owner-2",
+      },
+    });
+
+    const actorSupabase = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn(async () => ({
+              data: { contractor_id: "contractor-2" },
+              error: null,
+            })),
+          })),
+        })),
+      })),
+    };
+
+    const admin = {
+      from: vi.fn((table: string) => {
+        if (table === "jobs") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                is: vi.fn(() => ({
+                  maybeSingle: vi.fn(async () => ({
+                    data: {
+                      id: "123e4567-e89b-42d3-a456-426614174081",
+                      customer_id: "223e4567-e89b-42d3-a456-426614174081",
+                    },
+                    error: null,
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
+
+        if (table === "customers") {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                maybeSingle: vi.fn(async () => ({
+                  data: {
+                    id: "223e4567-e89b-42d3-a456-426614174081",
+                    owner_user_id: "owner-other",
+                  },
+                  error: null,
+                })),
+              })),
+            })),
+          };
+        }
+
+        return {
+          select: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              maybeSingle: vi.fn(async () => ({ data: null, error: null })),
+            })),
+          })),
+        };
+      }),
+    };
+
+    loadScopedInternalJobForMutationMock.mockResolvedValue(null);
+
+    const {
+      resolveJobDetailActor,
+      loadScopedInternalJobDetailReadBoundaryOutcome,
+    } = await import("@/lib/actions/internal-job-detail-read-boundary");
+
+    const actor = await resolveJobDetailActor({
+      supabase: actorSupabase,
+      userId: "user-dual-cross",
+    });
+    expect(actor.kind).toBe("internal");
+
+    const outcome = await loadScopedInternalJobDetailReadBoundaryOutcome({
+      accountOwnerUserId: "owner-2",
+      jobId: "123e4567-e89b-42d3-a456-426614174081",
+      admin,
+    });
+
+    expect(outcome).toEqual({ status: "forbidden" });
   });
 
   it("allows same-account signed URL generation after signing preflight", async () => {
