@@ -4282,23 +4282,6 @@ const failureResolutionPathCount =
                     jobWorkbenchAccountLabel || fieldHeaderTitle
                   )}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {telLink ? (
-                    <a href={telLink} className={`${compactSecondaryButtonClass} min-h-10 text-sm`}>
-                      Call
-                    </a>
-                  ) : null}
-                  {customerPhone !== "—" ? (
-                    <a href={`sms:${accountPhoneDigits}`} className={`${compactSecondaryButtonClass} min-h-10 text-sm`}>
-                      Text
-                    </a>
-                  ) : null}
-                  {accountEmailLink ? (
-                    <a href={accountEmailLink} className={`${compactSecondaryButtonClass} min-h-10 text-sm`}>
-                      Email
-                    </a>
-                  ) : null}
-                </div>
               </div>
 
               <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-[0_14px_28px_-28px_rgba(15,23,42,0.26)]">
@@ -4380,7 +4363,7 @@ const failureResolutionPathCount =
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-3">
+              <div id="assigned-team" className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-3">
                 <AssignedTeamControls
                   jobId={String(job.id)}
                   tab={tab}

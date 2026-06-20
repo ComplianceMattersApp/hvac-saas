@@ -317,6 +317,22 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).not.toContain("Open Map");
   });
 
+  it("does not repeat account call and text actions inside the mobile Field Operations Board customer card", () => {
+    const mobileBoardStart = jobPageSource.indexOf('<div className="text-lg font-semibold text-[#0f1f35]">Field Operations Board</div>');
+    const mobileCustomerStart = jobPageSource.indexOf('<div className="text-sm font-semibold text-[#0f1f35]">Customer / Account</div>', mobileBoardStart);
+    const mobileCustomerEnd = jobPageSource.indexOf('<div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white', mobileCustomerStart);
+    const mobileCustomerSlice =
+      mobileCustomerStart > -1 && mobileCustomerEnd > mobileCustomerStart
+        ? jobPageSource.slice(mobileCustomerStart, mobileCustomerEnd)
+        : "";
+
+    expect(mobileBoardStart).toBeGreaterThan(-1);
+    expect(mobileCustomerSlice).toContain("mobileCustomerHref");
+    expect(mobileCustomerSlice).not.toContain("telLink");
+    expect(mobileCustomerSlice).not.toContain("sms:${accountPhoneDigits}");
+    expect(mobileCustomerSlice).not.toContain("accountEmailLink");
+  });
+
   it("uses the preferred job workbench heading fallback chain", () => {
     expect(jobPageSource).toContain("const fieldHeaderTitle =");
     expect(jobPageSource).toContain("const jobWorkbenchTitle = firstNonEmpty(jobTitleText, visitScopeLeadText, fieldHeaderTitle) ?? \"Job Detail\";");
