@@ -105,7 +105,12 @@ async function getCreateNotice(params: {
       email,
     });
     return "contractor_created_invite_sent";
-  } catch {
+  } catch (error) {
+    console.warn("contractor-actions: contractor create invite failed", {
+      contractorId: params.contractorId,
+      email,
+      error: error instanceof Error ? error.message : String(error),
+    });
     return "contractor_created_invite_failed";
   }
 }

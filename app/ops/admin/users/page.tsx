@@ -142,6 +142,8 @@ function FieldBillingAccessControls(params: {
 
 const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   invite_resent: { tone: "success", message: "Invite link resent successfully." },
+  invite_failed: { tone: "error", message: "Invite email could not be sent. Please check email configuration and try again." },
+  invite_not_pending: { tone: "warn", message: "That invite is no longer pending." },
   recovery_sent: { tone: "success", message: "Account setup recovery email sent successfully." },
   password_reset_sent: { tone: "success", message: "Password reset email sent successfully." },
   password_reset_failed: { tone: "error", message: "Could not send password reset email. Verify reset redirect configuration and try again." },
@@ -729,7 +731,7 @@ export default async function AdminUsersCommandCenterPage({
                         </form>
                       ) : null}
 
-                      {record.email && record.category === "contractor" && record.contractorId ? (
+                      {record.email && record.category === "contractor" && record.contractorId && record.lifecycle === "invited" ? (
                         <form action={resendContractorInviteFromForm}>
                           <input type="hidden" name="email" value={record.email} />
                           <input type="hidden" name="contractor_id" value={record.contractorId} />
@@ -739,7 +741,7 @@ export default async function AdminUsersCommandCenterPage({
                             pendingText="Resending..."
                             className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100"
                           >
-                            Resend Setup Link
+                            Resend invite
                           </ImmediateSubmitButton>
                         </form>
                       ) : null}

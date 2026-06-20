@@ -21,6 +21,8 @@ type SearchParams = Promise<{ notice?: string }>;
 const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message: string }> = {
   invite_sent: { tone: "success", message: "Contractor user invite sent." },
   invite_resent: { tone: "success", message: "Contractor user invite resent." },
+  invite_failed: { tone: "error", message: "Contractor invite email could not be sent. Please check email configuration and try again." },
+  invite_not_pending: { tone: "warn", message: "That contractor invite is no longer pending." },
   password_reset_sent: { tone: "success", message: "Password reset email sent." },
   contractor_created_invite_sent: { tone: "success", message: "Contractor created and invite sent." },
   contractor_created_no_email: { tone: "warn", message: "Contractor created. No invite sent because no email was provided." },
@@ -109,12 +111,14 @@ export default async function AdminContractorsPage({
     email: string;
     status: string;
     created_at: string | null;
+    last_sent_at: string | null;
+    sent_count: number | null;
   }> = [];
 
   if (contractorIds.length > 0) {
     const { data: inviteRows, error: inviteErr } = await supabase
       .from("contractor_invites")
-      .select("id, contractor_id, email, status, created_at")
+      .select("id, contractor_id, email, status, created_at, last_sent_at, sent_count")
       .eq("owner_user_id", internalUser.account_owner_user_id)
       .in("contractor_id", contractorIds)
       .in("status", ["pending", "invited"])
@@ -176,7 +180,7 @@ export default async function AdminContractorsPage({
   >();
   const pendingInvitesByContractor = new Map<
     string,
-    Array<{ id: string; email: string; status: string; createdAt: string | null }>
+    Array<{ id: string; email: string; status: string; createdAt: string | null; lastSentAt: string | null; sentCount: number }>
   >();
 
   for (const membership of memberships) {
@@ -210,6 +214,8 @@ export default async function AdminContractorsPage({
       email,
       status,
       createdAt: invite.created_at ?? null,
+      lastSentAt: invite.last_sent_at ?? invite.created_at ?? null,
+      sentCount: Number(invite.sent_count ?? 0),
     });
     pendingInvitesByContractor.set(contractorId, list);
   }
@@ -381,21 +387,37 @@ export default async function AdminContractorsPage({
                   ) : (
                     <div className={`divide-y ${isArchived ? "divide-slate-200" : "divide-sky-100"}`}>
                       {invites.map((invite) => {
-                        const sentDate = invite.createdAt
-                          ? new Date(invite.createdAt).toLocaleDateString()
+                        const sentDate = invite.lastSentAt
+                          ? new Date(invite.lastSentAt).toLocaleString()
                           : null;
 
                         return (
-                          <div key={`${contractorId}:invite:${invite.id}`} className="flex flex-col gap-1 px-3 py-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="text-sm font-medium text-slate-900">{invite.email}</span>
-                              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
-                                {invite.status}
-                              </span>
+                          <div key={`${contractorId}:invite:${invite.id}`} className="flex flex-col gap-3 px-3 py-3">
+                            <div className="space-y-1">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="text-sm font-medium text-slate-900">{invite.email}</span>
+                                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-900">
+                                  {invite.status}
+                                </span>
+                              </div>
+                              <p className="text-xs text-slate-600">
+                                {sentDate ? `Last invite sent ${sentDate}` : "Invite pending"}
+                                {invite.sentCount > 0 ? ` | Sends: ${invite.sentCount}` : ""}
+                              </p>
                             </div>
-                            <p className="text-xs text-slate-600">
-                              {sentDate ? `Sent ${sentDate}` : "Invite pending"}
-                            </p>
+
+                            <form action={resendContractorInviteFromForm}>
+                              <input type="hidden" name="contractor_id" value={contractorId} />
+                              <input type="hidden" name="email" value={invite.email} />
+                              <input type="hidden" name="return_to" value="/ops/admin/contractors" />
+                              <button
+                                type="submit"
+                                disabled={isArchived}
+                                className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-sm font-medium text-amber-800 transition-colors hover:bg-amber-50 disabled:cursor-not-allowed disabled:opacity-55"
+                              >
+                                Resend invite
+                              </button>
+                            </form>
                           </div>
                         );
                       })}
@@ -435,7 +457,7 @@ export default async function AdminContractorsPage({
                           </div>
 
                           <div className="flex flex-wrap items-center gap-2">
-                            {member.email ? (
+                            {member.email && member.status === "invited" ? (
                               <form action={resendContractorInviteFromForm}>
                                 <input type="hidden" name="contractor_id" value={contractorId} />
                                 <input type="hidden" name="email" value={member.email} />
@@ -445,7 +467,7 @@ export default async function AdminContractorsPage({
                                   disabled={isArchived}
                                   className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-900 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-55"
                                 >
-                                  Resend Setup Link
+                                  Resend invite
                                 </button>
                               </form>
                             ) : null}

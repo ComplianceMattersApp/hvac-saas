@@ -115,6 +115,27 @@ async function assertOwnerScopedContractorTarget(params: {
   }
 }
 
+async function assertPendingContractorInviteTarget(params: {
+  supabase: any;
+  contractorId: string;
+  email: string;
+  accountOwnerUserId: string;
+}) {
+  const { data: invite, error } = await params.supabase
+    .from("contractor_invites")
+    .select("id")
+    .eq("owner_user_id", params.accountOwnerUserId)
+    .eq("contractor_id", params.contractorId)
+    .eq("email", params.email)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!invite?.id) {
+    throw new Error("CONTRACTOR_INVITE_NOT_PENDING");
+  }
+}
+
 function createPasswordRecoveryClient() {
   return createSupabaseJsClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -274,10 +295,32 @@ export async function resendContractorInviteFromForm(formData: FormData): Promis
     redirect(returnTo);
   }
 
-  await inviteContractor({
-    contractorId,
-    email,
-  });
+  try {
+    await assertPendingContractorInviteTarget({
+      supabase,
+      contractorId,
+      email,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+
+    await inviteContractor({
+      contractorId,
+      email,
+      requirePendingInvite: true,
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "CONTRACTOR_INVITE_NOT_PENDING") {
+      redirect(withNotice(returnTo, "invite_not_pending"));
+    }
+
+    console.warn("admin-user-actions: contractor invite resend failed", {
+      contractorId,
+      email,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    redirect(withNotice(returnTo, "invite_failed"));
+  }
 
   redirect(withNotice(returnTo, "invite_resent"));
 }
@@ -304,10 +347,20 @@ export async function inviteContractorUserFromForm(formData: FormData): Promise<
     redirect(returnTo);
   }
 
-  await inviteContractor({
-    contractorId,
-    email,
-  });
+  try {
+    await inviteContractor({
+      contractorId,
+      email,
+    });
+  } catch (error) {
+    console.warn("admin-user-actions: contractor invite failed", {
+      contractorId,
+      email,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    redirect(withNotice(returnTo, "invite_failed"));
+  }
 
   redirect(withNotice(returnTo, "invite_sent"));
 }

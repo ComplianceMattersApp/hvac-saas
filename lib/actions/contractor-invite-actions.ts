@@ -65,6 +65,7 @@ export async function inviteContractor(args: {
   email: string;
   contractorId?: string;       // preferred if inviting from contractor page
   contractorName?: string;     // used only if contractorId missing
+  requirePendingInvite?: boolean;
 }) {
   const email = normalizeEmail(args.email);
   if (!email.includes("@")) throw new Error("Invalid email");
@@ -137,6 +138,10 @@ export async function inviteContractor(args: {
 
   if (existingInviteErr) throw new Error(existingInviteErr.message);
 
+  if (args.requirePendingInvite && existingInvite?.status !== "pending") {
+    throw new Error("CONTRACTOR_INVITE_NOT_PENDING");
+  }
+
   const nextInviteStatus = existingInvite?.status === "accepted" ? "accepted" : "pending";
 
   // 2) Upsert invite row (status tracking + resend support)
@@ -175,60 +180,72 @@ export async function inviteContractor(args: {
 
   let authUserId: string | undefined;
 
-  const { data: createData, error: createErr } = await admin.auth.admin.createUser({
-    email,
-    email_confirm: true,
-  });
+  try {
+    const { data: createData, error: createErr } = await admin.auth.admin.createUser({
+      email,
+      email_confirm: true,
+    });
 
-  if (!createErr) {
-    // Fresh user created successfully — no Supabase system email was sent.
-    authUserId = createData?.user?.id ? String(createData.user.id) : undefined;
-  } else if (isAlreadyExistsError(createErr)) {
-    // User already exists in auth.users — look up their id for the recovery path.
-    const found = await getAuthUserIdByEmail(admin, email);
-    authUserId = found ?? undefined;
-  } else {
-    // Genuine unexpected failure — surface the real message.
-    throw new Error(`User creation failed: ${createErr.message}`);
+    if (!createErr) {
+      // Fresh user created successfully — no Supabase system email was sent.
+      authUserId = createData?.user?.id ? String(createData.user.id) : undefined;
+    } else if (isAlreadyExistsError(createErr)) {
+      // User already exists in auth.users — look up their id for the recovery path.
+      const found = await getAuthUserIdByEmail(admin, email);
+      authUserId = found ?? undefined;
+    } else {
+      // Genuine unexpected failure — surface the real message.
+      throw new Error(`User creation failed: ${createErr.message}`);
+    }
+
+    // 4) Generate a recovery link for our custom branded email.
+    //    Recovery links are handled by hashType==="recovery" in auth/callback, which
+    //    routes to /set-password?mode=invite — same destination as an invite link.
+    //    generateLink("recovery") works for both newly-created and existing users.
+    const { data: recoveryData, error: recoveryErr } = await admin.auth.admin.generateLink({
+      type: "recovery",
+      email,
+      options: { redirectTo },
+    });
+
+    if (recoveryErr) {
+      throw new Error(`Could not generate invite link: ${recoveryErr.message}`);
+    }
+
+    const actionLink =
+      (recoveryData as any)?.properties?.action_link ||
+      (recoveryData as any)?.action_link;
+
+    if (!actionLink) throw new Error("Invite link missing from generateLink response");
+
+    if (!authUserId) {
+      authUserId = (recoveryData as any)?.user?.id;
+    }
+
+    // 5) Send our branded SMTP email with the recovery link.
+    const subject = "You've been invited to Compliance Matters";
+    const html = `
+      <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height: 1.4;">
+        <h2>Contractor Portal Invite</h2>
+        <p>You have been invited to join a contractor portal.</p>
+        <p><a href="${actionLink}">Accept your invite</a></p>
+        <p>If the button does not work, copy/paste this link:</p>
+        <p style="word-break: break-all;">${actionLink}</p>
+      </div>
+    `;
+
+    await sendInviteEmail({ to: email, subject, html });
+  } catch (error) {
+    if (!existingInvite?.id) {
+      await supabase
+        .from("contractor_invites")
+        .update({ status: "expired" })
+        .eq("id", inviteRow.id)
+        .eq("owner_user_id", ownerUserId);
+    }
+
+    throw error;
   }
-
-  // 4) Generate a recovery link for our custom branded email.
-  //    Recovery links are handled by hashType==="recovery" in auth/callback, which
-  //    routes to /set-password?mode=invite — same destination as an invite link.
-  //    generateLink("recovery") works for both newly-created and existing users.
-  const { data: recoveryData, error: recoveryErr } = await admin.auth.admin.generateLink({
-    type: "recovery",
-    email,
-    options: { redirectTo },
-  });
-
-  if (recoveryErr) {
-    throw new Error(`Could not generate invite link: ${recoveryErr.message}`);
-  }
-
-  const actionLink =
-    (recoveryData as any)?.properties?.action_link ||
-    (recoveryData as any)?.action_link;
-
-  if (!actionLink) throw new Error("Invite link missing from generateLink response");
-
-  if (!authUserId) {
-    authUserId = (recoveryData as any)?.user?.id;
-  }
-
-  // 5) Send our branded SMTP email with the recovery link.
-  const subject = "You've been invited to Compliance Matters";
-  const html = `
-    <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height: 1.4;">
-      <h2>Contractor Portal Invite</h2>
-      <p>You have been invited to join a contractor portal.</p>
-      <p><a href="${actionLink}">Accept your invite</a></p>
-      <p>If the button does not work, copy/paste this link:</p>
-      <p style="word-break: break-all;">${actionLink}</p>
-    </div>
-  `;
-
-  await sendInviteEmail({ to: email, subject, html });
 
   // 6) Update tracking fields.
   //    auth_user_id column added via migration 20260319_contractor_invites_auth_user_column.sql

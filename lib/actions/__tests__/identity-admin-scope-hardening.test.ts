@@ -134,6 +134,10 @@ function buildAdminFixture(options: FixtureOptions = {}) {
         };
       }
 
+      if (table === "contractor_invites") {
+        return { data: { id: "invite-1" }, error: null };
+      }
+
       throw new Error(`Unexpected maybeSingle table: ${table}`);
     }
 
@@ -256,6 +260,7 @@ type TestCase = {
   invoke: () => Promise<unknown>;
   setupAllow: () => { internalUsersWrites: Array<{ method: "insert" | "update" | "delete" }> };
   setupCrossAccount: () => { internalUsersWrites: Array<{ method: "insert" | "update" | "delete" }> };
+  expectedAllowError?: string;
   expectedCrossAccountError: string;
 };
 
@@ -691,6 +696,7 @@ describe("identity/admin same-account hardening", () => {
         createClientMock.mockResolvedValue({ from: fixture.admin.from.bind(fixture.admin) });
         return fixture;
       },
+      expectedAllowError: "REDIRECT:/ops/admin/users?notice=invite_failed",
       expectedCrossAccountError: "REDIRECT:/ops/admin/users",
     },
     {
@@ -720,6 +726,7 @@ describe("identity/admin same-account hardening", () => {
         createClientMock.mockResolvedValue({ from: fixture.admin.from.bind(fixture.admin) });
         return fixture;
       },
+      expectedAllowError: "REDIRECT:/ops/admin/users?notice=invite_failed",
       expectedCrossAccountError: "REDIRECT:/ops/admin/users",
     },
   ];
@@ -728,7 +735,7 @@ describe("identity/admin same-account hardening", () => {
     it(`allows same-account internal ${testCase.entrypoint} past scoped preflight`, async () => {
       testCase.setupAllow();
 
-      await expect(testCase.invoke()).rejects.toThrow(ALLOW_PATH_REACHED);
+      await expect(testCase.invoke()).rejects.toThrow(testCase.expectedAllowError ?? ALLOW_PATH_REACHED);
     });
 
     it(`denies cross-account internal ${testCase.entrypoint} before internal_users writes/identity side effects`, async () => {
