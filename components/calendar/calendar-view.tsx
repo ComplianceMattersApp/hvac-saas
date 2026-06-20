@@ -1675,27 +1675,30 @@ export async function CalendarView(props: Props) {
             <p className="mt-0.5 text-xs text-blue-900/90">Open a job in Needs Scheduling, then place it on today&apos;s board.</p>
           </div>
 
+          <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-3 sm:hidden">
+            <Suspense fallback={<CalendarRosterControlsFallback activeFilterLabel={activeFilterLabel} />}>
+              <CalendarDispatchFocusControls
+                rosterPromise={rosterPromise}
+                uiView={uiView}
+                anchorDate={data.anchorDate}
+                activeTech={activeTech}
+                selectedUserIds={selectedCalendarUserIds}
+                activeUnassignedFilter={activeUnassignedFilter}
+                activeFilterLabel={activeFilterLabel}
+              />
+            </Suspense>
+          </div>
+
           <details className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-3 sm:hidden">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-800 [&::-webkit-details-marker]:hidden">
-              <span>Filters &amp; Status</span>
+              <span>Status Legend</span>
               <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
-                Status legend
+                Open
               </span>
             </summary>
 
-            <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
-              <Suspense fallback={<CalendarRosterControlsFallback activeFilterLabel={activeFilterLabel} />}>
-                <CalendarDispatchFocusControls
-                  rosterPromise={rosterPromise}
-                  uiView={uiView}
-                  anchorDate={data.anchorDate}
-                  activeTech={activeTech}
-                  selectedUserIds={selectedCalendarUserIds}
-                  activeUnassignedFilter={activeUnassignedFilter}
-                  activeFilterLabel={activeFilterLabel}
-                />
-              </Suspense>
-              <div className="border-t border-slate-200 pt-3">{statusLegend}</div>
+            <div className="mt-3 border-t border-slate-200 pt-3">
+              {statusLegend}
             </div>
           </details>
 
