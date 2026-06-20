@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { isSessionInvalidError } from "@/lib/auth/session-error";
 
 export type InternalRole = "admin" | "office" | "tech" | "billing";
 
@@ -74,8 +75,10 @@ export async function getInternalUser(
       supabase.auth.getUser(),
     );
 
-    if (error) throw error;
-    userId = user?.id ?? null;
+    // An expired/invalid session is not an unexpected failure - it just means
+    // there's no authenticated user, same as if getUser() had returned none.
+    if (error && !isSessionInvalidError(error)) throw error;
+    userId = error ? null : (user?.id ?? null);
   }
 
   if (!userId) return null;
@@ -120,8 +123,11 @@ export async function requireInternalUser(
       supabase.auth.getUser(),
     );
 
-    if (error) throw error;
-    userId = user?.id ?? null;
+    // An expired/invalid session means the caller is unauthenticated, not that
+    // something unexpected broke - fall through to the AUTH_REQUIRED error
+    // below instead of throwing the raw Supabase error.
+    if (error && !isSessionInvalidError(error)) throw error;
+    userId = error ? null : (user?.id ?? null);
   }
 
   if (!userId) {

@@ -1,6 +1,7 @@
 import { cache } from "react";
 import type { InternalUserRow } from "@/lib/auth/internal-user";
 import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
+import { isSessionInvalidError } from "@/lib/auth/session-error";
 import { createClient } from "@/lib/supabase/server";
 
 export type RequestActorKind =
@@ -38,15 +39,6 @@ function buildUnauthenticatedActorContext(supabase: any): RequestActorContext {
   };
 }
 
-function isAuthSessionMissingError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-
-  const name = String((error as { name?: unknown }).name ?? "").trim();
-  const message = String((error as { message?: unknown }).message ?? "").trim();
-
-  return name === "AuthSessionMissingError" || /auth session missing/i.test(message);
-}
-
 async function resolveRequestActorContextUncached(): Promise<RequestActorContext> {
   const supabase = await createClient();
   const _t_getUser = isOpsTimingEnabled() ? Date.now() : 0;
@@ -57,7 +49,7 @@ async function resolveRequestActorContextUncached(): Promise<RequestActorContext
   finishOpsTiming("ops:requestActorContext:getUser", _t_getUser);
 
   if (userErr) {
-    if (isAuthSessionMissingError(userErr)) {
+    if (isSessionInvalidError(userErr)) {
       return buildUnauthenticatedActorContext(supabase);
     }
     throw userErr;

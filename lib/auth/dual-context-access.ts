@@ -2,6 +2,7 @@ import {
   resolveOperationalMutationEntitlementAccess,
   type OperationalMutationEntitlementReason,
 } from "@/lib/business/platform-entitlement";
+import { isSessionInvalidError } from "@/lib/auth/session-error";
 
 export type DualContextInternalRole = "admin" | "office" | "tech" | "billing";
 export type DualContextLandingContext = "app" | "portal" | "inactive_app" | "none";
@@ -46,15 +47,6 @@ function normalizeText(value: unknown) {
   return String(value ?? "").trim();
 }
 
-function isAuthSessionMissingError(error: unknown): boolean {
-  if (!error || typeof error !== "object") return false;
-
-  const name = normalizeText((error as { name?: unknown }).name);
-  const message = normalizeText((error as { message?: unknown }).message);
-
-  return name === "AuthSessionMissingError" || /auth session missing/i.test(message);
-}
-
 function pickRelatedObject<T extends Record<string, unknown>>(value: T | T[] | null | undefined): T | null {
   if (Array.isArray(value)) return value[0] ?? null;
   return value ?? null;
@@ -77,7 +69,7 @@ export async function resolveDualContextAccess(input: {
   if (!user) {
     const { data, error } = await supabase.auth.getUser();
     if (error) {
-      if (isAuthSessionMissingError(error)) {
+      if (isSessionInvalidError(error)) {
         user = null;
       } else {
         throw error;
