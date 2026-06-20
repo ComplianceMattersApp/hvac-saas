@@ -21,7 +21,23 @@ const workspaceRichCardSource =
     ? opsPageSource.slice(workspaceRichCardStart, workspaceRichCardEnd)
     : "";
 
-const workspaceListStart = opsPageSource.indexOf("selectedWorkspaceSection.previewRows.map");
+const workspaceCloseoutCardStart = opsPageSource.indexOf("function workspaceCloseoutRichCard(");
+const workspaceCloseoutCardEnd = opsPageSource.indexOf("function workspaceFieldPaymentReviewCard(", workspaceCloseoutCardStart);
+const workspaceCloseoutCardSource =
+  workspaceCloseoutCardStart > -1 && workspaceCloseoutCardEnd > workspaceCloseoutCardStart
+    ? opsPageSource.slice(workspaceCloseoutCardStart, workspaceCloseoutCardEnd)
+    : "";
+
+const workspacePaymentCardStart = opsPageSource.indexOf("function workspaceFieldPaymentReviewCard(");
+const workspacePaymentCardEnd = opsPageSource.indexOf("const selectedWorkspaceItemCount", workspacePaymentCardStart);
+const workspacePaymentCardSource =
+  workspacePaymentCardStart > -1 && workspacePaymentCardEnd > workspacePaymentCardStart
+    ? opsPageSource.slice(workspacePaymentCardStart, workspacePaymentCardEnd)
+    : "";
+
+const workspaceListStart = opsPageSource.indexOf(
+  'selectedWorkspaceSection.key === "closeout" && canViewFieldPaymentVerificationAttention',
+);
 const workspaceListEnd = opsPageSource.indexOf("</article>", workspaceListStart);
 const workspaceListSource =
   workspaceListStart > -1 && workspaceListEnd > workspaceListStart
@@ -86,12 +102,60 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(workspaceRichCardSource).toContain("Open SMS App");
   });
 
-  it("preserves compact workspace card rendering for non-Needs-Scheduling queues", () => {
+  it("preserves compact workspace card rendering for queues that have not been promoted", () => {
     expect(workspaceListSource).toMatch(
       /if \(selectedWorkspaceSection\.key === "need_to_schedule"\)[\s\S]+return workspaceNeedsSchedulingRichCard\(job, visibleReason\);[\s\S]+<Link href=\{`\/jobs\/\$\{job\.id\}\?tab=ops`\}[\s\S]+Open Job/,
     );
     expect(workspaceListSource).not.toContain('selectedWorkspaceSection.key === "field_work"');
     expect(workspaceListSource).not.toContain('selectedWorkspaceSection.key === "waiting"');
-    expect(workspaceListSource).not.toContain('selectedWorkspaceSection.key === "closeout"');
+  });
+});
+
+describe("/ops Closeout rich cards", () => {
+  it("renders rich closeout cards only from the actual visible closeout workspace key", () => {
+    expect(opsPageSource).toContain('closeout: "closeout"');
+    expect(opsPageSource).toContain('label: "Closeout & Review"');
+    expect(workspaceCloseoutCardSource).toContain('data-ops-workspace-card-variant="closeout-rich"');
+    expect(workspaceListSource).toContain('if (selectedWorkspaceSection.key === "closeout")');
+    expect(workspaceListSource).toContain("return workspaceCloseoutRichCard(job, visibleReason);");
+  });
+
+  it("uses closeout projection and billing truth before showing External Billing Complete", () => {
+    expect(opsPageSource).toContain("buildBillingTruthCloseoutProjectionMap");
+    expect(opsPageSource).toContain("const selectedWorkspaceCloseoutProjectionByJob");
+    expect(workspaceCloseoutCardSource).toContain("selectedWorkspaceCloseoutProjectionByJob.get(jobId) ?? job");
+    expect(workspaceCloseoutCardSource).toContain("canShowExternalInvoiceSentAction");
+    expect(workspaceCloseoutCardSource).toContain("form action={markInvoiceCompleteFromForm}");
+    expect(workspaceCloseoutCardSource).toContain("External Billing Complete");
+    expect(workspaceCloseoutCardSource).toContain('name="return_to" value={`${activeWorkspaceBaseHref}#ops-workspace-closeout-job-${jobId}`}');
+  });
+
+  it("does not promote deep invoice or payment workspace mutations into closeout job cards", () => {
+    expect(workspaceCloseoutCardSource).not.toContain("createInternalInvoice");
+    expect(workspaceCloseoutCardSource).not.toContain("issueInternalInvoice");
+    expect(workspaceCloseoutCardSource).not.toContain("sendInternalInvoice");
+    expect(workspaceCloseoutCardSource).not.toContain("void");
+    expect(workspaceCloseoutCardSource).not.toContain("recordPayment");
+    expect(workspaceCloseoutCardSource).not.toContain("line_items");
+  });
+
+  it("wires optional confirm-payment cards through the existing verification actions", () => {
+    expect(workspaceListSource).toContain("workspaceFieldPaymentReviewCard(item)");
+    expect(workspacePaymentCardSource).toContain("form action={verifyFieldPaymentCollectionReportFromForm}");
+    expect(workspacePaymentCardSource).toContain("form action={rejectFieldPaymentCollectionReportFromForm}");
+    expect(workspacePaymentCardSource).toContain("Reporter cannot verify their own report.");
+    expect(workspacePaymentCardSource).toContain("Confirm Payment");
+    expect(workspacePaymentCardSource).toContain("Reject Report");
+    expect(workspacePaymentCardSource).toContain('name="return_to" value={`${activeWorkspaceBaseHref}#ops-workspace-field-payment-${item.reportId}`}');
+    expect(
+      readFileSync(resolve(__dirname, "../../actions/internal-invoice-payment-actions.ts"), "utf-8"),
+    ).toContain("'/ops'");
+  });
+
+  it("keeps non-closeout queues on the compact workspace card path", () => {
+    expect(workspaceListSource).not.toContain('selectedWorkspaceSection.key === "field_work"');
+    expect(workspaceListSource).not.toContain('selectedWorkspaceSection.key === "waiting"');
+    expect(workspaceListSource).not.toContain('selectedWorkspaceSection.key === "exceptions"');
+    expect(workspaceListSource).toContain("Open Job");
   });
 });

@@ -66,6 +66,7 @@ function buildInternalInvoiceReturnHref(jobId: string, tab: string, banner: stri
     const allowedPaths = new Set([
       `/jobs/${jobId}`,
       `/jobs/${jobId}/invoice`,
+      '/ops',
       '/ops/closeout-queue',
       '/reports/payment-reconciliation',
     ]);

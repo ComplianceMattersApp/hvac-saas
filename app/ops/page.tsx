@@ -6,6 +6,11 @@ import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
 import { updateJobScheduleFromForm } from "@/lib/actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
+import { markInvoiceCompleteFromForm } from "@/lib/actions/job-ops-actions";
+import {
+  rejectFieldPaymentCollectionReportFromForm,
+  verifyFieldPaymentCollectionReportFromForm,
+} from "@/lib/actions/internal-invoice-payment-actions";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import {
@@ -26,7 +31,7 @@ import {
 } from "@/lib/utils/schedule-la";
 import { formatCityNamePart, formatPersonNamePart } from "@/lib/utils/identity-display";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
-import { getCloseoutNeeds, isInCloseoutQueue } from "@/lib/utils/closeout";
+import { getCloseoutNeeds, getCloseoutQueueNextStepLabel, isInCloseoutQueue } from "@/lib/utils/closeout";
 import { extractFailureReasons } from "@/lib/portal/resolveContractorIssues";
 import { getActiveJobAssignmentDisplayMap, resolveUserDisplayMap } from "@/lib/staffing/human-layer";
 import { buildIlikeSearchTerms, matchesNormalizedSearch } from "@/lib/utils/search-normalization";
@@ -65,7 +70,10 @@ import {
   buildOperationalReportingReadModel,
   type OperationalReportingJob,
 } from "@/lib/ops/operational-reporting";
-import { listCloseoutQueueJobs } from "@/lib/ops/closeout-queue";
+import {
+  canShowExternalInvoiceSentAction,
+  listCloseoutQueueJobs,
+} from "@/lib/ops/closeout-queue";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { isMaintenanceAgreementsEnabled } from "@/lib/maintenance-agreements/agreement-exposure";
 import { summarizeMaintenanceAgreementsForAccount } from "@/lib/maintenance-agreements/read-model";
@@ -1235,6 +1243,16 @@ function subtractBusinessDays(date: Date, days: number) {
     const selectedPreviewLatestCustomerAttemptByJob = buildLatestCustomerAttemptByJob(
       (selectedPreviewCustomerAttemptEventsRes.data ?? []) as Array<{ job_id: string; created_at: string }>,
     );
+    const selectedWorkspaceCloseoutProjectionByJob =
+      selectedWorkspaceKey === "closeout" && selectedPreviewRows.length
+        ? (
+            await buildBillingTruthCloseoutProjectionMap({
+              supabase,
+              accountOwnerUserId: internalUser.account_owner_user_id,
+              jobs: closeoutProjectionInputs(selectedPreviewRows),
+            })
+          ).projectionsByJobId
+        : new Map<string, any>();
 
     const operationalTenantIdentity = await operationalTenantIdentityPromise;
     const workspaceContractorsRes = await supabase
@@ -1316,7 +1334,7 @@ function subtractBusinessDays(date: Date, days: number) {
           : null;
       })
       .filter(Boolean) as PermitJobLocationOption[];
-    const activeWorkspaceHref = `/ops${buildQueryString({
+    const activeWorkspaceBaseHref = `/ops${buildQueryString({
       bucket: effectiveBoardBucketFilter,
       create: "",
       contractor: contractorScopeFilter ?? "",
@@ -1324,7 +1342,8 @@ function subtractBusinessDays(date: Date, days: number) {
       sort,
       reason: effectiveBoardReasonFilter ?? "",
       signal,
-    })}#ops-workspace`;
+    })}`;
+    const activeWorkspaceHref = `${activeWorkspaceBaseHref}#ops-workspace`;
 
     function workspaceNeedsSchedulingRichCard(job: any, visibleReason: OpsBoardVisibleReason) {
       const jobId = String(job?.id ?? "").trim();
@@ -1505,6 +1524,288 @@ function subtractBusinessDays(date: Date, days: number) {
               <p className="text-[11px] text-slate-500">
                 Logs communication attempts only; does not confirm carrier delivery.
               </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function formatWorkspaceUsdFromCents(cents: number | null | undefined) {
+      const amount = Number(cents ?? 0) / 100;
+      return new Intl.NumberFormat("en-US", {
+        style: "currency",
+        currency: "USD",
+      }).format(Number.isFinite(amount) ? amount : 0);
+    }
+
+    function formatWorkspaceFieldPaymentMethod(method: string | null | undefined) {
+      const normalized = String(method ?? "").trim().toLowerCase();
+      if (normalized === "cash") return "Cash";
+      if (normalized === "check") return "Check";
+      return "Other";
+    }
+
+    function formatWorkspaceTimestamp(value: string | null | undefined) {
+      const normalized = String(value ?? "").trim();
+      if (!normalized) return "-";
+      const parsed = new Date(normalized);
+      if (Number.isNaN(parsed.getTime())) return "-";
+      return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(parsed);
+    }
+
+    function workspaceCloseoutRichCard(job: any, visibleReason: OpsBoardVisibleReason) {
+      const jobId = String(job?.id ?? "").trim();
+      const phone = String(job?.customer_phone ?? "").trim();
+      const phoneHref = telHref(phone);
+      const textHref = smsHref(phone);
+      const projection = selectedWorkspaceCloseoutProjectionByJob.get(jobId) ?? job;
+      const needs = getCloseoutNeeds(projection);
+      const canMarkExternalInvoiceSent = canShowExternalInvoiceSentAction({
+        needsInvoice: needs.needsInvoice,
+        billingState: projection?.billingState ?? null,
+      });
+      const completedText = job?.field_complete_at
+        ? formatWorkspaceTimestamp(String(job.field_complete_at))
+        : "Completion pending";
+      const scheduledText = job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "";
+      const assignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
+      const contractorName = workspaceContractorName(job) || operationalTenantIdentity.displayName;
+      const utilityLabelClass =
+        "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
+      const inlineActionClass =
+        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99]";
+      const primaryActionClass =
+        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
+      const chipClass =
+        "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
+
+      return (
+        <div
+          key={jobId}
+          id={`ops-workspace-closeout-job-${jobId}`}
+          data-ops-workspace-card-variant="closeout-rich"
+          className="rounded-xl border border-l-4 border-slate-200 border-l-violet-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-violet-900/35 sm:px-5"
+        >
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,1.05fr)_minmax(14rem,0.72fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/jobs/${jobId}?tab=ops`}
+                  className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                >
+                  {workspaceTitle(job)}
+                </Link>
+                <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-violet-700">
+                  Closeout
+                </span>
+              </div>
+              <div className="mt-2 text-sm font-semibold text-slate-800">{workspaceCustomerLocation(job)}</div>
+              <div className="mt-2 grid gap-1 text-sm leading-5 text-slate-500">
+                <div>
+                  <span className={utilityLabelClass}>Reason</span>
+                  <div className="font-medium text-slate-700">{visibleReason.label}</div>
+                  {visibleReason.detail ? <div className="text-slate-700">{visibleReason.detail}</div> : null}
+                </div>
+                <div>
+                  <span className={utilityLabelClass}>Contractor</span>
+                  <div className="font-medium text-slate-700">{contractorName}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Completed</span>
+                <span className={chipClass}>{completedText}</span>
+              </div>
+              {scheduledText ? (
+                <div className="grid gap-1.5">
+                  <span className={utilityLabelClass}>Scheduled</span>
+                  <span className={chipClass}>{scheduledText}</span>
+                </div>
+              ) : null}
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Assignment</span>
+                <span className={chipClass}>{assignmentSummary}</span>
+              </div>
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Needs</span>
+                <span className={chipClass}>
+                  {needs.needsInvoice && needs.needsCerts
+                    ? "Invoice + paperwork"
+                    : needs.needsInvoice
+                    ? "Invoice"
+                    : needs.needsCerts
+                    ? "Paperwork"
+                    : "Review"}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+              <span className={utilityLabelClass}>Next Step</span>
+              <p className="text-sm leading-5 text-slate-700">{getCloseoutQueueNextStepLabel(projection)}</p>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <Link href={`/jobs/${jobId}?tab=ops`} className={primaryActionClass}>
+                  View Job
+                </Link>
+                {phoneHref ? (
+                  <a href={phoneHref} className={inlineActionClass}>
+                    Call
+                  </a>
+                ) : null}
+                {textHref ? (
+                  <a href={textHref} className={inlineActionClass}>
+                    Open SMS App
+                  </a>
+                ) : null}
+                {canMarkExternalInvoiceSent ? (
+                  <form action={markInvoiceCompleteFromForm}>
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="return_to" value={`${activeWorkspaceBaseHref}#ops-workspace-closeout-job-${jobId}`} />
+                    <input type="hidden" name="success_notice" value="external_billing_complete" />
+                    <button type="submit" className={inlineActionClass}>
+                      External Billing Complete
+                    </button>
+                  </form>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    function workspaceFieldPaymentReviewCard(item: NonNullable<typeof fieldPaymentReconciliationAttention>["items"][number]) {
+      const isSelfReported = item.reportedByUserId === user.id;
+      const utilityLabelClass =
+        "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
+      const inlineActionClass =
+        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99]";
+      const primaryActionClass =
+        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
+      const inputClass =
+        "w-full rounded-md border border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-900";
+      const chipClass =
+        "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
+
+      return (
+        <div
+          key={`field-payment-${item.reportId}`}
+          id={`ops-workspace-field-payment-${item.reportId}`}
+          data-ops-workspace-card-variant="closeout-payment-review"
+          className="rounded-xl border border-l-4 border-slate-200 border-l-violet-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-violet-900/35 sm:px-5"
+        >
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,1.05fr)_minmax(14rem,0.72fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={item.links.jobHref}
+                  className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                >
+                  {item.jobTitle || item.jobReference}
+                </Link>
+                <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-violet-700">
+                  Confirm Payment
+                </span>
+              </div>
+              <div className="mt-2 text-sm font-semibold text-slate-800">{item.customerDisplayName || "Customer"}</div>
+              <div className="mt-2 grid gap-1 text-sm leading-5 text-slate-500">
+                <div>
+                  <span className={utilityLabelClass}>Reason</span>
+                  <div className="font-medium text-slate-700">Field-reported payment needs confirmation.</div>
+                </div>
+                <div>
+                  <span className={utilityLabelClass}>Invoice</span>
+                  <div className="font-medium text-slate-700">{item.invoiceReference}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Method</span>
+                <span className={chipClass}>{formatWorkspaceFieldPaymentMethod(item.paymentMethod)}</span>
+              </div>
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Amount</span>
+                <span className={chipClass}>{formatWorkspaceUsdFromCents(item.amountCents)}</span>
+              </div>
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Reported By</span>
+                <span className={chipClass}>{item.reportedByDisplayName}</span>
+              </div>
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Reported</span>
+                <span className={chipClass}>{formatWorkspaceTimestamp(item.reportedAt)}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+              <span className={utilityLabelClass}>Next Step</span>
+              <p className="text-sm leading-5 text-slate-700">Confirm only after verifying the money was received.</p>
+              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                <Link href={item.links.jobHref} className={primaryActionClass}>
+                  View Job
+                </Link>
+                <Link href={item.links.invoiceWorkspaceHref} className={inlineActionClass}>
+                  Open invoice workspace
+                </Link>
+              </div>
+              {isSelfReported ? (
+                <div className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
+                  Reporter cannot verify their own report.
+                </div>
+              ) : (
+                <div className="mt-1 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-[11px]">
+                  <form action={verifyFieldPaymentCollectionReportFromForm} className="space-y-2">
+                    <input type="hidden" name="field_payment_report_id" value={item.reportId} />
+                    <input type="hidden" name="report_id" value={item.reportId} />
+                    <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
+                    <input type="hidden" name="job_id" value={item.jobId} />
+                    <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="return_to" value={`${activeWorkspaceBaseHref}#ops-workspace-field-payment-${item.reportId}`} />
+                    <label className="block">
+                      <span className="mb-1 block font-semibold text-slate-900">Verification note</span>
+                      <input
+                        name="verification_note"
+                        type="text"
+                        className={inputClass}
+                        placeholder="Optional office confirmation details"
+                      />
+                    </label>
+                    <button type="submit" className={inlineActionClass}>
+                      Confirm Payment
+                    </button>
+                  </form>
+                  <form action={rejectFieldPaymentCollectionReportFromForm} className="space-y-2">
+                    <input type="hidden" name="field_payment_report_id" value={item.reportId} />
+                    <input type="hidden" name="report_id" value={item.reportId} />
+                    <input type="hidden" name="invoice_id" value={item.internalInvoiceId} />
+                    <input type="hidden" name="job_id" value={item.jobId} />
+                    <input type="hidden" name="tab" value="info" />
+                    <input type="hidden" name="return_to" value={`${activeWorkspaceBaseHref}#ops-workspace-field-payment-${item.reportId}`} />
+                    <label className="block">
+                      <span className="mb-1 block font-semibold text-slate-900">Rejection reason</span>
+                      <input
+                        name="rejection_reason"
+                        type="text"
+                        required
+                        className={inputClass}
+                        placeholder="Required"
+                      />
+                    </label>
+                    <button type="submit" className={inlineActionClass}>
+                      Reject Report
+                    </button>
+                  </form>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -2542,10 +2843,16 @@ function subtractBusinessDays(date: Date, days: number) {
               </div>
             ) : (
               <div className="space-y-2">
+                {selectedWorkspaceSection.key === "closeout" && canViewFieldPaymentVerificationAttention
+                  ? (fieldPaymentReconciliationAttention?.items ?? []).map((item) => workspaceFieldPaymentReviewCard(item))
+                  : null}
                 {selectedWorkspaceSection.previewRows.map((job: any) => {
                   const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);
                   if (selectedWorkspaceSection.key === "need_to_schedule") {
                     return workspaceNeedsSchedulingRichCard(job, visibleReason);
+                  }
+                  if (selectedWorkspaceSection.key === "closeout") {
+                    return workspaceCloseoutRichCard(job, visibleReason);
                   }
 
                   return (
