@@ -6,6 +6,7 @@ export type DraggedJobPayload = {
   city?: string | null;
   assigneeSummary?: string | null;
   hasNoTechAssigned?: boolean;
+  originColumnKey?: string | null;
 };
 
 export const DISPATCH_GRID_START_MINUTES = 6 * 60;
@@ -46,6 +47,7 @@ export function buildDragPayload(args: {
   city?: string | null;
   assigneeSummary?: string | null;
   hasNoTechAssigned?: boolean;
+  originColumnKey?: string | null;
 }): DraggedJobPayload {
   return {
     jobId: String(args.jobId ?? "").trim(),
@@ -55,6 +57,7 @@ export function buildDragPayload(args: {
     city: String(args.city ?? "").trim() || null,
     assigneeSummary: String(args.assigneeSummary ?? "").trim() || null,
     hasNoTechAssigned: Boolean(args.hasNoTechAssigned),
+    originColumnKey: String(args.originColumnKey ?? "").trim() || null,
   };
 }
 
@@ -89,6 +92,7 @@ export function extractDraggedJobPayloadFromDataTransfer(transfer: DataTransfer)
           city: String(parsed.city ?? "").trim() || null,
           assigneeSummary: String(parsed.assigneeSummary ?? "").trim() || null,
           hasNoTechAssigned: parsed.hasNoTechAssigned === true,
+          originColumnKey: String(parsed.originColumnKey ?? "").trim() || null,
         };
       }
     } catch {
@@ -105,6 +109,22 @@ export function extractDraggedJobPayloadFromDataTransfer(transfer: DataTransfer)
     windowStart: null,
     windowEnd: null,
   };
+}
+
+export function computeDropColumnKey(args: {
+  clientX: number;
+  left: number;
+  width: number;
+  columns: Array<{ key: string }>;
+}): string {
+  const count = args.columns.length;
+  if (count === 0) return "";
+
+  const safeWidth = args.width > 0 ? args.width : 1;
+  const ratio = Math.max(0, Math.min(1, (args.clientX - args.left) / safeWidth));
+  const index = Math.max(0, Math.min(count - 1, Math.floor(ratio * count)));
+
+  return args.columns[index].key;
 }
 
 export function computeDropStartMinutes(args: {

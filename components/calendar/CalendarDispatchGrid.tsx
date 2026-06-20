@@ -9,6 +9,7 @@ import { buildCalendarHref } from "./calendar-href";
 import { formatCalendarDisplayStatus, getCalendarDisplayStatus } from "./calendar-status";
 import {
   buildDragPayload,
+  computeDropColumnKey,
   computeDropStartMinutes,
   computeDropWindow,
   DISPATCH_GRID_END_MINUTES,
@@ -20,12 +21,48 @@ import {
 type Props = {
   jobs: DispatchJob[];
   blockEvents: DispatchCalendarBlockEvent[];
+  assignableUsers: Array<{ user_id: string; display_name: string }>;
   mode: DispatchViewMode;
   date: string;
   tech?: string | null;
   selectedJobId?: string;
   dropReturnTo: string;
   scheduleAction: (formData: FormData) => Promise<void> | void;
+  reassignAction: (formData: FormData) => Promise<void> | void;
+};
+
+type GridColumn = {
+  key: string;
+  label: string;
+};
+
+const UNASSIGNED_COLUMN_KEY = "unassigned";
+
+type PendingReassignDrop = {
+  jobId: string;
+  originColumnKey: string;
+  originLabel: string;
+  targetColumnKey: string;
+  targetLabel: string;
+  windowStart: string;
+  windowEnd: string;
+  start: number;
+  end: number;
+  title: string;
+  city: string;
+  assigneeSummary: string | null;
+  hasNoTechAssigned: boolean;
+};
+
+type PendingUnassignDrop = {
+  jobId: string;
+  assigneeNames: string[];
+  windowStart: string;
+  windowEnd: string;
+  start: number;
+  end: number;
+  title: string;
+  city: string;
 };
 
 type GridItem = {
@@ -33,6 +70,7 @@ type GridItem = {
   kind: "job" | "block";
   job?: DispatchJob;
   event?: DispatchCalendarBlockEvent;
+  columnKey: string;
   start: number;
   end: number;
   lane: number;
@@ -214,12 +252,14 @@ export default function CalendarDispatchGrid(props: Props) {
   const {
     jobs,
     blockEvents,
+    assignableUsers,
     mode,
     date,
     tech,
     selectedJobId,
     dropReturnTo,
     scheduleAction,
+    reassignAction,
   } = props;
 
   const currentView = mode === "week" ? "week" : "day";
@@ -236,6 +276,8 @@ export default function CalendarDispatchGrid(props: Props) {
   const [dropZoneActive, setDropZoneActive] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
   const [optimisticDrop, setOptimisticDrop] = useState<OptimisticJobDrop | null>(null);
+  const [pendingReassignDrop, setPendingReassignDrop] = useState<PendingReassignDrop | null>(null);
+  const [pendingUnassignDrop, setPendingUnassignDrop] = useState<PendingUnassignDrop | null>(null);
 
   const router = useRouter();
   const [isSavingDrop, startSavingDrop] = useTransition();
@@ -246,6 +288,26 @@ export default function CalendarDispatchGrid(props: Props) {
   });
 
   const dayBlockEvents = blockEvents.filter((event) => event.calendar_date === date);
+
+  const columns: GridColumn[] = [
+    { key: UNASSIGNED_COLUMN_KEY, label: "Unassigned" },
+    ...assignableUsers.map((user) => ({ key: user.user_id, label: user.display_name })),
+  ];
+  const columnIndexByKey = new Map(columns.map((column, index) => [column.key, index]));
+  const activeTechKeys = new Set(assignableUsers.map((user) => user.user_id));
+
+  function resolveJobColumnKey(job: DispatchJob): string {
+    const assignments = Array.isArray(job.assignments) ? job.assignments : [];
+    if (!assignments.length) return UNASSIGNED_COLUMN_KEY;
+    const primary = assignments.find((assignment) => assignment.is_primary) ?? assignments[0];
+    const userId = String(primary?.user_id ?? "").trim();
+    return userId && activeTechKeys.has(userId) ? userId : UNASSIGNED_COLUMN_KEY;
+  }
+
+  function resolveBlockColumnKey(event: DispatchCalendarBlockEvent): string {
+    const userId = String(event.internal_user_id ?? "").trim();
+    return userId && activeTechKeys.has(userId) ? userId : UNASSIGNED_COLUMN_KEY;
+  }
 
   const rows: GridItem[] = [];
 
@@ -261,6 +323,7 @@ export default function CalendarDispatchGrid(props: Props) {
       id: job.id,
       kind: "job",
       job,
+      columnKey: resolveJobColumnKey(job),
       start: clampedStart,
       end: clampedEnd,
       lane: 0,
@@ -280,6 +343,7 @@ export default function CalendarDispatchGrid(props: Props) {
       id: event.id,
       kind: "block",
       event,
+      columnKey: resolveBlockColumnKey(event),
       start: clampedStart,
       end: clampedEnd,
       lane: 0,
@@ -287,7 +351,18 @@ export default function CalendarDispatchGrid(props: Props) {
     });
   }
 
-  assignLanes(rows);
+  const rowsByColumn = new Map<string, GridItem[]>();
+  for (const row of rows) {
+    const group = rowsByColumn.get(row.columnKey);
+    if (group) group.push(row);
+    else rowsByColumn.set(row.columnKey, [row]);
+  }
+  for (const group of rowsByColumn.values()) {
+    assignLanes(group);
+  }
+
+  const columnCount = columns.length;
+  const columnWidthPct = 100 / Math.max(columnCount, 1);
 
   const isTodayColumn = String(date) === todayYmdLA();
   const nowMinutes = currentMinutesLA();
@@ -340,6 +415,90 @@ export default function CalendarDispatchGrid(props: Props) {
     });
   }
 
+  // Cross-column drop confirmed via the modal below — kept entirely separate
+  // from submitDropSchedule above so the same-column path is untouched.
+  function submitReassignDrop(mode: "reassign" | "add") {
+    if (!pendingReassignDrop) return;
+    const drop = pendingReassignDrop;
+
+    const payload = new FormData();
+    payload.set("job_id", drop.jobId);
+    payload.set("target_user_id", drop.targetColumnKey);
+    payload.set("mode", mode);
+    payload.set("scheduled_date", date);
+    payload.set("window_start", drop.windowStart);
+    payload.set("window_end", drop.windowEnd);
+    payload.set("return_to", dropReturnTo);
+    payload.set("no_redirect", "1");
+
+    setPendingReassignDrop(null);
+    setOptimisticDrop({
+      jobId: drop.jobId,
+      start: drop.start,
+      end: drop.end,
+      title: drop.title,
+      city: drop.city,
+      assigneeSummary: drop.assigneeSummary,
+      hasNoTechAssigned: drop.hasNoTechAssigned,
+    });
+
+    startSavingDrop(() => {
+      void Promise.resolve(reassignAction(payload))
+        .then(() => {
+          router.refresh();
+        })
+        .catch(() => {
+          setDropError("Could not reassign the job. Please try again.");
+          setOptimisticDrop(null);
+        })
+        .finally(() => {
+          setOptimisticDrop(null);
+        });
+    });
+  }
+
+  // Drop onto the Unassigned column, confirmed via the modal below — same
+  // shape as submitReassignDrop, kept separate so neither it nor
+  // submitDropSchedule is touched by this path.
+  function submitUnassignDrop() {
+    if (!pendingUnassignDrop) return;
+    const drop = pendingUnassignDrop;
+
+    const payload = new FormData();
+    payload.set("job_id", drop.jobId);
+    payload.set("mode", "unassign");
+    payload.set("scheduled_date", date);
+    payload.set("window_start", drop.windowStart);
+    payload.set("window_end", drop.windowEnd);
+    payload.set("return_to", dropReturnTo);
+    payload.set("no_redirect", "1");
+
+    setPendingUnassignDrop(null);
+    setOptimisticDrop({
+      jobId: drop.jobId,
+      start: drop.start,
+      end: drop.end,
+      title: drop.title,
+      city: drop.city,
+      assigneeSummary: null,
+      hasNoTechAssigned: true,
+    });
+
+    startSavingDrop(() => {
+      void Promise.resolve(reassignAction(payload))
+        .then(() => {
+          router.refresh();
+        })
+        .catch(() => {
+          setDropError("Could not unassign the job. Please try again.");
+          setOptimisticDrop(null);
+        })
+        .finally(() => {
+          setOptimisticDrop(null);
+        });
+    });
+  }
+
   return (
     <>
       {dropError ? (
@@ -351,12 +510,16 @@ export default function CalendarDispatchGrid(props: Props) {
       ) : null}
 
       <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
-        <div className="grid" style={{ gridTemplateColumns: "84px minmax(0, 1fr)" }}>
+        <div className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-2">
+          <p className="truncate text-[11px] text-slate-500">Drag changes date and time only. Technician assignment stays attached to the job.</p>
+        </div>
+        <div className="grid" style={{ gridTemplateColumns: `84px repeat(${columnCount}, minmax(150px, 1fr))` }}>
           <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Time</div>
-          <div className="border-b border-r border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-3">
-            <p className="truncate text-sm font-semibold text-slate-900">Appointment timeline</p>
-            <p className="mt-0.5 truncate text-[11px] text-slate-500">Drag changes date and time only. Technician assignment stays attached to the job.</p>
-          </div>
+          {columns.map((column) => (
+            <div key={`header-${column.key}`} className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3">
+              <p className="truncate text-sm font-semibold text-slate-900">{column.label}</p>
+            </div>
+          ))}
 
           <div className="relative border-r border-slate-200 bg-white" style={{ height: `${totalGridHeight}px` }}>
             {Array.from({ length: endHour - startHour }, (_, i) => (
@@ -383,7 +546,7 @@ export default function CalendarDispatchGrid(props: Props) {
 
           <div
             className={`relative border-r border-slate-200 bg-white transition ${dropZoneActive ? "bg-blue-50/25 ring-2 ring-inset ring-blue-300/70" : ""}`}
-            style={{ height: `${totalGridHeight}px` }}
+            style={{ height: `${totalGridHeight}px`, gridColumn: `span ${columnCount}` }}
             onDragEnter={(event) => {
               if (!event.dataTransfer) return;
               if (!isLikelyJobDrag(event.dataTransfer)) return;
@@ -456,6 +619,55 @@ export default function CalendarDispatchGrid(props: Props) {
               const nextStart = parseMinutes(dropWindow.windowStart) ?? DISPATCH_GRID_START_MINUTES;
               const nextEnd = parseMinutes(dropWindow.windowEnd) ?? DISPATCH_GRID_END_MINUTES;
 
+              const targetColumnKey = computeDropColumnKey({
+                clientX: event.clientX,
+                left: rect.left,
+                width: rect.width,
+                columns,
+              });
+              const originColumnKey = payload.originColumnKey ?? UNASSIGNED_COLUMN_KEY;
+
+              if (targetColumnKey !== originColumnKey) {
+                const originLabel = columns.find((column) => column.key === originColumnKey)?.label ?? "Unassigned";
+                const targetLabel = columns.find((column) => column.key === targetColumnKey)?.label ?? "Unassigned";
+
+                if (targetColumnKey === UNASSIGNED_COLUMN_KEY) {
+                  const assigneeSummaryRaw = String(payload.assigneeSummary ?? "").trim();
+                  const assigneeNames = assigneeSummaryRaw
+                    ? assigneeSummaryRaw.split(",").map((name) => name.trim()).filter(Boolean)
+                    : [];
+
+                  setPendingUnassignDrop({
+                    jobId: payload.jobId,
+                    assigneeNames,
+                    windowStart: dropWindow.windowStart,
+                    windowEnd: dropWindow.windowEnd,
+                    start: nextStart,
+                    end: nextEnd,
+                    title: String(payload.title ?? "").trim() || `Job ${payload.jobId.slice(0, 8)}`,
+                    city: String(payload.city ?? "").trim() || "",
+                  });
+                  return;
+                }
+
+                setPendingReassignDrop({
+                  jobId: payload.jobId,
+                  originColumnKey,
+                  originLabel,
+                  targetColumnKey,
+                  targetLabel,
+                  windowStart: dropWindow.windowStart,
+                  windowEnd: dropWindow.windowEnd,
+                  start: nextStart,
+                  end: nextEnd,
+                  title: String(payload.title ?? "").trim() || `Job ${payload.jobId.slice(0, 8)}`,
+                  city: String(payload.city ?? "").trim() || "",
+                  assigneeSummary: String(payload.assigneeSummary ?? "").trim() || null,
+                  hasNoTechAssigned: payload.hasNoTechAssigned === true,
+                });
+                return;
+              }
+
               submitDropSchedule({
                 jobId: payload.jobId,
                 windowStart: dropWindow.windowStart,
@@ -477,6 +689,13 @@ export default function CalendarDispatchGrid(props: Props) {
               return <div key={hour} className="absolute left-0 right-0 border-t border-slate-100/90" style={{ top: `${y}px` }} />;
             })}
             {showNowLine ? <div className="absolute left-0 right-0 border-t border-rose-400/70" style={{ top: `${nowTop}px` }} /> : null}
+            {columns.slice(1).map((_, index) => (
+              <div
+                key={`col-divider-${index}`}
+                className="pointer-events-none absolute top-0 bottom-0 border-l border-slate-200"
+                style={{ left: `${(index + 1) * columnWidthPct}%` }}
+              />
+            ))}
 
             {dropHoverMinutes != null ? (
               <>
@@ -528,8 +747,9 @@ export default function CalendarDispatchGrid(props: Props) {
               if (row.kind === "job" && optimisticDrop?.jobId === row.id) return null;
               const top = ((row.start - gridStartMinutes) / 60) * hourHeight;
               const height = Math.max(((row.end - row.start) / 60) * hourHeight, 36);
-              const laneWidthPct = 100 / Math.max(row.laneCount, 1);
-              const laneLeftPct = row.lane * laneWidthPct;
+              const columnIndex = columnIndexByKey.get(row.columnKey) ?? 0;
+              const laneWidthPct = columnWidthPct / Math.max(row.laneCount, 1);
+              const laneLeftPct = columnIndex * columnWidthPct + row.lane * laneWidthPct;
               const laneGapPx = 3;
 
               if (row.kind === "block" && row.event) {
@@ -628,6 +848,7 @@ export default function CalendarDispatchGrid(props: Props) {
                         city: job.city,
                         assigneeSummary,
                         hasNoTechAssigned: !job.assignments || job.assignments.length === 0,
+                        originColumnKey: row.columnKey,
                       });
                       event.dataTransfer.setData("application/x-cm-job", serializeDragPayload(payload));
                       event.dataTransfer.setData("application/x-cm-job-id", payload.jobId);
@@ -653,6 +874,100 @@ export default function CalendarDispatchGrid(props: Props) {
           </div>
         </div>
       </div>
+
+      {pendingReassignDrop ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="reassign-drop-title"
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.45)] sm:p-6"
+          >
+            <h2 id="reassign-drop-title" className="text-lg font-semibold tracking-tight text-slate-950">
+              Reassign this job?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              This job is currently assigned to <strong>{pendingReassignDrop.originLabel}</strong>. You dropped it
+              on <strong>{pendingReassignDrop.targetLabel}</strong>&apos;s column at {hmLabel(pendingReassignDrop.start)}.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={isSavingDrop}
+                onClick={() => submitReassignDrop("reassign")}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-4 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Reassign to {pendingReassignDrop.targetLabel}
+              </button>
+              <button
+                type="button"
+                disabled={isSavingDrop}
+                onClick={() => submitReassignDrop("add")}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Also assign {pendingReassignDrop.targetLabel}
+              </button>
+              <button
+                type="button"
+                disabled={isSavingDrop}
+                onClick={() => setPendingReassignDrop(null)}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg px-4 text-sm font-semibold text-slate-500 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {pendingUnassignDrop ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/40 px-4">
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="unassign-drop-title"
+            className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.45)] sm:p-6"
+          >
+            <h2 id="unassign-drop-title" className="text-lg font-semibold tracking-tight text-slate-950">
+              Unassign this job?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-slate-700">
+              {pendingUnassignDrop.assigneeNames.length === 1 ? (
+                <>
+                  Remove <strong>{pendingUnassignDrop.assigneeNames[0]}</strong> from this job and mark it
+                  unassigned?
+                </>
+              ) : pendingUnassignDrop.assigneeNames.length > 1 ? (
+                <>
+                  Remove all {pendingUnassignDrop.assigneeNames.length} technicians (
+                  {pendingUnassignDrop.assigneeNames.join(", ")}) from this job?
+                </>
+              ) : (
+                <>Mark this job unassigned?</>
+              )}{" "}
+              It will also move to {hmLabel(pendingUnassignDrop.start)}.
+            </p>
+            <div className="mt-5 flex flex-col gap-2">
+              <button
+                type="button"
+                disabled={isSavingDrop}
+                onClick={() => submitUnassignDrop()}
+                className="inline-flex min-h-11 items-center justify-center rounded-lg border border-rose-700 bg-rose-700 px-4 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Confirm
+              </button>
+              <button
+                type="button"
+                disabled={isSavingDrop}
+                onClick={() => setPendingUnassignDrop(null)}
+                className="inline-flex min-h-9 items-center justify-center rounded-lg px-4 text-sm font-semibold text-slate-500 transition hover:text-slate-700 disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

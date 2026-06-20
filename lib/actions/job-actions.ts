@@ -5246,6 +5246,157 @@ export async function removeJobAssigneeFromForm(formData: FormData) {
   });
 }
 
+/**
+ * Drag-and-drop cross-column reassignment from the per-technician dispatch
+ * grid (calendar day/week view). Updates the job's scheduled time via the
+ * same applyJobScheduleUpdate helper updateJobScheduleFromForm uses, then
+ * one of:
+ *   - "reassign": removes the prior active assignee(s), target_user_id
+ *     becomes sole/primary
+ *   - "add": adds target_user_id alongside existing assignees
+ *     (non-primary, nobody removed)
+ *   - "unassign": removes every currently-active assignee, no target user
+ *     (the Unassigned-column drop case — no one to reassign/add to)
+ * Reuses the same job_assignments helpers as removeJobAssigneeFromForm/
+ * assignJobAssigneeFromForm/setPrimaryJobAssigneeFromForm so the
+ * resulting event trail (assignment_added, assignment_primary_set,
+ * assignment_removed) matches those existing flows exactly, plus one
+ * schedule_updated event recording the reschedule and assignment change
+ * together.
+ */
+export async function reassignAndRescheduleJobFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const targetUserId = String(formData.get("target_user_id") || "").trim();
+  const mode = String(formData.get("mode") || "").trim();
+  const scheduledDate = String(formData.get("scheduled_date") || "").trim() || null;
+  const windowStart = String(formData.get("window_start") || "").trim() || null;
+  const windowEnd = String(formData.get("window_end") || "").trim() || null;
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const noRedirect = String(formData.get("no_redirect") || "").trim() === "1";
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (mode !== "reassign" && mode !== "add" && mode !== "unassign") throw new Error("Invalid mode");
+  if ((mode === "reassign" || mode === "add") && !targetUserId) throw new Error("Missing target_user_id");
+  if (!scheduledDate) throw new Error("Missing scheduled_date");
+  if (windowStart && windowEnd && windowStart >= windowEnd) {
+    throw new Error("Arrival window start must be before end");
+  }
+
+  function finishReassignTarget(banner: string) {
+    if (noRedirect) return;
+    redirectToJobWithBanner({
+      jobId,
+      banner,
+      returnToRaw,
+    });
+  }
+
+  const supabase = await createClient();
+  const { userId: actorUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  const { data: priorAssignmentRows, error: priorAssignmentErr } = await supabase
+    .from("job_assignments")
+    .select("user_id")
+    .eq("job_id", jobId)
+    .eq("is_active", true);
+
+  if (priorAssignmentErr) throw priorAssignmentErr;
+
+  const scheduleResult = await applyJobScheduleUpdate({
+    jobId,
+    scheduledDate,
+    windowStart,
+    windowEnd,
+    unscheduleRequested: false,
+  });
+
+  if (mode === "reassign") {
+    await ensureActiveAssignmentAndNotify({
+      supabase,
+      jobId,
+      userId: targetUserId,
+      actorUserId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+    await setPrimaryJobAssignment({
+      supabase,
+      jobId,
+      userId: targetUserId,
+      actorUserId,
+    });
+
+    const originUserIds = (priorAssignmentRows ?? [])
+      .map((row: any) => String(row?.user_id ?? "").trim())
+      .filter((assignedUserId: string) => assignedUserId && assignedUserId !== targetUserId);
+
+    for (const originUserId of originUserIds) {
+      await softRemoveJobAssignment({
+        supabase,
+        jobId,
+        userId: originUserId,
+        removedBy: actorUserId,
+      });
+    }
+  } else if (mode === "add") {
+    await ensureActiveAssignmentAndNotify({
+      supabase,
+      jobId,
+      userId: targetUserId,
+      actorUserId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } else {
+    // mode === "unassign": no target user — remove every currently-active
+    // assignee, add no one, set no one primary.
+    const originUserIds = (priorAssignmentRows ?? [])
+      .map((row: any) => String(row?.user_id ?? "").trim())
+      .filter((assignedUserId: string) => assignedUserId);
+
+    for (const originUserId of originUserIds) {
+      await softRemoveJobAssignment({
+        supabase,
+        jobId,
+        userId: originUserId,
+        removedBy: actorUserId,
+      });
+    }
+  }
+
+  await insertJobEvent({
+    supabase,
+    jobId,
+    event_type: "schedule_updated",
+    meta: {
+      timeline_v: 1,
+      event_family: "scheduling",
+      actor_user_id: actorUserId,
+      source_action: "reassignAndRescheduleJobFromForm",
+      reassignment_mode: mode,
+      target_user_id: targetUserId || null,
+      ops_eval_failed: scheduleResult.opsEvalFailed,
+      next: { scheduled_date: scheduledDate, window_start: windowStart, window_end: windowEnd },
+    },
+    userId: actorUserId,
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/ops");
+  revalidatePath("/ops/field");
+  revalidatePath(`/calendar`);
+
+  finishReassignTarget(
+    mode === "reassign" ? "assignment_primary_set" : mode === "add" ? "assignment_added" : "assignment_removed",
+  );
+}
+
 /** =========================
  * SAVE: REFRIGERANT CHARGE
  * - merges existing data
@@ -10019,6 +10170,57 @@ export async function revertOnTheWayFromForm(formData: FormData) {
   redirectToJob("on_the_way_reverted");
 }
 
+/**
+ * Core schedule write shared by updateJobScheduleFromForm and any other
+ * caller that needs to move a job's scheduled_date/window_start/window_end
+ * (e.g. the dispatch-grid drag-and-drop reassignment action). Writes the
+ * jobs row (plus any caller-supplied extraFields in the SAME update call,
+ * so e.g. permit fields stay in the same statement as today) and evaluates
+ * ops_status immediately after, matching updateJobScheduleFromForm's
+ * existing ordering exactly. Does not touch job_assignments, job_events,
+ * hold-release, or notifications — those stay with each caller so their
+ * existing ordering/interleaving (e.g. permit-change side effects in
+ * updateJobScheduleFromForm) is not disturbed.
+ */
+async function applyJobScheduleUpdate(params: {
+  jobId: string;
+  scheduledDate: string | null;
+  windowStart: string | null;
+  windowEnd: string | null;
+  unscheduleRequested: boolean;
+  extraFields?: Record<string, unknown>;
+}): Promise<{
+  opsEvalFailed: boolean;
+  nextLifecycleStatus: "open" | undefined;
+  nextOnTheWayAt: null | undefined;
+}> {
+  const { jobId, scheduledDate, windowStart, windowEnd, unscheduleRequested, extraFields } = params;
+
+  const isUnscheduledAfterSave = !scheduledDate && !windowStart && !windowEnd;
+  const nextLifecycleStatus: "open" | undefined =
+    unscheduleRequested && isUnscheduledAfterSave ? "open" : undefined;
+  const nextOnTheWayAt: null | undefined =
+    unscheduleRequested && isUnscheduledAfterSave ? null : undefined;
+
+  await updateJob({
+    id: jobId,
+    scheduled_date: scheduledDate,
+    window_start: windowStart,
+    window_end: windowEnd,
+    status: nextLifecycleStatus,
+    on_the_way_at: nextOnTheWayAt,
+    ...extraFields,
+  });
+
+  let opsEvalFailed = false;
+  try {
+    await evaluateJobOpsStatus(jobId);
+  } catch {
+    opsEvalFailed = true;
+  }
+
+  return { opsEvalFailed, nextLifecycleStatus, nextOnTheWayAt };
+}
 
 export async function updateJobScheduleFromForm(formData: FormData) {
   const id =
@@ -10160,28 +10362,21 @@ export async function updateJobScheduleFromForm(formData: FormData) {
     return finishScheduleTarget("schedule_already_saved");
   }
 
-  const nextLifecycleStatus =
-    unscheduleRequested && isUnscheduledAfterSave ? "open" : undefined;
-  const nextOnTheWayAt =
-    unscheduleRequested && isUnscheduledAfterSave ? null : undefined;
-
-  await updateJob({
-    id,
-    scheduled_date,
-    window_start,
-    window_end,
-    status: nextLifecycleStatus,
-    on_the_way_at: nextOnTheWayAt,
-    permit_number,
-    jurisdiction,
-    permit_date,
+  const scheduleUpdateResult = await applyJobScheduleUpdate({
+    jobId: id,
+    scheduledDate: scheduled_date,
+    windowStart: window_start,
+    windowEnd: window_end,
+    unscheduleRequested,
+    extraFields: { permit_number, jurisdiction, permit_date },
   });
 
-  try {
-    await evaluateJobOpsStatus(id);
-  } catch {
+  if (scheduleUpdateResult.opsEvalFailed) {
     return finishScheduleTarget("schedule_saved_ops_eval_failed");
   }
+
+  const nextLifecycleStatus = scheduleUpdateResult.nextLifecycleStatus;
+  const nextOnTheWayAt = scheduleUpdateResult.nextOnTheWayAt;
 
   const hadPendingInfoSignal =
     String(before?.ops_status ?? "").trim().toLowerCase() === "pending_info" ||

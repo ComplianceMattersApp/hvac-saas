@@ -22,6 +22,7 @@ import SubmitButton from '@/components/SubmitButton';
 import { createCalendarBlockEventFromForm, deleteCalendarBlockEventFromForm, updateCalendarBlockEventFromForm } from '@/lib/actions/calendar-event-actions';
 import {
   assignJobAssigneeFromForm,
+  reassignAndRescheduleJobFromForm,
   removeJobAssigneeFromForm,
   updateJobScheduleFromForm,
 } from '@/lib/actions/job-actions';
@@ -1440,7 +1441,10 @@ export async function CalendarView(props: Props) {
 
   const queuePromise = getDispatchCalendarQueueData(calendarLoadParams);
   const rosterPromise = getDispatchCalendarRosterData(calendarLoadParams);
-  const data = await getDispatchCalendarBoardData(calendarLoadParams);
+  const [data, roster] = await Promise.all([
+    getDispatchCalendarBoardData(calendarLoadParams),
+    rosterPromise,
+  ]);
 
   const returnTo = buildReturnTo(uiView, data.anchorDate, activeTech);
   const banner = bannerMessage(props.banner);
@@ -1770,12 +1774,14 @@ export async function CalendarView(props: Props) {
               <CalendarDispatchGrid
                 jobs={filteredDayJobs}
                 blockEvents={techFilteredBlockEvents}
+                assignableUsers={roster.assignableUsers}
                 mode={baseMode}
                 date={data.day.date}
                 tech={activeTech}
                 selectedJobId={selectedJobId}
                 dropReturnTo={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech, inspector: '1' })}
                 scheduleAction={updateJobScheduleFromForm}
+                reassignAction={reassignAndRescheduleJobFromForm}
               />
             </section>
           ) : (
@@ -1792,12 +1798,14 @@ export async function CalendarView(props: Props) {
                   <CalendarDispatchGrid
                     jobs={day.jobs}
                     blockEvents={techFilteredBlockEvents}
+                    assignableUsers={roster.assignableUsers}
                     mode={baseMode}
                     date={day.date}
                     tech={activeTech}
                     selectedJobId={selectedJobId}
                     dropReturnTo={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech, inspector: '1' })}
                     scheduleAction={updateJobScheduleFromForm}
+                    reassignAction={reassignAndRescheduleJobFromForm}
                   />
                 </div>
               ))}
