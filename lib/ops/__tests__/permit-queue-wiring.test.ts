@@ -21,7 +21,8 @@ describe("Ops workspace permit queue wiring", () => {
     expect(opsPageSource).toContain("permitWorkflowEnabled");
     expect(opsPageSource).toContain("permitRequestsSchemaAvailable");
     expect(opsPageSource).toContain("permitWorkflowEnabled && activePermitRequestsResult.schemaAvailable");
-    expect(opsPageSource).toContain('activeBoardBucketFilter === "permits" && !permitRequestsSchemaAvailable');
+    expect(opsPageSource).toContain("resolveEffectiveOpsBoardBucketFilter");
+    expect(opsPageSource).toContain("permitRequestsSchemaAvailable,");
     expect(opsPageSource).toContain('key: "permits"');
     expect(opsPageSource).toContain('label: "Permits"');
     expect(opsPageSource).toContain('bucket: "permits"');

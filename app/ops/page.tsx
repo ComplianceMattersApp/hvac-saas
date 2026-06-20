@@ -89,6 +89,12 @@ import {
   sortOpsBoardRows,
 } from "@/lib/ops/ops-board-sorting";
 import {
+  isContractorIntakeQueueAvailableForProductMode,
+  resolveEffectiveOpsBoardBucketFilter,
+  resolveVisibleOpsWorkspaceQueueKeys,
+  type OpsBoardFilterBucket,
+} from "@/lib/ops/ops-workspace-queues";
+import {
   buildOpsBoardReasonOptions,
   filterOpsBoardRowsByReason,
   formatOpsBoardVisibleReasonText,
@@ -225,8 +231,6 @@ const OPS_TABS: { key: BucketKey; label: string }[] = [
   { key: "closeout", label: "Closeout Work Queue" },
   { key: "recent_closed", label: "Recently Closed" },
 ];
-
-type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout" | "contractor_intake" | "permits";
 
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
@@ -515,6 +519,7 @@ export default async function OpsPage({
 
   const productMode: ProductMode = await resolvedProductModePromise;
   const isHvacServiceMode = productMode === "hvac_service";
+  const contractorIntakeQueueAvailable = isContractorIntakeQueueAvailableForProductMode(productMode);
   const contractorScopeFilter = isHvacServiceMode ? null : contractor;
   const permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(internalUser.account_owner_user_id);
 
@@ -812,11 +817,13 @@ function subtractBusinessDays(date: Date, days: number) {
       scheduledOpenRowsQ,
       closeoutCountRowsQ,
       closeoutPermitExceptionRowsQ,
-      countPendingContractorIntakeQueueRows({
-        supabase: admin,
-        accountOwnerUserId: internalUser.account_owner_user_id,
-        contractorId: contractorScopeFilter,
-      }),
+      contractorIntakeQueueAvailable
+        ? countPendingContractorIntakeQueueRows({
+            supabase: admin,
+            accountOwnerUserId: internalUser.account_owner_user_id,
+            contractorId: contractorScopeFilter,
+          })
+        : Promise.resolve(0),
       listInternalContractorUpdateAwareness({ limit: 100, onlyUnread: true }),
       listInternalNewWorkRequestAwareness({ limit: 100, onlyUnread: true }),
       permitWorkflowEnabled
@@ -895,10 +902,11 @@ function subtractBusinessDays(date: Date, days: number) {
     ).length;
     const permitRequestsSchemaAvailable = permitWorkflowEnabled && activePermitRequestsResult.schemaAvailable;
     const activePermitRequestRows = activePermitRequestsResult.rows;
-    const effectiveBoardBucketFilter =
-      activeBoardBucketFilter === "permits" && !permitRequestsSchemaAvailable
-        ? "pending"
-        : activeBoardBucketFilter;
+    const effectiveBoardBucketFilter = resolveEffectiveOpsBoardBucketFilter({
+      requestedBucket: activeBoardBucketFilter,
+      productMode,
+      permitRequestsSchemaAvailable,
+    });
 
     const workspaceTabs = [
       {
@@ -937,12 +945,14 @@ function subtractBusinessDays(date: Date, days: number) {
         count: closeoutCount,
         href: `/ops/closeout-queue${contractorScopeFilter ? `?contractor=${encodeURIComponent(contractorScopeFilter)}` : ""}`,
       },
-      {
-        key: "contractor_intake",
-        label: "Contractor Intake",
-        count: contractorIntakeCount,
-        href: `/ops${buildQueryString({ bucket: "contractor_intake", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
-      },
+      ...(contractorIntakeQueueAvailable
+        ? [{
+            key: "contractor_intake",
+            label: "Contractor Intake",
+            count: contractorIntakeCount,
+            href: `/ops${buildQueryString({ bucket: "contractor_intake", contractor: contractorScopeFilter ?? "" })}#ops-workspace`,
+          }]
+        : []),
       ...(permitRequestsSchemaAvailable
         ? [{
             key: "permits",
@@ -968,15 +978,10 @@ function subtractBusinessDays(date: Date, days: number) {
       contractor_intake: "contractor_intake",
       permits: "permits",
     };
-    const coreBoardWorkspaceKeys = [
-      "need_to_schedule",
-      "field_work",
-      "contractor_intake",
-      "waiting",
-      "exceptions",
-      "closeout",
-      ...(permitRequestsSchemaAvailable ? ["permits"] : []),
-    ];
+    const coreBoardWorkspaceKeys = resolveVisibleOpsWorkspaceQueueKeys({
+      productMode,
+      permitRequestsSchemaAvailable,
+    });
     const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter]];
 
     async function loadWithoutTechPreviewRows() {
@@ -1069,6 +1074,7 @@ function subtractBusinessDays(date: Date, days: number) {
       }
 
       if (workspaceKey === "contractor_intake") {
+        if (!contractorIntakeQueueAvailable) return [];
         return listPendingContractorIntakeQueueRows({
           supabase: admin,
           accountOwnerUserId: internalUser.account_owner_user_id,

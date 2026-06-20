@@ -37,6 +37,11 @@ const opsBoardReasonsSource = readFileSync(
   "utf-8",
 );
 
+const opsWorkspaceQueuesSource = readFileSync(
+  resolve(__dirname, "../../../lib/ops/ops-workspace-queues.ts"),
+  "utf-8",
+);
+
 function assertFound(label: string, index: number) {
   expect(index, `${label} marker should exist in the Full Ops branch`).toBeGreaterThan(-1);
 }
@@ -111,13 +116,8 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain('exceptions: "exceptions"');
     expect(opsPageSource).toContain('closeout: "closeout"');
     expect(opsPageSource).toContain('contractor_intake: "contractor_intake"');
-    expect(opsPageSource).toContain("const coreBoardWorkspaceKeys = [");
-    expect(opsPageSource).toContain('"need_to_schedule",');
-    expect(opsPageSource).toContain('"field_work",');
-    expect(opsPageSource).toContain('"contractor_intake",');
-    expect(opsPageSource).toContain('"waiting",');
-    expect(opsPageSource).toContain('"exceptions",');
-    expect(opsPageSource).toContain('"closeout",');
+    expect(opsPageSource).toContain("resolveVisibleOpsWorkspaceQueueKeys");
+    expect(opsPageSource).toContain("const coreBoardWorkspaceKeys = resolveVisibleOpsWorkspaceQueueKeys({");
     expect(opsPageSource).toContain("const requestedWorkspaceKeys = [boardBucketWorkspaceKeyMap[effectiveBoardBucketFilter]];");
   });
 
@@ -143,7 +143,8 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("restores Field Work through the existing scheduled field-work read model", () => {
-    expect(opsPageSource).toContain('type OpsBoardFilterBucket = "all" | "pending" | "field_work" | "waiting" | "exceptions" | "closeout" | "contractor_intake" | "permits";');
+    expect(opsWorkspaceQueuesSource).toContain("export type OpsBoardFilterBucket =");
+    expect(opsWorkspaceQueuesSource).toContain('"contractor_intake"');
     expect(opsPageSource).toContain('if (normalized === "scheduled") return "field_work";');
     expect(opsPageSource).toContain('} else if (workspaceKey === "field_work") {');
     expect(opsPageSource).toContain('.eq("field_complete", false)');
@@ -269,7 +270,7 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).not.toContain("/ops/queues/without-tech");
     expect(opsPageSource).not.toContain("Open focused queue");
     expect(opsPageSource).toContain('href={`/ops${buildQueryString({');
-    expect(opsPageSource).toContain('bucket: queue.key');
+    expect(opsPageSource).toContain('bucket: card.key');
   });
 
   it("leaves direct focused queue route files renderable with return navigation", () => {
@@ -285,6 +286,10 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("countPendingContractorIntakeQueueRows");
     expect(opsPageSource).toContain("listPendingContractorIntakeQueueRows");
     expect(opsPageSource).toContain("CONTRACTOR_INTAKE_QUEUE_PAGE_LIMIT");
+    expect(opsPageSource).toContain("isContractorIntakeQueueAvailableForProductMode");
+    expect(opsPageSource).toContain("contractorIntakeQueueAvailable");
+    expect(opsPageSource).toContain("? countPendingContractorIntakeQueueRows");
+    expect(opsPageSource).toContain("resolveEffectiveOpsBoardBucketFilter");
     expect(opsPageSource).toContain('if (normalized === "intake") return "contractor_intake";');
     expect(opsPageSource).toContain('normalized === "contractor_intake"');
     expect(opsPageSource).toContain('selectedWorkspaceKey === "contractor_intake"');
