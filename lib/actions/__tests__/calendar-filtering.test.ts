@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CALENDAR_TECH_FILTER_UNASSIGNED,
   filterJobsForTechnician,
+  parseCalendarSelectedUserIds,
 } from '@/components/calendar/calendar-filtering';
 import type { DispatchJob } from '@/lib/actions/calendar';
 
@@ -42,6 +43,13 @@ function makeJob(params: {
 }
 
 describe('calendar technician filtering', () => {
+  it('parses repeated and comma-separated technician selections without duplicates', () => {
+    expect(parseCalendarSelectedUserIds(['tech-1, tech-2', 'tech-2', '', CALENDAR_TECH_FILTER_UNASSIGNED])).toEqual([
+      'tech-1',
+      'tech-2',
+    ]);
+  });
+
   it('supports all, specific-tech, and explicit unassigned filters', () => {
     const jobs = [
       makeJob({ id: 'assigned-tech-1', assignmentUserIds: ['tech-1'] }),
@@ -59,6 +67,11 @@ describe('calendar technician filtering', () => {
     // Specific technician excludes unassigned and other technicians.
     expect(filterJobsForTechnician(jobs, 'tech-1').map((job) => job.id)).toEqual([
       'assigned-tech-1',
+    ]);
+
+    expect(filterJobsForTechnician(jobs, 'tech-1,tech-2').map((job) => job.id)).toEqual([
+      'assigned-tech-1',
+      'assigned-tech-2',
     ]);
 
     // Unassigned filter includes only jobs with no assigned technician.

@@ -23,7 +23,7 @@ export default async function CalendarPage({
     banner?: string;
     job?: string;
     block?: string;
-    tech?: string;
+    tech?: string | string[];
     inspector?: string;
     prefill_date?: string;
   }>;

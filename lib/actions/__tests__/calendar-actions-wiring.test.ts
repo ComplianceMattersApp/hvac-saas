@@ -123,6 +123,32 @@ function makeFixture() {
       deleted_at: null,
     },
     {
+      id: 'job-assigned-tech-2',
+      customer_id: 'cust-1',
+      location_id: 'loc-2',
+      title: 'Heat Pump Tuneup',
+      job_type: 'service',
+      status: 'open',
+      ops_status: 'scheduled',
+      parent_job_id: null,
+      scheduled_date: '2026-04-29',
+      window_start: '14:00',
+      window_end: '15:00',
+      city: 'Snapshot City',
+      customer_phone: '555-4000',
+      job_address: '444 Main St',
+      customer_first_name: 'Morgan',
+      customer_last_name: 'Patel',
+      contractor_id: null,
+      contractors: null,
+      customers: { phone: null },
+      locations: { city: null },
+      visit_scope_summary: null,
+      visit_scope_items: null,
+      created_at: '2026-04-29T09:00:00.000Z',
+      deleted_at: null,
+    },
+    {
       id: 'job-needs-scheduling',
       customer_id: 'cust-1',
       location_id: 'loc-3',
@@ -323,6 +349,13 @@ describe('calendar action wiring', () => {
         },
       ],
       'job-unassigned-fallback': [],
+      'job-assigned-tech-2': [
+        {
+          user_id: 'tech-2',
+          display_name: 'Tech Two',
+          is_primary: true,
+        },
+      ],
     });
   });
 
@@ -344,8 +377,8 @@ describe('calendar action wiring', () => {
       anchorDate: '2026-04-29',
     });
 
-    expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-unassigned-fallback']);
-    expect(board.day.jobs.map((job) => job.latest_event_type)).toEqual([null, null]);
+    expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-unassigned-fallback', 'job-assigned-tech-2']);
+    expect(board.day.jobs.map((job) => job.latest_event_type)).toEqual([null, null, null]);
     expect('unassignedScheduledJobs' in board).toBe(false);
     expect('scheduledAttentionWindowJobs' in board).toBe(false);
     expect('assignableUsers' in board).toBe(false);
@@ -353,11 +386,72 @@ describe('calendar action wiring', () => {
     expect(queue.scheduledAttentionWindowJobs.map((job) => job.id)).toEqual([
       'job-assigned-canonical',
       'job-unassigned-fallback',
+      'job-assigned-tech-2',
     ]);
     expect(roster.assignableUsers).toEqual([
       { user_id: 'tech-1', display_name: 'Tech One' },
       { user_id: 'tech-2', display_name: 'Tech Two' },
     ]);
-    expect(getAssignableInternalUsersMock).toHaveBeenCalledTimes(1);
+    expect(getAssignableInternalUsersMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('filters office board data to selected allowed calendar users', async () => {
+    createClientMock.mockResolvedValue(makeFixture().supabase);
+
+    const { getDispatchCalendarBoardData } = await import('@/lib/actions/calendar-actions');
+
+    const board = await getDispatchCalendarBoardData({
+      mode: 'day',
+      anchorDate: '2026-04-29',
+      selectedUserIds: ['tech-1', 'tech-2', 'tech-outside-account'],
+      techFilterType: 'specific',
+    });
+
+    expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-assigned-tech-2']);
+  });
+
+  it('falls back to the safe default when office selected user ids are invalid', async () => {
+    createClientMock.mockResolvedValue(makeFixture().supabase);
+
+    const { getDispatchCalendarBoardData } = await import('@/lib/actions/calendar-actions');
+
+    const board = await getDispatchCalendarBoardData({
+      mode: 'day',
+      anchorDate: '2026-04-29',
+      selectedUserIds: ['tech-outside-account'],
+      techFilterType: 'specific',
+    });
+
+    expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-unassigned-fallback', 'job-assigned-tech-2']);
+  });
+
+  it('forces technicians to their own calendar even when the URL requests another user', async () => {
+    createClientMock.mockResolvedValue(makeFixture().supabase);
+    requireInternalUserMock.mockResolvedValue({
+      userId: 'tech-1',
+      internalUser: {
+        user_id: 'tech-1',
+        role: 'tech',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { getDispatchCalendarBoardData, getDispatchCalendarRosterData } = await import('@/lib/actions/calendar-actions');
+
+    const board = await getDispatchCalendarBoardData({
+      mode: 'day',
+      anchorDate: '2026-04-29',
+      selectedUserIds: ['tech-2'],
+      techFilterType: 'specific',
+    });
+    const roster = await getDispatchCalendarRosterData({
+      mode: 'day',
+      anchorDate: '2026-04-29',
+      selectedUserIds: ['tech-2'],
+    });
+
+    expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical']);
+    expect(roster.assignableUsers).toEqual([{ user_id: 'tech-1', display_name: 'My calendar' }]);
   });
 });

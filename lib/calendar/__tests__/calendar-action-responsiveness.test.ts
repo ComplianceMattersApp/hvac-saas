@@ -49,6 +49,13 @@ describe("calendar action responsiveness", () => {
     expect(calendarViewSource).toContain("const showDesktopInspectorColumn = inspectorOpen");
   });
 
+  it("renders dispatch focus as checkbox-style multi-select controls", () => {
+    expect(calendarViewSource).toContain('type="checkbox"');
+    expect(calendarViewSource).toContain('name="tech"');
+    expect(calendarViewSource).toContain("selectedUserIds={selectedCalendarUserIds}");
+    expect(calendarViewSource).toContain("parseCalendarSelectedUserIds(activeTech)");
+  });
+
   it("renders mobile calendar jobs as direct job-detail links", () => {
     expect(calendarViewSource).toContain("CalendarResponsiveJobLink");
     expect(calendarViewSource).toContain('mobileHref={`/jobs/${job.id}`}');
@@ -84,6 +91,12 @@ describe("calendar action responsiveness", () => {
     expect(calendarViewSource).toContain("Filters &amp; Status");
     expect(calendarViewSource).toContain("Status legend");
     expect(calendarViewSource).toContain("Next dispatch action");
+  });
+
+  it("mobile day and week grids have intentional horizontal scrolling instead of clipped columns", () => {
+    expect(calendarViewSource).toContain("overflow-x-auto overscroll-x-contain pb-2");
+    expect(dispatchGridSource).toContain("const minGridWidth = 84 + columnCount * 170");
+    expect(dispatchGridSource).toContain('style={{ minWidth: `${minGridWidth}px` }}');
   });
 
   it("desktop toolbar exposes jump-to-date without changing the selected view", () => {

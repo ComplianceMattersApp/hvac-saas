@@ -363,6 +363,7 @@ export default function CalendarDispatchGrid(props: Props) {
 
   const columnCount = columns.length;
   const columnWidthPct = 100 / Math.max(columnCount, 1);
+  const minGridWidth = 84 + columnCount * 170;
 
   const isTodayColumn = String(date) === todayYmdLA();
   const nowMinutes = currentMinutesLA();
@@ -509,7 +510,7 @@ export default function CalendarDispatchGrid(props: Props) {
         <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">Saving schedule...</div>
       ) : null}
 
-      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5">
+      <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5" style={{ minWidth: `${minGridWidth}px` }}>
         <div className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-2">
           <p className="truncate text-[11px] text-slate-500">Drag changes date and time only. Technician assignment stays attached to the job.</p>
         </div>

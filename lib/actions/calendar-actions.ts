@@ -4,6 +4,7 @@ import { requireInternalUser } from '@/lib/auth/internal-user';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveJobAssignmentDisplayMap, getAssignableInternalUsers } from '@/lib/staffing/human-layer';
 import { buildVisitScopeIncludesReadModel } from '@/lib/jobs/visit-scope';
+import { CALENDAR_TECH_FILTER_UNASSIGNED, parseCalendarSelectedUserIds } from '@/lib/calendar/calendar-user-selection';
 import { displayDateLA, displayTimeLA, laDateTimeToUtcIso } from '@/lib/utils/schedule-la';
 
 export type DispatchViewMode = 'day' | 'week';
@@ -451,7 +452,80 @@ type DispatchCalendarLoadParams = {
   rangeEndDate?: string | null;
   view?: string | null;
   techFilterType?: CalendarTimingDebugTechFilter;
+  selectedUserIds?: string[];
 };
+
+type CalendarUserVisibility = {
+  assignableUsers: Array<{ user_id: string; display_name: string }>;
+  visibleUserIds: string[];
+  explicitSelection: boolean;
+  canSelectMultiple: boolean;
+};
+
+function isCalendarMultiUserRole(role: unknown) {
+  return role === 'admin' || role === 'office' || role === 'billing';
+}
+
+function normalizeAssignableUsers(users: Array<{ user_id: unknown; display_name: unknown }>) {
+  return users
+    .map((user) => ({
+      user_id: String(user.user_id ?? '').trim(),
+      display_name: String(user.display_name ?? '').trim(),
+    }))
+    .filter((user) => user.user_id && user.display_name);
+}
+
+async function resolveCalendarUserVisibility(params: {
+  supabase: any;
+  internalUser: { user_id?: string | null; role?: unknown; account_owner_user_id?: string | null };
+  accountOwnerUserId: string;
+  selectedUserIds?: string[] | null;
+}): Promise<CalendarUserVisibility> {
+  const actorUserId = String(params.internalUser.user_id ?? '').trim();
+  const requestedUserIds = parseCalendarSelectedUserIds(params.selectedUserIds ?? []);
+
+  if (!isCalendarMultiUserRole(params.internalUser.role)) {
+    return {
+      assignableUsers: actorUserId ? [{ user_id: actorUserId, display_name: 'My calendar' }] : [],
+      visibleUserIds: actorUserId ? [actorUserId] : [],
+      explicitSelection: true,
+      canSelectMultiple: false,
+    };
+  }
+
+  const assignableUsers = normalizeAssignableUsers(
+    await getAssignableInternalUsers({
+      supabase: params.supabase,
+      accountOwnerUserId: params.accountOwnerUserId,
+    }),
+  );
+  const allowedUserIds = new Set(assignableUsers.map((user) => user.user_id));
+  const visibleUserIds = requestedUserIds.filter((userId) => allowedUserIds.has(userId));
+
+  return {
+    assignableUsers,
+    visibleUserIds: visibleUserIds.length ? visibleUserIds : assignableUsers.map((user) => user.user_id),
+    explicitSelection: visibleUserIds.length > 0,
+    canSelectMultiple: true,
+  };
+}
+
+function filterCalendarJobsForVisibleUsers(
+  jobs: DispatchJob[],
+  visibility: CalendarUserVisibility,
+  filterType?: CalendarTimingDebugTechFilter,
+) {
+  if (filterType === CALENDAR_TECH_FILTER_UNASSIGNED) return jobs.filter((job) => !job.assignments.length);
+
+  const visibleUserIds = new Set(visibility.visibleUserIds);
+  const includeUnassigned = !visibility.explicitSelection && visibility.canSelectMultiple;
+
+  return jobs.filter((job) => {
+    const assignments = Array.isArray(job.assignments) ? job.assignments : [];
+    if (!assignments.length) return includeUnassigned;
+    return assignments.some((assignment) => visibleUserIds.has(assignment.user_id));
+  });
+}
 
 async function loadCalendarContext(
   params: DispatchCalendarLoadParams,
@@ -516,6 +590,14 @@ async function loadCalendarContext(
       accountOwnerUserId,
     }),
   );
+  const calendarUserVisibility = await timeCalendarStep(timingEnabled, timings, 'calendar_user_visibility_ms', () =>
+    resolveCalendarUserVisibility({
+      supabase,
+      internalUser,
+      accountOwnerUserId,
+      selectedUserIds: params.selectedUserIds,
+    }),
+  );
 
   return {
     supabase,
@@ -529,6 +611,7 @@ async function loadCalendarContext(
     weekStart: startOfWeekYmd(anchorDate),
     baseSelect,
     scopedCustomerIds,
+    calendarUserVisibility,
   };
 }
 
@@ -644,8 +727,10 @@ export async function getDispatchCalendarBoardData(params: DispatchCalendarLoadP
     includeLatestEvents: false,
   });
 
-  const scheduledCalendarJobs = scheduledCalendarRows.map((row) =>
-    mergeJobRow({ row, assignmentMap, latestEventByJob }),
+  const scheduledCalendarJobs = filterCalendarJobsForVisibleUsers(
+    scheduledCalendarRows.map((row) => mergeJobRow({ row, assignmentMap, latestEventByJob })),
+    context.calendarUserVisibility,
+    params.techFilterType,
   );
 
   const dayJobs = scheduledCalendarJobs.filter((job) => String(job.scheduled_date) === context.anchorDate);
@@ -678,7 +763,11 @@ export async function getDispatchCalendarBoardData(params: DispatchCalendarLoadP
       }),
   );
 
-  const assignableUserIds = activeInternalUserIdsForBlocks;
+  const visibleUserIdSet = new Set(context.calendarUserVisibility.visibleUserIds);
+  const assignableUserIds =
+    params.techFilterType === CALENDAR_TECH_FILTER_UNASSIGNED
+      ? []
+      : activeInternalUserIdsForBlocks.filter((userId) => visibleUserIdSet.has(userId));
   const calendarBlockEvents: DispatchCalendarBlockEvent[] = [];
 
   if (assignableUserIds.length) {
@@ -752,6 +841,7 @@ export async function getDispatchCalendarBoardData(params: DispatchCalendarLoadP
         primary_event_row_count: eventRowCount,
         primary_block_event_count: calendarBlockEvents.length,
         primary_active_user_id_count: activeInternalUserIdsForBlocks.length,
+        primary_visible_user_id_count: context.calendarUserVisibility.visibleUserIds.length,
         primary_assignable_user_count: 0,
       },
     }));
@@ -797,15 +887,15 @@ export async function getDispatchCalendarRosterData(params: DispatchCalendarLoad
     throw new Error('NOT_AUTHORIZED');
   }
 
-  const assignableUsers = (await timeCalendarStep(timingEnabled, timings, 'secondary_assignable_users_query_ms', () =>
-    getAssignableInternalUsers({
+  const visibility = await timeCalendarStep(timingEnabled, timings, 'secondary_calendar_user_visibility_ms', () =>
+    resolveCalendarUserVisibility({
       supabase,
+      internalUser,
       accountOwnerUserId,
+      selectedUserIds: params.selectedUserIds,
     }),
-  )).map((user) => ({
-    user_id: String(user.user_id),
-    display_name: String(user.display_name),
-  }));
+  );
+  const assignableUsers = visibility.assignableUsers;
 
   if (timingEnabled) {
     console.log(JSON.stringify({
@@ -890,8 +980,10 @@ export async function getDispatchCalendarQueueData(params: DispatchCalendarLoadP
     eventTimingLabel: 'queue_latest_job_events_query_ms',
   });
 
-  const scheduledAttentionJobs = scheduledAttentionCalendarRows.map((row) =>
-    mergeJobRow({ row, assignmentMap, latestEventByJob }),
+  const scheduledAttentionJobs = filterCalendarJobsForVisibleUsers(
+    scheduledAttentionCalendarRows.map((row) => mergeJobRow({ row, assignmentMap, latestEventByJob })),
+    context.calendarUserVisibility,
+    params.techFilterType,
   );
   const scheduledAttentionWindowJobs = scheduledAttentionJobs.filter((job) => {
     const scheduledDate = String(job.scheduled_date ?? '').trim();

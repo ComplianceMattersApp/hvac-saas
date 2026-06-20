@@ -14,9 +14,9 @@ import { CALENDAR_STATUS_LEGEND, calendarStatusDotClass, formatCalendarDisplaySt
 import {
   CALENDAR_TECH_FILTER_UNASSIGNED,
   filterJobsForTechnician,
-  isSpecificTechnicianFilter,
   isUnassignedTechFilter,
   normalizeCalendarTechFilter,
+  parseCalendarSelectedUserIds,
 } from './calendar-filtering';
 import SubmitButton from '@/components/SubmitButton';
 import { createCalendarBlockEventFromForm, deleteCalendarBlockEventFromForm, updateCalendarBlockEventFromForm } from '@/lib/actions/calendar-event-actions';
@@ -51,7 +51,7 @@ type Props = {
   banner?: string;
   job?: string;
   block?: string;
-  tech?: string;
+  tech?: string | string[];
   prefillDate?: string;
   inspector?: string;
 };
@@ -139,11 +139,15 @@ function phoneHrefValue(rawPhone: string) {
   return rawPhone.replace(/[^\d+]/g, '');
 }
 
-function buildReturnTo(view: CalendarUIView, date: string, tech?: string | null) {
+function buildReturnTo(view: CalendarUIView, date: string, tech?: string | string[] | null) {
   const q = new URLSearchParams();
   q.set('view', view);
   q.set('date', date);
-  if (tech) q.set('tech', tech);
+  const techValues = Array.isArray(tech) ? tech : tech ? [tech] : [];
+  for (const value of techValues) {
+    const clean = String(value ?? '').trim();
+    if (clean) q.append('tech', clean);
+  }
   return `/calendar?${q.toString()}`;
 }
 
@@ -1087,11 +1091,15 @@ async function CalendarDispatchFocusControls(props: {
   uiView: CalendarUIView;
   anchorDate: string;
   activeTech?: string | null;
+  selectedUserIds: string[];
   activeUnassignedFilter: boolean;
   activeFilterLabel: string;
 }) {
   const roster = await props.rosterPromise;
   if (!roster.assignableUsers.length) return null;
+  const selectedUserIds = props.activeUnassignedFilter ? [] : props.selectedUserIds;
+  const selectedUserIdSet = new Set(selectedUserIds);
+  const allUsersSelected = roster.assignableUsers.length > 0 && selectedUserIds.length === roster.assignableUsers.length;
 
   return (
     <div>
@@ -1105,41 +1113,74 @@ async function CalendarDispatchFocusControls(props: {
         </div>
       </div>
 
-      <div className="mt-2.5 flex flex-wrap gap-1.5">
-        <Link
-          href={buildCalendarHref(props.uiView, props.anchorDate)}
-          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            !props.activeTech
-              ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-              : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-          }`}
-        >
-          All technicians
-        </Link>
-        <Link
-          href={buildCalendarHref(props.uiView, props.anchorDate, { tech: CALENDAR_TECH_FILTER_UNASSIGNED })}
-          className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-            props.activeUnassignedFilter
-              ? 'border-rose-800 bg-rose-700 text-white shadow-sm'
-              : 'border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50'
-          }`}
-        >
-          Unassigned
-        </Link>
-        {roster.assignableUsers.map((user) => (
+      <form action="/calendar" method="get" className="mt-2.5 space-y-2">
+        <input type="hidden" name="view" value={props.uiView} />
+        <input type="hidden" name="date" value={props.anchorDate} />
+        <div className="flex flex-wrap items-center gap-1.5">
+          <button
+            type="submit"
+            className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+          >
+            Apply
+          </button>
           <Link
-            key={user.user_id}
-            href={buildCalendarHref(props.uiView, props.anchorDate, { tech: user.user_id })}
+            href={buildCalendarHref(props.uiView, props.anchorDate, {
+              tech: roster.assignableUsers.map((user) => user.user_id),
+            })}
             className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
-              props.activeTech === user.user_id
+              allUsersSelected && !props.activeUnassignedFilter
                 ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
                 : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
-            {user.display_name}
+            All
           </Link>
-        ))}
-      </div>
+          <Link
+            href={buildCalendarHref(props.uiView, props.anchorDate)}
+            className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              !props.activeTech
+                ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+            }`}
+          >
+            Clear
+          </Link>
+          <Link
+            href={buildCalendarHref(props.uiView, props.anchorDate, { tech: CALENDAR_TECH_FILTER_UNASSIGNED })}
+            className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+              props.activeUnassignedFilter
+                ? 'border-rose-800 bg-rose-700 text-white shadow-sm'
+                : 'border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50'
+            }`}
+          >
+            Unassigned
+          </Link>
+        </div>
+        <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto pr-1">
+          {roster.assignableUsers.map((user) => {
+            const checked = selectedUserIdSet.has(user.user_id);
+            return (
+              <label
+                key={user.user_id}
+                className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  checked
+                    ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="checkbox"
+                  name="tech"
+                  value={user.user_id}
+                  defaultChecked={checked}
+                  className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+                />
+                <span>{user.display_name}</span>
+              </label>
+            );
+          })}
+        </div>
+      </form>
     </div>
   );
 }
@@ -1414,7 +1455,8 @@ export async function CalendarView(props: Props) {
   const todayDate = todayYmdLA();
   const baseMode: DispatchViewMode = uiView === 'week' ? 'week' : 'day';
   const activeTech = normalizeCalendarTechFilter(props.tech);
-  const activeTechnicianUserId = isSpecificTechnicianFilter(activeTech) ? activeTech : null;
+  const selectedCalendarUserIds = parseCalendarSelectedUserIds(activeTech);
+  const activeTechnicianUserId = selectedCalendarUserIds.length === 1 ? selectedCalendarUserIds[0] : null;
   const activeUnassignedFilter = isUnassignedTechFilter(activeTech);
   const anchorForRange = parseISO(normalizeYmd(props.date) ?? todayDate);
   const monthStartDate = formatDate(startOfMonth(anchorForRange), 'yyyy-MM-dd');
@@ -1425,7 +1467,8 @@ export async function CalendarView(props: Props) {
     mode: baseMode,
     anchorDate: props.date,
     view: uiView,
-    techFilterType: activeUnassignedFilter ? 'unassigned' : activeTechnicianUserId ? 'specific' : 'all',
+    techFilterType: activeUnassignedFilter ? 'unassigned' : selectedCalendarUserIds.length ? 'specific' : 'all',
+    selectedUserIds: selectedCalendarUserIds,
     ...(uiView === 'month'
       ? {
           rangeStartDate: monthVisibleRange.startDate,
@@ -1478,8 +1521,11 @@ export async function CalendarView(props: Props) {
     canonicalDispatchJobsForRange = canonicalDispatchJobsByDay.flatMap((day) => day.jobs);
   }
 
-  const techFilteredBlockEvents = activeTechnicianUserId
-    ? canonicalBlockEventsForRange.filter((event) => event.internal_user_id === activeTech)
+  const selectedCalendarUserIdSet = new Set(selectedCalendarUserIds);
+  const techFilteredBlockEvents = activeUnassignedFilter
+    ? []
+    : selectedCalendarUserIds.length
+    ? canonicalBlockEventsForRange.filter((event) => selectedCalendarUserIdSet.has(event.internal_user_id))
     : canonicalBlockEventsForRange;
   const selectedBlock = canonicalBlockEventsForRange.find((event) => event.id === selectedBlockId) ?? null;
 
@@ -1547,8 +1593,8 @@ export async function CalendarView(props: Props) {
   const unscheduledJobs: DispatchJob[] = [];
   const activeFilterLabel = activeUnassignedFilter
     ? 'Unassigned scheduled jobs'
-    : activeTechnicianUserId
-    ? 'Single technician'
+    : selectedCalendarUserIds.length
+    ? `${selectedCalendarUserIds.length} technician${selectedCalendarUserIds.length === 1 ? '' : 's'}`
     : 'All technicians';
 
   const statusLegend = (
@@ -1644,6 +1690,7 @@ export async function CalendarView(props: Props) {
                   uiView={uiView}
                   anchorDate={data.anchorDate}
                   activeTech={activeTech}
+                  selectedUserIds={selectedCalendarUserIds}
                   activeUnassignedFilter={activeUnassignedFilter}
                   activeFilterLabel={activeFilterLabel}
                 />
@@ -1659,6 +1706,7 @@ export async function CalendarView(props: Props) {
                 uiView={uiView}
                 anchorDate={data.anchorDate}
                 activeTech={activeTech}
+                selectedUserIds={selectedCalendarUserIds}
                 activeUnassignedFilter={activeUnassignedFilter}
                 activeFilterLabel={activeFilterLabel}
               />
@@ -1764,7 +1812,7 @@ export async function CalendarView(props: Props) {
               </div>
             </section>
           ) : baseMode === 'day' ? (
-            <section className="space-y-2 overflow-x-auto">
+            <section className="space-y-2 overflow-x-auto overscroll-x-contain pb-2 [-webkit-overflow-scrolling:touch]">
               <div className="flex items-center justify-between px-1">
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Day Schedule</p>
@@ -1785,7 +1833,7 @@ export async function CalendarView(props: Props) {
               />
             </section>
           ) : (
-            <section className="space-y-5 overflow-x-auto">
+            <section className="space-y-5 overflow-x-auto overscroll-x-contain pb-2 [-webkit-overflow-scrolling:touch]">
               {filteredJobsByDay.map((day) => (
                 <div key={day.date} className="space-y-2">
                   <div className="flex items-center justify-between px-1">
