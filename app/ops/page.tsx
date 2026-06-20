@@ -4,6 +4,8 @@ import Image from "next/image";
 import { Clock3 } from "lucide-react";
 import ContractorFilter from "./_components/ContractorFilter";
 import { redirect } from "next/navigation";
+import { updateJobScheduleFromForm } from "@/lib/actions";
+import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
 import { createAdminClient } from "@/lib/supabase/server";
 import { getRequestActorContext } from "@/lib/auth/request-actor-context";
 import {
@@ -670,7 +672,7 @@ function subtractBusinessDays(date: Date, days: number) {
 
   if (panel !== "full_board") {
     const workspaceSelect =
-      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, pending_info_reason, on_hold_reason, permit_number, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
+      "id, title, status, job_type, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, pending_info_reason, on_hold_reason, permit_number, jurisdiction, permit_date, field_complete, field_complete_at, invoice_complete, billing_disposition, certs_complete, contractor_id, contractors(name), created_at";
     const scheduledSnapshotSelect =
       "id, status, ops_status, scheduled_date, window_start";
 
@@ -1217,8 +1219,22 @@ function subtractBusinessDays(date: Date, days: number) {
 
     if (selectedPreviewFailedRunsRes.error) throw selectedPreviewFailedRunsRes.error;
 
+    const selectedPreviewCustomerAttemptEventsRes = selectedPreviewJobIds.length
+      ? await supabase
+          .from("job_events")
+          .select("job_id, created_at")
+          .in("job_id", selectedPreviewJobIds)
+          .eq("event_type", "customer_attempt")
+          .order("created_at", { ascending: false })
+      : { data: [], error: null };
+
+    if (selectedPreviewCustomerAttemptEventsRes.error) throw selectedPreviewCustomerAttemptEventsRes.error;
+
     latestFailedRunByJob = buildLatestFailedRunByJob(selectedPreviewFailedRunsRes.data ?? []);
     primaryFailureReasonByJob = buildPrimaryFailureReasonByJob(latestFailedRunByJob);
+    const selectedPreviewLatestCustomerAttemptByJob = buildLatestCustomerAttemptByJob(
+      (selectedPreviewCustomerAttemptEventsRes.data ?? []) as Array<{ job_id: string; created_at: string }>,
+    );
 
     const operationalTenantIdentity = await operationalTenantIdentityPromise;
     const workspaceContractorsRes = await supabase
@@ -1309,6 +1325,192 @@ function subtractBusinessDays(date: Date, days: number) {
       reason: effectiveBoardReasonFilter ?? "",
       signal,
     })}#ops-workspace`;
+
+    function workspaceNeedsSchedulingRichCard(job: any, visibleReason: OpsBoardVisibleReason) {
+      const jobId = String(job?.id ?? "").trim();
+      const phone = String(job?.customer_phone ?? "").trim();
+      const phoneHref = telHref(phone);
+      const textHref = smsHref(phone);
+      const scheduleDateText = job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "Not scheduled";
+      const scheduleWindowText = displayWindowLA(job?.window_start, job?.window_end) || (job?.scheduled_date ? "Window TBD" : "");
+      const recentAttemptDisplay = resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null);
+      const contractorName = workspaceContractorName(job) || operationalTenantIdentity.displayName;
+      const utilityLabelClass =
+        "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
+      const inlineActionClass =
+        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99]";
+      const compactContactActionClass =
+        "inline-flex h-7 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
+      const inlinePrimaryActionClass =
+        "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
+      const scheduleFieldClass =
+        "w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition-colors focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
+
+      return (
+        <div
+          key={jobId}
+          data-ops-workspace-card-variant="needs-scheduling-rich"
+          className="rounded-xl border border-l-4 border-slate-200 border-l-blue-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-blue-900/35 sm:px-5"
+        >
+          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,1.05fr)_minmax(14rem,0.72fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-5">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={`/jobs/${jobId}?tab=ops`}
+                  className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                >
+                  {workspaceTitle(job)}
+                </Link>
+                <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700">
+                  Needs Scheduling
+                </span>
+              </div>
+              <div className="mt-2 text-sm font-semibold text-slate-800">{workspaceCustomerLocation(job)}</div>
+              <div className="mt-2 grid gap-1 text-sm leading-5 text-slate-500">
+                <div>
+                  <span className={utilityLabelClass}>Contractor</span>
+                  <div className="font-medium text-slate-700">{contractorName}</div>
+                </div>
+                <div>
+                  <span className="font-medium text-slate-500">Status/Reason:</span> {visibleReason.label}
+                  {visibleReason.detail ? <div className="text-slate-700">{visibleReason.detail}</div> : null}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Phone</span>
+                {phone ? (
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    {phoneHref || textHref ? (
+                      <a
+                        href={phoneHref || textHref}
+                        className="text-sm font-semibold text-slate-800 transition-colors hover:text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                      >
+                        {phone}
+                      </a>
+                    ) : (
+                      <span className="text-sm font-medium text-slate-800">{phone}</span>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      {phoneHref ? (
+                        <a href={phoneHref} className={compactContactActionClass}>
+                          Call
+                        </a>
+                      ) : null}
+                      {textHref ? (
+                        <a href={textHref} className={compactContactActionClass}>
+                          Open SMS App
+                        </a>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : (
+                  <span className="text-sm text-slate-400">No phone on file</span>
+                )}
+              </div>
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Schedule</span>
+                <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                  {scheduleWindowText ? `${scheduleDateText} / ${scheduleWindowText}` : scheduleDateText}
+                </span>
+              </div>
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Last attempt</span>
+                <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                  {recentAttemptDisplay}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+              <span className={utilityLabelClass}>Actions</span>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <details open className="group">
+                  <summary className={`${inlineActionClass} cursor-pointer list-none gap-1.5`}>
+                    <span>Scheduler</span>
+                    <span className="text-[10px] text-slate-400 transition-transform duration-150 group-open:rotate-180" aria-hidden="true">
+                      v
+                    </span>
+                  </summary>
+                  <form action={updateJobScheduleFromForm} className="mt-2 space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.35)]">
+                    <input type="hidden" name="job_id" value={jobId} />
+                    <input type="hidden" name="permit_number" value={String(job?.permit_number ?? "")} />
+                    <input type="hidden" name="jurisdiction" value={String(job?.jurisdiction ?? "")} />
+                    <input type="hidden" name="permit_date" value={String(job?.permit_date ?? "")} />
+                    <input type="hidden" name="return_to" value={activeWorkspaceHref} />
+
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                      <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                        Date
+                        <input
+                          type="date"
+                          name="scheduled_date"
+                          defaultValue={String(job?.scheduled_date ?? "")}
+                          className={scheduleFieldClass}
+                        />
+                      </label>
+                      <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                        Start
+                        <input
+                          type="time"
+                          name="window_start"
+                          defaultValue={timeToTimeInput(job?.window_start)}
+                          className={scheduleFieldClass}
+                        />
+                      </label>
+                      <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                        End
+                        <input
+                          type="time"
+                          name="window_end"
+                          defaultValue={timeToTimeInput(job?.window_end)}
+                          className={scheduleFieldClass}
+                        />
+                      </label>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <button type="submit" className={inlinePrimaryActionClass}>
+                        Save Schedule
+                      </button>
+                      <button type="submit" name="unschedule" value="1" className={inlineActionClass}>
+                        Clear
+                      </button>
+                    </div>
+                  </form>
+                </details>
+                <form action={logCustomerContactAttemptFromForm}>
+                  <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="method" value="call" />
+                  <input type="hidden" name="result" value="no_answer" />
+                  <input type="hidden" name="return_to" value={activeWorkspaceHref} />
+                  <input type="hidden" name="success_banner" value="contact_attempt_logged_call" />
+                  <button type="submit" className={inlineActionClass}>
+                    Log Call
+                  </button>
+                </form>
+                <form action={logCustomerContactAttemptFromForm}>
+                  <input type="hidden" name="job_id" value={jobId} />
+                  <input type="hidden" name="method" value="text" />
+                  <input type="hidden" name="result" value="sent" />
+                  <input type="hidden" name="return_to" value={activeWorkspaceHref} />
+                  <input type="hidden" name="success_banner" value="contact_attempt_logged_text" />
+                  <button type="submit" className={inlineActionClass}>
+                    Log Text Attempt
+                  </button>
+                </form>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Logs communication attempts only; does not confirm carrier delivery.
+              </p>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     const selectedWorkspaceItemCount =
       selectedWorkspaceKey === "permits"
         ? selectedPermitRows.length
@@ -2342,6 +2544,10 @@ function subtractBusinessDays(date: Date, days: number) {
               <div className="space-y-2">
                 {selectedWorkspaceSection.previewRows.map((job: any) => {
                   const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);
+                  if (selectedWorkspaceSection.key === "need_to_schedule") {
+                    return workspaceNeedsSchedulingRichCard(job, visibleReason);
+                  }
+
                   return (
                     <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
                       <div className="flex flex-wrap items-start justify-between gap-2">
@@ -3997,6 +4203,15 @@ const activeSignalLabel =
     ? "Contractor Updates"
     : "";
 
+const canonicalOpsQueueReturnTo = `/ops${buildQueryString({
+  bucket: activeBoardBucketFilter,
+  contractor: contractorScopeFilter ?? "",
+  q: q ?? "",
+  sort: sort ?? "",
+  reason: boardReasonFilter ?? "",
+  signal: signal ?? "",
+})}#ops-queues`;
+
 const PREVIEW_LIMIT = 4;
 const EXCEPTION_PREVIEW_LIMIT = 5;
 const isPanelExpanded = (key: string) => panel === key;
@@ -4118,6 +4333,217 @@ function contractorResponseBadgeLabelForJob(jobId: string) {
   }
 
   return "New Update";
+}
+
+function timeToTimeInput(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const hhmm = /^\d{2}:\d{2}/.test(raw) ? raw.slice(0, 5) : "";
+  return hhmm || "";
+}
+
+function needsSchedulingRichCard(j: any, note?: string) {
+  const jobId = String(j?.id ?? "");
+  const displayTitle = displayOpsCardTitle(j?.title);
+  const customerName = formatPersonNamePart(customerNameOnly(j));
+  const customerPhone = customerPhoneOnly(j);
+  const phoneHref = telHref(customerPhone);
+  const textHref = smsHref(customerPhone);
+  const contractorName = contractorNameOnly(j);
+  const jobType = String(j?.job_type ?? "").toLowerCase();
+  const badge = jobType === "ecc" || jobType === "service" ? jobType.toUpperCase() : "";
+  const createdMs = j?.created_at ? new Date(j.created_at).getTime() : null;
+  const ageDays =
+    createdMs != null && Number.isFinite(createdMs)
+      ? Math.floor((now.getTime() - createdMs) / (1000 * 60 * 60 * 24))
+      : null;
+  const ageSuffix =
+    ageDays == null
+      ? ""
+      : ageDays === 0
+      ? "Today"
+      : ageDays === 1
+      ? "1 day ago"
+      : `${ageDays} days ago`;
+  const scheduleDateText = j?.scheduled_date ? formatBusinessDateUS(String(j.scheduled_date)) : "Not scheduled";
+  const scheduleWindowText = displayWindowLA(j?.window_start, j?.window_end) || (j?.scheduled_date ? "Window TBD" : "");
+  const recentAttemptDisplay = resolveRecentAttemptDisplay(latestCustomerAttemptByJob.get(jobId) ?? null);
+  const noteText = String(note ?? "").trim();
+  const contractorResponseBadgeLabel = contractorResponseBadgeLabelForJob(jobId);
+
+  return (
+    <div
+      key={jobId}
+      data-ops-card-variant="needs-scheduling-rich"
+      className="rounded-xl border border-l-4 border-slate-200 border-l-blue-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-blue-900/35 sm:px-5"
+    >
+      <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,1.05fr)_minmax(14rem,0.72fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-5">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Link
+              href={`/jobs/${jobId}?tab=ops`}
+              className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+            >
+              {displayTitle}
+            </Link>
+            {badge ? (
+              <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-600">
+                {badge}
+              </span>
+            ) : null}
+            {contractorResponseBadgeLabel ? (
+              <span className="inline-flex rounded-full border border-indigo-200 bg-indigo-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-indigo-700">
+                {contractorResponseBadgeLabel}
+              </span>
+            ) : null}
+            {ageSuffix ? <span className="text-xs text-slate-400">{ageSuffix}</span> : null}
+          </div>
+          <div className="mt-2 text-sm font-semibold text-slate-800">{customerName}</div>
+          <div className="mt-2 grid gap-1 text-sm leading-5 text-slate-500">
+            <div>
+              <span className={opsUtilityLabelClass}>Contractor</span>
+              <div className="font-medium text-slate-700">{contractorName}</div>
+            </div>
+            <div>{addressLine(j)}</div>
+          </div>
+          {noteText ? (
+            <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50/60 px-2.5 py-1.5 text-xs font-medium leading-5 text-blue-900">
+              {noteText}
+            </div>
+          ) : null}
+        </div>
+
+        <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+          <div className="grid gap-1.5">
+            <span className={opsUtilityLabelClass}>Phone</span>
+            {customerPhone ? (
+              <div className="flex min-w-0 flex-wrap items-center gap-2">
+                {phoneHref || textHref ? (
+                  <a
+                    href={phoneHref || textHref}
+                    className="text-sm font-semibold text-slate-800 transition-colors hover:text-slate-950 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                  >
+                    {customerPhone}
+                  </a>
+                ) : (
+                  <span className="text-sm font-medium text-slate-800">{customerPhone}</span>
+                )}
+                <div className="flex items-center gap-1.5">
+                  {phoneHref ? (
+                    <a href={phoneHref} className={opsCompactContactActionClass}>
+                      Call
+                    </a>
+                  ) : null}
+                  {textHref ? (
+                    <a href={textHref} className={opsCompactContactActionClass}>
+                      Open SMS App
+                    </a>
+                  ) : null}
+                </div>
+              </div>
+            ) : (
+              <span className="text-sm text-slate-400">No phone on file</span>
+            )}
+          </div>
+          <div className="grid gap-1.5">
+            <span className={opsUtilityLabelClass}>Schedule</span>
+            <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+              {scheduleWindowText ? `${scheduleDateText} / ${scheduleWindowText}` : scheduleDateText}
+            </span>
+          </div>
+          <div className="grid gap-1.5">
+            <span className={opsUtilityLabelClass}>Last attempt</span>
+            <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+              {recentAttemptDisplay}
+            </span>
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+          <span className={opsUtilityLabelClass}>Actions</span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <details className="group">
+              <summary className={`${opsInlineActionClass} cursor-pointer list-none gap-1.5`}>
+                <span>Scheduler</span>
+                <span className="text-[10px] text-slate-400 transition-transform duration-150 group-open:rotate-180" aria-hidden="true">
+                  v
+                </span>
+              </summary>
+              <form action={updateJobScheduleFromForm} className="mt-2 space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.35)]">
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="permit_number" value={String(j?.permit_number ?? "")} />
+                <input type="hidden" name="jurisdiction" value={String(j?.jurisdiction ?? "")} />
+                <input type="hidden" name="permit_date" value={String(j?.permit_date ?? "")} />
+                <input type="hidden" name="return_to" value={canonicalOpsQueueReturnTo} />
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Date
+                    <input
+                      type="date"
+                      name="scheduled_date"
+                      defaultValue={String(j?.scheduled_date ?? "")}
+                      className={opsScheduleFieldClass}
+                    />
+                  </label>
+                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Start
+                    <input
+                      type="time"
+                      name="window_start"
+                      defaultValue={timeToTimeInput(j?.window_start)}
+                      className={opsScheduleFieldClass}
+                    />
+                  </label>
+                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    End
+                    <input
+                      type="time"
+                      name="window_end"
+                      defaultValue={timeToTimeInput(j?.window_end)}
+                      className={opsScheduleFieldClass}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button type="submit" className={opsInlinePrimaryActionClass}>
+                    Save Schedule
+                  </button>
+                  <button type="submit" name="unschedule" value="1" className={opsInlineActionClass}>
+                    Clear
+                  </button>
+                </div>
+              </form>
+            </details>
+            <form action={logCustomerContactAttemptFromForm}>
+              <input type="hidden" name="job_id" value={jobId} />
+              <input type="hidden" name="method" value="call" />
+              <input type="hidden" name="result" value="no_answer" />
+              <input type="hidden" name="return_to" value={canonicalOpsQueueReturnTo} />
+              <input type="hidden" name="success_banner" value="contact_attempt_logged_call" />
+              <button type="submit" className={opsInlineActionClass}>
+                Log Call
+              </button>
+            </form>
+            <form action={logCustomerContactAttemptFromForm}>
+              <input type="hidden" name="job_id" value={jobId} />
+              <input type="hidden" name="method" value="text" />
+              <input type="hidden" name="result" value="sent" />
+              <input type="hidden" name="return_to" value={canonicalOpsQueueReturnTo} />
+              <input type="hidden" name="success_banner" value="contact_attempt_logged_text" />
+              <button type="submit" className={opsInlineActionClass}>
+                Log Text Attempt
+              </button>
+            </form>
+          </div>
+          <p className="text-[11px] text-slate-500">
+            Logs communication attempts only; does not confirm carrier delivery.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function compactRow(j: any, showDate = false, note?: string, emphasize = false, queueKey?: string) {
@@ -4534,6 +4960,18 @@ const opsPrimaryActionClass =
 
 const opsSecondaryActionClass =
   "inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform] hover:-translate-y-px hover:border-slate-400 hover:bg-slate-50 hover:text-slate-900 hover:shadow-[0_10px_18px_-18px_rgba(15,23,42,0.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px] sm:min-h-8 sm:flex-none sm:px-2.5 sm:py-1.5 sm:text-xs";
+
+const opsInlineActionClass =
+  "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-1 text-[11px] font-semibold text-slate-700 shadow-sm transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 active:scale-[0.99]";
+
+const opsCompactContactActionClass =
+  "inline-flex h-7 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-700 transition-colors hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300";
+
+const opsInlinePrimaryActionClass =
+  "inline-flex min-h-8 items-center justify-center rounded-md border border-slate-900 bg-slate-900 px-3 py-1 text-[11px] font-semibold text-white shadow-sm transition-colors hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-1 active:scale-[0.99]";
+
+const opsScheduleFieldClass =
+  "w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition-colors focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
 
 const opsFilterControlClass =
   "w-full rounded-xl border border-slate-300/80 bg-white px-3 py-2.5 text-sm font-medium text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200";
@@ -5588,6 +6026,10 @@ return (
                     scheduledRetest: hasScheduledRetestForJob(String(j.id ?? "")),
                   })
                 : queueReason(j, bucket);
+
+              if (bucket === "need_to_schedule") {
+                return needsSchedulingRichCard(j, note || undefined);
+              }
 
               return compactRow(j, true, note || undefined, false, bucket);
             })}
