@@ -389,8 +389,8 @@ describe('calendar action wiring', () => {
       'job-assigned-tech-2',
     ]);
     expect(roster.assignableUsers).toEqual([
-      { user_id: 'tech-1', display_name: 'Tech One' },
-      { user_id: 'tech-2', display_name: 'Tech Two' },
+      { user_id: 'tech-1', display_name: 'Tech One', email: null, calendar_label: 'Tech One' },
+      { user_id: 'tech-2', display_name: 'Tech Two', email: null, calendar_label: 'Tech Two' },
     ]);
     expect(getAssignableInternalUsersMock).toHaveBeenCalledTimes(3);
   });
@@ -452,6 +452,6 @@ describe('calendar action wiring', () => {
     });
 
     expect(board.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical']);
-    expect(roster.assignableUsers).toEqual([{ user_id: 'tech-1', display_name: 'My calendar' }]);
+    expect(roster.assignableUsers).toEqual([{ user_id: 'tech-1', display_name: 'My calendar', calendar_label: 'My calendar', email: null }]);
   });
 });

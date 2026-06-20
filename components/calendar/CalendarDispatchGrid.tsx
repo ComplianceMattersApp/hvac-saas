@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 import type { DispatchCalendarBlockEvent, DispatchJob, DispatchViewMode } from "@/lib/actions/calendar";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
+import { compactCalendarUserLabel } from "@/lib/calendar/calendar-user-label";
 import { buildCalendarHref } from "./calendar-href";
 import { formatCalendarDisplayStatus, getCalendarDisplayStatus } from "./calendar-status";
 import {
@@ -21,7 +22,7 @@ import {
 type Props = {
   jobs: DispatchJob[];
   blockEvents: DispatchCalendarBlockEvent[];
-  assignableUsers: Array<{ user_id: string; display_name: string }>;
+  assignableUsers: Array<{ user_id: string; display_name: string; calendar_label?: string | null; email?: string | null }>;
   mode: DispatchViewMode;
   date: string;
   tech?: string | null;
@@ -34,6 +35,7 @@ type Props = {
 type GridColumn = {
   key: string;
   label: string;
+  title: string;
 };
 
 const UNASSIGNED_COLUMN_KEY = "unassigned";
@@ -290,8 +292,15 @@ export default function CalendarDispatchGrid(props: Props) {
   const dayBlockEvents = blockEvents.filter((event) => event.calendar_date === date);
 
   const columns: GridColumn[] = [
-    { key: UNASSIGNED_COLUMN_KEY, label: "Unassigned" },
-    ...assignableUsers.map((user) => ({ key: user.user_id, label: user.display_name })),
+    { key: UNASSIGNED_COLUMN_KEY, label: "Unassigned", title: "Unassigned" },
+    ...assignableUsers.map((user) => ({
+      key: user.user_id,
+      label: String(user.calendar_label ?? "").trim() || compactCalendarUserLabel({
+        displayName: user.display_name,
+        email: user.email,
+      }),
+      title: user.display_name,
+    })),
   ];
   const columnIndexByKey = new Map(columns.map((column, index) => [column.key, index]));
   const activeTechKeys = new Set(assignableUsers.map((user) => user.user_id));
@@ -514,11 +523,11 @@ export default function CalendarDispatchGrid(props: Props) {
         <div className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-2">
           <p className="truncate text-[11px] text-slate-500">Drag changes date and time only. Technician assignment stays attached to the job.</p>
         </div>
-        <div className="grid" style={{ gridTemplateColumns: `84px repeat(${columnCount}, minmax(150px, 1fr))` }}>
+        <div className="grid" style={{ gridTemplateColumns: `84px repeat(${columnCount}, minmax(170px, 1fr))` }}>
           <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Time</div>
           {columns.map((column) => (
-            <div key={`header-${column.key}`} className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3">
-              <p className="truncate text-sm font-semibold text-slate-900">{column.label}</p>
+            <div key={`header-${column.key}`} className="min-w-0 border-b border-r border-slate-200 bg-slate-50 px-3 py-3">
+              <p className="min-w-0 truncate text-sm font-semibold text-slate-900" title={column.title}>{column.label}</p>
             </div>
           ))}
 

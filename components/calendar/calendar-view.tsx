@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { CalendarPlus, X } from 'lucide-react';
+import { CalendarPlus, ChevronDown, X } from 'lucide-react';
 import { endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
 import CalendarMonthGrid from './CalendarMonthGrid';
@@ -43,7 +43,7 @@ import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
 
 type CalendarUIView = 'day' | 'week' | 'list' | 'month';
 
-type AssignableCalendarUser = { user_id: string; display_name: string };
+type AssignableCalendarUser = { user_id: string; display_name: string; calendar_label?: string | null; email?: string | null };
 
 type Props = {
   view?: string;
@@ -1116,10 +1116,10 @@ async function CalendarDispatchFocusControls(props: {
       <form action="/calendar" method="get" className="mt-2.5 space-y-2">
         <input type="hidden" name="view" value={props.uiView} />
         <input type="hidden" name="date" value={props.anchorDate} />
-        <div className="flex flex-wrap items-center gap-1.5">
+        <div className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:items-center">
           <button
             type="submit"
-            className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50"
+            className="inline-flex min-h-10 min-w-0 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50 sm:min-h-9 sm:rounded-full"
           >
             Apply
           </button>
@@ -1127,7 +1127,7 @@ async function CalendarDispatchFocusControls(props: {
             href={buildCalendarHref(props.uiView, props.anchorDate, {
               tech: roster.assignableUsers.map((user) => user.user_id),
             })}
-            className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`inline-flex min-h-10 min-w-0 items-center justify-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors sm:min-h-9 sm:rounded-full ${
               allUsersSelected && !props.activeUnassignedFilter
                 ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
                 : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
@@ -1137,7 +1137,7 @@ async function CalendarDispatchFocusControls(props: {
           </Link>
           <Link
             href={buildCalendarHref(props.uiView, props.anchorDate)}
-            className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`inline-flex min-h-10 min-w-0 items-center justify-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors sm:min-h-9 sm:rounded-full ${
               !props.activeTech
                 ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
                 : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
@@ -1147,7 +1147,7 @@ async function CalendarDispatchFocusControls(props: {
           </Link>
           <Link
             href={buildCalendarHref(props.uiView, props.anchorDate, { tech: CALENDAR_TECH_FILTER_UNASSIGNED })}
-            className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+            className={`inline-flex min-h-10 min-w-0 items-center justify-center rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors sm:min-h-9 sm:rounded-full ${
               props.activeUnassignedFilter
                 ? 'border-rose-800 bg-rose-700 text-white shadow-sm'
                 : 'border-rose-200 bg-white text-rose-700 hover:border-rose-300 hover:bg-rose-50'
@@ -1156,13 +1156,14 @@ async function CalendarDispatchFocusControls(props: {
             Unassigned
           </Link>
         </div>
-        <div className="flex max-h-40 flex-wrap gap-1.5 overflow-y-auto pr-1">
+        <div className="grid max-h-48 grid-cols-1 gap-1.5 overflow-y-auto pr-1 min-[430px]:grid-cols-2 sm:flex sm:max-h-40 sm:flex-wrap">
           {roster.assignableUsers.map((user) => {
             const checked = selectedUserIdSet.has(user.user_id);
             return (
               <label
                 key={user.user_id}
-                className={`inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors ${
+                title={user.display_name}
+                className={`inline-flex min-h-10 min-w-0 cursor-pointer items-center gap-2 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-colors sm:min-h-9 sm:rounded-full ${
                   checked
                     ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
                     : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
@@ -1175,7 +1176,7 @@ async function CalendarDispatchFocusControls(props: {
                   defaultChecked={checked}
                   className="h-3.5 w-3.5 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
                 />
-                <span>{user.display_name}</span>
+                <span className="min-w-0 truncate">{user.display_name}</span>
               </label>
             );
           })}
@@ -1675,30 +1676,32 @@ export async function CalendarView(props: Props) {
             <p className="mt-0.5 text-xs text-blue-900/90">Open a job in Needs Scheduling, then place it on today&apos;s board.</p>
           </div>
 
-          <div className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-3 sm:hidden">
-            <Suspense fallback={<CalendarRosterControlsFallback activeFilterLabel={activeFilterLabel} />}>
-              <CalendarDispatchFocusControls
-                rosterPromise={rosterPromise}
-                uiView={uiView}
-                anchorDate={data.anchorDate}
-                activeTech={activeTech}
-                selectedUserIds={selectedCalendarUserIds}
-                activeUnassignedFilter={activeUnassignedFilter}
-                activeFilterLabel={activeFilterLabel}
-              />
-            </Suspense>
-          </div>
-
-          <details className="mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3 py-3 sm:hidden">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-800 [&::-webkit-details-marker]:hidden">
-              <span>Status Legend</span>
-              <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
-                Open
+          <details open className="group mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 p-2 shadow-sm shadow-slate-950/5 sm:hidden">
+            <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 [&::-webkit-details-marker]:hidden">
+              <span className="min-w-0">
+                <span className="block truncate">Filters &amp; Status</span>
+                <span className="block text-[11px] font-medium text-slate-500 group-open:hidden">Show filters</span>
+                <span className="hidden text-[11px] font-medium text-slate-500 group-open:block">Hide filters</span>
+              </span>
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+                {activeFilterLabel}
+                <ChevronDown className="h-3.5 w-3.5 transition-transform group-open:rotate-180" aria-hidden="true" />
               </span>
             </summary>
 
-            <div className="mt-3 border-t border-slate-200 pt-3">
-              {statusLegend}
+            <div className="mt-3 space-y-3 px-1 pb-1">
+              <Suspense fallback={<CalendarRosterControlsFallback activeFilterLabel={activeFilterLabel} />}>
+                <CalendarDispatchFocusControls
+                  rosterPromise={rosterPromise}
+                  uiView={uiView}
+                  anchorDate={data.anchorDate}
+                  activeTech={activeTech}
+                  selectedUserIds={selectedCalendarUserIds}
+                  activeUnassignedFilter={activeUnassignedFilter}
+                  activeFilterLabel={activeFilterLabel}
+                />
+              </Suspense>
+              <div className="border-t border-slate-200 pt-3">{statusLegend}</div>
             </div>
           </details>
 

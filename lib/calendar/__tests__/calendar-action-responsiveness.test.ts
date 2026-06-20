@@ -52,6 +52,10 @@ describe("calendar action responsiveness", () => {
   it("renders dispatch focus as checkbox-style multi-select controls", () => {
     expect(calendarViewSource).toContain('type="checkbox"');
     expect(calendarViewSource).toContain('name="tech"');
+    expect(calendarViewSource).toContain("Apply");
+    expect(calendarViewSource).toContain("All");
+    expect(calendarViewSource).toContain("Clear");
+    expect(calendarViewSource).toContain("Unassigned");
     expect(calendarViewSource).toContain("selectedUserIds={selectedCalendarUserIds}");
     expect(calendarViewSource).toContain("parseCalendarSelectedUserIds(activeTech)");
   });
@@ -88,7 +92,10 @@ describe("calendar action responsiveness", () => {
   });
 
   it("mobile calendar keeps controls accessible through progressive disclosure", () => {
-    expect(calendarViewSource).toContain("Status Legend");
+    expect(calendarViewSource).toContain("Filters &amp; Status");
+    expect(calendarViewSource).toContain("Show filters");
+    expect(calendarViewSource).toContain("Hide filters");
+    expect(calendarViewSource).toContain("ChevronDown");
     expect(calendarViewSource).toContain("selectedUserIds={selectedCalendarUserIds}");
     expect(calendarViewSource).toContain("Next dispatch action");
   });
@@ -96,6 +103,9 @@ describe("calendar action responsiveness", () => {
   it("mobile day and week grids have intentional horizontal scrolling instead of clipped columns", () => {
     expect(calendarViewSource).toContain("overflow-x-auto overscroll-x-contain pb-2");
     expect(dispatchGridSource).toContain("const minGridWidth = 84 + columnCount * 170");
+    expect(dispatchGridSource).toContain("compactCalendarUserLabel");
+    expect(dispatchGridSource).toContain("calendar_label");
+    expect(dispatchGridSource).toContain("minmax(170px, 1fr)");
     expect(dispatchGridSource).toContain('style={{ minWidth: `${minGridWidth}px` }}');
   });
 

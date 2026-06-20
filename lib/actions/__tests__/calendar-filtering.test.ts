@@ -4,6 +4,7 @@ import {
   filterJobsForTechnician,
   parseCalendarSelectedUserIds,
 } from '@/components/calendar/calendar-filtering';
+import { compactCalendarUserLabel } from '@/lib/calendar/calendar-user-label';
 import type { DispatchJob } from '@/lib/actions/calendar';
 
 function makeJob(params: {
@@ -43,6 +44,13 @@ function makeJob(params: {
 }
 
 describe('calendar technician filtering', () => {
+  it('builds compact calendar labels from profile names or email local-parts', () => {
+    expect(compactCalendarUserLabel({ displayName: 'Alex Rivera', email: 'alex@example.com' })).toBe('Alex Rivera');
+    expect(compactCalendarUserLabel({ displayName: 'adnguyen1005@example.com' })).toBe('adnguyen1005');
+    expect(compactCalendarUserLabel({ displayName: '', email: 'verylongcalendaruser@example.com', maxLength: 12 })).toBe('verylongc...');
+    expect(compactCalendarUserLabel({ displayName: '', email: '' })).toBe('User');
+  });
+
   it('parses repeated and comma-separated technician selections without duplicates', () => {
     expect(parseCalendarSelectedUserIds(['tech-1, tech-2', 'tech-2', '', CALENDAR_TECH_FILTER_UNASSIGNED])).toEqual([
       'tech-1',

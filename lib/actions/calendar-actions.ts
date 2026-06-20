@@ -4,6 +4,7 @@ import { requireInternalUser } from '@/lib/auth/internal-user';
 import { createClient } from '@/lib/supabase/server';
 import { getActiveJobAssignmentDisplayMap, getAssignableInternalUsers } from '@/lib/staffing/human-layer';
 import { buildVisitScopeIncludesReadModel } from '@/lib/jobs/visit-scope';
+import { compactCalendarUserLabel } from '@/lib/calendar/calendar-user-label';
 import { CALENDAR_TECH_FILTER_UNASSIGNED, parseCalendarSelectedUserIds } from '@/lib/calendar/calendar-user-selection';
 import { displayDateLA, displayTimeLA, laDateTimeToUtcIso } from '@/lib/utils/schedule-la';
 
@@ -63,6 +64,8 @@ export type DispatchCalendarData = {
   assignableUsers: Array<{
     user_id: string;
     display_name: string;
+    calendar_label?: string;
+    email?: string | null;
   }>;
 };
 
@@ -456,7 +459,7 @@ type DispatchCalendarLoadParams = {
 };
 
 type CalendarUserVisibility = {
-  assignableUsers: Array<{ user_id: string; display_name: string }>;
+  assignableUsers: Array<{ user_id: string; display_name: string; calendar_label?: string; email?: string | null }>;
   visibleUserIds: string[];
   explicitSelection: boolean;
   canSelectMultiple: boolean;
@@ -466,13 +469,21 @@ function isCalendarMultiUserRole(role: unknown) {
   return role === 'admin' || role === 'office' || role === 'billing';
 }
 
-function normalizeAssignableUsers(users: Array<{ user_id: unknown; display_name: unknown }>) {
+function normalizeAssignableUsers(users: Array<{ user_id: unknown; display_name: unknown; email?: unknown }>) {
   return users
     .map((user) => ({
       user_id: String(user.user_id ?? '').trim(),
       display_name: String(user.display_name ?? '').trim(),
+      email: user.email ? String(user.email).trim() || null : null,
     }))
-    .filter((user) => user.user_id && user.display_name);
+    .filter((user) => user.user_id && user.display_name)
+    .map((user) => ({
+      ...user,
+      calendar_label: compactCalendarUserLabel({
+        displayName: user.display_name,
+        email: user.email,
+      }),
+    }));
 }
 
 async function resolveCalendarUserVisibility(params: {
@@ -486,7 +497,7 @@ async function resolveCalendarUserVisibility(params: {
 
   if (!isCalendarMultiUserRole(params.internalUser.role)) {
     return {
-      assignableUsers: actorUserId ? [{ user_id: actorUserId, display_name: 'My calendar' }] : [],
+      assignableUsers: actorUserId ? [{ user_id: actorUserId, display_name: 'My calendar', calendar_label: 'My calendar', email: null }] : [],
       visibleUserIds: actorUserId ? [actorUserId] : [],
       explicitSelection: true,
       canSelectMultiple: false,
