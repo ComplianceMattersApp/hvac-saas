@@ -699,14 +699,28 @@ function subtractBusinessDays(date: Date, days: number) {
     }
 
     const _t_workspaceCounts = opsTimingEnabled ? Date.now() : 0;
-    let countsQ = supabase
-      .from("jobs")
-      .select("ops_status, status")
-      .neq("ops_status", "closed")
-      .neq("status", "cancelled")
-      .is("deleted_at", null);
 
-    if (contractorScopeFilter) countsQ = countsQ.eq("contractor_id", contractorScopeFilter);
+    function opsStatusCountQuery(opsStatus: string, options?: { requireOpenStatus?: boolean }) {
+      let q = supabase
+        .from("jobs")
+        .select("id", { count: "exact", head: true })
+        .is("deleted_at", null)
+        .neq("status", "cancelled")
+        .eq("ops_status", opsStatus);
+
+      if (options?.requireOpenStatus) q = q.eq("status", "open");
+      if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
+      return q;
+    }
+
+    const needToScheduleCountQ = opsStatusCountQuery("need_to_schedule", { requireOpenStatus: true });
+    const pendingInfoCountQ = opsStatusCountQuery("pending_info");
+    const onHoldCountQ = opsStatusCountQuery("on_hold");
+    const waitingStatusCountQ = opsStatusCountQuery("waiting");
+    const pendingOfficeReviewCountQ = opsStatusCountQuery("pending_office_review");
+    const failedCountQ = opsStatusCountQuery("failed");
+    const retestNeededCountQ = opsStatusCountQuery("retest_needed");
+    const problemCountQ = opsStatusCountQuery("problem");
 
     let fieldWorkCountQ = supabase
       .from("jobs")
@@ -759,7 +773,14 @@ function subtractBusinessDays(date: Date, days: number) {
     if (contractorScopeFilter) closeoutPermitExceptionRowsQ = closeoutPermitExceptionRowsQ.eq("contractor_id", contractorScopeFilter);
 
     const [
-      countsResWs,
+      needToScheduleCountRes,
+      pendingInfoCountRes,
+      onHoldCountRes,
+      waitingStatusCountRes,
+      pendingOfficeReviewCountRes,
+      failedCountRes,
+      retestNeededCountRes,
+      problemCountRes,
       fieldWorkCountRes,
       scheduledOpenRowsRes,
       closeoutCountRowsRes,
@@ -769,7 +790,14 @@ function subtractBusinessDays(date: Date, days: number) {
       unreadNewWorkRequests,
       activePermitRequestsResult,
     ] = await Promise.all([
-      countsQ,
+      needToScheduleCountQ,
+      pendingInfoCountQ,
+      onHoldCountQ,
+      waitingStatusCountQ,
+      pendingOfficeReviewCountQ,
+      failedCountQ,
+      retestNeededCountQ,
+      problemCountQ,
       fieldWorkCountQ,
       scheduledOpenRowsQ,
       closeoutCountRowsQ,
@@ -791,20 +819,29 @@ function subtractBusinessDays(date: Date, days: number) {
         : Promise.resolve({ schemaAvailable: true, rows: [] as PermitRequestQueueRow[] }),
     ]);
 
-    if (countsResWs.error) throw countsResWs.error;
+    if (needToScheduleCountRes.error) throw needToScheduleCountRes.error;
+    if (pendingInfoCountRes.error) throw pendingInfoCountRes.error;
+    if (onHoldCountRes.error) throw onHoldCountRes.error;
+    if (waitingStatusCountRes.error) throw waitingStatusCountRes.error;
+    if (pendingOfficeReviewCountRes.error) throw pendingOfficeReviewCountRes.error;
+    if (failedCountRes.error) throw failedCountRes.error;
+    if (retestNeededCountRes.error) throw retestNeededCountRes.error;
+    if (problemCountRes.error) throw problemCountRes.error;
     if (fieldWorkCountRes.error) throw fieldWorkCountRes.error;
     if (scheduledOpenRowsRes.error) throw scheduledOpenRowsRes.error;
     if (closeoutCountRowsRes.error) throw closeoutCountRowsRes.error;
     if (closeoutPermitExceptionRowsRes.error) throw closeoutPermitExceptionRowsRes.error;
 
-    const countsWs = new Map<string, number>();
-    for (const row of countsResWs.data ?? []) {
-      const key = String((row as any)?.ops_status ?? "").trim().toLowerCase();
-      const lifecycle = String((row as any)?.status ?? "").trim().toLowerCase();
-      if (!key) continue;
-      if ((key === "need_to_schedule" || key === "scheduled") && lifecycle !== "open") continue;
-      countsWs.set(key, (countsWs.get(key) ?? 0) + 1);
-    }
+    const countsWs = new Map<string, number>([
+      ["need_to_schedule", needToScheduleCountRes.count ?? 0],
+      ["pending_info", pendingInfoCountRes.count ?? 0],
+      ["on_hold", onHoldCountRes.count ?? 0],
+      ["waiting", waitingStatusCountRes.count ?? 0],
+      ["pending_office_review", pendingOfficeReviewCountRes.count ?? 0],
+      ["failed", failedCountRes.count ?? 0],
+      ["retest_needed", retestNeededCountRes.count ?? 0],
+      ["problem", problemCountRes.count ?? 0],
+    ]);
 
     const scheduledOpenRows = (scheduledOpenRowsRes.data ?? []) as any[];
     const scheduledIds = scheduledOpenRows
