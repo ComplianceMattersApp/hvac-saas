@@ -101,11 +101,14 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
       : "No recent attempts yet"
     : String(lastAttemptLabel ?? "").trim() || summaryText;
 
+  const actionButtonClassName =
+    `${buttonClassName} h-full min-h-[4rem] whitespace-normal text-center leading-tight`.trim();
+
   return (
     <div ref={sectionRef} id="contact-logging" className="mt-4 border-t border-slate-200/80 pt-4 scroll-mt-24">
       <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Contact Logging</div>
       <div className="grid grid-cols-1 gap-2 min-[420px]:grid-cols-2">
-        <form action={action} className="w-full">
+        <form action={action} className="flex w-full">
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="method" value="call" />
           <input type="hidden" name="result" value="no_answer" />
@@ -113,12 +116,12 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
           <input type="hidden" name="success_banner" value="contact_attempt_logged" />
           <ContactLoggingSubmitButton
             label="No Answer"
-            buttonClassName={buttonClassName}
+            buttonClassName={actionButtonClassName}
             onPressed={markForRestore}
           />
         </form>
 
-        <form action={action} className="w-full">
+        <form action={action} className="flex w-full">
           <input type="hidden" name="job_id" value={jobId} />
           <input type="hidden" name="method" value="text" />
           <input type="hidden" name="result" value="sent" />
@@ -126,7 +129,7 @@ export default function ContactLoggingQuickActions(props: ContactLoggingQuickAct
           <input type="hidden" name="success_banner" value="contact_attempt_logged" />
           <ContactLoggingSubmitButton
             label="Log Text Attempt"
-            buttonClassName={buttonClassName}
+            buttonClassName={actionButtonClassName}
             onPressed={markForRestore}
           />
         </form>

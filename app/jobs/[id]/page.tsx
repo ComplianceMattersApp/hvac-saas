@@ -11,8 +11,6 @@ import { archiveJobFromForm } from "@/lib/actions/job-actions";
 import JobLocationPreview from "@/components/jobs/JobLocationPreview";
 import {
   getContractors,
-  setPrimaryJobAssigneeFromForm,
-  removeJobAssigneeFromForm,
   changeJobServiceLocationFromForm,
   updateJobCustomerFromForm,
   updateJobContractorFromForm,
@@ -135,7 +133,7 @@ import DeferredJobAttachmentsInternal from "./_components/DeferredJobAttachments
 import DeferredCustomerAttemptsHistory from "./_components/DeferredCustomerAttemptsHistory";
 import DeferredServiceChainPanelBody from "./_components/DeferredServiceChainPanelBody";
 import DeferredWorkflowMilestonesPanelBody from "./_components/DeferredWorkflowMilestonesPanelBody";
-import DeferredAddAssigneeForm from "./_components/DeferredAddAssigneeForm";
+import AssignedTeamControls from "./_components/AssignedTeamControls";
 import ContactLoggingQuickActions from "./_components/ContactLoggingQuickActions";
 import DeferredTimelineBody from "./_components/DeferredTimelineBody";
 import DeferredSharedNotesBody from "./_components/DeferredSharedNotesBody";
@@ -1265,8 +1263,6 @@ const workspaceSoftCardClass =
   "rounded-xl border border-slate-200/80 bg-slate-50/72 p-4";
 const workspaceEmptyStateClass =
   "rounded-lg border border-dashed border-slate-300 bg-slate-50/72 px-4 py-4 text-sm text-slate-600";
-const workspaceUtilityControlClass =
-  "rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow] hover:border-slate-400 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200";
 
 export default async function JobDetailPage({
   params,
@@ -2743,6 +2739,7 @@ export default async function JobDetailPage({
       : job.scheduled_date
       ? "Time window TBD"
       : "No time window set";
+  const mobileAppointmentTimeLabel = job.scheduled_date ? appointmentTimeLabel : "";
 
 function formatOpsStatusLabel(value?: string | null, jobType?: string | null) {
   const v = String(value ?? "").trim();
@@ -3430,6 +3427,13 @@ const failureResolutionPathCount =
   const showMobileInvoiceOpenAttention =
     job.job_type === "service" && Boolean(internalInvoiceTruth) && !showInternalInvoicingPlaceholder;
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
+  const mobileWorkStateLabel = isFieldComplete
+    ? "Field complete"
+    : mobileLifecycleStatus === "in_process"
+    ? "In progress"
+    : mobileLifecycleStatus === "on_the_way"
+    ? "On the way"
+    : "Not started";
   const showMobileContractorContext =
     surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
 
@@ -3503,7 +3507,9 @@ const failureResolutionPathCount =
                           <span>Schedule</span>
                         </div>
                         <div className="mt-1 text-base font-semibold">{appointmentDateLabel}</div>
-                        <div className="text-sm text-slate-700">{appointmentTimeLabel}</div>
+                        {mobileAppointmentTimeLabel ? (
+                          <div className="text-sm text-slate-700">{mobileAppointmentTimeLabel}</div>
+                        ) : null}
                       </div>
                       <span className="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full bg-slate-200/70 text-slate-600 transition-transform group-open:rotate-90">
                         <ChevronRightIcon className="h-3.5 w-3.5" />
@@ -3581,7 +3587,7 @@ const failureResolutionPathCount =
                     <span>Work</span>
                   </div>
                   <div className="mt-1 text-base font-semibold">{job.job_type === "service" ? "Service" : "ECC"}</div>
-                  <div className="text-sm text-slate-600">{isFieldComplete ? "Field complete" : "Field active"}</div>
+                  <div className="text-sm text-slate-600">{mobileWorkStateLabel}</div>
                 </div>
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2">
@@ -4389,27 +4395,17 @@ const failureResolutionPathCount =
               </div>
 
               <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div>
-                    <div className="text-sm font-semibold text-[#0f1f35]">{surfaceProfile.labels.fieldTeam} Assignment</div>
-                    <div className="text-xs text-slate-500">{surfaceProfile.labels.fieldUser}s assigned to the job.</div>
-                  </div>
-                  <span className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-semibold text-slate-600">
-                    {assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}
-                  </span>
-                </div>
-                {assignedTeam.length > 0 ? (
-                  <div className="mt-3 space-y-2">
-                    {assignedTeam.map((assignee) => (
-                      <div key={`mobile-board-${assignee.job_id}-${assignee.user_id}`} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-800">
-                        {formatPersonNamePart(assignee.display_name)}
-                        {assignee.is_primary ? <span className="ml-2 text-xs text-slate-500">Primary</span> : null}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="mt-3 rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600">No team assigned yet.</div>
-                )}
+                <AssignedTeamControls
+                  jobId={String(job.id)}
+                  tab={tab}
+                  assignedTeam={assignedTeam}
+                  assignedUserIds={assignedUserIds}
+                  isInternalUser={isInternalUser}
+                  fieldTeamLabel={surfaceProfile.labels.fieldTeam}
+                  fieldUserLabel={surfaceProfile.labels.fieldUser}
+                  emptyStateClassName="rounded-lg border border-dashed border-slate-300 bg-white px-3 py-2 text-sm text-slate-600"
+                  variant="mobile"
+                />
               </div>
             </div>
           </section>
@@ -4989,34 +4985,9 @@ const failureResolutionPathCount =
                 />
               ) : null}
 
-              <details className="group">
-                <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
-                  <span className="inline-flex items-center gap-2"><UserIcon className="h-4.5 w-4.5" />Assigned {surfaceProfile.labels.fieldTeam}</span>
-                </summary>
-                <div className="mt-2 rounded-2xl border border-slate-200 bg-white p-3">
-                  {assignedTeam.length > 0 ? (
-                    <div className="space-y-2">
-                      {assignedTeam.map((assignee) => (
-                        <div key={`mobile-${assignee.job_id}-${assignee.user_id}`} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base font-semibold text-slate-800">
-                          {formatPersonNamePart(assignee.display_name)}
-                          {assignee.is_primary ? <span className="ml-2 text-sm text-slate-500">Primary</span> : null}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className={workspaceEmptyStateClass}>No team assigned yet.</div>
-                  )}
-                  {isInternalUser ? (
-                    <Suspense fallback={<div className="h-12 animate-pulse rounded-xl bg-slate-100" />}>
-                      <DeferredAddAssigneeForm
-                        jobId={String(job.id)}
-                        tab={tab}
-                        assignedUserIds={assignedUserIds}
-                      />
-                    </Suspense>
-                  ) : null}
-                </div>
-              </details>
+              <a href="#mobile-assigned-team" className={mobileToolLinkClass}>
+                <span className="inline-flex items-center gap-2"><UserIcon className="h-4.5 w-4.5" />Assign / Manage {surfaceProfile.labels.fieldTeam}</span>
+              </a>
 
               <details id="mobile-tools-timeline" className="group">
                 <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
@@ -5949,82 +5920,16 @@ const failureResolutionPathCount =
         </div>
       </div>
 
-      <div id="assigned-team" className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-2.5 py-2 sm:px-3 sm:py-2.5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <div className="text-sm font-semibold text-slate-900">Assigned {surfaceProfile.labels.fieldTeam}</div>
-            <div className="mt-0.5 text-xs text-slate-600">{surfaceProfile.labels.fieldUser}s assigned to the job.</div>
-          </div>
-          <div className="inline-flex rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[9.5px] font-semibold text-slate-600 sm:px-2.5 sm:py-1 sm:text-[10px]">{assignedTeam.length > 0 ? `${assignedTeam.length} assigned` : "Awaiting assignment"}</div>
-        </div>
-        {assignedTeam.length > 0 ? (
-          <div className="mt-3 flex min-w-0 flex-wrap gap-2">
-            {assignedTeam.map((assignee) => (
-              <div
-                key={`${assignee.job_id}-${assignee.user_id}`}
-                className="inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]"
-              >
-                <span className="max-w-full break-words">{formatPersonNamePart(assignee.display_name)}</span>
-                {assignee.is_primary ? (
-                  <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                    Primary
-                  </span>
-                ) : null}
-
-                {isInternalUser && !assignee.is_primary ? (
-                  <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="user_id" value={assignee.user_id} />
-                    <input type="hidden" name="tab" value={tab} />
-                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
-                    <SubmitButton
-                      loadingText="Updating..."
-                      className={workspaceUtilityControlClass}
-                    >
-                      Make Primary
-                    </SubmitButton>
-                  </form>
-                ) : null}
-
-                {isInternalUser ? (
-                  <form action={removeJobAssigneeFromForm} className="shrink-0">
-                    <input type="hidden" name="job_id" value={job.id} />
-                    <input type="hidden" name="user_id" value={assignee.user_id} />
-                    <input type="hidden" name="tab" value={tab} />
-                    <input type="hidden" name="return_to" value={`/jobs/${job.id}?tab=${tab}#assigned-team`} />
-                    <SubmitButton
-                      loadingText="Removing..."
-                      className="rounded-md border border-rose-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-rose-700 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200"
-                    >
-                      Remove
-                    </SubmitButton>
-                  </form>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={`mt-3 ${workspaceEmptyStateClass}`}>No team assigned yet.</div>
-        )}
-
-        {isInternalUser ? (
-          <Suspense
-            fallback={
-              <div className="mt-3 flex min-w-0 animate-pulse flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
-                <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-56" />
-                <div className="h-4 w-28 rounded bg-slate-100" />
-                <div className="h-10 w-full rounded-lg bg-slate-100 sm:w-20" />
-              </div>
-            }
-          >
-            <DeferredAddAssigneeForm
-              jobId={String(job.id)}
-              tab={tab}
-              assignedUserIds={assignedUserIds}
-            />
-          </Suspense>
-        ) : null}
-      </div>
+      <AssignedTeamControls
+        jobId={String(job.id)}
+        tab={tab}
+        assignedTeam={assignedTeam}
+        assignedUserIds={assignedUserIds}
+        isInternalUser={isInternalUser}
+        fieldTeamLabel={surfaceProfile.labels.fieldTeam}
+        fieldUserLabel={surfaceProfile.labels.fieldUser}
+        emptyStateClassName={workspaceEmptyStateClass}
+      />
 
       {roleContactSections.map((section, index) => (
         <RoleContactsCard

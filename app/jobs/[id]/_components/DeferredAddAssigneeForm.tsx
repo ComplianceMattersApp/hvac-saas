@@ -7,6 +7,7 @@ type DeferredAddAssigneeFormProps = {
   jobId: string;
   tab: string;
   assignedUserIds: string[];
+  returnAnchor?: string;
 };
 
 const selectClass =
@@ -16,6 +17,7 @@ export default async function DeferredAddAssigneeForm({
   jobId,
   tab,
   assignedUserIds,
+  returnAnchor = "assigned-team",
 }: DeferredAddAssigneeFormProps) {
   const supabase = await createClient();
 
@@ -33,7 +35,7 @@ export default async function DeferredAddAssigneeForm({
     >
       <input type="hidden" name="job_id" value={jobId} />
       <input type="hidden" name="tab" value={tab} />
-      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#assigned-team`} />
+      <input type="hidden" name="return_to" value={`/jobs/${jobId}?tab=${tab}#${returnAnchor}`} />
       <select
         name="user_id"
         className={`${selectClass} w-full min-w-0 sm:w-auto sm:min-w-[14rem]`}
