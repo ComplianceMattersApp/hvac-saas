@@ -1661,8 +1661,8 @@ const [billingRecipient, setBillingRecipient] = useState<
             ? "Could not submit your job. Please try again, or contact us if the issue persists."
             : errorCode === "visit_scope_required"
             ? "Service jobs require at least one job scope item."
-            : errorCode === "visit_scope_invalid"
-            ? "Job scope entries could not be read. Please review Step 5 and try again."
+              : errorCode === "service_submit_failed"
+              ? "Could not create the work order. Please try again, or contact us if the issue persists."
             : null
         }
         className="mb-5"

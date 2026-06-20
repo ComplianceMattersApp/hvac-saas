@@ -7784,6 +7784,32 @@ if (!canonicalOwnerUserId) {
     redirect(`/jobs/${jobId}${suffix}`);
   }
 
+  function redirectServiceSubmitFailed(error: unknown, stage: string) {
+    const maybeError = error as { code?: unknown; status?: unknown; message?: unknown };
+    const codeRaw = maybeError?.code ?? maybeError?.status;
+    const errorCode = String(codeRaw ?? "").trim() || "service_submit_failed";
+    const errorMessage = String(
+      maybeError?.message ?? (error instanceof Error ? error.message : error),
+    )
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 240);
+
+    if (errorMessage === "ALLOW_PATH_REACHED") {
+      throw error;
+    }
+
+    console.error("service_submit_failed", {
+      branch: "createJobFromForm:service",
+      stage,
+      job_type: jobType,
+      error_code: errorCode,
+      error_message: errorMessage || "Unknown service submit error",
+    });
+
+    redirect("/jobs/new?err=service_submit_failed");
+  }
+
   const DUPLICATE_SUBMISSION_WINDOW_MS = 45_000;
 
   function normalizeDuplicateField(value: string | null | undefined) {
@@ -8652,50 +8678,58 @@ function canContractorWriteEvent(event_type: string) {
       },
     });
 
-    const created = await createJob({
-      job_type: jobType,
-      service_case_id: followUpServiceCaseId,
-      service_case_kind,
-      service_visit_type,
-      service_visit_reason,
-      service_visit_outcome,
-      project_type: projectType,
-      job_address: canonicalSnapshot.job_address,
-      customer_id: existingCustomerId,
-      location_id: existingLocationId,
+    let created;
+    try {
+      created = await createJob({
+        job_type: jobType,
+        service_case_id: followUpServiceCaseId,
+        service_case_kind,
+        service_visit_type,
+        service_visit_reason,
+        service_visit_outcome,
+        project_type: projectType,
+        job_address: canonicalSnapshot.job_address,
+        customer_id: existingCustomerId,
+        location_id: existingLocationId,
 
-      customer_first_name: canonicalSnapshot.customer_first_name,
-      customer_last_name: canonicalSnapshot.customer_last_name,
-      customer_email: canonicalSnapshot.customer_email,
-      job_notes: jobNotesFinal || null,
-      visit_scope_summary,
-      visit_scope_items,
+        customer_first_name: canonicalSnapshot.customer_first_name,
+        customer_last_name: canonicalSnapshot.customer_last_name,
+        customer_email: canonicalSnapshot.customer_email,
+        job_notes: jobNotesFinal || null,
+        visit_scope_summary,
+        visit_scope_items,
 
-      title: titleFinal,
-      city: canonicalSnapshot.city,
-      scheduled_date,
-      status,
-      contractor_id: contractorIdFinal,
-      permit_number,
-      jurisdiction,
-      permit_date,
-      window_start,
-      window_end,
-      customer_phone: canonicalSnapshot.customer_phone,
-      ops_status,
+        title: titleFinal,
+        city: canonicalSnapshot.city,
+        scheduled_date,
+        status,
+        contractor_id: contractorIdFinal,
+        permit_number,
+        jurisdiction,
+        permit_date,
+        window_start,
+        window_end,
+        customer_phone: canonicalSnapshot.customer_phone,
+        ops_status,
 
-      billing_recipient: billingRecipientFinal,
-      billing_name,
-      billing_email,
-      billing_phone,
-      billing_address_line1,
-      billing_address_line2,
-      billing_city,
-      billing_state,
-      billing_zip,
-    }, {
-      serviceCaseWriteClient: canonicalWriteClient,
-    });
+        billing_recipient: billingRecipientFinal,
+        billing_name,
+        billing_email,
+        billing_phone,
+        billing_address_line1,
+        billing_address_line2,
+        billing_city,
+        billing_state,
+        billing_zip,
+      }, {
+        serviceCaseWriteClient: canonicalWriteClient,
+      });
+    } catch (error) {
+      if (!isContractorUser && jobType === "service") {
+        redirectServiceSubmitFailed(error, "existing_customer_existing_location:create_job");
+      }
+      throw error;
+    }
 
   // Attempt to create maintenance agreement visit link if this job came from service plan prefill
   if (maintenanceAgreementIdRaw && userId) {
@@ -8974,49 +9008,57 @@ if (existingCustomerId && !existingLocationId) {
     },
   });
 
-  const created = await createJob({
-    job_type: jobType,
-    service_case_kind,
-    service_visit_type,
-    service_visit_reason,
-    service_visit_outcome,
-    project_type: projectType,
-    job_address: canonicalSnapshot.job_address,
-    customer_id: existingCustomerId,
-    location_id: locationIdToUse,
+  let created;
+  try {
+    created = await createJob({
+      job_type: jobType,
+      service_case_kind,
+      service_visit_type,
+      service_visit_reason,
+      service_visit_outcome,
+      project_type: projectType,
+      job_address: canonicalSnapshot.job_address,
+      customer_id: existingCustomerId,
+      location_id: locationIdToUse,
 
-    customer_first_name: canonicalSnapshot.customer_first_name,
-    customer_last_name: canonicalSnapshot.customer_last_name,
-    customer_email: canonicalSnapshot.customer_email,
-    job_notes: jobNotesFinal || null,
-    visit_scope_summary,
-    visit_scope_items,
+      customer_first_name: canonicalSnapshot.customer_first_name,
+      customer_last_name: canonicalSnapshot.customer_last_name,
+      customer_email: canonicalSnapshot.customer_email,
+      job_notes: jobNotesFinal || null,
+      visit_scope_summary,
+      visit_scope_items,
 
-    title: titleFinal,
-    city: canonicalSnapshot.city,
-    scheduled_date,
-    status,
-    contractor_id: contractorIdFinal,
-    permit_number,
-    jurisdiction,
-    permit_date,
-    window_start,
-    window_end,
-    customer_phone: canonicalSnapshot.customer_phone,
-    ops_status,
+      title: titleFinal,
+      city: canonicalSnapshot.city,
+      scheduled_date,
+      status,
+      contractor_id: contractorIdFinal,
+      permit_number,
+      jurisdiction,
+      permit_date,
+      window_start,
+      window_end,
+      customer_phone: canonicalSnapshot.customer_phone,
+      ops_status,
 
-    billing_recipient: billingRecipientFinal,
-    billing_name,
-    billing_email,
-    billing_phone,
-    billing_address_line1,
-    billing_address_line2,
-    billing_city,
-    billing_state,
-    billing_zip,
-  }, {
-    serviceCaseWriteClient: canonicalWriteClient,
-  });
+      billing_recipient: billingRecipientFinal,
+      billing_name,
+      billing_email,
+      billing_phone,
+      billing_address_line1,
+      billing_address_line2,
+      billing_city,
+      billing_state,
+      billing_zip,
+    }, {
+      serviceCaseWriteClient: canonicalWriteClient,
+    });
+  } catch (error) {
+    if (!isContractorUser && jobType === "service") {
+      redirectServiceSubmitFailed(error, "existing_customer_new_location:create_job");
+    }
+    throw error;
+  }
 
   try {
     await maybeCreateLocationSiteAccessContact(locationIdToUse);
@@ -9108,49 +9150,57 @@ const canonicalSnapshot = await loadCanonicalJobSnapshot({
   },
 });
 
-const created = await createJob({
-  job_type: jobType,
-  service_case_kind,
-  service_visit_type,
-  service_visit_reason,
-  service_visit_outcome,
-  project_type: projectType,
-  job_address: canonicalSnapshot.job_address,
-  customer_id: customerId,
-  location_id: locationIdToUse,
+let created;
+try {
+  created = await createJob({
+    job_type: jobType,
+    service_case_kind,
+    service_visit_type,
+    service_visit_reason,
+    service_visit_outcome,
+    project_type: projectType,
+    job_address: canonicalSnapshot.job_address,
+    customer_id: customerId,
+    location_id: locationIdToUse,
 
-  customer_first_name: canonicalSnapshot.customer_first_name,
-  customer_last_name: canonicalSnapshot.customer_last_name,
-  customer_email: canonicalSnapshot.customer_email,
-  job_notes: jobNotesFinal || null,
-  visit_scope_summary,
-  visit_scope_items,
+    customer_first_name: canonicalSnapshot.customer_first_name,
+    customer_last_name: canonicalSnapshot.customer_last_name,
+    customer_email: canonicalSnapshot.customer_email,
+    job_notes: jobNotesFinal || null,
+    visit_scope_summary,
+    visit_scope_items,
 
-  title: titleFinal,
-  city: canonicalSnapshot.city,
-  scheduled_date,
-  status,
-  contractor_id: contractorIdFinal,
-  permit_number,
-  jurisdiction,
-  permit_date,
-  window_start,
-  window_end,
-  customer_phone: canonicalSnapshot.customer_phone,
-  ops_status,
+    title: titleFinal,
+    city: canonicalSnapshot.city,
+    scheduled_date,
+    status,
+    contractor_id: contractorIdFinal,
+    permit_number,
+    jurisdiction,
+    permit_date,
+    window_start,
+    window_end,
+    customer_phone: canonicalSnapshot.customer_phone,
+    ops_status,
 
-  billing_recipient: billingRecipientFinal,
-  billing_name,
-  billing_email,
-  billing_phone,
-  billing_address_line1,
-  billing_address_line2,
-  billing_city,
-  billing_state,
-  billing_zip,
-}, {
-  serviceCaseWriteClient: canonicalWriteClient,
-});
+    billing_recipient: billingRecipientFinal,
+    billing_name,
+    billing_email,
+    billing_phone,
+    billing_address_line1,
+    billing_address_line2,
+    billing_city,
+    billing_state,
+    billing_zip,
+  }, {
+    serviceCaseWriteClient: canonicalWriteClient,
+  });
+} catch (error) {
+  if (!isContractorUser && jobType === "service") {
+    redirectServiceSubmitFailed(error, "new_customer:create_job");
+  }
+  throw error;
+}
 
   try {
     await maybeCreateLocationSiteAccessContact(locationIdToUse);

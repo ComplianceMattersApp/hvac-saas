@@ -25,6 +25,7 @@ type InsertCall = {
 
 type FixtureOptions = {
   throwOnJobsInsert?: boolean;
+  jobsInsertError?: Error | null;
   contractorId?: string | null;
   accountSettingsProductMode?: "hybrid" | "ecc_hers" | "hvac_service" | null;
   locationRows?: Array<Record<string, unknown>>;
@@ -321,6 +322,9 @@ function buildSupabaseFixture(options: FixtureOptions = {}) {
 
     function resolveSingle() {
       if (table === "jobs") {
+        if (options.jobsInsertError) {
+          throw options.jobsInsertError;
+        }
         if (options.throwOnJobsInsert) {
           throw new Error(ALLOW_PATH_REACHED);
         }
@@ -763,6 +767,32 @@ describe("job intake create same-account hardening", () => {
       job_type: "service",
       service_visit_type: "install",
     });
+  });
+
+  it("redirects cleanly when internal service submit fails during create", async () => {
+    const fixture = buildSupabaseFixture({
+      jobsInsertError: new Error("database unavailable"),
+      accountSettingsProductMode: "hvac_service",
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.supabase);
+
+    resolveCanonicalOwnerMock.mockResolvedValue({
+      canonicalOwnerUserId: "owner-1",
+      canonicalWriteClient: fixture.supabase,
+    });
+
+    const { createJobFromForm } = await import("@/lib/actions/job-actions");
+
+    const formData = buildInternalServiceIntakeFormData({
+      visitScopeItemsJson: JSON.stringify([
+        { title: "Diagnose weak airflow", details: "Upstairs hall", kind: "primary" },
+      ]),
+    });
+
+    await expect(createJobFromForm(formData)).rejects.toThrow(
+      "REDIRECT:/jobs/new?err=service_submit_failed",
+    );
   });
 
   it("preserves requested ECC lane create in hybrid mode", async () => {
