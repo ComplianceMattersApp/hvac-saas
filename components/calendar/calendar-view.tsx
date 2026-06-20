@@ -9,6 +9,7 @@ import CalendarDragJobLink from './CalendarDragJobLink';
 import CalendarOpenJobButton from './CalendarOpenJobButton';
 import CalendarMobileListAnchor from './CalendarMobileListAnchor';
 import CalendarResponsiveJobLink from './CalendarResponsiveJobLink';
+import { buildCalendarHref } from './calendar-href';
 import { CALENDAR_STATUS_LEGEND, calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
 import {
   CALENDAR_TECH_FILTER_UNASSIGNED,
@@ -142,31 +143,6 @@ function buildReturnTo(view: CalendarUIView, date: string, tech?: string | null)
   q.set('view', view);
   q.set('date', date);
   if (tech) q.set('tech', tech);
-  return `/calendar?${q.toString()}`;
-}
-
-function buildCalendarHref(
-  view: CalendarUIView,
-  date: string,
-  params?: {
-    banner?: string;
-    job?: string | null;
-    block?: string | null;
-    tech?: string | null;
-    prefillDate?: string | null;
-    inspector?: string | null;
-  },
-) {
-  const q = new URLSearchParams();
-  q.set('view', view);
-  q.set('date', date);
-  if (params?.banner) q.set('banner', params.banner);
-  if (params?.job) q.set('job', params.job);
-  if (params?.block) q.set('block', params.block);
-  if (params?.tech) q.set('tech', params.tech);
-  if (params?.prefillDate) q.set('prefill_date', params.prefillDate);
-  if (params?.inspector) q.set('inspector', params.inspector);
-  else if (params?.job) q.set('inspector', '1');
   return `/calendar?${q.toString()}`;
 }
 
@@ -1794,7 +1770,6 @@ export async function CalendarView(props: Props) {
               <CalendarDispatchGrid
                 jobs={filteredDayJobs}
                 blockEvents={techFilteredBlockEvents}
-                assignableUsers={[]}
                 mode={baseMode}
                 date={data.day.date}
                 tech={activeTech}
@@ -1817,7 +1792,6 @@ export async function CalendarView(props: Props) {
                   <CalendarDispatchGrid
                     jobs={day.jobs}
                     blockEvents={techFilteredBlockEvents}
-                    assignableUsers={[]}
                     mode={baseMode}
                     date={day.date}
                     tech={activeTech}

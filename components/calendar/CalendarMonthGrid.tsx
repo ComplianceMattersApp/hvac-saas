@@ -5,6 +5,7 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, endOfWeek, isSameM
 import type { DispatchCalendarBlockEvent, DispatchJob } from '@/lib/actions/calendar';
 import Link from 'next/link';
 import CalendarDragJobLink from './CalendarDragJobLink';
+import { buildCalendarHref } from './calendar-href';
 import { normalizeRetestLinkedJobTitle } from '@/lib/utils/job-title-display';
 import { displayWindowLA } from '@/lib/utils/schedule-la';
 import { calendarStatusDotClass, formatCalendarDisplayStatus, getCalendarDisplayStatus } from './calendar-status';
@@ -18,29 +19,6 @@ interface CalendarMonthGridProps {
   selectedDate?: string;
   selectedJobId?: string;
   selectedBlockId?: string;
-}
-
-function buildCalendarHref(
-  view: 'day' | 'week' | 'list' | 'month',
-  date: string,
-  params?: {
-    job?: string | null;
-    block?: string | null;
-    tech?: string | null;
-    prefillDate?: string | null;
-    inspector?: string | null;
-  },
-) {
-  const q = new URLSearchParams();
-  q.set('view', view);
-  q.set('date', date);
-  if (params?.job) q.set('job', params.job);
-  if (params?.block) q.set('block', params.block);
-  if (params?.tech) q.set('tech', params.tech);
-  if (params?.prefillDate) q.set('prefill_date', params.prefillDate);
-  if (params?.inspector) q.set('inspector', params.inspector);
-  else if (params?.job) q.set('inspector', '1');
-  return `/calendar?${q.toString()}`;
 }
 
 function extractDraggedJobId(event: React.DragEvent<HTMLElement>) {

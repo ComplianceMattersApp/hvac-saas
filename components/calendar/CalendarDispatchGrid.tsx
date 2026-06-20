@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Fragment, useState, useTransition } from "react";
 import type { DispatchCalendarBlockEvent, DispatchJob, DispatchViewMode } from "@/lib/actions/calendar";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
+import { buildCalendarHref } from "./calendar-href";
 import { formatCalendarDisplayStatus, getCalendarDisplayStatus } from "./calendar-status";
 import {
   buildDragPayload,
@@ -19,7 +20,6 @@ import {
 type Props = {
   jobs: DispatchJob[];
   blockEvents: DispatchCalendarBlockEvent[];
-  assignableUsers: Array<{ user_id: string; display_name: string }>;
   mode: DispatchViewMode;
   date: string;
   tech?: string | null;
@@ -214,7 +214,6 @@ export default function CalendarDispatchGrid(props: Props) {
   const {
     jobs,
     blockEvents,
-    assignableUsers: _assignableUsers,
     mode,
     date,
     tech,
@@ -224,31 +223,6 @@ export default function CalendarDispatchGrid(props: Props) {
   } = props;
 
   const currentView = mode === "week" ? "week" : "day";
-
-  function buildCalendarHref(
-    view: "day" | "week" | "list" | "month",
-    nextDate: string,
-    params?: {
-      banner?: string;
-      job?: string | null;
-      block?: string | null;
-      tech?: string | null;
-      prefillDate?: string | null;
-      inspector?: string | null;
-    },
-  ) {
-    const q = new URLSearchParams();
-    q.set("view", view);
-    q.set("date", nextDate);
-    if (params?.banner) q.set("banner", params.banner);
-    if (params?.job) q.set("job", params.job);
-    if (params?.block) q.set("block", params.block);
-    if (params?.tech) q.set("tech", params.tech);
-    if (params?.prefillDate) q.set("prefill_date", params.prefillDate);
-    if (params?.inspector) q.set("inspector", params.inspector);
-    else if (params?.job) q.set("inspector", "1");
-    return `/calendar?${q.toString()}`;
-  }
 
   const startHour = 6;
   const endHour = 18;
