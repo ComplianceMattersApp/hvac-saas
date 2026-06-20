@@ -17,6 +17,11 @@ const jobLocationPreviewSource = readFileSync(
   "utf8",
 );
 
+const jobLocationPreviewImageSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/JobLocationPreviewImage.tsx"),
+  "utf8",
+);
+
 const ductLeakageEntryFieldsSource = readFileSync(
   resolve(__dirname, "../../../components/jobs/DuctLeakageEntryFields.tsx"),
   "utf8",
@@ -465,8 +470,8 @@ describe("job detail field operations board layout", () => {
   });
 
   it("keeps the location preview compact on mobile and hides lower map actions there", () => {
-    expect(jobLocationPreviewSource).toContain("h-40 w-full object-cover");
-    expect(jobLocationPreviewSource).toContain("sm:h-52 lg:h-56 xl:h-60");
+    expect(jobLocationPreviewImageSource).toContain("h-40 w-full object-cover");
+    expect(jobLocationPreviewImageSource).toContain("sm:h-52 lg:h-56 xl:h-60");
     expect(jobLocationPreviewSource).toContain("mt-3 hidden flex-col gap-2 sm:flex");
     expect(jobLocationPreviewSource).toContain("border border-gray-300 bg-white");
     expect(jobPageSource).toContain("h-40 w-full animate-pulse");
@@ -491,8 +496,8 @@ describe("job detail field operations board layout", () => {
     expect(mobileLocationSlice).not.toContain("<span>Navigate</span>");
     expect(jobLocationPreviewSource).toContain("showActionsOnMobile?: boolean");
     expect(jobLocationPreviewSource).toContain('props.showActionsOnMobile ? "mt-3 flex flex-col gap-2 sm:flex-row sm:items-stretch sm:justify-between"');
-    expect(jobLocationPreviewSource).toContain("props.showAddressOverlay && imageUrl && addressDisplay");
-    expect(jobLocationPreviewSource).toContain("(!props.showAddressOverlay || !imageUrl) && props.showAddressFooter");
+    expect(jobLocationPreviewSource).toContain("showAddressOverlay={props.showAddressOverlay}");
+    expect(jobLocationPreviewSource).toContain("!props.showAddressOverlay && props.showAddressFooter");
     expect(jobLocationPreviewSource).toContain("Navigate");
     expect(jobLocationPreviewSource).toContain("Open in Maps");
   });
@@ -521,8 +526,8 @@ describe("job detail field operations board layout", () => {
     expect(lowerPermitIndex).toBeGreaterThan(lowerEccSummaryIndex);
     expect(lowerEquipmentIndex).toBeGreaterThan(lowerPermitIndex);
     expect(attachmentsIndex).toBeGreaterThan(lowerEquipmentIndex);
-    expect(jobPageSource).toContain("showEccSummaryCard = job.job_type === \"ecc\"");
-    expect(jobPageSource).toContain("showJobRecordsPermitCard = showEccSummaryCard || hasPermitDetails");
+    expect(jobPageSource).toContain("showEccSummaryCard = surfaceProfile.surfaces.eccTests && job.job_type === \"ecc\"");
+    expect(jobPageSource).toContain("showJobRecordsPermitCard = surfaceProfile.surfaces.permits && (showEccSummaryCard || hasPermitDetails)");
     expect(jobPageSource).toContain("Manage Equipment");
   });
 
