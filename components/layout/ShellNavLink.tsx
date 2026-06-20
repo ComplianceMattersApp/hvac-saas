@@ -9,6 +9,7 @@ type Props = {
   children: ReactNode;
   exact?: boolean;
   className?: string;
+  "aria-label"?: string;
 };
 
 function isActivePath(pathname: string, href: string, exact: boolean) {
@@ -16,13 +17,14 @@ function isActivePath(pathname: string, href: string, exact: boolean) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export default function ShellNavLink({ href, children, exact = false, className = "" }: Props) {
+export default function ShellNavLink({ href, children, exact = false, className = "", "aria-label": ariaLabel }: Props) {
   const pathname = usePathname() || "/";
   const active = isActivePath(pathname, href, exact);
 
   return (
     <Link
       href={href}
+      aria-label={ariaLabel}
       aria-current={active ? "page" : undefined}
       className={[
         "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70 xl:px-3",

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Settings } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import LogoutButton from "@/components/auth/LogoutButton";
 
@@ -15,7 +16,7 @@ type Props = {
 const menuItemClass =
   "block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200";
 
-export default function UserAccountMenu({ accountName, accountLabel, isAdmin, isInternalUser }: Props) {
+export default function UserAccountMenu({ accountName, accountLabel, isAdmin }: Props) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -55,17 +56,12 @@ export default function UserAccountMenu({ accountName, accountLabel, isAdmin, is
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="rounded-xl border border-slate-200/90 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
+        className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-slate-200/90 bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
       >
-        <span className="inline-flex min-w-0 items-center gap-2">
-          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-lg border border-slate-200/90 bg-slate-50 px-1 text-[10px] font-semibold text-slate-700">
-            {accountName ? accountName.slice(0, 1).toUpperCase() : "A"}
-          </span>
-          <span className="inline-flex min-w-0 items-center gap-1.5">
-            <span className="max-w-28 truncate xl:max-w-40">{accountLabel}</span>
-            <span className="hidden text-slate-400 xl:inline">/</span>
-            <span className="hidden text-slate-500 xl:inline">Account</span>
-          </span>
+        <Settings className="h-4 w-4 text-slate-500" aria-hidden="true" />
+        <span className="hidden xl:inline">Settings</span>
+        <span className="sr-only">
+          Account settings for {accountLabel || accountName || "account"}
         </span>
       </button>
 
@@ -74,16 +70,6 @@ export default function UserAccountMenu({ accountName, accountLabel, isAdmin, is
           {isAdmin ? (
             <Link href="/ops/admin" onClick={() => setOpen(false)} className={menuItemClass}>
               Admin Center
-            </Link>
-          ) : null}
-          {isInternalUser ? (
-            <Link href="/time-clock" onClick={() => setOpen(false)} className={menuItemClass}>
-              Time Clock
-            </Link>
-          ) : null}
-          {isInternalUser ? (
-            <Link href="/notes" onClick={() => setOpen(false)} className={menuItemClass}>
-              Notes
             </Link>
           ) : null}
           <Link href="/account" onClick={() => setOpen(false)} className={menuItemClass}>

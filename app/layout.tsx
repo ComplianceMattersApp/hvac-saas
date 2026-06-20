@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import Image from "next/image";
+import { Bell } from "lucide-react";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileShellMenu from "@/components/layout/MobileShellMenu";
@@ -184,6 +185,16 @@ export default async function RootLayout({
       label: "Reports",
       href: "/reports",
     });
+
+    moreMenuItems.push({
+      label: "Time Clock",
+      href: "/time-clock",
+    });
+
+    moreMenuItems.push({
+      label: "Notes",
+      href: "/notes",
+    });
   }
 
   const showOperationalNotificationAwareness = !isInternalUser || productMode !== "hvac_service";
@@ -272,10 +283,11 @@ export default async function RootLayout({
                   {/* Utility links — fixed right */}
                   <div className="hidden shrink-0 items-center gap-2 sm:flex">
                     {isInternalUser && showOperationalNotificationAwareness && (
-                      <ShellNavLink href="/ops/notifications" className="gap-1.5">
-                        <span>Notifications</span>
+                      <ShellNavLink href="/ops/notifications" className="relative w-10 px-0" aria-label="Notifications">
+                        <Bell className="h-4 w-4" aria-hidden="true" />
+                        <span className="sr-only">Notifications</span>
                         {unreadNotificationCount > 0 ? (
-                          <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1 text-[10px] font-semibold text-blue-700 shadow-[0_6px_12px_-10px_rgba(37,99,235,0.42)]">
+                          <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1 text-[10px] font-semibold text-blue-700 shadow-[0_6px_12px_-10px_rgba(37,99,235,0.42)]">
                             {unreadNotificationBadgeLabel}
                           </span>
                         ) : null}
@@ -292,6 +304,20 @@ export default async function RootLayout({
                   </div>
 
                   <div className="flex items-center gap-2 lg:hidden">
+                    {isInternalUser ? (
+                      <Link
+                        href="/ops/notifications"
+                        aria-label="Notifications"
+                        className="relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-300/80 bg-white text-slate-700 shadow-[0_10px_18px_-16px_rgba(15,23,42,0.3)] transition-colors hover:bg-slate-50 hover:text-slate-950 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                      >
+                        <Bell className="h-4 w-4" aria-hidden="true" />
+                        {unreadNotificationCount > 0 ? (
+                          <span className="absolute -right-1 -top-1 inline-flex h-4 min-w-4 items-center justify-center rounded-full border border-blue-200 bg-blue-50 px-1 text-[10px] font-semibold text-blue-700 shadow-[0_6px_12px_-10px_rgba(37,99,235,0.42)]">
+                            {unreadNotificationBadgeLabel}
+                          </span>
+                        ) : null}
+                      </Link>
+                    ) : null}
                     <MobileShellMenu
                       isInternalUser={isInternalUser}
                       isAdmin={isAdmin}
