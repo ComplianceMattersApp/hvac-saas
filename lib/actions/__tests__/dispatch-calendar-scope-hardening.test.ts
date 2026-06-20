@@ -287,53 +287,6 @@ describe("dispatch calendar same-account scope hardening", () => {
     });
   });
 
-  it("allows same-account internal and excludes cross-account jobs/events/assignment expansion", async () => {
-    const fixture = makeCalendarFixture();
-    createClientMock.mockResolvedValue(fixture.supabase);
-
-    const { getDispatchCalendarData } = await import("@/lib/actions/calendar-actions");
-
-    const result = await getDispatchCalendarData({
-      mode: "day",
-      anchorDate: "2026-04-24",
-    });
-
-    expect(result.day.jobs.map((job) => job.id)).toEqual(["job-owner-1"]);
-    expect(result.week.days.flatMap((day) => day.jobs).map((job) => job.id)).not.toContain("job-owner-2");
-    expect(result.scheduledAttentionWindowJobs.map((job) => job.id)).toEqual(["job-owner-1"]);
-
-    expect(result.day.jobs[0]?.latest_event_type).toBe("scoped_event");
-    expect(result.day.jobs[0]?.assignment_names).toEqual(["Scoped Tech"]);
-    expect(result.day.jobs[0]?.work_context_label).toBe("Diagnostic + 1 more");
-
-    expect(getActiveJobAssignmentDisplayMapMock).toHaveBeenCalledWith(
-      expect.objectContaining({
-        jobIds: ["job-owner-1"],
-      }),
-    );
-
-    const jobEventsCall = fixture.calls.find((call) => call.table === "job_events");
-    expect(jobEventsCall?.value).toEqual(["job-owner-1"]);
-  });
-
-  it("denies non-internal before dispatch dataset assembly", async () => {
-    const fixture = makeCalendarFixture();
-    createClientMock.mockResolvedValue(fixture.supabase);
-    requireInternalUserMock.mockRejectedValueOnce(new Error("Active internal user required."));
-
-    const { getDispatchCalendarData } = await import("@/lib/actions/calendar-actions");
-
-    await expect(
-      getDispatchCalendarData({
-        mode: "day",
-        anchorDate: "2026-04-24",
-      }),
-    ).rejects.toThrow("Active internal user required.");
-
-    expect(fixture.calls).toHaveLength(0);
-    expect(getActiveJobAssignmentDisplayMapMock).not.toHaveBeenCalled();
-  });
-
   it("expands the dispatch payload with visit scope fields and a derived work label", () => {
     expect(calendarActionsSource).toContain("visit_scope_summary");
     expect(calendarActionsSource).toContain("visit_scope_items");

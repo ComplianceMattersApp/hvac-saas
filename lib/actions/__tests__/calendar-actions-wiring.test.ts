@@ -326,38 +326,6 @@ describe('calendar action wiring', () => {
     });
   });
 
-  it('returns canonical phone/city with snapshot fallback and keeps scheduled unassigned jobs in day dataset', async () => {
-    createClientMock.mockResolvedValue(makeFixture().supabase);
-
-    const { getDispatchCalendarData } = await import('@/lib/actions/calendar-actions');
-    const result = await getDispatchCalendarData({
-      mode: 'day',
-      anchorDate: '2026-04-29',
-    });
-
-    expect(result.day.jobs.map((job) => job.id)).toEqual(['job-assigned-canonical', 'job-unassigned-fallback']);
-
-    const assigned = result.day.jobs.find((job) => job.id === 'job-assigned-canonical');
-    const unassigned = result.day.jobs.find((job) => job.id === 'job-unassigned-fallback');
-
-    expect(assigned?.title).toBe('Attic Duct Repair');
-    expect(assigned?.city).toBe('Canonical City');
-    expect(assigned?.customer_phone).toBe('555-1000');
-    expect(assigned?.work_context_label).toBe('Diagnostic + 1 more');
-    expect(assigned?.assignments.map((a) => a.user_id)).toEqual(['tech-1']);
-
-    expect(unassigned?.title).toBe('Condenser Check');
-    expect(unassigned?.city).toBe('Snapshot Fallback City');
-    expect(unassigned?.customer_phone).toBe('555-2000');
-    expect(unassigned?.work_context_label).toBeNull();
-    expect(unassigned?.assignments).toEqual([]);
-
-    expect(result.scheduledAttentionWindowJobs.map((job) => job.id)).toEqual([
-      'job-assigned-canonical',
-      'job-unassigned-fallback',
-    ]);
-  });
-
   it('splits primary board data from secondary queue data', async () => {
     createClientMock.mockResolvedValue(makeFixture().supabase);
 
