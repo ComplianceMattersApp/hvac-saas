@@ -25,10 +25,10 @@ export default function ShellNavLink({ href, children, exact = false, className 
       href={href}
       aria-current={active ? "page" : undefined}
       className={[
-        "inline-flex h-9 items-center justify-center rounded-lg border px-3 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70",
+        "inline-flex h-8 items-center justify-center whitespace-nowrap rounded-lg px-2.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70 xl:px-3",
         active
-          ? "border-slate-300 bg-slate-900 text-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)]"
-          : "border-transparent text-slate-700 hover:bg-slate-100 hover:text-slate-950",
+          ? "bg-slate-900 text-white shadow-[0_12px_24px_-20px_rgba(15,23,42,0.6)]"
+          : "text-slate-700 hover:bg-white hover:text-slate-950 hover:shadow-sm",
         className,
       ].join(" ")}
     >

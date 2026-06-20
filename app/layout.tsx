@@ -5,8 +5,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import MobileShellMenu from "@/components/layout/MobileShellMenu";
 import BrowserPushSubscriptionAutoReconciler from "@/components/layout/BrowserPushSubscriptionAutoReconciler";
+import HeaderCustomerSearch from "@/components/layout/HeaderCustomerSearch";
 import PwaUpdateNotice from "@/components/layout/PwaUpdateNotice";
 import ShellCreateMenu, { type ShellCreateItem } from "@/components/layout/ShellCreateMenu";
+import ShellMoreMenu, { type ShellMoreItem } from "@/components/layout/ShellMoreMenu";
 import ShellNavLink from "@/components/layout/ShellNavLink";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
@@ -154,6 +156,36 @@ export default async function RootLayout({
     });
   }
 
+  const moreMenuItems: ShellMoreItem[] = [];
+
+  if (isInternalUser) {
+    moreMenuItems.push({
+      label: "Customers",
+      href: "/customers",
+    });
+  }
+
+  if (isInternalUser && servicePlansEnabled) {
+    moreMenuItems.push({
+      label: "Service Plans",
+      href: "/service-plans",
+    });
+  }
+
+  if (isInternalUser && estimatesEnabled) {
+    moreMenuItems.push({
+      label: "Estimates",
+      href: "/estimates",
+    });
+  }
+
+  if (isInternalUser) {
+    moreMenuItems.push({
+      label: "Reports",
+      href: "/reports",
+    });
+  }
+
   const showOperationalNotificationAwareness = !isInternalUser || productMode !== "hvac_service";
 
   const userMetadata = (user?.user_metadata ?? {}) as Record<string, unknown>;
@@ -186,7 +218,7 @@ export default async function RootLayout({
               ) : null}
 
               {/* Top Bar */}
-              <header className="fixed top-0 inset-x-0 z-50 border-b border-slate-300/80 bg-white/90 px-4 py-3 backdrop-blur-md shadow-[0_14px_28px_-24px_rgba(15,23,42,0.4)] sm:px-6 print:hidden">
+              <header className="fixed top-0 inset-x-0 z-50 border-b border-slate-300/80 bg-white/92 px-3 py-2.5 backdrop-blur-md shadow-[0_14px_28px_-24px_rgba(15,23,42,0.4)] sm:px-5 print:hidden">
                 <div className="mx-auto flex w-full max-w-screen-2xl items-center justify-between gap-3 sm:gap-4">
                   {/* Brand — fixed left */}
                   <div className="shrink-0 flex items-center gap-3">
@@ -208,9 +240,14 @@ export default async function RootLayout({
                   <div className="hidden h-8 w-px shrink-0 bg-slate-200/90 lg:block" />
 
                   {/* Primary nav — expands between brand and utilities, aligned left */}
-                  <div className="hidden min-w-0 flex-1 items-center justify-start gap-2 lg:flex">
+                  <div className="hidden min-w-0 flex-1 items-center justify-start gap-3 lg:flex">
                     {isInternalUser ? <ShellCreateMenu items={createMenuItems} /> : null}
-                    <nav aria-label="Primary navigation" className="flex min-w-0 items-center gap-1">
+                    {isInternalUser ? (
+                      <div className="w-[min(24rem,34vw)] min-w-60 max-w-md">
+                        <HeaderCustomerSearch />
+                      </div>
+                    ) : null}
+                    <nav aria-label="Primary navigation" className="flex min-w-0 shrink-0 items-center rounded-xl border border-slate-200/90 bg-slate-50/70 p-1 shadow-inner shadow-white">
                       {isInternalUser ? (
                         <ShellNavLink href="/today" exact>Today</ShellNavLink>
                       ) : null}
@@ -228,18 +265,7 @@ export default async function RootLayout({
                       {showPartnerWorkMenuItem ? (
                         <ShellNavLink href="/portal">Partner Work</ShellNavLink>
                       ) : null}
-                      {isInternalUser ? (
-                        <ShellNavLink href="/customers">Customers</ShellNavLink>
-                      ) : null}
-                      {isInternalUser && servicePlansEnabled ? (
-                        <ShellNavLink href="/service-plans">Service Plans</ShellNavLink>
-                      ) : null}
-                      {isInternalUser && estimatesEnabled ? (
-                        <ShellNavLink href="/estimates">Estimates</ShellNavLink>
-                      ) : null}
-                      {isInternalUser ? (
-                        <ShellNavLink href="/reports">Reports</ShellNavLink>
-                      ) : null}
+                      <ShellMoreMenu items={moreMenuItems} />
                     </nav>
                   </div>
 

@@ -13,7 +13,7 @@ type Props = {
 };
 
 const menuItemClass =
-  "block rounded-xl px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50";
+  "block rounded-lg px-3 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200";
 
 export default function UserAccountMenu({ accountName, accountLabel, isAdmin, isInternalUser }: Props) {
   const pathname = usePathname();
@@ -55,10 +55,10 @@ export default function UserAccountMenu({ accountName, accountLabel, isAdmin, is
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-haspopup="menu"
-        className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
+        className="rounded-xl border border-slate-200/90 bg-white px-2.5 py-1.5 text-sm font-semibold text-slate-900 shadow-sm transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300/70"
       >
         <span className="inline-flex min-w-0 items-center gap-2">
-          <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full border border-slate-200/90 bg-slate-50 px-1 text-[10px] font-semibold text-slate-700">
+          <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-lg border border-slate-200/90 bg-slate-50 px-1 text-[10px] font-semibold text-slate-700">
             {accountName ? accountName.slice(0, 1).toUpperCase() : "A"}
           </span>
           <span className="inline-flex min-w-0 items-center gap-1.5">
@@ -70,7 +70,7 @@ export default function UserAccountMenu({ accountName, accountLabel, isAdmin, is
       </button>
 
       {open ? (
-        <div className="absolute right-0 z-50 mt-2 min-w-48 rounded-2xl border border-slate-200/90 bg-white/95 p-1.5 shadow-[0_18px_38px_-24px_rgba(15,23,42,0.38)] backdrop-blur">
+        <div className="absolute right-0 z-50 mt-2 min-w-48 overflow-hidden rounded-xl border border-slate-200/90 bg-white/95 p-1.5 shadow-[0_20px_42px_-26px_rgba(15,23,42,0.42)] backdrop-blur">
           {isAdmin ? (
             <Link href="/ops/admin" onClick={() => setOpen(false)} className={menuItemClass}>
               Admin Center
@@ -90,7 +90,7 @@ export default function UserAccountMenu({ accountName, accountLabel, isAdmin, is
             Account
           </Link>
           <div className="my-1.5 border-t border-slate-200/80" />
-          <LogoutButton className="w-full rounded-xl px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900" />
+          <LogoutButton className="w-full rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 hover:text-slate-900" />
         </div>
       ) : null}
     </div>
