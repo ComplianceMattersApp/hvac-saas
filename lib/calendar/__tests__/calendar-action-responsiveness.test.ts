@@ -56,8 +56,10 @@ describe("calendar action responsiveness", () => {
     expect(calendarViewSource).toContain("All");
     expect(calendarViewSource).toContain("Clear");
     expect(calendarViewSource).toContain("Unassigned");
-    expect(calendarViewSource).toContain("selectedUserIds={selectedCalendarUserIds}");
+    expect(calendarViewSource).toContain("selectedUserIds={appliedSelectedCalendarUserIds}");
     expect(calendarViewSource).toContain("parseCalendarSelectedUserIds(activeTech)");
+    expect(calendarViewSource).toContain("assignableUsers={renderedCalendarUsers}");
+    expect(calendarViewSource).toContain("includeUnassignedColumn={includeUnassignedColumn}");
   });
 
   it("renders mobile calendar jobs as direct job-detail links", () => {
@@ -96,13 +98,14 @@ describe("calendar action responsiveness", () => {
     expect(calendarViewSource).toContain("Show filters");
     expect(calendarViewSource).toContain("Hide filters");
     expect(calendarViewSource).toContain("ChevronDown");
-    expect(calendarViewSource).toContain("selectedUserIds={selectedCalendarUserIds}");
+    expect(calendarViewSource).toContain("selectedUserIds={appliedSelectedCalendarUserIds}");
     expect(calendarViewSource).toContain("Next dispatch action");
   });
 
   it("mobile day and week grids have intentional horizontal scrolling instead of clipped columns", () => {
     expect(calendarViewSource).toContain("overflow-x-auto overscroll-x-contain pb-2");
     expect(dispatchGridSource).toContain("const minGridWidth = 84 + columnCount * 170");
+    expect(dispatchGridSource).toContain("includeUnassignedColumn");
     expect(dispatchGridSource).toContain("compactCalendarUserLabel");
     expect(dispatchGridSource).toContain("calendar_label");
     expect(dispatchGridSource).toContain("minmax(170px, 1fr)");

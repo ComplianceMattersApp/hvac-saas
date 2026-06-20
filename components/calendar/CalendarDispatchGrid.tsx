@@ -23,6 +23,7 @@ type Props = {
   jobs: DispatchJob[];
   blockEvents: DispatchCalendarBlockEvent[];
   assignableUsers: Array<{ user_id: string; display_name: string; calendar_label?: string | null; email?: string | null }>;
+  includeUnassignedColumn?: boolean;
   mode: DispatchViewMode;
   date: string;
   tech?: string | null;
@@ -255,6 +256,7 @@ export default function CalendarDispatchGrid(props: Props) {
     jobs,
     blockEvents,
     assignableUsers,
+    includeUnassignedColumn = true,
     mode,
     date,
     tech,
@@ -292,7 +294,7 @@ export default function CalendarDispatchGrid(props: Props) {
   const dayBlockEvents = blockEvents.filter((event) => event.calendar_date === date);
 
   const columns: GridColumn[] = [
-    { key: UNASSIGNED_COLUMN_KEY, label: "Unassigned", title: "Unassigned" },
+    ...(includeUnassignedColumn ? [{ key: UNASSIGNED_COLUMN_KEY, label: "Unassigned", title: "Unassigned" }] : []),
     ...assignableUsers.map((user) => ({
       key: user.user_id,
       label: String(user.calendar_label ?? "").trim() || compactCalendarUserLabel({
@@ -308,8 +310,11 @@ export default function CalendarDispatchGrid(props: Props) {
   function resolveJobColumnKey(job: DispatchJob): string {
     const assignments = Array.isArray(job.assignments) ? job.assignments : [];
     if (!assignments.length) return UNASSIGNED_COLUMN_KEY;
-    const primary = assignments.find((assignment) => assignment.is_primary) ?? assignments[0];
-    const userId = String(primary?.user_id ?? "").trim();
+    const visiblePrimary = assignments.find((assignment) => assignment.is_primary && activeTechKeys.has(String(assignment.user_id ?? "").trim()));
+    const firstVisible = assignments.find((assignment) => activeTechKeys.has(String(assignment.user_id ?? "").trim()));
+    const primaryOrVisible = visiblePrimary ?? firstVisible;
+    if (!primaryOrVisible) return UNASSIGNED_COLUMN_KEY;
+    const userId = String(primaryOrVisible?.user_id ?? "").trim();
     return userId && activeTechKeys.has(userId) ? userId : UNASSIGNED_COLUMN_KEY;
   }
 

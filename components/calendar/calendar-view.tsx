@@ -1457,7 +1457,6 @@ export async function CalendarView(props: Props) {
   const baseMode: DispatchViewMode = uiView === 'week' ? 'week' : 'day';
   const activeTech = normalizeCalendarTechFilter(props.tech);
   const selectedCalendarUserIds = parseCalendarSelectedUserIds(activeTech);
-  const activeTechnicianUserId = selectedCalendarUserIds.length === 1 ? selectedCalendarUserIds[0] : null;
   const activeUnassignedFilter = isUnassignedTechFilter(activeTech);
   const anchorForRange = parseISO(normalizeYmd(props.date) ?? todayDate);
   const monthStartDate = formatDate(startOfMonth(anchorForRange), 'yyyy-MM-dd');
@@ -1489,8 +1488,28 @@ export async function CalendarView(props: Props) {
     getDispatchCalendarBoardData(calendarLoadParams),
     rosterPromise,
   ]);
+  const selectedCalendarUserIdSet = new Set(selectedCalendarUserIds);
+  const appliedSelectedCalendarUsers = activeUnassignedFilter
+    ? []
+    : selectedCalendarUserIds.length
+    ? roster.assignableUsers.filter((user) => selectedCalendarUserIdSet.has(user.user_id))
+    : [];
+  const hasAppliedSelectedCalendarUsers = appliedSelectedCalendarUsers.length > 0;
+  const appliedSelectedCalendarUserIds = appliedSelectedCalendarUsers.map((user) => user.user_id);
+  const renderedCalendarUsers = activeUnassignedFilter
+    ? []
+    : hasAppliedSelectedCalendarUsers
+    ? appliedSelectedCalendarUsers
+    : roster.assignableUsers;
+  const includeUnassignedColumn = activeUnassignedFilter || !hasAppliedSelectedCalendarUsers;
+  const activeCalendarTechParam = activeUnassignedFilter
+    ? CALENDAR_TECH_FILTER_UNASSIGNED
+    : hasAppliedSelectedCalendarUsers
+    ? appliedSelectedCalendarUserIds.join(',')
+    : null;
+  const activeCalendarTechnicianUserId = appliedSelectedCalendarUserIds.length === 1 ? appliedSelectedCalendarUserIds[0] : null;
 
-  const returnTo = buildReturnTo(uiView, data.anchorDate, activeTech);
+  const returnTo = buildReturnTo(uiView, data.anchorDate, activeCalendarTechParam);
   const banner = bannerMessage(props.banner);
   const selectedJobId = String(props.job ?? '').trim();
   const selectedBlockId = String(props.block ?? '').trim();
@@ -1522,10 +1541,9 @@ export async function CalendarView(props: Props) {
     canonicalDispatchJobsForRange = canonicalDispatchJobsByDay.flatMap((day) => day.jobs);
   }
 
-  const selectedCalendarUserIdSet = new Set(selectedCalendarUserIds);
   const techFilteredBlockEvents = activeUnassignedFilter
     ? []
-    : selectedCalendarUserIds.length
+    : hasAppliedSelectedCalendarUsers
     ? canonicalBlockEventsForRange.filter((event) => selectedCalendarUserIdSet.has(event.internal_user_id))
     : canonicalBlockEventsForRange;
   const selectedBlock = canonicalBlockEventsForRange.find((event) => event.id === selectedBlockId) ?? null;
@@ -1540,17 +1558,17 @@ export async function CalendarView(props: Props) {
   const inspectorOpen = inspectorForcedOpen || (Boolean(selectedJob) && !inspectorForcedClosed);
 
   const hideInspectorHref = buildCalendarHref(uiView, data.anchorDate, {
-    tech: activeTech,
+    tech: activeCalendarTechParam,
     job: selectedJobId || null,
     block: selectedBlockId || null,
     prefillDate,
     inspector: '0',
   });
 
-  const techFilteredScheduledJobsByDay = activeTech
+  const techFilteredScheduledJobsByDay = activeCalendarTechParam
     ? canonicalDispatchJobsByDay.map((day) => ({
         ...day,
-        jobs: filterJobsForTechnician(day.jobs, activeTech),
+        jobs: filterJobsForTechnician(day.jobs, activeCalendarTechParam),
       }))
     : canonicalDispatchJobsByDay;
 
@@ -1593,10 +1611,10 @@ export async function CalendarView(props: Props) {
   const hiddenScheduledJobs: DispatchJob[] = [];
   const unscheduledJobs: DispatchJob[] = [];
   const activeFilterLabel = activeUnassignedFilter
-    ? 'Unassigned scheduled jobs'
-    : selectedCalendarUserIds.length
-    ? `${selectedCalendarUserIds.length} technician${selectedCalendarUserIds.length === 1 ? '' : 's'}`
-    : 'All technicians';
+    ? 'Unassigned only'
+    : hasAppliedSelectedCalendarUsers
+    ? `${appliedSelectedCalendarUsers.length} technician${appliedSelectedCalendarUsers.length === 1 ? '' : 's'}`
+    : 'All technicians + unassigned';
 
   const statusLegend = (
     <div className="flex flex-wrap items-center gap-3 text-xs text-slate-500">
@@ -1633,7 +1651,7 @@ export async function CalendarView(props: Props) {
               {(['day', 'week', 'month', 'list'] as CalendarUIView[]).map((viewValue) => (
                 <Link
                   key={viewValue}
-                  href={buildCalendarHref(viewValue, targetDateForView(viewValue), { tech: activeTech, job: selectedJobId || null })}
+                  href={buildCalendarHref(viewValue, targetDateForView(viewValue), { tech: activeCalendarTechParam, job: selectedJobId || null })}
                   className={`inline-flex min-h-9 items-center justify-center rounded-lg px-4 py-1.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30 ${
                     uiView === viewValue
                       ? 'bg-white text-[#0f1f35] shadow-sm'
@@ -1649,7 +1667,7 @@ export async function CalendarView(props: Props) {
 
         {/* ── Navigation + stats + filters (light) ── */}
         <div className="bg-white px-4 py-4 sm:px-5 sm:py-5">
-          <NavLinks view={uiView} date={data.anchorDate} tech={activeTech} />
+          <NavLinks view={uiView} date={data.anchorDate} tech={activeCalendarTechParam} />
 
           <div className="mt-4 grid gap-2 sm:grid-cols-4">
             <div className="rounded-xl border border-blue-200 bg-blue-50 px-3.5 py-3">
@@ -1660,7 +1678,7 @@ export async function CalendarView(props: Props) {
               <p className="mt-1.5 text-3xl font-bold tabular-nums text-[#0f1f35]">{scheduledJobCount}</p>
             </div>
             <Suspense fallback={<CalendarQueueStatFallback />}>
-              <CalendarQueueStats queuePromise={queuePromise} activeTech={activeTech} noTechScheduledCount={noTechScheduledCount} />
+              <CalendarQueueStats queuePromise={queuePromise} activeTech={activeCalendarTechParam} noTechScheduledCount={noTechScheduledCount} />
             </Suspense>
             <div className="rounded-xl border border-slate-200/80 bg-white px-3.5 py-3">
               <div className="flex items-center gap-1.5">
@@ -1695,8 +1713,8 @@ export async function CalendarView(props: Props) {
                   rosterPromise={rosterPromise}
                   uiView={uiView}
                   anchorDate={data.anchorDate}
-                  activeTech={activeTech}
-                  selectedUserIds={selectedCalendarUserIds}
+                  activeTech={activeCalendarTechParam}
+                  selectedUserIds={appliedSelectedCalendarUserIds}
                   activeUnassignedFilter={activeUnassignedFilter}
                   activeFilterLabel={activeFilterLabel}
                 />
@@ -1711,8 +1729,8 @@ export async function CalendarView(props: Props) {
                 rosterPromise={rosterPromise}
                 uiView={uiView}
                 anchorDate={data.anchorDate}
-                activeTech={activeTech}
-                selectedUserIds={selectedCalendarUserIds}
+                activeTech={activeCalendarTechParam}
+                selectedUserIds={appliedSelectedCalendarUserIds}
                 activeUnassignedFilter={activeUnassignedFilter}
                 activeFilterLabel={activeFilterLabel}
               />
@@ -1730,13 +1748,13 @@ export async function CalendarView(props: Props) {
               selectedBlock={selectedBlock}
               uiView={uiView}
               anchorDate={data.anchorDate}
-              activeTech={activeTech}
-              activeTechnicianUserId={activeTechnicianUserId}
+              activeTech={activeCalendarTechParam}
+              activeTechnicianUserId={activeCalendarTechnicianUserId}
             />
           </Suspense>
 
           <Suspense fallback={<CalendarQueueSidebarFallback />}>
-            <CalendarQueueSidebar queuePromise={queuePromise} uiView={uiView} anchorDate={data.anchorDate} activeTech={activeTech} />
+            <CalendarQueueSidebar queuePromise={queuePromise} uiView={uiView} anchorDate={data.anchorDate} activeTech={activeCalendarTechParam} />
           </Suspense>
 
           {hiddenScheduledJobs.length ? (
@@ -1756,7 +1774,7 @@ export async function CalendarView(props: Props) {
                   return (
                     <CalendarDragJobLink
                       key={`hidden-scheduled-${job.id}`}
-                      href={buildCalendarHref(uiView, job.scheduled_date ?? data.anchorDate, { job: job.id, tech: activeTech })}
+                      href={buildCalendarHref(uiView, job.scheduled_date ?? data.anchorDate, { job: job.id, tech: activeCalendarTechParam })}
                       mobileHref={`/jobs/${job.id}`}
                       title={calendarJobTooltip(job)}
                       draggable={!isCancelledJob}
@@ -1798,19 +1816,19 @@ export async function CalendarView(props: Props) {
                 currentDate={todayDate}
                 focusedDate={data.anchorDate}
               />
-              <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeTech} selectedBlockId={selectedBlockId} />
+              <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeCalendarTechParam} selectedBlockId={selectedBlockId} />
             </section>
           ) : uiView === 'month' ? (
             <section>
               <div className="lg:hidden px-1">
-                <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeTech} selectedBlockId={selectedBlockId} />
+                <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeCalendarTechParam} selectedBlockId={selectedBlockId} />
               </div>
               <div className="hidden overflow-x-auto lg:block">
                 <CalendarMonthGrid
                   monthDate={data.anchorDate}
                   jobs={filteredJobsForRange}
                   blockEvents={techFilteredBlockEvents}
-                  tech={activeTech}
+                  tech={activeCalendarTechParam}
                   selectedDate={data.anchorDate}
                   selectedJobId={selectedJobId}
                   selectedBlockId={selectedBlockId}
@@ -1828,12 +1846,13 @@ export async function CalendarView(props: Props) {
               <CalendarDispatchGrid
                 jobs={filteredDayJobs}
                 blockEvents={techFilteredBlockEvents}
-                assignableUsers={roster.assignableUsers}
+                assignableUsers={renderedCalendarUsers}
+                includeUnassignedColumn={includeUnassignedColumn}
                 mode={baseMode}
                 date={data.day.date}
-                tech={activeTech}
+                tech={activeCalendarTechParam}
                 selectedJobId={selectedJobId}
-                dropReturnTo={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech, inspector: '1' })}
+                dropReturnTo={buildCalendarHref(uiView, data.anchorDate, { tech: activeCalendarTechParam, inspector: '1' })}
                 scheduleAction={updateJobScheduleFromForm}
                 reassignAction={reassignAndRescheduleJobFromForm}
               />
@@ -1852,12 +1871,13 @@ export async function CalendarView(props: Props) {
                   <CalendarDispatchGrid
                     jobs={day.jobs}
                     blockEvents={techFilteredBlockEvents}
-                    assignableUsers={roster.assignableUsers}
+                    assignableUsers={renderedCalendarUsers}
+                    includeUnassignedColumn={includeUnassignedColumn}
                     mode={baseMode}
                     date={day.date}
-                    tech={activeTech}
+                    tech={activeCalendarTechParam}
                     selectedJobId={selectedJobId}
-                    dropReturnTo={buildCalendarHref(uiView, data.anchorDate, { tech: activeTech, inspector: '1' })}
+                    dropReturnTo={buildCalendarHref(uiView, data.anchorDate, { tech: activeCalendarTechParam, inspector: '1' })}
                     scheduleAction={updateJobScheduleFromForm}
                     reassignAction={reassignAndRescheduleJobFromForm}
                   />
@@ -1878,7 +1898,7 @@ export async function CalendarView(props: Props) {
                   closeHref={hideInspectorHref}
                   view={uiView}
                   date={data.anchorDate}
-                  tech={activeTech}
+                  tech={activeCalendarTechParam}
                   prefillDate={prefillDate}
                   className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
                 />
@@ -1893,7 +1913,7 @@ export async function CalendarView(props: Props) {
                   closeHref={hideInspectorHref}
                   view={uiView}
                   date={data.anchorDate}
-                  tech={activeTech}
+                  tech={activeCalendarTechParam}
                   prefillDate={prefillDate}
                   className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
                 />
@@ -1905,7 +1925,7 @@ export async function CalendarView(props: Props) {
                 <p className="mt-2 text-xs text-slate-600">
                   {selectedDayJobs.length} scheduled job{selectedDayJobs.length === 1 ? '' : 's'} in this day context.
                 </p>
-                <MonthInspectorDaySummary date={data.anchorDate} jobs={selectedDayJobs} tech={activeTech} />
+                <MonthInspectorDaySummary date={data.anchorDate} jobs={selectedDayJobs} tech={activeCalendarTechParam} />
                 <p className="mt-3 text-xs text-slate-600">
                   Use Add Block in the planner column to create an internal block for this selected day.
                 </p>
@@ -1927,7 +1947,7 @@ export async function CalendarView(props: Props) {
                 closeHref={hideInspectorHref}
                 view={uiView}
                 date={data.anchorDate}
-                tech={activeTech}
+                tech={activeCalendarTechParam}
                 prefillDate={prefillDate}
                 className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10"
               />
@@ -1942,7 +1962,7 @@ export async function CalendarView(props: Props) {
                 closeHref={hideInspectorHref}
                 view={uiView}
                 date={data.anchorDate}
-                tech={activeTech}
+                tech={activeCalendarTechParam}
                 prefillDate={prefillDate}
                 className="ml-auto max-h-[calc(100vh-8rem)] max-w-md rounded-2xl border border-slate-200 bg-white shadow-xl shadow-slate-950/10"
               />
