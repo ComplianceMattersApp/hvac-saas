@@ -5,7 +5,15 @@ import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
+import { AskComplianceMattersLauncher } from "@/components/help-assistant/AskComplianceMattersLauncher";
 import { isInternalAccessError, requireInternalRole } from "@/lib/auth/internal-user";
+import { canViewFinancialRegister, isStructuralAccountOwner } from "@/lib/auth/financial-access";
+import {
+  hasFieldPaymentCollectionAccess,
+  resolveFieldBillingCapabilities,
+} from "@/lib/auth/field-billing-access";
+import { buildHelpAssistantSafeContext } from "@/lib/help-assistant/help-assistant-context";
+import { isAskComplianceMattersEnabled } from "@/lib/help-assistant/help-assistant-flags";
 import { createClient } from "@/lib/supabase/server";
 
 async function requireAdminOrRedirect() {
@@ -320,6 +328,24 @@ export default async function OpsAdminPage() {
     });
   }
   const lifecycleCopy = resolveLaunchRoomLifecycleCopy(entitlement);
+  const fieldBillingCapabilities = resolveFieldBillingCapabilities({
+    actorUserId: user.id,
+    internalUser,
+  });
+  const helpAssistantContext = buildHelpAssistantSafeContext({
+    pathname: "/ops/admin",
+    internalRole: internalUser.role,
+    isAccountOwner: isStructuralAccountOwner({
+      actorUserId: user.id,
+      internalUser,
+    }),
+    productMode,
+    canViewFinancialRegister: canViewFinancialRegister({
+      actorUserId: user.id,
+      internalUser,
+    }),
+    canCollectFieldPayment: hasFieldPaymentCollectionAccess(fieldBillingCapabilities),
+  });
 
   return (
     <div className={pageClass}>
@@ -529,6 +555,9 @@ export default async function OpsAdminPage() {
           </section>
         </div>
       </div>
+      {isAskComplianceMattersEnabled() ? (
+        <AskComplianceMattersLauncher context={helpAssistantContext} />
+      ) : null}
     </div>
   );
 }
