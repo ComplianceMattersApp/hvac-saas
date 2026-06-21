@@ -13,8 +13,36 @@ describe("admin surface profile wiring", () => {
   });
 
   it("keeps cleaning admin landing copy team and crew oriented", () => {
-    expect(adminPageSource).toContain("office staff, cleaners, and crew setup");
-    expect(adminPageSource).toContain("Find team members, invites, and account access recovery actions.");
-    expect(adminPageSource).toContain("Manage employees, cleaners, and crew members inside your company.");
+    expect(adminPageSource).toContain("office staff, cleaners, and crew organized");
+    expect(adminPageSource).toContain("Invite users, manage roles, recover access, and keep office staff, cleaners, and crew organized.");
+    expect(adminPageSource).toContain("Team & Access");
+  });
+
+  it("renders the admin hub as focused workspace entry cards", () => {
+    expect(adminPageSource).toContain("Admin workspaces");
+    expect(adminPageSource).toContain("Choose a setup area");
+    expect(adminPageSource).toContain("Company Profile");
+    expect(adminPageSource).toContain("Team & Access");
+    expect(adminPageSource).toContain("Invoices & Online Payments");
+    expect(adminPageSource).toContain("Field Setup");
+    expect(adminPageSource).toContain("Open workspace");
+  });
+
+  it("keeps focused admin destinations on existing routes and anchors", () => {
+    expect(adminPageSource).toContain('href: "/ops/admin/company-profile#company-details"');
+    expect(adminPageSource).toContain('href: "/ops/admin/company-profile#accept-payments"');
+    expect(adminPageSource).toContain('href: "/ops/admin/users"');
+    expect(adminPageSource).toContain('href: "/ops/admin/internal-users"');
+    expect(adminPageSource).toContain('href: "/ops/admin/pricebook"');
+    expect(adminPageSource).toContain('href: "/account"');
+    expect(adminPageSource).toContain('href: "/ops/notifications"');
+  });
+
+  it("keeps advanced areas secondary and links the training room workspace", () => {
+    expect(adminPageSource).toContain("Advanced / Technical");
+    expect(adminPageSource).toContain("Training Room");
+    expect(adminPageSource).toContain("Role-based training, daily rhythms, and the First Job Mission");
+    expect(adminPageSource).toContain('href: "/training"');
+    expect(adminPageSource).not.toContain('href: "#training-room-planned"');
   });
 });
