@@ -1,6 +1,19 @@
 export const ASK_COMPLIANCE_MATTERS_FLAG = "ENABLE_ASK_COMPLIANCE_MATTERS";
+export const HELP_GAP_LOGGING_FLAG = "ENABLE_HELP_GAP_LOGGING";
+
+function isTruthyFlagValue(value: unknown) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  return normalized === "true" || normalized === "1" || normalized === "yes";
+}
 
 export function isAskComplianceMattersEnabled(env: Pick<NodeJS.ProcessEnv, string> = process.env) {
-  const value = String(env[ASK_COMPLIANCE_MATTERS_FLAG] ?? "").trim().toLowerCase();
-  return value === "true" || value === "1" || value === "yes";
+  return isTruthyFlagValue(env[ASK_COMPLIANCE_MATTERS_FLAG]);
+}
+
+export function isHelpGapLoggingEnabled(env: Pick<NodeJS.ProcessEnv, string> = process.env) {
+  return isTruthyFlagValue(env[HELP_GAP_LOGGING_FLAG]);
+}
+
+export function isHelpGapPersistenceEnabled(env: Pick<NodeJS.ProcessEnv, string> = process.env) {
+  return isAskComplianceMattersEnabled(env) && isHelpGapLoggingEnabled(env);
 }
