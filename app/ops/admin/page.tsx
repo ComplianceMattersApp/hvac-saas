@@ -13,7 +13,10 @@ import {
   resolveFieldBillingCapabilities,
 } from "@/lib/auth/field-billing-access";
 import { buildHelpAssistantSafeContext } from "@/lib/help-assistant/help-assistant-context";
-import { isAskComplianceMattersEnabled } from "@/lib/help-assistant/help-assistant-flags";
+import {
+  isAskComplianceMattersEnabled,
+  isHelpGapReviewQueueEnabled,
+} from "@/lib/help-assistant/help-assistant-flags";
 import { createClient } from "@/lib/supabase/server";
 
 async function requireAdminOrRedirect() {
@@ -311,6 +314,17 @@ export default async function OpsAdminPage() {
       enabled: true,
     },
   ];
+
+  if (isHelpGapReviewQueueEnabled()) {
+    advancedCards.push({
+      title: "Help Gap Review",
+      description:
+        "Review sanitized Ask Compliance Matters questions and feedback to improve setup, training, and support content.",
+      href: "/ops/admin/help-gaps",
+      ctaLabel: "Open review queue",
+      enabled: true,
+    });
+  }
 
   const platformOwnerAllowed = isPlatformOwnerActor({
     userId: user.id,
