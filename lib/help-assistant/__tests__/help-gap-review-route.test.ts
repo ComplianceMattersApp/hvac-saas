@@ -26,10 +26,19 @@ describe("help gap review route wiring", () => {
     expect(routeSource).not.toMatch(/OpenAI|openai|analytics|stripe|payment/i);
   });
 
-  it("does not expose mutation forms or server actions", () => {
+  it("exposes only review status controls as mutation forms", () => {
     expect(routeSource).not.toContain('"use server"');
     expect(routeSource).not.toContain("'use server'");
-    expect(routeSource).not.toMatch(/formAction|action=\{/);
+    expect(routeSource).toContain("updateHelpGapReviewStatusFromForm");
+    expect(routeSource).toContain("HELP_GAP_REVIEW_ACTION_STATUSES");
+    expect(routeSource).toContain("Review status is for product/support triage only. It does not create a support case.");
+    expect(routeSource).toContain("reviewed");
+    expect(routeSource).toContain("product_backlog");
+    expect(routeSource).toContain("bug_candidate");
+    expect(routeSource).toContain("converted_to_help_article");
+    expect(routeSource).toContain("dismissed");
+    expect(routeSource).not.toContain("linked_to_support_case");
+    expect(routeSource).not.toMatch(/formAction/);
     expect(routeSource).not.toMatch(/\.(insert|update|upsert|delete)\(/);
     expect(routeSource).toContain('method="get"');
   });
