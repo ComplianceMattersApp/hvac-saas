@@ -37,7 +37,7 @@ export const setupCoachChecklist: SetupCoachItem[] = [
   },
   {
     label: "Run Your First Job",
-    detail: "Create one customer, one job, schedule it, finish the visit, close out, invoice, and review tomorrow.",
+    detail: "Use the workflow map: understand the day in Today, start job intake when needed, do field work inside the job, finish the outcome, then use closeout operations for next steps, billing, and tomorrow's review.",
     href: "/jobs/new",
   },
 ];

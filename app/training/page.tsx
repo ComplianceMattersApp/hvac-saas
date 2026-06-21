@@ -230,7 +230,7 @@ export default async function TrainingRoomPage() {
             </p>
           </div>
           <Link href="/jobs/new" className={primaryLinkClass}>
-            Create first job
+            Start job intake
           </Link>
         </div>
 
@@ -242,6 +242,17 @@ export default async function TrainingRoomPage() {
                   <div className="text-xs font-semibold text-slate-500">Step {index + 1}</div>
                   <h3 className="mt-1 text-base font-semibold text-slate-950">{step.step}</h3>
                   <p className="mt-1 text-sm leading-6 text-slate-600">{step.description}</p>
+                  {step.whereThisHappens ? (
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <span className="font-semibold text-slate-800">Where this happens:</span>{" "}
+                      {step.whereThisHappens}
+                    </p>
+                  ) : null}
+                  {step.note ? (
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      <span className="font-semibold text-slate-800">Note:</span> {step.note}
+                    </p>
+                  ) : null}
                   <p className="mt-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                     {step.responsibility}
                   </p>

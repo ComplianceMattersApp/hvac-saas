@@ -35,6 +35,7 @@ describe("ask compliance matters local shell", () => {
     const coach = getSetupCoachAnswer();
     expect(coach.items.map((item) => item.label)).toContain("Review Launch Room");
     expect(coach.items.map((item) => item.href)).toContain("/training");
+    expect(coach.items.find((item) => item.label === "Run Your First Job")?.detail).toContain("workflow map");
     expect(coach.disclaimer).toContain("Read-only guidance only");
   });
 
@@ -64,5 +65,17 @@ describe("ask compliance matters local shell", () => {
     expect(answer.body).toContain("customers pay eligible Compliance Matters invoices online");
     expect(answer.body.toLowerCase()).not.toContain("stripe");
     expect(answer.body.toLowerCase()).not.toContain("connected account");
+  });
+
+  it("answers first-job questions as workflow phases without fake record links", () => {
+    const answer = answerAskComplianceMatters("How do I run my first job?", techContext);
+    expect(answer.body).toContain("Today: Understand Your Day");
+    expect(answer.body).toContain("Intake & Schedule");
+    expect(answer.body).toContain("Closeout Operations");
+    expect(answer.links).toContainEqual({ label: "Start job intake", href: "/jobs/new" });
+    expect(answer.links).toContainEqual({ label: "Open Today", href: "/today" });
+    expect(answer.links).toContainEqual({ label: "Open Operations", href: "/ops" });
+    expect(answer.links.map((link) => link.href)).not.toContain("/jobs/[id]");
+    expect(answer.links.map((link) => link.href)).not.toContain("/jobs/[id]/invoice");
   });
 });

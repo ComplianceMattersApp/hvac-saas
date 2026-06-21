@@ -84,21 +84,6 @@ export function answerAskComplianceMatters(
     };
   }
 
-  if (q.includes("first") || q.includes("start") || q.includes("what should i do")) {
-    return {
-      status: "answered",
-      title: "Start Here",
-      body:
-        "Start with Launch Room, then run the First Job Mission: create a customer, create a job, schedule and assign it, finish the field outcome, close out, invoice, and review tomorrow's work.",
-      links: [
-        { label: "Launch Room", href: "/ops/admin" },
-        { label: "Create customer", href: "/customers/new" },
-        { label: "Create job", href: "/jobs/new" },
-        { label: "Training Room", href: "/training" },
-      ],
-    };
-  }
-
   if (q.includes("first job") || q.includes("run my first job")) {
     return {
       status: "answered",
@@ -107,9 +92,24 @@ export function answerAskComplianceMatters(
         .map((step, index) => `${index + 1}. ${step.step} (${step.responsibility})`)
         .join(" "),
       links: [
-        { label: "Create customer", href: "/customers/new" },
-        { label: "Create job", href: "/jobs/new" },
+        { label: "Start job intake", href: "/jobs/new" },
         { label: "Open Today", href: "/today" },
+        { label: "Open Operations", href: "/ops" },
+      ],
+    };
+  }
+
+  if (q.includes("first") || q.includes("start") || q.includes("what should i do")) {
+    return {
+      status: "answered",
+      title: "Start Here",
+      body:
+        "Start with Today so you understand the day before it begins. Then use the First Job Mission as a workflow map: intake and scheduling, field work, finish outcome, closeout operations, and tomorrow's ops review.",
+      links: [
+        { label: "Launch Room", href: "/ops/admin" },
+        { label: "Open Today", href: "/today" },
+        { label: "Start job intake", href: "/jobs/new" },
+        { label: "Training Room", href: "/training" },
       ],
     };
   }

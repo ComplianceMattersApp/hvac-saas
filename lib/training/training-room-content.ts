@@ -8,6 +8,8 @@ export type FirstJobStep = {
   description: string;
   hrefs: TrainingLink[];
   responsibility: string;
+  whereThisHappens?: string;
+  note?: string;
 };
 
 export type RoleTrainingTrack = {
@@ -23,65 +25,58 @@ export type RoleTrainingTrack = {
 
 export const firstJobMissionSteps: FirstJobStep[] = [
   {
-    step: "Create first customer",
-    description: "Add the customer or account you are working for.",
-    hrefs: [{ label: "New customer", href: "/customers/new" }],
+    step: "Today: Understand Your Day",
+    description:
+      "Start in Today before the day begins. See what is scheduled, assigned, waiting, urgent, or ready for follow-up so the team knows where attention belongs.",
+    hrefs: [{ label: "Open Today", href: "/today" }],
+    responsibility: "Owner/Admin, Dispatcher/Office, Technician/Field, ECC/HERS Rater",
+    note:
+      "This is the orientation habit: understand the day before creating more work or jumping into the queue.",
+  },
+  {
+    step: "Intake & Schedule",
+    description:
+      "Start from the job intake flow. Create or select the customer, confirm the service location, create the job, and schedule/assign the work if appointment details are known.",
+    hrefs: [{ label: "Start job intake", href: "/jobs/new" }],
     responsibility: "Owner/Admin, Dispatcher/Office",
+    note:
+      "You can add a customer separately when you want to build your customer list first, but most first-job training should start from job intake.",
   },
   {
-    step: "Create first job",
-    description: "Create the work order or ECC job for that customer and service location.",
-    hrefs: [{ label: "New job", href: "/jobs/new" }],
-    responsibility: "Owner/Admin, Dispatcher/Office",
-  },
-  {
-    step: "Schedule and assign",
-    description: "Put the job on the calendar and assign the right field user.",
+    step: "Field Work",
+    description:
+      "The assigned user opens field work from My Work, the Ops queue, Today, Calendar, or a direct job link. They capture notes, photos, and field context inside the job.",
     hrefs: [
-      { label: "Operations", href: "/ops?bucket=need_to_schedule#ops-workspace" },
-      { label: "Calendar", href: "/calendar" },
-    ],
-    responsibility: "Dispatcher/Office",
-  },
-  {
-    step: "Open job",
-    description: "Field users open assigned work from Today or My Work.",
-    hrefs: [
-      { label: "Today", href: "/today" },
-      { label: "My Work", href: "/ops/field" },
+      { label: "Open My Work", href: "/ops/field" },
+      { label: "Open Ops Queue", href: "/ops" },
     ],
     responsibility: "Technician/Field, ECC/HERS Rater",
+    whereThisHappens: "Inside the job page after the job exists.",
   },
   {
-    step: "Capture notes/photos/context",
-    description: "Add the field context needed to explain what happened.",
-    hrefs: [{ label: "Today", href: "/today" }],
+    step: "Finish Outcome",
+    description:
+      "The field user finishes the visit inside the job and chooses the right outcome, such as Work Completed, Materials/Parts Needed, Approval Needed, or Unable to Complete.",
+    hrefs: [],
     responsibility: "Technician/Field, ECC/HERS Rater",
+    whereThisHappens: "Inside the active job page.",
   },
   {
-    step: "Finish outcome",
-    description: "Choose Work Completed, Materials Needed, Approval Needed, or Other.",
-    hrefs: [{ label: "My Work", href: "/ops/field" }],
-    responsibility: "Technician/Field, ECC/HERS Rater",
-  },
-  {
-    step: "Closeout",
-    description: "Office/admin reviews what is complete or waiting and handles the next responsibility.",
-    hrefs: [{ label: "Closeout queue", href: "/ops?bucket=closeout#ops-workspace" }],
-    responsibility: "Dispatcher/Office, Owner/Admin",
-  },
-  {
-    step: "Invoice",
-    description: "Create, send, record, or mark external billing complete according to invoice mode.",
-    hrefs: [{ label: "Operations", href: "/ops?bucket=closeout#ops-workspace" }],
-    responsibility: "Billing/AR, Owner/Admin",
+    step: "Closeout Operations",
+    description:
+      "Office/admin reviews what happened and decides the next step: job closeout, customer follow-up, return work, waiting status, billing handoff, invoice review, or payment attention.",
+    hrefs: [{ label: "Open Operations", href: "/ops" }],
+    responsibility: "Dispatcher/Office, Billing/AR, Owner/Admin",
+    whereThisHappens:
+      "Operations and closeout queues, with invoice/payment work handled from the job or invoice workspace after a job exists.",
   },
   {
     step: "Tomorrow's Ops Review",
-    description: "Use Today and Operations to see what needs action tomorrow.",
+    description:
+      "Use Today and Operations the next morning to see what needs action, what is waiting, and what should be closed out.",
     hrefs: [
-      { label: "Today", href: "/today" },
-      { label: "Operations", href: "/ops" },
+      { label: "Open Today", href: "/today" },
+      { label: "Open Operations", href: "/ops" },
     ],
     responsibility: "Owner/Admin, Dispatcher/Office",
   },
