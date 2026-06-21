@@ -57,30 +57,30 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   logo_too_large: { tone: "error", message: "Logo files must be 5 MB or smaller." },
   save_failed: { tone: "error", message: "We couldn't save your company details. Please try again." },
   invoice_settings_saved: { tone: "success", message: "Invoice settings were saved." },
-  stripe_connect_status_refreshed: { tone: "success", message: "Stripe payment readiness was refreshed." },
+  stripe_connect_status_refreshed: { tone: "success", message: "Online payment setup status was refreshed." },
   stripe_connect_onboarding_returned: {
     tone: "warn",
-    message: "Returned from Stripe setup. Refresh Stripe status to see current readiness.",
+    message: "Returned from online payment setup. Check payment setup status to see current readiness.",
   },
   stripe_connect_onboarding_refresh: {
     tone: "warn",
-    message: "Stripe setup was not completed. Continue setup when ready.",
+    message: "Online payment setup was not completed. Continue setup when ready.",
   },
   stripe_connect_onboarding_failed: {
     tone: "error",
-    message: "We couldn't start Stripe setup. Please try again.",
+    message: "We couldn't start online payment setup. Please try again.",
   },
   stripe_connect_status_refresh_failed: {
     tone: "warn",
-    message: "We couldn't refresh the latest Stripe status just now. The last saved setup state is shown below.",
+    message: "We couldn't refresh the latest online payment setup status just now. The last saved setup state is shown below.",
   },
   stripe_connect_status_refresh_failed_ready: {
     tone: "warn",
-    message: "Stripe is connected. We couldn't refresh the latest status just now.",
+    message: "Online invoice payments are ready. We couldn't refresh the latest status just now.",
   },
   stripe_connect_status_refresh_failed_unready: {
     tone: "warn",
-    message: "We couldn't refresh the latest Stripe status just now. The last saved setup state is shown below.",
+    message: "We couldn't refresh the latest online payment setup status just now. The last saved setup state is shown below.",
   },
   authorized_ecc_rater_saved: {
     tone: "success",
@@ -290,7 +290,7 @@ export default async function AdminCompanyProfilePage({
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-slate-900">30-day trial: Day 1 essentials</div>
+          <div className="font-semibold text-slate-900">Launch Room: first job essentials</div>
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
             {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
           </div>
@@ -307,7 +307,7 @@ export default async function AdminCompanyProfilePage({
             Invite your team
           </Link>
           <Link href="#account-billing" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
-            Review trial dates and account billing
+            Review account access and billing
           </Link>
           <Link href="#invoice-settings" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
             Pick your invoice mode
@@ -369,7 +369,7 @@ export default async function AdminCompanyProfilePage({
         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
           <div className="font-semibold text-slate-800">This can wait</div>
           <div className="mt-1">
-            Advanced reports, service plans unless you use them now, payment automation, contractor collaboration, and deep settings.
+            Advanced reports, service plans unless you use them now, advanced payment automation, contractor collaboration, and deep settings.
           </div>
         </div>
 
@@ -1002,7 +1002,7 @@ export default async function AdminCompanyProfilePage({
         </div>
       </div>
 
-      <TenantStripePaymentsSection readiness={tenantStripeReadiness} />
+      <TenantStripePaymentsSection readiness={tenantStripeReadiness} billingMode={billingMode} />
     </div>
   );
 }
@@ -1202,10 +1202,10 @@ function PlatformAccountSection({
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
         <div className="text-sm font-semibold text-slate-950">Account &amp; Billing</div>
         <div className="mt-1 text-sm text-slate-600">
-          Review your plan and trial dates. Focus first on running work from customer to invoice.
+          Review your plan and account billing. Focus first on running work from customer to invoice.
         </div>
         <div className="mt-2 text-xs leading-5 text-slate-500">
-          This subscription is for EveryStep FieldWorks access. Customer invoice payments are managed
+          This subscription is for Compliance Matters access. Customer invoice payments are managed
           separately through invoice payment settings.
         </div>
       </div>
@@ -1241,7 +1241,7 @@ function PlatformAccountSection({
       <div className="border-t border-slate-100 px-5 py-4">
         {isInternalComped ? (
           <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
-            This internal account is comped and does not require Stripe billing.
+            This internal account is comped and does not require app billing setup.
           </div>
         ) : availability.checkoutAvailable || availability.portalAvailable ? (
           <div className="flex flex-wrap gap-2">
@@ -1264,14 +1264,14 @@ function PlatformAccountSection({
           </div>
         ) : (
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
-            Platform subscription setup is unavailable until Stripe server configuration is added.
+            App subscription setup is unavailable until billing configuration is added.
           </div>
         )}
       </div>
       <details className="group border-t border-slate-100 bg-white px-5 py-3">
         <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
           <span className="inline-flex items-center gap-2">
-            <span aria-hidden="true" className="transition-transform group-open:rotate-90">›</span>
+            <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
             Billing details (this can wait)
           </span>
         </summary>
@@ -1305,51 +1305,74 @@ function PlatformAccountSection({
 
 function TenantStripePaymentsSection({
   readiness,
+  billingMode,
 }: {
   readiness: Awaited<ReturnType<typeof resolveTenantStripeConnectReadiness>>;
+  billingMode: string | null;
 }) {
   const hasConnectedAccountId = Boolean(String(readiness.connectedAccountId ?? "").trim());
+  const usesInternalInvoices = billingMode === "internal_invoicing";
   const setupActionLabel = readiness.isReady
-    ? "Manage Stripe Account"
+    ? "Manage online payments"
     : hasConnectedAccountId
-      ? "Continue Stripe Setup"
-      : "Connect Stripe Account";
+      ? "Finish online payment setup"
+      : "Set up online payments";
+  const statusCopy = (() => {
+    if (!usesInternalInvoices) {
+      return {
+        tone: "slate" as const,
+        title: "Online invoice payments not used",
+        body:
+          "This account tracks billing outside Compliance Matters. Online invoice payments can wait unless you switch to Compliance Matters invoices.",
+      };
+    }
+
+    if (readiness.isReady) {
+      return {
+        tone: "success" as const,
+        title: "Online invoice payments ready",
+        body: "Customers can pay eligible issued invoices online.",
+      };
+    }
+
+    if (hasConnectedAccountId) {
+      return {
+        tone: "warn" as const,
+        title: readiness.disabledReason ? "Payment setup needs attention" : "Finish online payment setup",
+        body: "Finish setup before customers can pay Compliance Matters invoices online.",
+      };
+    }
+
+    return {
+      tone: "warn" as const,
+      title: "Online invoice payments not set up",
+      body: "Let customers pay invoices online through Compliance Matters.",
+    };
+  })();
+  const statusClass =
+    statusCopy.tone === "success"
+      ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
+      : statusCopy.tone === "warn"
+        ? "border-amber-200 bg-amber-50/70 text-amber-900"
+        : "border-slate-200 bg-slate-50/80 text-slate-700";
 
   return (
     <div id="accept-payments" className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)] scroll-mt-24">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
-        <div className="text-sm font-semibold text-slate-950">Tenant customer invoice payments</div>
+        <div className="text-sm font-semibold text-slate-950">Accept Online Invoice Payments</div>
         <div className="mt-1 text-sm text-slate-600">
-          Stripe Connect setup controls online invoice payment readiness for this company. This can wait until you are ready to collect invoice payments online.
+          Let customers pay invoices online through Compliance Matters.
         </div>
       </div>
 
       <div className="space-y-4 px-5 py-4">
-        {readiness.isReady ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-sm leading-6 text-emerald-900">
-            <div className="font-semibold">Online invoice payments ready</div>
-            <div>Stripe Connect requirements are complete for direct-charge tenant payments.</div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm leading-6 text-amber-900">
-            <div className="font-semibold">Online invoice payments not ready</div>
-            <div>
-              Online invoice payments require Stripe Connect setup for this company before payment collection can go live.
-            </div>
-          </div>
-        )}
-
-        <dl className="grid grid-cols-1 gap-px rounded-2xl border border-slate-200 bg-slate-100/70 sm:grid-cols-2 lg:grid-cols-3">
-          <PlatformAccountField label="Connected account" value={readiness.connectedAccountId ?? "Not connected"} />
-          <PlatformAccountField label="Onboarding status" value={readiness.onboardingStatus} />
-          <PlatformAccountField label="Charges enabled" value={readiness.chargesEnabled ? "Yes" : "No"} />
-          <PlatformAccountField label="Payouts enabled" value={readiness.payoutsEnabled ? "Yes" : "No"} />
-          <PlatformAccountField label="Details submitted" value={readiness.detailsSubmitted ? "Yes" : "No"} />
-          <PlatformAccountField label="Disabled reason" value={readiness.disabledReason ?? "-"} />
-        </dl>
+        <div className={`rounded-2xl border px-4 py-3 text-sm leading-6 ${statusClass}`}>
+          <div className="font-semibold">{statusCopy.title}</div>
+          <div>{statusCopy.body}</div>
+        </div>
 
         <div className="text-xs text-slate-500">
-          Last synced: {readiness.lastSyncedAt ? new Date(readiness.lastSyncedAt).toLocaleString() : "Never"}
+          Last checked: {readiness.lastSyncedAt ? new Date(readiness.lastSyncedAt).toLocaleString() : "Never"}
         </div>
 
         <div className="flex flex-wrap gap-2">
@@ -1367,14 +1390,36 @@ function TenantStripePaymentsSection({
               type="submit"
               className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-[background-color,box-shadow,transform] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 active:translate-y-[0.5px]"
             >
-              Refresh Stripe Status
+              Check payment setup status
             </button>
           </form>
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-600">
-          Customer payment links are available from issued invoice workspaces when Stripe setup is ready.
+          Customer payment links are available from issued invoice workspaces when online invoice payments are ready.
         </div>
+
+        <details className="group rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
+            <span className="inline-flex items-center gap-2">
+              <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
+              Advanced / Technical payment details
+            </span>
+          </summary>
+          <div className="mt-3 space-y-3">
+            <div className="text-xs leading-5 text-slate-500">
+              These details are for owner/admin support review and do not change payment setup automatically.
+            </div>
+            <dl className="grid grid-cols-1 gap-px rounded-2xl border border-slate-200 bg-slate-100/70 sm:grid-cols-2 lg:grid-cols-3">
+              <PlatformAccountField label="Connected account" value={readiness.connectedAccountId ?? "Not connected"} />
+              <PlatformAccountField label="Onboarding status" value={readiness.onboardingStatus} />
+              <PlatformAccountField label="Charges enabled" value={readiness.chargesEnabled ? "Yes" : "No"} />
+              <PlatformAccountField label="Payouts enabled" value={readiness.payoutsEnabled ? "Yes" : "No"} />
+              <PlatformAccountField label="Details submitted" value={readiness.detailsSubmitted ? "Yes" : "No"} />
+              <PlatformAccountField label="Disabled reason" value={readiness.disabledReason ?? "-"} />
+            </dl>
+          </div>
+        </details>
       </div>
     </div>
   );

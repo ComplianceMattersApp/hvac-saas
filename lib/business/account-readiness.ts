@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveAccountEntitlement } from "@/lib/business/platform-entitlement";
 import { resolveTenantStripeConnectReadiness } from "@/lib/business/tenant-stripe-connect-readiness";
+import { normalizeBillingMode } from "@/lib/business/internal-business-profile";
 
 export type AccountReadinessItem = {
   key: string;
@@ -86,7 +87,7 @@ export async function resolveAccountReadiness(
         {
           key: "app_subscription",
           label: "App subscription",
-          description: "Set up your EveryStep FieldWorks subscription before the trial ends.",
+          description: "Set up your Compliance Matters subscription before the trial ends.",
           status: "incomplete",
           href: "/ops/admin/company-profile#account-billing",
         },
@@ -105,9 +106,9 @@ export async function resolveAccountReadiness(
           href: "/ops/admin/contractors",
         },
         {
-          key: "accept_customer_payments",
-          label: "Accept customer payments",
-          description: "Let customers pay invoices online through EveryStep FieldWorks.",
+          key: "accept_online_invoice_payments",
+          label: "Accept Online Invoice Payments",
+          description: "Let customers pay invoices online through Compliance Matters.",
           status: "optional",
           href: "/ops/admin/company-profile#accept-payments",
         },
@@ -157,6 +158,7 @@ export async function resolveAccountReadiness(
   const supportEmail = toCleanString(profile?.support_email);
   const supportPhone = toCleanString(profile?.support_phone);
   const billingMode = toCleanString(profile?.billing_mode);
+  const normalizedBillingMode = normalizeBillingMode(billingMode);
   const logoUrl = toCleanString(profile?.logo_url);
   const profileReviewed = Boolean(profile?.profile_reviewed_at);
   const activeInternalUserCount = normalizeCount(activeInternalUsersResult.count);
@@ -226,11 +228,23 @@ export async function resolveAccountReadiness(
         ? "Subscription is handled internally."
         : isAppSubscriptionComplete
           ? "Subscription setup is complete."
-          : "Set up your EveryStep FieldWorks subscription before the trial ends.",
+          : "Set up your Compliance Matters subscription before the trial ends.",
       status: isAppSubscriptionComplete ? "complete" : "incomplete",
       href: "/ops/admin/company-profile#account-billing",
     },
   ];
+
+  if (normalizedBillingMode === "internal_invoicing") {
+    requiredItems.push({
+      key: "accept_online_invoice_payments",
+      label: "Accept Online Invoice Payments",
+      description: tenantStripeReadiness.isReady
+        ? "Online invoice payments are ready."
+        : "Let customers pay invoices online through Compliance Matters.",
+      status: tenantStripeReadiness.isReady ? "complete" : "incomplete",
+      href: "/ops/admin/company-profile#accept-payments",
+    });
+  }
 
   const optionalItems: AccountReadinessItem[] = [
     {
@@ -243,14 +257,17 @@ export async function resolveAccountReadiness(
       status: "optional",
       href: "/ops/admin/contractors",
     },
-    {
-      key: "accept_customer_payments",
-      label: "Accept customer payments",
-      description: "Let customers pay invoices online through EveryStep FieldWorks.",
+  ];
+
+  if (normalizedBillingMode !== "internal_invoicing") {
+    optionalItems.push({
+      key: "online_invoice_payments",
+      label: "Online Invoice Payments",
+      description: "Not used when your company tracks billing outside Compliance Matters.",
       status: "optional",
       href: "/ops/admin/company-profile#accept-payments",
-    },
-  ];
+    });
+  }
 
   if (!logoUrl) {
     optionalItems.unshift({
@@ -260,13 +277,6 @@ export async function resolveAccountReadiness(
       status: "optional",
       href: "/ops/admin/company-profile",
     });
-  }
-
-  if (tenantStripeReadiness.isReady) {
-    const acceptPaymentsIndex = optionalItems.findIndex((item) => item.key === "accept_customer_payments");
-    if (acceptPaymentsIndex >= 0) {
-      optionalItems.splice(acceptPaymentsIndex, 1);
-    }
   }
 
   const completedRequiredCount = requiredItems.filter((item) => item.status === "complete").length;

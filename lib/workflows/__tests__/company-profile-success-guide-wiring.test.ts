@@ -26,7 +26,7 @@ describe("company profile success guide wiring", () => {
 
     expect(pageSource).toContain("This can wait");
     expect(pageSource).toContain("service plans unless you use them now");
-    expect(pageSource).toContain("payment automation");
+    expect(pageSource).toContain("advanced payment automation");
     expect(pageSource).toContain("contractor collaboration");
     expect(pageSource).not.toContain("14-day trial");
     expect(pageSource).not.toContain("14 day trial");

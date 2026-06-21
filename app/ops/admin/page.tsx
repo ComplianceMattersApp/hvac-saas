@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { resolveAccountReadiness } from "@/lib/business/account-readiness";
+import { resolveAccountEntitlement, type AccountEntitlementContext } from "@/lib/business/platform-entitlement";
 import { isPlatformOwnerActor } from "@/lib/business/platform-owner-access";
 import { resolveProductModeForAccountOwnerId, type ProductMode } from "@/lib/business/product-mode-defaults";
 import { resolveProductSurfaceProfile } from "@/lib/business/product-surface-profile";
@@ -86,13 +87,80 @@ function AdminCardLink({ card }: { card: AdminCard }) {
   );
 }
 
+function formatLifecycleDate(value: Date | null) {
+  if (!value || !Number.isFinite(value.getTime())) return null;
+
+  return value.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
+}
+
+function resolveLaunchRoomLifecycleCopy(entitlement: AccountEntitlementContext) {
+  if (entitlement.isInternalComped) {
+    return {
+      headline: "Launch Room",
+      statusLabel: "Internal account active",
+      description:
+        "Get your company ready, run your first job, and park the rest until later.",
+      helper:
+        "This internal account is active and does not require app billing setup.",
+    };
+  }
+
+  if (entitlement.entitlementStatus === "trial") {
+    const trialEndsLabel = formatLifecycleDate(entitlement.trialEndsAt);
+    return {
+      headline: "Launch Room",
+      statusLabel: "Trial active",
+      description:
+        "Get your company ready, run your first job, and park the rest until later.",
+      helper: trialEndsLabel
+        ? `Your trial ends ${trialEndsLabel}. Use it to prove the daily routine from customer to invoice.`
+        : "Use the trial to prove the daily routine from customer to invoice.",
+    };
+  }
+
+  if (entitlement.entitlementStatus === "active" || entitlement.entitlementStatus === "grace") {
+    return {
+      headline: "Launch Room",
+      statusLabel: "Account active",
+      description:
+        "Get your company ready, run your first job, and park the rest until later.",
+      helper: "Your Compliance Matters account is active. Keep operations moving.",
+    };
+  }
+
+  if (entitlement.entitlementStatus === "suspended" || entitlement.entitlementStatus === "cancelled") {
+    return {
+      headline: "Launch Room",
+      statusLabel: "Account needs attention",
+      description:
+        "Get your company ready, run your first job, and park the rest until later.",
+      helper: "App billing or account access needs review before normal operations continue.",
+    };
+  }
+
+  return {
+    headline: "Launch Room",
+    statusLabel: "Account status needs review",
+    description:
+      "Get your company ready, run your first job, and park the rest until later.",
+    helper: "We could not confirm account status. Review setup or contact support if blocked.",
+  };
+}
+
 export default async function OpsAdminPage() {
   const { supabase, internalUser, user } = await requireAdminOrRedirect();
-  const readiness = await resolveAccountReadiness(internalUser.account_owner_user_id, supabase);
-  const productMode = await resolveProductModeForAccountOwnerId({
-    supabase,
-    accountOwnerUserId: internalUser.account_owner_user_id,
-  });
+  const [readiness, entitlement, productMode] = await Promise.all([
+    resolveAccountReadiness(internalUser.account_owner_user_id, supabase),
+    resolveAccountEntitlement(internalUser.account_owner_user_id, supabase),
+    resolveProductModeForAccountOwnerId({
+      supabase,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    }),
+  ]);
   const surfaceProfile = resolveProductSurfaceProfile(productMode);
   const showContractorCollaboration = surfaceProfile.surfaces.contractorRaterHandoff;
   const requiredItems = readiness.items.filter((item) => item.status !== "optional");
@@ -255,6 +323,7 @@ export default async function OpsAdminPage() {
     productMode === "hvac_service"
       ? "Use this area for account access and internal staff tools."
       : modeContext.peopleCopy;
+  const lifecycleCopy = resolveLaunchRoomLifecycleCopy(entitlement);
 
   return (
     <div className={pageClass}>
@@ -263,14 +332,20 @@ export default async function OpsAdminPage() {
           <div>
             <div className="text-xs font-semibold text-slate-500">Admin Center</div>
             <h1 className="mt-1 text-2xl font-semibold text-slate-950 sm:text-3xl">
-              Start your 30-day trial with real work.
+              {lifecycleCopy.headline}
             </h1>
             <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-              Start here, set up your team, and run one real job from customer to invoice.
+              {lifecycleCopy.description}
+            </p>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+              {lifecycleCopy.helper}
             </p>
             <div className="mt-4 flex flex-wrap gap-2">
               <span className="inline-flex min-h-8 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
                 {modeContext.badge}
+              </span>
+              <span className="inline-flex min-h-8 items-center rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700">
+                {lifecycleCopy.statusLabel}
               </span>
             </div>
           </div>
@@ -286,7 +361,7 @@ export default async function OpsAdminPage() {
             <div className="px-2 pb-2 text-xs font-semibold text-slate-500">Admin areas</div>
             <nav className="space-y-1 text-sm font-semibold">
               <a href="#setup" className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-50">
-                Account setup
+                Launch Room
               </a>
               <a href="#people" className="block rounded-lg px-3 py-2 text-slate-700 hover:bg-slate-50">
                 People & Access
@@ -309,9 +384,13 @@ export default async function OpsAdminPage() {
           <section id="setup" className={panelClass}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <AdminSectionHeader
-                eyebrow="Account setup"
+                eyebrow="Launch Room"
                 title={readiness.isOperationallyReady ? "Ready for operations" : "Needs setup"}
-                description="This checks your 30-day trial start path, not just whether fields are filled in."
+                description={
+                  readiness.isOperationallyReady
+                    ? "Required setup is complete. Keep this room for account changes and new-team refreshers."
+                    : "Get your company ready, run your first job, and park the rest until later."
+                }
               />
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">
                 <div className="text-2xl font-semibold text-slate-950">{readinessPercent}%</div>
@@ -326,7 +405,7 @@ export default async function OpsAdminPage() {
             </div>
 
             <div className="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-4 text-sm text-sky-900">
-              <div className="text-xs font-semibold">Start here in your 30-day trial</div>
+              <div className="text-xs font-semibold">First job path</div>
               <p className="mt-1 leading-6">
                 Follow this path first: customer to job, then schedule, field notes, closeout, and invoice. Use Today/Ops each morning to keep work moving.
               </p>
@@ -345,7 +424,7 @@ export default async function OpsAdminPage() {
 
             {incompleteRequiredItems.length > 0 ? (
               <div className="mt-5 space-y-2 rounded-lg border border-amber-200 bg-amber-50 p-4">
-                <div className="text-xs font-semibold text-amber-900">Required setup</div>
+                <div className="text-xs font-semibold text-amber-900">Required Now</div>
                 {incompleteRequiredItems.map((item) => (
                   <div key={item.key} className="flex flex-wrap items-center justify-between gap-3 text-sm text-amber-900">
                     <div>
@@ -356,7 +435,11 @@ export default async function OpsAdminPage() {
                     </div>
                     {item.href ? (
                       <Link href={item.href} className={linkButtonClass}>
-                        {item.key === "app_subscription" ? "Set up subscription" : "Open"}
+                        {item.key === "app_subscription"
+                          ? "Set up subscription"
+                          : item.key === "accept_online_invoice_payments"
+                            ? "Set up online payments"
+                            : "Open"}
                       </Link>
                     ) : null}
                   </div>
@@ -364,13 +447,13 @@ export default async function OpsAdminPage() {
               </div>
             ) : (
               <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-900">
-                Required setup is complete.
+                Required setup is complete. Ready for operations.
               </div>
             )}
 
             {visibleOptionalItems.length > 0 ? (
               <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4">
-                <div className="text-xs font-semibold text-slate-600">This can wait</div>
+                <div className="text-xs font-semibold text-slate-600">Can Wait</div>
                 <div className="mt-3 space-y-3">
                   {visibleOptionalItems.map((item) => (
                     <div key={item.key} className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-700">

@@ -226,7 +226,7 @@ describe("resolveAccountReadiness", () => {
 
     expect(item?.status).toBe("incomplete");
     expect(item?.label).toBe("App subscription");
-    expect(item?.description).toBe("Set up your EveryStep FieldWorks subscription before the trial ends.");
+    expect(item?.description).toBe("Set up your Compliance Matters subscription before the trial ends.");
     expect(item?.href).toBe("/ops/admin/company-profile#account-billing");
     expect(summary.isOperationallyReady).toBe(false);
   });
@@ -381,7 +381,7 @@ describe("resolveAccountReadiness", () => {
         display_name: "Acme HVAC",
         support_email: "support@acme.test",
         support_phone: "(555) 111-2222",
-        billing_mode: "internal_invoicing",
+        billing_mode: "external_billing",
         logo_url: null,
         profile_reviewed_at: "2026-04-26T00:00:00Z",
         team_reviewed_at: "2026-04-26T00:00:00Z",
@@ -404,7 +404,7 @@ describe("resolveAccountReadiness", () => {
         display_name: "Acme HVAC",
         support_email: "support@acme.test",
         support_phone: "(555) 111-2222",
-        billing_mode: "internal_invoicing",
+        billing_mode: "external_billing",
         logo_url: null,
         profile_reviewed_at: "2026-04-26T00:00:00Z",
         team_reviewed_at: "2026-04-26T00:00:00Z",
@@ -427,7 +427,7 @@ describe("resolveAccountReadiness", () => {
         display_name: "Acme HVAC",
         support_email: "support@acme.test",
         support_phone: "(555) 111-2222",
-        billing_mode: "internal_invoicing",
+        billing_mode: "external_billing",
         logo_url: "storage://attachments/company-profile/logo.png",
         profile_reviewed_at: "2026-04-26T00:00:00Z",
         team_reviewed_at: "2026-04-26T00:00:00Z",
@@ -443,7 +443,7 @@ describe("resolveAccountReadiness", () => {
     expect(summary.isOperationallyReady).toBe(true);
   });
 
-  it("accept customer payments appears as optional when Stripe Connect is not ready", async () => {
+  it("accept online invoice payments is required when internal invoicing is not ready", async () => {
     const supabase = makeSupabase({
       profile: {
         display_name: "Acme HVAC",
@@ -458,14 +458,16 @@ describe("resolveAccountReadiness", () => {
     });
 
     const summary = await resolveAccountReadiness("owner-1", supabase);
-    const item = summary.items.find((x) => x.key === "accept_customer_payments");
+    const item = summary.items.find((x) => x.key === "accept_online_invoice_payments");
 
-    expect(item?.status).toBe("optional");
-    expect(item?.description).toBe("Let customers pay invoices online through EveryStep FieldWorks.");
+    expect(item?.status).toBe("incomplete");
+    expect(item?.label).toBe("Accept Online Invoice Payments");
+    expect(item?.description).toBe("Let customers pay invoices online through Compliance Matters.");
     expect(item?.href).toBe("/ops/admin/company-profile#accept-payments");
+    expect(summary.isOperationallyReady).toBe(false);
   });
 
-  it("accept customer payments is hidden when Stripe Connect is ready", async () => {
+  it("accept online invoice payments is complete when internal invoicing payment setup is ready", async () => {
     const supabase = makeSupabase({
       profile: {
         display_name: "Acme HVAC",
@@ -487,9 +489,34 @@ describe("resolveAccountReadiness", () => {
     });
 
     const summary = await resolveAccountReadiness("owner-1", supabase);
-    const item = summary.items.find((x) => x.key === "accept_customer_payments");
+    const item = summary.items.find((x) => x.key === "accept_online_invoice_payments");
 
-    expect(item).toBeUndefined();
+    expect(item?.status).toBe("complete");
+    expect(item?.description).toBe("Online invoice payments are ready.");
+    expect(summary.isOperationallyReady).toBe(true);
+  });
+
+  it("online invoice payments remains optional when billing is tracked outside Compliance Matters", async () => {
+    const supabase = makeSupabase({
+      profile: {
+        display_name: "Acme HVAC",
+        support_email: "support@acme.test",
+        support_phone: "(555) 111-2222",
+        billing_mode: "external_billing",
+        logo_url: null,
+        profile_reviewed_at: "2026-04-26T00:00:00Z",
+        team_reviewed_at: "2026-04-26T00:00:00Z",
+      },
+      activeInternalUsersCount: 1,
+    });
+
+    const summary = await resolveAccountReadiness("owner-1", supabase);
+    const item = summary.items.find((x) => x.key === "online_invoice_payments");
+
+    expect(item?.status).toBe("optional");
+    expect(item?.description).toBe("Not used when your company tracks billing outside Compliance Matters.");
+    expect(item?.href).toBe("/ops/admin/company-profile#accept-payments");
+    expect(summary.isOperationallyReady).toBe(true);
   });
 
   it("no contractors remains optional", async () => {
