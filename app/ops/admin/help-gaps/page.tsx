@@ -78,7 +78,15 @@ function topEntry(bucket: Record<string, number>) {
   return Object.entries(bucket).sort((a, b) => b[1] - a[1])[0] ?? null;
 }
 
-function BreakdownList({ title, values }: { title: string; values: Record<string, number> }) {
+function BreakdownList({
+  title,
+  values,
+  emptyMessage = "No data yet.",
+}: {
+  title: string;
+  values: Record<string, number>;
+  emptyMessage?: string;
+}) {
   const entries = Object.entries(values).sort((a, b) => b[1] - a[1]);
   return (
     <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -93,35 +101,104 @@ function BreakdownList({ title, values }: { title: string; values: Record<string
           ))}
         </div>
       ) : (
-        <div className="mt-3 text-sm text-slate-600">No data yet.</div>
+        <div className="mt-3 text-sm leading-6 text-slate-600">{emptyMessage}</div>
       )}
     </div>
   );
 }
 
-function SummaryCards({ summary }: { summary: HelpGapReviewSummary }) {
+function PatternSpotlight({ summary }: { summary: HelpGapReviewSummary }) {
   const topCategory = topEntry(summary.byCategory);
   const topPageFamily = topEntry(summary.byPageFamily);
+  const topRole = topEntry(summary.byRoleCategory);
+  const topTrainingMission = topEntry(summary.byTrainingMission);
+  const topSetupStep = topEntry(summary.bySetupStep);
 
+  return (
+    <section className={panelClass}>
+      <div className="flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+          <div className="text-xs font-semibold text-slate-500">Patterns</div>
+          <h2 className="mt-1 text-xl font-semibold text-slate-950">Where users are getting stuck</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+            Use these patterns to improve setup, training, and help content.
+          </p>
+        </div>
+        <p className="max-w-xl text-xs leading-5 text-slate-500">
+          Review status does not notify users or create follow-up. Support-case creation and linking remain deferred.
+        </p>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <BreakdownList
+          title="Top categories"
+          values={summary.byCategory}
+          emptyMessage="No category patterns yet. New help gaps will appear here after logging."
+        />
+        <BreakdownList
+          title="Top places users got stuck"
+          values={summary.byPageFamily}
+          emptyMessage="No page-family patterns yet."
+        />
+        <BreakdownList
+          title="Roles asking for help"
+          values={summary.byRoleCategory}
+          emptyMessage="No role patterns yet."
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BreakdownList
+          title="Training signals"
+          values={summary.byTrainingMission}
+          emptyMessage="No training mission signals yet."
+        />
+        <BreakdownList
+          title="Setup signals"
+          values={summary.bySetupStep}
+          emptyMessage="No setup step signals yet."
+        />
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <BreakdownList
+          title="Event type mix"
+          values={summary.byEventType}
+          emptyMessage="No event mix yet."
+        />
+        <BreakdownList
+          title="Review status mix"
+          values={summary.byReviewStatus}
+          emptyMessage="No reviewed rows yet."
+        />
+      </div>
+
+      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
+        Top category: <span className="font-semibold text-slate-900">{topCategory ? titleize(topCategory[0]) : "None"}</span>.
+        {" "}Top stuck place: <span className="font-semibold text-slate-900">{topPageFamily ? titleize(topPageFamily[0]) : "None"}</span>.
+        {" "}Top role: <span className="font-semibold text-slate-900">{topRole ? titleize(topRole[0]) : "None"}</span>.
+        {" "}Training: <span className="font-semibold text-slate-900">{topTrainingMission ? titleize(topTrainingMission[0]) : "None"}</span>.
+        {" "}Setup: <span className="font-semibold text-slate-900">{topSetupStep ? titleize(topSetupStep[0]) : "None"}</span>.
+      </div>
+    </section>
+  );
+}
+
+function SummaryCards({ summary }: { summary: HelpGapReviewSummary }) {
   return (
     <section className={panelClass}>
       <div>
         <div className="text-xs font-semibold text-slate-500">Summary</div>
         <h2 className="mt-1 text-xl font-semibold text-slate-950">Current help gap signals</h2>
+        <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+          Help gaps are product/support intelligence. They are not support cases.
+        </p>
       </div>
       <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard label="New" value={summary.totalNew} helper="Rows waiting for review." />
         <StatCard label="Unknown answers" value={summary.unknownAnswers} helper="Questions the assistant could not answer." />
         <StatCard label="Not helpful" value={summary.notHelpful} helper="Answers users marked as not helpful." />
         <StatCard label="Still need help" value={summary.stillNeedHelp} helper="Support intent signals, not support cases." />
-      </div>
-      <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-        <BreakdownList title="Top categories" values={summary.byCategory} />
-        <BreakdownList title="Top page families" values={summary.byPageFamily} />
-      </div>
-      <div className="mt-4 rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-600">
-        Top category: <span className="font-semibold text-slate-900">{topCategory ? titleize(topCategory[0]) : "None"}</span>.
-        {" "}Top page family: <span className="font-semibold text-slate-900">{topPageFamily ? titleize(topPageFamily[0]) : "None"}</span>.
       </div>
     </section>
   );
@@ -166,6 +243,9 @@ function Filters({
         <div>
           <div className="text-xs font-semibold text-slate-500">Filters</div>
           <h2 className="mt-1 text-xl font-semibold text-slate-950">Narrow the review queue</h2>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+            Filters update both the summary patterns and the rows below.
+          </p>
         </div>
         <Link href="/ops/admin/help-gaps" className={linkButtonClass}>
           Reset
@@ -370,6 +450,7 @@ export default async function HelpGapReviewPage({
       </section>
 
       <SummaryCards summary={result.summary} />
+      <PatternSpotlight summary={result.summary} />
       <Filters searchParams={sp} availableFilters={result.availableFilters} />
 
       <section className={panelClass}>

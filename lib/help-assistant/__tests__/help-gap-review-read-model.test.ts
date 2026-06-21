@@ -321,6 +321,15 @@ describe("help gap review read model", () => {
         admin: 1,
         office: 2,
       },
+      byEventType: {
+        unknown_answer: 1,
+        not_helpful: 1,
+        still_need_help: 1,
+      },
+      byReviewStatus: {
+        new: 2,
+        reviewed: 1,
+      },
       byTrainingMission: {
         run_your_first_job: 1,
       },

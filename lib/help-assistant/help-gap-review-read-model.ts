@@ -53,6 +53,8 @@ export type HelpGapReviewSummary = {
   byRoleCategory: Record<string, number>;
   byTrainingMission: Record<string, number>;
   bySetupStep: Record<string, number>;
+  byEventType: Record<string, number>;
+  byReviewStatus: Record<string, number>;
 };
 
 export type HelpGapReviewReadModelResult = {
@@ -159,6 +161,8 @@ function emptySummary(): HelpGapReviewSummary {
     byRoleCategory: {},
     byTrainingMission: {},
     bySetupStep: {},
+    byEventType: {},
+    byReviewStatus: {},
   };
 }
 
@@ -227,6 +231,8 @@ function summarize(items: HelpGapReviewItem[]): HelpGapReviewSummary {
     if (item.eventType === "unknown_answer") summary.unknownAnswers += 1;
     if (item.eventType === "not_helpful") summary.notHelpful += 1;
     if (item.eventType === "still_need_help") summary.stillNeedHelp += 1;
+    increment(summary.byEventType, item.eventType);
+    increment(summary.byReviewStatus, item.reviewStatus);
     increment(summary.byCategory, item.category);
     increment(summary.byPageFamily, item.pageFamily);
     increment(summary.byRoleCategory, item.roleCategory);
