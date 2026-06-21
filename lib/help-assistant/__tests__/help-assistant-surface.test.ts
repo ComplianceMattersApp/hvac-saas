@@ -21,7 +21,8 @@ describe("help assistant surface wiring", () => {
 
   it("keeps the client shell local and non-persistent", () => {
     expect(launcherSource).toContain("answerAskComplianceMatters");
-    expect(launcherSource).toContain("Feedback noted locally for this session only.");
+    expect(launcherSource).toContain("Marked locally for this session.");
+    expect(launcherSource).toContain("Guidance only. I do not change settings or create records.");
     expect(launcherSource).toContain("No support case was created.");
     expect(launcherSource).not.toContain("fetch(");
     expect(launcherSource).not.toContain("XMLHttpRequest");
