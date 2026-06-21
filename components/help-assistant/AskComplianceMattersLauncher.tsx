@@ -12,6 +12,11 @@ import {
   getSetupCoachAnswer,
   type HelpAssistantAnswer,
 } from "@/lib/help-assistant/help-assistant-answer";
+import {
+  createFeedbackHelpGapEvent,
+  createUnknownAnswerHelpGapEvent,
+  type HelpGapEvent,
+} from "@/lib/help-assistant/help-gap-events";
 
 type AssistantMode = "ask" | "setup";
 type FeedbackState = "helpful" | "not_helpful" | "still_need_help" | null;
@@ -34,6 +39,7 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<HelpAssistantAnswer | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
+  const [helpGapEvent, setHelpGapEvent] = useState<HelpGapEvent | null>(null);
   const safeContext = useMemo(
     () => buildHelpAssistantSafeContext({ ...context, pathname: pathname ?? context.pathname }),
     [context, pathname],
@@ -45,7 +51,45 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
     setQuestion(nextQuestion);
     setAnswer(nextAnswer);
     setFeedback(null);
+    setHelpGapEvent(
+      nextAnswer.status === "fallback"
+        ? createUnknownAnswerHelpGapEvent({
+            context: safeContext,
+            questionText: nextQuestion,
+            answer: nextAnswer,
+          })
+        : null,
+    );
     setMode("ask");
+  }
+
+  function handleFeedback(nextFeedback: FeedbackState) {
+    setFeedback(nextFeedback);
+    if (!nextFeedback || nextFeedback === "helpful") {
+      setHelpGapEvent(null);
+      return;
+    }
+
+    setHelpGapEvent(
+      createFeedbackHelpGapEvent({
+        eventType: nextFeedback,
+        context: safeContext,
+        questionText: question,
+        answer,
+        assistantMode: mode === "setup" ? "setup_coach" : "help_chat",
+      }),
+    );
+  }
+
+  function feedbackMessage() {
+    if (!feedback) return null;
+    if (feedback === "still_need_help") {
+      return "No support case was created. Contact support if this is blocking your work.";
+    }
+    if (feedback === "not_helpful") {
+      return "Feedback is local to this session. This is the kind of question we should improve.";
+    }
+    return "Feedback noted locally for this session only.";
   }
 
   return (
@@ -128,6 +172,11 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
                   <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                     <div className="text-sm font-semibold text-slate-950">{answer.title}</div>
                     <p className="mt-1 text-sm leading-6 text-slate-700">{answer.body}</p>
+                    {helpGapEvent?.eventType === "unknown_answer" ? (
+                      <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-2.5 py-2 text-xs leading-5 text-amber-900">
+                        This is the kind of question we should improve. Contact support if this is blocking your work.
+                      </p>
+                    ) : null}
                     {answer.links.length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2">
                         {answer.links.map((link) => (
@@ -146,7 +195,7 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
                         <button
                           key={value}
                           type="button"
-                          onClick={() => setFeedback(value as FeedbackState)}
+                          onClick={() => handleFeedback(value as FeedbackState)}
                           className={feedback === value ? "rounded-md bg-slate-900 px-2.5 py-1 text-xs font-semibold text-white" : "rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-100"}
                         >
                           {label}
@@ -155,7 +204,7 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
                     </div>
                     {feedback ? (
                       <p className="mt-2 text-xs leading-5 text-slate-500">
-                        Feedback noted locally for this session only.
+                        {feedbackMessage()}
                       </p>
                     ) : null}
                   </div>

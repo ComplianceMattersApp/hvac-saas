@@ -9,6 +9,7 @@ const launcherSource = readFileSync(
 const adminPageSource = readFileSync(resolve(__dirname, "../../../app/ops/admin/page.tsx"), "utf8");
 const trainingPageSource = readFileSync(resolve(__dirname, "../../../app/training/page.tsx"), "utf8");
 const answerSource = readFileSync(resolve(__dirname, "../help-assistant-answer.ts"), "utf8");
+const helpGapEventsSource = readFileSync(resolve(__dirname, "../help-gap-events.ts"), "utf8");
 
 describe("help assistant surface wiring", () => {
   it("mounts the launcher behind the feature flag on scoped internal pages", () => {
@@ -21,6 +22,7 @@ describe("help assistant surface wiring", () => {
   it("keeps the client shell local and non-persistent", () => {
     expect(launcherSource).toContain("answerAskComplianceMatters");
     expect(launcherSource).toContain("Feedback noted locally for this session only.");
+    expect(launcherSource).toContain("No support case was created.");
     expect(launcherSource).not.toContain("fetch(");
     expect(launcherSource).not.toContain("XMLHttpRequest");
     expect(launcherSource).not.toContain("localStorage");
@@ -35,5 +37,18 @@ describe("help assistant surface wiring", () => {
     expect(answerSource).not.toContain(".upsert(");
     expect(answerSource).not.toContain(".update(");
     expect(answerSource).not.toContain("service_role");
+  });
+
+  it("keeps help-gap events as pure local contract objects", () => {
+    expect(helpGapEventsSource).toContain("createUnknownAnswerHelpGapEvent");
+    expect(helpGapEventsSource).toContain("createFeedbackHelpGapEvent");
+    expect(helpGapEventsSource).not.toContain("fetch(");
+    expect(helpGapEventsSource).not.toContain(".insert(");
+    expect(helpGapEventsSource).not.toContain(".upsert(");
+    expect(helpGapEventsSource).not.toContain(".update(");
+    expect(helpGapEventsSource).not.toContain("support_cases");
+    expect(helpGapEventsSource).not.toContain("OpenAI");
+    expect(helpGapEventsSource).not.toContain("openai");
+    expect(helpGapEventsSource).not.toContain("service_role");
   });
 });

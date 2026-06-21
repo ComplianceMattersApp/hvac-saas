@@ -6,9 +6,14 @@ export type SetupCoachItem = {
 
 export const setupCoachChecklist: SetupCoachItem[] = [
   {
-    label: "Review Launch Room",
+    label: "Open Launch Room",
     detail: "Start in Admin Center and handle Required Now before optional setup.",
     href: "/ops/admin",
+  },
+  {
+    label: "Understand Today",
+    detail: "Open Today first so the team understands the day before creating more work.",
+    href: "/today",
   },
   {
     label: "Confirm company profile",
@@ -26,7 +31,7 @@ export const setupCoachChecklist: SetupCoachItem[] = [
     href: "/ops/admin/company-profile#invoice-settings",
   },
   {
-    label: "Set up online invoice payments if used",
+    label: "Set up Online Invoice Payments if used",
     detail: "Use this when customers should pay Compliance Matters invoices online.",
     href: "/ops/admin/company-profile#accept-payments",
   },
@@ -39,5 +44,10 @@ export const setupCoachChecklist: SetupCoachItem[] = [
     label: "Run Your First Job",
     detail: "Use the workflow map: understand the day in Today, start job intake when needed, do field work inside the job, finish the outcome, then use closeout operations for next steps, billing, and tomorrow's review.",
     href: "/jobs/new",
+  },
+  {
+    label: "Review Tomorrow in Today/Ops",
+    detail: "Use Today and Operations the next morning to see what needs action, what is waiting, and what should be closed out.",
+    href: "/today",
   },
 ];
