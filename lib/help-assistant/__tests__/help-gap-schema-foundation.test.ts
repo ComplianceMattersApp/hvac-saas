@@ -8,9 +8,20 @@ const migrationPath = join(
   "migrations",
   "20260621100000_assistant_help_gap_events_foundation.sql",
 );
+const grantsMigrationPath = join(
+  process.cwd(),
+  "supabase",
+  "migrations",
+  "20260621113000_assistant_help_gap_events_authenticated_grants.sql",
+);
 
 const sql = readFileSync(migrationPath, "utf8");
+const grantsSql = readFileSync(grantsMigrationPath, "utf8");
 const sqlWithoutComments = sql
+  .split("\n")
+  .filter((line) => !line.trim().startsWith("--"))
+  .join("\n");
+const grantsSqlWithoutComments = grantsSql
   .split("\n")
   .filter((line) => !line.trim().startsWith("--"))
   .join("\n");
@@ -105,6 +116,20 @@ describe("assistant help-gap schema foundation migration", () => {
     expect(sql).toContain("actor.is_active = true");
     expect(sql).toContain("(actor.role = 'admin' OR actor.user_id = assistant_help_gap_events.account_owner_user_id)");
     expect(sql).not.toMatch(/TO\s+anon/i);
+  });
+
+  it("grants authenticated table access for existing RLS policies without anon or delete access", () => {
+    expect(grantsSql).toContain(
+      "GRANT SELECT, INSERT, UPDATE ON TABLE public.assistant_help_gap_events TO authenticated",
+    );
+    expect(grantsSql).toContain(
+      "REVOKE DELETE ON TABLE public.assistant_help_gap_events FROM authenticated",
+    );
+    expect(grantsSql).toContain(
+      "REVOKE ALL ON TABLE public.assistant_help_gap_events FROM anon",
+    );
+    expect(grantsSqlWithoutComments).not.toMatch(/GRANT\s+DELETE/i);
+    expect(grantsSqlWithoutComments).not.toMatch(/GRANT\s+.*\s+TO\s+anon/i);
   });
 
   it("keeps support-case linkage optional and does not create support behavior", () => {

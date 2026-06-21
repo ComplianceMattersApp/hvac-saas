@@ -642,3 +642,389 @@ Recommended next slice after local migration validation passes:
 - No support-case writes.
 - No provider calls.
 - No review UI.
+
+## 18. G5 Review Surface Planning
+
+Status: ACTIVE MODEL LOCK / PLANNING ONLY
+
+This section plans the future Help Gap Review surface after CMTest proved durable persistence for `unknown_answer`, `not_helpful`, and `still_need_help` rows. It does not authorize runtime behavior, review UI implementation, schema changes, migrations, Supabase writes, support-case creation, Support Console enablement, provider calls, analytics, payment behavior, or tenant operational mutation.
+
+### 18.1 Executive Summary
+
+Help Gap Review should be a small internal owner/admin/support-safe review surface for sanitized Ask Compliance Matters feedback.
+
+Recommended V1 location:
+
+- `/ops/admin/help-gaps`
+
+Recommended posture:
+
+- gated behind a new `ENABLE_HELP_GAP_REVIEW_QUEUE` flag
+- internal authenticated route only
+- owner/admin first for tenant-scoped review, with platform-owner/support-safe visibility only through separately approved owner-support surfaces
+- not Training Room
+- not the assistant panel
+- not Support Console
+- not Reports V1 unless later aggregate reporting is added
+
+The surface should answer where users are getting stuck and which help/training/product areas need attention. It must not become support intake, impersonation, tenant browsing, or operational record mutation.
+
+### 18.2 Current Confirmed Baseline
+
+Confirmed after G4-Fix-C in CMTest sandbox `kvpesjdukqwwlgpkzfjm`:
+
+- `public.assistant_help_gap_events` exists.
+- RLS is enabled.
+- Account-scoped select, insert, and owner/admin update policies are present.
+- `authenticated` has `SELECT`, `INSERT`, and `UPDATE` table privileges.
+- `authenticated` does not have `DELETE`.
+- `anon` has no table access.
+- PostgREST schema cache was reloaded after targeted apply.
+- G4-QA confirmed durable rows for:
+  - `unknown_answer`
+  - `not_helpful`
+  - `still_need_help`
+- Persisted rows used `review_status = 'new'`.
+- Persisted rows used `linked_support_case_id = null`.
+- No support cases or support case notes were created.
+- No Support Console behavior changed.
+
+Current runtime persistence remains limited to:
+
+- `ENABLE_ASK_COMPLIANCE_MATTERS`
+- `ENABLE_HELP_GAP_LOGGING`
+- routes allowed by the server helper: `/ops/admin` and `/training`
+- writes only to `assistant_help_gap_events`
+
+### 18.3 Recommended Review Surface Location
+
+Preferred V1 route:
+
+- `/ops/admin/help-gaps`
+
+Rationale:
+
+- Admin Center already owns Launch Room, setup readiness, and owner/admin operational controls.
+- Help gaps are operational onboarding/training/product-intelligence signals, not user training content.
+- The route can be explicitly feature-flagged and access-gated without expanding the assistant panel.
+- It keeps review close to owner/admin readiness work while avoiding Support Console.
+
+Rejected or deferred locations:
+
+- Training Room: users go there to learn, not to inspect other users' confusion.
+- Assistant panel: feedback capture belongs there, review workflow does not.
+- Reports: useful later for aggregate summaries, but V1 needs row review and triage.
+- Support Console: parked, runbook-gated, and not required for help-gap review.
+- Normal Support area: risks implying support-case creation or active support intake.
+- Platform-owner-only route as the only V1 surface: useful later for cross-account product review, but tenant account RLS already supports account-scoped owner/admin review.
+
+### 18.4 Reviewer Access Model
+
+Recommended V1 reviewers:
+
+- tenant structural owner
+- tenant admin
+- platform owner/support-safe reviewer only through a separately approved owner-support route or platform-owner route
+
+Do not grant V1 review access to:
+
+- billing/AR by default
+- office/dispatcher unless they are also admin
+- technicians/field users
+- contractor/portal users
+- customer-facing users
+- Support Console users merely because Support Console exists
+
+Access rules:
+
+- Route must fail closed when `ENABLE_HELP_GAP_REVIEW_QUEUE` is false.
+- Route must require authenticated internal access.
+- Reads must remain account-scoped through existing RLS and server-side access checks.
+- V1 should avoid broad cross-tenant browsing.
+- Any future platform-owner aggregate review needs a separate platform-owner access model and copy review.
+
+### 18.5 Review Surface Purpose
+
+The review surface should help reviewers answer:
+
+- What questions did Ask Compliance Matters not know?
+- Which curated answers were marked not helpful?
+- Which users clicked Still need help?
+- Which Launch Room or Training Room surfaces cause confusion?
+- Which categories repeat?
+- Which product modes, roles, routes, missions, or setup steps generate the most friction?
+- Which items look like missing help articles?
+- Which items look like bug candidates or product-backlog candidates?
+
+The surface should not be used to:
+
+- monitor individual workers as a performance tool
+- inspect private job/customer/invoice details
+- start support sessions
+- create or mutate tenant operational records
+- train an AI model automatically
+- export raw feedback payloads
+
+### 18.6 V1 Row Display Model
+
+Show per row:
+
+- created time
+- event type
+- help-gap category
+- page family
+- sanitized route pathname
+- role category and role label
+- product mode
+- sanitized question text, capped by existing storage limits
+- answer key or fallback key
+- feedback value
+- setup step key, if present
+- training mission key, if present
+- review status
+
+Show in secondary/detail context only:
+
+- coarse capability booleans such as financial-register visibility and field-payment collection
+- reviewer timestamp and reviewer label after review actions exist
+- dormant linked support-case status as `none` while `linked_support_case_id` is null
+
+Do not show as primary UI:
+
+- raw UUIDs
+- raw payload dumps
+- support-console internals
+- payment/provider internals
+- Stripe/customer/payment method identifiers
+- private customer/job/invoice details
+- raw query strings or hashes
+- support-case notes
+- full assistant transcripts
+
+### 18.7 Filters and Summary Cards
+
+Recommended first filters:
+
+- review status
+- help-gap category
+- event type
+- page family
+- role category
+- product mode
+- date range
+- training mission key
+- setup step key
+- answer key
+
+Recommended first summary cards:
+
+- New help gaps
+- Unknown answers
+- Not helpful answers
+- Still need help
+- Top categories
+- Top page families/routes
+- Top training missions
+- Top setup steps
+
+Summary cards should be derived from sanitized help-gap rows only. They should not join into customer/job/invoice/payment payloads in V1.
+
+### 18.8 Safe Review Actions
+
+Recommended V1 actions:
+
+- mark reviewed
+- mark product backlog
+- mark bug candidate
+- mark converted to help article
+- dismiss
+- copy sanitized summary
+
+First implementation can be read-only list/detail before adding actions. If status updates are included, they must update only:
+
+- `review_status`
+- `reviewed_at`
+- `reviewed_by_user_id`
+- `updated_at` via trigger
+
+Status actions must preserve the existing account-scoped owner/admin update policy and must not use a service-role runtime path.
+
+### 18.9 Deferred Actions
+
+Defer:
+
+- create support case
+- link support case
+- create support-case note
+- create help article automatically
+- create product backlog ticket automatically
+- create bug ticket automatically
+- send message to user
+- notify support automatically
+- train AI automatically
+- export raw data
+- broaden route capture beyond the approved assistant surfaces
+- support-side tenant mutation
+
+Any future support-case create/link flow must be separately approved and feature-flagged.
+
+### 18.10 Support Case and Support Console Boundary
+
+Help gaps are not support cases.
+
+`still_need_help` is support intent, not support-case creation.
+
+V1 review surface must preserve:
+
+- no automatic support case creation
+- no automatic support case linking
+- no support-case notes
+- no Support Console enablement
+- no support users, grants, sessions, or support access audit events
+- no impersonation
+- no tenant operational mutation
+
+A future explicit "Create support case from help gap" or "Link support case" action may be planned later, but it is outside G5 V1 review-surface implementation unless separately approved.
+
+### 18.11 Retention and Review Status Recommendation
+
+Review-only is enough for the first review surface if the first implementation is read-only.
+
+Recommended first write action:
+
+- status update only, after read-only list/detail is proven
+
+Recommended retention posture:
+
+- keep `question_text_sanitized` for 180 days during controlled rollout
+- keep aggregate counts longer if they contain no question text and no user id
+- plan future anonymization/redaction after review
+- do not add automatic deletion/anonymization in the first review UI slice
+
+Review statuses remain:
+
+- `new`
+- `reviewed`
+- `converted_to_help_article`
+- `linked_to_support_case`
+- `dismissed`
+- `product_backlog`
+- `bug_candidate`
+
+Even though `linked_to_support_case` exists in the schema for future compatibility, V1 must not set it unless explicit support-case linking is separately approved.
+
+### 18.12 Feature Flag Recommendation
+
+Existing flags:
+
+- `ENABLE_ASK_COMPLIANCE_MATTERS`
+- `ENABLE_HELP_GAP_LOGGING`
+
+Recommended new flag:
+
+- `ENABLE_HELP_GAP_REVIEW_QUEUE`
+
+Flag rules:
+
+- Review route hidden/fail-closed when `ENABLE_HELP_GAP_REVIEW_QUEUE` is false.
+- Review route must not imply assistant visibility.
+- Review route must not imply help-gap persistence.
+- Review route must not imply Support Console enablement.
+- Review actions must still enforce server-side role and account scope.
+
+Optional later flag:
+
+- `ENABLE_HELP_GAP_SUPPORT_CASE_LINKING`
+
+This later flag would require a separate model lock and tests.
+
+### 18.13 Pending Migration Caution
+
+CMTest had unrelated pending migrations during G4-Fix-C. Normal `supabase db push` was unsafe because it would have applied unrelated pending migrations.
+
+Future migration/apply work must:
+
+- confirm the target ref before any command
+- avoid production unless explicitly approved
+- avoid normal `db push` when unrelated migrations are pending
+- use targeted SQL or isolated migration artifacts when applying a narrow sandbox/production fix
+- document whether migration history was repaired after targeted SQL apply
+- never bundle Help Gap Review with unrelated schema, payment, support, product-mode, or operational migrations
+
+Known caution from G4-Fix-C:
+
+- CMTest target ref: `kvpesjdukqwwlgpkzfjm`
+- production ref to avoid unless explicitly approved: `ornrnvxtwwtulohqwxop`
+- unrelated pending CMTest migrations remained pending after targeted Help Gap apply
+
+### 18.14 Recommended Implementation Sequence
+
+G5-A: docs/model only
+
+- This section.
+- No runtime behavior.
+- No schema.
+- No Supabase commands.
+
+G5-B: read model for help gaps
+
+- Add a server-only read helper for `assistant_help_gap_events`.
+- Enforce account scope and owner/admin access.
+- Support filters and summary counts.
+- Read only.
+- No UI yet if separate review is preferred.
+
+G5-C: review route UI read-only
+
+- Add `/ops/admin/help-gaps` behind `ENABLE_HELP_GAP_REVIEW_QUEUE`.
+- Render summary cards, filters, and sanitized list/detail.
+- No status mutation yet.
+- No support-case actions.
+
+G5-D: review status update action
+
+- Add narrow server action for approved status transitions.
+- Mutate only the help-gap row's review fields.
+- Preserve RLS and owner/admin scope.
+- No service-role runtime path.
+
+G5-E: smoke with seeded/sandbox help-gap rows
+
+- Verify route hidden when flag off.
+- Verify owner/admin access.
+- Verify non-admin denied.
+- Verify filters/summaries.
+- Verify optional status action if included.
+- Verify no support-case rows or notes are created.
+
+G5-F: optional support-case link/create planning later
+
+- Separate model lock only.
+- Separate flag.
+- Explicit user/support/admin intent.
+- Preserve Support Case V1 and Support Console boundaries.
+
+### 18.15 Explicit Non-Actions
+
+G5 planning does not perform or authorize:
+
+- product/runtime code changes
+- schema changes
+- migrations
+- Supabase writes
+- production Supabase commands
+- normal `db push`
+- review UI implementation
+- review status update implementation
+- support case creation
+- support case linking
+- support-case note creation
+- Support Console enablement
+- support-user/grant/session creation
+- impersonation
+- AI provider/OpenAI calls
+- analytics provider behavior
+- payment, Stripe, billing, subscription, or entitlement behavior changes
+- customer/job/invoice/payment operational mutation
+- customer-facing visibility
+- contractor/portal visibility
