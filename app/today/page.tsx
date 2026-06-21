@@ -401,8 +401,11 @@ function TodayWorkSection({
           <h2 className={primary ? SECTION_HEADING_TEXT_LG : SECTION_HEADING_TEXT}>{label}</h2>
         </div>
         {desktop ? (
-          <Link href="/ops/field" className="text-xs font-semibold text-blue-700 hover:underline">
-            View My Work
+          <Link
+            href={showFieldActions ? "/ops/field" : "/ops?bucket=field_work#ops-workspace"}
+            className="text-xs font-semibold text-blue-700 hover:underline"
+          >
+            {showFieldActions ? "View My Work" : "View Field Work"}
           </Link>
         ) : null}
       </div>

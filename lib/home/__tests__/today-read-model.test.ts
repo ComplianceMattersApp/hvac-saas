@@ -153,7 +153,7 @@ describe("selectNextBestAction", () => {
       openInvoiceCount: 9,
     }));
     expect(result.kind).toBe("compliance_exception");
-    expect(result.primaryHref).toBe("/ops");
+    expect(result.primaryHref).toBe("/ops?bucket=exceptions#ops-workspace");
   });
 
   it("billing: prioritizes open invoices", () => {
@@ -353,7 +353,7 @@ describe("buildPriorityChips", () => {
     const exceptions = chips.find((c) => c.key === "exceptions");
     expect(exceptions?.urgent).toBe(true);
     expect(exceptions?.tone).toBe("danger");
-    expect(exceptions?.href).toBe("/ops");
+    expect(exceptions?.href).toBe("/ops?bucket=exceptions#ops-workspace");
   });
 
   it("maps waiting and on-hold chips to the waiting queue", () => {
@@ -365,8 +365,8 @@ describe("buildPriorityChips", () => {
       openInvoiceCount: 0,
       canViewBusinessPulse: false,
     });
-    expect(chips.find((c) => c.key === "waiting")?.href).toBe("/ops");
-    expect(chips.find((c) => c.key === "on_hold")?.href).toBe("/ops");
+    expect(chips.find((c) => c.key === "waiting")?.href).toBe("/ops?bucket=waiting#ops-workspace");
+    expect(chips.find((c) => c.key === "on_hold")?.href).toBe("/ops?bucket=waiting#ops-workspace");
   });
 });
 
@@ -581,8 +581,8 @@ describe("buildFollowUpGroups", () => {
     });
 
     expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops");
-    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops");
-    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops");
+    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops?bucket=waiting#ops-workspace");
+    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops?bucket=exceptions#ops-workspace");
   });
 
   it("labels service plan group as follow-up", () => {
@@ -623,8 +623,8 @@ describe("buildFollowUpGroups", () => {
     });
 
     expect(groups.find((g) => g.key === "without_tech")?.href).toBe("/ops");
-    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops");
-    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops");
+    expect(groups.find((g) => g.key === "waiting")?.href).toBe("/ops?bucket=waiting#ops-workspace");
+    expect(groups.find((g) => g.key === "exceptions")?.href).toBe("/ops?bucket=exceptions#ops-workspace");
   });
 
   it("labels service plan group as follow-up", () => {

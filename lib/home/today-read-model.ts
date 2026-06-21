@@ -415,7 +415,7 @@ export function buildTeamCoverageSnapshot(params: {
   assignmentDisplayMap: Record<string, ActiveJobAssignmentDisplay[]>;
   maxRows: number;
 }): TeamCoverage {
-  const href = "/ops/field";
+  const href = "/ops?bucket=field_work#ops-workspace";
 
   if (params.role === "tech" || params.role === "billing") {
     return {
@@ -1118,7 +1118,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
         productMode === "ecc_hers"
           ? "Compliance exceptions are blocking clean throughput."
           : "Failed or escalated jobs are blocking throughput.",
-      primaryHref: "/ops",
+      primaryHref: "/ops?bucket=exceptions#ops-workspace",
       primaryLabel: "Review Exceptions",
       focusKey: "exceptions",
     };
@@ -1140,7 +1140,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       kind: "dispatcher_schedule",
       headline: `${priorityCounts.needScheduling} job${priorityCounts.needScheduling === 1 ? "" : "s"} need scheduling`,
       detail: "Get unscheduled work onto the calendar before gaps widen.",
-      primaryHref: "/ops/call-list",
+      primaryHref: "/ops?bucket=pending#ops-workspace",
       primaryLabel: "Open Scheduling Queue",
       focusKey: "need_scheduling",
     };
@@ -1151,7 +1151,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       kind: "owner_exception",
       headline: `${priorityCounts.closeoutReady} job${priorityCounts.closeoutReady === 1 ? "" : "s"} ready for closeout`,
       detail: "Finish certs and invoicing so work can close cleanly.",
-      primaryHref: "/ops/closeout-queue",
+      primaryHref: "/ops?bucket=closeout#ops-workspace",
       primaryLabel: "Review Closeout",
       focusKey: "closeout",
     };
@@ -1162,7 +1162,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       kind: "follow_up",
       headline: `${waitingCount} waiting item${waitingCount === 1 ? "" : "s"} need follow-up`,
       detail: "Pending info and on-hold work need office attention.",
-      primaryHref: "/ops",
+      primaryHref: "/ops?bucket=waiting#ops-workspace",
       primaryLabel: "Review Waiting Work",
       focusKey: "waiting",
     };
@@ -1356,7 +1356,7 @@ export function buildFollowUpGroups(params: {
       key: "scheduling",
       label: "Needs Scheduling",
       count: schedulingCount > 0 ? schedulingCount : schedulingItems.length,
-      href: "/ops/call-list",
+      href: "/ops?bucket=pending#ops-workspace",
       preview: schedulingItems.slice(0, 3),
       summary: null,
     });
@@ -1368,7 +1368,7 @@ export function buildFollowUpGroups(params: {
       key: "closeout",
       label: "Closeout & Review",
       count: closeoutCount > 0 ? closeoutCount : closeoutItems.length,
-      href: "/ops/closeout-queue",
+      href: "/ops?bucket=closeout#ops-workspace",
       preview: closeoutItems.slice(0, 3),
       summary: closeoutItems.length === 0 ? `${closeoutCount} ${closeoutCount === 1 ? "job" : "jobs"} ready for closeout.` : null,
     });
@@ -1380,7 +1380,7 @@ export function buildFollowUpGroups(params: {
       key: "waiting",
       label: "Waiting / Pending Info",
       count: waitingCount > 0 ? waitingCount : waitingItems.length,
-      href: "/ops",
+      href: "/ops?bucket=waiting#ops-workspace",
       preview: waitingItems.slice(0, 3),
       summary: null,
     });
@@ -1392,7 +1392,7 @@ export function buildFollowUpGroups(params: {
       key: "exceptions",
       label: "Exceptions",
       count: exceptionCount > 0 ? exceptionCount : exceptionItems.length,
-      href: "/ops",
+      href: "/ops?bucket=exceptions#ops-workspace",
       preview: exceptionItems.slice(0, 3),
       summary: null,
     });
@@ -1456,7 +1456,7 @@ export function buildPriorityChips(params: {
       key: "need_scheduling",
       label: "Start Here: Scheduling",
       count: params.priorityCounts.needScheduling ?? 0,
-      href: "/ops/call-list",
+      href: "/ops?bucket=pending#ops-workspace",
       tone: "warn",
       urgent: (params.priorityCounts.needScheduling ?? 0) >= 5,
     });
@@ -1492,7 +1492,7 @@ export function buildPriorityChips(params: {
       key: "exceptions",
       label: "Needs Attention",
       count: params.priorityCounts.failed ?? 0,
-      href: "/ops",
+      href: "/ops?bucket=exceptions#ops-workspace",
       tone: "danger",
       urgent: true,
     });
@@ -1503,7 +1503,7 @@ export function buildPriorityChips(params: {
       key: "waiting",
       label: "Waiting on Info",
       count: params.priorityCounts.pendingInfo ?? 0,
-      href: "/ops",
+      href: "/ops?bucket=waiting#ops-workspace",
       tone: "neutral",
       urgent: false,
     });
@@ -1514,7 +1514,7 @@ export function buildPriorityChips(params: {
       key: "on_hold",
       label: "On Hold",
       count: params.priorityCounts.onHold ?? 0,
-      href: "/ops",
+      href: "/ops?bucket=waiting#ops-workspace",
       tone: "neutral",
       urgent: false,
     });
@@ -1525,7 +1525,7 @@ export function buildPriorityChips(params: {
       key: "closeout",
       label: "Next: Closeout",
       count: params.priorityCounts.closeoutReady ?? 0,
-      href: "/ops/closeout-queue",
+      href: "/ops?bucket=closeout#ops-workspace",
       tone: "info",
       urgent: false,
     });
@@ -1639,7 +1639,7 @@ function buildRoleAwarePulse(params: {
       label: "NEEDS SCHEDULING",
       value: params.priorityCounts.needScheduling ?? 0,
       valueDetail: null,
-      href: "/ops/call-list",
+      href: "/ops?bucket=pending#ops-workspace",
       context: "Live queue",
       tone: (params.priorityCounts.needScheduling ?? 0) > 0 ? "warn" : "neutral",
     });
@@ -1648,7 +1648,7 @@ function buildRoleAwarePulse(params: {
       label: "WAITING / PENDING",
       value: waitingCount,
       valueDetail: null,
-      href: "/ops",
+      href: "/ops?bucket=waiting#ops-workspace",
       context: "Office follow-up",
       tone: waitingCount > 0 ? "warn" : "neutral",
     });
@@ -1657,7 +1657,7 @@ function buildRoleAwarePulse(params: {
       label: "CLOSEOUT / INVOICE",
       value: params.priorityCounts.closeoutReady ?? 0,
       valueDetail: null,
-      href: "/ops/closeout-queue",
+      href: "/ops?bucket=closeout#ops-workspace",
       context: "Office follow-up",
       tone: (params.priorityCounts.closeoutReady ?? 0) > 0 ? "info" : "neutral",
     });
@@ -1678,7 +1678,7 @@ function buildRoleAwarePulse(params: {
       label: "INVOICE / CLOSEOUT",
       value: params.priorityCounts.closeoutReady ?? 0,
       valueDetail: null,
-      href: "/ops/closeout-queue",
+      href: "/ops?bucket=closeout#ops-workspace",
       context: "Billing-ready office work",
       tone: (params.priorityCounts.closeoutReady ?? 0) > 0 ? "info" : "neutral",
     });

@@ -3,6 +3,8 @@ import Link from "next/link";
 import Image from "next/image";
 import { Clock3 } from "lucide-react";
 import ContractorFilter from "./_components/ContractorFilter";
+import QueueCard from "@/components/ops/QueueCard";
+import QueueCardOpenAndAct from "@/components/ops/QueueCardOpenAndAct";
 import { redirect } from "next/navigation";
 import { updateJobScheduleFromForm } from "@/lib/actions";
 import { logCustomerContactAttemptFromForm } from "@/lib/actions/job-contact-actions";
@@ -1372,38 +1374,29 @@ function subtractBusinessDays(date: Date, days: number) {
         "w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-800 shadow-sm transition-colors focus:border-slate-500 focus:outline-none focus:ring-2 focus:ring-slate-200";
 
       return (
-        <div
+        <QueueCard
           key={jobId}
-          data-ops-workspace-card-variant="needs-scheduling-rich"
-          className="rounded-xl border border-l-4 border-slate-200 border-l-blue-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-blue-900/35 sm:px-5"
+          variant="needs-scheduling-rich"
+          href={`/jobs/${jobId}?tab=ops`}
+          title={workspaceTitle(job)}
+          subtitle={workspaceCustomerLocation(job)}
+          actionLabel="Open Job"
+          tags={[
+            {
+              label: "Status",
+              value: visibleReason.label,
+              detail: visibleReason.detail || undefined,
+            },
+            { label: "Aging", value: workspaceAgeLabel(job) },
+            { label: "Last Attempt", value: recentAttemptDisplay },
+          ]}
         >
-          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,1.05fr)_minmax(14rem,0.72fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-5">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={`/jobs/${jobId}?tab=ops`}
-                  className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                >
-                  {workspaceTitle(job)}
-                </Link>
-                <span className="inline-flex rounded-full border border-blue-200 bg-blue-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blue-700">
-                  Needs Scheduling
-                </span>
+          <QueueCardOpenAndAct>
+            <div className="space-y-3">
+              <div className="grid gap-1.5">
+                <span className={utilityLabelClass}>Contractor</span>
+                <span className="text-sm font-medium text-slate-700">{contractorName}</span>
               </div>
-              <div className="mt-2 text-sm font-semibold text-slate-800">{workspaceCustomerLocation(job)}</div>
-              <div className="mt-2 grid gap-1 text-sm leading-5 text-slate-500">
-                <div>
-                  <span className={utilityLabelClass}>Contractor</span>
-                  <div className="font-medium text-slate-700">{contractorName}</div>
-                </div>
-                <div>
-                  <span className="font-medium text-slate-500">Status/Reason:</span> {visibleReason.label}
-                  {visibleReason.detail ? <div className="text-slate-700">{visibleReason.detail}</div> : null}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
               <div className="grid gap-1.5">
                 <span className={utilityLabelClass}>Phone</span>
                 {phone ? (
@@ -1441,71 +1434,55 @@ function subtractBusinessDays(date: Date, days: number) {
                   {scheduleWindowText ? `${scheduleDateText} / ${scheduleWindowText}` : scheduleDateText}
                 </span>
               </div>
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Last attempt</span>
-                <span className="inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                  {recentAttemptDisplay}
-                </span>
-              </div>
-            </div>
 
-            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-              <span className={utilityLabelClass}>Actions</span>
+              <form action={updateJobScheduleFromForm} className="space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.35)]">
+                <input type="hidden" name="job_id" value={jobId} />
+                <input type="hidden" name="permit_number" value={String(job?.permit_number ?? "")} />
+                <input type="hidden" name="jurisdiction" value={String(job?.jurisdiction ?? "")} />
+                <input type="hidden" name="permit_date" value={String(job?.permit_date ?? "")} />
+                <input type="hidden" name="return_to" value={activeWorkspaceHref} />
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Date
+                    <input
+                      type="date"
+                      name="scheduled_date"
+                      defaultValue={String(job?.scheduled_date ?? "")}
+                      className={scheduleFieldClass}
+                    />
+                  </label>
+                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    Start
+                    <input
+                      type="time"
+                      name="window_start"
+                      defaultValue={timeToTimeInput(job?.window_start)}
+                      className={scheduleFieldClass}
+                    />
+                  </label>
+                  <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                    End
+                    <input
+                      type="time"
+                      name="window_end"
+                      defaultValue={timeToTimeInput(job?.window_end)}
+                      className={scheduleFieldClass}
+                    />
+                  </label>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <button type="submit" className={inlinePrimaryActionClass}>
+                    Save Schedule
+                  </button>
+                  <button type="submit" name="unschedule" value="1" className={inlineActionClass}>
+                    Clear
+                  </button>
+                </div>
+              </form>
+
               <div className="flex flex-wrap items-center gap-1.5">
-                <details open className="group">
-                  <summary className={`${inlineActionClass} cursor-pointer list-none gap-1.5`}>
-                    <span>Scheduler</span>
-                    <span className="text-[10px] text-slate-400 transition-transform duration-150 group-open:rotate-180" aria-hidden="true">
-                      v
-                    </span>
-                  </summary>
-                  <form action={updateJobScheduleFromForm} className="mt-2 space-y-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3 shadow-[0_12px_24px_-24px_rgba(15,23,42,0.35)]">
-                    <input type="hidden" name="job_id" value={jobId} />
-                    <input type="hidden" name="permit_number" value={String(job?.permit_number ?? "")} />
-                    <input type="hidden" name="jurisdiction" value={String(job?.jurisdiction ?? "")} />
-                    <input type="hidden" name="permit_date" value={String(job?.permit_date ?? "")} />
-                    <input type="hidden" name="return_to" value={activeWorkspaceHref} />
-
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
-                      <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                        Date
-                        <input
-                          type="date"
-                          name="scheduled_date"
-                          defaultValue={String(job?.scheduled_date ?? "")}
-                          className={scheduleFieldClass}
-                        />
-                      </label>
-                      <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                        Start
-                        <input
-                          type="time"
-                          name="window_start"
-                          defaultValue={timeToTimeInput(job?.window_start)}
-                          className={scheduleFieldClass}
-                        />
-                      </label>
-                      <label className="space-y-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
-                        End
-                        <input
-                          type="time"
-                          name="window_end"
-                          defaultValue={timeToTimeInput(job?.window_end)}
-                          className={scheduleFieldClass}
-                        />
-                      </label>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <button type="submit" className={inlinePrimaryActionClass}>
-                        Save Schedule
-                      </button>
-                      <button type="submit" name="unschedule" value="1" className={inlineActionClass}>
-                        Clear
-                      </button>
-                    </div>
-                  </form>
-                </details>
                 <form action={logCustomerContactAttemptFromForm}>
                   <input type="hidden" name="job_id" value={jobId} />
                   <input type="hidden" name="method" value="call" />
@@ -1531,8 +1508,8 @@ function subtractBusinessDays(date: Date, days: number) {
                 Logs communication attempts only; does not confirm carrier delivery.
               </p>
             </div>
-          </div>
-        </div>
+          </QueueCardOpenAndAct>
+        </QueueCard>
       );
     }
 
@@ -1591,43 +1568,39 @@ function subtractBusinessDays(date: Date, days: number) {
         "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
 
       return (
-        <div
+        <QueueCard
           key={jobId}
           id={`ops-workspace-closeout-job-${jobId}`}
-          data-ops-workspace-card-variant="closeout-rich"
-          className="rounded-xl border border-l-4 border-slate-200 border-l-violet-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-violet-900/35 sm:px-5"
+          variant="closeout-rich"
+          href={`/jobs/${jobId}?tab=ops`}
+          title={workspaceTitle(job)}
+          subtitle={workspaceCustomerLocation(job)}
+          actionLabel="Open Job"
+          tags={[
+            {
+              label: "Reason",
+              value: visibleReason.label,
+              detail: visibleReason.detail || undefined,
+            },
+            { label: "Completed", value: completedText },
+            {
+              label: "Needs",
+              value:
+                needs.needsInvoice && needs.needsCerts
+                  ? "Invoice + paperwork"
+                  : needs.needsInvoice
+                  ? "Invoice"
+                  : needs.needsCerts
+                  ? "Paperwork"
+                  : "Review",
+            },
+          ]}
         >
-          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,1.05fr)_minmax(14rem,0.72fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-5">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={`/jobs/${jobId}?tab=ops`}
-                  className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                >
-                  {workspaceTitle(job)}
-                </Link>
-                <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-violet-700">
-                  Closeout
-                </span>
-              </div>
-              <div className="mt-2 text-sm font-semibold text-slate-800">{workspaceCustomerLocation(job)}</div>
-              <div className="mt-2 grid gap-1 text-sm leading-5 text-slate-500">
-                <div>
-                  <span className={utilityLabelClass}>Reason</span>
-                  <div className="font-medium text-slate-700">{visibleReason.label}</div>
-                  {visibleReason.detail ? <div className="text-slate-700">{visibleReason.detail}</div> : null}
-                </div>
-                <div>
-                  <span className={utilityLabelClass}>Contractor</span>
-                  <div className="font-medium text-slate-700">{contractorName}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+          <QueueCardOpenAndAct>
+            <div className="space-y-3">
               <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Completed</span>
-                <span className={chipClass}>{completedText}</span>
+                <span className={utilityLabelClass}>Contractor</span>
+                <span className="text-sm font-medium text-slate-700">{contractorName}</span>
               </div>
               {scheduledText ? (
                 <div className="grid gap-1.5">
@@ -1640,23 +1613,10 @@ function subtractBusinessDays(date: Date, days: number) {
                 <span className={chipClass}>{assignmentSummary}</span>
               </div>
               <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Needs</span>
-                <span className={chipClass}>
-                  {needs.needsInvoice && needs.needsCerts
-                    ? "Invoice + paperwork"
-                    : needs.needsInvoice
-                    ? "Invoice"
-                    : needs.needsCerts
-                    ? "Paperwork"
-                    : "Review"}
-                </span>
+                <span className={utilityLabelClass}>Next Step</span>
+                <p className="text-sm leading-5 text-slate-700">{getCloseoutQueueNextStepLabel(projection)}</p>
               </div>
-            </div>
-
-            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-              <span className={utilityLabelClass}>Next Step</span>
-              <p className="text-sm leading-5 text-slate-700">{getCloseoutQueueNextStepLabel(projection)}</p>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Link href={`/jobs/${jobId}?tab=ops`} className={primaryActionClass}>
                   View Job
                 </Link>
@@ -1682,8 +1642,8 @@ function subtractBusinessDays(date: Date, days: number) {
                 ) : null}
               </div>
             </div>
-          </div>
-        </div>
+          </QueueCardOpenAndAct>
+        </QueueCard>
       );
     }
 
@@ -1701,61 +1661,35 @@ function subtractBusinessDays(date: Date, days: number) {
         "inline-flex w-fit items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-600";
 
       return (
-        <div
+        <QueueCard
           key={`field-payment-${item.reportId}`}
           id={`ops-workspace-field-payment-${item.reportId}`}
-          data-ops-workspace-card-variant="closeout-payment-review"
-          className="rounded-xl border border-l-4 border-slate-200 border-l-violet-900/25 bg-white px-4 py-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.45)] transition-colors hover:border-slate-300 hover:border-l-violet-900/35 sm:px-5"
+          variant="closeout-payment-review"
+          href={item.links.jobHref}
+          title={item.jobTitle || item.jobReference}
+          subtitle={item.customerDisplayName || "Customer"}
+          actionLabel="Open Job"
+          tags={[
+            { label: "Amount", value: formatWorkspaceUsdFromCents(item.amountCents) },
+            { label: "Method", value: formatWorkspaceFieldPaymentMethod(item.paymentMethod) },
+            {
+              label: "Reported",
+              value: formatWorkspaceTimestamp(item.reportedAt),
+              detail: `by ${item.reportedByDisplayName}`,
+            },
+          ]}
         >
-          <div className="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(16rem,1.05fr)_minmax(14rem,0.72fr)_minmax(18rem,0.9fr)] lg:items-start lg:gap-5">
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link
-                  href={item.links.jobHref}
-                  className="text-[15px] font-semibold leading-5 text-slate-950 underline-offset-4 hover:text-slate-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
-                >
-                  {item.jobTitle || item.jobReference}
-                </Link>
-                <span className="inline-flex rounded-full border border-violet-200 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-violet-700">
-                  Confirm Payment
-                </span>
-              </div>
-              <div className="mt-2 text-sm font-semibold text-slate-800">{item.customerDisplayName || "Customer"}</div>
-              <div className="mt-2 grid gap-1 text-sm leading-5 text-slate-500">
-                <div>
-                  <span className={utilityLabelClass}>Reason</span>
-                  <div className="font-medium text-slate-700">Field-reported payment needs confirmation.</div>
-                </div>
-                <div>
-                  <span className={utilityLabelClass}>Invoice</span>
-                  <div className="font-medium text-slate-700">{item.invoiceReference}</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
+          <QueueCardOpenAndAct>
+            <div className="space-y-3">
               <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Method</span>
-                <span className={chipClass}>{formatWorkspaceFieldPaymentMethod(item.paymentMethod)}</span>
+                <span className={utilityLabelClass}>Invoice</span>
+                <span className="text-sm font-medium text-slate-700">{item.invoiceReference}</span>
               </div>
               <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Amount</span>
-                <span className={chipClass}>{formatWorkspaceUsdFromCents(item.amountCents)}</span>
+                <span className={utilityLabelClass}>Next Step</span>
+                <p className="text-sm leading-5 text-slate-700">Confirm only after verifying the money was received.</p>
               </div>
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Reported By</span>
-                <span className={chipClass}>{item.reportedByDisplayName}</span>
-              </div>
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Reported</span>
-                <span className={chipClass}>{formatWorkspaceTimestamp(item.reportedAt)}</span>
-              </div>
-            </div>
-
-            <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
-              <span className={utilityLabelClass}>Next Step</span>
-              <p className="text-sm leading-5 text-slate-700">Confirm only after verifying the money was received.</p>
-              <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <Link href={item.links.jobHref} className={primaryActionClass}>
                   View Job
                 </Link>
@@ -1764,11 +1698,11 @@ function subtractBusinessDays(date: Date, days: number) {
                 </Link>
               </div>
               {isSelfReported ? (
-                <div className="mt-1 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[11px] font-semibold text-amber-800">
                   Reporter cannot verify their own report.
                 </div>
               ) : (
-                <div className="mt-1 space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-[11px]">
+                <div className="space-y-2 rounded-lg border border-slate-200 bg-slate-50 p-2 text-[11px]">
                   <form action={verifyFieldPaymentCollectionReportFromForm} className="space-y-2">
                     <input type="hidden" name="field_payment_report_id" value={item.reportId} />
                     <input type="hidden" name="report_id" value={item.reportId} />
@@ -1813,8 +1747,8 @@ function subtractBusinessDays(date: Date, days: number) {
                 </div>
               )}
             </div>
-          </div>
-        </div>
+          </QueueCardOpenAndAct>
+        </QueueCard>
       );
     }
 
@@ -2201,66 +2135,42 @@ function subtractBusinessDays(date: Date, days: number) {
                     const permitAttachments = permitAttachmentsByRequestId[permitRequest.id] ?? [];
 
                     return (
-                    <div
+                    <QueueCard
                       key={permitRequest.id}
-                      className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2"
+                      title={permitRequest.requestLabel || "Permit Request"}
+                      subtitle={permitQueueContext(permitRequest)}
+                      tagsColumns={2}
+                      tags={[
+                        { label: "Status", value: permitRequest.internalStatusLabel },
+                        { label: "Contractor", value: permitRequest.contractorName || permitRequest.contractorId },
+                        {
+                          label: "Submitted",
+                          value: `${permitRequest.submittedAgeDays} days ago · ${formatPermitQueueTimestamp(permitRequest.createdAt)}`,
+                        },
+                        ...(permitRequest.customerFirstNameSnapshot || permitRequest.customerLastNameSnapshot
+                          ? [
+                              {
+                                label: "Customer",
+                                value: [permitRequest.customerFirstNameSnapshot, permitRequest.customerLastNameSnapshot]
+                                  .filter(Boolean)
+                                  .join(" "),
+                              },
+                            ]
+                          : []),
+                        ...(permitRequest.serviceAddressTextSnapshot
+                          ? [{ label: "Address", value: permitRequest.serviceAddressTextSnapshot }]
+                          : []),
+                        ...(permitRequest.jurisdiction
+                          ? [{ label: "Jurisdiction", value: permitRequest.jurisdiction }]
+                          : []),
+                        ...(permitRequest.contractorNote
+                          ? [{ label: "Note", value: permitRequest.contractorNote, fullWidth: true }]
+                          : permitRequest.internalIntakeNote
+                          ? [{ label: "Note", value: permitRequest.internalIntakeNote, fullWidth: true }]
+                          : []),
+                      ]}
                     >
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex min-h-6 items-center rounded-full border border-slate-300 bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-600">
-                              {permitRequest.internalStatusLabel}
-                            </span>
-                            {permitRequest.requestLabel ? (
-                              <span className="text-[14px] font-semibold leading-5 text-slate-950">
-                                {permitRequest.requestLabel}
-                              </span>
-                            ) : null}
-                          </div>
-                          <div className="mt-1 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-2">
-                            <div>
-                              <span className="font-medium text-slate-500">Contractor:</span>{" "}
-                              {permitRequest.contractorName || permitRequest.contractorId}
-                            </div>
-                            <div>
-                              <span className="font-medium text-slate-500">Submitted:</span>{" "}
-                              {permitRequest.submittedAgeDays} days ago · {formatPermitQueueTimestamp(permitRequest.createdAt)}
-                            </div>
-                            {permitRequest.customerFirstNameSnapshot || permitRequest.customerLastNameSnapshot ? (
-                              <div>
-                                <span className="font-medium text-slate-500">Customer:</span>{" "}
-                                {[permitRequest.customerFirstNameSnapshot, permitRequest.customerLastNameSnapshot].filter(Boolean).join(" ")}
-                              </div>
-                            ) : null}
-                            {permitRequest.serviceAddressTextSnapshot ? (
-                              <div>
-                                <span className="font-medium text-slate-500">Address:</span>{" "}
-                                {permitRequest.serviceAddressTextSnapshot}
-                              </div>
-                            ) : null}
-                            {permitRequest.jurisdiction ? (
-                              <div>
-                                <span className="font-medium text-slate-500">Jurisdiction:</span>{" "}
-                                {permitRequest.jurisdiction}
-                              </div>
-                            ) : null}
-                            {permitRequest.contractorNote ? (
-                              <div className="sm:col-span-2">
-                                <span className="font-medium text-slate-500">Note:</span>{" "}
-                                {permitRequest.contractorNote}
-                              </div>
-                            ) : permitRequest.internalIntakeNote ? (
-                              <div className="sm:col-span-2">
-                                <span className="font-medium text-slate-500">Note:</span>{" "}
-                                {permitRequest.internalIntakeNote}
-                              </div>
-                            ) : null}
-                          </div>
-                          <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700">
-                            {permitQueueContext(permitRequest)}
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap justify-end gap-1.5">
+                      <div className="mt-2 flex flex-wrap justify-end gap-1.5">
                           {permitRequest.status === "permit_request" ? (
                             <form action={acceptPermitRequestFromOps}>
                               <input type="hidden" name="permit_request_id" value={permitRequest.id} />
@@ -2294,7 +2204,6 @@ function subtractBusinessDays(date: Date, days: number) {
                               </button>
                             </form>
                           ) : null}
-                        </div>
                       </div>
 
                       <details className="mt-2 rounded-xl border border-slate-200 bg-white/80 px-3 py-2">
@@ -2720,38 +2629,6 @@ function subtractBusinessDays(date: Date, days: number) {
                       </details>
 
                       <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-2">
-                        {permitRequest.requestLabel ? (
-                          <div className="sm:col-span-2">
-                            <span className="font-medium text-slate-500">Request:</span>{" "}
-                            {permitRequest.requestLabel}
-                          </div>
-                        ) : null}
-                        {permitRequest.customerFirstNameSnapshot || permitRequest.customerLastNameSnapshot ? (
-                          <div>
-                            <span className="font-medium text-slate-500">Customer:</span>{" "}
-                            {[permitRequest.customerFirstNameSnapshot, permitRequest.customerLastNameSnapshot].filter(Boolean).join(" ")}
-                          </div>
-                        ) : null}
-                        {permitRequest.serviceAddressTextSnapshot ? (
-                          <div>
-                            <span className="font-medium text-slate-500">Address:</span>{" "}
-                            {permitRequest.serviceAddressTextSnapshot}
-                          </div>
-                        ) : null}
-                        <div>
-                          <span className="font-medium text-slate-500">Contractor:</span>{" "}
-                          {permitRequest.contractorName || permitRequest.contractorId}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-500">Submitted:</span>{" "}
-                          {permitRequest.submittedAgeDays} days ago · {formatPermitQueueTimestamp(permitRequest.createdAt)}
-                        </div>
-                        {permitRequest.jurisdiction ? (
-                          <div>
-                            <span className="font-medium text-slate-500">Jurisdiction:</span>{" "}
-                            {permitRequest.jurisdiction}
-                          </div>
-                        ) : null}
                         {permitRequest.permitNumber ? (
                           <div>
                             <span className="font-medium text-slate-500">Permit #:</span>{" "}
@@ -2775,7 +2652,7 @@ function subtractBusinessDays(date: Date, days: number) {
                           </div>
                         ) : null}
                       </div>
-                    </div>
+                    </QueueCard>
                     );
                   })}
                 </div>
@@ -2788,53 +2665,31 @@ function subtractBusinessDays(date: Date, days: number) {
               ) : (
                 <div className="space-y-2">
                   {selectedContractorIntakeRows.map((submission) => (
-                    <div key={submission.id} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <Link href={submission.detailHref} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
-                            {submission.proposedTitle}
-                          </Link>
-                          <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700">
-                            {submission.customerDisplay} - {submission.addressDisplay}
-                          </div>
-                        </div>
-                        <Link href={submission.detailHref} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]">
-                          Review Intake
-                        </Link>
-                      </div>
-                      <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600 sm:grid-cols-2">
-                        <div>
-                          <span className="font-medium text-slate-500">Contractor:</span>{" "}
-                          {submission.contractorName}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-500">Submitted:</span>{" "}
-                          {submission.submittedAgeDays} days ago - {submission.submittedAtDisplay}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-500">Proposed customer:</span>{" "}
-                          {submission.customerDisplay}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-500">Address:</span>{" "}
-                          {submission.addressDisplay}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-500">Job/project:</span>{" "}
-                          {submission.jobTypeLabel} / {submission.projectTypeLabel}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-500">Review status:</span>{" "}
-                          {submission.reviewStatus}
-                        </div>
-                        {submission.notesPreview ? (
-                          <div className="sm:col-span-2">
-                            <span className="font-medium text-slate-500">Notes:</span>{" "}
-                            {submission.notesPreview}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
+                    <QueueCard
+                      key={submission.id}
+                      href={submission.detailHref}
+                      title={submission.proposedTitle}
+                      subtitle={`${submission.customerDisplay} - ${submission.addressDisplay}`}
+                      actionLabel="Review Intake"
+                      tagsColumns={2}
+                      tags={[
+                        { label: "Contractor", value: submission.contractorName },
+                        {
+                          label: "Submitted",
+                          value: `${submission.submittedAgeDays} days ago - ${submission.submittedAtDisplay}`,
+                        },
+                        { label: "Proposed customer", value: submission.customerDisplay },
+                        { label: "Address", value: submission.addressDisplay },
+                        {
+                          label: "Job/project",
+                          value: `${submission.jobTypeLabel} / ${submission.projectTypeLabel}`,
+                        },
+                        { label: "Review status", value: submission.reviewStatus },
+                        ...(submission.notesPreview
+                          ? [{ label: "Notes", value: submission.notesPreview, fullWidth: true }]
+                          : []),
+                      ]}
+                    />
                   ))}
                 </div>
               )
@@ -2862,42 +2717,31 @@ function subtractBusinessDays(date: Date, days: number) {
                   }
 
                   return (
-                    <div key={String(job?.id ?? "")} className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2">
-                      <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <Link href={`/jobs/${job.id}?tab=ops`} className="text-[14px] font-semibold leading-5 text-blue-700 hover:text-blue-800 hover:underline">
-                            {workspaceTitle(job)}
-                          </Link>
-                          <div className="mt-0.5 text-[12.5px] leading-5 text-slate-700">{workspaceCustomerLocation(job)}</div>
-                        </div>
-                        <Link href={`/jobs/${job.id}?tab=ops`} className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]">
-                          Open Job
-                        </Link>
-                      </div>
-
-                      <div className="mt-1.5 grid gap-1 text-[12px] leading-5 text-slate-600">
-                        <div>
-                          <span className="font-medium text-slate-500">Status/Reason:</span> {visibleReason.label}
-                          {visibleReason.detail ? (
-                            <div className="pl-[84px] text-slate-700">{visibleReason.detail}</div>
-                          ) : null}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-500">Days Aging:</span>{" "}
-                          {workspaceAgeLabel(job)}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-500">Assignment:</span>{" "}
-                          {formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap)}
-                        </div>
-                        {workspaceContractorName(job) ? (
-                          <div>
-                            <span className="font-medium text-slate-500">Contractor:</span>{" "}
-                            {workspaceContractorName(job)}
-                          </div>
-                        ) : null}
-                      </div>
-                    </div>
+                    <QueueCard
+                      key={String(job?.id ?? "")}
+                      href={`/jobs/${job.id}?tab=ops`}
+                      title={workspaceTitle(job)}
+                      subtitle={workspaceCustomerLocation(job)}
+                      actionLabel="Open Job"
+                      tags={[
+                        {
+                          label: "Status/Reason",
+                          value: visibleReason.label,
+                          detail: visibleReason.detail || undefined,
+                        },
+                        {
+                          label: "Days Aging",
+                          value: workspaceAgeLabel(job),
+                        },
+                        {
+                          label: "Assignment",
+                          value: formatAssignmentSummaryForJob(String(job?.id ?? ""), selectedPreviewAssignmentDisplayMap),
+                        },
+                        ...(workspaceContractorName(job)
+                          ? [{ label: "Contractor", value: workspaceContractorName(job) }]
+                          : []),
+                      ]}
+                    />
                   );
                 })}
               </div>

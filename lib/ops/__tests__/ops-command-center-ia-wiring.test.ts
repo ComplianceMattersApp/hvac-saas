@@ -194,8 +194,8 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey)");
     expect(opsPageSource).toContain("const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);");
     expect(opsPageSource).toContain("const visibleReason = getOpsBoardVisibleReason(");
-    expect(opsPageSource).toContain("{visibleReason.label}");
-    expect(opsPageSource).toContain("{visibleReason.detail}");
+    expect(opsPageSource).toContain("value: visibleReason.label");
+    expect(opsPageSource).toContain("detail: visibleReason.detail");
   });
 
   it("guards Ops card reason rendering from bypassing the structured visible reason helper", () => {
@@ -214,8 +214,8 @@ describe("/ops Full Ops command center IA wiring", () => {
         : "";
 
     expect(fullCardRenderSource).toContain("workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key)");
-    expect(fullCardRenderSource).toContain("{visibleReason.label}");
-    expect(fullCardRenderSource).toContain("{visibleReason.detail}");
+    expect(fullCardRenderSource).toContain("value: visibleReason.label");
+    expect(fullCardRenderSource).toContain("detail: visibleReason.detail || undefined");
     expect(fullCardRenderSource).not.toContain("wsStatusReason(job");
     expect(fullCardRenderSource).not.toContain("workspaceStatusReason(job");
 

@@ -55,7 +55,7 @@ describe("/ops Needs Scheduling rich cards", () => {
   it("renders rich action cards in the actual visible workspace Needs Scheduling queue", () => {
     expect(opsPageSource).toContain('pending: "need_to_schedule"');
     expect(opsPageSource).toContain('label: "Needs Scheduling"');
-    expect(workspaceRichCardSource).toContain('data-ops-workspace-card-variant="needs-scheduling-rich"');
+    expect(workspaceRichCardSource).toContain('variant="needs-scheduling-rich"');
     expect(workspaceListSource).toContain('if (selectedWorkspaceSection.key === "need_to_schedule")');
     expect(workspaceListSource).toContain("return workspaceNeedsSchedulingRichCard(job, visibleReason);");
   });
@@ -73,13 +73,13 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(workspaceRichCardSource).toContain(
       "resolveRecentAttemptDisplay(selectedPreviewLatestCustomerAttemptByJob.get(jobId) ?? null)",
     );
-    expect(workspaceRichCardSource).toContain("Last attempt");
+    expect(workspaceRichCardSource).toContain("Last Attempt");
   });
 
   it("wires the workspace scheduler to the existing schedule action with current /ops filters preserved", () => {
     expect(opsPageSource).toContain('import { updateJobScheduleFromForm } from "@/lib/actions";');
     expect(workspaceRichCardSource).toContain("form action={updateJobScheduleFromForm}");
-    expect(workspaceRichCardSource).toContain('<details open className="group">');
+    expect(workspaceRichCardSource).toContain("<QueueCardOpenAndAct>");
     expect(workspaceRichCardSource).toContain('name="scheduled_date"');
     expect(workspaceRichCardSource).toContain('name="window_start"');
     expect(workspaceRichCardSource).toContain('name="window_end"');
@@ -104,7 +104,7 @@ describe("/ops Needs Scheduling rich cards", () => {
 
   it("preserves compact workspace card rendering for queues that have not been promoted", () => {
     expect(workspaceListSource).toMatch(
-      /if \(selectedWorkspaceSection\.key === "need_to_schedule"\)[\s\S]+return workspaceNeedsSchedulingRichCard\(job, visibleReason\);[\s\S]+<Link href=\{`\/jobs\/\$\{job\.id\}\?tab=ops`\}[\s\S]+Open Job/,
+      /if \(selectedWorkspaceSection\.key === "need_to_schedule"\)[\s\S]+return workspaceNeedsSchedulingRichCard\(job, visibleReason\);[\s\S]+<QueueCard[\s\S]+href=\{`\/jobs\/\$\{job\.id\}\?tab=ops`\}[\s\S]+actionLabel="Open Job"/,
     );
     expect(workspaceListSource).not.toContain('selectedWorkspaceSection.key === "field_work"');
     expect(workspaceListSource).not.toContain('selectedWorkspaceSection.key === "waiting"');
@@ -115,7 +115,7 @@ describe("/ops Closeout rich cards", () => {
   it("renders rich closeout cards only from the actual visible closeout workspace key", () => {
     expect(opsPageSource).toContain('closeout: "closeout"');
     expect(opsPageSource).toContain('label: "Closeout & Review"');
-    expect(workspaceCloseoutCardSource).toContain('data-ops-workspace-card-variant="closeout-rich"');
+    expect(workspaceCloseoutCardSource).toContain('variant="closeout-rich"');
     expect(workspaceListSource).toContain('if (selectedWorkspaceSection.key === "closeout")');
     expect(workspaceListSource).toContain("return workspaceCloseoutRichCard(job, visibleReason);");
   });

@@ -57,7 +57,7 @@ describe("lifecycle aging slice 1 wiring", () => {
     expect(opsPageSource).toContain("resolveLifecycleDaysAgingLabel");
     expect(opsPageSource).toContain("workspaceAgeTime");
     expect(opsPageSource).toContain("workspaceAgeLabel");
-    expect(opsPageSource).toContain("Days Aging:");
+    expect(opsPageSource).toContain("Days Aging");
     expect(opsPageSource).not.toContain("Age/Time:");
     expect(opsPageSource).not.toContain('?? "-"');
   });

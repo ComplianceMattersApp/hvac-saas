@@ -443,7 +443,7 @@ describe("focused queue display labels", () => {
 
   it("Operations Workspace cards use formatted status/reason copy instead of raw Ops Status", () => {
     expect(opsPageSource).toContain("getOpsQueueCardStatusReason");
-    expect(opsPageSource).toContain("Status/Reason:");
+    expect(opsPageSource).toContain("Status/Reason");
     expect(opsPageSource).not.toContain("Ops Status:");
   });
 
@@ -495,7 +495,7 @@ describe("focused queue display labels", () => {
   it("Operations Workspace rows include contractor context only when a job contractor exists", () => {
     expect(opsPageSource).toContain("contractors(name)");
     expect(opsPageSource).toContain("workspaceContractorName(job)");
-    expect(opsPageSource).toContain("Contractor:");
+    expect(opsPageSource).toContain("Contractor");
     expect(opsPageSource).not.toContain("Contractor:</span> -");
     expect(opsPageSource).not.toContain("formatCityNamePart(workspaceContractorName");
     expect(opsPageSource).not.toContain("formatPersonNamePart(workspaceContractorName");
@@ -513,11 +513,11 @@ describe("focused queue display labels", () => {
     expect(opsPageSource).toContain("formatPersonNamePart(job?.customer_first_name)");
     expect(opsPageSource).toContain("formatCityNamePart(job?.city)");
     expect(opsPageSource).toContain("formatCityNamePart(parts.city)");
-    expect(opsPageSource).toContain("{workspaceContractorName(job)}");
+    expect(opsPageSource).toContain("value: workspaceContractorName(job)");
   });
 
   it("Operations Workspace rows keep Days Aging and avoid dash-only metadata fallbacks", () => {
-    expect(opsPageSource).toContain("Days Aging:");
+    expect(opsPageSource).toContain("Days Aging");
     expect(opsPageSource).toContain("resolveLifecycleDaysAgingLabel");
     expect(opsPageSource).toContain("Not available");
     expect(opsPageSource).not.toContain("Age/Time:");
