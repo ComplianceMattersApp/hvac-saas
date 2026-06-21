@@ -1,8 +1,8 @@
 # Help Gap Logging Durable Model Spec
 
-Status: ACTIVE MODEL LOCK / G2 DORMANT SCHEMA FOUNDATION ADDED
+Status: ACTIVE MODEL LOCK / G5 REVIEW QUEUE MATURITY MILESTONE CLOSED
 
-Mode: Documentation/model/audit plus G2 schema-foundation closeout notes. This document authorizes no runtime behavior, Supabase write path, provider call, support case creation, Support Console enablement, impersonation, permission change, or user-facing product change by itself.
+Mode: Documentation/model/audit plus implementation closeout notes through G5-F. This document authorizes no new runtime behavior, Supabase write path, provider call, support case creation, Support Console enablement, impersonation, permission change, or user-facing product change by itself.
 
 Authority: Subordinate to:
 - `docs/ACTIVE/Active Spine V4.0 Current.md`
@@ -37,21 +37,28 @@ This spec prefers `assistant_help_gap_events` because it makes the source and sc
 
 ## 2. Current Baseline
 
-Ask Compliance Matters currently has:
+Ask Compliance Matters and Help Gap Logging currently have:
 
 - local/mock help and setup coach shell
 - feature flag: `ENABLE_ASK_COMPLIANCE_MATTERS`
-- mounted only on `/ops/admin` and `/training`
+- mounted only on approved surfaces:
+  - `/ops/admin`
+  - `/training`
+- Admin Center Launch Room and `/training` Training Room content as the approved contextual sources
 - expanded curated local knowledge coverage
 - polished assistant panel
-- pure non-durable Help Gap event contract
-- local-only event creation for:
+- durable Help Gap event contract behind `ENABLE_HELP_GAP_LOGGING`
+- durable event creation for:
   - `unknown_answer`
   - `not_helpful`
   - `still_need_help`
-- no database persistence
-- no Supabase writes
+- writes only to `assistant_help_gap_events`
+- owner/admin Help Gap Review queue at `/ops/admin/help-gaps` behind `ENABLE_HELP_GAP_REVIEW_QUEUE`
+- Admin Center link appears only when `ENABLE_HELP_GAP_REVIEW_QUEUE` is enabled
+- row-level review status update controls for owner/admin reviewers
+- reporting/pattern summaries for sanitized help-gap rows
 - no support case creation
+- no support case linking
 - no Support Console dependency
 - no provider/LLM/OpenAI calls
 - safe context only:
@@ -62,13 +69,19 @@ Ask Compliance Matters currently has:
   - product mode
   - coarse capability booleans
 
-Current pure code reference:
+Current code references:
 
 - `lib/help-assistant/help-gap-events.ts`
 - `lib/help-assistant/help-gap-classification.ts`
 - `lib/help-assistant/help-assistant-context.ts`
+- `lib/help-assistant/help-gap-persistence.ts`
+- `lib/actions/help-gap-actions.ts`
+- `lib/help-assistant/help-gap-review-read-model.ts`
+- `lib/help-assistant/help-gap-review-status.ts`
+- `lib/actions/help-gap-review-actions.ts`
+- `app/ops/admin/help-gaps/page.tsx`
 
-The current local event shape is a contract prototype only. It is not durable truth.
+The durable table is the review queue source of truth for captured help gaps. Assistant knowledge remains curated/local and does not use provider-generated answers in this lane.
 
 ## 3. Recommended Storage Model
 
@@ -242,19 +255,21 @@ Required trust rules:
 
 ## 7. Access and Review Model
 
-Recommended V1 review access:
+Implemented V1 review access:
 
-- Platform owner/support-internal review first.
-- Tenant owner/admin review should be deferred until a separate privacy and trust review decides whether customers should see their own help-gap events.
+- Tenant structural owner and tenant admin may review account-scoped help-gap rows through `/ops/admin/help-gaps`.
+- Review queue exposure is controlled by `ENABLE_HELP_GAP_REVIEW_QUEUE`.
+- Review status updates are owner/admin only and same-account scoped.
 - Billing/AR should not have review access in V1.
 - Technicians and field users should not have review access in V1.
 - Contractor/portal users should not have review access in V1.
+- Portal, contractor, customer-facing, unauthenticated, and non-internal users are blocked.
 
 Rationale:
 
 - Help gaps can contain user confusion, support-sensitive context, and product-quality signals.
-- Tenant-visible review could chill user feedback or expose worker uncertainty.
-- Platform owner/support-internal review fits current Support V0 and owner-led rollout posture.
+- Owner/admin account-scoped review fits the Launch Room/Training Room maturity lane and keeps the queue out of Support Console.
+- Platform-wide or support-side review remains deferred to a separately approved owner-support route or reporting model.
 
 Access boundaries:
 
@@ -265,12 +280,7 @@ Access boundaries:
 - No tenant operational record edits.
 - No payment, invoice, customer, job, team, or company-profile mutation.
 
-Future tenant owner/admin review may be considered only after:
-
-- copy/trust policy is approved,
-- sensitive text handling is proven,
-- role visibility is reviewed,
-- and review actions are limited to product-feedback visibility, not support mutation.
+Future platform/support review may be considered only after a separate access model and copy/trust review.
 
 ## 8. Review Workflow
 
@@ -284,30 +294,33 @@ Recommended review statuses:
 - `product_backlog`
 - `bug_candidate`
 
-Recommended V1 allowed actions:
+Implemented V1 allowed review actions:
 
-- View sanitized item.
+- View sanitized rows.
+- Filter by safe review dimensions.
 - Mark reviewed.
-- Dismiss.
 - Mark product backlog candidate.
 - Mark bug candidate.
-- Copy sanitized summary manually.
+- Mark converted to help article.
+- Dismiss.
 
 Deferred actions:
 
 - Create support case from item.
 - Link to existing support case.
-- Create help article.
+- Create help article automatically.
 - Create product backlog item.
 - Create bug ticket.
 - Add internal support note.
 - Notify user.
 
-V1 safest review surface:
+Implemented write action mutates only:
 
-- Read-only list/detail plus `mark reviewed` and `dismiss`.
+- `review_status`
+- `reviewed_at`
+- `reviewed_by_user_id`
 
-If write actions are added, they must mutate only the help-gap table and must not touch tenant operational records or support-case tables unless separately approved.
+The table trigger may update `updated_at`. No other help-gap payload fields, tenant operational records, or support-case tables are mutated.
 
 ## 9. Retention Recommendation
 
@@ -333,20 +346,30 @@ Required future implementation detail:
 
 ## 10. Reporting Model
 
-First useful summaries:
+Implemented review queue summaries:
 
-- Top unknown questions.
-- Top not-helpful answer keys.
-- Top `still_need_help` routes.
-- Most confusing routes.
-- Most confusing training missions.
-- Most confusing setup steps.
-- Category counts over time.
-- Role-based confusion patterns.
-- Repeated payment/setup questions.
-- Repeated bug-like questions.
-- Fallback rate by page family.
-- Feedback rate by answer key.
+- Top cards:
+  - New
+  - Unknown answers
+  - Not helpful
+  - Still need help
+- Patterns section:
+  - top categories
+  - top places users got stuck / page families
+  - roles asking for help
+  - training signals
+  - setup signals
+  - event type mix
+  - review status mix
+- Filters:
+  - review status
+  - help-gap category
+  - event type
+  - page family
+  - role category
+  - product mode
+  - recent days
+  - limit
 
 Reporting should use aggregated, sanitized data only.
 
@@ -394,12 +417,10 @@ Support Console:
 
 ## 12. Feature Flag Model
 
-Existing flag:
+Implemented flags:
 
 - `ENABLE_ASK_COMPLIANCE_MATTERS`
   - Controls assistant visibility/runtime shell.
-
-Recommended future flags:
 
 - `ENABLE_HELP_GAP_LOGGING`
   - Controls persistence of sanitized help-gap events.
@@ -957,52 +978,51 @@ Known caution from G4-Fix-C:
 - production ref to avoid unless explicitly approved: `ornrnvxtwwtulohqwxop`
 - unrelated pending CMTest migrations remained pending after targeted Help Gap apply
 
-### 18.14 Recommended Implementation Sequence
+### 18.14 G5 Implementation Sequence and Closeout Status
 
-G5-A: docs/model only
+G5-A: docs/model only - complete
 
 - This section.
 - No runtime behavior.
 - No schema.
 - No Supabase commands.
 
-G5-B: read model for help gaps
+G5-B: read model for help gaps - complete
 
 - Add a server-only read helper for `assistant_help_gap_events`.
 - Enforce account scope and owner/admin access.
 - Support filters and summary counts.
 - Read only.
-- No UI yet if separate review is preferred.
+- Implemented in `lib/help-assistant/help-gap-review-read-model.ts`.
 
-G5-C: review route UI read-only
+G5-C: review route UI read-only - complete
 
 - Add `/ops/admin/help-gaps` behind `ENABLE_HELP_GAP_REVIEW_QUEUE`.
 - Render summary cards, filters, and sanitized list/detail.
-- No status mutation yet.
 - No support-case actions.
+- Admin Center link is flag-gated.
 
-G5-D: review status update action
+G5-D: review status update action - complete
 
 - Add narrow server action for approved status transitions.
 - Mutate only the help-gap row's review fields.
 - Preserve RLS and owner/admin scope.
 - No service-role runtime path.
+- Passed CMTest owner/admin smoke for `reviewed`, `bug_candidate`, and `dismissed`.
 
-G5-E: smoke with seeded/sandbox help-gap rows
+G5-E: reporting and summary polish - complete
 
-- Verify route hidden when flag off.
-- Verify owner/admin access.
-- Verify non-admin denied.
-- Verify filters/summaries.
-- Verify optional status action if included.
-- Verify no support-case rows or notes are created.
+- Added patterns and review summary polish.
+- Verified filters, summaries, desktop/mobile layout, and support-case boundary.
 
-G5-F: optional support-case link/create planning later
+G5-F: docs closeout and maturity lane lock - complete
 
-- Separate model lock only.
-- Separate flag.
-- Explicit user/support/admin intent.
-- Preserve Support Case V1 and Support Console boundaries.
+- This closeout section.
+- No runtime behavior.
+- No schema.
+- No Supabase commands.
+
+Future optional support-case link/create planning is not part of G5 and requires a separate model lock, separate flag, explicit user/support/admin intent, and preservation of Support Case V1 and Support Console boundaries.
 
 ### 18.15 Explicit Non-Actions
 
@@ -1028,3 +1048,177 @@ G5 planning does not perform or authorize:
 - customer/job/invoice/payment operational mutation
 - customer-facing visibility
 - contractor/portal visibility
+
+## 19. G5-F Closeout / Stable Maturity Milestone
+
+Status: G5 HELP GAP REVIEW QUEUE CLOSED AS STABLE MATURITY MILESTONE
+
+This closeout records the implemented Help Gap Logging and Help Gap Review Queue lane after G5-D CMTest smoke and G5-E reporting polish.
+
+### 19.1 Completed Runtime Surfaces
+
+Completed startup maturity surfaces:
+
+- Launch Room exists in Admin Center at `/ops/admin`.
+- Training Room exists at `/training`.
+- Ask Compliance Matters exists as a local/mock assistant on approved surfaces.
+- Durable Help Gap Logging exists behind flags.
+- Help Gap Review exists at `/ops/admin/help-gaps`.
+- Admin Center links to Help Gap Review only when `ENABLE_HELP_GAP_REVIEW_QUEUE` is enabled.
+
+Assistant launcher surfaces:
+
+- `/ops/admin`
+- `/training`
+
+No customer portal, contractor portal, Support Console, payment, billing, job, invoice, or customer route is added to the assistant or review queue by this lane.
+
+### 19.2 Feature Flags
+
+Implemented flags:
+
+- `ENABLE_ASK_COMPLIANCE_MATTERS`
+  - Controls Ask Compliance Matters launcher visibility and local assistant runtime shell.
+- `ENABLE_HELP_GAP_LOGGING`
+  - Controls durable persistence of sanitized assistant help-gap events.
+  - Durable persistence requires Ask Compliance Matters to be enabled.
+- `ENABLE_HELP_GAP_REVIEW_QUEUE`
+  - Controls `/ops/admin/help-gaps` review route exposure and Admin Center link visibility.
+  - Review status actions also enforce this flag server-side and fail closed when disabled.
+
+Flag boundaries:
+
+- Logging flag does not imply review queue visibility.
+- Review queue flag does not imply assistant visibility or persistence.
+- No flag in this lane enables Support Console, support-case creation/linking, provider calls, analytics, payment behavior, or tenant operational mutation.
+
+### 19.3 Data Model Closeout
+
+Durable table:
+
+- `public.assistant_help_gap_events`
+
+Durable event types:
+
+- `unknown_answer`
+- `not_helpful`
+- `still_need_help`
+
+Review statuses:
+
+- `new`
+- `reviewed`
+- `product_backlog`
+- `bug_candidate`
+- `converted_to_help_article`
+- `dismissed`
+- `linked_to_support_case`
+
+`linked_to_support_case` is a dormant table capability only. It is not exposed as an active UI action, is rejected by the current review action helper, and is reserved for a separately approved support-case linking model.
+
+### 19.4 Access Model Closeout
+
+Implemented access posture:
+
+- Durable event insert is authenticated and account-scoped.
+- Review queue is owner/admin only.
+- Review status update is owner/admin only.
+- Review reads and writes are scoped to the same `account_owner_user_id`.
+- Portal, contractor, customer-facing, unauthenticated, and non-internal users are blocked.
+- Billing, office, and tech users are blocked unless they are also structural owner/admin under the existing internal-user/account-owner model.
+- Runtime review actions use the normal authenticated Supabase path, not a service-role runtime path.
+- Support Console is not part of the flow.
+
+### 19.5 Safety Model Closeout
+
+Implemented safety posture:
+
+- Store sanitized question text only.
+- Trim, normalize, and length-limit question text server-side.
+- Store safe answer keys and fallback keys, not full assistant answer bodies.
+- Store sanitized route pathname only.
+- Strip query strings and hashes.
+- Persist only approved assistant surfaces in V1.
+- Review UI does not expose raw technical payloads, raw account/internal user ids, provider ids, payment ids, customer/job/invoice payloads, support-console internals, or raw JSON dumps.
+- Review status is internal product/support triage only.
+- Review status does not notify users, create follow-up, create support cases, link support cases, or create support-case notes.
+
+### 19.6 Review Queue Capabilities
+
+Implemented `/ops/admin/help-gaps` capabilities:
+
+- Feature-flagged route.
+- Disabled and unauthorized states.
+- Safe read-failed state with no raw database/server errors.
+- Summary cards:
+  - New
+  - Unknown answers
+  - Not helpful
+  - Still need help
+- Patterns section:
+  - Top categories
+  - Top places users got stuck
+  - Roles asking for help
+  - Training signals
+  - Setup signals
+  - Event type mix
+  - Review status mix
+- Filters:
+  - Review status
+  - Category
+  - Event type
+  - Page family
+  - Role
+  - Product mode
+  - Recent days
+  - Limit
+- Sanitized row list/detail.
+- Row-level review status controls for the V1 active statuses:
+  - `reviewed`
+  - `product_backlog`
+  - `bug_candidate`
+  - `converted_to_help_article`
+  - `dismissed`
+
+The review route intentionally does not expose support-case creation, support-case linking, Support Console actions, exports, bulk updates, provider calls, analytics calls, or tenant operational mutations.
+
+### 19.7 Deferred Items
+
+Deferred outside the G5 maturity milestone:
+
+- support-case creation from a help gap
+- support-case linking from a help gap
+- setting `linked_support_case_id`
+- support-case note creation
+- help article generation
+- AI/provider answer generation
+- automatic model training
+- analytics provider integration
+- bulk review actions
+- export
+- notification or user follow-up workflow
+- Support Console integration
+- support-side tenant mutation
+- tenant-wide or platform-wide reporting beyond the owner/admin account-scoped review queue
+- customer/contractor/portal review visibility
+- background retention/anonymization automation
+
+Any future support-case create/link flow must be separately model-locked, feature-flagged, explicitly intentional, and preserve Support Case V1 and Support Console boundaries.
+
+### 19.8 Validation History
+
+High-level validation completed through this closeout:
+
+- G5-B read model tests passed.
+- G5-C route/source tests passed.
+- G5-C authenticated browser smoke passed for route, flag-off behavior, Admin Center link behavior, populated/empty route posture, filters, and mobile layout.
+- G5-D review status action tests passed.
+- G5-D CMTest smoke passed for owner/admin updates to `reviewed`, `bug_candidate`, and `dismissed`.
+- G5-D smoke confirmed only `review_status`, `reviewed_at`, and `reviewed_by_user_id` changed.
+- G5-D smoke confirmed `support_cases` and `support_case_notes` counts were unchanged.
+- G5-E route/read-model/action tests passed.
+- G5-E browser smoke passed for reporting/pattern summaries, filters, desktop/mobile layout, and support-case boundary.
+- `npx.cmd tsc --noEmit` passed during implementation validation.
+- `git diff --check` passed during implementation validation.
+
+This G5-F docs slice performed documentation-only closeout and does not rerun Supabase, browser, or production validation.

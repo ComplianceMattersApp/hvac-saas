@@ -42,9 +42,9 @@ Current support/help/training posture:
 - `docs/ACTIVE/Support_V0_Operational_Readiness_Pack.md` defines manual owner-led support, issue intake, severity, escalation, and boundaries.
 - `docs/ACTIVE/Support_V0_Issue_Log_Template.md` defines slim and full support issue logging templates.
 - `docs/ACTIVE/Support_Case_Call_Log_V1_Model_Spec.md` and Support Case V1 code provide durable owner/support-internal issue records, separate from Support Console.
-- There is no dedicated in-app Training Room route yet.
-- There is no Ask Compliance Matters assistant yet.
-- There is no durable help-gap logging model yet.
+- The in-app Training Room now exists at `/training`.
+- Ask Compliance Matters now exists as a local/mock assistant on approved Launch Room and Training Room surfaces.
+- Durable Help Gap Logging and the owner/admin Help Gap Review queue now exist behind explicit feature flags. See `docs/ACTIVE/Help_Gap_Logging_Durable_Model_Spec.md`.
 
 ## 3. Current File / Component / Read-Model Inventory
 
@@ -417,9 +417,10 @@ Suggested categories:
 
 Review location:
 
-- V0 contract only: local/mock event shape and console/dev-only review or support/manual issue-log handoff.
-- Future durable logging: owner/admin/support review queue, likely tied to Support Case V1 or a dedicated help-gap table after separate approval.
-- Later reporting: pattern summaries by route, role, mission, and setup bucket.
+- Durable logging now writes sanitized help-gap rows to the dedicated `assistant_help_gap_events` table when `ENABLE_HELP_GAP_LOGGING` is enabled.
+- Owner/admin review queue now lives at `/ops/admin/help-gaps` behind `ENABLE_HELP_GAP_REVIEW_QUEUE`.
+- Reporting summaries now show patterns by category, page family, role, event type, review status, training mission, and setup step.
+- Help gaps remain separate from Support Case V1; no support case is created or linked by this lane.
 
 ## 13. Proposed Information Architecture
 
