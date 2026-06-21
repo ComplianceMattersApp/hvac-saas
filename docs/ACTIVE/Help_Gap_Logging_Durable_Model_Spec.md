@@ -1,8 +1,8 @@
 # Help Gap Logging Durable Model Spec
 
-Status: ACTIVE PLANNING / MODEL LOCK ONLY
+Status: ACTIVE MODEL LOCK / G2 DORMANT SCHEMA FOUNDATION ADDED
 
-Mode: Documentation/model/audit only. This document authorizes no runtime behavior, schema, migration, Supabase write, provider call, support case creation, Support Console enablement, impersonation, permission change, or user-facing product change by itself.
+Mode: Documentation/model/audit plus G2 schema-foundation closeout notes. This document authorizes no runtime behavior, Supabase write path, provider call, support case creation, Support Console enablement, impersonation, permission change, or user-facing product change by itself.
 
 Authority: Subordinate to:
 - `docs/ACTIVE/Active Spine V4.0 Current.md`
@@ -584,3 +584,61 @@ Recommended G2 closeout proof:
 - tests pass,
 - no runtime files changed except schema/test files,
 - no assistant persistence path exists yet.
+
+## 17. G2 / G2-A Closeout Status
+
+G2 additive schema foundation is implemented as a dormant database foundation:
+
+- Migration: `supabase/migrations/20260621100000_assistant_help_gap_events_foundation.sql`
+- Table: `public.assistant_help_gap_events`
+- Focused schema test: `lib/help-assistant/__tests__/help-gap-schema-foundation.test.ts`
+
+Implemented G2 schema posture:
+
+- additive table only
+- account-scoped `account_owner_user_id`
+- optional same-account `internal_user_id`
+- constrained event types, assistant modes, help-gap categories, page families, product modes, and review statuses
+- sanitized route path constraint with no query/hash
+- short sanitized question and key length constraints
+- optional future `linked_support_case_id` reference only, with no support-case creation behavior
+- account-scoped RLS enabled
+- authenticated same-account select/insert policy
+- owner/admin same-account review update policy
+- no delete policy
+- reporting/review indexes for account/date/status/category/event/page/setup/training slices
+
+G2 remains intentionally dormant:
+
+- no assistant persistence wiring
+- no server action
+- no review UI
+- no Support Console enablement
+- no support-case creation
+- no support-case note creation
+- no provider/LLM/OpenAI wiring
+- no analytics provider wiring
+- no tenant operational mutation
+- no payment, Stripe, QBO, portal, entitlement, role, or permission behavior change
+
+G2-A local verification status:
+
+- Focused Help Assistant/schema tests passed.
+- `npx.cmd tsc --noEmit` passed.
+- Local-only Supabase reset was attempted with `supabase db reset --local --no-seed --yes`, but did not complete because Docker Desktop's Linux engine pipe was unavailable in the local environment.
+- No production Supabase command was run.
+
+G2-A remains pending for full local migration-chain validation until Docker Desktop/local Supabase is available, then rerun:
+
+```powershell
+supabase db reset --local --no-seed --yes
+```
+
+Recommended next slice after local migration validation passes:
+
+- G3 sanitized persistence helper/server action behind `ENABLE_HELP_GAP_LOGGING`.
+- Server-side re-sanitization and route allowlist.
+- Insert only into `assistant_help_gap_events`.
+- No support-case writes.
+- No provider calls.
+- No review UI.
