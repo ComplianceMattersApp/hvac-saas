@@ -242,6 +242,10 @@ describe("help gap persistence helper", () => {
     expect(helperSource).not.toContain("analytics");
     expect(actionSource).not.toContain("createAdminClient");
     expect(actionSource).not.toContain("support_cases");
-    expect(launcherSource).not.toContain("persistHelpGapEventFromAssistantAction");
+    expect(launcherSource).toContain("persistHelpGapEventFromAssistantAction");
+    expect(launcherSource).not.toContain("localStorage");
+    expect(launcherSource).not.toContain("sessionStorage");
+    expect(launcherSource).not.toContain("support_cases");
+    expect(launcherSource).not.toContain("support_case_notes");
   });
 });

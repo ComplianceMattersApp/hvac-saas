@@ -17,6 +17,12 @@ import {
   createUnknownAnswerHelpGapEvent,
   type HelpGapEvent,
 } from "@/lib/help-assistant/help-gap-events";
+import { persistHelpGapEventFromAssistantAction } from "@/lib/actions/help-gap-actions";
+import {
+  getHelpGapFeedbackMessage,
+  resolveHelpGapPersistenceStatus,
+  type HelpGapPersistenceUiStatus,
+} from "@/lib/help-assistant/help-gap-persistence-copy";
 
 type AssistantMode = "ask" | "setup";
 type FeedbackState = "helpful" | "not_helpful" | "still_need_help" | null;
@@ -56,56 +62,107 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
   const [answer, setAnswer] = useState<HelpAssistantAnswer | null>(null);
   const [feedback, setFeedback] = useState<FeedbackState>(null);
   const [helpGapEvent, setHelpGapEvent] = useState<HelpGapEvent | null>(null);
+  const [helpGapPersistenceStatus, setHelpGapPersistenceStatus] =
+    useState<HelpGapPersistenceUiStatus>("idle");
+  const [persistedEventKey, setPersistedEventKey] = useState<string | null>(null);
   const safeContext = useMemo(
     () => buildHelpAssistantSafeContext({ ...context, pathname: pathname ?? context.pathname }),
     [context, pathname],
   );
   const setupCoach = getSetupCoachAnswer();
 
+  function persistenceKeyFor(event: HelpGapEvent) {
+    return [
+      event.eventType,
+      event.assistantMode,
+      event.routePathname,
+      event.questionText ?? "",
+      event.answerKey,
+      event.feedbackValue ?? "",
+      event.setupStepKey ?? "",
+      event.trainingMissionKey ?? "",
+    ].join("|");
+  }
+
+  async function persistHelpGapEvent(event: HelpGapEvent) {
+    const eventKey = persistenceKeyFor(event);
+    if (persistedEventKey === eventKey && helpGapPersistenceStatus === "saved") return;
+
+    setPersistedEventKey(eventKey);
+    setHelpGapPersistenceStatus("pending");
+
+    try {
+      const result = await persistHelpGapEventFromAssistantAction({
+        eventType: event.eventType,
+        assistantMode: event.assistantMode,
+        helpGapCategory: event.helpGapCategory,
+        routePathname: event.routePathname,
+        questionText: event.questionText,
+        answerKey: event.answerKey,
+        feedbackValue: event.feedbackValue,
+        setupStepKey: event.setupStepKey,
+        trainingMissionKey: event.trainingMissionKey,
+      });
+
+      setHelpGapPersistenceStatus(resolveHelpGapPersistenceStatus(result));
+    } catch {
+      setHelpGapPersistenceStatus("local_only");
+    }
+  }
+
   function ask(nextQuestion: string) {
     const nextAnswer = answerAskComplianceMatters(nextQuestion, safeContext);
-    setQuestion(nextQuestion);
-    setAnswer(nextAnswer);
-    setFeedback(null);
-    setHelpGapEvent(
+    const nextHelpGapEvent =
       nextAnswer.status === "fallback"
         ? createUnknownAnswerHelpGapEvent({
             context: safeContext,
             questionText: nextQuestion,
             answer: nextAnswer,
           })
-        : null,
-    );
+        : null;
+
+    setQuestion(nextQuestion);
+    setAnswer(nextAnswer);
+    setFeedback(null);
+    setHelpGapEvent(nextHelpGapEvent);
+    setHelpGapPersistenceStatus(nextHelpGapEvent ? "pending" : "idle");
+    setPersistedEventKey(null);
     setMode("ask");
+
+    if (nextHelpGapEvent) {
+      void persistHelpGapEvent(nextHelpGapEvent);
+    }
   }
 
   function handleFeedback(nextFeedback: FeedbackState) {
     setFeedback(nextFeedback);
     if (!nextFeedback || nextFeedback === "helpful") {
       setHelpGapEvent(null);
+      setHelpGapPersistenceStatus("idle");
+      setPersistedEventKey(null);
       return;
     }
 
-    setHelpGapEvent(
-      createFeedbackHelpGapEvent({
-        eventType: nextFeedback,
-        context: safeContext,
-        questionText: question,
-        answer,
-        assistantMode: mode === "setup" ? "setup_coach" : "help_chat",
-      }),
-    );
+    const nextHelpGapEvent = createFeedbackHelpGapEvent({
+      eventType: nextFeedback,
+      context: safeContext,
+      questionText: question,
+      answer,
+      assistantMode: mode === "setup" ? "setup_coach" : "help_chat",
+    });
+
+    setHelpGapEvent(nextHelpGapEvent);
+    setHelpGapPersistenceStatus("pending");
+    void persistHelpGapEvent(nextHelpGapEvent);
   }
 
   function feedbackMessage() {
-    if (!feedback) return null;
-    if (feedback === "still_need_help") {
-      return "Marked locally for this session. No support case was created. Contact support if this is blocking your work.";
-    }
-    if (feedback === "not_helpful") {
-      return "Marked locally for this session. This is the kind of question we should improve.";
-    }
-    return "Marked locally for this session.";
+    if (!helpGapEvent) return null;
+    if (helpGapPersistenceStatus === "pending") return "Saving feedback...";
+    return getHelpGapFeedbackMessage({
+      eventType: helpGapEvent.eventType,
+      status: helpGapPersistenceStatus,
+    });
   }
 
   return (
@@ -224,6 +281,7 @@ export function AskComplianceMattersLauncher({ context }: AskComplianceMattersLa
                       <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-xs leading-5 text-amber-900">
                         <div className="font-semibold">I don't know that yet.</div>
                         <p className="mt-1">This is the kind of question we should improve. Contact support if this is blocking your work.</p>
+                        <p className="mt-1">{feedbackMessage()}</p>
                       </div>
                     ) : null}
                     {answer.links.length > 0 ? (
