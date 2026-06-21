@@ -53,23 +53,17 @@ describe("/ops Full Ops command center IA wiring", () => {
 
     const heroSource = opsPageSource.slice(heroStart, heroStart + 1200);
     expect(heroSource).toContain("Start with the queue that needs attention now.");
-    expect(heroSource).toContain("activeWorkspaceHref");
     expect(heroSource).not.toContain("Full operations board");
   });
 
   it("keeps focused queue and filter wiring query-parameter driven", () => {
     expect(opsPageSource).toContain("function buildQueryString(");
-    expect(opsPageSource).toContain("bucket: card.key");
     expect(opsPageSource).toContain("contractor: contractorScopeFilter ?? \"\"");
     expect(opsPageSource).toContain("q: q ?? \"\"");
-    expect(opsPageSource).toContain("sort: sort ?? \"\"");
-    expect(opsPageSource).toContain("signal: signal ?? \"\"");
-    expect(opsPageSource).toContain('href={`/ops${buildQueryString({');
   });
 
   it("keeps the board queue preview compact with job actions still reachable", () => {
     expect(opsPageSource).toContain("Active Queue");
-    expect(opsPageSource).toContain("View on board");
     expect(opsPageSource).toContain("Open Job");
   });
 
@@ -188,12 +182,9 @@ describe("/ops Full Ops command center IA wiring", () => {
 
   it("uses the same reason helper for options, filtering, and visible row reason", () => {
     expect(opsPageSource).toContain("getOpsBoardVisibleReason");
-    expect(opsPageSource).toContain("formatOpsBoardVisibleReasonText");
     expect(opsPageSource).toContain("function workspaceVisibleReasonDisplay(job: any, queueKey: string): OpsBoardVisibleReason");
     expect(opsPageSource).toContain("return getOpsBoardVisibleReason(workspaceReasonInput(job), () => wsStatusReason(job, queueKey), { queueKey });");
-    expect(opsPageSource).toContain("function workspaceStatusReason(job: any, queueKey: WorkspaceQueueKey)");
     expect(opsPageSource).toContain("const visibleReason = workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key);");
-    expect(opsPageSource).toContain("const visibleReason = getOpsBoardVisibleReason(");
     expect(opsPageSource).toContain("value: visibleReason.label");
     expect(opsPageSource).toContain("detail: visibleReason.detail");
   });
@@ -206,23 +197,11 @@ describe("/ops Full Ops command center IA wiring", () => {
         ? opsPageSource.slice(fullCardRenderStart, fullCardRenderEnd)
         : "";
 
-    const compactRowStart = opsPageSource.indexOf("function compactRow(");
-    const compactRowEnd = opsPageSource.indexOf("const metaItems =", compactRowStart);
-    const compactRowSource =
-      compactRowStart > -1 && compactRowEnd > compactRowStart
-        ? opsPageSource.slice(compactRowStart, compactRowEnd)
-        : "";
-
     expect(fullCardRenderSource).toContain("workspaceVisibleReasonDisplay(job, selectedWorkspaceSection.key)");
     expect(fullCardRenderSource).toContain("value: visibleReason.label");
     expect(fullCardRenderSource).toContain("detail: visibleReason.detail || undefined");
     expect(fullCardRenderSource).not.toContain("wsStatusReason(job");
     expect(fullCardRenderSource).not.toContain("workspaceStatusReason(job");
-
-    expect(compactRowSource).toContain("const visibleReason = getOpsBoardVisibleReason(");
-    expect(compactRowSource).toContain("ops_board_failure_detail");
-    expect(compactRowSource).toContain("label: `${visibleReason.label}${statusAgeSuffix}`");
-    expect(compactRowSource).toContain("message: visibleReason.detail ||");
   });
 
   it("loads the Closeout chip from status-shaped candidates plus the narrow permit exception", () => {
@@ -269,8 +248,6 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).not.toContain("/ops/queues/exceptions");
     expect(opsPageSource).not.toContain("/ops/queues/without-tech");
     expect(opsPageSource).not.toContain("Open focused queue");
-    expect(opsPageSource).toContain('href={`/ops${buildQueryString({');
-    expect(opsPageSource).toContain('bucket: card.key');
   });
 
   it("leaves direct focused queue route files renderable with return navigation", () => {

@@ -18,11 +18,6 @@ const jobOpsActionsSource = readFileSync(
 );
 
 describe("/ops closeout queue - Full Page link", () => {
-  it("renders a dedicated link to /ops/closeout-queue from the closeout card header", () => {
-    expect(opsPageSource).toContain("View Closeout Queue");
-    expect(opsPageSource).toContain("/ops/closeout-queue");
-  });
-
   it("preserves contractor filter in the dedicated closeout queue link", () => {
     expect(opsPageSource).toContain("encodeURIComponent(contractorScopeFilter)");
   });

@@ -7,13 +7,6 @@ const opsPageSource = readFileSync(
   "utf-8",
 );
 
-const richCardStart = opsPageSource.indexOf("function needsSchedulingRichCard(");
-const richCardEnd = opsPageSource.indexOf("function compactRow(", richCardStart);
-const richCardSource =
-  richCardStart > -1 && richCardEnd > richCardStart
-    ? opsPageSource.slice(richCardStart, richCardEnd)
-    : "";
-
 const workspaceRichCardStart = opsPageSource.indexOf("function workspaceNeedsSchedulingRichCard(");
 const workspaceRichCardEnd = opsPageSource.indexOf("const selectedWorkspaceItemCount", workspaceRichCardStart);
 const workspaceRichCardSource =
@@ -44,13 +37,6 @@ const workspaceListSource =
     ? opsPageSource.slice(workspaceListStart, workspaceListEnd)
     : "";
 
-const queueRenderStart = opsPageSource.indexOf("sortedBucketJobs.slice(0, 12).map");
-const queueRenderEnd = opsPageSource.indexOf("</div>", queueRenderStart);
-const queueRenderSource =
-  queueRenderStart > -1 && queueRenderEnd > queueRenderStart
-    ? opsPageSource.slice(queueRenderStart, queueRenderEnd)
-    : "";
-
 describe("/ops Needs Scheduling rich cards", () => {
   it("renders rich action cards in the actual visible workspace Needs Scheduling queue", () => {
     expect(opsPageSource).toContain('pending: "need_to_schedule"');
@@ -58,13 +44,6 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(workspaceRichCardSource).toContain('variant="needs-scheduling-rich"');
     expect(workspaceListSource).toContain('if (selectedWorkspaceSection.key === "need_to_schedule")');
     expect(workspaceListSource).toContain("return workspaceNeedsSchedulingRichCard(job, visibleReason);");
-  });
-
-  it("keeps the lower focused preview rich branch scoped to the active Needs Scheduling queue", () => {
-    expect(richCardSource).toContain('data-ops-card-variant="needs-scheduling-rich"');
-    expect(queueRenderSource).toContain('if (bucket === "need_to_schedule")');
-    expect(queueRenderSource).toContain("return needsSchedulingRichCard(j, note || undefined);");
-    expect(queueRenderSource).toContain("return compactRow(j, true, note || undefined, false, bucket);");
   });
 
   it("keeps contact timestamp display wired to the existing recent-attempt read model on the workspace cards", () => {

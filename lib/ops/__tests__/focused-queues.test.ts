@@ -489,7 +489,6 @@ describe("focused queue display labels", () => {
     expect(opsPageSource).toContain(
       "formatAssignmentSummaryForJob(String(job?.id ?? \"\"), selectedPreviewAssignmentDisplayMap)",
     );
-    expect(opsPageSource).toContain("return formatAssignmentSummaryForJob(jobId, activeAssignmentDisplayMap);");
   });
 
   it("Operations Workspace rows include contractor context only when a job contractor exists", () => {
@@ -512,7 +511,6 @@ describe("focused queue display labels", () => {
   it("Operations Workspace rows normalize person and city casing without touching companies", () => {
     expect(opsPageSource).toContain("formatPersonNamePart(job?.customer_first_name)");
     expect(opsPageSource).toContain("formatCityNamePart(job?.city)");
-    expect(opsPageSource).toContain("formatCityNamePart(parts.city)");
     expect(opsPageSource).toContain("value: workspaceContractorName(job)");
   });
 

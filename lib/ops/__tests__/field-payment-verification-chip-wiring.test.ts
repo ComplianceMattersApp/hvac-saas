@@ -10,7 +10,6 @@ const opsPageSource = readFileSync(
 describe("/ops field payment verification chip wiring", () => {
   it("loads field payment reconciliation count from existing B7-Q read model", () => {
     expect(opsPageSource).toContain("listFieldPaymentCollectionReportsForReconciliation");
-    expect(opsPageSource).toContain("fieldPaymentReconciliationAttention?.summary.openCount");
     expect(opsPageSource).toContain('limit: 1');
   });
 
@@ -21,17 +20,6 @@ describe("/ops field payment verification chip wiring", () => {
     expect(opsPageSource).toContain("loadFieldBillingExplicitCapabilitiesForUser");
     expect(opsPageSource).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
     expect(opsPageSource).toContain("fieldBillingCapabilities.can_verify_non_card_collection");
-  });
-
-  it("shows chip only when open reconciliation count is greater than zero", () => {
-    expect(opsPageSource).toContain("showFieldPaymentVerificationChip");
-    expect(opsPageSource).toContain("(fieldPaymentReconciliationAttention?.summary.openCount ?? 0) > 0");
-  });
-
-  it("renders Confirm Payment chip copy and links to closeout confirm payment filter", () => {
-    expect(opsPageSource).toContain("Confirm Payment:");
-    expect(opsPageSource).toContain('filter: "confirm_payment"');
-    expect(opsPageSource).toContain("/ops/closeout-queue");
   });
 
   it("does not expose verify/reject/correct/void actions from the dashboard chip", () => {

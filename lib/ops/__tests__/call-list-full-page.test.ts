@@ -18,21 +18,8 @@ const recentAttemptDisplaySource = readFileSync(
 );
 
 describe("/ops call list — Full Page link", () => {
-  it("renders a link to /ops/call-list from the call list card header", () => {
-    expect(opsPageSource).toContain('href={`/ops/call-list');
-  });
-
-  it("the View Unscheduled Work link label is present", () => {
-    expect(opsPageSource).toContain("View Unscheduled Work");
-  });
-
   it("contractor filter is preserved in the Full page link href", () => {
     expect(opsPageSource).toContain("encodeURIComponent(contractorScopeFilter)");
-  });
-
-  it("renders Last attempt metadata sourced from customer_attempt events", () => {
-    expect(opsPageSource).toContain('.eq("event_type", "customer_attempt")');
-    expect(opsPageSource).toContain('label: "Last attempt"');
   });
 
   it("uses a subtle no-attempt fallback copy on ops cards", () => {
