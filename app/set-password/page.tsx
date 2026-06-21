@@ -169,9 +169,11 @@ export default function SetPasswordPage() {
     <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-950">
       <div className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-8 shadow-md space-y-6">
         <div className="space-y-1">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">Set Your Password</h1>
+          <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">EveryStep FieldWorks</div>
+          <div className="text-sm font-medium text-gray-500 dark:text-gray-400">by Compliance Matters</div>
+          <h1 className="pt-3 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">Set Your Password</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            Create a password to finish setting up your Compliance Matters account.
+            Create a password to finish setting up your EveryStep FieldWorks account.
           </p>
         </div>
 

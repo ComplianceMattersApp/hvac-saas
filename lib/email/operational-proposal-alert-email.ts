@@ -45,7 +45,7 @@ export function buildInternalProposalAlertEmailHtml(args: InternalProposalAlertE
   const ctaBlock = args.proposalUrl
     ? `
       <div style="margin: 14px 0 2px 0;">
-        <a href="${escapeHtml(args.proposalUrl)}" style="display: inline-block; border-radius: 8px; background: #1d4ed8; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 10px 14px;">Review Proposal in Compliance Matters</a>
+        <a href="${escapeHtml(args.proposalUrl)}" style="display: inline-block; border-radius: 8px; background: #1d4ed8; color: #ffffff; text-decoration: none; font-size: 14px; font-weight: 700; padding: 10px 14px;">Review Proposal in EveryStep FieldWorks</a>
       </div>
       <div style="margin: 8px 0 0 0; font-size: 12px; color: #64748b;">If the button does not open, use this link: <a href="${escapeHtml(args.proposalUrl)}">${escapeHtml(args.proposalUrl)}</a></div>
     `

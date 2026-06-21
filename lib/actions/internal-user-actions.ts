@@ -273,8 +273,8 @@ async function sendExistingInternalSetupLink(params: {
 
   const html = `
     <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height: 1.4;">
-      <h2>Complete your Compliance Matters account setup</h2>
-      <p>You have been invited to join your internal team in Compliance Matters.</p>
+      <h2>Complete your EveryStep FieldWorks account setup</h2>
+      <p>You have been invited to join your internal team in EveryStep FieldWorks by Compliance Matters.</p>
       <p><a href="${actionLink}">Accept your invite</a></p>
       <p>If the button does not work, copy and paste this link:</p>
       <p style="word-break: break-all;">${actionLink}</p>
@@ -283,7 +283,7 @@ async function sendExistingInternalSetupLink(params: {
 
   await sendInviteEmail({
     to: params.email,
-    subject: "You've been invited to Compliance Matters",
+    subject: "You've been invited to EveryStep FieldWorks",
     html,
   });
 }

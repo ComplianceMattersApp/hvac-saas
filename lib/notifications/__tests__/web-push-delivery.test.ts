@@ -756,7 +756,7 @@ describe("web-push-delivery", () => {
 
       // Verify safe content
       expect(payload.title).toBe("You were assigned to a job");
-      expect(payload.body).toBe("Open Compliance Matters to view details");
+      expect(payload.body).toBe("Open EveryStep FieldWorks to view details");
       expect(payload.url).toBe("/jobs/job-1?tab=ops");
       expect(payload.data?.url).toBe("/jobs/job-1?tab=ops");
 
@@ -799,7 +799,7 @@ describe("web-push-delivery", () => {
 
       // Verify safe content
       expect(payload.title).toBe("You were mentioned in an internal note");
-      expect(payload.body).toBe("Open Compliance Matters to view details");
+      expect(payload.body).toBe("Open EveryStep FieldWorks to view details");
 
       // Verify no sensitive data
       expect(JSON.stringify(payload)).not.toMatch(/note_text|phone|email|address|permit|customer/i);

@@ -21,7 +21,7 @@ describe("buildInternalProposalAlertEmailHtml", () => {
 
     expect(html).toContain("New job proposal submitted");
     expect(html).toContain("A new job proposal was submitted through the portal and is ready for internal review.");
-    expect(html).toContain("Review Proposal in Compliance Matters");
+    expect(html).toContain("Review Proposal in EveryStep FieldWorks");
     expect(html).toContain("This proposal is pending internal review and has not been approved, scheduled, or finalized.");
     expect(html).toContain("Submitted Notes");
     expect(html).toContain("Customer asked for morning window.");
@@ -45,6 +45,6 @@ describe("buildInternalProposalAlertEmailHtml", () => {
     });
 
     expect(html).not.toContain("Submitted Notes");
-    expect(html).not.toContain("Review Proposal in Compliance Matters");
+    expect(html).not.toContain("Review Proposal in EveryStep FieldWorks");
   });
 });

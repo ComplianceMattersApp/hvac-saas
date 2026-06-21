@@ -42,7 +42,7 @@ export function renderSystemEmailLayout(args: {
   const headerAlign = centerHeader ? "center" : "left";
 
   const logoBlock = logoUrl
-    ? `<div style="margin-bottom: ${logoMarginBottomPx}px; text-align: ${headerAlign};"><img src="${escapeHtml(logoUrl)}" alt="Compliance Matters logo" width="${logoWidthPx}" height="${logoWidthPx}" style="width: ${logoWidthPx}px; max-width: 100%; height: auto; display: inline-block;" /></div>`
+    ? `<div style="margin-bottom: ${logoMarginBottomPx}px; text-align: ${headerAlign};"><img src="${escapeHtml(logoUrl)}" alt="EveryStep FieldWorks logo" width="${logoWidthPx}" height="${logoWidthPx}" style="width: ${logoWidthPx}px; max-width: 100%; height: auto; display: inline-block;" /></div>`
     : "";
 
   const titleBlock = title

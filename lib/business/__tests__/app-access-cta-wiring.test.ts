@@ -17,7 +17,7 @@ describe("app access CTA wiring", () => {
     expect(portalPage).toContain("getPlatformBillingAvailability");
     expect(portalPage).toContain("<AppAccessCtaCard cta={appAccessCta} />");
 
-    expect(helper).toContain("Want to run your own jobs in Compliance Matters?");
+    expect(helper).toContain("Want to run your own jobs in EveryStep FieldWorks?");
     expect(helper).toContain("Start 30-day trial");
     expect(helper).toContain("Resume app access");
     expect(helper).toContain("Reactivate app access");

@@ -20,11 +20,11 @@ self.addEventListener("push", (event) => {
     data = {};
   }
 
-  const title = typeof data.title === "string" && data.title ? data.title : "Compliance Matters";
+  const title = typeof data.title === "string" && data.title ? data.title : "EveryStep FieldWorks";
   const body =
     typeof data.body === "string" && data.body
       ? data.body
-      : "Open Compliance Matters to view details";
+      : "Open EveryStep FieldWorks to view details";
   const nestedUrl =
     data.data && typeof data.data.url === "string" && data.data.url.startsWith("/")
       ? data.data.url

@@ -34,16 +34,26 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: {
-    default: "Compliance Matters",
-    template: "%s | Compliance Matters",
+    default: "EveryStep FieldWorks",
+    template: "%s | EveryStep FieldWorks",
   },
-  applicationName: "Compliance Matters",
-  description: "Compliance Matters operations software for service and compliance workflows",
+  applicationName: "EveryStep FieldWorks",
+  description: "EveryStep FieldWorks by Compliance Matters keeps field work, office follow-through, billing, and job history in one place.",
+  openGraph: {
+    title: "EveryStep FieldWorks",
+    description: "Every job. Every step. Fully closed.",
+    siteName: "EveryStep FieldWorks",
+  },
+  twitter: {
+    card: "summary",
+    title: "EveryStep FieldWorks",
+    description: "Every job. Every step. Fully closed.",
+  },
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
-    title: "Compliance Matters",
+    title: "EveryStep FieldWorks",
   },
   formatDetection: {
     telephone: false,
@@ -237,14 +247,14 @@ export default async function RootLayout({
                       href={homeHref}
                       className="flex h-9 w-9 items-center justify-center rounded-lg transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                     >
-                      <Image src="/icon.png" alt="Compliance Matters logo" width={30} height={30} className="rounded-md shadow-[0_12px_22px_-18px_rgba(15,23,42,0.45)]" />
+                      <Image src="/icon.png" alt="EveryStep FieldWorks logo" width={30} height={30} className="rounded-md shadow-[0_12px_22px_-18px_rgba(15,23,42,0.45)]" />
                     </Link>
                     <Link
                       href={homeHref}
                       className="min-w-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                     >
-                      <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">Compliance Matters</span>
-                      <span className="block truncate text-sm font-semibold tracking-[-0.01em] text-slate-950 transition-colors hover:text-slate-700">Operations Software</span>
+                      <span className="block truncate text-sm font-semibold tracking-[-0.01em] text-slate-950 transition-colors hover:text-slate-700">EveryStep FieldWorks</span>
+                      <span className="block truncate text-[10px] font-medium text-slate-500">by Compliance Matters</span>
                     </Link>
                   </div>
 

@@ -87,7 +87,7 @@ export function DeviceInstallHelper() {
 
   const bodyCopy = useMemo(() => {
     if (installState.isInstalled) {
-      return "This device already opens Compliance Matters like an app for faster access.";
+      return "This device already opens EveryStep FieldWorks like an app for faster access.";
     }
 
     if (installState.canPromptInstall) {

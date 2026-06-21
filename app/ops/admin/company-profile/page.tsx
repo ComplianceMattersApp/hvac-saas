@@ -529,7 +529,7 @@ export default async function AdminCompanyProfilePage({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invoice Settings</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Choose whether your company creates invoices in Compliance Matters or tracks billing in another system.
+            Choose whether your company creates invoices in EveryStep FieldWorks or tracks billing in another system.
           </p>
         </div>
 
@@ -545,31 +545,31 @@ export default async function AdminCompanyProfilePage({
                 defaultValue={billingMode}
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-3 text-sm text-slate-900 shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-slate-200"
               >
-                <option value="external_billing">Track billing outside Compliance Matters</option>
-                <option value="internal_invoicing">Use Compliance Matters invoices</option>
+                <option value="external_billing">Track billing outside EveryStep FieldWorks</option>
+                <option value="internal_invoicing">Use EveryStep FieldWorks invoices</option>
               </select>
             </div>
 
             <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
               <p>
-                <span className="font-medium text-slate-800">Track billing outside Compliance Matters</span>{" "}
-                - use Compliance Matters for job workflow and closeout. Invoices are created and managed in
+                <span className="font-medium text-slate-800">Track billing outside EveryStep FieldWorks</span>{" "}
+                - use EveryStep FieldWorks for job workflow and closeout. Invoices are created and managed in
                 another system, such as QuickBooks.
               </p>
               <p>
-                <span className="font-medium text-slate-800">Use Compliance Matters invoices</span>{" "}
-                - create, issue, send, and track invoices from each job in Compliance Matters.
+                <span className="font-medium text-slate-800">Use EveryStep FieldWorks invoices</span>{" "}
+                - create, issue, send, and track invoices from each job in EveryStep FieldWorks.
               </p>
             </div>
 
             {billingMode === "external_billing" ? (
               <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-sm leading-6 text-blue-900">
-                Outside billing tracking is active. Jobs can be closed out in Compliance Matters while invoices
+                Outside billing tracking is active. Jobs can be closed out in EveryStep FieldWorks while invoices
                 are managed in another system.
               </div>
             ) : (
               <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm leading-6 text-emerald-900">
-                Compliance Matters invoices are active. Your team can create, issue, send, and track invoices
+                EveryStep FieldWorks invoices are active. Your team can create, issue, send, and track invoices
                 from each job.
               </div>
             )}
@@ -1205,7 +1205,7 @@ function PlatformAccountSection({
           Review your plan and trial dates. Focus first on running work from customer to invoice.
         </div>
         <div className="mt-2 text-xs leading-5 text-slate-500">
-          This subscription is for Compliance Matters access. Customer invoice payments are managed
+          This subscription is for EveryStep FieldWorks access. Customer invoice payments are managed
           separately through invoice payment settings.
         </div>
       </div>

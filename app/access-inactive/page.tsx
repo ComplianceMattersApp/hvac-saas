@@ -103,10 +103,14 @@ export default async function AccessInactivePage({
           </div>
         ) : null}
         <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+          <div>
+            <div className="text-xl font-semibold tracking-tight text-slate-950">EveryStep FieldWorks</div>
+            <div className="mt-0.5 text-sm font-medium text-slate-500">by Compliance Matters</div>
+          </div>
+          <p className="mt-5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
             App access inactive
           </p>
-          <h1 className="mt-3 text-2xl font-semibold text-slate-950">
+          <h1 className="mt-2 text-2xl font-semibold text-slate-950">
             Your app access is inactive.
           </h1>
           <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -130,7 +134,7 @@ export default async function AccessInactivePage({
                   Billing status may still be syncing
                 </h2>
                 <p className="mt-1 text-sm leading-6 text-slate-600">
-                  If Stripe shows an active Compliance Matters subscription, refresh subscription status from Stripe before starting a new checkout.
+                  If Stripe shows an active EveryStep FieldWorks subscription, refresh subscription status from Stripe before starting a new checkout.
                 </p>
               </div>
               <form action={refreshPlatformSubscriptionStatusFromForm} className="shrink-0">

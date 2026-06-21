@@ -229,7 +229,7 @@ export async function resendInternalInviteFromForm(formData: FormData): Promise<
   await sendRecoveryEmail({
     admin,
     email,
-    subject: "Complete your Compliance Matters account setup",
+    subject: "Complete your EveryStep FieldWorks account setup",
     headline: "Complete your account setup",
     body: "Use the link below to finish account setup and set your password.",
   });

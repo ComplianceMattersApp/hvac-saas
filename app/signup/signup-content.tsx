@@ -55,10 +55,10 @@ const SIGNUP_COPY: Record<
   }
 > = {
   generic: {
-    eyebrow: "Compliance Matters Onboarding",
-    title: "Create Your Company Account",
+    eyebrow: "Guided setup",
+    title: "Every job. Every step. Fully closed.",
     intro:
-      "Set up the daily work your team already handles in one place.",
+      "Set up the daily field work, office follow-through, billing, and job history your team already handles in one place.",
     details: "We'll send a secure setup link so you can finish creating your account.",
     cards: [
       {
@@ -177,6 +177,8 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
   return (
     <AuthCommandCenterLayout
       eyebrow={copy.eyebrow}
+      brandName="EveryStep FieldWorks"
+      backingLine="by Compliance Matters"
       headline={copy.title}
       subhead={copy.intro}
       highlights={copy.cards.map((card) => card.title)}
@@ -186,16 +188,17 @@ export function SignupContent({ productIntent = "generic" }: SignupContentProps)
           <div className="flex items-center gap-3">
             <img
               src="/cm-logo.png"
-              alt="Compliance Matters logo"
+              alt="EveryStep FieldWorks logo"
               width={44}
               height={44}
               className="rounded-xl border border-slate-200 shadow-sm"
             />
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Compliance Matters</p>
-              <h2 className="text-xl font-semibold tracking-tight text-slate-900">Create your account</h2>
+              <h2 className="text-xl font-semibold tracking-tight text-slate-900">EveryStep FieldWorks</h2>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">by Compliance Matters</p>
             </div>
           </div>
+          <div className="mt-4 text-sm font-semibold text-slate-900">Create your account</div>
           <p className="mt-3 text-sm leading-relaxed text-slate-500">{copy.formIntro}</p>
 
           <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 shadow-sm">

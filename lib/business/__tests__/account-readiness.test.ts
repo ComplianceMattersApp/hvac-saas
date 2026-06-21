@@ -226,7 +226,7 @@ describe("resolveAccountReadiness", () => {
 
     expect(item?.status).toBe("incomplete");
     expect(item?.label).toBe("App subscription");
-    expect(item?.description).toBe("Set up your Compliance Matters subscription before the trial ends.");
+    expect(item?.description).toBe("Set up your EveryStep FieldWorks subscription before the trial ends.");
     expect(item?.href).toBe("/ops/admin/company-profile#account-billing");
     expect(summary.isOperationallyReady).toBe(false);
   });
@@ -461,7 +461,7 @@ describe("resolveAccountReadiness", () => {
     const item = summary.items.find((x) => x.key === "accept_customer_payments");
 
     expect(item?.status).toBe("optional");
-    expect(item?.description).toBe("Let customers pay invoices online through Compliance Matters.");
+    expect(item?.description).toBe("Let customers pay invoices online through EveryStep FieldWorks.");
     expect(item?.href).toBe("/ops/admin/company-profile#accept-payments");
   });
 

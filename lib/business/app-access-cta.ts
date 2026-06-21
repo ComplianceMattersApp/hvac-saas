@@ -95,7 +95,7 @@ export function resolveAppAccessCta(input: {
   if (!access.hasInternalMembership && access.hasPortalAccess) {
     return {
       kind: "start_trial",
-      heading: "Want to run your own jobs in Compliance Matters?",
+      heading: "Want to run your own jobs in EveryStep FieldWorks?",
       helper: "Start with a 30-day trial when you're ready.",
       buttonLabel: "Start 30-day trial",
       target: { mode: "link", href: "/signup/service" },
@@ -155,7 +155,7 @@ export function resolveAppAccessCta(input: {
     return {
       kind: "manage_billing",
       heading: "Manage app billing",
-      helper: "Review or update your Compliance Matters subscription.",
+      helper: "Review or update your EveryStep FieldWorks subscription.",
       buttonLabel: "Manage billing",
       target: { mode: "post", action: "/api/stripe/portal" },
     };

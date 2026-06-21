@@ -37,13 +37,15 @@ function OperationsPreview() {
 
 export type AuthCommandCenterLayoutProps = {
   eyebrow: string;
+  brandName?: string;
+  backingLine?: string;
   headline: ReactNode;
   subhead: string;
   highlights?: string[];
   children: ReactNode;
 };
 
-export function AuthCommandCenterLayout({ eyebrow, headline, subhead, highlights, children }: AuthCommandCenterLayoutProps) {
+export function AuthCommandCenterLayout({ eyebrow, brandName, backingLine, headline, subhead, highlights, children }: AuthCommandCenterLayoutProps) {
   return (
     <div className="relative min-h-screen overflow-hidden bg-gradient-to-b from-[#101b2d] to-[#0b1422] text-slate-100">
       <div
@@ -57,14 +59,33 @@ export function AuthCommandCenterLayout({ eyebrow, headline, subhead, highlights
 
       <div className="relative mx-auto grid min-h-screen w-full max-w-7xl gap-12 px-4 py-10 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:py-14">
         <section className="hidden lg:block">
-          <div className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-300">
-            <span className="h-px w-6 bg-blue-400/50" />
-            {eyebrow}
-          </div>
-
-          <h1 className="mt-5 max-w-xl text-4xl font-semibold leading-[1.15] tracking-tight text-white xl:text-[2.6rem]">
-            {headline}
-          </h1>
+          {brandName ? (
+            <>
+              <div className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-300">
+                <span className="h-px w-6 bg-blue-400/50" />
+                {eyebrow}
+              </div>
+              <h1 className="mt-5 max-w-xl text-4xl font-semibold leading-[1.08] tracking-tight text-white xl:text-[2.85rem]">
+                {brandName}
+              </h1>
+              {backingLine ? (
+                <p className="mt-2 text-sm font-medium text-blue-200/85">{backingLine}</p>
+              ) : null}
+              <h2 className="mt-6 max-w-xl text-2xl font-semibold leading-tight tracking-tight text-white xl:text-[2rem]">
+                {headline}
+              </h2>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-blue-300">
+                <span className="h-px w-6 bg-blue-400/50" />
+                {eyebrow}
+              </div>
+              <h1 className="mt-5 max-w-xl text-4xl font-semibold leading-[1.15] tracking-tight text-white xl:text-[2.6rem]">
+                {headline}
+              </h1>
+            </>
+          )}
 
           <p className="mt-4 max-w-lg text-sm leading-relaxed text-slate-300 sm:text-base">{subhead}</p>
 

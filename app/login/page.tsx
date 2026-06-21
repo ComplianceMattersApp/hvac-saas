@@ -170,9 +170,11 @@ export default function LoginPage() {
 
   return (
     <AuthCommandCenterLayout
-      eyebrow="Field Operations Desk"
-      headline="Run your day, from first job to follow-up."
-      subhead="Compliance Matters brings jobs, scheduling, field notes, closeout, and follow-up into a single, organized view for teams that work in the field."
+      eyebrow="Field service workbench"
+      brandName="EveryStep FieldWorks"
+      backingLine="by Compliance Matters"
+      headline="Every job. Every step. Fully closed."
+      subhead="Bring scheduling, field notes, invoices, payments, job history, and closeout into one organized view."
       highlights={[
         "Schedule field work from one queue",
         "Track jobs from first call to closeout",
@@ -183,14 +185,14 @@ export default function LoginPage() {
       <div className="space-y-5">
         <div className="rounded-[28px] border border-white/10 bg-white p-7 shadow-[0_50px_100px_-30px_rgba(2,6,23,0.7)] sm:p-8">
           <div className="flex items-center gap-3">
-            <img src="/cm-logo.png" alt="Compliance Matters" width={44} height={44} className="rounded-xl border border-slate-200 shadow-sm" />
+            <img src="/cm-logo.png" alt="EveryStep FieldWorks" width={44} height={44} className="rounded-xl border border-slate-200 shadow-sm" />
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Compliance Matters</p>
-              <h1 className="text-xl font-semibold tracking-tight text-slate-900">Log in</h1>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-900">EveryStep FieldWorks</h1>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">by Compliance Matters</p>
             </div>
           </div>
           <p className="mt-3 text-sm leading-relaxed text-slate-500">
-            Run field work, scheduling, closeout, and follow-up from one organized place.
+            Log in to run field work, scheduling, closeout, and follow-up from one organized place.
           </p>
 
           <form onSubmit={onSubmit} className="mt-6 space-y-4">
@@ -263,7 +265,7 @@ export default function LoginPage() {
         <div className="rounded-[24px] border border-white/10 bg-white/[0.04] p-5 backdrop-blur-xl">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <p className="text-sm font-medium text-white">New to Compliance Matters?</p>
+              <p className="text-sm font-medium text-white">New to EveryStep FieldWorks?</p>
               <p className="mt-1 text-xs leading-5 text-slate-400">Start a 30-day guided setup. No payment details needed.</p>
             </div>
             <span className="inline-flex h-fit items-center rounded-full border border-blue-400/25 bg-blue-400/10 px-2.5 py-1 text-[11px] font-semibold text-blue-200">

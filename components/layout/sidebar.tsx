@@ -4,8 +4,8 @@ export function Sidebar() {
   return (
     <aside className="hidden md:block md:w-64 border-r bg-white p-4">
       <div className="mb-6">
-        <div className="text-lg font-bold">Compliance Matters</div>
-        <div className="text-sm text-gray-500">Booking Software</div>
+        <div className="text-lg font-bold">EveryStep FieldWorks</div>
+        <div className="text-sm text-gray-500">by Compliance Matters</div>
       </div>
 
       <nav className="space-y-2 text-sm">

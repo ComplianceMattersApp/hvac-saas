@@ -197,7 +197,7 @@ function buildSafePayload(params: {
   if (notificationType === "internal_job_assigned") {
     return {
       title: "You were assigned to a job",
-      body: "Open Compliance Matters to view details",
+      body: "Open EveryStep FieldWorks to view details",
       data: {
         url: jobId ? `/jobs/${jobId}?tab=ops` : "/ops",
       },
@@ -207,7 +207,7 @@ function buildSafePayload(params: {
   if (notificationType === "internal_note_tag") {
     return {
       title: "You were mentioned in an internal note",
-      body: "Open Compliance Matters to view details",
+      body: "Open EveryStep FieldWorks to view details",
       data: {
         url: jobId ? `/jobs/${jobId}?tab=ops#internal-notes` : "/ops",
       },

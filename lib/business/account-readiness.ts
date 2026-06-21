@@ -86,7 +86,7 @@ export async function resolveAccountReadiness(
         {
           key: "app_subscription",
           label: "App subscription",
-          description: "Set up your Compliance Matters subscription before the trial ends.",
+          description: "Set up your EveryStep FieldWorks subscription before the trial ends.",
           status: "incomplete",
           href: "/ops/admin/company-profile#account-billing",
         },
@@ -107,7 +107,7 @@ export async function resolveAccountReadiness(
         {
           key: "accept_customer_payments",
           label: "Accept customer payments",
-          description: "Let customers pay invoices online through Compliance Matters.",
+          description: "Let customers pay invoices online through EveryStep FieldWorks.",
           status: "optional",
           href: "/ops/admin/company-profile#accept-payments",
         },
@@ -226,7 +226,7 @@ export async function resolveAccountReadiness(
         ? "Subscription is handled internally."
         : isAppSubscriptionComplete
           ? "Subscription setup is complete."
-          : "Set up your Compliance Matters subscription before the trial ends.",
+          : "Set up your EveryStep FieldWorks subscription before the trial ends.",
       status: isAppSubscriptionComplete ? "complete" : "incomplete",
       href: "/ops/admin/company-profile#account-billing",
     },
@@ -246,7 +246,7 @@ export async function resolveAccountReadiness(
     {
       key: "accept_customer_payments",
       label: "Accept customer payments",
-      description: "Let customers pay invoices online through Compliance Matters.",
+      description: "Let customers pay invoices online through EveryStep FieldWorks.",
       status: "optional",
       href: "/ops/admin/company-profile#accept-payments",
     },

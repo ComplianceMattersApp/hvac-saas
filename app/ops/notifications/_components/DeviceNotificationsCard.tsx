@@ -335,7 +335,7 @@ export function DeviceNotificationsCard({
                 <p className="mt-1 text-sm leading-6 text-slate-600">{statusText}</p>
                 {isDenied ? (
                   <p className="mt-2 text-xs text-slate-600">
-                    To enable notifications, allow notifications for Compliance Matters in this browser, then reload this page.
+                    To enable notifications, allow notifications for EveryStep FieldWorks in this browser, then reload this page.
                   </p>
                 ) : null}
                 {isUnsupported ? null : null}

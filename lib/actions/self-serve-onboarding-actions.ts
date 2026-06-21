@@ -479,8 +479,8 @@ function createRealDeps(): SelfServeOnboardingDeps {
 
       const html = `
         <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height: 1.4;">
-          <h2>Complete your Compliance Matters account setup</h2>
-          <p>Use the link below to finish account setup and set your password.</p>
+          <h2>Complete your EveryStep FieldWorks account setup</h2>
+          <p>EveryStep FieldWorks is by Compliance Matters. Use the link below to finish account setup and set your password.</p>
           <p><a href="${actionLink}">Continue setup</a></p>
           <p>If the button does not work, copy and paste this link:</p>
           <p style="word-break: break-all;">${actionLink}</p>
@@ -489,7 +489,7 @@ function createRealDeps(): SelfServeOnboardingDeps {
 
       await sendInviteEmail({
         to: email,
-        subject: "Complete your Compliance Matters account setup",
+        subject: "Complete your EveryStep FieldWorks account setup",
         html,
       });
     },

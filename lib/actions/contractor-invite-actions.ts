@@ -223,11 +223,11 @@ export async function inviteContractor(args: {
     }
 
     // 5) Send our branded SMTP email with the recovery link.
-    const subject = "You've been invited to Compliance Matters";
+    const subject = "You've been invited to EveryStep FieldWorks";
     const html = `
       <div style="font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; line-height: 1.4;">
         <h2>Contractor Portal Invite</h2>
-        <p>You have been invited to join a contractor portal.</p>
+        <p>You have been invited to join a contractor portal in EveryStep FieldWorks by Compliance Matters.</p>
         <p><a href="${actionLink}">Accept your invite</a></p>
         <p>If the button does not work, copy/paste this link:</p>
         <p style="word-break: break-all;">${actionLink}</p>
