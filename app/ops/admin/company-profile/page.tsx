@@ -76,7 +76,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   },
   stripe_connect_status_refresh_failed_ready: {
     tone: "warn",
-    message: "Online invoice payments are ready. We couldn't refresh the latest status just now.",
+    message: "Online payments are ready. We couldn't refresh the latest status just now.",
   },
   stripe_connect_status_refresh_failed_unready: {
     tone: "warn",
@@ -477,7 +477,7 @@ export default async function AdminCompanyProfilePage({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Invoice Settings</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Choose whether your company creates invoices in EveryStep FieldWorks or tracks billing in another system.
+            Choose where your company creates and manages invoices.
           </p>
         </div>
 
@@ -501,24 +501,24 @@ export default async function AdminCompanyProfilePage({
             <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
               <p>
                 <span className="font-medium text-slate-800">Track billing outside EveryStep FieldWorks</span>{" "}
-                - use EveryStep FieldWorks for job workflow and closeout. Invoices are created and managed in
-                another system, such as QuickBooks.
+                - use EveryStep for job workflow and closeout, while invoices are created in another system such
+                as QuickBooks.
               </p>
               <p>
                 <span className="font-medium text-slate-800">Use EveryStep FieldWorks invoices</span>{" "}
-                - create, issue, send, and track invoices from each job in EveryStep FieldWorks.
+                - create, send, and track invoices from each job.
               </p>
             </div>
 
             {billingMode === "external_billing" ? (
               <div className="mt-3 rounded-xl border border-blue-200 bg-blue-50/70 px-3 py-2 text-sm leading-6 text-blue-900">
-                Outside billing tracking is active. Jobs can be closed out in EveryStep FieldWorks while invoices
-                are managed in another system.
+                Billing is managed outside EveryStep FieldWorks. Jobs can still be closed out here while invoices
+                are created in another system.
               </div>
             ) : (
               <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50/70 px-3 py-2 text-sm leading-6 text-emerald-900">
-                EveryStep FieldWorks invoices are active. Your team can create, issue, send, and track invoices
-                from each job.
+                EveryStep FieldWorks invoices are active. Online Payments can let customers pay those invoices
+                online.
               </div>
             )}
           </div>
@@ -1333,32 +1333,31 @@ function TenantStripePaymentsSection({
     if (!usesInternalInvoices) {
       return {
         tone: "slate" as const,
-        title: "Online invoice payments not used",
-        body:
-          "This account tracks billing outside Compliance Matters. Online invoice payments can wait unless you switch to Compliance Matters invoices.",
+        title: "Online payments optional",
+        body: "Online payments are optional here because invoices are managed outside EveryStep FieldWorks.",
       };
     }
 
     if (readiness.isReady) {
       return {
         tone: "success" as const,
-        title: "Online invoice payments ready",
-        body: "Customers can pay eligible issued invoices online.",
+        title: "Online payments are ready.",
+        body: "Customers can pay eligible EveryStep FieldWorks invoices online.",
       };
     }
 
     if (hasConnectedAccountId) {
       return {
         tone: "warn" as const,
-        title: readiness.disabledReason ? "Payment setup needs attention" : "Finish online payment setup",
-        body: "Finish setup before customers can pay Compliance Matters invoices online.",
+        title: readiness.disabledReason ? "Online payments need attention." : "Finish online payment setup.",
+        body: "Finish setup before customers can pay EveryStep FieldWorks invoices online.",
       };
     }
 
     return {
       tone: "warn" as const,
-      title: "Online invoice payments not set up",
-      body: "Let customers pay invoices online through Compliance Matters.",
+      title: "Finish online payment setup.",
+      body: "Set up customer online payments for EveryStep FieldWorks invoices.",
     };
   })();
   const statusClass =
@@ -1373,7 +1372,7 @@ function TenantStripePaymentsSection({
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
         <div className="text-sm font-semibold text-slate-950">Online Payments</div>
         <div className="mt-1 text-sm text-slate-600">
-          Let customers pay invoices online through Compliance Matters.
+          Let customers pay EveryStep FieldWorks invoices online.
         </div>
       </div>
 
@@ -1408,7 +1407,9 @@ function TenantStripePaymentsSection({
         </div>
 
         <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-600">
-          Customer payment links are available from issued invoice workspaces when online invoice payments are ready.
+          {usesInternalInvoices
+            ? "Online payments apply to invoices created in EveryStep FieldWorks."
+            : "Online payments are optional here because invoices are managed outside EveryStep FieldWorks."}
         </div>
 
         <details className="group rounded-2xl border border-slate-200 bg-white px-4 py-3">

@@ -28,6 +28,30 @@ describe("company profile day 1 essentials wiring", () => {
     expect(pageSource).toContain("id=\"company-details\"");
     expect(pageSource).toContain("id=\"invoice-settings\"");
     expect(pageSource).toContain("id=\"account-billing\"");
+    expect(pageSource).toContain("id=\"accept-payments\"");
+  });
+
+  it("separates invoice workflow settings from online payment collection", () => {
+    const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
+
+    expect(pageSource).toContain("Choose where your company creates and manages invoices.");
+    expect(pageSource).toContain("Company invoice workflow");
+    expect(pageSource).toContain("Track billing outside EveryStep FieldWorks");
+    expect(pageSource).toContain("use EveryStep for job workflow and closeout");
+    expect(pageSource).toContain("Use EveryStep FieldWorks invoices");
+    expect(pageSource).toContain("create, send, and track invoices from each job.");
+    expect(pageSource).toContain("Let customers pay EveryStep FieldWorks invoices online.");
+    expect(pageSource).toContain("Online payments apply to invoices created in EveryStep FieldWorks.");
+    expect(pageSource).toContain("Online payments are optional here because invoices are managed outside EveryStep FieldWorks.");
+  });
+
+  it("keeps invoice and payment actions wired", () => {
+    const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
+
+    expect(pageSource).toContain("action={saveInvoiceModeFromForm}");
+    expect(pageSource).toContain("action={startTenantStripeConnectOnboardingFromForm}");
+    expect(pageSource).toContain("action={refreshTenantStripeConnectReadinessFromForm}");
+    expect(pageSource).toContain("Refresh payment status");
   });
 
   it("keeps subscription and payment diagnostics behind advanced details", () => {

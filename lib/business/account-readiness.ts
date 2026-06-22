@@ -108,7 +108,7 @@ export async function resolveAccountReadiness(
         {
           key: "accept_online_invoice_payments",
           label: "Online Payments",
-          description: "Let customers pay invoices online through Compliance Matters.",
+          description: "Let customers pay EveryStep FieldWorks invoices online.",
           status: "optional",
           href: "/ops/admin/company-profile#accept-payments",
         },
@@ -239,8 +239,8 @@ export async function resolveAccountReadiness(
       key: "accept_online_invoice_payments",
       label: "Online Payments",
       description: tenantStripeReadiness.isReady
-        ? "Online invoice payments are ready."
-        : "Let customers pay invoices online through Compliance Matters.",
+        ? "Online payments are ready."
+        : "Let customers pay EveryStep FieldWorks invoices online.",
       status: tenantStripeReadiness.isReady ? "complete" : "incomplete",
       href: "/ops/admin/company-profile#accept-payments",
     });
@@ -263,7 +263,7 @@ export async function resolveAccountReadiness(
     optionalItems.push({
       key: "online_invoice_payments",
       label: "Online Payments",
-      description: "Not used when your company tracks billing outside Compliance Matters.",
+      description: "Online payments are optional when invoices are managed outside EveryStep FieldWorks.",
       status: "optional",
       href: "/ops/admin/company-profile#accept-payments",
     });

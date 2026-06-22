@@ -462,7 +462,7 @@ describe("resolveAccountReadiness", () => {
 
     expect(item?.status).toBe("incomplete");
     expect(item?.label).toBe("Online Payments");
-    expect(item?.description).toBe("Let customers pay invoices online through Compliance Matters.");
+    expect(item?.description).toBe("Let customers pay EveryStep FieldWorks invoices online.");
     expect(item?.href).toBe("/ops/admin/company-profile#accept-payments");
     expect(summary.isOperationallyReady).toBe(false);
   });
@@ -492,7 +492,7 @@ describe("resolveAccountReadiness", () => {
     const item = summary.items.find((x) => x.key === "accept_online_invoice_payments");
 
     expect(item?.status).toBe("complete");
-    expect(item?.description).toBe("Online invoice payments are ready.");
+    expect(item?.description).toBe("Online payments are ready.");
     expect(summary.isOperationallyReady).toBe(true);
   });
 
@@ -514,7 +514,7 @@ describe("resolveAccountReadiness", () => {
     const item = summary.items.find((x) => x.key === "online_invoice_payments");
 
     expect(item?.status).toBe("optional");
-    expect(item?.description).toBe("Not used when your company tracks billing outside Compliance Matters.");
+    expect(item?.description).toBe("Online payments are optional when invoices are managed outside EveryStep FieldWorks.");
     expect(item?.href).toBe("/ops/admin/company-profile#accept-payments");
     expect(summary.isOperationallyReady).toBe(true);
   });
