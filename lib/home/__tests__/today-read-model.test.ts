@@ -36,6 +36,7 @@ function job(overrides: Partial<TodayJobSummary> = {}): TodayJobSummary {
     windowEnd: null,
     jobAddress: null,
     city: null,
+    state: null,
     customerFirstName: null,
     customerLastName: null,
     customerPhone: null,

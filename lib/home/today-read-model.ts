@@ -55,6 +55,11 @@ import {
   isTodayWithoutTechCandidateJob,
 } from "@/lib/ops/without-tech-predicate";
 import { countPendingContractorIntakeQueueRows } from "@/lib/ops/contractor-intake-queue";
+import {
+  loadTodayFieldConditions,
+  normalizeTodayJobLocation,
+  type TodayFieldConditions,
+} from "@/lib/home/today-field-conditions";
 
 // -----------------------------------------------------------------------------
 // Public types
@@ -70,6 +75,7 @@ export type TodayJobSummary = {
   windowEnd: string | null;
   jobAddress: string | null;
   city: string | null;
+  state: string | null;
   customerFirstName: string | null;
   customerLastName: string | null;
   customerPhone: string | null;
@@ -236,6 +242,7 @@ export type TodayReadModel = {
   role: InternalRole;
   todayHeader: TodayHeader;
   dailyBriefing: string;
+  fieldConditions: TodayFieldConditions | null;
   nextBestAction: NextBestAction;
   todayWork: {
     label: string;
@@ -367,11 +374,12 @@ async function safeQueryAssignedJobIdsForUser(
 }
 
 const TODAY_JOB_SELECT =
-  "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, field_complete, field_complete_at, deleted_at, created_at";
+  "id, title, status, ops_status, scheduled_date, window_start, window_end, city, job_address, customer_first_name, customer_last_name, customer_phone, field_complete, field_complete_at, deleted_at, created_at, locations:location_id(city, state)";
 
 function normalizeJob(row: any): TodayJobSummary | null {
   const id = String(row?.id ?? "").trim();
   if (!id) return null;
+  const location = normalizeTodayJobLocation(row);
   return {
     id,
     title: String(row?.title ?? "").trim() || "Untitled Job",
@@ -381,7 +389,8 @@ function normalizeJob(row: any): TodayJobSummary | null {
     windowStart: row?.window_start ? String(row.window_start) : null,
     windowEnd: row?.window_end ? String(row.window_end) : null,
     jobAddress: row?.job_address ? String(row.job_address) : null,
-    city: row?.city ? String(row.city) : null,
+    city: location.city,
+    state: location.state,
     customerFirstName: row?.customer_first_name ? String(row.customer_first_name) : null,
     customerLastName: row?.customer_last_name ? String(row.customer_last_name) : null,
     customerPhone: row?.customer_phone ? String(row.customer_phone) : null,
@@ -2100,6 +2109,13 @@ async function buildTodayReadModelForInternalActor(
     ]),
   );
 
+  const fieldConditions = await localTimedPhase("fieldConditionsRead", () =>
+    loadTodayFieldConditions({
+      jobs: todayJobs,
+      today,
+    }),
+  );
+
   const servicePlansOverdue = servicePlans?.due_counts?.overdue ?? null;
   const servicePlansDueIn7 = servicePlans?.due_counts?.due_in_next_7_days ?? null;
   const servicePlansNotScheduled = servicePlans?.due_counts?.not_scheduled_active ?? null;
@@ -2206,6 +2222,7 @@ async function buildTodayReadModelForInternalActor(
     role,
     todayHeader,
     dailyBriefing,
+    fieldConditions,
     nextBestAction,
     todayWork: {
       label: todayLabel,

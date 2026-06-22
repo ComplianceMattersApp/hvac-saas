@@ -7,6 +7,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { Cloud, CloudRain, Sun, Wind } from "lucide-react";
 
 import {
   buildTodayReadModel,
@@ -21,6 +22,7 @@ import {
   type TodayJobSummary,
   type TodayReadModel,
 } from "@/lib/home/today-read-model";
+import type { TodayFieldConditions } from "@/lib/home/today-field-conditions";
 import TodayWelcomeModal from "@/components/home/TodayWelcomeModal";
 import {
   landingPathForDualContextAccess,
@@ -105,7 +107,11 @@ export default async function TodayPage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-3 pb-12 sm:px-5 sm:space-y-5 lg:space-y-6 lg:px-6">
       <TodayWelcomeModal initiallyOpen={model.showWelcomeModal} />
-      <HeaderSection header={model.todayHeader} briefing={model.dailyBriefing} />
+      <HeaderSection
+        header={model.todayHeader}
+        briefing={model.dailyBriefing}
+        fieldConditions={model.fieldConditions}
+      />
 
       {/* MOBILE-FIRST RANKED STREAM (visible on mobile, hidden on lg+) */}
       <div className="space-y-4 lg:hidden">
@@ -208,9 +214,11 @@ export default async function TodayPage() {
 function HeaderSection({
   header,
   briefing,
+  fieldConditions,
 }: {
   header: TodayHeader;
   briefing: string;
+  fieldConditions: TodayFieldConditions | null;
 }) {
   return (
     <section className="overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-[0_24px_52px_-30px_rgba(15,31,53,0.34)]">
@@ -255,7 +263,55 @@ function HeaderSection({
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
         <p className="text-sm font-medium leading-6 text-slate-800">{briefing}</p>
       </div>
+
+      {fieldConditions ? (
+        <div className="border-t border-slate-100 bg-slate-50/60 px-3.5 py-2.5 sm:px-4">
+          <FieldConditionsChip conditions={fieldConditions} />
+        </div>
+      ) : null}
     </section>
+  );
+}
+
+function FieldConditionsChip({ conditions }: { conditions: TodayFieldConditions }) {
+  const Icon =
+    conditions.icon === "rain"
+      ? CloudRain
+      : conditions.icon === "wind"
+      ? Wind
+      : conditions.icon === "cloud"
+      ? Cloud
+      : Sun;
+  const rainLabel =
+    conditions.rainChancePercent != null && conditions.rainChancePercent >= 20
+      ? ` · ${conditions.rainChancePercent}% rain`
+      : "";
+  const windLabel = conditions.windMph != null ? ` · ${conditions.windMph} mph wind` : "";
+
+  return (
+    <div className="flex flex-col gap-2 rounded-xl border border-slate-200/80 bg-white/90 px-3 py-2.5 shadow-[0_12px_26px_-24px_rgba(15,31,53,0.5)] sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-blue-100 bg-blue-50 text-blue-700">
+          <Icon className="h-[18px] w-[18px]" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">
+              {conditions.label}
+            </span>
+            <span className="text-[11px] font-medium text-slate-500">{conditions.locationLabel}</span>
+          </div>
+          <div className="mt-0.5 text-sm font-semibold text-slate-900">
+            {conditions.currentTempF}&deg; now &middot; High {conditions.highTempF}&deg; &middot; {conditions.condition}
+            {rainLabel}
+            {windLabel}
+          </div>
+        </div>
+      </div>
+      <p className="text-sm font-medium leading-5 text-slate-600 sm:max-w-[18rem] sm:text-right">
+        {conditions.note}
+      </p>
+    </div>
   );
 }
 
