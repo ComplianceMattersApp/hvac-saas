@@ -6,47 +6,33 @@ function readWorkspaceFile(path: string) {
 }
 
 describe("company profile first job training wiring", () => {
-  it("renders first job training copy and plain-English checklist", () => {
+  it("renders compact first job training card", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
     expect(pageSource).toContain("First job training");
-    expect(pageSource).toContain("Open Training Room when you want the step-by-step first job path.");
-    expect(pageSource).toContain("Confirm company details");
-    expect(pageSource).toContain("Invite your team");
-    expect(pageSource).toContain("Create your first customer");
-    expect(pageSource).toContain("Create your first job");
-    expect(pageSource).toContain("Schedule and assign the job");
-    expect(pageSource).toContain("Have the tech add notes from the field");
-    expect(pageSource).toContain("Close out the work and handle the invoice");
-    expect(pageSource).toContain("Use Today/Ops each morning");
+    expect(pageSource).toContain("Open Training Room for the step-by-step first job path.");
     expect(pageSource).toContain('href="/training"');
+    expect(pageSource).not.toContain("<ol");
   });
 
-  it("renders This can wait guidance and avoids stale 14-day trial copy", () => {
+  it("keeps training content out of the primary profile flow", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain("This can wait");
-    expect(pageSource).toContain("service plans unless you use them now");
-    expect(pageSource).toContain("payment automation");
-    expect(pageSource).toContain("contractor collaboration");
+    expect(pageSource.indexOf('id="company-details"')).toBeLessThan(pageSource.indexOf("First job training"));
     expect(pageSource).not.toContain("14-day trial");
     expect(pageSource).not.toContain("14 day trial");
   });
 
-  it("shows trial-specific helper only behind trial status and keeps non-trial helper", () => {
+  it("does not keep old trial-guide helper copy in Company Profile", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain('entitlement.entitlementStatus === "trial"');
-    expect(pageSource).toContain("Use your 30-day trial to prove the daily routine.");
-    expect(pageSource).toContain("Use this guide to train your team or tighten your daily routine.");
+    expect(pageSource).not.toContain("Use your 30-day trial to prove the daily routine.");
+    expect(pageSource).not.toContain("Use this guide to train your team or tighten your daily routine.");
   });
 
-  it("keeps existing setup actions visible on company profile", () => {
+  it("keeps training room action visible on company profile", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain("href=\"#company-details\"");
-    expect(pageSource).toContain("href=\"/ops/admin/internal-users\"");
-    expect(pageSource).toContain("href=\"#account-billing\"");
-    expect(pageSource).toContain("href=\"#invoice-settings\"");
+    expect(pageSource).toContain("Open Training Room");
   });
 });

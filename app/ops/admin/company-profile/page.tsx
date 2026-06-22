@@ -288,97 +288,6 @@ export default async function AdminCompanyProfilePage({
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-slate-900">Setup attention</div>
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
-            {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
-          </div>
-        </div>
-        <div className="mt-1 text-sm leading-6 text-slate-600">
-          Finish the items that affect your company profile, team access, invoices, and subscription.
-        </div>
-
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <Link href="#company-details" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
-            Confirm company details
-          </Link>
-          <Link href="/ops/admin/internal-users" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
-            Invite your team
-          </Link>
-          <Link href="#account-billing" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
-            Review subscription
-          </Link>
-          <Link href="#invoice-settings" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
-            Pick your invoice mode
-          </Link>
-        </div>
-
-        {readiness.isOperationallyReady ? (
-          <div className="mt-2 font-medium text-emerald-700">Setup items are complete.</div>
-        ) : (
-          <div className="mt-2 space-y-1">
-            <div className="font-medium text-amber-700">Needs attention</div>
-            {incompleteRequiredItems.map((item) => (
-              <div key={item.key} className="flex flex-wrap items-center gap-2 text-slate-700">
-                <span>{item.key === "billing_mode" ? "Choose how invoices are handled" : `Finish: ${item.label}`}</span>
-                {item.href ? (
-                  <Link href={item.href} className="text-xs font-semibold text-slate-900 underline-offset-2 hover:underline">
-                    Open
-                  </Link>
-                ) : null}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm">
-        <div className="font-semibold text-slate-900">First job training</div>
-        <p className="mt-1 text-sm leading-6 text-slate-600">
-          Open Training Room when you want the step-by-step first job path.
-        </p>
-
-        <ol className="mt-3 space-y-1.5 pl-5 text-sm leading-6 text-slate-700">
-          <li>Confirm company details</li>
-          <li>Invite your team</li>
-          <li>Create your first customer</li>
-          <li>Create your first job</li>
-          <li>Schedule and assign the job</li>
-          <li>Have the tech add notes from the field</li>
-          <li>Close out the work and handle the invoice</li>
-          <li>Use Today/Ops each morning</li>
-        </ol>
-
-        <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
-          <Link href="/customers/new" className="rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-800 hover:bg-slate-100">
-            Create first customer
-          </Link>
-          <Link href="/jobs/new" className="rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-800 hover:bg-slate-100">
-            Create first job
-          </Link>
-          <Link href="/today" className="rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-800 hover:bg-slate-100">
-            Open Today/Ops
-          </Link>
-          <Link href="/training" className="rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-800 hover:bg-slate-100">
-            Open Training Room
-          </Link>
-        </div>
-
-        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
-          <div className="font-semibold text-slate-800">This can wait</div>
-          <div className="mt-1">
-            Advanced reports, service plans unless you use them now, payment automation, contractor collaboration, and deep settings.
-          </div>
-        </div>
-
-        <div className="mt-3 text-xs leading-5 text-slate-600">
-          {entitlement.entitlementStatus === "trial"
-            ? "Use your 30-day trial to prove the daily routine."
-            : "Use this guide to train your team or tighten your daily routine."}
-        </div>
-      </div>
-
       <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
           <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
@@ -515,6 +424,46 @@ export default async function AdminCompanyProfilePage({
               </button>
             </div>
           </form>
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        {incompleteRequiredItems.length > 0 ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-sm text-amber-950">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="font-semibold">Setup attention</div>
+              <div className="text-xs font-semibold uppercase tracking-wide">
+                {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
+              </div>
+            </div>
+            <div className="mt-1 text-sm leading-6 text-amber-900">
+              Finish only the items that need attention.
+            </div>
+            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+              {incompleteRequiredItems.map((item) => (
+                <div key={item.key} className="rounded-lg border border-amber-200 bg-white/80 px-3 py-2 text-sm text-amber-950">
+                  <div className="font-medium">
+                    {item.key === "billing_mode" ? "Choose how invoices are handled" : `Finish: ${item.label}`}
+                  </div>
+                  {item.href ? (
+                    <Link href={item.href} className="mt-1 inline-flex text-xs font-semibold text-amber-950 underline-offset-2 hover:underline">
+                      Open
+                    </Link>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm">
+          <div className="font-semibold text-slate-900">First job training</div>
+          <p className="mt-1 text-sm leading-6 text-slate-600">
+            Open Training Room for the step-by-step first job path.
+          </p>
+          <Link href="/training" className="mt-3 inline-flex rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-100">
+            Open Training Room
+          </Link>
         </div>
       </div>
 

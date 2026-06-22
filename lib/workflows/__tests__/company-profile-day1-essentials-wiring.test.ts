@@ -10,17 +10,16 @@ describe("company profile day 1 essentials wiring", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
     expect(pageSource).toContain("Setup attention");
-    expect(pageSource).toContain("Finish the items that affect your company profile");
+    expect(pageSource).toContain("Finish only the items that need attention.");
     expect(pageSource).toContain("Open Training Room");
   });
 
-  it("wires day 1 guidance links to existing setup sections/actions", () => {
+  it("keeps company details before setup and training content", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain("href=\"#company-details\"");
-    expect(pageSource).toContain("href=\"/ops/admin/internal-users\"");
-    expect(pageSource).toContain("href=\"#account-billing\"");
-    expect(pageSource).toContain("href=\"#invoice-settings\"");
+    expect(pageSource.indexOf('id="company-details"')).toBeGreaterThan(-1);
+    expect(pageSource.indexOf("Setup attention")).toBeGreaterThan(pageSource.indexOf('id="company-details"'));
+    expect(pageSource.indexOf("First job training")).toBeGreaterThan(pageSource.indexOf('id="company-details"'));
   });
 
   it("keeps linked section anchors on existing company profile sections", () => {
