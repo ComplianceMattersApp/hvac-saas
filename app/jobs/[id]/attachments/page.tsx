@@ -284,10 +284,10 @@ export default async function JobAttachmentsPage({
         {isRefrigerantChargePhotoContext ? (
           <div className="space-y-1">
             <div className="font-medium text-slate-700">
-              Refrigerant charge photo support mode.
+              Refrigerant charge photo evidence.
             </div>
             <div>
-              Photo Taken still lives in ECC as attestation. Attach the actual photo here as supporting evidence.
+              This library stores the job attachments used by the Refrigerant Charge workflow.
             </div>
           </div>
         ) : (

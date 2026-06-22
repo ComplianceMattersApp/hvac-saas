@@ -11,6 +11,7 @@ import DuctLeakageEntryFields from "@/components/jobs/DuctLeakageEntryFields";
 import DuctLeakageMethodFields from "@/components/jobs/DuctLeakageMethodFields";
 import RefrigerantChargeExceptionFields from "@/components/jobs/RefrigerantChargeExceptionFields";
 import RefrigerantChargeInlinePreview from "@/components/jobs/RefrigerantChargeInlinePreview";
+import RefrigerantChargePhotoEvidencePanel from "@/components/jobs/RefrigerantChargePhotoEvidencePanel";
 import { resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
 import {
   isInternalAccessError,
@@ -68,7 +69,7 @@ import {
 function getEffectiveResultLabel(t: any) {
   if (t.override_pass === true) return "PASS (override)";
   if (t.override_pass === false) return "FAIL (override)";
-  if (t.computed?.status === "photo_evidence") return "Photo Taken (attestation)";
+  if (t.computed?.status === "photo_evidence") return "Photo Evidence";
   if (t.computed?.status === "blocked") return "BLOCKED (conditions)";
   if (t.computed_pass === true) return "PASS";
   if (t.computed_pass === false) return "FAIL";
@@ -220,7 +221,7 @@ function getRequiredTestStatusForSystem(job: any, systemId: string, testType: Ec
   if (run.computed?.status === "photo_evidence") {
     return {
       state: "attestation" as const,
-      label: "Photo Taken",
+      label: "Photo Evidence",
       tone: "border-blue-200 bg-blue-50 text-blue-700",
       run,
     };
@@ -318,7 +319,7 @@ function getTestStatusHelp(state: string, carriedForward: boolean) {
   if (state === "saved") return "Draft readings are saved. Complete when verified.";
   if (state === "pass_override") return "Completed with pass override.";
   if (state === "fail_override") return "Completed with fail override.";
-  if (state === "attestation") return "Completed by Photo Taken attestation.";
+  if (state === "attestation") return "Completed with photo evidence.";
   if (state === "pass") return "Completed and passed.";
   if (state === "fail") return "Completed and failed.";
   return "Needs review before closeout.";
@@ -1694,6 +1695,15 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
             <div className="font-semibold">Manual override needs a reason.</div>
             <div className="mt-1">
               Enter an <span className="font-semibold">override reason</span> before completing this test.
+            </div>
+          </div>
+        )}
+        {notice === "photo_result_required" && (
+          <div className="rounded-lg border border-rose-300 bg-rose-50 px-4 py-3 text-sm text-rose-950 shadow-sm">
+            <div className="font-semibold">Photo evidence needs a result.</div>
+            <div className="mt-1">
+              Choose <span className="font-semibold">Pass</span>, <span className="font-semibold">Fail</span>, or{" "}
+              <span className="font-semibold">Needs Review</span> before completing Refrigerant Charge.
             </div>
           </div>
         )}
@@ -3451,7 +3461,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                           name="photo_taken_attested"
                           defaultChecked={!!runFan.data?.photo_taken_attested}
                         />
-                        Photo Taken - attestation only
+                        Photo evidence - attestation only
                       </label>
                     </div>
                   </details>
@@ -4597,6 +4607,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   <input type="hidden" name="test_run_id" value={runRC.id} />
                   <RefrigerantChargeExceptionFields
                     initialExceptionReason={runRC.data?.charge_exempt_details ?? ""}
+                    initialPhotoResult={runRC.data?.photo_evidence_result ?? ""}
                     initialExceptionValue={
                       runRC.data?.verification_method === "photo_taken"
                         ? "photo_taken"
@@ -4604,78 +4615,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                     }
                     runId={runRC.id}
                   >
-                    <div className="rounded-xl border border-blue-100 bg-white/80 px-3 py-3 text-xs text-blue-800">
-                      <div className="font-medium text-blue-900">
-                        Photo Taken records the field attestation. Attach the photo to the job for supporting evidence.
-                      </div>
-                      <div className="mt-2">
-                        <Link
-                          href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
-                          className={eccSecondaryButtonClass}
-                        >
-                          Attach refrigerant charge photo
-                        </Link>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-slate-200 bg-white px-3 py-3 text-xs text-slate-700">
-                      <div className="font-medium text-slate-900">Refrigerant Charge Photo Evidence</div>
-                      <div className="mt-1 text-slate-600">
-                        Photo evidence supports the field record. It does not automatically verify numeric pass/fail.
-                      </div>
-
-                      {refrigerantEvidenceAttachments.length ? (
-                        <div className="mt-2 space-y-2">
-                          {refrigerantEvidenceAttachments.slice(0, 3).map((attachment) => (
-                            <div
-                              key={attachment.id}
-                              className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2"
-                            >
-                              <div className="font-medium text-emerald-900">Refrigerant charge photo attached</div>
-                              <div className="mt-1 break-all text-emerald-800">{attachment.fileName}</div>
-                              <div className="mt-1 text-emerald-700">
-                                Uploaded{" "}
-                                {attachment.uploadedAt
-                                  ? new Date(attachment.uploadedAt).toLocaleString()
-                                  : "(date unavailable)"}
-                              </div>
-                              {attachment.caption ? (
-                                <div className="mt-1 text-emerald-700">{attachment.caption}</div>
-                              ) : null}
-                              {attachment.signedUrl ? (
-                                <a
-                                  href={attachment.signedUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="mt-2 inline-flex min-h-9 items-center justify-center rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
-                                >
-                                  Open attachment
-                                </a>
-                              ) : null}
-                            </div>
-                          ))}
-
-                          {refrigerantEvidenceAttachments.length > 3 ? (
-                            <div className="text-slate-600">
-                              +{refrigerantEvidenceAttachments.length - 3} more refrigerant charge evidence file(s) in Attachments.
-                            </div>
-                          ) : null}
-                        </div>
-                      ) : (
-                        <div className="mt-2 rounded-md border border-dashed border-slate-300 bg-slate-50 px-3 py-2 text-slate-600">
-                          No refrigerant charge photo attached yet.
-                        </div>
-                      )}
-
-                      <div className="mt-2">
-                        <Link
-                          href={`/jobs/${job.id}/attachments?context=refrigerant-charge-photo`}
-                          className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-                        >
-                          View refrigerant charge photo attachments
-                        </Link>
-                      </div>
-                    </div>
+                    <RefrigerantChargePhotoEvidencePanel
+                      jobId={job.id}
+                      systemName={selectedSystemName}
+                      evidenceAttachments={refrigerantEvidenceAttachments}
+                    />
                   </RefrigerantChargeExceptionFields>
                   <input type="hidden" name="outdoor_temp_f" value={runRC.data?.outdoor_temp_f ?? ""} />
 

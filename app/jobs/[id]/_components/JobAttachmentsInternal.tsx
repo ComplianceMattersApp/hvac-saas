@@ -12,6 +12,7 @@ import {
   updateInternalJobAttachmentCaption,
 } from "@/lib/actions/attachment-actions";
 import type { AttachmentReviewSummary } from "@/lib/jobs/attachment-review-summary";
+import { stripRefrigerantChargeEvidenceTag } from "@/lib/jobs/refrigerant-charge-evidence";
 
 type Item = {
   id: string;
@@ -235,7 +236,7 @@ export default function JobAttachmentsInternal({
     setError(null);
     setOk(null);
     setEditingId(attachment.id);
-    setEditingCaption(String(attachment.caption ?? ""));
+    setEditingCaption(stripRefrigerantChargeEvidenceTag(attachment.caption));
   }
 
   function cancelEdit() {
@@ -412,6 +413,7 @@ export default function JobAttachmentsInternal({
                 const sizeLabel = formatFileSize(a.file_size);
                 const typeLabel = fileTypeLabel(a.content_type, a.file_name);
                 const glyph = fileGlyph(a.content_type, a.file_name);
+                const visibleCaption = stripRefrigerantChargeEvidenceTag(a.caption);
 
                 return (
                   <div
@@ -522,10 +524,10 @@ export default function JobAttachmentsInternal({
                             </button>
                           </div>
                         </div>
-                      ) : a.caption ? (
+                      ) : visibleCaption ? (
                         <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2">
                           <div className="line-clamp-2 text-sm text-slate-700">
-                            {a.caption}
+                            {visibleCaption}
                           </div>
                         </div>
                       ) : null}
@@ -537,7 +539,7 @@ export default function JobAttachmentsInternal({
                           disabled={isPending || isDeleting}
                           className="inline-flex min-h-10 items-center justify-center rounded-md border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-50"
                         >
-                          {isEditing ? "Editing..." : a.caption ? "Edit Title" : "Add Title"}
+                          {isEditing ? "Editing..." : visibleCaption ? "Edit Title" : "Add Title"}
                         </button>
 
                         <button

@@ -98,11 +98,11 @@ function makeAttachmentMutationFixture(options: FixtureOptions = {}) {
             writes.push({ table, op: "insert", payload: values });
             return Promise.resolve({ data: values, error: null });
           }),
-          update: vi.fn(() => ({
+          update: vi.fn((values: Record<string, unknown>) => ({
             eq: vi.fn((_idColumn: string, idValue: unknown) => ({
               eq: vi.fn(() => ({
                 eq: vi.fn(async () => {
-                  writes.push({ table, op: "update" });
+                  writes.push({ table, op: "update", payload: values });
                   updatedAttachmentIds.push(String(idValue ?? "").trim());
                   return { error: null };
                 }),
@@ -713,6 +713,44 @@ describe("attachment entitlement hardening", () => {
       expect(fixture.writes.some((w) => w.table === "attachments" && w.op === "update")).toBe(true);
       expect(fixture.writes.some((w) => w.table === "job_events" && w.op === "insert")).toBe(true);
       expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1");
+    });
+
+    it("preserves refrigerant charge evidence context when editing attachment title", async () => {
+      const fixture = makeAttachmentMutationFixture({
+        attachments: [
+          {
+            id: "attachment-2",
+            entity_type: "job",
+            entity_id: "job-1",
+            bucket: "attachments",
+            storage_path: "job/job-1/attachment-2-proof.pdf",
+            file_name: "proof.pdf",
+            caption: `${REFRIGERANT_CHARGE_ATTACHMENT_TAG} Old title`,
+          },
+        ],
+      });
+      createClientMock.mockResolvedValue(fixture.supabase);
+      createAdminClientMock.mockReturnValue(fixture.adminClient);
+      loadScopedInternalJobAttachmentForMutationMock.mockResolvedValueOnce({
+        attachment: {
+          id: "attachment-2",
+          file_name: "proof.pdf",
+          caption: `${REFRIGERANT_CHARGE_ATTACHMENT_TAG} Old title`,
+        },
+      });
+
+      const { updateInternalJobAttachmentCaption } = await import("@/lib/actions/attachment-actions");
+
+      await updateInternalJobAttachmentCaption({
+        jobId: "job-1",
+        attachmentId: "attachment-2",
+        caption: "Clean field label",
+      });
+
+      const updateWrite = fixture.writes.find((w) => w.table === "attachments" && w.op === "update");
+      expect((updateWrite?.payload as Record<string, unknown>)?.caption).toBe(
+        `${REFRIGERANT_CHARGE_ATTACHMENT_TAG} Clean field label`,
+      );
     });
 
     it("blocks missing entitlement attachment title updates before writes", async () => {

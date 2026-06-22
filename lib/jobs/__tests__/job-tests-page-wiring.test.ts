@@ -22,6 +22,11 @@ const jobLocationPreviewImageSource = readFileSync(
   "utf8",
 );
 
+const jobAttachmentsInternalSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/JobAttachmentsInternal.tsx"),
+  "utf8",
+);
+
 const ductLeakageEntryFieldsSource = readFileSync(
   resolve(__dirname, "../../../components/jobs/DuctLeakageEntryFields.tsx"),
   "utf8",
@@ -39,6 +44,11 @@ const refrigerantChargeExceptionFieldsSource = readFileSync(
 
 const refrigerantChargeInlinePreviewSource = readFileSync(
   resolve(__dirname, "../../../components/jobs/RefrigerantChargeInlinePreview.tsx"),
+  "utf8",
+);
+
+const refrigerantChargePhotoEvidencePanelSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/RefrigerantChargePhotoEvidencePanel.tsx"),
   "utf8",
 );
 
@@ -125,15 +135,20 @@ describe("job tests page wiring", () => {
     expect(refrigerantBlock).toContain('RefrigerantChargeExceptionFields');
     expect(refrigerantBlock).toContain('RefrigerantChargeInlinePreview formId={rcSaveFormId} kind="subcool"');
     expect(refrigerantBlock).toContain('RefrigerantChargeInlinePreview formId={rcSaveFormId} kind="superheat"');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('name="rc_documentation_method"');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('Enter readings');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('Photo evidence');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('Exception / Not applicable');
     expect(refrigerantChargeExceptionFieldsSource).toContain('name="rc_exception"');
-    expect(refrigerantChargeExceptionFieldsSource).toContain('No exception');
     expect(refrigerantChargeExceptionFieldsSource).toContain('Package unit');
     expect(refrigerantChargeExceptionFieldsSource).toContain('Conditions not met / weather');
-    expect(refrigerantChargeExceptionFieldsSource).toContain('Photo Taken');
     expect(refrigerantChargeExceptionFieldsSource).toContain('name="rc_photo_taken"');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('name="rc_photo_result"');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('Needs Review');
     expect(refrigerantChargeExceptionFieldsSource).toContain('name="rc_override_details"');
     expect(refrigerantChargeExceptionFieldsSource).toContain('required');
-    expect(refrigerantChargeExceptionFieldsSource).toContain('showEvidence ? children : null');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('showEvidence ? (');
+    expect(refrigerantChargeExceptionFieldsSource).toContain('{children}');
     expect(refrigerantChargeInlinePreviewSource).toContain('const SUBCOOL_TOLERANCE_F = 3');
     expect(refrigerantChargeInlinePreviewSource).toContain('const SUPERHEAT_MAX_F = 25');
     expect(refrigerantChargeInlinePreviewSource).toContain('condenserSat - liquidLineTemp');
@@ -151,14 +166,24 @@ describe("job tests page wiring", () => {
     expect(refrigerantBlock).toContain('Evaporator Saturation Temp');
     expect(refrigerantChargeInlinePreviewSource).toContain('Measured Subcool');
     expect(refrigerantChargeInlinePreviewSource).toContain('Measured Superheat');
-    expect(refrigerantBlock).toContain('Photo Taken records the field attestation.');
-    expect(refrigerantBlock).toContain('Attach refrigerant charge photo');
+    expect(refrigerantBlock).toContain('RefrigerantChargePhotoEvidencePanel');
+    expect(refrigerantChargePhotoEvidencePanelSource).toContain('Take Photo');
+    expect(refrigerantChargePhotoEvidencePanelSource).toContain('Upload Photo');
+    expect(refrigerantChargePhotoEvidencePanelSource).toContain('capture="environment"');
+    expect(refrigerantChargePhotoEvidencePanelSource.match(/capture=/g) ?? []).toHaveLength(1);
+    expect(refrigerantChargePhotoEvidencePanelSource).toContain('attachmentEvidenceContext: "refrigerant_charge_photo"');
     expect(refrigerantBlock).not.toContain('Photo / Notes');
     expect(refrigerantBlock).not.toContain('Photo Taken - user attests gauge photo was captured');
     expect(refrigerantBlock).not.toContain('EccLivePreview mode="refrigerant_charge"');
     expect(refrigerantBlock).not.toContain('className="mt-3 grid grid-cols-2 gap-2 text-center"');
     expect(refrigerantBlock).not.toContain('className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2"');
     expect(refrigerantBlock).not.toContain('id={`out-${runRC.id}`}');
+  });
+
+  it("strips refrigerant evidence tags from attachment display and edit labels", () => {
+    expect(jobAttachmentsInternalSource).toContain("stripRefrigerantChargeEvidenceTag");
+    expect(jobAttachmentsInternalSource).toContain("setEditingCaption(stripRefrigerantChargeEvidenceTag(attachment.caption))");
+    expect(jobAttachmentsInternalSource).toContain("const visibleCaption = stripRefrigerantChargeEvidenceTag(a.caption)");
   });
 
   it("opens Completion Report as a report-first print view", () => {

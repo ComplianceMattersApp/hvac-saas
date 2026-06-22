@@ -109,12 +109,13 @@ function makeCapturingSupabase() {
 // Form helpers
 // ---------------------------------------------------------------------------
 
-function buildPhotoAttestation(): FormData {
+function buildPhotoAttestation(photoResult?: "pass" | "fail" | "needs_review"): FormData {
   const fd = new FormData();
   fd.set("job_id", "job-1");
   fd.set("test_run_id", "run-1");
   fd.set("system_id", "sys-1");
   fd.set("rc_photo_taken", "on");
+  if (photoResult) fd.set("rc_photo_result", photoResult);
   return fd;
 }
 
@@ -199,6 +200,19 @@ describe("saveRefrigerantChargeDataFromForm — photo attestation path", () => {
     expect(data.verification_method).toBe("photo_taken");
     expect(typeof data.photo_taken_timestamp).toBe("string");
     expect(new Date(data.photo_taken_timestamp).getTime()).toBeGreaterThan(0);
+  });
+
+  it("persists selected photo evidence result on save draft", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { saveRefrigerantChargeDataFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveRefrigerantChargeDataFromForm(buildPhotoAttestation("needs_review"))).rejects.toThrow("REDIRECT:");
+
+    const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
+    expect(update!.payload.data.photo_evidence_result).toBe("needs_review");
+    expect(update!.payload.computed_pass).toBeNull();
+    expect(update!.payload.override_pass).toBeNull();
   });
 
   it("sets computed.status = photo_evidence when photo attestation selected", async () => {
@@ -406,12 +420,24 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     revalidateEccProjectionConsumersMock.mockReturnValue(undefined);
   });
 
-  it("Complete Test with photo attestation: is_completed=true, computed_pass=null, computed.status=photo_evidence", async () => {
+  it("Complete Test with photo attestation requires explicit result", async () => {
     const { supabase, captured } = makeCapturingSupabase();
     createClientMock.mockResolvedValue(supabase);
 
     const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
     await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation())).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=photo_result_required",
+    );
+
+    expect(captured.filter((c) => c.table === "ecc_test_runs" && c.method === "update")).toHaveLength(0);
+  });
+
+  it("Complete Test with photo evidence needs review: is_completed=true, computed_pass=null, computed.status=photo_evidence", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation("needs_review"))).rejects.toThrow(
       "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=test_completed"
     );
 
@@ -421,7 +447,38 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     expect(update!.payload.computed_pass).toBeNull();
     expect(update!.payload.computed.status).toBe("photo_evidence");
     expect(update!.payload.data.verification_method).toBe("photo_taken");
+    expect(update!.payload.data.photo_evidence_result).toBe("needs_review");
     expect(update!.payload.override_pass).toBeNull();
+  });
+
+  it("Complete Test with photo evidence pass sets explicit override without computed pass", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation("pass"))).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=test_completed"
+    );
+
+    const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
+    expect(update!.payload.computed_pass).toBeNull();
+    expect(update!.payload.override_pass).toBe(true);
+    expect(update!.payload.override_reason).toContain("marked Pass");
+  });
+
+  it("Complete Test with photo evidence fail sets explicit fail override without computed pass", async () => {
+    const { supabase, captured } = makeCapturingSupabase();
+    createClientMock.mockResolvedValue(supabase);
+
+    const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
+    await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation("fail"))).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/tests?t=refrigerant_charge&s=sys-1&notice=test_completed"
+    );
+
+    const update = captured.find((c) => c.table === "ecc_test_runs" && c.method === "update");
+    expect(update!.payload.computed_pass).toBeNull();
+    expect(update!.payload.override_pass).toBe(false);
+    expect(update!.payload.override_reason).toContain("marked Fail");
   });
 
   it("Complete Test with photo attestation: evaluateEccOpsStatus is called", async () => {
@@ -429,7 +486,7 @@ describe("saveAndCompleteRefrigerantChargeFromForm — photo attestation path", 
     createClientMock.mockResolvedValue(supabase);
 
     const { saveAndCompleteRefrigerantChargeFromForm } = await import("@/lib/actions/job-actions");
-    await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation())).rejects.toThrow(
+    await expect(saveAndCompleteRefrigerantChargeFromForm(buildPhotoAttestation("needs_review"))).rejects.toThrow(
       "REDIRECT:"
     );
 

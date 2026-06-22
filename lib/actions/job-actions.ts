@@ -2046,6 +2046,14 @@ function normalizeServiceVisitOutcome(value: string | null | undefined) {
   return SERVICE_VISIT_OUTCOMES.has(normalized) ? normalized : null;
 }
 
+function normalizeRefrigerantChargePhotoResult(value: FormDataEntryValue | null) {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (normalized === "pass" || normalized === "fail" || normalized === "needs_review") {
+    return normalized;
+  }
+  return null;
+}
+
 /**
  * DERIVE SERVICE VISIT REASON (Step 5 Clean-Up):
  *
@@ -5529,6 +5537,9 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
 
     // Override / exemption flags (no schema change; stored + enforced via override_pass)
   const photoTaken = formData.get("rc_photo_taken") === "on";
+  const photoResult = photoTaken
+    ? normalizeRefrigerantChargePhotoResult(formData.get("rc_photo_result"))
+    : null;
   const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
   const exemptConditions = formData.get("rc_exempt_conditions") === "on";
   const overrideDetails =
@@ -5595,6 +5606,7 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
     // Photo Taken evidence
     verification_method: photoTaken ? "photo_taken" : null,
     photo_taken_timestamp: photoTaken ? new Date().toISOString() : null,
+    photo_evidence_result: photoResult,
   };
 
   const measuredSubcool =
@@ -5685,6 +5697,9 @@ export async function saveRefrigerantChargeDataFromForm(formData: FormData) {
 
   if (photoTaken) {
     warnings.push("User confirmed gauge photo was taken (photo attestation)");
+    if (photoResult === "pass") warnings.push("Photo evidence result selected: Pass");
+    if (photoResult === "fail") warnings.push("Photo evidence result selected: Fail");
+    if (photoResult === "needs_review") warnings.push("Photo evidence result selected: Needs Review");
     if (overrideDetails) warnings.push(`Photo attestation notes: ${overrideDetails}`);
   }
 
@@ -6882,6 +6897,9 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
 
   // Override / exemption flags (no schema change; stored + enforced via override_pass)
   const photoTaken = formData.get("rc_photo_taken") === "on";
+  const photoResult = photoTaken
+    ? normalizeRefrigerantChargePhotoResult(formData.get("rc_photo_result"))
+    : null;
   const exemptPackageUnit = formData.get("rc_exempt_package_unit") === "on";
   const exemptConditions = formData.get("rc_exempt_conditions") === "on";
   const overrideDetails =
@@ -6917,6 +6935,15 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
     redirect(`/jobs/${jobId}/tests?${q.toString()}`);
   }
 
+  if (photoTaken && !photoResult) {
+    const q = new URLSearchParams();
+    q.set("t", "refrigerant_charge");
+    const systemIdFromForm = String(formData.get("system_id") || "").trim();
+    if (systemIdFromForm) q.set("s", systemIdFromForm);
+    q.set("notice", "photo_result_required");
+    redirect(`/jobs/${jobId}/tests?${q.toString()}`);
+  }
+
   const data = {
     lowest_return_air_db_f: num("lowest_return_air_db_f"),
     condenser_air_entering_db_f: num("condenser_air_entering_db_f"),
@@ -6934,6 +6961,7 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
     // Photo Taken evidence
     verification_method: photoTaken ? "photo_taken" : null,
     photo_taken_timestamp: photoTaken ? new Date().toISOString() : null,
+    photo_evidence_result: photoResult,
   };
 
   const measuredSubcool =
@@ -7019,6 +7047,9 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
 
   if (photoTaken) {
     warnings.push("User confirmed gauge photo was taken (photo attestation)");
+    if (photoResult === "pass") warnings.push("Photo evidence result selected: Pass");
+    if (photoResult === "fail") warnings.push("Photo evidence result selected: Fail");
+    if (photoResult === "needs_review") warnings.push("Photo evidence result selected: Needs Review");
     if (overrideDetails) warnings.push(`Photo attestation notes: ${overrideDetails}`);
   }
 
@@ -7041,6 +7072,14 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
     failures: isChargeExempt ? [] : failures,
     warnings,
   };
+  const photoOverridePass =
+    photoResult === "pass" ? true : photoResult === "fail" ? false : null;
+  const photoOverrideReason =
+    photoResult === "pass"
+      ? "Refrigerant charge photo evidence marked Pass by field user"
+      : photoResult === "fail"
+        ? "Refrigerant charge photo evidence marked Fail by field user"
+        : null;
 
   const supabase = await createClient();
   const scoped = await requireInternalEccTestsAccess({ supabase, jobId });
@@ -7104,8 +7143,8 @@ export async function saveAndCompleteRefrigerantChargeFromForm(formData: FormDat
       },
       computed,
       computed_pass: computedPass,
-      override_pass: isChargeExempt ? true : null,
-      override_reason: isChargeExempt ? fullOverrideReason : null,
+      override_pass: isChargeExempt ? true : photoOverridePass,
+      override_reason: isChargeExempt ? fullOverrideReason : photoOverrideReason,
       updated_at: new Date().toISOString(),
       is_completed: true,
       visit_id: visitId,

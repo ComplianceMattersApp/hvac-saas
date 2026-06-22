@@ -13,6 +13,7 @@ import { resolveOperationalMutationEntitlementAccess } from "@/lib/business/plat
 import { insertInternalNotificationForEvent } from "@/lib/actions/notification-actions";
 import {
   buildAttachmentCaptionWithEvidenceContext,
+  isRefrigerantChargeEvidenceCaption,
   normalizeJobAttachmentEvidenceContext,
 } from "@/lib/jobs/refrigerant-charge-evidence";
 
@@ -362,8 +363,6 @@ export async function updateInternalJobAttachmentCaption(input: {
   if (!user) throw new Error("Not authenticated");
 
   const { internalUser } = await requireInternalUser({ supabase, userId: user.id });
-  const normalizedCaption = sanitizeAttachmentCaption(input.caption);
-
   const scopedAttachment = await loadScopedInternalJobAttachmentForMutation({
     accountOwnerUserId: internalUser.account_owner_user_id,
     jobId,
@@ -385,6 +384,14 @@ export async function updateInternalJobAttachmentCaption(input: {
     caption?: string | null;
   };
   const previousCaption = sanitizeAttachmentCaption(attachment.caption);
+  const requestedCaption = sanitizeAttachmentCaption(input.caption);
+  const shouldPreserveRefrigerantEvidenceContext = isRefrigerantChargeEvidenceCaption(previousCaption);
+  const normalizedCaption = shouldPreserveRefrigerantEvidenceContext
+    ? buildAttachmentCaptionWithEvidenceContext({
+        caption: requestedCaption,
+        context: "refrigerant_charge_photo",
+      })
+    : requestedCaption;
 
   if (previousCaption === normalizedCaption) {
     return {
