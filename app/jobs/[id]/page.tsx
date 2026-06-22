@@ -3590,16 +3590,6 @@ const failureResolutionPathCount =
                   <div className="text-sm text-slate-600">{mobileWorkStateLabel}</div>
                 </div>
             </div>
-            <div className="mt-2 grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
-                <div className="text-xs font-semibold text-blue-900/70">Workflow</div>
-                <div className="mt-0.5 text-sm font-semibold text-slate-950">{formatOpsStatusLabel(job.ops_status, job.job_type)}</div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-slate-50/80 px-3 py-2 shadow-[inset_3px_0_0_rgba(37,99,235,0.16)]">
-                <div className="text-xs font-semibold text-blue-900/70">Field</div>
-                <div className={`mt-0.5 text-sm font-semibold ${isFieldComplete ? "text-emerald-800" : "text-blue-700"}`}>{formatStatus(job.status)}</div>
-              </div>
-            </div>
             </div>
           </section>
 
@@ -3723,10 +3713,8 @@ const failureResolutionPathCount =
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[#0f1f35] text-blue-100">
                     <ChevronRightIcon className="h-4 w-4" />
                   </span>
-                  <span>Next Field Action</span>
+                  <span>{mobileCurrentStatusLabel}</span>
                 </div>
-                <div className="mt-1 text-xs font-semibold uppercase tracking-[0.1em] text-blue-900/55">Current Status</div>
-                <div className="mt-0.5 text-base font-semibold text-slate-800">{mobileCurrentStatusLabel}</div>
               </div>
             </div>
 

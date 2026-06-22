@@ -83,4 +83,28 @@ describe("mobile job detail assignment parity", () => {
     expect(pageSource).toContain("{mobileWorkStateLabel}");
     expect(pageSource).not.toContain('{isFieldComplete ? "Field complete" : "Field active"}');
   });
+
+  it("removes duplicate mobile workflow and field status row below the schedule/work cards", () => {
+    const mobileWorkbenchStart = pageSource.indexOf("{mobileWorkStateLabel}");
+    const mobileWorkbenchEnd = pageSource.indexOf('{banner === "note_added"', mobileWorkbenchStart);
+    const mobileWorkbench = pageSource.slice(mobileWorkbenchStart, mobileWorkbenchEnd);
+
+    expect(mobileWorkbenchStart).toBeGreaterThan(-1);
+    expect(mobileWorkbenchEnd).toBeGreaterThan(mobileWorkbenchStart);
+    expect(mobileWorkbench).not.toContain("formatOpsStatusLabel(job.ops_status, job.job_type)");
+    expect(mobileWorkbench).not.toContain("{formatStatus(job.status)}");
+  });
+
+  it("uses the current mobile field status as the compact action card header", () => {
+    const actionCardStart = pageSource.indexOf('shadow-[0_18px_36px_-30px_rgba(29,78,216,0.32)]');
+    const actionCardEnd = pageSource.indexOf("<JobFieldActionButton", actionCardStart);
+    const actionCard = pageSource.slice(actionCardStart, actionCardEnd);
+
+    expect(actionCardStart).toBeGreaterThan(-1);
+    expect(actionCardEnd).toBeGreaterThan(actionCardStart);
+    expect(actionCard).toContain("<span>{mobileCurrentStatusLabel}</span>");
+    expect(actionCard).not.toContain("Next Field Action");
+    expect(actionCard).not.toContain("Current Status");
+    expect(pageSource).toContain("<JobFieldActionButton");
+  });
 });
