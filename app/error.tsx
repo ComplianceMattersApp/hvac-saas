@@ -22,6 +22,11 @@ export default function AppError({
     window.location.href = `/login?next=${encodeURIComponent(next)}`;
   }, [sessionInvalid, pathname]);
 
+  const refreshPage = () => {
+    reset();
+    window.location.reload();
+  };
+
   if (sessionInvalid) {
     return (
       <div className="mx-auto max-w-3xl px-4 py-16">
@@ -38,15 +43,15 @@ export default function AppError({
       <div className="rounded-lg border border-amber-200 bg-amber-50 p-6 text-amber-900 shadow-[0_14px_34px_-30px_rgba(15,23,42,0.22)]">
         <h2 className="text-lg font-semibold">Something went wrong.</h2>
         <p className="mt-2 text-sm">
-          We hit an unexpected error loading this page. Please try again, or head back home if it keeps happening.
+          We hit an unexpected error loading this page. Refresh the page, or head back home if it keeps happening.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => reset()}
+            onClick={refreshPage}
             className="rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-medium hover:bg-amber-100"
           >
-            Try again
+            Refresh page
           </button>
           <Link
             href="/"
