@@ -47,12 +47,12 @@ export default function AssignedTeamControls({
   const returnTo = `/jobs/${jobId}?tab=${tab}#${isMobile ? "mobile-assigned-team" : "assigned-team"}`;
   const listClassName = isMobile ? "mt-3 space-y-2" : "mt-3 flex min-w-0 flex-wrap gap-2";
   const assigneeClassName = isMobile
-    ? "rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.24)]"
+    ? "flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800 shadow-[0_10px_22px_-24px_rgba(15,23,42,0.24)]"
     : "inline-flex max-w-full flex-wrap items-center gap-2 rounded-lg border border-slate-200/80 bg-slate-50/72 px-3 py-2 text-sm text-slate-800 shadow-[0_8px_20px_-24px_rgba(15,23,42,0.22)]";
   const identityClassName = isMobile
-    ? "break-words text-base font-semibold"
+    ? "min-w-0 flex-1 break-words text-base font-semibold"
     : "max-w-full break-words";
-  const actionRowClassName = isMobile ? "mt-2 flex flex-wrap gap-2" : "contents";
+  const actionRowClassName = isMobile ? "flex shrink-0 flex-wrap justify-end gap-2" : "contents";
   const primaryControlClassName = isMobile ? mobileUtilityControlClass : desktopUtilityControlClass;
   const removeControlClassName = isMobile ? mobileRemoveControlClass : desktopRemoveControlClass;
 
