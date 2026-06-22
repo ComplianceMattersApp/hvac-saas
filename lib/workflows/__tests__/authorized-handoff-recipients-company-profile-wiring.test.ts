@@ -15,8 +15,8 @@ describe("authorized ECC raters company profile wiring", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
     expect(pageSource).toContain("Connected ECC Raters");
-    expect(pageSource).toContain("For Compliance Matters testing, paste the Rater Link ID provided by Compliance Matters.");
-    expect(pageSource).toContain("Other connected rating companies can provide their own Link ID when available.");
+    expect(pageSource).toContain("For Compliance Matters testing, paste the ECC/HERS handoff ID provided by Compliance Matters.");
+    expect(pageSource).toContain("Other connected rating companies can provide their own handoff ID when available.");
     expect(pageSource).toContain("No connected ECC raters are set up yet.");
     expect(pageSource).toContain("Add Compliance Matters or another authorized rater account to enable ECC handoffs.");
     expect(pageSource).toContain("Workflow handoff will show setup required.");
@@ -28,13 +28,13 @@ describe("authorized ECC raters company profile wiring", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
     expect(pageSource).toContain("const raterLinkId = internalUser.account_owner_user_id;");
-    expect(pageSource).toContain("My Rater Link ID");
+    expect(pageSource).toContain("My ECC/HERS handoff ID");
     expect(pageSource).toContain("Share this ID with contractors who use Compliance Matters");
-    expect(pageSource).toContain("connect to your rater account for ECC testing, corrections, retests, and cert closeout");
+    expect(pageSource).toContain("connect to your rater account for ECC/HERS testing, corrections, retests, and cert closeout");
     expect(pageSource).toContain('id="my-rater-link-id"');
     expect(pageSource).toContain("readOnly");
     expect(pageSource).toContain("value={raterLinkId}");
-    expect(pageSource).toContain('aria-label="Copy Rater Link ID"');
+    expect(pageSource).toContain('aria-label="Copy ECC/HERS handoff ID"');
   });
 
   it("wires active recipients list, default badge, and archive/default actions", () => {
@@ -78,7 +78,7 @@ describe("authorized ECC raters company profile wiring", () => {
     expect(pageSource).toContain("Add connected ECC rater");
     expect(pageSource).toContain("listActiveRecipientConnectionsForAccount");
     expect(pageSource).toContain("createConnectedAccountAuthorizedEccRaterFromForm");
-    expect(pageSource).toContain("For Compliance Matters, use the Rater Link ID provided by Compliance Matters.");
+    expect(pageSource).toContain("For Compliance Matters, use the ECC/HERS handoff ID provided by Compliance Matters.");
     expect(pageSource).toContain("No active connected rater accounts yet.");
     expect(pageSource).toContain("Connect ECC rater");
     expect(pageSource).toContain("#account-handoff-connections");
@@ -87,13 +87,13 @@ describe("authorized ECC raters company profile wiring", () => {
   it("labels the connection request field as rater link id while preserving current backend field", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain("Rater Link ID");
+    expect(pageSource).toContain("ECC/HERS handoff ID");
     expect(pageSource).toContain('name="recipient_account_owner_user_id"');
-    expect(pageSource).toContain("current connected account lookup until dedicated Rater Link ID validation is available");
+    expect(pageSource).toContain("match this to a connected account behind the scenes until dedicated handoff ID validation is available");
   });
 
   it("labels connected recipient rows clearly", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
-    expect(pageSource).toContain("Connected account");
+    expect(pageSource).toContain("Connected handoff account");
   });
 });

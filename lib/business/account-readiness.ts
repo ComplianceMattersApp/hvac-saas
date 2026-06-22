@@ -58,22 +58,22 @@ export async function resolveAccountReadiness(
         },
         {
           key: "support_email",
-          label: "Support email",
-          description: "Set support email in Company Profile.",
+          label: "Business email",
+          description: "Set business email in Company Profile.",
           status: "incomplete",
           href: "/ops/admin/company-profile",
         },
         {
           key: "support_phone",
-          label: "Support phone",
-          description: "Set support phone in Company Profile.",
+          label: "Business phone",
+          description: "Set business phone in Company Profile.",
           status: "incomplete",
           href: "/ops/admin/company-profile",
         },
         {
           key: "billing_mode",
-          label: "Billing mode",
-          description: "Select billing mode in Company Profile.",
+          label: "Invoice settings",
+          description: "Choose how invoices are handled in Company Profile.",
           status: "incomplete",
           href: "/ops/admin/company-profile",
         },
@@ -107,7 +107,7 @@ export async function resolveAccountReadiness(
         },
         {
           key: "accept_online_invoice_payments",
-          label: "Accept Online Invoice Payments",
+          label: "Online Payments",
           description: "Let customers pay invoices online through Compliance Matters.",
           status: "optional",
           href: "/ops/admin/company-profile#accept-payments",
@@ -183,31 +183,31 @@ export async function resolveAccountReadiness(
     },
     {
       key: "support_email",
-      label: "Support email",
+      label: "Business email",
       description:
         profileReviewed && supportEmail
-          ? "Support email is set."
-          : "Save your company profile to confirm support email.",
+          ? "Business email is set."
+          : "Save your company profile to confirm business email.",
       status: profileReviewed && supportEmail ? "complete" : "incomplete",
       href: "/ops/admin/company-profile",
     },
     {
       key: "support_phone",
-      label: "Support phone",
+      label: "Business phone",
       description:
         profileReviewed && supportPhone
-          ? "Support phone is set."
-          : "Save your company profile to confirm support phone.",
+          ? "Business phone is set."
+          : "Save your company profile to confirm business phone.",
       status: profileReviewed && supportPhone ? "complete" : "incomplete",
       href: "/ops/admin/company-profile",
     },
     {
       key: "billing_mode",
-      label: "Billing mode",
+      label: "Invoice settings",
       description:
         profileReviewed && billingMode
-          ? `Billing mode confirmed as ${billingMode}.`
-          : "Save your company profile to confirm billing mode.",
+          ? `Invoice workflow confirmed as ${billingMode}.`
+          : "Save your company profile to confirm how invoices are handled.",
       status: profileReviewed && billingMode ? "complete" : "incomplete",
       href: "/ops/admin/company-profile",
     },
@@ -237,7 +237,7 @@ export async function resolveAccountReadiness(
   if (normalizedBillingMode === "internal_invoicing") {
     requiredItems.push({
       key: "accept_online_invoice_payments",
-      label: "Accept Online Invoice Payments",
+      label: "Online Payments",
       description: tenantStripeReadiness.isReady
         ? "Online invoice payments are ready."
         : "Let customers pay invoices online through Compliance Matters.",
@@ -262,7 +262,7 @@ export async function resolveAccountReadiness(
   if (normalizedBillingMode !== "internal_invoicing") {
     optionalItems.push({
       key: "online_invoice_payments",
-      label: "Online Invoice Payments",
+      label: "Online Payments",
       description: "Not used when your company tracks billing outside Compliance Matters.",
       status: "optional",
       href: "/ops/admin/company-profile#accept-payments",

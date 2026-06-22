@@ -60,7 +60,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   stripe_connect_status_refreshed: { tone: "success", message: "Online payment setup status was refreshed." },
   stripe_connect_onboarding_returned: {
     tone: "warn",
-    message: "Returned from online payment setup. Check payment setup status to see current readiness.",
+    message: "Returned from online payment setup. Refresh payment status to see the latest readiness.",
   },
   stripe_connect_onboarding_refresh: {
     tone: "warn",
@@ -265,10 +265,10 @@ export default async function AdminCompanyProfilePage({
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Company Profile</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Keep your company name, support details, and logo polished anywhere your team expects to see them.
+              Manage the business identity and operating preferences your team and customers see.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
-              Shown in internal views, emails, and support touchpoints
+              Used on invoices, messages, and team screens
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -290,13 +290,13 @@ export default async function AdminCompanyProfilePage({
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm text-slate-700">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="font-semibold text-slate-900">Launch Room: first job essentials</div>
+          <div className="font-semibold text-slate-900">Setup attention</div>
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-600">
             {readiness.completedRequiredCount} of {readiness.totalRequiredCount} required complete
           </div>
         </div>
         <div className="mt-1 text-sm leading-6 text-slate-600">
-          Start with these areas first. Then run one real job end to end.
+          Finish the items that affect your company profile, team access, invoices, and subscription.
         </div>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -307,25 +307,21 @@ export default async function AdminCompanyProfilePage({
             Invite your team
           </Link>
           <Link href="#account-billing" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
-            Review account access and billing
+            Review subscription
           </Link>
           <Link href="#invoice-settings" className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-800 transition hover:border-slate-300 hover:bg-slate-50">
             Pick your invoice mode
           </Link>
         </div>
 
-        <div className="mt-2 text-xs leading-5 text-slate-500">
-          Next: create your first customer, create your first job, schedule/assign it, capture field notes on the job page, then close out and invoice. Authorized ECC raters and connected handoff accounts can wait unless you need them now.
-        </div>
-
         {readiness.isOperationallyReady ? (
-          <div className="mt-2 font-medium text-emerald-700">Ready for operations</div>
+          <div className="mt-2 font-medium text-emerald-700">Setup items are complete.</div>
         ) : (
           <div className="mt-2 space-y-1">
-            <div className="font-medium text-amber-700">Needs setup</div>
+            <div className="font-medium text-amber-700">Needs attention</div>
             {incompleteRequiredItems.map((item) => (
               <div key={item.key} className="flex flex-wrap items-center gap-2 text-slate-700">
-                <span>Needs setup confirmation: {item.label}</span>
+                <span>{item.key === "billing_mode" ? "Choose how invoices are handled" : `Finish: ${item.label}`}</span>
                 {item.href ? (
                   <Link href={item.href} className="text-xs font-semibold text-slate-900 underline-offset-2 hover:underline">
                     Open
@@ -338,9 +334,9 @@ export default async function AdminCompanyProfilePage({
       </div>
 
       <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm">
-        <div className="font-semibold text-slate-900">Success Guide</div>
+        <div className="font-semibold text-slate-900">First job training</div>
         <p className="mt-1 text-sm leading-6 text-slate-600">
-          Start with one real job. You can come back to the rest later.
+          Open Training Room when you want the step-by-step first job path.
         </p>
 
         <ol className="mt-3 space-y-1.5 pl-5 text-sm leading-6 text-slate-700">
@@ -364,12 +360,15 @@ export default async function AdminCompanyProfilePage({
           <Link href="/today" className="rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-800 hover:bg-slate-100">
             Open Today/Ops
           </Link>
+          <Link href="/training" className="rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-slate-800 hover:bg-slate-100">
+            Open Training Room
+          </Link>
         </div>
 
         <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
           <div className="font-semibold text-slate-800">This can wait</div>
           <div className="mt-1">
-            Advanced reports, service plans unless you use them now, advanced payment automation, contractor collaboration, and deep settings.
+            Advanced reports, service plans unless you use them now, payment automation, contractor collaboration, and deep settings.
           </div>
         </div>
 
@@ -383,8 +382,8 @@ export default async function AdminCompanyProfilePage({
       <div className="grid gap-5 lg:grid-cols-[320px_minmax(0,1fr)]">
         <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
           <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
-            <div className="text-sm font-semibold text-slate-950">Brand preview</div>
-            <div className="mt-1 text-sm text-slate-600">A quick look at how your company appears today.</div>
+            <div className="text-sm font-semibold text-slate-950">Customer-facing identity</div>
+            <div className="mt-1 text-sm text-slate-600">A quick look at the name, logo, and contact info customers see.</div>
           </div>
           <div className="space-y-4 p-5">
             <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,1))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
@@ -412,7 +411,7 @@ export default async function AdminCompanyProfilePage({
                   </div>
                 ) : (
                   <div className="border-t border-slate-200/80 pt-3 text-sm leading-6 text-slate-600">
-                    Add support contact details so your team can find the right info faster.
+                    Add business contact info so customers and your team see the right details.
                   </div>
                 )}
               </div>
@@ -430,7 +429,7 @@ export default async function AdminCompanyProfilePage({
           <div className="space-y-1">
             <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Company details</h2>
             <p className="text-sm leading-6 text-slate-600">
-              Keep your company name, support email, phone number, and logo current.
+              Keep your company name, business contact info, and logo current.
             </p>
           </div>
 
@@ -481,7 +480,7 @@ export default async function AdminCompanyProfilePage({
 
               <div className="space-y-1.5">
                 <label htmlFor="support_email" className="text-sm font-medium text-slate-700">
-                  Support email
+                  Business email
                 </label>
                 <input
                   id="support_email"
@@ -495,7 +494,7 @@ export default async function AdminCompanyProfilePage({
 
               <div className="space-y-1.5">
                 <label htmlFor="support_phone" className="text-sm font-medium text-slate-700">
-                  Support phone
+                  Business phone
                 </label>
                 <input
                   id="support_phone"
@@ -590,29 +589,29 @@ export default async function AdminCompanyProfilePage({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Connected ECC Raters</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Add the ECC rater accounts this company is allowed to send jobs to. For Compliance Matters testing, paste the Rater Link ID provided by Compliance Matters. Other connected rating companies can provide their own Link ID when available.
+            Add the ECC/HERS rater accounts this company is allowed to send jobs to. For Compliance Matters testing, paste the ECC/HERS handoff ID provided by Compliance Matters. Other connected rating companies can provide their own handoff ID when available.
           </p>
         </div>
 
         <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
-          <div className="text-sm font-semibold text-emerald-950">My Rater Link ID</div>
+          <div className="text-sm font-semibold text-emerald-950">My ECC/HERS handoff ID</div>
           <p className="mt-1 text-sm leading-6 text-emerald-900">
-            Share this ID with contractors who use Compliance Matters so they can connect to your rater account for ECC testing, corrections, retests, and cert closeout.
+            Share this ID with contractors who use Compliance Matters so they can connect to your rater account for ECC/HERS testing, corrections, retests, and cert closeout.
           </p>
           <div className="mt-3 space-y-1.5">
             <label htmlFor="my-rater-link-id" className="text-sm font-medium text-emerald-950">
-              Rater Link ID
+              ECC/HERS handoff ID
             </label>
             <input
               id="my-rater-link-id"
               readOnly
               value={raterLinkId}
-              aria-label="Copy Rater Link ID"
+              aria-label="Copy ECC/HERS handoff ID"
               className="w-full select-all rounded-xl border border-emerald-200 bg-white px-3.5 py-2.5 font-mono text-sm text-slate-950 shadow-sm"
             />
           </div>
           <p className="mt-2 text-xs leading-5 text-emerald-900">
-            Contractors can paste this Rater Link ID when adding Compliance Matters or another connected rater account.
+            Contractors can paste this ECC/HERS handoff ID when adding Compliance Matters or another connected rater account.
           </p>
         </div>
 
@@ -699,12 +698,12 @@ export default async function AdminCompanyProfilePage({
         <div className="mt-5 rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-sm font-semibold text-slate-900">Add connected ECC rater</div>
           <p className="mt-1 text-sm leading-6 text-slate-600">
-            For Compliance Matters, use the Rater Link ID provided by Compliance Matters. This lets jobs be shared for ECC testing, corrections, retests, and cert closeout.
+            For Compliance Matters, use the ECC/HERS handoff ID provided by Compliance Matters. This lets jobs be shared for ECC testing, corrections, retests, and cert closeout.
           </p>
 
           {activeConnectedRecipientConnections.length === 0 ? (
             <div className="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50/70 px-3 py-2 text-sm text-slate-600">
-              No active connected rater accounts yet. <a href="#account-handoff-connections" className="font-semibold text-slate-900 underline-offset-2 hover:underline">Add a Rater Link ID</a> from Compliance Matters or another connected rating company first.
+              No active connected rater accounts yet. <a href="#account-handoff-connections" className="font-semibold text-slate-900 underline-offset-2 hover:underline">Add an ECC/HERS handoff ID</a> from Compliance Matters or another connected rating company first.
             </div>
           ) : activeConnectedRecipientConnections.length === 1 ? (
             <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
@@ -727,7 +726,7 @@ export default async function AdminCompanyProfilePage({
             <form action={createConnectedAccountAuthorizedEccRaterFromForm} className="mt-3 space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-3">
               <div className="space-y-1.5">
                 <label htmlFor="connected-rater-connection-id" className="text-sm font-medium text-slate-700">
-                  Rater Link ID
+                  ECC/HERS handoff ID
                 </label>
                 <select
                   id="connected-rater-connection-id"
@@ -742,7 +741,7 @@ export default async function AdminCompanyProfilePage({
                   ))}
                 </select>
                 <p className="text-xs leading-5 text-slate-500">
-                  Choose an active Rater Link ID that has already been connected below.
+                  Choose an active ECC/HERS handoff ID that has already been connected below.
                 </p>
               </div>
               <label className="inline-flex items-center gap-2 text-sm text-slate-700">
@@ -763,7 +762,7 @@ export default async function AdminCompanyProfilePage({
           <div>
             <div className="text-sm font-semibold text-slate-900">Track manual/external rater</div>
             <p className="mt-1 text-sm leading-6 text-slate-600">
-              Use this only for tracking a rater that is not connected by Rater Link ID yet. Manual tracking remains available, but connected rater accounts are preferred for ECC handoffs.
+              Use this only for tracking a rater that is not connected by ECC/HERS handoff ID yet. Manual tracking remains available, but connected rater accounts are preferred for ECC handoffs.
             </p>
           </div>
           <input type="hidden" name="handoff_kind" value="ecc" />
@@ -852,7 +851,7 @@ export default async function AdminCompanyProfilePage({
           </label>
 
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
-            Manual/external rater records are tracking only. Use connected ECC raters when the rater provides a Rater Link ID.
+            Manual/external rater records are tracking only. Use connected ECC raters when the rater provides an ECC/HERS handoff ID.
           </div>
 
           <div className="flex justify-end">
@@ -877,24 +876,24 @@ export default async function AdminCompanyProfilePage({
         <form action={requestAccountHandoffConnectionFromForm} className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-sm font-semibold text-slate-900">Request connection</div>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
-            Enter the Rater Link ID provided by the connected rating company. For Compliance Matters testing, use the Rater Link ID provided by Compliance Matters.
+            Enter the ECC/HERS handoff ID provided by the connected rating company. For Compliance Matters testing, use the ECC/HERS handoff ID provided by Compliance Matters.
           </div>
           <input type="hidden" name="handoff_kind" value="ecc" />
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <label htmlFor="connection-recipient-account-owner-id" className="text-sm font-medium text-slate-700">
-                Rater Link ID
+                ECC/HERS handoff ID
               </label>
               <input
                 id="connection-recipient-account-owner-id"
                 name="recipient_account_owner_user_id"
                 required
                 className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900"
-                placeholder="Compliance Matters Rater Link ID"
+                placeholder="Compliance Matters ECC/HERS handoff ID"
               />
               <p className="text-xs leading-5 text-slate-500">
-                This uses the current connected account lookup until dedicated Rater Link ID validation is available.
+                We'll match this to a connected account behind the scenes until dedicated handoff ID validation is available.
               </p>
             </div>
 
@@ -1072,7 +1071,7 @@ function ConnectionListSection(props: {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="min-w-0">
                     <div className="text-sm font-semibold text-slate-900">{resolveOtherAccountOwnerUserId(connection, props.currentAccountOwnerUserId)}</div>
-                    <div className="mt-1 text-xs text-slate-600">Connected account ID</div>
+                    <div className="mt-1 text-xs text-slate-600">Connected handoff account</div>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className={`inline-flex rounded-full border px-2 py-0.5 text-[11px] font-semibold ${connectionStatusBadgeClass(connection.connection_status)}`}>
@@ -1111,7 +1110,7 @@ function formatAuthorizedRecipientTypeLabel(recipient: AuthorizedHandoffRecipien
     return "Internal user";
   }
   if (normalizedType === "connected_account_future") {
-    return "Connected account";
+    return "Connected handoff account";
   }
   return "External/manual rater";
 }
@@ -1200,7 +1199,7 @@ function PlatformAccountSection({
   return (
     <div id="account-billing" className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)] scroll-mt-24">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
-        <div className="text-sm font-semibold text-slate-950">Account &amp; Billing</div>
+        <div className="text-sm font-semibold text-slate-950">Compliance Matters Subscription</div>
         <div className="mt-1 text-sm text-slate-600">
           Review your plan and account billing. Focus first on running work from customer to invoice.
         </div>
@@ -1214,7 +1213,7 @@ function PlatformAccountSection({
         <PlatformAccountField label="Account status" value={statusLabel} />
         <PlatformAccountField label="Active users" value={String(entitlement.activeSeatCount)} />
         <PlatformAccountField label="Seat limit" value={seatLimitLabel} />
-        <PlatformAccountField label="Billing profile" value={billingCustomerLabel} />
+        <PlatformAccountField label="Payment method for subscription" value={billingCustomerLabel} />
         <PlatformAccountField label="Subscription status" value={subscriptionLabel} />
       </dl>
       {billingPeriodEndLabel || trialEndsLabel ? (
@@ -1359,7 +1358,7 @@ function TenantStripePaymentsSection({
   return (
     <div id="accept-payments" className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)] scroll-mt-24">
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
-        <div className="text-sm font-semibold text-slate-950">Accept Online Invoice Payments</div>
+        <div className="text-sm font-semibold text-slate-950">Online Payments</div>
         <div className="mt-1 text-sm text-slate-600">
           Let customers pay invoices online through Compliance Matters.
         </div>
@@ -1390,7 +1389,7 @@ function TenantStripePaymentsSection({
               type="submit"
               className="inline-flex min-h-10 items-center rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-900 transition-[background-color,box-shadow,transform] hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300 active:translate-y-[0.5px]"
             >
-              Check payment setup status
+              Refresh payment status
             </button>
           </form>
         </div>
@@ -1403,7 +1402,7 @@ function TenantStripePaymentsSection({
           <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
             <span className="inline-flex items-center gap-2">
               <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
-              Advanced / Technical payment details
+              Advanced payment details
             </span>
           </summary>
           <div className="mt-3 space-y-3">
@@ -1411,7 +1410,7 @@ function TenantStripePaymentsSection({
               These details are for owner/admin support review and do not change payment setup automatically.
             </div>
             <dl className="grid grid-cols-1 gap-px rounded-2xl border border-slate-200 bg-slate-100/70 sm:grid-cols-2 lg:grid-cols-3">
-              <PlatformAccountField label="Connected account" value={readiness.connectedAccountId ?? "Not connected"} />
+              <PlatformAccountField label="Payment provider account" value={readiness.connectedAccountId ?? "Not connected"} />
               <PlatformAccountField label="Onboarding status" value={readiness.onboardingStatus} />
               <PlatformAccountField label="Charges enabled" value={readiness.chargesEnabled ? "Yes" : "No"} />
               <PlatformAccountField label="Payouts enabled" value={readiness.payoutsEnabled ? "Yes" : "No"} />

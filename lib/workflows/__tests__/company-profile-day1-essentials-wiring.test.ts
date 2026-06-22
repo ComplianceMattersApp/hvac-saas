@@ -9,9 +9,9 @@ describe("company profile day 1 essentials wiring", () => {
   it("renders compact day 1 guidance copy", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
-    expect(pageSource).toContain("Launch Room: first job essentials");
-    expect(pageSource).toContain("Start with these areas first.");
-    expect(pageSource).toContain("create your first customer, create your first job");
+    expect(pageSource).toContain("Setup attention");
+    expect(pageSource).toContain("Finish the items that affect your company profile");
+    expect(pageSource).toContain("Open Training Room");
   });
 
   it("wires day 1 guidance links to existing setup sections/actions", () => {

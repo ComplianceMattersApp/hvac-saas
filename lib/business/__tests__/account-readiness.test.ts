@@ -461,7 +461,7 @@ describe("resolveAccountReadiness", () => {
     const item = summary.items.find((x) => x.key === "accept_online_invoice_payments");
 
     expect(item?.status).toBe("incomplete");
-    expect(item?.label).toBe("Accept Online Invoice Payments");
+    expect(item?.label).toBe("Online Payments");
     expect(item?.description).toBe("Let customers pay invoices online through Compliance Matters.");
     expect(item?.href).toBe("/ops/admin/company-profile#accept-payments");
     expect(summary.isOperationallyReady).toBe(false);

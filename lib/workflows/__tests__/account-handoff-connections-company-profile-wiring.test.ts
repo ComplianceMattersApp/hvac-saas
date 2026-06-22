@@ -25,8 +25,8 @@ describe("account handoff connections company profile wiring", () => {
     expect(pageSource).toContain("action={requestAccountHandoffConnectionFromForm}");
     expect(pageSource).toContain('name="recipient_account_owner_user_id"');
     expect(pageSource).toContain('name="connection_note"');
-    expect(pageSource).toContain("Enter the account owner user id for the company you want to connect with.");
-    expect(pageSource).toContain("Company lookup/search can come later.");
+    expect(pageSource).toContain("Enter the ECC/HERS handoff ID provided by the connected rating company.");
+    expect(pageSource).toContain("match this to a connected account behind the scenes until dedicated handoff ID validation is available");
     expect(pageSource).not.toContain("handoff request queue");
   });
 
