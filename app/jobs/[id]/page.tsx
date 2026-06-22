@@ -3473,18 +3473,22 @@ const failureResolutionPathCount =
                   )}
                 </div>
                 {serviceAddressDisplay !== "No address set" ? (
-                  <div className="mt-2 flex items-start gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-sm font-medium text-slate-700">
-                    <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
-                    <span className="break-words">{serviceAddressDisplay}</span>
-                  </div>
-                ) : null}
-                {serviceLocationEditHref && isInternalUser ? (
-                  <Link
-                    href={serviceLocationEditHref}
-                    className="mt-2 inline-flex rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:border-blue-200 hover:text-blue-800"
-                  >
-                    Edit service address
-                  </Link>
+                  serviceLocationEditHref && isInternalUser ? (
+                    <Link
+                      href={serviceLocationEditHref}
+                      aria-label={`Edit service address: ${serviceAddressDisplay}`}
+                      className="mt-2 flex items-start gap-2 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-sm font-medium text-slate-700 transition-colors hover:border-blue-200 hover:bg-blue-50/60 hover:text-blue-900"
+                    >
+                      <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+                      <span className="min-w-0 flex-1 break-words">{serviceAddressDisplay}</span>
+                      <ChevronRightIcon className="mt-0.5 h-4 w-4 shrink-0 text-slate-500" />
+                    </Link>
+                  ) : (
+                    <div className="mt-2 flex items-start gap-1.5 rounded-xl border border-slate-200/80 bg-slate-50/70 px-3 py-2 text-sm font-medium text-slate-700">
+                      <MapPinIcon className="mt-0.5 h-4 w-4 shrink-0 text-blue-700" />
+                      <span className="break-words">{serviceAddressDisplay}</span>
+                    </div>
+                  )
                 ) : null}
               </div>
             </div>

@@ -12,7 +12,7 @@ describe("job detail service address edit affordance", () => {
     expect(jobPageSource).toContain(
       "const serviceLocationEditHref = locationId ? `/locations/${locationId}` : null;",
     );
-    expect(jobPageSource).toContain("Edit service address");
+    expect(jobPageSource).toContain("aria-label={`Edit service address: ${serviceAddressDisplay}`}");
     expect(jobPageSource).toContain("Correct address");
     expect(jobPageSource).toContain("href={serviceLocationEditHref}");
   });

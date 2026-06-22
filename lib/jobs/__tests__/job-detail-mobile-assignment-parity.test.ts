@@ -114,6 +114,22 @@ describe("mobile job detail assignment parity", () => {
     expect(fieldOpsBoard).not.toContain("mobileCustomerHref");
   });
 
+  it("folds the mobile service address edit affordance into the address row", () => {
+    const mobileHeaderStart = pageSource.indexOf("<h1");
+    const mobileHeaderEnd = pageSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
+    const mobileHeader = pageSource.slice(mobileHeaderStart, mobileHeaderEnd);
+
+    expect(mobileHeaderStart).toBeGreaterThan(-1);
+    expect(mobileHeaderEnd).toBeGreaterThan(mobileHeaderStart);
+    expect(mobileHeader).toContain("serviceAddressDisplay !== \"No address set\"");
+    expect(mobileHeader).toContain("serviceLocationEditHref && isInternalUser");
+    expect(mobileHeader).toContain("aria-label={`Edit service address: ${serviceAddressDisplay}`}");
+    expect(mobileHeader).toContain("href={serviceLocationEditHref}");
+    expect(mobileHeader).toContain("<MapPinIcon");
+    expect(mobileHeader).toContain("<ChevronRightIcon");
+    expect(mobileHeader).not.toContain(">Edit service address<");
+  });
+
   it("removes duplicate mobile workflow and field status row below the schedule/work cards", () => {
     const mobileWorkbenchStart = pageSource.indexOf('id="mobile-when-panel"');
     const mobileWorkbenchEnd = pageSource.indexOf('{banner === "note_added"', mobileWorkbenchStart);
