@@ -358,20 +358,33 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).not.toContain("Open Map");
   });
 
-  it("does not repeat account call and text actions inside the mobile Field Operations Board customer card", () => {
+  it("keeps customer context in the mobile header without duplicating it in the Field Operations Board", () => {
+    const mobileHeaderStart = jobPageSource.indexOf('<span>Job Workbench</span>');
+    const mobileHeaderEnd = jobPageSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
+    const mobileHeaderSlice =
+      mobileHeaderStart > -1 && mobileHeaderEnd > mobileHeaderStart
+        ? jobPageSource.slice(mobileHeaderStart, mobileHeaderEnd)
+        : "";
     const mobileBoardStart = jobPageSource.indexOf('<div className="text-lg font-semibold text-[#0f1f35]">Field Operations Board</div>');
-    const mobileCustomerStart = jobPageSource.indexOf('<div className="text-sm font-semibold text-[#0f1f35]">Customer / Account</div>', mobileBoardStart);
-    const mobileCustomerEnd = jobPageSource.indexOf('<div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white', mobileCustomerStart);
-    const mobileCustomerSlice =
-      mobileCustomerStart > -1 && mobileCustomerEnd > mobileCustomerStart
-        ? jobPageSource.slice(mobileCustomerStart, mobileCustomerEnd)
+    const mobileBoardEnd = jobPageSource.indexOf("{showMobileContractorContext ? (", mobileBoardStart);
+    const mobileBoardSlice =
+      mobileBoardStart > -1 && mobileBoardEnd > mobileBoardStart
+        ? jobPageSource.slice(mobileBoardStart, mobileBoardEnd)
         : "";
 
+    expect(mobileHeaderStart).toBeGreaterThan(-1);
+    expect(mobileHeaderSlice).toContain("Customer / Account");
+    expect(mobileHeaderSlice).toContain("mobileCustomerHref");
+    expect(mobileHeaderSlice).toContain("serviceLocationEditHref");
     expect(mobileBoardStart).toBeGreaterThan(-1);
-    expect(mobileCustomerSlice).toContain("mobileCustomerHref");
-    expect(mobileCustomerSlice).not.toContain("telLink");
-    expect(mobileCustomerSlice).not.toContain("sms:${accountPhoneDigits}");
-    expect(mobileCustomerSlice).not.toContain("accountEmailLink");
+    expect(mobileBoardSlice).toContain("Service Location");
+    expect(mobileBoardSlice).toContain("Contact Logging");
+    expect(mobileBoardSlice).toContain("AssignedTeamControls");
+    expect(mobileBoardSlice).not.toContain("Customer / Account");
+    expect(mobileBoardSlice).not.toContain("mobileCustomerHref");
+    expect(mobileBoardSlice).not.toContain("telLink");
+    expect(mobileBoardSlice).not.toContain("sms:${accountPhoneDigits}");
+    expect(mobileBoardSlice).not.toContain("accountEmailLink");
   });
 
   it("uses the preferred job workbench heading fallback chain", () => {
@@ -395,7 +408,10 @@ describe("job detail field operations board layout", () => {
     expect(jobPageSource).toContain(
       '<section className="overflow-visible rounded-2xl border border-slate-200/80 bg-white shadow-[0_20px_48px_-34px_rgba(15,23,42,0.36)] ring-1 ring-blue-100/35">',
     );
-    expect(mobileScheduleSlice).toContain('className="group relative self-start overflow-visible rounded-xl');
+    expect(mobileScheduleSlice).toContain('className="group relative overflow-visible rounded-xl');
+    expect(mobileScheduleSlice).toContain("<ClockIcon");
+    expect(mobileScheduleSlice).toContain("{appointmentDateLabel}");
+    expect(mobileScheduleSlice).toContain("{mobileAppointmentTimeLabel}");
     expect(mobileScheduleSlice).toContain('group-open:block');
     expect(mobileScheduleSlice).toContain('form action={updateJobScheduleFromForm}');
     expect(mobileScheduleSlice).toContain('name="scheduled_date"');
