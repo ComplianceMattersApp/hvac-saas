@@ -72,6 +72,8 @@ describe("mobile job detail assignment parity", () => {
     expect(pageSource).toContain("const mobileAppointmentTimeLabel = job.scheduled_date ? appointmentTimeLabel : \"\";");
     expect(pageSource).toContain("{mobileAppointmentTimeLabel ? (");
     expect(pageSource).toContain('<details id="mobile-when-panel" className="group relative overflow-visible rounded-xl');
+    expect(pageSource).toContain("mt-2 break-words text-xl font-semibold leading-tight text-[#0f1f35]");
+    expect(pageSource).toContain("mt-2 inline-flex rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-sm font-semibold text-blue-900");
     expect(pageSource).toContain("hidden w-full max-w-[calc(100vw-1.5rem)] group-open:block");
     expect(contactLoggingSource).toContain("min-h-[4rem]");
     expect(contactLoggingSource).toContain("h-full");
@@ -90,6 +92,26 @@ describe("mobile job detail assignment parity", () => {
     expect(pageSource).not.toContain("{mobileWorkStateLabel}");
     expect(mobileScheduleSection).not.toContain("<span>Work</span>");
     expect(mobileScheduleSection).not.toContain('job.job_type === "service" ? "Service" : "ECC"');
+  });
+
+  it("keeps the top mobile customer link while omitting the duplicate operations-board customer card", () => {
+    const mobileHeaderStart = pageSource.indexOf("<h1");
+    const mobileHeaderEnd = pageSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);
+    const mobileHeader = pageSource.slice(mobileHeaderStart, mobileHeaderEnd);
+    const fieldOpsStart = pageSource.indexOf("Field Operations Board");
+    const fieldOpsEnd = pageSource.indexOf('id="assigned-team"', fieldOpsStart);
+    const fieldOpsBoard = pageSource.slice(fieldOpsStart, fieldOpsEnd);
+
+    expect(mobileHeaderStart).toBeGreaterThan(-1);
+    expect(mobileHeaderEnd).toBeGreaterThan(mobileHeaderStart);
+    expect(mobileHeader).toContain("Customer / Account");
+    expect(mobileHeader).toContain("mobileCustomerHref");
+    expect(fieldOpsStart).toBeGreaterThan(-1);
+    expect(fieldOpsEnd).toBeGreaterThan(fieldOpsStart);
+    expect(fieldOpsBoard).toContain("Service Location");
+    expect(fieldOpsBoard).toContain("Contact Logging");
+    expect(fieldOpsBoard).not.toContain("Customer / Account");
+    expect(fieldOpsBoard).not.toContain("mobileCustomerHref");
   });
 
   it("removes duplicate mobile workflow and field status row below the schedule/work cards", () => {
