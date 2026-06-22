@@ -30,4 +30,15 @@ describe("company profile day 1 essentials wiring", () => {
     expect(pageSource).toContain("id=\"invoice-settings\"");
     expect(pageSource).toContain("id=\"account-billing\"");
   });
+
+  it("keeps subscription and payment diagnostics behind advanced details", () => {
+    const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
+
+    expect(pageSource).toContain("Compliance Matters Subscription");
+    expect(pageSource).toContain("Advanced subscription details");
+    expect(pageSource).toContain("Payment method for subscription");
+    expect(pageSource).toContain("Online Payments");
+    expect(pageSource).toContain("Advanced payment details");
+    expect(pageSource).toContain("Payment provider account");
+  });
 });

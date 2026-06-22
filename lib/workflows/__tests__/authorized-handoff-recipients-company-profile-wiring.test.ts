@@ -15,8 +15,9 @@ describe("authorized ECC raters company profile wiring", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
     expect(pageSource).toContain("Connected ECC Raters");
-    expect(pageSource).toContain("For Compliance Matters testing, paste the ECC/HERS handoff ID provided by Compliance Matters.");
-    expect(pageSource).toContain("Other connected rating companies can provide their own handoff ID when available.");
+    expect(pageSource).toContain("Choose who receives ECC/HERS handoffs when jobs need rater review");
+    expect(pageSource).toContain("No ECC/HERS rater selected yet");
+    expect(pageSource).toContain("Advanced ECC/HERS rater details");
     expect(pageSource).toContain("No connected ECC raters are set up yet.");
     expect(pageSource).toContain("Add Compliance Matters or another authorized rater account to enable ECC handoffs.");
     expect(pageSource).toContain("Workflow handoff will show setup required.");

@@ -589,10 +589,35 @@ export default async function AdminCompanyProfilePage({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Connected ECC Raters</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Add the ECC/HERS rater accounts this company is allowed to send jobs to. For Compliance Matters testing, paste the ECC/HERS handoff ID provided by Compliance Matters. Other connected rating companies can provide their own handoff ID when available.
+            Choose who receives ECC/HERS handoffs when jobs need rater review, corrections, retests, or cert closeout.
           </p>
         </div>
 
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-700">
+          <div className="font-semibold text-slate-900">
+            {authorizedEccRecipients.length === 0
+              ? "No ECC/HERS rater selected yet"
+              : authorizedEccRecipients.length === 1
+                ? "1 ECC/HERS rater available"
+                : `${authorizedEccRecipients.length} ECC/HERS raters available`}
+          </div>
+          <div className="mt-1 text-slate-600">
+            {authorizedEccSelection.mode === "none"
+              ? "Handoff setup is available when you need it."
+              : authorizedEccSelection.mode === "single"
+                ? "Handoffs will default to the selected rater."
+                : "Your team will choose a rater during handoff."}
+          </div>
+        </div>
+
+        <details className="group mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
+            <span className="inline-flex items-center gap-2">
+              <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
+              Advanced ECC/HERS rater details
+            </span>
+          </summary>
+          <div className="mt-4 space-y-5">
         <div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
           <div className="text-sm font-semibold text-emerald-950">My ECC/HERS handoff ID</div>
           <p className="mt-1 text-sm leading-6 text-emerald-900">
@@ -863,16 +888,44 @@ export default async function AdminCompanyProfilePage({
             </button>
           </div>
         </form>
+          </div>
+        </details>
       </div>
 
       <div id="account-handoff-connections" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Connected Handoff Accounts</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Set up trusted company-to-company handoff connections. This only controls whether another account can be approved for future workflow handoffs. It does not share jobs, customers, service cases, or payment data.
+            Manage trusted company-to-company connections for future ECC/HERS handoffs.
           </p>
         </div>
 
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-700">
+          <div className="font-semibold text-slate-900">
+            {activeConnections.length === 0
+              ? "No handoff accounts connected yet"
+              : activeConnections.length === 1
+                ? "1 handoff account connected"
+                : `${activeConnections.length} handoff accounts connected`}
+          </div>
+          <div className="mt-1 text-slate-600">
+            {pendingIncomingConnections.length + pendingOutgoingConnections.length > 0
+              ? `${pendingIncomingConnections.length + pendingOutgoingConnections.length} pending connection request${pendingIncomingConnections.length + pendingOutgoingConnections.length === 1 ? "" : "s"} need review.`
+              : "Connection setup is available when ECC/HERS collaboration needs it."}
+          </div>
+        </div>
+
+        <details className="group mt-5 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+          <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
+            <span className="inline-flex items-center gap-2">
+              <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
+              Advanced ECC/HERS handoff details
+            </span>
+          </summary>
+          <div className="mt-4 space-y-5">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
+              This only controls whether another account can be approved for future workflow handoffs. It does not share jobs, customers, service cases, or payment data.
+            </div>
         <form action={requestAccountHandoffConnectionFromForm} className="mt-5 space-y-4 rounded-2xl border border-slate-200 bg-white p-4">
           <div className="text-sm font-semibold text-slate-900">Request connection</div>
           <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/70 px-3 py-2 text-xs leading-5 text-slate-600">
@@ -999,6 +1052,8 @@ export default async function AdminCompanyProfilePage({
             currentAccountOwnerUserId={internalUser.account_owner_user_id}
           />
         </div>
+          </div>
+        </details>
       </div>
 
       <TenantStripePaymentsSection readiness={tenantStripeReadiness} billingMode={billingMode} />
@@ -1208,12 +1263,9 @@ function PlatformAccountSection({
           separately through invoice payment settings.
         </div>
       </div>
-      <dl className="grid grid-cols-2 gap-px bg-slate-100/70 sm:grid-cols-3">
+      <dl className="grid grid-cols-1 gap-px bg-slate-100/70 sm:grid-cols-3">
         <PlatformAccountField label="Plan" value={planLabel} />
         <PlatformAccountField label="Account status" value={statusLabel} />
-        <PlatformAccountField label="Active users" value={String(entitlement.activeSeatCount)} />
-        <PlatformAccountField label="Seat limit" value={seatLimitLabel} />
-        <PlatformAccountField label="Payment method for subscription" value={billingCustomerLabel} />
         <PlatformAccountField label="Subscription status" value={subscriptionLabel} />
       </dl>
       {billingPeriodEndLabel || trialEndsLabel ? (
@@ -1271,7 +1323,7 @@ function PlatformAccountSection({
         <summary className="cursor-pointer list-none text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 transition-colors hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-200 [&::-webkit-details-marker]:hidden">
           <span className="inline-flex items-center gap-2">
             <span aria-hidden="true" className="transition-transform group-open:rotate-90">&gt;</span>
-            Billing details (this can wait)
+            Advanced subscription details
           </span>
         </summary>
         <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
@@ -1279,6 +1331,18 @@ function PlatformAccountSection({
             These details are for support review only and do not change billing automatically.
           </div>
           <dl className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-slate-200 bg-slate-100/70 sm:grid-cols-2">
+            <PlatformAccountField
+              label="Active users"
+              value={String(entitlement.activeSeatCount)}
+            />
+            <PlatformAccountField
+              label="Seat limit"
+              value={seatLimitLabel}
+            />
+            <PlatformAccountField
+              label="Payment method for subscription"
+              value={billingCustomerLabel}
+            />
             <PlatformAccountField
               label="Active users counted"
               value={String(entitlement.activeSeatCount)}
