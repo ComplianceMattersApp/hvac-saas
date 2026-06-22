@@ -1241,6 +1241,13 @@ export default async function JobTestsPage({
     selectedTotalCount > 0
       ? `${selectedCompletedCount}/${selectedTotalCount} completed`
       : "No active tests";
+  const selectedAllTestsComplete =
+    selectedTotalCount > 0 &&
+    selectedRequiredRemainingCount === 0 &&
+    selectedDraftCount === 0 &&
+    selectedNotStartedCount === 0;
+  const isEccWorkspaceClosedOrCompleted =
+    normalizedOpsStatus === "closed" || normalizedStatus === "completed";
   const isFailedOrRetestState = ["failed", "retest_needed", "pending_office_review"].includes(normalizedOpsStatus);
   const isCompletionReportCertCloseoutBlocked =
     isFailedOrRetestState ||
@@ -1278,11 +1285,7 @@ export default async function JobTestsPage({
       : null;
 
   const packageSystem = isPackageSystem(selectedSystemEquipment);
-  const mobileNextTestRow =
-    selectedSystemStatusRows.find((row) => !row.complete && !row.carriedForward) ??
-    selectedSystemStatusRows.find((row) => !row.carriedForward) ??
-    selectedSystemStatusRows[0] ??
-    null;
+  const mobileNextTestRow = selectedSystemStatusRows.find((row) => !row.complete && !row.carriedForward) ?? null;
   const mobileNextTestType = mobileNextTestRow?.testType ? String(mobileNextTestRow.testType) : "";
   const mobileNextTestLabel = mobileNextTestType
     ? getTestDisplayLabel(mobileNextTestType, packageSystem)
@@ -1546,6 +1549,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
 
   const showInlineAddAnotherTestCard =
     Boolean(selectedSystemId) &&
+    !isEccWorkspaceClosedOrCompleted &&
     !isCompactTestWorkspace &&
     selectedSystemStatusRows.length > 0 &&
     selectedSystemStatusRows.length % 2 === 1;
@@ -1807,12 +1811,18 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 </Link>
               )
             ) : (
+              selectedSystemId && selectedAllTestsComplete ? (
+                <div className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-2.5 text-base font-semibold text-emerald-900">
+                  Tests Complete
+                </div>
+              ) : (
               <Link
                 href={`/jobs/${job.id}/info?f=equipment`}
                 className="inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-blue-700 px-5 py-2.5 text-base font-semibold text-white shadow-[0_18px_34px_-22px_rgba(29,78,216,0.5)] transition-colors hover:bg-blue-800"
               >
                 Add / View Equipment
               </Link>
+              )
             )}
           </div>
         </div>
@@ -2686,7 +2696,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
         ) : null}
 
         {/* Add Test panel */}
-        {selectedSystemId && focusedType === "custom" ? (
+        {selectedSystemId && focusedType === "custom" && !isEccWorkspaceClosedOrCompleted ? (
           <div className={`${eccWorkspaceCardClass}`}>
             <div>
               <div className={eccUtilityLabelClass}>Add Test</div>
@@ -2763,9 +2773,21 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
           </div>
         ) : null}
 
+        {selectedSystemId && focusedType === "custom" && isEccWorkspaceClosedOrCompleted ? (
+          <div className={`${eccWorkspaceCardClass}`}>
+            <div>
+              <div className={eccUtilityLabelClass}>Add Test</div>
+              <div className="mt-1 text-base font-semibold text-slate-950">Additional tests unavailable</div>
+              <p className="mt-1 text-sm leading-6 text-slate-600">
+                Additional tests are unavailable after completion.
+              </p>
+            </div>
+          </div>
+        ) : null}
+
                 {/* Add Test pill */}
         {!isCompactTestWorkspace && !showInlineAddAnotherTestCard ? (
-          selectedSystemId ? (
+          selectedSystemId && !isEccWorkspaceClosedOrCompleted ? (
             <Link
               href={focusedType === "custom" ? withS(undefined) : withS("custom")}
               className={`flex w-full items-center justify-between rounded-lg border px-4 py-3 shadow-sm transition-colors ${
@@ -2782,6 +2804,10 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
               </div>
               <span className="text-xs">{focusedType === "custom" ? "Hide" : "Open"}</span>
             </Link>
+          ) : selectedSystemId && isEccWorkspaceClosedOrCompleted ? (
+            <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+              Additional tests are unavailable after completion.
+            </div>
           ) : (
             <div className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-muted-foreground">
               Select a system first to add tests.

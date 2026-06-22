@@ -292,6 +292,28 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain("Continue {mobileNextTestLabel}");
   });
 
+  it("does not fall back to completed tests for the mobile continue action", () => {
+    expect(jobTestsPageSource).toContain(
+      "const mobileNextTestRow = selectedSystemStatusRows.find((row) => !row.complete && !row.carriedForward) ?? null;",
+    );
+    expect(jobTestsPageSource).not.toContain(
+      "selectedSystemStatusRows.find((row) => !row.carriedForward) ??\n    selectedSystemStatusRows[0]",
+    );
+    expect(jobTestsPageSource).toContain("const selectedAllTestsComplete =");
+    expect(jobTestsPageSource).toContain("selectedRequiredRemainingCount === 0");
+    expect(jobTestsPageSource).toContain("selectedDraftCount === 0");
+    expect(jobTestsPageSource).toContain("selectedNotStartedCount === 0");
+    expect(jobTestsPageSource).toContain("Tests Complete");
+  });
+
+  it("keeps add-another-test unavailable after the ECC workspace is closed or completed", () => {
+    expect(jobTestsPageSource).toContain("const isEccWorkspaceClosedOrCompleted =");
+    expect(jobTestsPageSource).toContain('normalizedOpsStatus === "closed" || normalizedStatus === "completed"');
+    expect(jobTestsPageSource).toContain("!isEccWorkspaceClosedOrCompleted &&\n    !isCompactTestWorkspace");
+    expect(jobTestsPageSource).toContain('focusedType === "custom" && !isEccWorkspaceClosedOrCompleted');
+    expect(jobTestsPageSource).toContain("Additional tests are unavailable after completion.");
+  });
+
   it("shows save and completion recognition on the focused ECC test page", () => {
     expect(jobTestsPageSource).toContain('notice === "results_saved" || notice === "test_completed"');
     expect(jobTestsPageSource).toContain('notice === "test_completed" ? "Test completed." : "Results saved."');
