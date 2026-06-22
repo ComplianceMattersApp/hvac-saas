@@ -19,6 +19,11 @@ export default function GlobalError({
     window.location.href = `/login?next=${encodeURIComponent(next)}`;
   }, [sessionInvalid]);
 
+  const refreshApp = () => {
+    reset();
+    window.location.reload();
+  };
+
   return (
     <html lang="en">
       <body>
@@ -52,13 +57,13 @@ export default function GlobalError({
             >
               <h2 style={{ fontSize: "1.125rem", fontWeight: 600 }}>Something went wrong.</h2>
               <p style={{ marginTop: "0.5rem", fontSize: "0.875rem" }}>
-                We hit an unexpected error loading the app. Please try again, or head back home if it keeps
+                We hit an unexpected error loading the app. Refresh the app, or head back home if it keeps
                 happening.
               </p>
               <div style={{ marginTop: "1rem", display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
                 <button
                   type="button"
-                  onClick={() => reset()}
+                  onClick={refreshApp}
                   style={{
                     borderRadius: "0.5rem",
                     border: "1px solid #fde68a",
@@ -69,7 +74,7 @@ export default function GlobalError({
                     cursor: "pointer",
                   }}
                 >
-                  Try again
+                  Refresh app
                 </button>
                 <a
                   href="/"
