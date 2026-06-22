@@ -258,14 +258,13 @@ export default async function AdminCompanyProfilePage({
 
   return (
     <div className="mx-auto max-w-5xl space-y-6 p-4 text-gray-900 sm:p-6">
-      <div className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98)_55%,rgba(236,253,245,0.72))] p-6 shadow-[0_28px_60px_-36px_rgba(15,23,42,0.28)]">
-        <div aria-hidden="true" className="pointer-events-none absolute right-0 top-0 h-36 w-36 rounded-full bg-emerald-100/70 blur-3xl" />
+      <div className="relative overflow-hidden rounded-[28px] border border-slate-200/80 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(248,250,252,0.98)_55%,rgba(236,253,245,0.56))] p-6 shadow-[0_28px_60px_-36px_rgba(15,23,42,0.28)]">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="space-y-2">
             <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">Admin Center</p>
             <h1 className="text-[2rem] font-semibold tracking-[-0.03em] text-slate-950">Company Profile</h1>
             <p className="max-w-2xl text-sm leading-6 text-slate-600">
-              Manage the business identity and operating preferences your team and customers see.
+              Manage business identity, account settings, and customer-facing preferences.
             </p>
             <div className="inline-flex items-center rounded-full border border-white/80 bg-white/85 px-3 py-1 text-[11px] font-medium text-slate-600 shadow-sm">
               Used on invoices, messages, and team screens
@@ -292,7 +291,7 @@ export default async function AdminCompanyProfilePage({
         <div className="overflow-hidden rounded-[24px] border border-slate-200/80 bg-white shadow-[0_18px_38px_-30px_rgba(15,23,42,0.24)]">
           <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
             <div className="text-sm font-semibold text-slate-950">Customer-facing identity</div>
-            <div className="mt-1 text-sm text-slate-600">A quick look at the name, logo, and contact info customers see.</div>
+            <div className="mt-1 text-sm text-slate-600">Preview the name, logo, and contact info customers see.</div>
           </div>
           <div className="space-y-4 p-5">
             <div className="rounded-[24px] border border-slate-200 bg-[linear-gradient(180deg,rgba(248,250,252,0.96),rgba(255,255,255,1))] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)]">
@@ -338,7 +337,7 @@ export default async function AdminCompanyProfilePage({
           <div className="space-y-1">
             <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Company details</h2>
             <p className="text-sm leading-6 text-slate-600">
-              Keep your company name, business contact info, and logo current.
+              Edit the name, contact info, and logo shown across the app.
             </p>
           </div>
 
@@ -347,9 +346,7 @@ export default async function AdminCompanyProfilePage({
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                 <div className="space-y-1">
                   <div className="text-sm font-semibold text-slate-950">Logo</div>
-                  <div className="text-sm leading-6 text-slate-600">
-                    Upload a clear logo for a more polished experience across the app.
-                  </div>
+                  <div className="text-sm leading-6 text-slate-600">Shown on invoices, messages, and team screens.</div>
                 </div>
 
                 {currentLogoUrl ? (
@@ -456,9 +453,9 @@ export default async function AdminCompanyProfilePage({
           </div>
         ) : null}
 
-        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4 text-sm text-slate-700 shadow-sm">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 shadow-sm">
           <div className="font-semibold text-slate-900">First job training</div>
-          <p className="mt-1 text-sm leading-6 text-slate-600">
+          <p className="mt-1 text-sm leading-5 text-slate-600">
             Open Training Room for the step-by-step first job path.
           </p>
           <Link href="/training" className="mt-3 inline-flex rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-100">
@@ -534,15 +531,17 @@ export default async function AdminCompanyProfilePage({
         </form>
       </div>
 
+      <TenantStripePaymentsSection readiness={tenantStripeReadiness} billingMode={billingMode} />
+
       <div id="authorized-ecc-raters" className="rounded-[24px] border border-slate-200/80 bg-white p-6 shadow-[0_20px_42px_-32px_rgba(15,23,42,0.26)] scroll-mt-24">
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Connected ECC Raters</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Choose who receives ECC/HERS handoffs when jobs need rater review, corrections, retests, or cert closeout.
+            Choose who receives ECC/HERS handoffs when jobs need rater review.
           </p>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-700">
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-5 text-slate-700">
           <div className="font-semibold text-slate-900">
             {authorizedEccRecipients.length === 0
               ? "No ECC/HERS rater selected yet"
@@ -552,7 +551,7 @@ export default async function AdminCompanyProfilePage({
           </div>
           <div className="mt-1 text-slate-600">
             {authorizedEccSelection.mode === "none"
-              ? "Handoff setup is available when you need it."
+              ? "Add this only when jobs need ECC/HERS coordination."
               : authorizedEccSelection.mode === "single"
                 ? "Handoffs will default to the selected rater."
                 : "Your team will choose a rater during handoff."}
@@ -591,7 +590,7 @@ export default async function AdminCompanyProfilePage({
 
         <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 text-sm leading-6 text-slate-700">
           {authorizedEccSelection.mode === "none" ? (
-            <span>Workflow handoff will show setup required.</span>
+            <span>ECC/HERS handoff setup is available when needed.</span>
           ) : authorizedEccSelection.mode === "single" ? (
             <span>Workflow handoff will default to this rater.</span>
           ) : (
@@ -845,11 +844,11 @@ export default async function AdminCompanyProfilePage({
         <div className="space-y-1">
           <h2 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">Connected Handoff Accounts</h2>
           <p className="text-sm leading-6 text-slate-600">
-            Manage trusted company-to-company connections for future ECC/HERS handoffs.
+            Manage trusted company-to-company connections for ECC/HERS handoffs.
           </p>
         </div>
 
-        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-700">
+        <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-5 text-slate-700">
           <div className="font-semibold text-slate-900">
             {activeConnections.length === 0
               ? "No handoff accounts connected yet"
@@ -860,7 +859,7 @@ export default async function AdminCompanyProfilePage({
           <div className="mt-1 text-slate-600">
             {pendingIncomingConnections.length + pendingOutgoingConnections.length > 0
               ? `${pendingIncomingConnections.length + pendingOutgoingConnections.length} pending connection request${pendingIncomingConnections.length + pendingOutgoingConnections.length === 1 ? "" : "s"} need review.`
-              : "Connection setup is available when ECC/HERS collaboration needs it."}
+              : "Add connections only when ECC/HERS collaboration needs them."}
           </div>
         </div>
 
@@ -1004,8 +1003,6 @@ export default async function AdminCompanyProfilePage({
           </div>
         </details>
       </div>
-
-      <TenantStripePaymentsSection readiness={tenantStripeReadiness} billingMode={billingMode} />
     </div>
   );
 }
@@ -1205,11 +1202,10 @@ function PlatformAccountSection({
       <div className="border-b border-slate-200/80 bg-slate-50/80 px-5 py-4">
         <div className="text-sm font-semibold text-slate-950">Compliance Matters Subscription</div>
         <div className="mt-1 text-sm text-slate-600">
-          Review your plan and account billing. Focus first on running work from customer to invoice.
+          Review app access and subscription billing.
         </div>
         <div className="mt-2 text-xs leading-5 text-slate-500">
-          This subscription is for Compliance Matters access. Customer invoice payments are managed
-          separately through invoice payment settings.
+          Customer invoice payments are managed separately under Online Payments.
         </div>
       </div>
       <dl className="grid grid-cols-1 gap-px bg-slate-100/70 sm:grid-cols-3">
@@ -1240,7 +1236,7 @@ function PlatformAccountSection({
       ) : null}
       <div className="border-t border-slate-100 px-5 py-4">
         {isInternalComped ? (
-          <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-900">
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">
             This internal account is comped and does not require app billing setup.
           </div>
         ) : availability.checkoutAvailable || availability.portalAvailable ? (
@@ -1362,7 +1358,7 @@ function TenantStripePaymentsSection({
   })();
   const statusClass =
     statusCopy.tone === "success"
-      ? "border-emerald-200 bg-emerald-50/70 text-emerald-900"
+      ? "border-slate-200 bg-slate-50/80 text-slate-700"
       : statusCopy.tone === "warn"
         ? "border-amber-200 bg-amber-50/70 text-amber-900"
         : "border-slate-200 bg-slate-50/80 text-slate-700";
@@ -1376,17 +1372,13 @@ function TenantStripePaymentsSection({
         </div>
       </div>
 
-      <div className="space-y-4 px-5 py-4">
-        <div className={`rounded-2xl border px-4 py-3 text-sm leading-6 ${statusClass}`}>
+      <div className="space-y-3 px-5 py-4">
+        <div className={`rounded-2xl border px-4 py-3 text-sm leading-5 ${statusClass}`}>
           <div className="font-semibold">{statusCopy.title}</div>
-          <div>{statusCopy.body}</div>
+          <div className="mt-1">{statusCopy.body}</div>
         </div>
 
-        <div className="text-xs text-slate-500">
-          Last checked: {readiness.lastSyncedAt ? new Date(readiness.lastSyncedAt).toLocaleString() : "Never"}
-        </div>
-
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <form action={startTenantStripeConnectOnboardingFromForm}>
             <button
               type="submit"
@@ -1406,7 +1398,11 @@ function TenantStripePaymentsSection({
           </form>
         </div>
 
-        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-6 text-slate-600">
+        <div className="text-xs text-slate-500">
+          Last checked: {readiness.lastSyncedAt ? new Date(readiness.lastSyncedAt).toLocaleString() : "Never"}
+        </div>
+
+        <div className="rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm leading-5 text-slate-600">
           {usesInternalInvoices
             ? "Online payments apply to invoices created in EveryStep FieldWorks."
             : "Online payments are optional here because invoices are managed outside EveryStep FieldWorks."}

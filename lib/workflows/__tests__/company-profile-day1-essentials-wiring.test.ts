@@ -64,4 +64,13 @@ describe("company profile day 1 essentials wiring", () => {
     expect(pageSource).toContain("Advanced payment details");
     expect(pageSource).toContain("Payment provider account");
   });
+
+  it("keeps online payments before ECC handoff setup in the owner page rhythm", () => {
+    const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
+
+    expect(pageSource.indexOf("<PlatformAccountSection")).toBeLessThan(pageSource.indexOf('id="invoice-settings"'));
+    expect(pageSource.indexOf("<TenantStripePaymentsSection")).toBeGreaterThan(pageSource.indexOf('id="invoice-settings"'));
+    expect(pageSource.indexOf("<TenantStripePaymentsSection")).toBeLessThan(pageSource.indexOf('id="authorized-ecc-raters"'));
+    expect(pageSource.indexOf('id="authorized-ecc-raters"')).toBeLessThan(pageSource.indexOf('id="account-handoff-connections"'));
+  });
 });
