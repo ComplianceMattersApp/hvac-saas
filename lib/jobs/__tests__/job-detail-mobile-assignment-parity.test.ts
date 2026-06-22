@@ -36,14 +36,14 @@ describe("mobile job detail assignment parity", () => {
     expect(mobilePanel).toContain("assignedUserIds={assignedUserIds}");
   });
 
-  it("keeps lower mobile tools as a jump back to the visible assignment card", () => {
+  it("omits the redundant lower mobile tools jump to the visible assignment card", () => {
     const mobileToolsStart = pageSource.indexOf('id="mobile-tools"');
     const mobileToolsEnd = pageSource.indexOf('id="mobile-tools-timeline"', mobileToolsStart);
     const mobileTools = pageSource.slice(mobileToolsStart, mobileToolsEnd);
 
     expect(mobileToolsStart).toBeGreaterThan(-1);
-    expect(mobileTools).toContain('href="#mobile-assigned-team"');
-    expect(mobileTools).toContain("Assign / Manage");
+    expect(mobileTools).not.toContain('href="#mobile-assigned-team"');
+    expect(mobileTools).not.toContain("Assign / Manage");
     expect(mobileTools).not.toContain('id="mobile-assigned-team-panel"');
   });
 

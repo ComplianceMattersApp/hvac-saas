@@ -4919,10 +4919,6 @@ const failureResolutionPathCount =
                 />
               ) : null}
 
-              <a href="#mobile-assigned-team" className={mobileToolLinkClass}>
-                <span className="inline-flex items-center gap-2"><UserIcon className="h-4.5 w-4.5" />Assign / Manage {surfaceProfile.labels.fieldTeam}</span>
-              </a>
-
               <details id="mobile-tools-timeline" className="group">
                 <summary className={`${mobileToolLinkClass} cursor-pointer list-none`}>
                   <span className="inline-flex items-center gap-2"><FolderIcon className="h-4.5 w-4.5" />Timeline / History</span>
