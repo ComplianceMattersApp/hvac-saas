@@ -3427,13 +3427,6 @@ const failureResolutionPathCount =
   const showMobileInvoiceOpenAttention =
     job.job_type === "service" && Boolean(internalInvoiceTruth) && !showInternalInvoicingPlaceholder;
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
-  const mobileWorkStateLabel = isFieldComplete
-    ? "Field complete"
-    : mobileLifecycleStatus === "in_process"
-    ? "In progress"
-    : mobileLifecycleStatus === "on_the_way"
-    ? "On the way"
-    : "Not started";
   const showMobileContractorContext =
     surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
 
@@ -3496,8 +3489,8 @@ const failureResolutionPathCount =
               </div>
             </div>
 
-            <div className="relative mt-3.5 grid grid-cols-2 items-stretch gap-2 overflow-visible border-t border-slate-200 pt-3">
-                <details id="mobile-when-panel" className="group relative self-start overflow-visible rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.24)]">
+            <div className="relative mt-3.5 overflow-visible border-t border-slate-200 pt-3">
+                <details id="mobile-when-panel" className="group relative overflow-visible rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.24)]">
                   <div className="absolute inset-x-0 top-0 h-[2px] bg-blue-600/70" />
                   <summary className="cursor-pointer list-none">
                     <div className="flex items-start justify-between gap-2">
@@ -3517,7 +3510,7 @@ const failureResolutionPathCount =
                     </div>
                   </summary>
 
-                  <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-[calc(200%+0.75rem)] max-w-[calc(100vw-1.5rem)] group-open:block">
+                  <div className="pointer-events-none absolute left-0 top-full z-30 mt-2 hidden w-full max-w-[calc(100vw-1.5rem)] group-open:block">
                     <div className="pointer-events-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_24px_44px_-28px_rgba(15,23,42,0.38)] ring-1 ring-slate-200/70">
                       <form action={updateJobScheduleFromForm} className="space-y-3">
                         <input type="hidden" name="job_id" value={job.id} />
@@ -3580,15 +3573,6 @@ const failureResolutionPathCount =
                     </div>
                   </div>
                 </details>
-                <div className="relative overflow-hidden rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_24px_-24px_rgba(15,23,42,0.24)]">
-                  <div className="absolute inset-x-0 top-0 h-[2px] bg-blue-600/70" />
-                  <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-blue-900/70">
-                    <ToolIcon className="h-4 w-4" />
-                    <span>Work</span>
-                  </div>
-                  <div className="mt-1 text-base font-semibold">{job.job_type === "service" ? "Service" : "ECC"}</div>
-                  <div className="text-sm text-slate-600">{mobileWorkStateLabel}</div>
-                </div>
             </div>
             </div>
           </section>

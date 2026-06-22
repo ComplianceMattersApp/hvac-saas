@@ -71,21 +71,29 @@ describe("mobile job detail assignment parity", () => {
   it("keeps compact mobile schedule and equal-height contact logging controls", () => {
     expect(pageSource).toContain("const mobileAppointmentTimeLabel = job.scheduled_date ? appointmentTimeLabel : \"\";");
     expect(pageSource).toContain("{mobileAppointmentTimeLabel ? (");
+    expect(pageSource).toContain('<details id="mobile-when-panel" className="group relative overflow-visible rounded-xl');
+    expect(pageSource).toContain("hidden w-full max-w-[calc(100vw-1.5rem)] group-open:block");
     expect(contactLoggingSource).toContain("min-h-[4rem]");
     expect(contactLoggingSource).toContain("h-full");
     expect(contactLoggingSource).toContain("whitespace-normal");
     expect(contactLoggingSource).toContain('className="flex w-full"');
   });
 
-  it("does not label unstarted mobile work as active", () => {
-    expect(pageSource).toContain("const mobileWorkStateLabel = isFieldComplete");
-    expect(pageSource).toContain(': "Not started";');
-    expect(pageSource).toContain("{mobileWorkStateLabel}");
-    expect(pageSource).not.toContain('{isFieldComplete ? "Field complete" : "Field active"}');
+  it("omits the redundant mobile work summary card from the header", () => {
+    const mobileScheduleStart = pageSource.indexOf('id="mobile-when-panel"');
+    const mobileScheduleEnd = pageSource.indexOf('{banner === "note_added"', mobileScheduleStart);
+    const mobileScheduleSection = pageSource.slice(mobileScheduleStart, mobileScheduleEnd);
+
+    expect(mobileScheduleStart).toBeGreaterThan(-1);
+    expect(mobileScheduleEnd).toBeGreaterThan(mobileScheduleStart);
+    expect(pageSource).not.toContain("const mobileWorkStateLabel =");
+    expect(pageSource).not.toContain("{mobileWorkStateLabel}");
+    expect(mobileScheduleSection).not.toContain("<span>Work</span>");
+    expect(mobileScheduleSection).not.toContain('job.job_type === "service" ? "Service" : "ECC"');
   });
 
   it("removes duplicate mobile workflow and field status row below the schedule/work cards", () => {
-    const mobileWorkbenchStart = pageSource.indexOf("{mobileWorkStateLabel}");
+    const mobileWorkbenchStart = pageSource.indexOf('id="mobile-when-panel"');
     const mobileWorkbenchEnd = pageSource.indexOf('{banner === "note_added"', mobileWorkbenchStart);
     const mobileWorkbench = pageSource.slice(mobileWorkbenchStart, mobileWorkbenchEnd);
 
