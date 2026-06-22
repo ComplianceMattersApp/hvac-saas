@@ -27,6 +27,97 @@ Recommended model:
 
 ## 2. Current-State Audit Findings
 
+### 2A. Company Profile / Account Center UX Maturity Lock
+
+Status: CLOSED / MODEL LOCKED
+Date: 2026-06-22
+
+This addendum records the completed Company Profile cleanup lane and locks the current owner/admin UX model for `/ops/admin/company-profile`.
+
+Completed slices:
+
+- CP-A: owner-friendly copy and label cleanup.
+- CP-B: collapsed advanced/provider/ECC clutter.
+- CP-B2: made Company Details the primary landing experience.
+- CP-C: clarified Invoice Settings vs Online Payments.
+- CP-D: final owner-friendly readability/layout polish.
+
+Primary route and anchors:
+
+- `/ops/admin/company-profile`
+- `#company-details`
+- `#invoice-settings`
+- `#account-billing`
+- `#accept-payments`
+
+Company Profile purpose:
+
+- Business identity.
+- Customer-facing identity.
+- Business contact info.
+- Operating preferences.
+- Subscription/payment readiness summaries.
+- ECC/HERS handoff summaries when relevant.
+
+Locked page order:
+
+1. Hero.
+2. Customer-facing identity plus Company Details.
+3. Setup attention only when required setup items are incomplete.
+4. Compact First Job Training / Training Room card.
+5. Compliance Matters Subscription.
+6. Invoice Settings.
+7. Online Payments.
+8. ECC/HERS summaries.
+9. Advanced details collapsed.
+
+Intentionally primary:
+
+- Company Details.
+- Customer-facing identity.
+- Business email and phone.
+- Invoice workflow preference.
+- Online payment readiness and action.
+- Subscription status and action summary.
+
+Intentionally secondary / Advanced:
+
+- Subscription diagnostics.
+- Seat/payment-method diagnostics.
+- Payment provider internals.
+- ECC/HERS handoff IDs.
+- Empty/pending/active handoff lists.
+- Manual rater/handoff management details.
+- Provider troubleshooting fields.
+
+Preserved behavior:
+
+- All primary anchors are preserved.
+- All Company Profile form actions are preserved.
+- Payment setup/manage/refresh actions are preserved.
+- Invoice Settings are preserved.
+- ECC/HERS rater and handoff actions are preserved.
+- Auth and account scoping are preserved.
+
+Locked UX principles:
+
+- Company Profile should not feel like onboarding before profile.
+- Training Room owns first-job education.
+- Setup attention appears only when required items are incomplete.
+- Healthy/ready states should be quiet.
+- Broken/incomplete states should be actionable.
+- Provider/system diagnostics belong behind Advanced.
+- Online Payments is customer payment collection and remains separate from the Invoice Settings workflow choice.
+
+Deferred items:
+
+- Dedicated Invoices & Payments workspace split, if needed later.
+- Dedicated ECC/HERS Handoff workspace, if needed later.
+- Full Account Center redesign.
+- Mobile bottom-nav overlay cleanup, which predates this cleanup lane.
+- Any payment/provider behavior changes.
+- Any schema changes.
+
 Current startup/readiness surfaces:
 
 - `app/ops/admin/page.tsx` renders Admin Center with an "Account setup" area, progress percent, required setup, optional setup, and a first-job path.
