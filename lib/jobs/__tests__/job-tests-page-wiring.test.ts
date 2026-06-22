@@ -81,6 +81,10 @@ describe("job tests page wiring", () => {
     const resultsEntryIndex = ductLeakageEntryFieldsSource.indexOf('Enter the measured duct leakage result');
     expect(resultsEntryIndex).toBeGreaterThan(-1);
     expect(ductLeakageEntryFieldsSource.indexOf('Exception')).toBeLessThan(resultsEntryIndex);
+    expect(ductLeakageEntryFieldsSource).toContain("const showMeasurementFields = !exceptionActive;");
+    expect(ductLeakageEntryFieldsSource).toContain("{showMeasurementFields ? (");
+    expect(ductLeakageEntryFieldsSource).toContain('name="measured_duct_leakage_cfm"');
+    expect(ductLeakageEntryFieldsSource).toContain(") : preview.statusText ? (");
     expect(ductLeakageEntryFieldsSource).toContain('Total Leakage %');
     expect(ductBlock).toContain('DuctLeakageEntryFields');
     expect(ductBlock).not.toContain('data-duct-exception-select');
@@ -113,6 +117,10 @@ describe("job tests page wiring", () => {
     expect(airflowEntryFieldsSource.indexOf('Exception')).toBeLessThan(
       airflowEntryFieldsSource.indexOf('Enter measured total airflow'),
     );
+    expect(airflowEntryFieldsSource).toContain("const showMeasurementFields = !exceptionActive;");
+    expect(airflowEntryFieldsSource).toContain("{showMeasurementFields ? (");
+    expect(airflowEntryFieldsSource).toContain('name="measured_total_cfm"');
+    expect(airflowEntryFieldsSource).toContain(") : preview.statusText ? (");
     expect(airflowEntryFieldsSource).toContain('Required');
     expect(airflowBlock).not.toContain('EccLivePreview mode="airflow"');
     expect(airflowBlock).not.toContain('Airflow Override Pass');
@@ -289,6 +297,7 @@ describe("job tests page wiring", () => {
     expect(jobTestsPageSource).toContain('notice === "test_completed" ? "Test completed." : "Results saved."');
     expect(jobTestsPageSource).toContain("Review the completed test here, or return to the test matrix when ready.");
     expect(jobTestsPageSource).toContain("Your latest entries were saved. You can keep editing or return to the test matrix.");
+    expect(jobTestsPageSource).toContain("{!isCompactTestWorkspace ? (");
     expect(jobTestsPageSource).toContain("Back to Tests");
   });
 });

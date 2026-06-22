@@ -143,8 +143,9 @@ export default function AirflowEntryFields({
   }, [formId, projectType, selectedException?.label, measuredInput, previewVersion]);
 
   const exceptionActive = Boolean(selectedException);
+  const showMeasurementFields = !exceptionActive;
   const statusLabel =
-    exceptionActive && !measuredInput.trim()
+    exceptionActive
       ? "Exception"
       : preview.tone === "pass"
       ? "Pass"
@@ -210,7 +211,11 @@ export default function AirflowEntryFields({
           <div className="mb-3 flex flex-wrap items-start justify-between gap-2 sm:gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Results</div>
-              <p className="mt-1 text-sm text-slate-600">Enter measured total airflow when no exception applies.</p>
+              <p className="mt-1 text-sm text-slate-600">
+                {showMeasurementFields
+                  ? "Enter measured total airflow when no exception applies."
+                  : "Exception details are recorded for this test."}
+              </p>
             </div>
             {statusLabel ? (
               <span className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${toneClasses(preview.tone)}`}>
@@ -219,43 +224,49 @@ export default function AirflowEntryFields({
             ) : null}
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,0.7fr)] sm:items-start sm:gap-3">
-            <div className="grid gap-2">
-              <label className="flex items-center justify-between gap-2 text-sm font-medium" htmlFor={`af-meas-${runId}`}>
-                <span>Measured Total Airflow</span>
-                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                  CFM
-                </span>
-              </label>
-              <input
-                id={`af-meas-${runId}`}
-                name="measured_total_cfm"
-                type="number"
-                step="1"
-                required={!exceptionActive}
-                className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-xl sm:font-semibold sm:tracking-tight"
-                defaultValue={measuredInput}
-                onInput={(event) => setMeasuredInput(event.currentTarget.value)}
-                placeholder="Enter CFM"
-              />
-            </div>
+          {showMeasurementFields ? (
+            <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(13rem,0.7fr)] sm:items-start sm:gap-3">
+              <div className="grid gap-2">
+                <label className="flex items-center justify-between gap-2 text-sm font-medium" htmlFor={`af-meas-${runId}`}>
+                  <span>Measured Total Airflow</span>
+                  <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                    CFM
+                  </span>
+                </label>
+                <input
+                  id={`af-meas-${runId}`}
+                  name="measured_total_cfm"
+                  type="number"
+                  step="1"
+                  required
+                  className="w-full rounded-xl border border-slate-300 px-3 py-3 text-3xl font-semibold tracking-tight placeholder:text-slate-400 sm:rounded-md sm:py-2 sm:text-xl sm:font-semibold sm:tracking-tight"
+                  defaultValue={measuredInput}
+                  onInput={(event) => setMeasuredInput(event.currentTarget.value)}
+                  placeholder="Enter CFM"
+                />
+              </div>
 
-            <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 sm:gap-2 sm:py-3">
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-medium text-slate-600">Measured</span>
-                <span className="font-semibold text-slate-950">{formatNumber(preview.measuredTotalCfm)} CFM</span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="font-medium text-slate-600">Required</span>
-                <span className="font-semibold text-slate-950">{formatNumber(preview.requiredTotalCfm)} CFM</span>
-              </div>
-              {preview.statusText ? (
-                <div className={`rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${toneClasses(preview.tone)}`}>
-                  {preview.statusText}
+              <div className="grid gap-1.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-700 sm:gap-2 sm:py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-slate-600">Measured</span>
+                  <span className="font-semibold text-slate-950">{formatNumber(preview.measuredTotalCfm)} CFM</span>
                 </div>
-              ) : null}
+                <div className="flex items-center justify-between gap-3">
+                  <span className="font-medium text-slate-600">Required</span>
+                  <span className="font-semibold text-slate-950">{formatNumber(preview.requiredTotalCfm)} CFM</span>
+                </div>
+                {preview.statusText ? (
+                  <div className={`rounded-xl border px-3 py-2 text-sm font-semibold sm:rounded-md sm:px-2.5 sm:text-xs ${toneClasses(preview.tone)}`}>
+                    {preview.statusText}
+                  </div>
+                ) : null}
+              </div>
             </div>
-          </div>
+          ) : preview.statusText ? (
+            <div className={`rounded-xl border px-3 py-2 text-sm font-semibold ${toneClasses(preview.tone)}`}>
+              {preview.statusText}
+            </div>
+          ) : null}
 
           <div className="mt-3 grid gap-1">
             <label className="text-sm font-medium" htmlFor={`af-notes-${runId}`}>

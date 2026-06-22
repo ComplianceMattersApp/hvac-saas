@@ -1716,12 +1716,14 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   ? "Review the completed test here, or return to the test matrix when ready."
                   : "Your latest entries were saved. You can keep editing or return to the test matrix."}
               </span>
-              <Link
-                href={selectedSystemId ? withS(undefined, selectedSystemId) : baseHref}
-                className="inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-sm transition-colors hover:bg-emerald-100"
-              >
-                Back to Tests
-              </Link>
+              {!isCompactTestWorkspace ? (
+                <Link
+                  href={selectedSystemId ? withS(undefined, selectedSystemId) : baseHref}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-emerald-300 bg-white px-3 py-1.5 text-xs font-semibold text-emerald-800 shadow-sm transition-colors hover:bg-emerald-100"
+                >
+                  Back to Tests
+                </Link>
+              ) : null}
             </div>
           </div>
         )}
