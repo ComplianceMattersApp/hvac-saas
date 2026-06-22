@@ -890,13 +890,18 @@ function telHref(phone?: string | null) {
         });
       }
 
+      const queuePreviewLimit =
+        workspaceKey === "need_to_schedule"
+          ? Math.max(countsWs.get("need_to_schedule") ?? 0, 10)
+          : 10;
+
       let queueQ = supabase
         .from("jobs")
         .select(workspaceSelect)
         .is("deleted_at", null)
         .neq("status", "cancelled")
         .order("created_at", { ascending: true })
-        .limit(10);
+        .limit(queuePreviewLimit);
 
       if (workspaceKey === "need_to_schedule") {
         queueQ = queueQ.eq("status", "open").eq("ops_status", "need_to_schedule");

@@ -37,6 +37,13 @@ const workspaceListSource =
     ? opsPageSource.slice(workspaceListStart, workspaceListEnd)
     : "";
 
+const loadWorkspaceRowsStart = opsPageSource.indexOf("async function loadWorkspacePreviewRows(");
+const loadWorkspaceRowsEnd = opsPageSource.indexOf("const workspacePreviewEntries", loadWorkspaceRowsStart);
+const loadWorkspaceRowsSource =
+  loadWorkspaceRowsStart > -1 && loadWorkspaceRowsEnd > loadWorkspaceRowsStart
+    ? opsPageSource.slice(loadWorkspaceRowsStart, loadWorkspaceRowsEnd)
+    : "";
+
 describe("/ops Needs Scheduling rich cards", () => {
   it("renders rich action cards in the actual visible workspace Needs Scheduling queue", () => {
     expect(opsPageSource).toContain('pending: "need_to_schedule"');
@@ -44,6 +51,13 @@ describe("/ops Needs Scheduling rich cards", () => {
     expect(workspaceRichCardSource).toContain('variant="needs-scheduling-rich"');
     expect(workspaceListSource).toContain('if (selectedWorkspaceSection.key === "need_to_schedule")');
     expect(workspaceListSource).toContain("return workspaceNeedsSchedulingRichCard(job, visibleReason);");
+  });
+
+  it("does not cap the selected Needs Scheduling workspace list at the generic ten-row preview limit", () => {
+    expect(loadWorkspaceRowsSource).toContain('workspaceKey === "need_to_schedule"');
+    expect(loadWorkspaceRowsSource).toContain('Math.max(countsWs.get("need_to_schedule") ?? 0, 10)');
+    expect(loadWorkspaceRowsSource).toContain(".limit(queuePreviewLimit)");
+    expect(loadWorkspaceRowsSource).not.toContain(".limit(10)");
   });
 
   it("keeps contact timestamp display wired to the existing recent-attempt read model on the workspace cards", () => {
