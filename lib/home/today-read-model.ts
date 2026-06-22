@@ -55,7 +55,6 @@ import {
   isTodayWithoutTechCandidateJob,
 } from "@/lib/ops/without-tech-predicate";
 import { countPendingContractorIntakeQueueRows } from "@/lib/ops/contractor-intake-queue";
-
 // -----------------------------------------------------------------------------
 // Public types
 // -----------------------------------------------------------------------------
