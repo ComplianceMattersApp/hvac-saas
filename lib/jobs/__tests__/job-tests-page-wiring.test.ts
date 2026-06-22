@@ -117,10 +117,11 @@ describe("job tests page wiring", () => {
     expect(airflowEntryFieldsSource.indexOf('Exception')).toBeLessThan(
       airflowEntryFieldsSource.indexOf('Enter measured total airflow'),
     );
-    expect(airflowEntryFieldsSource).toContain("const showMeasurementFields = !exceptionActive;");
-    expect(airflowEntryFieldsSource).toContain("{showMeasurementFields ? (");
+    expect(airflowEntryFieldsSource).toContain("const exceptionRecordedText = selectedException ? `${selectedException.label} exception recorded` : \"\";");
     expect(airflowEntryFieldsSource).toContain('name="measured_total_cfm"');
-    expect(airflowEntryFieldsSource).toContain(") : preview.statusText ? (");
+    expect(airflowEntryFieldsSource).toContain("required={!exceptionActive}");
+    expect(airflowEntryFieldsSource).toContain("{exceptionRecordedText ? (");
+    expect(airflowEntryFieldsSource).toContain('Enter measured total airflow when available. Exception details remain recorded for this test.');
     expect(airflowEntryFieldsSource).toContain('Required');
     expect(airflowBlock).not.toContain('EccLivePreview mode="airflow"');
     expect(airflowBlock).not.toContain('Airflow Override Pass');
