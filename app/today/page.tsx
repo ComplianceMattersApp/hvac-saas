@@ -21,6 +21,7 @@ import {
   type TodayJobSummary,
   type TodayReadModel,
 } from "@/lib/home/today-read-model";
+import TodayFieldConditionsClient from "@/components/home/TodayFieldConditionsClient";
 import TodayWelcomeModal from "@/components/home/TodayWelcomeModal";
 import {
   landingPathForDualContextAccess,
@@ -105,7 +106,10 @@ export default async function TodayPage() {
   return (
     <div className="mx-auto w-full max-w-6xl space-y-4 px-3 pb-12 sm:px-5 sm:space-y-5 lg:space-y-6 lg:px-6">
       <TodayWelcomeModal initiallyOpen={model.showWelcomeModal} />
-      <HeaderSection header={model.todayHeader} briefing={model.dailyBriefing} />
+      <HeaderSection
+        header={model.todayHeader}
+        briefing={model.dailyBriefing}
+      />
 
       {/* MOBILE-FIRST RANKED STREAM (visible on mobile, hidden on lg+) */}
       <div className="space-y-4 lg:hidden">
@@ -255,6 +259,8 @@ function HeaderSection({
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
         <p className="text-sm font-medium leading-6 text-slate-800">{briefing}</p>
       </div>
+
+      <TodayFieldConditionsClient />
     </section>
   );
 }
