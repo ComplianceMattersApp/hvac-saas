@@ -139,6 +139,9 @@ describe("job tests page wiring", () => {
     expect(refrigerantChargeExceptionFieldsSource).toContain('Enter readings');
     expect(refrigerantChargeExceptionFieldsSource).toContain('Photo evidence');
     expect(refrigerantChargeExceptionFieldsSource).toContain('Exception / Not applicable');
+    expect(refrigerantChargeExceptionFieldsSource).toContain("const showNumericFields = documentationMethod === \"\";");
+    expect(refrigerantChargeExceptionFieldsSource).toContain("document.getElementById(`rc-numeric-section-${runId}`)");
+    expect(refrigerantChargeExceptionFieldsSource).toContain("numericSection.hidden = !showNumericFields");
     expect(refrigerantChargeExceptionFieldsSource).toContain('name="rc_exception"');
     expect(refrigerantChargeExceptionFieldsSource).toContain('Package unit');
     expect(refrigerantChargeExceptionFieldsSource).toContain('Conditions not met / weather');
@@ -156,6 +159,10 @@ describe("job tests page wiring", () => {
     expect(refrigerantChargeInlinePreviewSource).toContain('Math.abs(measured - targetSubcool) <= SUBCOOL_TOLERANCE_F');
     expect(refrigerantChargeInlinePreviewSource).toContain('measured < SUPERHEAT_MAX_F');
     expect(refrigerantBlock).toContain('Lowest Return Air Dry Bulb');
+    expect(refrigerantBlock).toContain('id={`rc-numeric-section-${runRC.id}`}');
+    expect(refrigerantBlock).toContain("data-rc-numeric-section");
+    expect(refrigerantBlock).toContain('runRC.data?.verification_method === "photo_taken"');
+    expect(refrigerantBlock).toContain("Boolean(runRC.data?.charge_exempt_reason)");
     expect(refrigerantBlock).toContain('Condenser Air Entering DB');
     expect(refrigerantBlock).toContain('Liquid Line Temp');
     expect(refrigerantBlock).toContain('Liquid Line Pressure');

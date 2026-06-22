@@ -4621,9 +4621,22 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       evidenceAttachments={refrigerantEvidenceAttachments}
                     />
                   </RefrigerantChargeExceptionFields>
-                  <input type="hidden" name="outdoor_temp_f" value={runRC.data?.outdoor_temp_f ?? ""} />
+                  <div
+                    id={`rc-numeric-section-${runRC.id}`}
+                    data-rc-numeric-section
+                    hidden={
+                      runRC.data?.verification_method === "photo_taken" ||
+                      Boolean(runRC.data?.charge_exempt_reason)
+                    }
+                    aria-hidden={
+                      runRC.data?.verification_method === "photo_taken" ||
+                      Boolean(runRC.data?.charge_exempt_reason)
+                    }
+                    className="grid gap-3"
+                  >
+                    <input type="hidden" name="outdoor_temp_f" value={runRC.data?.outdoor_temp_f ?? ""} />
 
-                  <div className="grid gap-3">
+                    <div className="grid gap-3">
                     <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">Results</div>
                     <p className="text-sm text-slate-600">Enter readings top to bottom in field order.</p>
                     <div className="grid gap-1">
@@ -4821,6 +4834,7 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                       ) : null}
                     </div>
                     </div>
+                  </div>
                   </div>
 
                 </form>

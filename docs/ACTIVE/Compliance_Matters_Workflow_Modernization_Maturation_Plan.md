@@ -577,6 +577,20 @@ Every touched form should be challenged:
 
 Avoid lipstick-on-a-pig fixes. If old form structure fights the new workflow, redesign the form.
 
+### 15.1 Guided mode-aware field task pattern
+
+Current Refrigerant Charge photo evidence is the model for future guided field task polish:
+
+- choose the documentation/work method first
+- show only the fields and actions relevant to that method
+- avoid generic detours when the field task has a clear inline capture path
+- preserve source-of-truth safety even when the UX is faster
+- keep historical storage surfaces available without making them the first stop
+
+Refrigerant Charge now uses Enter readings, Photo evidence, and Exception / Not applicable modes. Enter readings remains the numeric computed pass/fail path. Photo evidence is captured inline with separate Take Photo and Upload Photo controls, saves as normal job attachments with clean labels and refrigerant charge evidence context, hides numeric entry fields, and requires explicit Pass / Fail / Needs Review before completion. Photo capture/upload alone does not auto-pass; Needs Review remains non-pass/non-fail; explicit Pass/Fail is user-selected outcome/override behavior. Package unit, weather, and conditions exceptions remain separate from photo evidence.
+
+Future V3 mobile UX may convert documentation method and result choices into large stacked mobile buttons for faster one-handed field use. Broader future field workflows should favor guided, mode-aware, mobile-first task paths: choose method first, show only relevant fields/actions, avoid generic detours, and preserve source-of-truth safety.
+
 ---
 
 ## 16. Staged audit and implementation plan

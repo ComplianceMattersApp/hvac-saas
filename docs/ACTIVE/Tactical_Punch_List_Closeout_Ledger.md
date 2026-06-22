@@ -64,7 +64,7 @@ Status: CLOSED for the commits listed below. These items were verified from rece
 
 - Evidence source: formerly duplicated in `Compliance_Matters_Prelaunch_Confirmation_Checklist.md` Section 2.3.3.
 - Closed behavior: notification/proposal unread-awareness cleanup, proposal card identity restoration, contractor/internal note preservation, calendar/scheduling display fixes, no-tech scheduled visibility, unassigned filter chip, inspector default-collapsed behavior, responsive default calendar views, date-only display format polish, login password show/hide, and day/aging counters on Failed and Need Info/Pending Info surfaces.
-- ECC/test tactical items: refrigerant Photo Taken path clarified as attestation-only, Duct Leakage override suggestions include Asbestos while preserving custom/manual reasons.
+- ECC/test tactical items: Refrigerant Charge photo evidence is now a guided inline documentation mode with separate Take Photo and Upload Photo actions, normal job attachment storage, clean labels, hidden numeric fields while in photo evidence mode, and explicit Pass / Fail / Needs Review before completion; photo capture/upload alone still does not auto-pass. Duct Leakage override suggestions include Asbestos while preserving custom/manual reasons.
 - Guardrails preserved: no payment execution behavior, no Pricebook behavior, no RLS behavior, no calendar engine rebuild claim, and no technician-assignment ownership change from calendar drag/drop.
 
 ### Proposal / Closeout / Calendar Polish Catch-Up

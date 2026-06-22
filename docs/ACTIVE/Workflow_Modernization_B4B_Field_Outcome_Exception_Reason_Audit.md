@@ -141,7 +141,7 @@ Notes/photos/attachments/diagnostics:
 - `addInternalNoteFromForm` writes `internal_note` and may create mention notifications.
 - Contractor portal paths write `contractor_note`, `contractor_correction_submission`, and `retest_ready_requested`.
 - `finalizeInternalJobAttachmentUpload` writes `attachment_added` with source, count, note, caption, evidence context, attachment IDs, and file names.
-- ECC test save/complete paths write test-run data and trigger ECC status evaluation; photo attestation is represented in ECC run data/computed status, not as a pass/fail by default.
+- ECC test save/complete paths write test-run data and trigger ECC status evaluation. Refrigerant Charge photo evidence is represented in ECC run data/computed status and requires explicit Pass / Fail / Needs Review for completion; photo capture/upload alone is not a pass/fail by default.
 
 ## 7. Notes / Photos / Diagnostics Capture Map
 
@@ -161,7 +161,7 @@ Photos/attachments:
 Diagnostics:
 
 - ECC diagnostics are captured in ECC test pages/actions using `ecc_test_runs`.
-- Refrigerant charge photo attestation and other ECC tests use structured `data`, `computed`, `computed_pass`, `override_pass`, and `is_completed`.
+- Refrigerant Charge guided photo evidence and other ECC tests use structured `data`, `computed`, `computed_pass`, `override_pass`, and `is_completed`.
 - Job detail displays the latest ECC run result and links to test pages rather than duplicating test capture in the finish action.
 
 Office visibility:

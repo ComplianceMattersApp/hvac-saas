@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 type Props = {
   children?: ReactNode;
@@ -36,6 +36,14 @@ export default function RefrigerantChargeExceptionFields({
     documentationMethod === "exception" &&
     (exceptionValue === "package_unit" || exceptionValue === "conditions_not_met");
   const showEvidence = documentationMethod === "photo_taken";
+  const showNumericFields = documentationMethod === "";
+
+  useEffect(() => {
+    const numericSection = document.getElementById(`rc-numeric-section-${runId}`);
+    if (!numericSection) return;
+    numericSection.hidden = !showNumericFields;
+    numericSection.setAttribute("aria-hidden", showNumericFields ? "false" : "true");
+  }, [runId, showNumericFields]);
 
   return (
     <section className="rounded-2xl border border-blue-100 bg-blue-50/40 p-3 shadow-[0_14px_28px_-28px_rgba(15,23,42,0.2)] sm:p-4">

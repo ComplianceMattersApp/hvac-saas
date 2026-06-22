@@ -51,18 +51,33 @@ Key boundary:
 
 ### Refrigerant Charge
 
-- Refrigerant Charge was restored to a strict top-to-bottom field-entry list.
+- Refrigerant Charge now uses a mode-based documentation path: Enter readings, Photo evidence, or Exception / Not applicable.
+- Enter readings shows the numeric Refrigerant Charge fields and preserves the existing computed pass/fail behavior.
 - Side-by-side/split-panel entry layout was removed.
 - Visible Outdoor Temp was removed from the workflow while compatibility was preserved where needed.
-- Exception handling moved to the top of the workflow.
-- Exception options include Package unit, Conditions not met / weather, and Photo Taken attestation.
-- Exception reason appears only for exception paths that require a reason and is required only in those cases.
-- Photo Taken opens the evidence/attachments area directly under the exception dropdown.
-- Results and Charge Readings were merged into one unified flow.
+- Photo evidence is now a guided inline path inside the Refrigerant Charge task instead of a required first detour to the generic Attachment Library.
+- Photo evidence provides separate Take Photo and Upload Photo controls.
+- Take Photo uses camera capture behavior.
+- Upload Photo allows existing photo/file selection without forcing camera capture.
+- Evidence saves as normal job attachments with refrigerant charge evidence context.
+- Original file_name is preserved.
+- User-facing attachment labels/titles are clean and do not expose internal refrigerant evidence tags.
+- Editing attachment title/label preserves refrigerant evidence context.
+- Evidence appears back inside the Refrigerant Charge panel after upload.
+- Attachment Library remains storage/history, not the required first stop.
+- Photo evidence mode hides numeric Refrigerant Charge entry fields, live numeric previews, filter drier checkbox, and numeric result summary.
+- Completing Photo evidence requires explicit Pass / Fail / Needs Review.
+- Photo capture/upload alone does not set computed_pass = true.
+- Needs Review remains non-pass/non-fail.
+- Explicit Pass/Fail is user-selected outcome/override behavior, not inferred from photo evidence.
+- Exception / Not applicable remains separate from photo evidence and shows only relevant exception controls/reason fields.
+- Package unit and weather/conditions exception behavior remains separate from photo evidence.
+- Results and Charge Readings remain one unified numeric flow when Enter readings is selected.
 - Old calculated summary/dashboard clutter was removed.
-- Inline live calculated pass/fail feedback is present for measured subcool and measured superheat.
+- Inline live calculated pass/fail feedback is present for measured subcool and measured superheat only in Enter readings mode.
 - Existing refrigerant charge formulas/evaluator truth were preserved.
 - Complete Test returns to the job detail test section.
+- Future V3 mobile UX may convert documentation method and photo result choices into large stacked mobile buttons for faster field use.
 
 ### Completion Report
 
