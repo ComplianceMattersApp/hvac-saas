@@ -54,7 +54,19 @@ describe("mobile job detail assignment parity", () => {
     expect(controlsSource).toContain("isInternalUser ? (");
     expect(controlsSource).toContain("<DeferredAddAssigneeForm");
     expect(addAssigneeSource).toContain("assignJobAssigneeFromForm");
+    expect(addAssigneeSource).toContain('name="make_primary"');
+    expect(addAssigneeSource).toContain("Set as primary");
     expect(addAssigneeSource).toContain("returnAnchor");
+  });
+
+  it("hides redundant mobile primary promotion for a single assignee while preserving valid switching", () => {
+    expect(controlsSource).toContain(
+      "const showMakePrimaryAction = !assignee.is_primary && (!isMobile || assignedTeam.length > 1);",
+    );
+    expect(controlsSource).toContain("{showMakePrimaryAction ? (");
+    expect(controlsSource).toContain("setPrimaryJobAssigneeFromForm");
+    expect(controlsSource).toContain("Remove");
+    expect(controlsSource).toContain("Primary");
   });
 
   it("preserves the desktop assignment surface through the shared controls", () => {

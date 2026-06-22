@@ -70,42 +70,46 @@ export default function AssignedTeamControls({
 
       {assignedTeam.length > 0 ? (
         <div className={listClassName}>
-          {assignedTeam.map((assignee) => (
-            <div key={`${isMobile ? "mobile-" : ""}${assignee.job_id}-${assignee.user_id}`} className={assigneeClassName}>
-              <span className={identityClassName}>{formatPersonNamePart(assignee.display_name)}</span>
-              {assignee.is_primary ? (
-                <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
-                  Primary
-                </span>
-              ) : null}
+          {assignedTeam.map((assignee) => {
+            const showMakePrimaryAction = !assignee.is_primary && (!isMobile || assignedTeam.length > 1);
 
-              {isInternalUser ? (
-                <div className={actionRowClassName}>
-                  {!assignee.is_primary ? (
-                    <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
+            return (
+              <div key={`${isMobile ? "mobile-" : ""}${assignee.job_id}-${assignee.user_id}`} className={assigneeClassName}>
+                <span className={identityClassName}>{formatPersonNamePart(assignee.display_name)}</span>
+                {assignee.is_primary ? (
+                  <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-slate-600">
+                    Primary
+                  </span>
+                ) : null}
+
+                {isInternalUser ? (
+                  <div className={actionRowClassName}>
+                    {showMakePrimaryAction ? (
+                      <form action={setPrimaryJobAssigneeFromForm} className="shrink-0">
+                        <input type="hidden" name="job_id" value={jobId} />
+                        <input type="hidden" name="user_id" value={assignee.user_id} />
+                        <input type="hidden" name="tab" value={tab} />
+                        <input type="hidden" name="return_to" value={returnTo} />
+                        <SubmitButton loadingText="Updating..." className={primaryControlClassName}>
+                          Make Primary
+                        </SubmitButton>
+                      </form>
+                    ) : null}
+
+                    <form action={removeJobAssigneeFromForm} className="shrink-0">
                       <input type="hidden" name="job_id" value={jobId} />
                       <input type="hidden" name="user_id" value={assignee.user_id} />
                       <input type="hidden" name="tab" value={tab} />
                       <input type="hidden" name="return_to" value={returnTo} />
-                      <SubmitButton loadingText="Updating..." className={primaryControlClassName}>
-                        Make Primary
+                      <SubmitButton loadingText="Removing..." className={removeControlClassName}>
+                        Remove
                       </SubmitButton>
                     </form>
-                  ) : null}
-
-                  <form action={removeJobAssigneeFromForm} className="shrink-0">
-                    <input type="hidden" name="job_id" value={jobId} />
-                    <input type="hidden" name="user_id" value={assignee.user_id} />
-                    <input type="hidden" name="tab" value={tab} />
-                    <input type="hidden" name="return_to" value={returnTo} />
-                    <SubmitButton loadingText="Removing..." className={removeControlClassName}>
-                      Remove
-                    </SubmitButton>
-                  </form>
-                </div>
-              ) : null}
-            </div>
-          ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
         </div>
       ) : (
         <div className={`mt-3 ${emptyStateClassName}`}>No team assigned yet.</div>
