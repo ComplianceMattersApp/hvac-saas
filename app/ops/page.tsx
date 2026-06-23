@@ -1162,6 +1162,23 @@ function telHref(phone?: string | null) {
       signal,
     })}`;
     const activeWorkspaceHref = `${activeWorkspaceBaseHref}#ops-workspace`;
+    const opsExportBaseParams = {
+      queue: selectedWorkspaceKey,
+      bucket: effectiveBoardBucketFilter,
+      contractor: contractorScopeFilter ?? "",
+      reason: effectiveBoardReasonFilter ?? "",
+      sort: boardSort === "oldest" ? "" : boardSort,
+    };
+    const internalOpsExportHref = `/ops/export${buildQueryString({
+      ...opsExportBaseParams,
+      mode: "internal",
+    })}`;
+    const contractorSafeOpsExportHref = `/ops/export${buildQueryString({
+      ...opsExportBaseParams,
+      mode: "contractor_safe",
+    })}`;
+    const canShowJobQueueExport = selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake";
+    const canExportContractorSafeCsv = Boolean(contractorScopeFilter);
 
     function workspaceNeedsSchedulingRichCard(job: any, visibleReason: OpsBoardVisibleReason) {
       const jobId = String(job?.id ?? "").trim();
@@ -1798,6 +1815,38 @@ function telHref(phone?: string | null) {
               </Link>
             ) : null}
           </div>
+
+          {canShowJobQueueExport ? (
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-slate-200 bg-slate-50/80 px-3 py-2.5">
+              <div className="min-w-0 text-xs text-slate-600">
+                <div className="font-semibold text-slate-800">Exports the current queue and filters.</div>
+                <div>Contractor-safe CSV excludes internal notes, billing, and payment details.</div>
+                {!canExportContractorSafeCsv ? (
+                  <div className="mt-1 font-semibold text-amber-700">Choose a contractor to create a contractor-safe CSV.</div>
+                ) : null}
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <Link
+                  href={internalOpsExportHref}
+                  className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-900 bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-slate-800"
+                >
+                  Internal CSV
+                </Link>
+                {canExportContractorSafeCsv ? (
+                  <Link
+                    href={contractorSafeOpsExportHref}
+                    className="inline-flex min-h-9 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                  >
+                    Contractor-Safe CSV
+                  </Link>
+                ) : (
+                  <span className="inline-flex min-h-9 cursor-not-allowed items-center justify-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-400">
+                    Contractor-Safe CSV
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : null}
 
           <article className="rounded-2xl border border-slate-300/80 bg-white p-3 shadow-[0_18px_38px_-30px_rgba(15,23,42,0.36)] ring-1 ring-slate-200/70 sm:p-3.5">
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-2">
