@@ -41,6 +41,31 @@ const QUEUE_LABELS: Record<OpsExportQueueKey, string> = {
 
 type ExportJob = Record<string, any>;
 
+const INTERNAL_WORK_CONTRACTOR_FOCUS_ID = "__internal_work";
+
+function normalizeContractorExportIds(value: unknown) {
+  return Array.from(
+    new Set(
+      String(value ?? "")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
+    ),
+  );
+}
+
+function applyContractorExportScope(query: any, contractorId: string | null) {
+  const contractorIds = normalizeContractorExportIds(contractorId);
+  if (contractorIds.length === 0) return query;
+  const includesInternalWork = contractorIds.includes(INTERNAL_WORK_CONTRACTOR_FOCUS_ID);
+  const realContractorIds = contractorIds.filter((id) => id !== INTERNAL_WORK_CONTRACTOR_FOCUS_ID);
+
+  if (includesInternalWork && realContractorIds.length === 0) return query.is("contractor_id", null);
+  if (!includesInternalWork && realContractorIds.length === 1) return query.eq("contractor_id", realContractorIds[0]);
+  if (!includesInternalWork) return query.in("contractor_id", realContractorIds);
+  return query.or(`contractor_id.is.null,contractor_id.in.(${realContractorIds.join(",")})`);
+}
+
 export function normalizeOpsExportMode(value: unknown): OpsExportMode {
   return String(value ?? "").trim().toLowerCase() === "contractor_safe" ? "contractor_safe" : "internal";
 }
@@ -181,8 +206,7 @@ async function loadCloseoutRows(params: {
       .in("ops_status", ["invoice_required", "paperwork_required"])
       .order("created_at", { ascending: true })
       .limit(EXPORT_LIMIT);
-    if (params.contractorId) q = q.eq("contractor_id", params.contractorId);
-    return q;
+    return applyContractorExportScope(q, params.contractorId);
   };
   const permitQuery = () => {
     let q = params.supabase
@@ -195,8 +219,7 @@ async function loadCloseoutRows(params: {
       .or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")
       .order("created_at", { ascending: true })
       .limit(EXPORT_LIMIT);
-    if (params.contractorId) q = q.eq("contractor_id", params.contractorId);
-    return q;
+    return applyContractorExportScope(q, params.contractorId);
   };
 
   const [base, permit] = await Promise.all([baseQuery(), permitQuery()]);
@@ -250,7 +273,7 @@ async function loadJobRows(params: {
     q = q.eq("status", "open").eq("ops_status", "scheduled").order("scheduled_date", { ascending: true }).order("window_start", { ascending: true });
   }
 
-  if (params.contractorId) q = q.eq("contractor_id", params.contractorId);
+  q = applyContractorExportScope(q, params.contractorId);
   const res = await q;
   if (res.error) throw res.error;
 

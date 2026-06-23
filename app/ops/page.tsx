@@ -1,6 +1,5 @@
 // app/ops/page
 import Link from "next/link";
-import ContractorFilter from "./_components/ContractorFilter";
 import QueueCard from "@/components/ops/QueueCard";
 import QueueCardOpenAndAct from "@/components/ops/QueueCardOpenAndAct";
 import { redirect } from "next/navigation";
@@ -110,6 +109,13 @@ type PermitJobLocationOption = {
   label: string;
 };
 
+type ContractorFocusOption = {
+  id: string;
+  name: string;
+  count: number;
+  selected: boolean;
+};
+
 function normalizeOpsBoardFilterBucket(value: unknown): OpsBoardFilterBucket {
   const normalized = String(value ?? "").trim().toLowerCase();
   if (normalized === "need_to_schedule") return "pending";
@@ -168,13 +174,25 @@ function buildQueryString(params: Record<string, string | undefined | null>) {
   return s ? `?${s}` : "";
 }
 
+const INTERNAL_WORK_CONTRACTOR_FOCUS_ID = "__internal_work";
+
+function normalizeContractorFocusIds(value: unknown) {
+  const rawValues = Array.isArray(value) ? value : [value];
+  const ids = rawValues
+    .flatMap((item) => String(item ?? "").split(","))
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  return Array.from(new Set(ids));
+}
+
 export default async function OpsPage({
   searchParams,
 }: {
   searchParams?: Promise<{
   bucket?: string;
   create?: string;
-  contractor?: string;
+  contractor?: string | string[];
   notice?: string;
   q?: string;
   sort?: string;
@@ -187,7 +205,7 @@ export default async function OpsPage({
   const sp = (searchParams ? await searchParams : {}) ?? {};
   const boardBucketFilter = normalizeOpsBoardFilterBucket(sp.bucket);
   const activeBoardBucketFilter = boardBucketFilter === "all" ? "pending" : boardBucketFilter;
-  const contractor = (sp.contractor ?? "").trim() || null;
+  const contractorFocusIdsFromQuery = normalizeContractorFocusIds(sp.contractor);
   const notice = (sp.notice ?? "").trim().toLowerCase();
   const q = (sp.q ?? "").trim() || null;
   const sort = (sp.sort ?? "").trim() || "default";
@@ -313,8 +331,15 @@ export default async function OpsPage({
 
   const productMode: ProductMode = await resolvedProductModePromise;
   const isHvacServiceMode = productMode === "hvac_service";
+  const showContractorFocusSelection = productMode === "ecc_hers" || productMode === "hybrid";
   const contractorIntakeQueueAvailable = isContractorIntakeQueueAvailableForProductMode(productMode);
-  const contractorScopeFilter = isHvacServiceMode ? null : contractor;
+  const contractorFocusIds = showContractorFocusSelection ? contractorFocusIdsFromQuery : [];
+  const contractorScopeFilter =
+    contractorFocusIds.length === 1 && contractorFocusIds[0] !== INTERNAL_WORK_CONTRACTOR_FOCUS_ID
+      ? contractorFocusIds[0]
+      : null;
+  const contractorFocusFilter = contractorFocusIds.length > 0 ? contractorFocusIds.join(",") : null;
+  const contractorFocusIdSet = new Set(contractorFocusIds);
   const permitWorkflowEnabled = isPermitWorkflowEnabledForAccountOwner(internalUser.account_owner_user_id);
 
   const _t_businessIdentity = opsTimingEnabled ? Date.now() : 0;
@@ -531,7 +556,6 @@ function telHref(phone?: string | null) {
         .eq("ops_status", opsStatus);
 
       if (options?.requireOpenStatus) q = q.eq("status", "open");
-      if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
       return q;
     }
 
@@ -554,8 +578,6 @@ function telHref(phone?: string | null) {
       .gte("scheduled_date", wsStartTodayUtc)
       .lt("scheduled_date", wsStartTomorrowUtc);
 
-    if (contractorScopeFilter) fieldWorkCountQ = fieldWorkCountQ.eq("contractor_id", contractorScopeFilter);
-
     let scheduledOpenRowsQ = supabase
       .from("jobs")
       .select(scheduledSnapshotSelect)
@@ -567,8 +589,6 @@ function telHref(phone?: string | null) {
       .order("window_start", { ascending: true })
       .limit(50);
 
-    if (contractorScopeFilter) scheduledOpenRowsQ = scheduledOpenRowsQ.eq("contractor_id", contractorScopeFilter);
-
     let closeoutCountRowsQ = supabase
       .from("jobs")
       .select(workspaceSelect)
@@ -578,8 +598,6 @@ function telHref(phone?: string | null) {
       .in("ops_status", ["invoice_required", "paperwork_required"])
       .order("created_at", { ascending: false })
       .limit(500);
-
-    if (contractorScopeFilter) closeoutCountRowsQ = closeoutCountRowsQ.eq("contractor_id", contractorScopeFilter);
 
     let closeoutPermitExceptionRowsQ = supabase
       .from("jobs")
@@ -591,8 +609,6 @@ function telHref(phone?: string | null) {
       .or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")
       .order("created_at", { ascending: false })
       .limit(50);
-
-    if (contractorScopeFilter) closeoutPermitExceptionRowsQ = closeoutPermitExceptionRowsQ.eq("contractor_id", contractorScopeFilter);
 
     const [
       needToScheduleCountRes,
@@ -628,7 +644,6 @@ function telHref(phone?: string | null) {
         ? countPendingContractorIntakeQueueRows({
             supabase: admin,
             accountOwnerUserId: internalUser.account_owner_user_id,
-            contractorId: contractorScopeFilter,
           })
         : Promise.resolve(0),
       listInternalContractorUpdateAwareness({ limit: 100, onlyUnread: true }),
@@ -637,7 +652,6 @@ function telHref(phone?: string | null) {
         ? listActivePermitRequestQueueRowsIfAvailable({
             supabase: supabase as any,
             accountOwnerUserId: internalUser.account_owner_user_id,
-            contractorId: contractorScopeFilter,
             limit: 50,
           })
         : Promise.resolve({ schemaAvailable: true, rows: [] as PermitRequestQueueRow[] }),
@@ -829,7 +843,6 @@ function telHref(phone?: string | null) {
           .in("ops_status", ["invoice_required", "paperwork_required"])
           .order("created_at", { ascending: true })
           .limit(50);
-        if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
         return q;
       };
 
@@ -844,7 +857,6 @@ function telHref(phone?: string | null) {
           .or("pending_info_reason.ilike.%permit%,on_hold_reason.ilike.%permit%")
           .order("created_at", { ascending: true })
           .limit(50);
-        if (contractorScopeFilter) q = q.eq("contractor_id", contractorScopeFilter);
         return q;
       };
 
@@ -885,15 +897,12 @@ function telHref(phone?: string | null) {
         return listPendingContractorIntakeQueueRows({
           supabase: admin,
           accountOwnerUserId: internalUser.account_owner_user_id,
-          contractorId: contractorScopeFilter,
           limit: CONTRACTOR_INTAKE_QUEUE_PAGE_LIMIT,
         });
       }
 
-      const queuePreviewLimit =
-        workspaceKey === "need_to_schedule"
-          ? Math.max(countsWs.get("need_to_schedule") ?? 0, 10)
-          : 10;
+      const tabCount = workspaceTabs.find((item) => item.key === workspaceKey)?.count ?? 0;
+      const queuePreviewLimit = Math.max(tabCount, 10);
 
       let queueQ = supabase
         .from("jobs")
@@ -922,7 +931,6 @@ function telHref(phone?: string | null) {
         return [];
       }
 
-      if (contractorScopeFilter) queueQ = queueQ.eq("contractor_id", contractorScopeFilter);
       const queueRes = await queueQ;
       if (queueRes.error) throw queueRes.error;
       return sortOpsBoardRows(queueRes.data ?? [], boardSort);
@@ -945,13 +953,35 @@ function telHref(phone?: string | null) {
     const effectiveBoardReasonFilter = boardReasonFilter && workspaceReasonOptions.some((option) => option.key === boardReasonFilter)
       ? boardReasonFilter
       : null;
-    const visibleWorkspaceSections = reasonSourceWorkspaceSections.map((section) => ({
+    const reasonFilteredWorkspaceSections = reasonSourceWorkspaceSections.map((section) => ({
       ...section,
       previewRows: filterOpsBoardRowsByReason(section.previewRows, effectiveBoardReasonFilter, { queueKey: section.key }),
     }));
+
+    function rowContractorFocusId(row: any) {
+      if (selectedWorkspaceKey === "contractor_intake" || selectedWorkspaceKey === "permits") {
+        return String(row?.contractorId ?? "").trim();
+      }
+      return String(row?.contractor_id ?? "").trim();
+    }
+
+    function filterRowsByContractorFocus(rows: any[]) {
+      if (contractorFocusIdSet.size === 0) return rows;
+      return rows.filter((row) => {
+        const rowContractorId = rowContractorFocusId(row);
+        return rowContractorId
+          ? contractorFocusIdSet.has(rowContractorId)
+          : contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID);
+      });
+    }
+
+    const visibleWorkspaceSections = reasonFilteredWorkspaceSections.map((section) => ({
+      ...section,
+      previewRows: filterRowsByContractorFocus(section.previewRows),
+    }));
     const selectedWorkspaceSection =
       visibleWorkspaceSections.find((section) => section.key === selectedWorkspaceKey) ?? visibleWorkspaceSections[0];
-    const selectedPermitRows = selectedWorkspaceKey === "permits" ? activePermitRequestRows : [];
+    const selectedPermitRows = selectedWorkspaceKey === "permits" ? filterRowsByContractorFocus(activePermitRequestRows) : [];
     const selectedContractorIntakeRows =
       selectedWorkspaceKey === "contractor_intake"
         ? ((selectedWorkspaceSection?.previewRows ?? []) as ContractorIntakeQueueRow[])
@@ -1005,10 +1035,10 @@ function telHref(phone?: string | null) {
           : section.label,
         isSelected,
         previewRows,
-        count: previewRows.length || section.count,
+        count: section.count,
         href: `/ops${buildQueryString({
           bucket: chipBucket,
-          contractor: contractorScopeFilter ?? "",
+          contractor: contractorFocusFilter ?? "",
           sort: boardSort === "oldest" ? "" : boardSort,
         })}#ops-workspace`,
       };
@@ -1017,7 +1047,7 @@ function telHref(phone?: string | null) {
       bucket: effectiveBoardBucketFilter,
       sort: boardSort === "oldest" ? "" : boardSort,
     })}#ops-workspace`;
-    const hasActiveOpsBoardFilters = Boolean(contractorScopeFilter) || Boolean(effectiveBoardReasonFilter);
+    const hasActiveOpsBoardFilters = contractorFocusIds.length > 0 || Boolean(effectiveBoardReasonFilter);
 
     if (opsTimingEnabled) {
       console.log(`[ops:workspace:countsAndPreview] ${Date.now() - _t_workspaceCounts}ms`);
@@ -1080,7 +1110,43 @@ function telHref(phone?: string | null) {
       .order("name", { ascending: true });
     if (workspaceContractorsRes.error) throw workspaceContractorsRes.error;
     const workspaceContractors = workspaceContractorsRes.data ?? [];
-    const showWorkspaceContractorFilter = workspaceContractors.length > 0 && !isHvacServiceMode;
+    const contractorFocusSourceRows =
+      selectedWorkspaceKey === "permits"
+        ? activePermitRequestRows
+        : reasonFilteredWorkspaceSections.find((section) => section.key === selectedWorkspaceKey)?.previewRows ?? [];
+    const contractorFocusCounts = new Map<string, number>();
+    let contractorFocusInternalCount = 0;
+    for (const row of contractorFocusSourceRows) {
+      const contractorId = rowContractorFocusId(row);
+      if (contractorId) contractorFocusCounts.set(contractorId, (contractorFocusCounts.get(contractorId) ?? 0) + 1);
+      else contractorFocusInternalCount += 1;
+    }
+    const showWorkspaceContractorFilter =
+      showContractorFocusSelection && (workspaceContractors.length > 0 || contractorFocusInternalCount > 0);
+    const contractorFocusOptions: ContractorFocusOption[] =
+      workspaceContractors
+        .map((contractorOption: { id: string; name: string | null }): ContractorFocusOption => ({
+          id: contractorOption.id,
+          name: String(contractorOption.name ?? "").trim() || contractorOption.id,
+          count: contractorFocusCounts.get(contractorOption.id) ?? 0,
+          selected: contractorFocusIdSet.has(contractorOption.id),
+        }))
+        .sort((a: ContractorFocusOption, b: ContractorFocusOption) => {
+          if (a.count > 0 && b.count === 0) return -1;
+          if (a.count === 0 && b.count > 0) return 1;
+          return a.name.localeCompare(b.name);
+        });
+    const visibleContractorFocusOptions = contractorFocusOptions.slice(0, 14);
+    const overflowContractorFocusOptions = contractorFocusOptions.slice(14);
+    const contractorFocusAllCount = contractorFocusSourceRows.length;
+    function contractorFocusHref(nextIds: string[]) {
+      return `/ops${buildQueryString({
+        bucket: effectiveBoardBucketFilter,
+        contractor: nextIds.length > 0 ? nextIds.join(",") : "",
+        reason: effectiveBoardReasonFilter ?? "",
+        sort: boardSort === "oldest" ? "" : boardSort,
+      })}#ops-workspace`;
+    }
     const shouldLoadPermitJobOptions = selectedWorkspaceKey === "permits";
     const [permitJobCustomersRes, permitJobLocationsRes] = shouldLoadPermitJobOptions
       ? await Promise.all([
@@ -1155,7 +1221,7 @@ function telHref(phone?: string | null) {
     const activeWorkspaceBaseHref = `/ops${buildQueryString({
       bucket: effectiveBoardBucketFilter,
       create: "",
-      contractor: contractorScopeFilter ?? "",
+      contractor: contractorFocusFilter ?? "",
       q: q ?? "",
       sort,
       reason: effectiveBoardReasonFilter ?? "",
@@ -1165,7 +1231,7 @@ function telHref(phone?: string | null) {
     const opsExportBaseParams = {
       queue: selectedWorkspaceKey,
       bucket: effectiveBoardBucketFilter,
-      contractor: contractorScopeFilter ?? "",
+      contractor: contractorFocusFilter ?? "",
       reason: effectiveBoardReasonFilter ?? "",
       sort: boardSort === "oldest" ? "" : boardSort,
     };
@@ -1178,7 +1244,7 @@ function telHref(phone?: string | null) {
       mode: "contractor_safe",
     })}`;
     const canShowJobQueueExport = selectedWorkspaceKey !== "permits" && selectedWorkspaceKey !== "contractor_intake";
-    const canExportContractorSafeCsv = Boolean(contractorScopeFilter);
+    const canExportContractorSafeCsv = contractorFocusIds.length > 0;
 
     function workspaceNeedsSchedulingRichCard(job: any, visibleReason: OpsBoardVisibleReason) {
       const jobId = String(job?.id ?? "").trim();
@@ -1759,18 +1825,111 @@ function telHref(phone?: string | null) {
             ))}
           </div>
 
-          <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
-            {showWorkspaceContractorFilter ? (
-              <ContractorFilter contractors={workspaceContractors} selectedId={contractorScopeFilter ?? ""} />
-            ) : (
-              <div className="grid gap-1">
-                <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Contractor</label>
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-medium text-slate-500">All contractors</div>
+          {showWorkspaceContractorFilter ? (
+            <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor Focus</div>
+                  <div className="text-sm font-semibold text-slate-950">{contractorFocusIds.length > 0 ? `${contractorFocusIds.length} selected` : "All Contractors"}</div>
+                </div>
+                {contractorFocusIds.length > 0 ? (
+                  <Link href={contractorFocusHref([])} className="text-xs font-semibold text-blue-700 underline-offset-2 hover:underline">
+                    Reset
+                  </Link>
+                ) : null}
               </div>
-            )}
+              <div className="flex flex-wrap gap-1.5">
+                <Link
+                  href={contractorFocusHref([])}
+                  aria-current={contractorFocusIds.length === 0 ? "page" : undefined}
+                  className={[
+                    "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-[border-color,background-color,box-shadow,color]",
+                    contractorFocusIds.length === 0
+                      ? "border-slate-900 bg-slate-900 text-white shadow-[0_8px_18px_-16px_rgba(15,23,42,0.5)]"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100",
+                  ].join(" ")}
+                >
+                  <span>All Contractors</span>
+                  <span className={contractorFocusIds.length === 0 ? "text-slate-200" : "text-slate-500"}>{contractorFocusAllCount}</span>
+                </Link>
+                <Link
+                  href={contractorFocusHref(
+                    contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)
+                      ? contractorFocusIds.filter((id) => id !== INTERNAL_WORK_CONTRACTOR_FOCUS_ID)
+                      : [...contractorFocusIds, INTERNAL_WORK_CONTRACTOR_FOCUS_ID],
+                  )}
+                  aria-current={contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID) ? "true" : undefined}
+                  className={[
+                    "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-[border-color,background-color,box-shadow,color]",
+                    contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)
+                      ? "border-blue-700 bg-blue-700 text-white shadow-[0_8px_18px_-16px_rgba(29,78,216,0.55)]"
+                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100",
+                  ].join(" ")}
+                >
+                  <span>Internal Work</span>
+                  <span className={contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID) ? "text-blue-100" : "text-slate-500"}>
+                    {contractorFocusInternalCount}
+                  </span>
+                </Link>
+                {visibleContractorFocusOptions.map((option) => {
+                  const nextIds = option.selected
+                    ? contractorFocusIds.filter((id) => id !== option.id)
+                    : [...contractorFocusIds, option.id];
+                  return (
+                    <Link
+                      key={option.id}
+                      href={contractorFocusHref(nextIds)}
+                      aria-current={option.selected ? "true" : undefined}
+                      className={[
+                        "inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-[border-color,background-color,box-shadow,color]",
+                        option.selected
+                          ? "border-blue-700 bg-blue-700 text-white shadow-[0_8px_18px_-16px_rgba(29,78,216,0.55)]"
+                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100",
+                      ].join(" ")}
+                    >
+                      <span className="truncate">{option.name}</span>
+                      <span className={option.selected ? "text-blue-100" : "text-slate-500"}>{option.count}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+              {overflowContractorFocusOptions.length > 0 ? (
+                <details className="mt-1.5">
+                  <summary className="cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-900">
+                    Show {overflowContractorFocusOptions.length} more contractors
+                  </summary>
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {overflowContractorFocusOptions.map((option) => {
+                      const nextIds = option.selected
+                        ? contractorFocusIds.filter((id) => id !== option.id)
+                        : [...contractorFocusIds, option.id];
+                      return (
+                        <Link
+                          key={option.id}
+                          href={contractorFocusHref(nextIds)}
+                          aria-current={option.selected ? "true" : undefined}
+                          className={[
+                            "inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-[border-color,background-color,box-shadow,color]",
+                            option.selected
+                              ? "border-blue-700 bg-blue-700 text-white shadow-[0_8px_18px_-16px_rgba(29,78,216,0.55)]"
+                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100",
+                          ].join(" ")}
+                        >
+                          <span className="truncate">{option.name}</span>
+                          <span className={option.selected ? "text-blue-100" : "text-slate-500"}>{option.count}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </details>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
             <form action="/ops" method="get" className="grid gap-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Reason</label>
-              <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
+              <input type="hidden" name="contractor" value={contractorFocusFilter ?? ""} />
               <input type="hidden" name="bucket" value={effectiveBoardBucketFilter} />
               <input type="hidden" name="sort" value={boardSort} />
               <select
@@ -1791,7 +1950,7 @@ function telHref(phone?: string | null) {
             </form>
             <form action="/ops" method="get" className="grid gap-1">
               <label className="text-[11px] font-semibold uppercase tracking-[0.11em] text-slate-500 sm:text-[10px] sm:tracking-[0.12em]">Sort</label>
-              <input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />
+              <input type="hidden" name="contractor" value={contractorFocusFilter ?? ""} />
               <input type="hidden" name="bucket" value={effectiveBoardBucketFilter} />
               <input type="hidden" name="reason" value={effectiveBoardReasonFilter ?? ""} />
               <select
@@ -1860,7 +2019,7 @@ function telHref(phone?: string | null) {
             {selectedWorkspaceKey === "contractor_intake" ? (
               <Link
                 href={`/ops/contractor-intake/export${buildQueryString({
-                  contractor: contractorScopeFilter ?? "",
+                  contractor: contractorFocusFilter ?? "",
                 })}`}
                 className="inline-flex items-center rounded-md border border-slate-200/90 bg-slate-50/80 px-2 py-1 text-[12px] font-semibold text-slate-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[border-color,background-color,box-shadow,transform,color] hover:-translate-y-px hover:border-slate-300 hover:bg-white hover:text-slate-900 hover:shadow-[0_8px_16px_-16px_rgba(15,23,42,0.2)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-200 active:translate-y-[0.5px]"
               >

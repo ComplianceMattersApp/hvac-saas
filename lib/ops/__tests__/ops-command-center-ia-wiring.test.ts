@@ -22,11 +22,6 @@ const withoutTechQueuePageSource = readFileSync(
   "utf-8",
 );
 
-const contractorFilterSource = readFileSync(
-  resolve(__dirname, "../../../app/ops/_components/ContractorFilter.tsx"),
-  "utf-8",
-);
-
 const opsBoardSortingSource = readFileSync(
   resolve(__dirname, "../../../lib/ops/ops-board-sorting.ts"),
   "utf-8",
@@ -67,13 +62,20 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("Open Job");
   });
 
-  it("renders compact contractor filtering while queue chips own bucket selection", () => {
+  it("renders Contractor Focus boxes for ECC/hybrid while queue chips own bucket selection", () => {
     expect(opsPageSource).toContain("Board Filters");
-    expect(opsPageSource).toContain("ContractorFilter contractors={workspaceContractors}");
-    expect(opsPageSource).toContain("All contractors");
-    expect(contractorFilterSource).toContain('<option value="">All contractors</option>');
-    expect(contractorFilterSource).toContain("contractors.map");
+    expect(opsPageSource).toContain('const showContractorFocusSelection = productMode === "ecc_hers" || productMode === "hybrid";');
+    expect(opsPageSource).toContain("Contractor Focus");
+    expect(opsPageSource).toContain("All Contractors");
+    expect(opsPageSource).toContain("Internal Work");
+    expect(opsPageSource).toContain("contractorFocusInternalCount");
+    expect(opsPageSource).toContain("visibleContractorFocusOptions.map");
+    expect(opsPageSource).toContain("overflowContractorFocusOptions.map");
+    expect(opsPageSource).toContain("contractorFocusHref(nextIds)");
+    expect(opsPageSource).toContain("contractorFocusHref([])");
+    expect(opsPageSource).toContain("Show {overflowContractorFocusOptions.length} more contractors");
     expect(opsPageSource).not.toContain("OPS_BOARD_BUCKET_FILTERS");
+    expect(opsPageSource).not.toContain("Tap to narrow");
   });
 
   it("renders compact sort controls on the primary Ops board", () => {
@@ -156,7 +158,9 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("applies contractor filtering to visible board rows without changing row actions", () => {
-    expect(opsPageSource).toContain("if (contractorScopeFilter) queueQ = queueQ.eq(\"contractor_id\", contractorScopeFilter);");
+    expect(opsPageSource).toContain("function filterRowsByContractorFocus(rows: any[])");
+    expect(opsPageSource).toContain("previewRows: filterRowsByContractorFocus(section.previewRows)");
+    expect(opsPageSource).toContain("contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)");
     expect(opsPageSource).toContain("return sortOpsBoardRows(queueRes.data ?? [], boardSort);");
     expect(opsPageSource).toContain("workspaceContractorName(job)");
     expect(opsPageSource).toContain('href={`/jobs/${job.id}?tab=ops`}');
@@ -166,7 +170,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   it("keeps sorting combined with Contractor and selected queue", () => {
     expect(opsPageSource).toContain("const boardSort = normalizeOpsBoardSort(sp.sort);");
     expect(opsPageSource).toContain('<input type="hidden" name="sort" value={boardSort} />');
-    expect(opsPageSource).toContain('<input type="hidden" name="contractor" value={contractorScopeFilter ?? ""} />');
+    expect(opsPageSource).toContain('<input type="hidden" name="contractor" value={contractorFocusFilter ?? ""} />');
     expect(opsPageSource).toContain('<input type="hidden" name="bucket" value={effectiveBoardBucketFilter} />');
     expect(opsPageSource).toContain('<input type="hidden" name="reason" value={effectiveBoardReasonFilter ?? ""} />');
   });
@@ -235,7 +239,7 @@ describe("/ops Full Ops command center IA wiring", () => {
   });
 
   it("shows clear filters and empty filtered state for unmatched board filters", () => {
-    expect(opsPageSource).toContain("const hasActiveOpsBoardFilters = Boolean(contractorScopeFilter) || Boolean(effectiveBoardReasonFilter);");
+    expect(opsPageSource).toContain("const hasActiveOpsBoardFilters = contractorFocusIds.length > 0 || Boolean(effectiveBoardReasonFilter);");
     expect(opsPageSource).toContain("clearOpsBoardFiltersHref");
     expect(opsPageSource).toContain("bucket: effectiveBoardBucketFilter");
     expect(opsPageSource).toContain('boardSort === "oldest" ? "" : boardSort');

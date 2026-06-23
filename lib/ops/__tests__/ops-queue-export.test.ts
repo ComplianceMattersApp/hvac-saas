@@ -48,6 +48,16 @@ function makeSupabase(jobs: any[]) {
   };
 }
 
+function makeSupabaseWithJobsQuery(jobsQuery: ReturnType<typeof queryResult>) {
+  return {
+    from: vi.fn((table: string) => {
+      if (table === "jobs") return jobsQuery;
+      if (table === "ecc_test_runs") return queryResult([]);
+      throw new Error(`Unexpected table ${table}`);
+    }),
+  };
+}
+
 const job = {
   id: "job-1",
   title: "Job, Alpha",
@@ -131,6 +141,36 @@ describe("ops queue CSV export", () => {
     expect(result.csv).toContain("Assigned Team");
     expect(result.csv).toContain("Internal Job Link");
     expect(result.csv).toContain("/jobs/job-1?tab=ops");
+  });
+
+  it("exports internal-work contractor focus by filtering contractorless jobs", async () => {
+    const jobsQuery = queryResult([job]);
+
+    await buildOpsQueueExport({
+      supabase: makeSupabaseWithJobsQuery(jobsQuery),
+      accountOwnerUserId: "owner-1",
+      mode: "internal",
+      queueKey: "need_to_schedule",
+      contractorId: "__internal_work",
+      sort: "oldest",
+    });
+
+    expect(jobsQuery.is).toHaveBeenCalledWith("contractor_id", null);
+  });
+
+  it("exports mixed contractor focus with internal work and selected contractors", async () => {
+    const jobsQuery = queryResult([job]);
+
+    await buildOpsQueueExport({
+      supabase: makeSupabaseWithJobsQuery(jobsQuery),
+      accountOwnerUserId: "owner-1",
+      mode: "internal",
+      queueKey: "need_to_schedule",
+      contractorId: "__internal_work,contractor-1",
+      sort: "oldest",
+    });
+
+    expect(jobsQuery.or).toHaveBeenCalledWith("contractor_id.is.null,contractor_id.in.(contractor-1)");
   });
 
   it("exports valid headers only for empty results", async () => {
