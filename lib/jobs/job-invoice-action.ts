@@ -4,11 +4,13 @@ export type JobInvoiceActionInput = {
   hasInvoice: boolean;
   invoiceStatus?: string | null;
   invoiceTotalCents?: number | null;
+  hasInvoiceCharges?: boolean | null;
   paymentStatus?: JobInvoicePaymentStatus | null;
   balanceDueCents?: number | null;
   billingDispositionLabel?: string | null;
   billedTruthSatisfied?: boolean | null;
   hasVisitScopeDefined?: boolean | null;
+  eligibleUnaddedPricedWorkItemsTotalCents?: number | null;
 };
 
 function normalizeInvoiceStatus(value?: string | null) {
@@ -37,11 +39,18 @@ export function resolveJobInvoiceActionLabel(input: JobInvoiceActionInput) {
 
   const invoiceStatus = normalizeInvoiceStatus(input.invoiceStatus);
   const invoiceTotalCents = Number(input.invoiceTotalCents ?? 0) || 0;
+  const hasInvoiceCharges = Boolean(input.hasInvoiceCharges);
+  const eligibleUnaddedPricedWorkItemsTotalCents =
+    Number(input.eligibleUnaddedPricedWorkItemsTotalCents ?? 0) || 0;
   const paymentStatus = normalizePaymentStatus(input.paymentStatus);
   const balanceDueCents = Number(input.balanceDueCents ?? invoiceTotalCents) || 0;
 
   if (invoiceStatus === "draft") {
-    return invoiceTotalCents === 0 ? "Resolve $0 Invoice" : "Issue Invoice";
+    if (invoiceTotalCents > 0) return "Issue Invoice";
+    if (!hasInvoiceCharges && eligibleUnaddedPricedWorkItemsTotalCents > 0) {
+      return "Add Work Items to Invoice";
+    }
+    return "Review Draft Invoice";
   }
 
   if (invoiceStatus === "issued") {

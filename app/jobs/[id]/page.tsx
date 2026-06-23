@@ -1745,6 +1745,7 @@ export default async function JobDetailPage({
           billing_name: string | null;
           billing_email: string | null;
           line_item_count: number;
+          visit_scope_source_ids: string[];
         } | null,
         internalInvoicePaymentSummaryTruth: null as InternalInvoiceCollectedPaymentSummary | null,
       };
@@ -1768,12 +1769,12 @@ export default async function JobDetailPage({
     }
 
     const [
-      { count: lineItemCount, error: lineItemCountErr },
+      { data: invoiceLineRows, error: invoiceLineRowsErr },
       internalInvoicePaymentSummaryTruth,
     ] = await Promise.all([
       supabase
         .from("internal_invoice_line_items")
-        .select("id", { count: "exact", head: true })
+        .select("id, source_kind, source_visit_scope_item_id")
         .eq("invoice_id", invoiceTruthRow.id),
       resolveInvoiceCollectedPaymentSummary(
         internalUser.account_owner_user_id,
@@ -1782,7 +1783,12 @@ export default async function JobDetailPage({
       ),
     ]);
 
-    if (lineItemCountErr) throw lineItemCountErr;
+    if (invoiceLineRowsErr) throw invoiceLineRowsErr;
+    const invoiceLineItems = Array.isArray(invoiceLineRows) ? invoiceLineRows : [];
+    const visitScopeSourceIds = invoiceLineItems
+      .filter((lineItem: any) => lineItem?.source_kind === "visit_scope")
+      .map((lineItem: any) => sanitizeVisitScopeItemId(lineItem?.source_visit_scope_item_id))
+      .filter(Boolean) as string[];
 
     return {
       internalInvoiceTruth: {
@@ -1794,7 +1800,8 @@ export default async function JobDetailPage({
         total_cents: Number(invoiceTruthRow.total_cents ?? 0) || 0,
         billing_name: String(invoiceTruthRow.billing_name ?? "").trim() || null,
         billing_email: String(invoiceTruthRow.billing_email ?? "").trim() || null,
-        line_item_count: Number(lineItemCount ?? 0) || 0,
+        line_item_count: invoiceLineItems.length,
+        visit_scope_source_ids: visitScopeSourceIds,
       },
       internalInvoicePaymentSummaryTruth,
     };
@@ -3017,6 +3024,29 @@ const visitScopeReadyTotalCents = visitScopeItems.reduce((sum, item) => {
   if (!Number.isFinite(unitPrice) || unitPrice <= 0) return sum;
   return sum + Math.round(unitPrice * 100);
 }, 0);
+const invoiceVisitScopeSourceIds = new Set(internalInvoiceTruth?.visit_scope_source_ids ?? []);
+const unaddedPricedVisitScopeItems = visitScopeItems.filter((item) => {
+  const unitPrice = Number(item.expected_unit_price ?? 0);
+  const itemId = sanitizeVisitScopeItemId(item.id);
+  return Number.isFinite(unitPrice) && unitPrice > 0 && Boolean(itemId) && !invoiceVisitScopeSourceIds.has(itemId!);
+});
+const eligibleUnaddedPricedWorkItemsTotalCents = unaddedPricedVisitScopeItems.reduce((sum, item) => {
+  const unitPrice = Number(item.expected_unit_price ?? 0);
+  return Number.isFinite(unitPrice) && unitPrice > 0 ? sum + Math.round(unitPrice * 100) : sum;
+}, 0);
+const invoiceHasCharges = Number(internalInvoiceTruth?.line_item_count ?? 0) > 0;
+const hasUnaddedPricedWorkItemsForDraftInvoice =
+  Boolean(internalInvoiceTruth) &&
+  internalInvoiceTruth?.status === "draft" &&
+  !invoiceHasCharges &&
+  Number(internalInvoiceTruth?.total_cents ?? 0) === 0 &&
+  eligibleUnaddedPricedWorkItemsTotalCents > 0;
+const hasEmptyDraftInvoiceWithoutPricedWorkItems =
+  Boolean(internalInvoiceTruth) &&
+  internalInvoiceTruth?.status === "draft" &&
+  !invoiceHasCharges &&
+  Number(internalInvoiceTruth?.total_cents ?? 0) === 0 &&
+  eligibleUnaddedPricedWorkItemsTotalCents <= 0;
 const visitScopeLeadText = visitScopeSummary || visitScopeHeaderPreview.lead;
 const visitScopeBadgeItems = primaryVisitScopeItems.length > 0 ? primaryVisitScopeItems : visitScopeItems;
 const visitScopeBadgeItemCount = visitScopeBadgeItems.length;
@@ -3032,10 +3062,11 @@ const jobPageInvoiceDisplayReference = internalInvoiceTruth
       invoiceId: internalInvoiceTruth.id,
     })
   : null;
-const jobPageInvoiceStateLabel = resolveJobInvoiceStateLabel({
+const jobPageInvoiceStateLabel = hasUnaddedPricedWorkItemsForDraftInvoice ? "Billing Review" : resolveJobInvoiceStateLabel({
   hasInvoice: Boolean(internalInvoiceTruth),
   invoiceStatus: internalInvoiceTruth?.status,
   invoiceTotalCents: internalInvoiceTruth?.total_cents,
+  hasInvoiceCharges: invoiceHasCharges,
   paymentStatus: internalInvoicePaymentSummaryTruth?.paymentStatus,
   balanceDueCents: internalInvoicePaymentSummaryTruth?.balanceDueCents,
   billingDispositionLabel: jobBillingDispositionLabel,
@@ -3046,11 +3077,13 @@ const jobPageInvoiceNextAction = resolveJobInvoiceActionLabel({
   hasInvoice: Boolean(internalInvoiceTruth),
   invoiceStatus: internalInvoiceTruth?.status,
   invoiceTotalCents: internalInvoiceTruth?.total_cents,
+  hasInvoiceCharges: invoiceHasCharges,
   paymentStatus: internalInvoicePaymentSummaryTruth?.paymentStatus,
   balanceDueCents: internalInvoicePaymentSummaryTruth?.balanceDueCents,
   billingDispositionLabel: jobBillingDispositionLabel,
   billedTruthSatisfied: billingState.billedTruthSatisfied,
   hasVisitScopeDefined,
+  eligibleUnaddedPricedWorkItemsTotalCents,
 });
 const jobPageInvoicePaymentSummaryText =
   internalInvoiceTruth?.status === "issued" && internalInvoicePaymentSummaryTruth && !jobBillingDispositionLabel
@@ -3061,7 +3094,18 @@ const jobPageInvoicePaymentSummaryText =
         : `Balance ${formatCurrencyFromCents(internalInvoicePaymentSummaryTruth.balanceDueCents)}`
     : null;
 const jobPageInvoiceSummaryText = internalInvoiceTruth
-  ? [
+  ? hasUnaddedPricedWorkItemsForDraftInvoice
+    ? [
+        `Work captured: ${formatCurrencyFromCents(eligibleUnaddedPricedWorkItemsTotalCents)}`,
+        `Draft invoice: ${formatCurrencyFromCents(internalInvoiceTruth.total_cents)} - ${internalInvoiceTruth.line_item_count} charges.`,
+        "Work Item pricing is ready to add as editable draft invoice charges. Review and edit before issuing.",
+      ].join(" ")
+    : hasEmptyDraftInvoiceWithoutPricedWorkItems
+      ? [
+          `Draft invoice: ${formatCurrencyFromCents(internalInvoiceTruth.total_cents)} - ${internalInvoiceTruth.line_item_count} charges.`,
+          "No invoice charges have been added yet. Add charges, mark external billing complete, or mark no charge as appropriate.",
+        ].join(" ")
+      : [
       jobPageInvoiceDisplayReference,
       `${internalInvoiceTruth.line_item_count} charge${internalInvoiceTruth.line_item_count === 1 ? "" : "s"}`,
       formatCurrencyFromCents(internalInvoiceTruth.total_cents),

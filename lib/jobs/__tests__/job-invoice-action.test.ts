@@ -15,12 +15,13 @@ describe("job invoice action labels", () => {
     ).toBe("View Billing Details");
   });
 
-  it("labels draft invoices by total", () => {
+  it("labels draft invoices by total and Work Item import context", () => {
     expect(
       resolveJobInvoiceActionLabel({
         hasInvoice: true,
         invoiceStatus: "draft",
         invoiceTotalCents: 12500,
+        hasInvoiceCharges: true,
       }),
     ).toBe("Issue Invoice");
     expect(
@@ -28,8 +29,27 @@ describe("job invoice action labels", () => {
         hasInvoice: true,
         invoiceStatus: "draft",
         invoiceTotalCents: 0,
+        hasInvoiceCharges: false,
+        eligibleUnaddedPricedWorkItemsTotalCents: 25000,
       }),
-    ).toBe("Resolve $0 Invoice");
+    ).toBe("Add Work Items to Invoice");
+    expect(
+      resolveJobInvoiceActionLabel({
+        hasInvoice: true,
+        invoiceStatus: "draft",
+        invoiceTotalCents: 0,
+        hasInvoiceCharges: false,
+      }),
+    ).toBe("Review Draft Invoice");
+    expect(
+      resolveJobInvoiceActionLabel({
+        hasInvoice: true,
+        invoiceStatus: "draft",
+        invoiceTotalCents: 0,
+        hasInvoiceCharges: true,
+        eligibleUnaddedPricedWorkItemsTotalCents: 25000,
+      }),
+    ).toBe("Review Draft Invoice");
   });
 
   it("labels issued invoices from recorded payment truth", () => {

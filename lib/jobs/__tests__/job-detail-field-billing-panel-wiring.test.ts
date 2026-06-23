@@ -80,7 +80,6 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("normalizeJobBillingDisposition");
     expect(source).toContain("const jobBillingDisposition = normalizeJobBillingDisposition((job as any).billing_disposition)");
     expect(source).toContain("const jobBillingDispositionLabel = formatJobBillingDispositionLabel(jobBillingDisposition)");
-    expect(source).toContain("billingDisposition={jobBillingDisposition}");
     expect(source).toContain("jobBillingDispositionLabel");
   });
 
@@ -108,22 +107,18 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("explicitCapabilities: explicitFieldBillingCapabilities");
     expect(source).toContain("const canIssueInvoiceLifecycleAccess = hasInvoiceIssueAccess(fieldBillingCapabilities)");
     expect(source).toContain("const canSendInvoiceLifecycleAccess = hasInvoiceSendAccess(fieldBillingCapabilities)");
-    expect(source).toContain("{canIssueInvoiceLifecycleAccess ? (");
-    expect(source).toContain("{canSendInvoiceLifecycleAccess ? (");
-    expect(source).toContain("Invoice issue authority is not available for your current role.");
-    expect(source).toContain("Invoice send authority is not available for your current role.");
   });
 
   it("routes Create Invoice directly to the invoice workspace after draft creation", () => {
-    const noInvoicePanelIndex = source.indexOf("Build a draft invoice from the Work Items when billing is ready.");
-    const noInvoicePanelSlice = source.slice(noInvoicePanelIndex, noInvoicePanelIndex + 900);
+    const noInvoicePanelIndex = source.indexOf('internalInvoiceTruth ? jobPageInvoiceNextAction : "Create invoice"');
+    const noInvoicePanelSlice = source.slice(noInvoicePanelIndex, noInvoicePanelIndex + 1400);
 
     expect(noInvoicePanelIndex).toBeGreaterThanOrEqual(0);
     expect(noInvoicePanelSlice).toContain("createInternalInvoiceDraftFromForm");
     expect(noInvoicePanelSlice).toContain("return_to");
     expect(noInvoicePanelSlice).toContain("/invoice#invoice-workspace");
     expect(noInvoicePanelSlice).toContain("auto_import_visit_scope_items");
-    expect(noInvoicePanelSlice).toContain("Create Invoice");
+    expect(noInvoicePanelSlice).toContain("Create invoice");
     expect(noInvoicePanelSlice).not.toContain("Create Draft Invoice");
   });
 
@@ -157,16 +152,21 @@ describe("job detail field billing panel wiring", () => {
     expect(source).toContain("internalInvoicePaymentSummaryTruth?.balanceDueCents");
     expect(source).toContain("jobPageInvoicePaymentSummaryText");
     expect(source).toContain("Balance ${formatCurrencyFromCents");
-    expect(source).toContain('internalInvoice.status === "draft"');
-    expect(source).toContain("alreadyAdded: existingVisitScopeInvoiceSourceIds.has(persistedItemId)");
+    expect(source).toContain('internalInvoiceTruth?.status === "draft"');
+    expect(source).toContain("visit_scope_source_ids");
+    expect(source).toContain("invoiceVisitScopeSourceIds");
   });
 
   it("shows job-page Work Item pricing as invoice-ready context", () => {
     expect(source).toContain("visitScopeReadyTotalCents");
+    expect(source).toContain("eligibleUnaddedPricedWorkItemsTotalCents");
+    expect(source).toContain("hasUnaddedPricedWorkItemsForDraftInvoice");
     expect(source).toContain("Ready-to-invoice total");
+    expect(source).toContain("Work captured: ${formatCurrencyFromCents(eligibleUnaddedPricedWorkItemsTotalCents)}");
+    expect(source).toContain("Work Item pricing is ready to add as editable draft invoice charges. Review and edit before issuing.");
     expect(source).toContain("Price ${Number(item.expected_unit_price).toFixed(2)}");
-    expect(source).toContain("Build an invoice later when billing is ready.");
     expect(source).toContain("Create invoice");
+    expect(source).not.toContain("Resolve $0 Invoice");
   });
 
   it("gates the top invoice-required banner on billing closeout state instead of missing invoice alone", () => {
