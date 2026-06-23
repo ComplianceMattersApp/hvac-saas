@@ -1340,6 +1340,12 @@ export default async function JobDetailPage({
       ? "Team member assigned to this job."
       : banner === "assignment_added_primary"
       ? "Team member assigned and set as primary."
+      : banner === "assignment_team_updated"
+      ? "Assigned team updated."
+      : banner === "assignment_team_unchanged"
+      ? "Assigned team was unchanged."
+      : banner === "assignment_team_target_invalid"
+      ? "One or more selected team members cannot be assigned to this job."
       : banner === "assignment_primary_set"
       ? "Primary assignee updated."
       : banner === "assignment_primary_target_invalid"
@@ -1354,7 +1360,10 @@ export default async function JobDetailPage({
   const assignmentBannerType =
     banner === "assignment_primary_failed"
       ? "error"
-      : banner === "assignment_user_required" || banner === "assignment_primary_target_invalid"
+      : banner === "assignment_user_required" ||
+        banner === "assignment_primary_target_invalid" ||
+        banner === "assignment_team_target_invalid" ||
+        banner === "assignment_team_unchanged"
       ? "warning"
       : "success";
   const noteScopeRaw = sp.note_scope;
@@ -7360,6 +7369,27 @@ const failureResolutionPathCount =
         <FlashBanner
           type="success"
           message="Team member assigned and set as primary."
+        />
+      )}
+
+      {banner === "assignment_team_updated" && (
+        <FlashBanner
+          type="success"
+          message="Assigned team updated."
+        />
+      )}
+
+      {banner === "assignment_team_unchanged" && (
+        <FlashBanner
+          type="warning"
+          message="Assigned team was unchanged."
+        />
+      )}
+
+      {banner === "assignment_team_target_invalid" && (
+        <FlashBanner
+          type="warning"
+          message="One or more selected team members cannot be assigned to this job."
         />
       )}
 

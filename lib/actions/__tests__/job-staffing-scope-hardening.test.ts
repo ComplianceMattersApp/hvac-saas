@@ -74,6 +74,26 @@ function buildAssignFormData(values?: Partial<Record<string, string>>) {
   return formData;
 }
 
+function buildTeamAssignmentFormData(params?: {
+  selectedUserIds?: string[];
+  primaryUserId?: string;
+  values?: Partial<Record<string, string>>;
+}) {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("tab", "ops");
+  for (const userId of params?.selectedUserIds ?? []) {
+    formData.append("selected_user_ids", userId);
+  }
+  if (params?.primaryUserId) {
+    formData.set("primary_user_id", params.primaryUserId);
+  }
+  for (const [key, value] of Object.entries(params?.values ?? {})) {
+    if (value != null) formData.set(key, value);
+  }
+  return formData;
+}
+
 function makeDenySupabaseFixture() {
   const assignmentWrites: Array<{ method: string; payload?: Record<string, unknown> }> = [];
   const jobEventWrites: Array<Record<string, unknown>> = [];
@@ -308,6 +328,154 @@ function makeAllowSupabaseFixture(options?: { existingActiveAssignment?: boolean
   return { supabase, calls, notificationWrites };
 }
 
+function makeTeamAssignmentFixture(options?: {
+  assignments?: PrimaryAssignmentRow[];
+  assignableUserIds?: string[];
+}) {
+  const assignments = (options?.assignments ?? []).map((row) => ({ ...row }));
+  const assignableUserIds = new Set(
+    options?.assignableUserIds ?? [
+      "internal-user-1",
+      "internal-user-2",
+      "internal-user-3",
+      "internal-user-4",
+    ],
+  );
+  const writes: Array<{ table: string; op: string; payload?: Record<string, unknown> }> = [];
+  const notifications: Array<Record<string, unknown>> = [];
+
+  function matches(row: Record<string, unknown>, filters: Array<[string, unknown]>) {
+    return filters.every(([key, value]) => row[key] === value);
+  }
+
+  function selectableAssignments(filters: Array<[string, unknown]>) {
+    return assignments.filter((row) => matches(row, filters));
+  }
+
+  function makeQuery(table: string, op: "select" | "update" | "insert", payload?: Record<string, unknown>) {
+    const filters: Array<[string, unknown]> = [];
+    const query = {
+      eq(key: string, value: unknown) {
+        filters.push([key, value]);
+        return query;
+      },
+      async maybeSingle() {
+        if (table === "job_assignments") {
+          return { data: selectableAssignments(filters)[0] ?? null, error: null };
+        }
+        if (table === "internal_users") {
+          const userId = String(filters.find(([key]) => key === "user_id")?.[1] ?? "");
+          return {
+            data: assignableUserIds.has(userId)
+              ? {
+                  user_id: userId,
+                  role: "tech",
+                  is_active: true,
+                  account_owner_user_id: "owner-1",
+                }
+              : null,
+            error: null,
+          };
+        }
+        return { data: null, error: null };
+      },
+      async single() {
+        if (table === "job_assignments" && op === "insert" && payload) {
+          const row: PrimaryAssignmentRow = {
+            id: `assignment-${String(payload.user_id)}`,
+            job_id: String(payload.job_id),
+            user_id: String(payload.user_id),
+            is_active: Boolean(payload.is_active),
+            is_primary: Boolean(payload.is_primary),
+          };
+          assignments.push(row);
+          return { data: row, error: null };
+        }
+        if (table === "job_events") return { data: { id: "event-1" }, error: null };
+        if (table === "notifications") return { data: { id: "notification-1" }, error: null };
+        return { data: null, error: null };
+      },
+      select() {
+        return query;
+      },
+      then(
+        onFulfilled: (value: { data?: unknown; error: null }) => unknown,
+        onRejected?: (reason: unknown) => unknown,
+      ) {
+        if (table === "job_assignments" && op === "select") {
+          return Promise.resolve({ data: selectableAssignments(filters), error: null }).then(
+            onFulfilled,
+            onRejected,
+          );
+        }
+
+        if (table === "job_assignments" && op === "update" && payload) {
+          writes.push({ table, op, payload });
+          const changedRows = selectableAssignments(filters);
+          for (const row of changedRows) {
+            Object.assign(row, payload);
+          }
+          return Promise.resolve({
+            data: changedRows.map((row) => ({ id: row.id })),
+            error: null,
+          }).then(onFulfilled, onRejected);
+        }
+
+        return Promise.resolve({ data: null, error: null }).then(onFulfilled, onRejected);
+      },
+    };
+    return query;
+  }
+
+  const supabase = {
+    from(table: string) {
+      if (table === "job_assignments" || table === "internal_users") {
+        return {
+          select: vi.fn(() => makeQuery(table, "select")),
+          update: vi.fn((payload: Record<string, unknown>) => makeQuery(table, "update", payload)),
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            if (table === "job_assignments") {
+              const duplicateActive = assignments.some(
+                (row) =>
+                  row.job_id === payload.job_id &&
+                  row.user_id === payload.user_id &&
+                  row.is_active === true,
+              );
+              if (duplicateActive) {
+                throw new Error("duplicate active assignment insert attempted");
+              }
+            }
+            writes.push({ table, op: "insert", payload });
+            return makeQuery(table, "insert", payload);
+          }),
+        };
+      }
+
+      if (table === "job_events") {
+        return {
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            writes.push({ table, op: "insert", payload });
+            return makeQuery(table, "insert", payload);
+          }),
+        };
+      }
+
+      if (table === "notifications") {
+        return {
+          insert: vi.fn((payload: Record<string, unknown>) => {
+            notifications.push(payload);
+            return makeQuery(table, "insert", payload);
+          }),
+        };
+      }
+
+      throw new Error(`Unexpected table ${table}`);
+    },
+  };
+
+  return { supabase, assignments, writes, notifications };
+}
+
 type PrimaryAssignmentRow = {
   id: string;
   job_id: string;
@@ -486,6 +654,23 @@ describe("internal staffing same-account hardening", () => {
     expect(jobEventWrites).toHaveLength(0);
   });
 
+  it("denies cross-account internal updateJobTeamAssignmentsFromForm before assignment or staffing event writes", async () => {
+    const { supabase, assignmentWrites, jobEventWrites } = makeDenySupabaseFixture();
+    createClientMock.mockResolvedValue(supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue(null);
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({ selectedUserIds: ["internal-user-2", "internal-user-3"] }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?notice=not_authorized");
+
+    expect(assignmentWrites).toHaveLength(0);
+    expect(jobEventWrites).toHaveLength(0);
+  });
+
   it("allows same-account internal assignJobAssigneeFromForm and scopes assignable teammate validation", async () => {
     const { supabase, calls, notificationWrites } = makeAllowSupabaseFixture();
     createClientMock.mockResolvedValue(supabase);
@@ -551,6 +736,207 @@ describe("internal staffing same-account hardening", () => {
     ).toBeGreaterThan(0);
     expect(calls.some((call) => call.table === "job_events" && call.op === "insert")).toBe(true);
     expect(notificationWrites).toHaveLength(0);
+  });
+
+  it("multi-select adds multiple users in one submit and sets a primary", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [],
+      assignableUserIds: ["internal-user-2", "internal-user-3"],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({
+          selectedUserIds: ["internal-user-2", "internal-user-3"],
+          primaryUserId: "internal-user-3",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_updated");
+
+    expect(fixture.assignments.filter((row) => row.is_active)).toHaveLength(2);
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-3")?.is_primary).toBe(true);
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-2")?.is_primary).toBe(false);
+    expect(
+      fixture.writes.filter((call) => call.table === "job_assignments" && call.op === "insert"),
+    ).toHaveLength(2);
+    expect(
+      fixture.writes.filter((call) => call.table === "job_events" && call.op === "insert").length,
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it("does not create duplicate active rows when existing assignees remain selected", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [
+        {
+          id: "assignment-existing",
+          job_id: "job-1",
+          user_id: "internal-user-2",
+          is_active: true,
+          is_primary: true,
+        },
+      ],
+      assignableUserIds: ["internal-user-2"],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({ selectedUserIds: ["internal-user-2"] }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_unchanged");
+
+    expect(fixture.assignments.filter((row) => row.user_id === "internal-user-2" && row.is_active)).toHaveLength(1);
+    expect(fixture.writes.some((call) => call.table === "job_assignments" && call.op === "insert")).toBe(false);
+    expect(fixture.notifications).toHaveLength(0);
+  });
+
+  it("removing an assignee through Change Team deactivates only that assignment", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [
+        {
+          id: "assignment-keep",
+          job_id: "job-1",
+          user_id: "internal-user-2",
+          is_active: true,
+          is_primary: true,
+        },
+        {
+          id: "assignment-remove",
+          job_id: "job-1",
+          user_id: "internal-user-3",
+          is_active: true,
+          is_primary: false,
+        },
+      ],
+      assignableUserIds: ["internal-user-2"],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({ selectedUserIds: ["internal-user-2"] }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_updated");
+
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-2")?.is_active).toBe(true);
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-3")?.is_active).toBe(false);
+  });
+
+  it("preserves the existing primary when that assignee remains selected", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [
+        {
+          id: "assignment-primary",
+          job_id: "job-1",
+          user_id: "internal-user-2",
+          is_active: true,
+          is_primary: true,
+        },
+        {
+          id: "assignment-other",
+          job_id: "job-1",
+          user_id: "internal-user-3",
+          is_active: true,
+          is_primary: false,
+        },
+      ],
+      assignableUserIds: ["internal-user-2", "internal-user-3"],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({
+          selectedUserIds: ["internal-user-2", "internal-user-3"],
+          primaryUserId: "internal-user-3",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_unchanged");
+
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-2")?.is_primary).toBe(true);
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-3")?.is_primary).toBe(false);
+  });
+
+  it("removing the primary assigns a new selected valid primary", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [
+        {
+          id: "assignment-primary",
+          job_id: "job-1",
+          user_id: "internal-user-2",
+          is_active: true,
+          is_primary: true,
+        },
+        {
+          id: "assignment-next",
+          job_id: "job-1",
+          user_id: "internal-user-3",
+          is_active: true,
+          is_primary: false,
+        },
+      ],
+      assignableUserIds: ["internal-user-3"],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({
+          selectedUserIds: ["internal-user-3"],
+          primaryUserId: "internal-user-3",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_updated");
+
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-2")?.is_active).toBe(false);
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-3")?.is_primary).toBe(true);
+  });
+
+  it("rejects inactive or ineligible team selections before assignment writes", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [
+        {
+          id: "assignment-existing",
+          job_id: "job-1",
+          user_id: "internal-user-2",
+          is_active: true,
+          is_primary: true,
+        },
+      ],
+      assignableUserIds: ["internal-user-2"],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({
+          selectedUserIds: ["internal-user-2", "inactive-user"],
+          primaryUserId: "inactive-user",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_target_invalid");
+
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-2")?.is_primary).toBe(true);
+    expect(fixture.writes.filter((call) => call.table === "job_assignments")).toHaveLength(0);
   });
 
   it("makes an existing assigned user primary and clears the previous primary", async () => {

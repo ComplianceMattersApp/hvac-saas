@@ -36,7 +36,6 @@ export default function AssignedTeamControls({
   jobId,
   tab,
   assignedTeam,
-  assignedUserIds,
   isInternalUser,
   fieldTeamLabel,
   fieldUserLabel,
@@ -132,7 +131,7 @@ export default function AssignedTeamControls({
           <DeferredAddAssigneeForm
             jobId={jobId}
             tab={tab}
-            assignedUserIds={assignedUserIds}
+            assignedTeam={assignedTeam}
             returnAnchor={isMobile ? "mobile-assigned-team" : "assigned-team"}
           />
         </Suspense>

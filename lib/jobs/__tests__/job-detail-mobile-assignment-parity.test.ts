@@ -17,6 +17,11 @@ const addAssigneeSource = readFileSync(
   "utf8",
 );
 
+const teamSelectorSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/TeamAssignmentSelector.tsx"),
+  "utf8",
+);
+
 const contactLoggingSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/ContactLoggingQuickActions.tsx"),
   "utf8",
@@ -53,10 +58,47 @@ describe("mobile job detail assignment parity", () => {
     expect(controlsSource).toContain('isMobile ? "mobile-assigned-team" : "assigned-team"');
     expect(controlsSource).toContain("isInternalUser ? (");
     expect(controlsSource).toContain("<DeferredAddAssigneeForm");
-    expect(addAssigneeSource).toContain("assignJobAssigneeFromForm");
-    expect(addAssigneeSource).toContain('name="make_primary"');
-    expect(addAssigneeSource).toContain("Set as primary");
+    expect(addAssigneeSource).toContain("<TeamAssignmentSelector");
+    expect(addAssigneeSource).toContain("updateJobTeamAssignmentsFromForm");
+    expect(teamSelectorSource).toContain("updateTeamAction");
+    expect(teamSelectorSource).toContain('name="selected_user_ids"');
+    expect(teamSelectorSource).toContain('name="primary_user_id"');
+    expect(teamSelectorSource).toContain("Change Team");
+    expect(teamSelectorSource).toContain("Assign Team");
+    expect(teamSelectorSource).toContain("Search team");
     expect(addAssigneeSource).toContain("returnAnchor");
+  });
+
+  it("keeps the Team Assignment selector opener as an interactive client control", () => {
+    expect(teamSelectorSource.startsWith('"use client";')).toBe(true);
+    expect(teamSelectorSource).toContain("const openSelector = (event: MouseEvent<HTMLButtonElement>) => {");
+    expect(teamSelectorSource).toContain("event.preventDefault();");
+    expect(teamSelectorSource).toContain("event.stopPropagation();");
+    expect(teamSelectorSource).toContain("setOpen(true);");
+    expect(teamSelectorSource).toContain('type="button"');
+    expect(teamSelectorSource).toContain('data-team-assignment-opener="true"');
+    expect(teamSelectorSource).toContain("onClick={openSelector}");
+    expect(teamSelectorSource).toContain('role="dialog"');
+    expect(teamSelectorSource).toContain('data-team-assignment-panel="true"');
+    expect(teamSelectorSource).toContain("fixed inset-x-3 top-20 z-[100]");
+    expect(teamSelectorSource).not.toContain("sm:absolute");
+    expect(teamSelectorSource).toContain('placeholder="Search team"');
+    expect(teamSelectorSource).toContain("onClick={cancelSelector}");
+    expect(teamSelectorSource).toContain("setOpen(false);");
+    expect(teamSelectorSource).toContain('type="checkbox"');
+    expect(teamSelectorSource).toContain("checked={checked}");
+    expect(teamSelectorSource).toContain("onChange={() => toggleUser(user.user_id)}");
+    expect(teamSelectorSource).toContain("<SubmitButton");
+    expect(teamSelectorSource).toContain("Apply");
+  });
+
+  it("keeps both empty and assigned team selector states on the same opener path", () => {
+    expect(teamSelectorSource).toContain('? "No team assigned"');
+    expect(teamSelectorSource).toContain('{selectedCount > 0 ? "Change Team" : "Assign Team"}');
+    expect(teamSelectorSource).toContain("disabled={!hasEligibleUsers}");
+    expect(teamSelectorSource).toContain("const hasEligibleUsers = assignableUsers.length > 0;");
+    expect(teamSelectorSource).toContain("onClick={openSelector}");
+    expect(teamSelectorSource).toContain("setOpen(true);");
   });
 
   it("hides redundant mobile primary promotion for a single assignee while preserving valid switching", () => {

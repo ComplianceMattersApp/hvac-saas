@@ -5312,6 +5312,137 @@ export async function removeJobAssigneeFromForm(formData: FormData) {
   });
 }
 
+export async function updateJobTeamAssignmentsFromForm(formData: FormData) {
+  const jobId = String(formData.get("job_id") || "").trim();
+  const tabRaw = String(formData.get("tab") || "").trim();
+  const returnToRaw = String(formData.get("return_to") || "").trim();
+  const primaryUserIdRaw = String(formData.get("primary_user_id") || "").trim();
+  const selectedUserIds = Array.from(
+    new Set(
+      formData
+        .getAll("selected_user_ids")
+        .map((value) => String(value ?? "").trim())
+        .filter(Boolean),
+    ),
+  );
+
+  if (!jobId) throw new Error("Missing job_id");
+
+  const supabase = await createClient();
+  const { userId: actorUserId, internalUser } = await requireInternalScopedJobAccessOrRedirect({
+    supabase,
+    jobId,
+  });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: internalUser.account_owner_user_id,
+  });
+
+  for (const userId of selectedUserIds) {
+    try {
+      await assertAssignableInternalUser({
+        supabase,
+        userId,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+      });
+    } catch (error: any) {
+      if (error?.message === "ASSIGNABLE_INTERNAL_USER_REQUIRED") {
+        redirectToJobWithBanner({
+          jobId,
+          banner: "assignment_team_target_invalid",
+          tabRaw,
+          returnToRaw,
+        });
+      }
+      throw error;
+    }
+  }
+
+  if (primaryUserIdRaw && !selectedUserIds.includes(primaryUserIdRaw)) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "assignment_primary_target_invalid",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  const beforeAssignments = await listActiveJobAssignments({ supabase, jobId });
+  const beforeByUserId = new Map(beforeAssignments.map((row) => [row.user_id, row]));
+  const selectedSet = new Set(selectedUserIds);
+  const existingPrimary = beforeAssignments.find((row) => row.is_primary);
+  const existingPrimaryStillSelected = existingPrimary
+    ? selectedSet.has(existingPrimary.user_id)
+    : false;
+
+  for (const userId of selectedUserIds) {
+    await ensureActiveAssignmentAndNotify({
+      supabase,
+      jobId,
+      userId,
+      actorUserId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  }
+
+  for (const assignment of beforeAssignments) {
+    if (!selectedSet.has(assignment.user_id)) {
+      await softRemoveJobAssignment({
+        supabase,
+        jobId,
+        userId: assignment.user_id,
+        removedBy: actorUserId,
+      });
+    }
+  }
+
+  const shouldSetPrimary = selectedUserIds.length > 0 && !existingPrimaryStillSelected;
+
+  if (shouldSetPrimary) {
+    const nextPrimaryUserId = selectedSet.has(primaryUserIdRaw)
+      ? primaryUserIdRaw
+      : selectedUserIds[0];
+
+    const primaryResult = await setPrimaryJobAssignment({
+      supabase,
+      jobId,
+      userId: nextPrimaryUserId,
+      actorUserId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+
+    if (
+      primaryResult.status === "target_not_active_assignee" ||
+      primaryResult.status === "target_not_assignable"
+    ) {
+      redirectToJobWithBanner({
+        jobId,
+        banner: "assignment_primary_target_invalid",
+        tabRaw,
+        returnToRaw,
+      });
+    }
+  }
+
+  const hasAddedOrRemoved =
+    selectedUserIds.some((userId) => !beforeByUserId.has(userId)) ||
+    beforeAssignments.some((assignment) => !selectedSet.has(assignment.user_id));
+  const hasTeamChanged = hasAddedOrRemoved || shouldSetPrimary;
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath("/ops");
+  revalidatePath("/ops/field");
+  revalidatePath(`/calendar`);
+
+  redirectToJobWithBanner({
+    jobId,
+    banner: hasTeamChanged ? "assignment_team_updated" : "assignment_team_unchanged",
+    tabRaw,
+    returnToRaw,
+  });
+}
+
 /**
  * Drag-and-drop cross-column reassignment from the per-technician dispatch
  * grid (calendar day/week view). Updates the job's scheduled time via the
