@@ -5368,67 +5368,144 @@ export async function updateJobTeamAssignmentsFromForm(formData: FormData) {
     });
   }
 
-  const beforeAssignments = await listActiveJobAssignments({ supabase, jobId });
-  const beforeByUserId = new Map(beforeAssignments.map((row) => [row.user_id, row]));
-  const selectedSet = new Set(selectedUserIds);
-  const existingPrimary = beforeAssignments.find((row) => row.is_primary);
-  const existingPrimaryStillSelected = existingPrimary
-    ? selectedSet.has(existingPrimary.user_id)
-    : false;
+  let hasTeamChanged = false;
+  let primaryTargetInvalid = false;
+  const createdAssignments: JobAssignment[] = [];
 
-  for (const userId of selectedUserIds) {
-    await ensureActiveAssignmentAndNotify({
-      supabase,
-      jobId,
-      userId,
-      actorUserId,
-      accountOwnerUserId: internalUser.account_owner_user_id,
-    });
-  }
+  try {
+    const beforeAssignments = await listActiveJobAssignments({ supabase, jobId });
+    const beforeByUserId = new Map(beforeAssignments.map((row) => [row.user_id, row]));
+    const selectedSet = new Set(selectedUserIds);
+    const existingPrimary = beforeAssignments.find((row) => row.is_primary);
+    const existingPrimaryStillSelected = existingPrimary
+      ? selectedSet.has(existingPrimary.user_id)
+      : false;
 
-  for (const assignment of beforeAssignments) {
-    if (!selectedSet.has(assignment.user_id)) {
-      await softRemoveJobAssignment({
+    for (const userId of selectedUserIds) {
+      await ensureActiveAssignmentForUser({
         supabase,
         jobId,
-        userId: assignment.user_id,
-        removedBy: actorUserId,
+        userId,
+        actorUserId,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        onCreated: (assignment) => {
+          createdAssignments.push(assignment);
+        },
       });
     }
+
+    for (const assignment of beforeAssignments) {
+      if (!selectedSet.has(assignment.user_id)) {
+        await softRemoveJobAssignment({
+          supabase,
+          jobId,
+          userId: assignment.user_id,
+          removedBy: actorUserId,
+        });
+      }
+    }
+
+    const shouldSetPrimary = selectedUserIds.length > 0 && !existingPrimaryStillSelected;
+
+    if (shouldSetPrimary) {
+      const nextPrimaryUserId = selectedSet.has(primaryUserIdRaw)
+        ? primaryUserIdRaw
+        : selectedUserIds[0];
+
+      const primaryResult = await setPrimaryJobAssignment({
+        supabase,
+        jobId,
+        userId: nextPrimaryUserId,
+        actorUserId,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+      });
+
+      if (
+        primaryResult.status === "target_not_active_assignee" ||
+        primaryResult.status === "target_not_assignable"
+      ) {
+        primaryTargetInvalid = true;
+      }
+    }
+
+    const hasAddedOrRemoved =
+      selectedUserIds.some((userId) => !beforeByUserId.has(userId)) ||
+      beforeAssignments.some((assignment) => !selectedSet.has(assignment.user_id));
+    hasTeamChanged = hasAddedOrRemoved || shouldSetPrimary;
+  } catch (error) {
+    const safeError = getSafeErrorDetails(error);
+    console.error("[jobs] bulk team assignment update failed", {
+      marker: "bulk_team_assignment_update_failed",
+      jobId,
+      actorUserId,
+      account_owner_user_id: internalUser.account_owner_user_id,
+      selected_user_count: selectedUserIds.length,
+      error_code: safeError.error_code,
+      error_message: safeError.error_message,
+    });
+    redirectToJobWithBanner({
+      jobId,
+      banner: "assignment_team_update_failed",
+      tabRaw,
+      returnToRaw,
+    });
   }
 
-  const shouldSetPrimary = selectedUserIds.length > 0 && !existingPrimaryStillSelected;
-
-  if (shouldSetPrimary) {
-    const nextPrimaryUserId = selectedSet.has(primaryUserIdRaw)
-      ? primaryUserIdRaw
-      : selectedUserIds[0];
-
-    const primaryResult = await setPrimaryJobAssignment({
-      supabase,
+  if (primaryTargetInvalid) {
+    redirectToJobWithBanner({
       jobId,
-      userId: nextPrimaryUserId,
-      actorUserId,
-      accountOwnerUserId: internalUser.account_owner_user_id,
+      banner: "assignment_primary_target_invalid",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  for (const assignment of createdAssignments) {
+    console.info("[jobs] assignment notification attempt", {
+      marker: "assignment_notification_attempt",
+      job_id: jobId,
+      actor_user_id: actorUserId,
+      target_user_id: assignment.user_id,
+      account_owner_user_id: internalUser.account_owner_user_id,
+      assignment_created: true,
+      notification_attempted: true,
     });
 
-    if (
-      primaryResult.status === "target_not_active_assignee" ||
-      primaryResult.status === "target_not_assignable"
-    ) {
-      redirectToJobWithBanner({
+    try {
+      const notificationId = await notifyJobAssignmentCreated({
+        supabase,
         jobId,
-        banner: "assignment_primary_target_invalid",
-        tabRaw,
-        returnToRaw,
+        accountOwnerUserId: internalUser.account_owner_user_id,
+        actorUserId,
+        recipientUserId: assignment.user_id,
+      });
+
+      console.info("[jobs] assignment notification result", {
+        marker: "assignment_notification_attempt",
+        job_id: jobId,
+        actor_user_id: actorUserId,
+        target_user_id: assignment.user_id,
+        account_owner_user_id: internalUser.account_owner_user_id,
+        assignment_created: true,
+        notification_attempted: true,
+        notification_created: !!notificationId,
+      });
+    } catch (notificationError) {
+      const safeError = getSafeErrorDetails(notificationError);
+      console.error("[jobs] job assignment notification failed", {
+        marker: "assignment_notification_attempt",
+        jobId,
+        actorUserId,
+        recipientUserId: assignment.user_id,
+        account_owner_user_id: internalUser.account_owner_user_id,
+        assignment_created: true,
+        notification_attempted: true,
+        notification_created: false,
+        error_code: safeError.error_code,
+        error_message: safeError.error_message,
       });
     }
   }
-
-  const hasAddedOrRemoved =
-    selectedUserIds.some((userId) => !beforeByUserId.has(userId)) ||
-    beforeAssignments.some((assignment) => !selectedSet.has(assignment.user_id));
-  const hasTeamChanged = hasAddedOrRemoved || shouldSetPrimary;
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/ops");

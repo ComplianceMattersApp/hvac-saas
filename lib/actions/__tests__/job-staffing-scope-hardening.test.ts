@@ -331,6 +331,8 @@ function makeAllowSupabaseFixture(options?: { existingActiveAssignment?: boolean
 function makeTeamAssignmentFixture(options?: {
   assignments?: PrimaryAssignmentRow[];
   assignableUserIds?: string[];
+  failInsertUserIds?: string[];
+  failUpdatePayload?: Record<string, unknown>;
 }) {
   const assignments = (options?.assignments ?? []).map((row) => ({ ...row }));
   const assignableUserIds = new Set(
@@ -343,6 +345,9 @@ function makeTeamAssignmentFixture(options?: {
   );
   const writes: Array<{ table: string; op: string; payload?: Record<string, unknown> }> = [];
   const notifications: Array<Record<string, unknown>> = [];
+  const operations: string[] = [];
+  const failInsertUserIds = new Set(options?.failInsertUserIds ?? []);
+  const failUpdatePayload = options?.failUpdatePayload ?? null;
 
   function matches(row: Record<string, unknown>, filters: Array<[string, unknown]>) {
     return filters.every(([key, value]) => row[key] === value);
@@ -381,10 +386,20 @@ function makeTeamAssignmentFixture(options?: {
       },
       async single() {
         if (table === "job_assignments" && op === "insert" && payload) {
+          const userId = String(payload.user_id);
+          if (failInsertUserIds.has(userId)) {
+            return {
+              data: null,
+              error: {
+                code: "42501",
+                message: "new row violates row-level security policy for table \"job_assignments\"",
+              },
+            };
+          }
           const row: PrimaryAssignmentRow = {
-            id: `assignment-${String(payload.user_id)}`,
+            id: `assignment-${userId}`,
             job_id: String(payload.job_id),
-            user_id: String(payload.user_id),
+            user_id: userId,
             is_active: Boolean(payload.is_active),
             is_primary: Boolean(payload.is_primary),
           };
@@ -399,7 +414,7 @@ function makeTeamAssignmentFixture(options?: {
         return query;
       },
       then(
-        onFulfilled: (value: { data?: unknown; error: null }) => unknown,
+        onFulfilled: (value: { data?: unknown; error: unknown }) => unknown,
         onRejected?: (reason: unknown) => unknown,
       ) {
         if (table === "job_assignments" && op === "select") {
@@ -410,7 +425,22 @@ function makeTeamAssignmentFixture(options?: {
         }
 
         if (table === "job_assignments" && op === "update" && payload) {
+          if (
+            failUpdatePayload &&
+            Object.entries(failUpdatePayload).every(([key, value]) => payload[key] === value)
+          ) {
+            writes.push({ table, op, payload });
+            operations.push(`${table}:${op}`);
+            return Promise.resolve({
+              data: null,
+              error: {
+                code: "42501",
+                message: "new row violates row-level security policy for table \"job_assignments\"",
+              },
+            }).then(onFulfilled, onRejected);
+          }
           writes.push({ table, op, payload });
+          operations.push(`${table}:${op}`);
           const changedRows = selectableAssignments(filters);
           for (const row of changedRows) {
             Object.assign(row, payload);
@@ -429,6 +459,21 @@ function makeTeamAssignmentFixture(options?: {
 
   const supabase = {
     from(table: string) {
+      if (table === "profiles") {
+        return {
+          select: vi.fn(() => ({
+            in: vi.fn(async (column: string, ids: string[]) => ({
+              data: (ids ?? []).map((id) => ({
+                id,
+                full_name: id === "internal-user-1" ? "Alex Office" : null,
+                email: `${id}@example.com`,
+              })),
+              error: null,
+            })),
+          })),
+        };
+      }
+
       if (table === "job_assignments" || table === "internal_users") {
         return {
           select: vi.fn(() => makeQuery(table, "select")),
@@ -446,6 +491,7 @@ function makeTeamAssignmentFixture(options?: {
               }
             }
             writes.push({ table, op: "insert", payload });
+            operations.push(`${table}:insert`);
             return makeQuery(table, "insert", payload);
           }),
         };
@@ -455,6 +501,7 @@ function makeTeamAssignmentFixture(options?: {
         return {
           insert: vi.fn((payload: Record<string, unknown>) => {
             writes.push({ table, op: "insert", payload });
+            operations.push(`${table}:insert`);
             return makeQuery(table, "insert", payload);
           }),
         };
@@ -464,8 +511,14 @@ function makeTeamAssignmentFixture(options?: {
         return {
           insert: vi.fn((payload: Record<string, unknown>) => {
             notifications.push(payload);
+            operations.push(`${table}:insert`);
             return makeQuery(table, "insert", payload);
           }),
+          delete: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              eq: vi.fn(async () => ({ error: null })),
+            })),
+          })),
         };
       }
 
@@ -473,7 +526,7 @@ function makeTeamAssignmentFixture(options?: {
     },
   };
 
-  return { supabase, assignments, writes, notifications };
+  return { supabase, assignments, writes, notifications, operations };
 }
 
 type PrimaryAssignmentRow = {
@@ -766,6 +819,37 @@ describe("internal staffing same-account hardening", () => {
     expect(
       fixture.writes.filter((call) => call.table === "job_events" && call.op === "insert").length,
     ).toBeGreaterThanOrEqual(2);
+    expect(fixture.notifications).toHaveLength(2);
+    const firstNotificationIndex = fixture.operations.findIndex((op) => op === "notifications:insert");
+    const lastAssignmentWriteIndex = fixture.operations.reduce(
+      (last, op, index) => (op.startsWith("job_assignments:") ? index : last),
+      -1,
+    );
+    expect(firstNotificationIndex).toBeGreaterThan(lastAssignmentWriteIndex);
+  });
+
+  it("bulk assign one valid same-account user succeeds without throwing globally", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [],
+      assignableUserIds: ["internal-user-2"],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({
+          selectedUserIds: ["internal-user-2"],
+          primaryUserId: "internal-user-2",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_updated");
+
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-2")?.is_active).toBe(true);
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-2")?.is_primary).toBe(true);
+    expect(fixture.notifications).toHaveLength(1);
   });
 
   it("does not create duplicate active rows when existing assignees remain selected", async () => {
@@ -795,6 +879,95 @@ describe("internal staffing same-account hardening", () => {
     expect(fixture.assignments.filter((row) => row.user_id === "internal-user-2" && row.is_active)).toHaveLength(1);
     expect(fixture.writes.some((call) => call.table === "job_assignments" && call.op === "insert")).toBe(false);
     expect(fixture.notifications).toHaveLength(0);
+  });
+
+  it("does not duplicate the actor assignment when the current user is already assigned and selected", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [
+        {
+          id: "assignment-actor",
+          job_id: "job-1",
+          user_id: "internal-user-1",
+          is_active: true,
+          is_primary: true,
+        },
+      ],
+      assignableUserIds: ["internal-user-1", "internal-user-2"],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({
+          selectedUserIds: ["internal-user-1", "internal-user-2"],
+          primaryUserId: "internal-user-1",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_updated");
+
+    expect(fixture.assignments.filter((row) => row.user_id === "internal-user-1" && row.is_active)).toHaveLength(1);
+    expect(
+      fixture.writes.filter(
+        (call) =>
+          call.table === "job_assignments" &&
+          call.op === "insert" &&
+          call.payload?.user_id === "internal-user-1",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("returns a safe banner when a bulk assignment insert hits an RLS-style failure", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [],
+      assignableUserIds: ["internal-user-2", "internal-user-3"],
+      failInsertUserIds: ["internal-user-3"],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({
+          selectedUserIds: ["internal-user-2", "internal-user-3"],
+          primaryUserId: "internal-user-2",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_update_failed");
+
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-2")?.is_active).toBe(true);
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-3")).toBeUndefined();
+    expect(fixture.notifications).toHaveLength(0);
+    expect(fixture.operations).not.toContain("notifications:insert");
+  });
+
+  it("returns a safe banner when primary promotion hits an RLS-style update failure without notifying", async () => {
+    const fixture = makeTeamAssignmentFixture({
+      assignments: [],
+      assignableUserIds: ["internal-user-2"],
+      failUpdatePayload: { is_primary: true },
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    loadScopedInternalJobForMutationMock.mockResolvedValue({ id: "job-1" });
+
+    const { updateJobTeamAssignmentsFromForm } = await import("@/lib/actions/job-actions");
+
+    await expect(
+      updateJobTeamAssignmentsFromForm(
+        buildTeamAssignmentFormData({
+          selectedUserIds: ["internal-user-2"],
+          primaryUserId: "internal-user-2",
+        }),
+      ),
+    ).rejects.toThrow("REDIRECT:/jobs/job-1?tab=ops&banner=assignment_team_update_failed");
+
+    expect(fixture.assignments.find((row) => row.user_id === "internal-user-2")?.is_active).toBe(true);
+    expect(fixture.notifications).toHaveLength(0);
+    expect(fixture.operations).not.toContain("notifications:insert");
   });
 
   it("removing an assignee through Change Team deactivates only that assignment", async () => {

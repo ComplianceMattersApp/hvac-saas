@@ -1346,6 +1346,8 @@ export default async function JobDetailPage({
       ? "Assigned team was unchanged."
       : banner === "assignment_team_target_invalid"
       ? "One or more selected team members cannot be assigned to this job."
+      : banner === "assignment_team_update_failed"
+      ? "Could not update the assigned team."
       : banner === "assignment_primary_set"
       ? "Primary assignee updated."
       : banner === "assignment_primary_target_invalid"
@@ -1363,6 +1365,7 @@ export default async function JobDetailPage({
       : banner === "assignment_user_required" ||
         banner === "assignment_primary_target_invalid" ||
         banner === "assignment_team_target_invalid" ||
+        banner === "assignment_team_update_failed" ||
         banner === "assignment_team_unchanged"
       ? "warning"
       : "success";
@@ -7390,6 +7393,13 @@ const failureResolutionPathCount =
         <FlashBanner
           type="warning"
           message="One or more selected team members cannot be assigned to this job."
+        />
+      )}
+
+      {banner === "assignment_team_update_failed" && (
+        <FlashBanner
+          type="warning"
+          message="Could not update the assigned team."
         />
       )}
 
