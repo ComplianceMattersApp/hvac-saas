@@ -30,6 +30,7 @@ function makeSupabaseMock(fixtures: Fixtures) {
       if (table === "internal_invoices") {
         const query = {
           eq: vi.fn(() => query),
+          is: vi.fn(() => query),
           in: vi.fn(() => query),
           gte: vi.fn(() => query),
           lte: vi.fn(() => query),

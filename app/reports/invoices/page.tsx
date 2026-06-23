@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import SubmitButton from "@/components/SubmitButton";
 import { sendInternalInvoiceEmailFromForm } from "@/lib/actions/internal-invoice-actions";
-import { canManageInvoiceLifecycle } from "@/lib/auth/financial-access";
+import { canManageInvoiceLifecycle, requireFinancialRegisterAccessOrRedirect } from "@/lib/auth/financial-access";
 import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
 import { resolveBillingModeByAccountOwnerId, resolveInternalBusinessIdentityByAccountOwnerId } from "@/lib/business/internal-business-profile";
@@ -54,10 +54,25 @@ function bannerMessage(value?: string | null) {
     internal_invoice_send_recipient_invalid: { tone: "warning", message: "Enter a valid billing recipient email before sending." },
     internal_invoice_send_requires_issued: { tone: "warning", message: "Issue the invoice before sending it." },
     internal_invoice_missing: { tone: "warning", message: "Invoice was not found." },
-    not_authorized: { tone: "warning", message: "You do not have invoice send authority." },
+    not_authorized: { tone: "warning", message: "You do not have invoice report authority." },
   };
   return messages[key] ?? null;
 }
+
+const emptyInvoiceLedger = {
+  rows: [],
+  totalCount: 0,
+  truncated: false,
+  summary: {
+    invoiceCount: 0,
+    openInvoiceCount: 0,
+    totalArCents: 0,
+    totalArDisplay: "$0.00",
+    partialOpenCount: 0,
+    unpaidOpenCount: 0,
+    oldestOpenInvoiceDateDisplay: "-",
+  },
+};
 
 export default async function InvoiceLedgerPage({
   searchParams,
@@ -89,6 +104,12 @@ export default async function InvoiceLedgerPage({
   const resolvedSearchParams = (searchParams ? await searchParams : {}) ?? {};
   const banner = bannerMessage(firstSearchValue(resolvedSearchParams.banner));
   const filters = parseInvoiceLedgerFilters(resolvedSearchParams);
+  requireFinancialRegisterAccessOrRedirect({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+    redirectTo: "/reports/dashboard?banner=not_authorized",
+  });
   const [internalBusinessIdentity, billingMode] = await Promise.all([
     resolveInternalBusinessIdentityByAccountOwnerId({
       supabase,
@@ -115,13 +136,11 @@ export default async function InvoiceLedgerPage({
           limit: INVOICE_LEDGER_PAGE_LIMIT,
         }),
       ])
-    : [{ customers: [], contractors: [] }, { rows: [], totalCount: 0, truncated: false }];
+    : [{ customers: [], contractors: [] }, emptyInvoiceLedger];
 
   const exportHref = `/reports/invoices/export?${buildInvoiceLedgerSearchParams(filters).toString()}`;
-  const issuedVisible = ledger.rows.filter((row) => row.invoiceStatusLabel.toLowerCase() === "issued").length;
-  const draftVisible = ledger.rows.filter((row) => row.invoiceStatusLabel.toLowerCase() === "draft").length;
-  const balanceVisible = ledger.rows.filter((row) => row.balanceDueDisplay !== "$0").length;
-  const paidVisible = ledger.rows.filter((row) => row.paymentStatusLabel.toLowerCase() === "paid").length;
+  const allInvoicesHref = "/reports/invoices?view=all";
+  const openInvoicesHref = "/reports/invoices?view=open";
   const canSendInvoiceLifecycle = canManageInvoiceLifecycle({
     actorUserId: user.id,
     internalUser,
@@ -133,8 +152,8 @@ export default async function InvoiceLedgerPage({
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Invoices report"
-        description="Billed-truth invoice ledger for internal invoices, communication state, issued totals, and recorded payment tracking."
+        title={filters.view === "open" ? "Open invoices" : "Invoices report"}
+        description="Accounts receivable view built from issued internal invoices and recorded internal invoice payments."
         countSummary={usesInternalInvoicing ? `Showing ${ledger.rows.length} of ${ledger.totalCount} invoice rows` : "External billing mode"}
         truncatedNote={usesInternalInvoicing && ledger.truncated ? `Page view is capped at ${INVOICE_LEDGER_PAGE_LIMIT} rows. Export includes up to ${INVOICE_LEDGER_EXPORT_LIMIT} rows.` : null}
         truthNote="This report shows internal invoice truth only. Recorded payments are tracking fields; no card processing or customer payment execution happens here."
@@ -165,12 +184,26 @@ export default async function InvoiceLedgerPage({
         </section>
       ) : (
         <>
+          <div className="flex flex-wrap gap-2">
+            <Link
+              href={openInvoicesHref}
+              className={reportActionClass(filters.view === "open" ? "primary" : "secondary")}
+            >
+              Open
+            </Link>
+            <Link
+              href={allInvoicesHref}
+              className={reportActionClass(filters.view === "all" ? "primary" : "secondary")}
+            >
+              All
+            </Link>
+          </div>
+
           <ReportStatGrid>
-            <ReportStatCard label="Visible invoices" value={ledger.rows.length} helperText="Invoice rows currently rendered with the active filters." />
-            <ReportStatCard label="Issued visible" value={issuedVisible} helperText="Visible invoices already marked issued." tone="emerald" />
-            <ReportStatCard label="Draft visible" value={draftVisible} helperText="Visible invoices still prepared but unissued." tone="blue" />
-            <ReportStatCard label="Balance visible" value={balanceVisible} helperText="Visible invoices with a non-zero tracked balance." tone="rose" />
-            <ReportStatCard label="Paid visible" value={paidVisible} helperText="Visible invoices marked paid by recorded payment entries." />
+            <ReportStatCard label="Open invoice count" value={ledger.summary.openInvoiceCount} helperText="Issued, non-void invoices with a positive balance due." tone="rose" />
+            <ReportStatCard label="Total AR balance" value={ledger.summary.totalArDisplay} helperText="Balance remaining after recorded internal invoice payments only." tone="emerald" />
+            <ReportStatCard label="Partial vs unpaid" value={`${ledger.summary.partialOpenCount} / ${ledger.summary.unpaidOpenCount}`} helperText="Partial payments first, then unpaid open invoices." tone="blue" />
+            <ReportStatCard label="Oldest open invoice" value={ledger.summary.oldestOpenInvoiceDateDisplay} helperText="Oldest issued or invoice date among open rows." />
           </ReportStatGrid>
 
           <ReportFilterPanel
@@ -178,9 +211,10 @@ export default async function InvoiceLedgerPage({
             description="Narrow internal invoice truth by status, customer, contractor, source type, communication state, date field, and sort order."
           >
             <form action="/reports/invoices" method="get" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+              <input type="hidden" name="view" value={filters.view} />
               <label className="grid gap-1 text-sm text-slate-700">
                 <span className={reportLabelClass}>Invoice status</span>
-                <select name="status" defaultValue={filters.status} className={reportControlClass}>
+                <select name="status" defaultValue={filters.status} className={reportControlClass} disabled={filters.view === "open"}>
                   <option value="">All statuses</option>
                   {INVOICE_LEDGER_STATUS_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -274,22 +308,15 @@ export default async function InvoiceLedgerPage({
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50/90">
                   <tr className={reportTableHeadClass}>
-                    <th className="px-3 py-3">Invoice Ref</th>
+                    <th className="px-3 py-3">Invoice</th>
                     <th className="px-3 py-3">Status</th>
-                    <th className="px-3 py-3">Source</th>
                     <th className="px-3 py-3">Customer</th>
-                    <th className="px-3 py-3">Location</th>
-                    <th className="px-3 py-3">Job / Visit</th>
-                    <th className="px-3 py-3">Service Case</th>
-                    <th className="px-3 py-3">Contractor</th>
+                    <th className="px-3 py-3">Job</th>
                     <th className="px-3 py-3">Invoice Date</th>
                     <th className="px-3 py-3">Issued</th>
-                    <th className="px-3 py-3">Last Communication</th>
-                    <th className="px-3 py-3">Recipient</th>
+                    <th className="px-3 py-3">Last Sent</th>
                     <th className="px-3 py-3">Send Status</th>
-                    <th className="px-3 py-3">Subtotal</th>
                     <th className="px-3 py-3">Total</th>
-                    <th className="px-3 py-3">Voided</th>
                     <th className="px-3 py-3">Amount Paid</th>
                     <th className="px-3 py-3">Balance Due</th>
                     <th className="px-3 py-3">Payment Status</th>
@@ -301,7 +328,7 @@ export default async function InvoiceLedgerPage({
                 <tbody>
                   {ledger.rows.length === 0 ? (
                     <tr>
-                      <td colSpan={22} className="px-4 py-12 text-center text-sm text-slate-500">
+                      <td colSpan={14} className="px-4 py-12 text-center text-sm text-slate-500">
                         <div className="mx-auto max-w-md space-y-2">
                           <div className="font-semibold text-slate-700">No invoices match the current filters</div>
                           <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing one of the invoice filters.</div>
@@ -321,9 +348,7 @@ export default async function InvoiceLedgerPage({
                           )}
                         </td>
                         <td className="px-3 py-3 text-slate-700">{row.invoiceStatusLabel}</td>
-                        <td className="px-3 py-3 text-slate-700">{row.sourceTypeLabel}</td>
                         <td className="px-3 py-3 text-slate-700">{row.customerDisplay}</td>
-                        <td className="px-3 py-3 text-slate-700"><div className="max-w-[16rem] text-xs leading-5">{row.locationDisplay}</div></td>
                         <td className="px-3 py-3">
                           {row.jobHref ? (
                             <Link href={row.jobHref} className="font-mono text-xs text-blue-700 hover:underline">{row.jobReference}</Link>
@@ -331,16 +356,11 @@ export default async function InvoiceLedgerPage({
                             <span className="font-mono text-xs text-slate-500">{row.jobReference}</span>
                           )}
                         </td>
-                        <td className="px-3 py-3"><span className="font-mono text-xs text-slate-700">{row.serviceCaseReference}</span></td>
-                        <td className="px-3 py-3 text-slate-700">{row.contractorDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.invoiceDateDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.issuedDateDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.lastCommunicationDateDisplay}</td>
-                        <td className="px-3 py-3 text-slate-700">{row.recipientDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.communicationStateLabel}</td>
-                        <td className="px-3 py-3 text-slate-700">{row.subtotalDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.totalDisplay}</td>
-                        <td className="px-3 py-3 text-slate-700">{row.voidedDateDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.amountPaidDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.balanceDueDisplay}</td>
                         <td className="px-3 py-3 text-slate-700">{row.paymentStatusLabel}</td>

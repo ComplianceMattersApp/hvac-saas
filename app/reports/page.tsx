@@ -1,5 +1,4 @@
 import { redirect } from "next/navigation";
-const DASHBOARD_QUERY_KEYS = new Set(["from", "to", "granularity", "density", "section"]);
 
 export const metadata = {
   title: "Reports",
@@ -25,10 +24,10 @@ export default async function ReportsPage({
     if (typeof value === "string") params.set(key, value);
   }
 
-  const targetPath = Array.from(params.keys()).every((key) => DASHBOARD_QUERY_KEYS.has(key))
-    ? "/reports/dashboard"
-    : "/reports/jobs";
+  if (!params.has("view")) {
+    params.set("view", "open");
+  }
   const query = params.toString();
 
-  redirect(query ? `${targetPath}?${query}` : targetPath);
+  redirect(query ? `/reports/invoices?${query}` : "/reports/invoices?view=open");
 }

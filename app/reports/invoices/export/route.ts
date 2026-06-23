@@ -10,6 +10,21 @@ import {
   parseInvoiceLedgerFilters,
 } from "@/lib/reports/invoice-ledger";
 
+const emptyInvoiceLedger = {
+  rows: [],
+  totalCount: 0,
+  truncated: false,
+  summary: {
+    invoiceCount: 0,
+    openInvoiceCount: 0,
+    totalArCents: 0,
+    totalArDisplay: "$0.00",
+    partialOpenCount: 0,
+    unpaidOpenCount: 0,
+    oldestOpenInvoiceDateDisplay: "-",
+  },
+};
+
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const {
@@ -65,15 +80,16 @@ export async function GET(request: NextRequest) {
         filters,
         limit: INVOICE_LEDGER_EXPORT_LIMIT,
       })
-    : { rows: [], totalCount: 0, truncated: false };
+    : emptyInvoiceLedger;
 
   const today = new Date().toISOString().slice(0, 10);
   const csv = `\uFEFF${buildInvoiceLedgerCsv(ledger.rows)}`;
+  const filenamePrefix = filters.view === "open" ? "open-invoices" : "invoice-ledger";
 
   return new NextResponse(csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="invoice-ledger-${today}.csv"`,
+      "Content-Disposition": `attachment; filename="${filenamePrefix}-${today}.csv"`,
       "Cache-Control": "no-store",
     },
   });

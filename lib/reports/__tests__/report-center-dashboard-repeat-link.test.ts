@@ -82,17 +82,16 @@ function makeSupabaseMock() {
 }
 
 describe("report-center dashboard active repeat visits link", () => {
-  it("points Active Repeat Visits cards to active multi-visit report state", async () => {
+  it("keeps Active Repeat Visits available in the service case detail section", async () => {
     const result = await buildReportCenterDashboardReadModel({
       supabase: makeSupabaseMock(),
       accountOwnerUserId: "owner-1",
       filters: { fromDate: "", toDate: "", granularity: "monthly" },
     });
 
-    const topCard = result.topCards.find((card) => card.label === "Active Repeat Visits");
     const continuityCard = result.continuity.cards.find((card) => card.label === "Active Repeat Visits");
 
-    expect(topCard?.href).toBe("/reports/service-cases?repeat_only=1&active_repeat_visits=1");
+    expect(result.topCards.length).toBeLessThanOrEqual(4);
     expect(continuityCard?.href).toBe("/reports/service-cases?repeat_only=1&active_repeat_visits=1");
   });
 });

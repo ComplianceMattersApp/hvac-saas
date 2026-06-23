@@ -40,10 +40,12 @@ export const INVOICE_LEDGER_SORT_OPTIONS = [
 
 type FilterSource = URLSearchParams | Record<string, string | string[] | undefined>;
 
+export type InvoiceLedgerView = "open" | "all";
 export type InvoiceLedgerDateField = (typeof INVOICE_LEDGER_DATE_FIELD_OPTIONS)[number]["value"];
 export type InvoiceLedgerSort = (typeof INVOICE_LEDGER_SORT_OPTIONS)[number]["value"];
 
 export type InvoiceLedgerFilters = {
+  view: InvoiceLedgerView;
   status: string;
   dateField: InvoiceLedgerDateField;
   fromDate: string;
@@ -84,15 +86,32 @@ export type InvoiceLedgerRow = {
   voidedDateDisplay: string;
   amountPaidDisplay: string;
   balanceDueDisplay: string;
+  totalCents: number;
+  amountPaidCents: number;
+  balanceDueCents: number;
+  invoiceDateValue: string | null;
+  issuedAtValue: string | null;
+  voidedAtValue: string | null;
   paymentStatusLabel: string;
   lastPaymentDateDisplay: string;
   paymentCountDisplay: string;
+};
+
+export type InvoiceLedgerSummary = {
+  invoiceCount: number;
+  openInvoiceCount: number;
+  totalArCents: number;
+  totalArDisplay: string;
+  partialOpenCount: number;
+  unpaidOpenCount: number;
+  oldestOpenInvoiceDateDisplay: string;
 };
 
 export type InvoiceLedgerResult = {
   rows: InvoiceLedgerRow[];
   totalCount: number;
   truncated: boolean;
+  summary: InvoiceLedgerSummary;
 };
 
 type InvoiceRow = {
@@ -305,7 +324,9 @@ async function resolveContractorJobIds(params: {
 }
 
 function applyInvoiceLedgerFilters(query: any, filters: InvoiceLedgerFilters, contractorJobIds: string[] | null) {
-  if (filters.status) {
+  if (filters.view === "open") {
+    query = query.eq("status", "issued").is("voided_at", null);
+  } else if (filters.status) {
     query = query.eq("status", filters.status);
   }
 
@@ -350,6 +371,11 @@ function applyInvoiceLedgerFilters(query: any, filters: InvoiceLedgerFilters, co
 
 export function parseInvoiceLedgerFilters(source: FilterSource): InvoiceLedgerFilters {
   return {
+    view: normalizeChoice(
+      readParam(source, "view"),
+      [{ value: "open" }, { value: "all" }],
+      "open",
+    ) as InvoiceLedgerView,
     status: normalizeChoice(
       readParam(source, "status"),
       [{ value: "" }, ...INVOICE_LEDGER_STATUS_OPTIONS],
@@ -385,6 +411,7 @@ export function parseInvoiceLedgerFilters(source: FilterSource): InvoiceLedgerFi
 export function buildInvoiceLedgerSearchParams(filters: InvoiceLedgerFilters) {
   const searchParams = new URLSearchParams();
 
+  if (filters.view !== "open") searchParams.set("view", filters.view);
   if (filters.status) searchParams.set("status", filters.status);
   if (filters.dateField !== "created") searchParams.set("date_field", filters.dateField);
   if (filters.fromDate) searchParams.set("from", filters.fromDate);
@@ -441,6 +468,26 @@ type InvoicePaymentSummary = {
   lastPaymentDate: string | null;
   paymentCount: number;
 };
+
+function buildInvoiceLedgerSummary(rows: InvoiceLedgerRow[]): InvoiceLedgerSummary {
+  const openRows = rows.filter(
+    (row) => row.invoiceStatus === "issued" && !row.voidedAtValue && row.balanceDueCents > 0,
+  );
+  const oldestOpenInvoiceDate = openRows
+    .map((row) => row.issuedAtValue || row.invoiceDateValue)
+    .filter((value): value is string => Boolean(value))
+    .sort()[0] ?? null;
+
+  return {
+    invoiceCount: rows.length,
+    openInvoiceCount: openRows.length,
+    totalArCents: openRows.reduce((total, row) => total + row.balanceDueCents, 0),
+    totalArDisplay: formatCurrencyCents(openRows.reduce((total, row) => total + row.balanceDueCents, 0)),
+    partialOpenCount: openRows.filter((row) => row.paymentStatusLabel.toLowerCase() === "partial").length,
+    unpaidOpenCount: openRows.filter((row) => row.paymentStatusLabel.toLowerCase() === "unpaid").length,
+    oldestOpenInvoiceDateDisplay: formatTimestampDisplay(oldestOpenInvoiceDate),
+  };
+}
 
 type PaymentRow = {
   invoice_id: string;
@@ -538,7 +585,7 @@ export async function listInvoiceLedgerRows(params: {
   });
 
   if (contractorJobIds && contractorJobIds.length === 0) {
-    return { rows: [], totalCount: 0, truncated: false };
+    return { rows: [], totalCount: 0, truncated: false, summary: buildInvoiceLedgerSummary([]) };
   }
 
   let query = params.supabase
@@ -559,7 +606,7 @@ export async function listInvoiceLedgerRows(params: {
   const invoices = rawInvoices.slice(0, INVOICE_LEDGER_EXPORT_LIMIT);
 
   if (!invoices.length) {
-    return { rows: [], totalCount: 0, truncated: false };
+    return { rows: [], totalCount: 0, truncated: false, summary: buildInvoiceLedgerSummary([]) };
   }
 
   const invoiceIds = invoices.map((invoice) => String(invoice.id ?? "").trim()).filter(Boolean);
@@ -675,6 +722,8 @@ export async function listInvoiceLedgerRows(params: {
       if (status === "paid") return "Paid";
       return "Unpaid";
     };
+    const amountPaidCents = paymentSummary?.amountPaidCents ?? 0;
+    const balanceDueCents = paymentSummary?.balanceDueCents ?? Math.max(0, Number(invoice.total_cents ?? 0) || 0);
 
     return {
       invoiceId,
@@ -705,18 +754,28 @@ export async function listInvoiceLedgerRows(params: {
       subtotalDisplay: formatCurrencyCents(invoice.subtotal_cents),
       totalDisplay: formatCurrencyCents(invoice.total_cents),
       voidedDateDisplay: formatTimestampDisplay(invoice.voided_at),
-      amountPaidDisplay: formatCurrencyCents(paymentSummary?.amountPaidCents ?? 0),
-      balanceDueDisplay: formatCurrencyCents(paymentSummary?.balanceDueCents ?? 0),
+      amountPaidDisplay: formatCurrencyCents(amountPaidCents),
+      balanceDueDisplay: formatCurrencyCents(balanceDueCents),
+      totalCents: Number(invoice.total_cents ?? 0) || 0,
+      amountPaidCents,
+      balanceDueCents,
+      invoiceDateValue: String(invoice.invoice_date ?? "").trim() || null,
+      issuedAtValue: String(invoice.issued_at ?? "").trim() || null,
+      voidedAtValue: String(invoice.voided_at ?? "").trim() || null,
       paymentStatusLabel: formatPaymentStatusLabel(paymentSummary?.paymentStatus ?? "unpaid"),
       lastPaymentDateDisplay: formatTimestampDisplay(paymentSummary?.lastPaymentDate ?? null),
       paymentCountDisplay: paymentSummary && paymentSummary.paymentCount > 0 ? String(paymentSummary.paymentCount) : "-",
     } satisfies InvoiceLedgerRow;
   });
+  const viewRows = params.filters.view === "open"
+    ? rows.filter((row) => row.invoiceStatus === "issued" && !row.voidedAtValue && row.balanceDueCents > 0)
+    : rows;
 
   return {
-    rows: rows.slice(0, limit),
-    totalCount: rows.length,
-    truncated: scanTruncated || rows.length > limit,
+    rows: viewRows.slice(0, limit),
+    totalCount: viewRows.length,
+    truncated: scanTruncated || viewRows.length > limit,
+    summary: buildInvoiceLedgerSummary(viewRows),
   };
 }
 

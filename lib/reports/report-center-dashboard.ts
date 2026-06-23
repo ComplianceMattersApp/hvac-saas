@@ -33,7 +33,14 @@ type DashboardInvoiceRow = {
   job_id: string | null;
   status: string | null;
   issued_at: string | null;
+  voided_at: string | null;
   total_cents: number | null;
+};
+
+type DashboardInvoicePaymentRow = {
+  invoice_id: string | null;
+  amount_cents: number | null;
+  payment_status: string | null;
 };
 
 type DashboardMetricCard = {
@@ -251,12 +258,14 @@ function buildTechRows(params: {
 }
 
 function buildInvoiceReportHref(input?: {
+  view?: "open" | "all";
   status?: string | null;
   dateField?: "created" | "invoice" | "issued";
   filters?: ReportCenterKpiFilters;
 }) {
   const params = new URLSearchParams();
 
+  if (input?.view) params.set("view", input.view);
   if (input?.status) params.set("status", input.status);
   if (input?.dateField && input.dateField !== "created") params.set("date_field", input.dateField);
   if (input?.filters) {
@@ -269,10 +278,44 @@ function buildInvoiceReportHref(input?: {
   return query ? `/reports/invoices?${query}` : "/reports/invoices";
 }
 
+function buildOpenInvoicesSummary(params: {
+  invoices: DashboardInvoiceRow[];
+  payments: DashboardInvoicePaymentRow[];
+}) {
+  const recordedPaidByInvoiceId = new Map<string, number>();
+  for (const payment of params.payments) {
+    if (String(payment.payment_status ?? "").trim().toLowerCase() !== "recorded") continue;
+    const invoiceId = String(payment.invoice_id ?? "").trim();
+    if (!invoiceId) continue;
+    recordedPaidByInvoiceId.set(
+      invoiceId,
+      (recordedPaidByInvoiceId.get(invoiceId) ?? 0) + (Number(payment.amount_cents ?? 0) || 0),
+    );
+  }
+
+  let openCount = 0;
+  let arBalanceCents = 0;
+  for (const invoice of params.invoices) {
+    if (normalizeInvoiceStatus(invoice.status) !== "issued") continue;
+    if (String(invoice.voided_at ?? "").trim()) continue;
+    const invoiceId = String(invoice.id ?? "").trim();
+    const balanceDueCents = Math.max(
+      0,
+      (Number(invoice.total_cents ?? 0) || 0) - (recordedPaidByInvoiceId.get(invoiceId) ?? 0),
+    );
+    if (balanceDueCents <= 0) continue;
+    openCount += 1;
+    arBalanceCents += balanceDueCents;
+  }
+
+  return { openCount, arBalanceCents };
+}
+
 export async function buildReportCenterDashboardReadModel(params: {
   supabase: any;
   accountOwnerUserId: string;
   filters: ReportCenterKpiFilters;
+  canViewFinancialReports?: boolean;
 }): Promise<ReportCenterDashboardReadModel> {
   const range = getKpiRange(params.filters);
   const contractorIds = await resolveReportAccountContractorIds({
@@ -298,7 +341,7 @@ export async function buildReportCenterDashboardReadModel(params: {
     }),
     params.supabase
       .from("internal_invoices")
-      .select("id, job_id, status, issued_at, total_cents")
+      .select("id, job_id, status, issued_at, voided_at, total_cents")
       .eq("account_owner_user_id", params.accountOwnerUserId),
     resolveBillingModeByAccountOwnerId({
       supabase: params.supabase,
@@ -326,6 +369,24 @@ export async function buildReportCenterDashboardReadModel(params: {
   });
   const usesInternalInvoicing = billingMode === "internal_invoicing";
   const invoices = usesInternalInvoicing ? ((invoiceResult.data ?? []) as DashboardInvoiceRow[]) : [];
+  const issuedInvoiceIds = invoices
+    .filter((invoice) => normalizeInvoiceStatus(invoice.status) === "issued")
+    .map((invoice) => String(invoice.id ?? "").trim())
+    .filter(Boolean);
+  const paymentResult = params.canViewFinancialReports && usesInternalInvoicing && issuedInvoiceIds.length
+    ? await params.supabase
+        .from("internal_invoice_payments")
+        .select("invoice_id, amount_cents, payment_status")
+        .eq("account_owner_user_id", params.accountOwnerUserId)
+        .in("invoice_id", issuedInvoiceIds)
+    : { data: [], error: null };
+
+  if (paymentResult.error) throw paymentResult.error;
+
+  const openInvoicesSummary = buildOpenInvoicesSummary({
+    invoices,
+    payments: (paymentResult.data ?? []) as DashboardInvoicePaymentRow[],
+  });
   const activeJobs = jobs.filter(
     (job) =>
       String(job.status ?? "").trim().toLowerCase() !== "cancelled" &&
@@ -381,20 +442,13 @@ export async function buildReportCenterDashboardReadModel(params: {
 
   return {
     topCards: [
-      {
-        label: "Need to Schedule",
-        value: getMetricValue(metricMap, "need_to_schedule_backlog"),
-        helperText: "Visits ready for dispatch placement.",
-        href: "/reports/jobs?scope=active&ops_status=need_to_schedule",
-        tone: "amber",
-      },
-      {
-        label: "Unassigned Open Visits",
-        value: new Intl.NumberFormat("en-US").format(unassignedOpenVisits),
-        helperText: "Active visits with no assigned team member.",
-        href: "/reports/jobs?assignee=unassigned",
-        tone: "sky",
-      },
+      ...(params.canViewFinancialReports ? [{
+        label: "Open Invoices",
+        value: formatCurrencyCents(openInvoicesSummary.arBalanceCents),
+        helperText: `${new Intl.NumberFormat("en-US").format(openInvoicesSummary.openCount)} issued invoices still have balance due.`,
+        href: buildInvoiceReportHref({ view: "open" }),
+        tone: "amber" as const,
+      }] : []),
       {
         label: "Closeout Backlog",
         value: getMetricValue(metricMap, "closeout_backlog"),
@@ -403,24 +457,19 @@ export async function buildReportCenterDashboardReadModel(params: {
         tone: "orange",
       },
       {
-        label: "Closeout Aging 7+ Days",
-        value: getMetricValue(metricMap, "closeout_aging_7_plus_days"),
-        helperText: "Older closeout work that is starting to drag.",
-        href: "/reports/closeout?closeout_only=1&sort=aging_desc",
-        tone: "orange",
-      },
-      {
-        label: "Open Interrupted Cases",
-        value: getMetricValue(metricMap, "open_service_cases"),
-        helperText: "Cases currently blocked, failed, pending, on hold, or waiting.",
-        href: "/reports/service-cases?case_status=open",
+        label: "Dispatch Gaps",
+        value: `${getMetricValue(metricMap, "need_to_schedule_backlog")} / ${new Intl.NumberFormat("en-US").format(unassignedOpenVisits)}`,
+        helperText: "Need-to-schedule visits first, then active visits without an assigned team member.",
+        href: "/reports/jobs?scope=active&ops_status=need_to_schedule",
         tone: "sky",
       },
       {
-        label: "Active Repeat Visits",
-        value: getMetricValue(metricMap, "repeat_visit_cases"),
-        helperText: "Multi-visit cases with active work still open.",
-        href: "/reports/service-cases?repeat_only=1&active_repeat_visits=1",
+        label: "Open Service Cases",
+        value: getMetricValue(metricMap, "open_service_cases"),
+        helperText: params.canViewFinancialReports
+          ? "Continuity work that still needs an outcome."
+          : "Primary attention item for non-financial report users.",
+        href: "/reports/service-cases?case_status=open",
         tone: "emerald",
       },
     ],

@@ -7,7 +7,10 @@ const isInternalAccessErrorMock = vi.fn((error: unknown) => {
   return Boolean(error && typeof error === 'object' && 'name' in (error as Record<string, unknown>));
 });
 const resolveBillingModeByAccountOwnerIdMock = vi.fn();
-const parseInvoiceLedgerFiltersMock = vi.fn((_: URLSearchParams) => ({ status: null }));
+const parseInvoiceLedgerFiltersMock = vi.fn((searchParams: URLSearchParams) => ({
+  status: null,
+  view: searchParams.get('view') === 'all' ? 'all' : 'open',
+}));
 const listInvoiceLedgerRowsMock = vi.fn();
 const buildInvoiceLedgerCsvMock = vi.fn((_: unknown[]) => 'invoice_number,total_due\nINV-1,100.00\n');
 
@@ -61,6 +64,10 @@ function buildRequest() {
   return new NextRequest('http://localhost:3000/reports/invoices/export?status=issued');
 }
 
+function buildOpenRequest() {
+  return new NextRequest('http://localhost:3000/reports/invoices/export?view=open');
+}
+
 describe('invoice export route financial access', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,6 +98,27 @@ describe('invoice export route financial access', () => {
     expect(response.status).toBe(200);
     expect(response.headers.get('content-type')).toContain('text/csv');
     expect(listInvoiceLedgerRowsMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('exports the Open Invoices view with the matching CSV filename', async () => {
+    createClientMock.mockResolvedValue(makeSupabaseFixture('billing-1'));
+    requireInternalUserMock.mockResolvedValue({
+      internalUser: {
+        user_id: 'billing-1',
+        role: 'billing',
+        is_active: true,
+        account_owner_user_id: 'owner-1',
+      },
+    });
+
+    const { GET } = await import('@/app/reports/invoices/export/route');
+    const response = await GET(buildOpenRequest());
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-disposition')).toContain('open-invoices-');
+    expect(listInvoiceLedgerRowsMock).toHaveBeenCalledWith(expect.objectContaining({
+      filters: expect.objectContaining({ view: 'open' }),
+    }));
   });
 
   it('allows structural owner to export invoice ledger CSV', async () => {

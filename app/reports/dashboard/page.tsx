@@ -70,7 +70,7 @@ function parseDashboardViewState(
 
   const visibleSections = requestedSections.length
     ? Array.from(new Set(requestedSections))
-    : DASHBOARD_SECTION_OPTIONS.map((option) => option.value);
+    : (["top-line"] satisfies DashboardSectionKey[]);
 
   const densityValue = source instanceof URLSearchParams
     ? source.get("density")
@@ -487,11 +487,17 @@ export default async function ReportCenterDashboardPage({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
+  const canViewDepositsReport = canViewFinancialRegister({
+    actorUserId: user.id,
+    internalUser,
+    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
+  });
 
   const dashboard = await buildReportCenterDashboardReadModel({
     supabase,
     accountOwnerUserId: internalUser.account_owner_user_id,
     filters,
+    canViewFinancialReports: canViewDepositsReport,
   });
   const operationsLedgerHref = buildOperationsLedgerHref(filters);
   const operationsExportHref = buildOperationsExportHref(filters);
@@ -501,11 +507,6 @@ export default async function ReportCenterDashboardPage({
   const continuityExportHref = buildContinuityExportHref(filters);
   const techWorkloadExportHref = buildTechWorkloadExportHref(filters);
   const classes = densityClasses(viewState.density);
-  const canViewDepositsReport = canViewFinancialRegister({
-    actorUserId: user.id,
-    internalUser,
-    resourceAccountOwnerUserId: internalUser.account_owner_user_id,
-  });
 
   return (
     <div className={`mx-auto max-w-[1680px] ${classes.sectionGap} px-3 py-4 text-slate-900 sm:px-5`}>

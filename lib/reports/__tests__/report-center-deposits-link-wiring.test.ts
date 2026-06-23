@@ -19,15 +19,12 @@ const depositsPageSource = readFileSync(
 );
 
 describe("report center deposits link wiring", () => {
-  it("adds Deposits to the existing Reports navigation near financial reports", () => {
+  it("keeps Reports navigation focused on four primary reports and moves Deposits under Advanced", () => {
+    expect(reportCenterTabsSource).toContain('href="/reports/invoices?view=open"');
+    expect(reportCenterTabsSource).toMatch(/>\s*Open Invoices\s*<\/ReportLink>/);
     expect(reportCenterTabsSource).toContain('href="/reports/payments"');
     expect(reportCenterTabsSource).toContain('href="/reports/deposits"');
-    expect(reportCenterTabsSource.indexOf('href="/reports/payments"')).toBeLessThan(
-      reportCenterTabsSource.indexOf('href="/reports/deposits"'),
-    );
-    expect(reportCenterTabsSource.indexOf('href="/reports/deposits"')).toBeLessThan(
-      reportCenterTabsSource.indexOf('href="/reports/payment-reconciliation"'),
-    );
+    expect(reportCenterTabsSource).toContain("Advanced / More");
     expect(reportCenterTabsSource).toMatch(/>\s*Deposits\s*<\/Link>/);
     expect(reportCenterTabsSource).toContain("showDeposits = false");
     expect(reportCenterTabsSource).toContain("showDeposits ?");
