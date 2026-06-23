@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
 import { resolvePostLoginDestination } from "@/lib/auth/post-login-destination";
-import { isInviteOrRecoveryCallbackError } from "@/lib/auth/invite-link-recovery";
+import {
+  hasExpiredInviteOrRecoveryError,
+  hasInviteSetPasswordIntent,
+  isInviteOrRecoveryCallbackError,
+  parseAuthCallbackHashParams,
+} from "@/lib/auth/invite-link-recovery";
 
 async function waitForSessionCommit(supabase: ReturnType<typeof createClient>) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -48,7 +53,7 @@ export default function AuthCallbackPage() {
     const handleCallback = async () => {
       try {
         // Parse hash fragment for tokens from Supabase redirect (invite flows)
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const hashParams = parseAuthCallbackHashParams(window.location.hash);
         const hashAccessToken = hashParams.get("access_token");
         const hashRefreshToken = hashParams.get("refresh_token");
         const hashType = hashParams.get("type");
@@ -60,7 +65,19 @@ export default function AuthCallbackPage() {
         const queryType = queryParams.get("type");
         const nextPath = queryParams.get("next");
 
-        if (isInviteOrRecoveryCallbackError(queryParams)) {
+        const hasInviteIntent =
+          queryType === "invite" ||
+          queryType === "recovery" ||
+          hashType === "invite" ||
+          hashType === "recovery" ||
+          hasInviteSetPasswordIntent(queryParams) ||
+          hasInviteSetPasswordIntent(hashParams);
+
+        if (
+          isInviteOrRecoveryCallbackError(queryParams) ||
+          hasExpiredInviteOrRecoveryError(queryParams) ||
+          hasExpiredInviteOrRecoveryError(hashParams)
+        ) {
           setStatus("This invite link is expired or invalid. Opening recovery instructions...");
           router.push("/set-password?mode=invite&invite_state=expired");
           return;
@@ -173,6 +190,12 @@ export default function AuthCallbackPage() {
 
           setStatus("Finishing sign-in...");
           await routeByRole(supabase, router, setStatus, nextPath);
+          return;
+        }
+
+        if (hasInviteIntent) {
+          setStatus("This invite link is expired or invalid. Opening recovery instructions...");
+          router.push("/set-password?mode=invite&invite_state=expired");
           return;
         }
 

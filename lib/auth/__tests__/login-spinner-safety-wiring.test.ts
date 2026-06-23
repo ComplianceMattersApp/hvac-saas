@@ -46,4 +46,22 @@ describe("login spinner safety wiring", () => {
     expect(source).toContain('router.push("/login")');
     expect(source).not.toContain('router.push("/auth/callback")');
   });
+
+  it("auth callback routes invite hash and no-code invite intent failures to invite recovery", () => {
+    const source = readRepoFile("app/auth/callback/page.tsx");
+
+    expect(source).toContain("parseAuthCallbackHashParams(window.location.hash)");
+    expect(source).toContain("hasExpiredInviteOrRecoveryError(hashParams)");
+    expect(source).toContain("hasInviteSetPasswordIntent(queryParams)");
+    expect(source).toContain('router.push("/set-password?mode=invite&invite_state=expired")');
+  });
+
+  it("set-password invite mode uses recovery state instead of redirecting missing sessions to login", () => {
+    const source = readRepoFile("app/set-password/page.tsx");
+
+    expect(source).toContain("const isInviteMode = isInviteSetPasswordMode(search)");
+    expect(source).toContain("setInviteRecoveryState(\"expired\")");
+    expect(source.indexOf("if (isInviteMode)")).toBeGreaterThan(source.indexOf("for (let attempt = 0; attempt < 3"));
+    expect(source.indexOf("router.replace(\"/login\")")).toBeGreaterThan(source.indexOf("if (isInviteMode)"));
+  });
 });

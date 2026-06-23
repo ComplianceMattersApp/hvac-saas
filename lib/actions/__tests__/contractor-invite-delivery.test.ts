@@ -85,6 +85,7 @@ function buildFixture(options?: {
     contractorUserWrites: 0,
     createUserCalls: 0,
     generateLinkCalls: 0,
+    generateLinkArgs: [] as any[],
   };
 
   function matchingInvite(filters: Array<{ column: string; value: unknown }>) {
@@ -243,8 +244,9 @@ function buildFixture(options?: {
           }
           return { data: { user: { id: "auth-user-1" } }, error: null };
         }),
-        generateLink: vi.fn(async () => {
+        generateLink: vi.fn(async (args: any) => {
           writes.generateLinkCalls += 1;
+          writes.generateLinkArgs.push(args);
           if (options?.generateLinkError) {
             return { data: null, error: options.generateLinkError };
           }
@@ -329,6 +331,24 @@ describe("contractor invite delivery", () => {
       sent_count: 1,
     });
     expect(sendInviteEmailMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("generates contractor recovery links with the app auth callback redirect", async () => {
+    const fixture = buildFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const mod = await import("@/lib/actions/contractor-invite-actions");
+    await expect(mod.inviteContractor({ contractorId: "contractor-1", email: "target@example.com" })).resolves.toMatchObject({
+      ok: true,
+    });
+
+    expect(fixture.writes.generateLinkArgs[0]).toMatchObject({
+      type: "recovery",
+      email: "target@example.com",
+      options: { redirectTo: expect.stringContaining("/auth/callback") },
+    });
+    expect(fixture.writes.generateLinkArgs[0].options.redirectTo).not.toContain("/login");
   });
 
   it("additional contractor user invite redirects with visible success after delivery", async () => {
