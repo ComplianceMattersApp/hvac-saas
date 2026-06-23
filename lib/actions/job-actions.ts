@@ -1730,13 +1730,20 @@ async function softRemoveJobAssignment(params: {
  * Only acts on active rows; does NOT activate an inactive assignment.
  * Emits assignment_primary_set on actual change only.
  */
+type SetPrimaryJobAssignmentResult =
+  | { status: "updated" }
+  | { status: "already_primary" }
+  | { status: "target_not_active_assignee" }
+  | { status: "target_not_assignable" };
+
 async function setPrimaryJobAssignment(params: {
   supabase: any;
   jobId: string;
   userId: string;
   actorUserId: string;
-}): Promise<void> {
-  const { supabase, jobId, userId, actorUserId } = params;
+  accountOwnerUserId?: string | null;
+}): Promise<SetPrimaryJobAssignmentResult> {
+  const { supabase, jobId, userId, actorUserId, accountOwnerUserId = null } = params;
 
   // Hardening: verify the target user has an active assignment.
   // Also detect no-op: if already primary, skip everything.
@@ -1750,14 +1757,25 @@ async function setPrimaryJobAssignment(params: {
 
   if (readErr) throw readErr;
 
-  if (!targetRow) {
-    throw new Error(
-      `Cannot set primary: no active assignment found for user ${userId} on job ${jobId}`
-    );
+  if (!targetRow?.id) {
+    return { status: "target_not_active_assignee" };
+  }
+
+  try {
+    await assertAssignableInternalUser({
+      supabase,
+      userId,
+      accountOwnerUserId,
+    });
+  } catch (error: any) {
+    if (error?.message === "ASSIGNABLE_INTERNAL_USER_REQUIRED") {
+      return { status: "target_not_assignable" };
+    }
+    throw error;
   }
 
   // Already primary — no change, no event
-  if (targetRow.is_primary) return;
+  if (targetRow.is_primary) return { status: "already_primary" };
 
   // Clear existing primary on all active rows for this job
   const { error: clearErr } = await supabase
@@ -1769,12 +1787,12 @@ async function setPrimaryJobAssignment(params: {
 
   if (clearErr) throw clearErr;
 
-  // Promote the target user
+  // Promote the selected existing assignment row only.
   const { error: setErr } = await supabase
     .from("job_assignments")
     .update({ is_primary: true })
+    .eq("id", targetRow.id)
     .eq("job_id", jobId)
-    .eq("user_id", userId)
     .eq("is_active", true);
 
   if (setErr) throw setErr;
@@ -1791,6 +1809,8 @@ async function setPrimaryJobAssignment(params: {
     },
     userId: actorUserId,
   });
+
+  return { status: "updated" };
 }
 
 /**
@@ -5167,6 +5187,7 @@ export async function assignJobAssigneeFromForm(formData: FormData) {
       jobId,
       userId,
       actorUserId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
     });
   }
 
@@ -5203,12 +5224,40 @@ export async function setPrimaryJobAssigneeFromForm(formData: FormData) {
     accountOwnerUserId: internalUser.account_owner_user_id,
   });
 
-  await setPrimaryJobAssignment({
-    supabase,
-    jobId,
-    userId,
-    actorUserId,
-  });
+  let primaryResult: SetPrimaryJobAssignmentResult = { status: "target_not_active_assignee" };
+  try {
+    primaryResult = await setPrimaryJobAssignment({
+      supabase,
+      jobId,
+      userId,
+      actorUserId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
+    });
+  } catch (error) {
+    console.error("[jobs] set primary assignee failed", {
+      jobId,
+      target_user_id: userId,
+      error: getSafeErrorDetails(error),
+    });
+    redirectToJobWithBanner({
+      jobId,
+      banner: "assignment_primary_failed",
+      tabRaw,
+      returnToRaw,
+    });
+  }
+
+  if (
+    primaryResult.status === "target_not_active_assignee" ||
+    primaryResult.status === "target_not_assignable"
+  ) {
+    redirectToJobWithBanner({
+      jobId,
+      banner: "assignment_primary_target_invalid",
+      tabRaw,
+      returnToRaw,
+    });
+  }
 
   revalidatePath(`/jobs/${jobId}`);
   revalidatePath("/ops");
@@ -5348,6 +5397,7 @@ export async function reassignAndRescheduleJobFromForm(formData: FormData) {
       jobId,
       userId: targetUserId,
       actorUserId,
+      accountOwnerUserId: internalUser.account_owner_user_id,
     });
 
     const originUserIds = (priorAssignmentRows ?? [])

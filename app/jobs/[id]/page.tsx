@@ -1342,12 +1342,21 @@ export default async function JobDetailPage({
       ? "Team member assigned and set as primary."
       : banner === "assignment_primary_set"
       ? "Primary assignee updated."
+      : banner === "assignment_primary_target_invalid"
+      ? "That team member is not currently assigned to this job."
+      : banner === "assignment_primary_failed"
+      ? "Could not update the primary assignee."
       : banner === "assignment_removed"
       ? "Assignee removed from this job."
       : banner === "assignment_user_required"
       ? "Select a team member to assign."
       : "";
-  const assignmentBannerType = banner === "assignment_user_required" ? "warning" : "success";
+  const assignmentBannerType =
+    banner === "assignment_primary_failed"
+      ? "error"
+      : banner === "assignment_user_required" || banner === "assignment_primary_target_invalid"
+      ? "warning"
+      : "success";
   const noteScopeRaw = sp.note_scope;
   const noteScope =
     Array.isArray(noteScopeRaw)
@@ -7386,6 +7395,20 @@ const failureResolutionPathCount =
         <FlashBanner
           type="success"
           message="Primary assignee updated."
+        />
+      )}
+
+      {banner === "assignment_primary_target_invalid" && (
+        <FlashBanner
+          type="warning"
+          message="That team member is not currently assigned to this job."
+        />
+      )}
+
+      {banner === "assignment_primary_failed" && (
+        <FlashBanner
+          type="error"
+          message="Could not update the primary assignee."
         />
       )}
 
