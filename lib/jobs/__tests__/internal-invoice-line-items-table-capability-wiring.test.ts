@@ -45,7 +45,8 @@ describe("internal invoice line items table capability wiring", () => {
 
   it("shows Work Item price as carried into draft charges instead of always zero", () => {
     expect(invoicePageSource).toContain("expectedUnitPrice: sanitizedRow.expected_unit_price");
-    expect(jobDetailPageSource).toContain("expectedUnitPrice: sanitizedRow.expected_unit_price ?? null");
+    expect(jobDetailPageSource).toContain("expected_unit_price?: number | null");
+    expect(jobDetailPageSource).toContain("Number(item.expected_unit_price).toFixed(2)");
     expect(source).toContain("expectedUnitPrice: number | null");
     expect(source).toContain("const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded)");
     expect(source).toContain("canAddVisitScopeLine && eligibleVisitScopeItems.length > 0");
@@ -87,22 +88,32 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source.indexOf("action={handleAddPricebook}")).toBe(source.lastIndexOf("action={handleAddPricebook}"));
   });
 
-  it("renders a compact zero-dollar decision rail above charges without adding outcome actions", () => {
+  it("renders draft billing disposition rails above charges without deleting draft detail", () => {
     const zeroRailIndex = source.indexOf("$0.00 invoice - choose how to handle it");
+    const externalRailIndex = source.indexOf("External billing option");
     const resolvedRailIndex = source.indexOf("Billing is handled for this $0.00 invoice. No payment was recorded.");
+    const externalResolvedRailIndex = source.indexOf("Billed outside EveryStep FieldWorks");
     const headerIndex = source.indexOf("Invoice Charge");
     const bottomAddFormIndex = source.indexOf("action={handleAddPricebook}");
 
-    expect(source).toContain("Number(totalCents ?? 0) === 0");
+    expect(source).toContain("const isZeroDollarDraft = totalCentsValue === 0");
     expect(source).toContain("billingDispositionLabel");
+    expect(source).toContain("billingDisposition === 'externally_billed'");
+    expect(externalResolvedRailIndex).toBeGreaterThan(-1);
+    expect(externalResolvedRailIndex).toBeLessThan(headerIndex);
     expect(resolvedRailIndex).toBeGreaterThan(-1);
     expect(resolvedRailIndex).toBeLessThan(zeroRailIndex);
     expect(zeroRailIndex).toBeGreaterThan(-1);
     expect(zeroRailIndex).toBeLessThan(headerIndex);
     expect(zeroRailIndex).toBeLessThan(bottomAddFormIndex);
-    expect(source).toContain("Add a charge if billing is missing. No Charge resolves billing without collecting money. Externally Billed resolves billing handled outside Compliance Matters.");
+    expect(externalRailIndex).toBeGreaterThan(-1);
+    expect(externalRailIndex).toBeLessThan(headerIndex);
+    expect(externalRailIndex).toBeLessThan(bottomAddFormIndex);
+    expect(source).toContain("Add a charge if billing is missing. No Charge resolves billing without collecting money. External Billing Complete resolves billing handled outside EveryStep FieldWorks.");
+    expect(source).toContain("Mark this job as billed outside EveryStep FieldWorks. Existing draft line items will stay here for reference, but this draft will not be treated as the invoice sent through the app.");
+    expect(source).toContain("Draft charges were kept for reference. No internal payment or Stripe collection was recorded.");
     expect(source).toContain("Mark No Charge");
-    expect(source).toContain("Externally Billed");
+    expect(source).toContain("External Billing Complete");
     expect(source).toContain("Send $0 Invoice");
     expect(source).toContain("Sending a no-payment-due invoice needs an approved zero-dollar issued invoice model.");
     expect(source).not.toContain("sendZeroDollarInvoice");

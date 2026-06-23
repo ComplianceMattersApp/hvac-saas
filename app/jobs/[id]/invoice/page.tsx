@@ -206,6 +206,10 @@ function bannerMessage(value?: string | null) {
     internal_invoice_issued: "Invoice issued. Send it to the billing recipient when ready.",
     internal_invoice_issue_blocked: "Invoice cannot be issued until job and field work are complete.",
     internal_invoice_issue_incomplete: "Review recipient, charges, and total before issuing.",
+    internal_invoice_no_charge_saved: "Billing resolved as No Charge.",
+    internal_invoice_externally_billed_saved:
+      "Billed outside EveryStep FieldWorks. Draft charges were kept for reference. No internal payment or Stripe collection was recorded.",
+    internal_invoice_disposition_requires_zero_total: "No Charge is only available for $0.00 draft invoices.",
     internal_invoice_email_sent: "Invoice email sent.",
     internal_invoice_email_resent: "Invoice email resent.",
     internal_invoice_email_failed: "Invoice email failed to send.",

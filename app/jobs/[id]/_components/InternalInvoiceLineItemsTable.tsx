@@ -114,8 +114,8 @@ function invoiceBannerMessage(banner?: string | null) {
     internal_invoice_visit_scope_item_not_found: 'Work Item is unavailable.',
     internal_invoice_visit_scope_line_item_duplicate: 'Selected Work Items are already added.',
     internal_invoice_no_charge_saved: 'Billing resolved as No Charge.',
-    internal_invoice_externally_billed_saved: 'Billing resolved as Externally Billed.',
-    internal_invoice_disposition_requires_zero_total: 'Billing disposition actions are only available for $0.00 draft invoices.',
+    internal_invoice_externally_billed_saved: 'Billed outside EveryStep FieldWorks. Draft charges were kept for reference. No internal payment or Stripe collection was recorded.',
+    internal_invoice_disposition_requires_zero_total: 'No Charge is only available for $0.00 draft invoices.',
     internal_invoice_locked: 'Invoice is locked and cannot be edited.',
     internal_invoice_line_items_locked: 'Invoice charges are locked.',
     internal_invoice_missing: 'Invoice was not found.',
@@ -226,6 +226,8 @@ export default function InternalInvoiceLineItemsTable({
     || canRemoveLine;
   const eligibleVisitScopeItems = visitScopePickerItems.filter((item) => !item.alreadyAdded);
   const billingDispositionLabel = formatBillingDispositionLabel(billingDisposition);
+  const totalCentsValue = Number(totalCents ?? 0);
+  const isZeroDollarDraft = totalCentsValue === 0;
   const pricebookSearch = pricebookSearchQuery.trim().toLowerCase();
   const filteredPricebookPickerItems = pricebookSearch
     ? pricebookPickerItems.filter((item) => {
@@ -356,7 +358,16 @@ export default function InternalInvoiceLineItemsTable({
         </div>
       ) : null}
 
-      {Number(totalCents ?? 0) === 0 && billingDispositionLabel ? (
+      {billingDisposition === 'externally_billed' ? (
+        <div className="border-b border-emerald-200/80 bg-emerald-50/75 px-5 py-3">
+          <div className="flex flex-col gap-1">
+            <div className="text-sm font-semibold text-emerald-950">Billed outside EveryStep FieldWorks</div>
+            <div className="text-xs leading-5 text-emerald-900">
+              Draft charges were kept for reference. No internal payment or Stripe collection was recorded.
+            </div>
+          </div>
+        </div>
+      ) : isZeroDollarDraft && billingDispositionLabel ? (
         <div className="border-b border-emerald-200/80 bg-emerald-50/75 px-5 py-3">
           <div className="flex flex-col gap-1">
             <div className="text-sm font-semibold text-emerald-950">{billingDispositionLabel}</div>
@@ -365,13 +376,13 @@ export default function InternalInvoiceLineItemsTable({
             </div>
           </div>
         </div>
-      ) : Number(totalCents ?? 0) === 0 ? (
+      ) : isZeroDollarDraft ? (
         <div className="border-b border-amber-200/80 bg-amber-50/75 px-5 py-3">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="min-w-0">
               <div className="text-sm font-semibold text-amber-950">$0.00 invoice - choose how to handle it</div>
               <div className="mt-1 text-xs leading-5 text-amber-900">
-                Add a charge if billing is missing. No Charge resolves billing without collecting money. Externally Billed resolves billing handled outside Compliance Matters.
+                Add a charge if billing is missing. No Charge resolves billing without collecting money. External Billing Complete resolves billing handled outside EveryStep FieldWorks.
               </div>
             </div>
             <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:justify-end">
@@ -402,7 +413,7 @@ export default function InternalInvoiceLineItemsTable({
                   loadingText="Saving..."
                   className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
                 >
-                  Externally Billed
+                  External Billing Complete
                 </SubmitButton>
               </form>
               <button
@@ -414,6 +425,28 @@ export default function InternalInvoiceLineItemsTable({
                 Send $0 Invoice
               </button>
             </div>
+          </div>
+        </div>
+      ) : !billingDispositionLabel ? (
+        <div className="border-b border-sky-200/80 bg-sky-50/75 px-5 py-3">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold text-sky-950">External billing option</div>
+              <div className="mt-1 text-xs leading-5 text-sky-900">
+                Mark this job as billed outside EveryStep FieldWorks. Existing draft line items will stay here for reference, but this draft will not be treated as the invoice sent through the app.
+              </div>
+            </div>
+            <form className="shrink-0" action={(formData) => handleBillingDisposition(formData, markExternallyBilledAction)}>
+              <input type="hidden" name="job_id" value={jobId} />
+              <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
+              <input type="hidden" name="tab" value={tab} />
+              <SubmitButton
+                loadingText="Saving..."
+                className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
+              >
+                External Billing Complete
+              </SubmitButton>
+            </form>
           </div>
         </div>
       ) : null}

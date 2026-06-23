@@ -196,6 +196,7 @@ function makeSupabaseFixture() {
 
       if (
         table === "internal_invoice_payments" ||
+        table === "internal_invoice_payment_allocations" ||
         table === "internal_invoice_line_items" ||
         table === "internal_invoices"
       ) {
@@ -322,7 +323,56 @@ describe("internal invoice billing disposition actions", () => {
     });
   });
 
-  it("denies billing disposition when the invoice has a positive total", async () => {
+  it("marks a positive draft invoice as externally billed without deleting draft lines or creating payment truth", async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
+      draftInvoice({
+        total_cents: 5000,
+        line_items: [
+          {
+            id: "line-1",
+            item_name_snapshot: "Diagnostic",
+            line_subtotal: 5000,
+          },
+        ],
+      }),
+    );
+
+    const { markInternalInvoiceExternallyBilledFromForm } = await import(
+      "@/lib/actions/internal-invoice-actions"
+    );
+
+    const result = await markInternalInvoiceExternallyBilledFromForm(buildFormData());
+
+    expect(result).toEqual({
+      ok: true,
+      banner: "internal_invoice_externally_billed_saved",
+      fieldErrors: undefined,
+    });
+    expect(fixture.jobUpdates).toHaveLength(1);
+    expect(fixture.jobUpdates[0]).toEqual(
+      expect.objectContaining({
+        invoice_complete: true,
+        billing_disposition: "externally_billed",
+        billing_disposition_at: expect.any(String),
+        billing_disposition_by_user_id: "owner-1",
+      }),
+    );
+    expect(fixture.forbiddenWrites).toEqual([]);
+    expect(insertJobEventMock).toHaveBeenCalledWith(
+      expect.objectContaining({
+        meta: expect.objectContaining({
+          source: "internal_invoice_billing_disposition",
+          invoice_id: "invoice-1",
+          total_cents: 5000,
+          billing_disposition: "externally_billed",
+        }),
+      }),
+    );
+  });
+
+  it("keeps no-charge blocked when the invoice has a positive total", async () => {
     const fixture = makeSupabaseFixture();
     createClientMock.mockResolvedValue(fixture.supabase);
     resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
@@ -338,6 +388,28 @@ describe("internal invoice billing disposition actions", () => {
     expect(result).toEqual({
       ok: false,
       banner: "internal_invoice_disposition_requires_zero_total",
+      fieldErrors: undefined,
+    });
+    expect(fixture.jobUpdates).toHaveLength(0);
+    expect(fixture.forbiddenWrites).toHaveLength(0);
+  });
+
+  it("does not silently switch an issued invoice to external billing", async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+    resolveInternalInvoiceByJobIdMock.mockResolvedValueOnce(
+      draftInvoice({ status: "issued", total_cents: 5000 }),
+    );
+
+    const { markInternalInvoiceExternallyBilledFromForm } = await import(
+      "@/lib/actions/internal-invoice-actions"
+    );
+
+    const result = await markInternalInvoiceExternallyBilledFromForm(buildFormData());
+
+    expect(result).toEqual({
+      ok: false,
+      banner: "internal_invoice_locked",
       fieldErrors: undefined,
     });
     expect(fixture.jobUpdates).toHaveLength(0);

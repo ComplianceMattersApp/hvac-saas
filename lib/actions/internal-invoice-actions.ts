@@ -1826,7 +1826,7 @@ async function markInternalInvoiceBillingDispositionFromForm(
     });
   }
 
-  if (Number(context.invoice.total_cents ?? 0) !== 0) {
+  if (disposition === 'no_charge' && Number(context.invoice.total_cents ?? 0) !== 0) {
     return resolveSmallMutationResult({
       jobId: context.jobId,
       tab: context.tab,
