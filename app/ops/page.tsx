@@ -1367,7 +1367,7 @@ function telHref(phone?: string | null) {
         : "Completion pending";
       const scheduledText = job?.scheduled_date ? formatBusinessDateUS(String(job.scheduled_date)) : "";
       const assignmentSummary = formatAssignmentSummaryForJob(jobId, selectedPreviewAssignmentDisplayMap);
-      const contractorName = workspaceContractorName(job) || operationalTenantIdentity.displayName;
+      const contractorName = workspaceContractorName(job);
       const utilityLabelClass =
         "text-[11px] font-semibold uppercase tracking-[0.11em] sm:text-[10px] sm:tracking-[0.12em]";
       const inlineActionClass =
@@ -1404,14 +1404,11 @@ function telHref(phone?: string | null) {
                   ? "Paperwork"
                   : "Review",
             },
+            ...(contractorName ? [{ label: "Contractor", value: contractorName }] : []),
           ]}
         >
           <QueueCardOpenAndAct>
             <div className="space-y-3">
-              <div className="grid gap-1.5">
-                <span className={utilityLabelClass}>Contractor</span>
-                <span className="text-sm font-medium text-slate-700">{contractorName}</span>
-              </div>
               {scheduledText ? (
                 <div className="grid gap-1.5">
                   <span className={utilityLabelClass}>Scheduled</span>
