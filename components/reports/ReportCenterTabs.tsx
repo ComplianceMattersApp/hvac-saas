@@ -71,7 +71,7 @@ export default function ReportCenterTabs({ current, showDeposits = false }: Prop
         Closeout
       </ReportLink>
       <ReportLink href="/reports/payments" current={current} active="payments">
-        Payments
+        Payments Received
       </ReportLink>
 
       <details className="relative">
@@ -79,7 +79,7 @@ export default function ReportCenterTabs({ current, showDeposits = false }: Prop
           Advanced / More
         </summary>
         <div className="absolute left-0 z-20 mt-2 grid min-w-64 gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-950/10">
-          <Link href="/reports/dashboard" className={tabClass(current === "dashboard")}>Dashboard</Link>
+          <Link href="/reports/dashboard" className={tabClass(current === "dashboard")}>Priority Board</Link>
           {showDeposits ? (
             <Link
               href="/reports/deposits"
@@ -90,7 +90,7 @@ export default function ReportCenterTabs({ current, showDeposits = false }: Prop
               Deposits
             </Link>
           ) : null}
-          <Link href="/reports/service-cases" className={tabClass(current === "service-cases")}>Service Cases</Link>
+          <Link href="/reports/service-cases" className={tabClass(current === "service-cases")}>Work History</Link>
           <Link href="/reports/time-clock" className={tabClass(current === "time-clock")}>Time Clock</Link>
           <Link href="/reports/failed-payments" className={tabClass(current === "failed-payments")}>Failed Payments</Link>
           <Link href="/reports/payment-reconciliation" className={tabClass(current === "payment-reconciliation")}>Confirm Payment</Link>

@@ -26,7 +26,7 @@ import {
 
 export const metadata = {
   title: "Deposits",
-  description: "Read-only Stripe settlement and payout reconciliation",
+  description: "Review online payment deposits, fees, net amounts, and payout timing.",
 };
 
 const PAYOUT_STATUS_OPTIONS = [
@@ -191,7 +191,7 @@ export default async function DepositsReportPage({
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
         title="Deposits"
-        description="Track how online invoice payments become bank deposits, including fees, net deposits, payout timing, and exportable records."
+        description="Review online payment deposits, fees, net amounts, payout timing, and exportable records."
         countSummary={hasRows ? `Showing ${depositsLedger.rows.length} deposit groups` : "No deposits to review yet"}
         truthNote="Deposits help you see how online payments turn into bank deposits, including Stripe fees, net amounts, and payout timing. Your invoices and payment records stay unchanged."
       />
@@ -208,7 +208,7 @@ export default async function DepositsReportPage({
 
       <ReportFilterPanel
         title="Filter deposits"
-        description="Narrow settlement rows by payout or available date, payout status, and sync status."
+        description="Narrow deposits by payout or available date, payout status, and sync status."
       >
         <form action="/reports/deposits" method="get" className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           <label className="grid gap-1 text-sm text-slate-700">
@@ -264,7 +264,7 @@ export default async function DepositsReportPage({
         <ReportStatCard
           label="Gross Collected"
           value={totalsAreMixed ? "Review by currency" : formatUsdCents(summary.grossCollectedCents)}
-          helperText="Online payments included in this deposits report."
+          helperText="Online payments included in this report."
           tone="emerald"
         />
         <ReportStatCard
@@ -288,12 +288,12 @@ export default async function DepositsReportPage({
         <ReportStatCard
           label="Unmatched / Needs Review"
           value={summary.unmatchedNeedsReviewCount}
-          helperText="Settlement rows that need review before they can be fully matched."
+          helperText="Payments that need review before they can be fully matched."
           tone={summary.unmatchedNeedsReviewCount > 0 ? "rose" : "slate"}
         />
       </ReportStatGrid>
 
-      <ReportTableShell note="This read-only report groups existing settlement rows by payout identity. Open a group to inspect the included settlement rows.">
+      <ReportTableShell note="This read-only report groups online payments by payout. Open a group to inspect the included payments.">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50/90">
             <tr className={reportTableHeadClass}>

@@ -138,7 +138,7 @@ export default async function PaymentReconciliationPage() {
       <ReportCenterTabs current="payment-reconciliation" />
 
       <section className="rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-600">
-        Confirm Payment shows reported payments awaiting verification. Payments Register shows collected payment truth. Failed Payments shows failed attempts needing review.
+        Confirm Payment shows reported payments awaiting verification. Payments Received shows money already recorded. Failed Payments shows failed attempts needing review.
       </section>
 
       <ReportStatGrid>
@@ -163,7 +163,7 @@ export default async function PaymentReconciliationPage() {
         <ReportStatCard
           label="Reported total"
           value={formatUsdFromCents(queue.summary.totalReportedAmountCents)}
-          helperText="Reported payment amount only. Not collected payment truth yet."
+          helperText="Reported payment amount only. Not counted as received yet."
           tone="slate"
         />
       </ReportStatGrid>
@@ -182,7 +182,7 @@ export default async function PaymentReconciliationPage() {
         </div>
       </section>
 
-      <ReportTableShell note="Reported payment amount only. Not collected payment truth yet. Correction and void actions are not enabled yet.">
+      <ReportTableShell note="Reported payment amount only. Not counted as received yet. Correction and void actions are not enabled yet.">
         {queue.items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
             <div className="font-semibold text-slate-900">No payments need confirmation.</div>
@@ -211,7 +211,7 @@ export default async function PaymentReconciliationPage() {
                       <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 md:min-w-48 md:text-right">
                         <div className="text-2xl font-semibold text-slate-950">{formatUsdFromCents(item.amountCents)}</div>
                         <div className="mt-1 text-sm font-semibold text-slate-700">{formatMethodLabel(item.paymentMethod)}</div>
-                        <div className="mt-1 text-xs text-slate-500">Reported payment amount only. Not collected payment truth yet.</div>
+                        <div className="mt-1 text-xs text-slate-500">Reported payment amount only. Not counted as received yet.</div>
                       </div>
                     </div>
 
@@ -317,7 +317,7 @@ export default async function PaymentReconciliationPage() {
       </ReportTableShell>
 
       <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm shadow-slate-950/5">
-        Verification records final payment truth through existing internal invoice payment actions. Rejection writes no payment truth. Correction and void actions are not enabled yet.
+        Confirmation records the payment after office review. Rejection does not record payment. Correction and void actions are not enabled yet.
       </section>
     </div>
   );

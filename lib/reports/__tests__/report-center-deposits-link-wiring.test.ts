@@ -34,7 +34,7 @@ describe("report center deposits link wiring", () => {
   });
 
   it("adds a visible Deposits card to the Reports dashboard billing area for financial roles", () => {
-    expect(reportsDashboardSource).toContain("Billing visibility");
+    expect(reportsDashboardSource).toContain("Billing follow-up");
     expect(reportsDashboardSource).toContain("canViewFinancialRegister");
     expect(reportsDashboardSource).toContain("canViewDepositsReport");
     expect(reportsDashboardSource).toContain('showDeposits={canViewDepositsReport}');

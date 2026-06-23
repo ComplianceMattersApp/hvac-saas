@@ -8,7 +8,7 @@ const detailPageSource = readFileSync(
 );
 
 describe("deposit detail page wiring", () => {
-  it("uses the same financial access posture as deposits and Payments Register", () => {
+  it("uses the same financial access posture as deposits and Payments Received", () => {
     expect(detailPageSource).toContain("requireInternalUser");
     expect(detailPageSource).toContain("requireFinancialRegisterAccessOrRedirect");
     expect(detailPageSource).toContain('redirect("/login")');
@@ -47,7 +47,7 @@ describe("deposit detail page wiring", () => {
 
   it("keeps unmatched and pending groups visible and non-leaky", () => {
     expect(detailPageSource).toContain("Pending payout / no payout assigned");
-    expect(detailPageSource).toContain("No settlement rows match this deposit group in your account.");
+    expect(detailPageSource).toContain("No payments match this deposit group in your account.");
     expect(detailPageSource).toContain("Unmatched");
     expect(detailPageSource).toContain("Needs Review");
     expect(detailPageSource).toContain("rowStatusLabels");

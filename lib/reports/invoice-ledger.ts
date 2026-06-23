@@ -1,4 +1,4 @@
-import { formatBusinessDateUS, laDateToUtcMidnightIso } from "@/lib/utils/schedule-la";
+import { displayDateLA, formatBusinessDateUS, laDateToUtcMidnightIso } from "@/lib/utils/schedule-la";
 import { preferredInvoiceReference, preferredJobReference } from "@/lib/utils/display-references";
 
 export const INVOICE_LEDGER_PAGE_LIMIT = 250;
@@ -104,6 +104,8 @@ export type InvoiceLedgerSummary = {
   totalArDisplay: string;
   partialOpenCount: number;
   unpaidOpenCount: number;
+  oldestOpenInvoiceDaysOpen: number | null;
+  oldestOpenInvoiceDaysOpenDisplay: string;
   oldestOpenInvoiceDateDisplay: string;
 };
 
@@ -477,16 +479,54 @@ function buildInvoiceLedgerSummary(rows: InvoiceLedgerRow[]): InvoiceLedgerSumma
     .map((row) => row.issuedAtValue || row.invoiceDateValue)
     .filter((value): value is string => Boolean(value))
     .sort()[0] ?? null;
+  const oldestOpenInvoiceDaysOpen = calculateDaysOpen(oldestOpenInvoiceDate);
+  const totalArCents = openRows.reduce((total, row) => total + row.balanceDueCents, 0);
 
   return {
     invoiceCount: rows.length,
     openInvoiceCount: openRows.length,
-    totalArCents: openRows.reduce((total, row) => total + row.balanceDueCents, 0),
-    totalArDisplay: formatCurrencyCents(openRows.reduce((total, row) => total + row.balanceDueCents, 0)),
+    totalArCents,
+    totalArDisplay: formatCurrencyCents(totalArCents),
     partialOpenCount: openRows.filter((row) => row.paymentStatusLabel.toLowerCase() === "partial").length,
     unpaidOpenCount: openRows.filter((row) => row.paymentStatusLabel.toLowerCase() === "unpaid").length,
+    oldestOpenInvoiceDaysOpen,
+    oldestOpenInvoiceDaysOpenDisplay:
+      oldestOpenInvoiceDaysOpen == null
+        ? "-"
+        : `${oldestOpenInvoiceDaysOpen} ${oldestOpenInvoiceDaysOpen === 1 ? "day" : "days"}`,
     oldestOpenInvoiceDateDisplay: formatTimestampDisplay(oldestOpenInvoiceDate),
   };
+}
+
+function businessDateYmd(value: string | null | undefined) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) return null;
+  const ymdMatch = normalized.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s].*)?$/);
+  if (ymdMatch?.[1]) return ymdMatch[1];
+  return displayDateLA(normalized) || null;
+}
+
+function todayYmdLA(now = new Date()) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(now);
+}
+
+function ymdToUtcNoonMs(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return Date.UTC(year, month - 1, day, 12, 0, 0);
+}
+
+function calculateDaysOpen(value: string | null | undefined) {
+  const ymd = businessDateYmd(value);
+  if (!ymd) return null;
+  const startMs = ymdToUtcNoonMs(ymd);
+  const endMs = ymdToUtcNoonMs(todayYmdLA());
+  if (!Number.isFinite(startMs) || !Number.isFinite(endMs)) return null;
+  return Math.max(0, Math.floor((endMs - startMs) / 86_400_000));
 }
 
 type PaymentRow = {

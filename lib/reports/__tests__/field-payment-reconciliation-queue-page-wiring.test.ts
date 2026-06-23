@@ -31,7 +31,7 @@ describe("field payment reconciliation queue page wiring", () => {
   it("renders required office-verification copy", () => {
     expect(queuePageSource).toContain('title="Confirm Payment"');
     expect(queuePageSource).toContain("Review cash, check, or other reported payments from the field before they count as collected payment.");
-    expect(queuePageSource).toContain("Reported payment amount only. Not collected payment truth yet.");
+    expect(queuePageSource).toContain("Reported payment amount only. Not counted as received yet.");
     expect(queuePageSource).toContain("Verify only after confirming the money was received.");
     expect(queuePageSource).toContain("Rejecting does not record payment.");
     expect(queuePageSource).toContain("Correction and void actions are not enabled yet.");
@@ -87,18 +87,18 @@ describe("field payment reconciliation queue page wiring", () => {
     expect(queuePageSource).not.toMatch(/>\s*Void\s*</);
   });
 
-  it("documents B7-S truth boundaries in UI", () => {
+  it("documents confirmation boundaries in UI", () => {
     expect(queuePageSource).toContain(
-      "Verification records final payment truth through existing internal invoice payment actions.",
+      "Confirmation records the payment after office review.",
     );
-    expect(queuePageSource).toContain("Rejection writes no payment truth.");
+    expect(queuePageSource).toContain("Rejection does not record payment.");
     expect(queuePageSource).toContain("Correction and void actions are not enabled yet.");
   });
 
   it("uses report center tab entry for payment reconciliation", () => {
     expect(queuePageSource).toContain('ReportCenterTabs current="payment-reconciliation"');
     expect(queuePageSource).toContain("Confirm Payment shows reported payments awaiting verification.");
-    expect(queuePageSource).toContain("Payments Register shows collected payment truth.");
+    expect(queuePageSource).toContain("Payments Received shows money already recorded.");
     expect(queuePageSource).toContain("Failed Payments shows failed attempts needing review.");
   });
 });

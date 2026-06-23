@@ -30,8 +30,8 @@ import {
 } from "@/lib/reports/time-clock-report";
 
 export const metadata = {
-  title: "Time Clock Report",
-  description: "Administrative time entry history report",
+  title: "Time Clock",
+  description: "Review internal time entries for history and export.",
 };
 
 export default async function TimeClockReportPage({
@@ -94,25 +94,25 @@ export default async function TimeClockReportPage({
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Time Clock Report"
-        description="Historical visibility for internal time entries with optional CSV export. This surface is not payroll, wages, overtime, or approval workflow."
+        title="Time Clock"
+        description="Review internal time entries for history and export. This page is not payroll, wages, overtime, or approval workflow."
         countSummary={`Showing ${report.rows.length} of ${report.totalCount} time entries`}
-        truncatedNote={report.truncated ? `Page view is capped at ${TIME_CLOCK_REPORT_PAGE_LIMIT} rows. Export includes up to ${TIME_CLOCK_REPORT_EXPORT_LIMIT} rows.` : null}
-        truthNote="Time entries come from the durable internal time-entry ledger. This report is historical visibility only and does not calculate payroll or overtime."
+        truncatedNote={report.truncated ? `Page view is capped at ${TIME_CLOCK_REPORT_PAGE_LIMIT} items. Export includes up to ${TIME_CLOCK_REPORT_EXPORT_LIMIT} items.` : null}
+        truthNote="Time entries are shown for history only. This report does not calculate payroll or overtime."
       />
 
       <ReportCenterTabs current="time-clock" />
 
       <ReportStatGrid>
-        <ReportStatCard label="Visible rows" value={report.rows.length} helperText="Rows currently rendered with the active filters." />
-        <ReportStatCard label="Adjusted visible" value={adjustedVisible} helperText="Visible entries with an adjustment marker or correction metadata." tone="blue" />
-        <ReportStatCard label="Open visible" value={openVisible} helperText="Visible entries still showing an open status." tone="rose" />
-        <ReportStatCard label="Needs review visible" value={reviewVisible} helperText="Visible entries currently marked for review." tone="emerald" />
+        <ReportStatCard label="Entries shown" value={report.rows.length} helperText="Entries currently shown with the active filters." />
+        <ReportStatCard label="Adjusted" value={adjustedVisible} helperText="Entries with an adjustment marker or correction note." tone="blue" />
+        <ReportStatCard label="Open" value={openVisible} helperText="Entries still showing an open status." tone="rose" />
+        <ReportStatCard label="Needs review" value={reviewVisible} helperText="Entries currently marked for review." tone="emerald" />
       </ReportStatGrid>
 
       <ReportFilterPanel
         title="Filter time entries"
-        description="Use date range, employee, and status to narrow the historical time-entry ledger."
+        description="Use date range, employee, and status to narrow time entries."
       >
         <form action="/reports/time-clock" method="get" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <label className="grid gap-1 text-sm text-slate-700">
@@ -147,10 +147,10 @@ export default async function TimeClockReportPage({
             <Link href={exportHref} className={reportActionClass()}>Export CSV</Link>
           </div>
         </form>
-        <p className="mt-3 text-xs leading-5 text-slate-600">Historical visibility only. Entries remain durable; this page does not delete, reset, approve, or calculate wages.</p>
+        <p className="mt-3 text-xs leading-5 text-slate-600">History only. This page does not delete, reset, approve, or calculate wages.</p>
       </ReportFilterPanel>
 
-      <ReportTableShell note="Scan left to right: employee and status first, then entry timing, then duration and adjustment history.">
+      <ReportTableShell note="Start with employee and status, then check timing, duration, and adjustment history.">
         <table className="min-w-full text-sm">
           <thead className="bg-slate-50/90">
             <tr className={reportTableHeadClass}>
@@ -172,8 +172,8 @@ export default async function TimeClockReportPage({
               <tr>
                 <td colSpan={11} className="px-4 py-12 text-center text-sm text-slate-500">
                   <div className="mx-auto max-w-md space-y-2">
-                    <div className="font-semibold text-slate-700">No time entries match the current filters</div>
-                    <div className="text-xs leading-5 text-slate-500">Adjust the filters above or reset the report to broaden the historical view.</div>
+                      <div className="font-semibold text-slate-700">No time entries found</div>
+                      <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing a filter.</div>
                   </div>
                 </td>
               </tr>

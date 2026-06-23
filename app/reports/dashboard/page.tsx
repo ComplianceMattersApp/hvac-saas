@@ -24,16 +24,16 @@ import {
 import { buildReportCenterDashboardReadModel } from "@/lib/reports/report-center-dashboard";
 
 export const metadata = {
-  title: "Dashboard",
-  description: "Internal business dashboard for workload, closeout, continuity, and billed visibility",
+  title: "Priority Board",
+  description: "A quick view of the work, billing, and follow-up areas that need attention.",
 };
 
 const DASHBOARD_SECTION_OPTIONS = [
   { value: "top-line", label: "Priority board" },
-  { value: "operations", label: "Ops flow" },
+  { value: "operations", label: "Work flow" },
   { value: "closeout", label: "Closeout" },
-  { value: "continuity", label: "Service cases" },
-  { value: "invoice", label: "Billing visibility" },
+  { value: "continuity", label: "Work history" },
+  { value: "invoice", label: "Billing follow-up" },
   { value: "tech-workload", label: "Team load" },
 ] as const;
 
@@ -164,7 +164,7 @@ function metricIconForLabel(label: string) {
   if (normalized.includes("unassigned") || normalized.includes("tech")) return UsersRound;
   if (normalized.includes("closeout") || normalized.includes("paperwork")) return CheckCircle2;
   if (normalized.includes("invoice") || normalized.includes("billed") || normalized.includes("draft")) return FileText;
-  if (normalized.includes("case") || normalized.includes("repeat")) return AlertTriangle;
+  if (normalized.includes("case") || normalized.includes("history") || normalized.includes("repeat")) return AlertTriangle;
   if (normalized.includes("completed") || normalized.includes("opened") || normalized.includes("created")) return BarChart3;
   return Gauge;
 }
@@ -176,7 +176,7 @@ function actionLabelForMetric(label: string) {
   if (normalized.includes("closeout")) return "Clear closeout";
   if (normalized.includes("paperwork")) return "Review paperwork";
   if (normalized.includes("invoice")) return "Review invoices";
-  if (normalized.includes("case") || normalized.includes("repeat")) return "Review cases";
+  if (normalized.includes("case") || normalized.includes("history") || normalized.includes("repeat")) return "Review work history";
   if (normalized.includes("completed") || normalized.includes("opened") || normalized.includes("created")) return "Open detail";
   return "Open report";
 }
@@ -520,9 +520,9 @@ export default async function ReportCenterDashboardPage({
               <div className="text-[11px] font-semibold uppercase text-slate-500">
                 {internalBusinessIdentity.display_name}
               </div>
-              <h1 className="mt-1 text-2xl font-semibold text-slate-950">Reports dashboard</h1>
+              <h1 className="mt-1 text-2xl font-semibold text-slate-950">Priority board</h1>
               <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
-                A dispatch-first view of the metrics operators actually need: schedule pressure, assignment gaps, closeout risk, continuity work, and billed truth.
+                A quick view of the work, billing, and follow-up areas that need attention.
               </p>
             </div>
           </div>
@@ -535,7 +535,7 @@ export default async function ReportCenterDashboardPage({
         <form action="/reports/dashboard" method="get" className="flex flex-col gap-3">
           <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
             <ListFilter className="h-4 w-4 text-slate-500" aria-hidden="true" />
-            Dashboard range and sections
+            Range and sections
           </div>
           <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
             <div className="grid gap-3 sm:grid-cols-3 xl:flex-1 xl:min-w-[44rem]">
@@ -624,9 +624,9 @@ export default async function ReportCenterDashboardPage({
               <div className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <Gauge className="h-5 w-5 text-slate-500" aria-hidden="true" />
-                  <h2 className="text-lg font-semibold text-slate-950">Ops flow</h2>
+                  <h2 className="text-lg font-semibold text-slate-950">Work flow</h2>
                 </div>
-                <p className="text-sm text-slate-600">Current workload, scheduling pressure, and visit throughput for the selected period.</p>
+                <p className="text-sm text-slate-600">Current workload, scheduling pressure, and completed work for the selected period.</p>
               </div>
               <div className="flex flex-wrap gap-2 text-sm">
                 <Link href={operationsLedgerHref} className={actionLinkClass()}>
@@ -643,7 +643,7 @@ export default async function ReportCenterDashboardPage({
               ))}
             </div>
             <div className="mt-5">
-              <div className="mb-3 text-sm font-semibold text-slate-950">Visits created vs completed</div>
+              <div className="mb-3 text-sm font-semibold text-slate-950">Jobs created vs completed</div>
               <TrendBars points={dashboard.operations.trend} primaryLabel="Created" secondaryLabel="Completed" density={viewState.density} />
             </div>
           </section>
@@ -695,16 +695,16 @@ export default async function ReportCenterDashboardPage({
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2">
                     <AlertTriangle className="h-5 w-5 text-slate-500" aria-hidden="true" />
-                    <h2 className="text-lg font-semibold text-slate-950">Service cases</h2>
+                    <h2 className="text-lg font-semibold text-slate-950">Work history</h2>
                   </div>
-                  <p className="text-sm text-slate-600">Open case pressure, repeat-visit risk, and resolution flow across the selected period.</p>
+                  <p className="text-sm text-slate-600">Open follow-up, repeat-visit risk, and resolved work across the selected period.</p>
                 </div>
                 <div className="flex flex-wrap gap-2 text-sm">
                   <Link href={continuityLedgerHref} className={actionLinkClass()}>
-                    Open service cases report
+                    Open work history
                   </Link>
                   <Link href={continuityExportHref} className={actionLinkClass()}>
-                    Export service cases CSV
+                    Export work history CSV
                   </Link>
                 </div>
               </header>
@@ -714,7 +714,7 @@ export default async function ReportCenterDashboardPage({
                 ))}
               </div>
               <div className="mt-5">
-                <div className="mb-3 text-sm font-semibold text-slate-950">Cases opened vs resolved</div>
+                <div className="mb-3 text-sm font-semibold text-slate-950">Issues opened vs resolved</div>
                 <TrendBars points={dashboard.continuity.trend} primaryLabel="Opened" secondaryLabel="Resolved" density={viewState.density} />
               </div>
             </section>
@@ -729,28 +729,28 @@ export default async function ReportCenterDashboardPage({
               <header className="flex flex-col gap-1">
                 <div className="flex items-center gap-2">
                   <FileText className="h-5 w-5 text-slate-500" aria-hidden="true" />
-                  <h2 className="text-lg font-semibold text-slate-950">Billing visibility</h2>
+                  <h2 className="text-lg font-semibold text-slate-950">Billing follow-up</h2>
                 </div>
-                <p className="text-sm text-slate-600">Billed truth only where internal invoices already support it honestly.</p>
-                <p className="text-sm text-slate-600">Recorded payment tracking only; no card processing from this surface.</p>
+                <p className="text-sm text-slate-600">Invoices and payments that need follow-up.</p>
+                <p className="text-sm text-slate-600">This page does not collect payment.</p>
               </header>
               <div className="mt-4 grid gap-4 lg:grid-cols-3">
                 <Link
                   href="/reports/invoices"
                   className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                 >
-                  <div className="text-sm font-semibold text-slate-950">Invoices</div>
+                  <div className="text-sm font-semibold text-slate-950">Open invoices</div>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Review invoice totals, balances, billing status, and exportable invoice records.
+                    Review who still owes money, balances, billing status, and exportable invoice records.
                   </p>
                 </Link>
                 <Link
                   href="/reports/payments"
                   className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
                 >
-                  <div className="text-sm font-semibold text-slate-950">Payments Register</div>
+                  <div className="text-sm font-semibold text-slate-950">Payments received</div>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Review collected payment records, methods, invoice matching, and CSV exports.
+                    Review money already recorded, payment methods, invoice matching, and CSV exports.
                   </p>
                 </Link>
                 {canViewDepositsReport ? (
@@ -771,7 +771,7 @@ export default async function ReportCenterDashboardPage({
                 ))}
               </div>
               <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 p-4 text-sm leading-6 text-slate-600">
-                {dashboard.invoiceVisibility.note} Use the dedicated invoice report for drill and export.
+                {dashboard.invoiceVisibility.note} Use Open Invoices for review and export.
               </div>
             </section>
           ) : null}

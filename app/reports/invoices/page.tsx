@@ -35,8 +35,8 @@ import {
 } from "@/lib/reports/invoice-ledger";
 
 export const metadata = {
-  title: "Invoices Report",
-  description: "Internal billed-truth invoices report",
+  title: "Open Invoices",
+  description: "Open invoices, balances due, and invoice follow-up.",
 };
 
 function firstSearchValue(value: string | string[] | undefined) {
@@ -70,6 +70,8 @@ const emptyInvoiceLedger = {
     totalArDisplay: "$0.00",
     partialOpenCount: 0,
     unpaidOpenCount: 0,
+    oldestOpenInvoiceDaysOpen: null,
+    oldestOpenInvoiceDaysOpenDisplay: "-",
     oldestOpenInvoiceDateDisplay: "-",
   },
 };
@@ -147,16 +149,25 @@ export default async function InvoiceLedgerPage({
     resourceAccountOwnerUserId: internalUser.account_owner_user_id,
   });
   const reportReturnTo = `/reports/invoices?${buildInvoiceLedgerSearchParams(filters).toString()}`;
+  const countSummary = usesInternalInvoicing
+    ? filters.view === "open"
+      ? `Showing ${ledger.totalCount} open ${ledger.totalCount === 1 ? "invoice" : "invoices"}`
+      : `Showing ${ledger.rows.length} of ${ledger.totalCount} invoices`
+    : "External billing mode";
+  const emptyTitle = filters.view === "open" ? "No open invoices" : "No invoices found";
+  const emptyBody = filters.view === "open"
+    ? "Paid, voided, and zero-balance invoices are still available under All invoices."
+    : "Try widening the date range or clearing a filter.";
 
   return (
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
         title={filters.view === "open" ? "Open invoices" : "Invoices report"}
-        description="Accounts receivable view built from issued internal invoices and recorded internal invoice payments."
-        countSummary={usesInternalInvoicing ? `Showing ${ledger.rows.length} of ${ledger.totalCount} invoice rows` : "External billing mode"}
-        truncatedNote={usesInternalInvoicing && ledger.truncated ? `Page view is capped at ${INVOICE_LEDGER_PAGE_LIMIT} rows. Export includes up to ${INVOICE_LEDGER_EXPORT_LIMIT} rows.` : null}
-        truthNote="This report shows internal invoice truth only. Recorded payments are tracking fields; no card processing or customer payment execution happens here."
+        description={filters.view === "open" ? "Invoices that still have money due. Use this page to follow up and keep payments moving." : "Review app invoice history, send status, totals, and recorded payment progress."}
+        countSummary={countSummary}
+        truncatedNote={usesInternalInvoicing && ledger.truncated ? `Page view is capped at ${INVOICE_LEDGER_PAGE_LIMIT} invoices. Export includes up to ${INVOICE_LEDGER_EXPORT_LIMIT} invoices.` : null}
+        truthNote="Balances update from payments recorded in the app. This page does not charge cards or collect payment."
       />
 
       <ReportCenterTabs current="invoices" />
@@ -176,9 +187,9 @@ export default async function InvoiceLedgerPage({
       {!usesInternalInvoicing ? (
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm shadow-slate-950/5">
           <div className="max-w-2xl space-y-3">
-            <h2 className="text-lg font-semibold text-slate-950">No internal invoices report in this billing mode</h2>
+            <h2 className="text-lg font-semibold text-slate-950">No app invoices to show</h2>
             <p className="text-sm leading-6 text-slate-600">
-              This company is configured for external billing. The invoices report only shows real rows from the internal invoice domain, so this surface stays empty rather than inventing billed totals, open invoice counts, or payment-style finance signals.
+              This account tracks billing outside the app, so there are no internal invoices to list here. Use Closeout or the job page to track external billing follow-up.
             </p>
           </div>
         </section>
@@ -195,20 +206,29 @@ export default async function InvoiceLedgerPage({
               href={allInvoicesHref}
               className={reportActionClass(filters.view === "all" ? "primary" : "secondary")}
             >
-              All
+              All invoices
             </Link>
           </div>
 
           <ReportStatGrid>
-            <ReportStatCard label="Open invoice count" value={ledger.summary.openInvoiceCount} helperText="Issued, non-void invoices with a positive balance due." tone="rose" />
-            <ReportStatCard label="Total AR balance" value={ledger.summary.totalArDisplay} helperText="Balance remaining after recorded internal invoice payments only." tone="emerald" />
-            <ReportStatCard label="Partial vs unpaid" value={`${ledger.summary.partialOpenCount} / ${ledger.summary.unpaidOpenCount}`} helperText="Partial payments first, then unpaid open invoices." tone="blue" />
-            <ReportStatCard label="Oldest open invoice" value={ledger.summary.oldestOpenInvoiceDateDisplay} helperText="Oldest issued or invoice date among open rows." />
+            <ReportStatCard label="Open invoices" value={ledger.summary.openInvoiceCount} helperText="Invoices with a balance still due." tone="rose" />
+            <ReportStatCard label="Total still owed" value={ledger.summary.totalArDisplay} helperText="Remaining balance after payments recorded in the app." tone="emerald" />
+            <ReportStatCard
+              label="Needs first payment"
+              value={ledger.summary.unpaidOpenCount}
+              helperText={`${ledger.summary.partialOpenCount} ${ledger.summary.partialOpenCount === 1 ? "invoice has" : "invoices have"} a partial payment.`}
+              tone="blue"
+            />
+            <ReportStatCard
+              label="Oldest balance"
+              value={ledger.summary.oldestOpenInvoiceDaysOpenDisplay}
+              helperText={ledger.summary.oldestOpenInvoiceDateDisplay === "-" ? "No open invoice date to show." : `Oldest open invoice was issued ${ledger.summary.oldestOpenInvoiceDateDisplay}.`}
+            />
           </ReportStatGrid>
 
           <ReportFilterPanel
-            title="Filter invoice rows"
-            description="Narrow internal invoice truth by status, customer, contractor, source type, communication state, date field, and sort order."
+            title="Find invoices"
+            description="Narrow the list by customer, contractor, date, send status, or invoice source."
           >
             <form action="/reports/invoices" method="get" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <input type="hidden" name="view" value={filters.view} />
@@ -262,7 +282,7 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className={reportLabelClass}>Source type</span>
+                <span className={reportLabelClass}>Invoice source</span>
                 <select name="source_type" defaultValue={filters.sourceType} className={reportControlClass}>
                   <option value="">All source types</option>
                   {INVOICE_LEDGER_SOURCE_TYPE_OPTIONS.map((option) => (
@@ -272,7 +292,7 @@ export default async function InvoiceLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className={reportLabelClass}>Communication state</span>
+                <span className={reportLabelClass}>Send status</span>
                 <select name="communication_state" defaultValue={filters.communicationState} className={reportControlClass}>
                   <option value="">All states</option>
                   {INVOICE_LEDGER_COMMUNICATION_STATE_OPTIONS.map((option) => (
@@ -304,7 +324,7 @@ export default async function InvoiceLedgerPage({
             </form>
           </ReportFilterPanel>
 
-          <ReportTableShell note="Scan left to right: invoice and visit identity first, communication status next, then billed totals and recorded payment tracking fields.">
+          <ReportTableShell note="Start with who owes money, then check when it was sent, what was paid, and what still needs follow-up.">
               <table className="min-w-full text-sm">
                 <thead className="bg-slate-50/90">
                   <tr className={reportTableHeadClass}>
@@ -317,21 +337,21 @@ export default async function InvoiceLedgerPage({
                     <th className="px-3 py-3">Last Sent</th>
                     <th className="px-3 py-3">Send Status</th>
                     <th className="px-3 py-3">Total</th>
-                    <th className="px-3 py-3">Amount Paid</th>
-                    <th className="px-3 py-3">Balance Due</th>
+                    <th className="px-3 py-3">Paid</th>
+                    <th className="px-3 py-3">Still Owed</th>
                     <th className="px-3 py-3">Payment Status</th>
                     <th className="px-3 py-3">Last Payment</th>
-                    <th className="px-3 py-3">Payment Count</th>
+                    <th className="px-3 py-3">Payments</th>
                     <th className="px-3 py-3">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {ledger.rows.length === 0 ? (
                     <tr>
-                      <td colSpan={14} className="px-4 py-12 text-center text-sm text-slate-500">
+                      <td colSpan={15} className="px-4 py-12 text-center text-sm text-slate-500">
                         <div className="mx-auto max-w-md space-y-2">
-                          <div className="font-semibold text-slate-700">No invoices match the current filters</div>
-                          <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing one of the invoice filters.</div>
+                          <div className="font-semibold text-slate-700">{emptyTitle}</div>
+                          <div className="text-xs leading-5 text-slate-500">{emptyBody}</div>
                         </div>
                       </td>
                     </tr>

@@ -145,6 +145,9 @@ describe("invoice ledger open invoices view", () => {
     expect(ledger.summary.totalArCents).toBe(17500);
     expect(ledger.summary.partialOpenCount).toBe(1);
     expect(ledger.summary.unpaidOpenCount).toBe(1);
+    expect(ledger.summary.oldestOpenInvoiceDaysOpen).not.toBeNull();
+    expect(ledger.summary.oldestOpenInvoiceDaysOpenDisplay).toMatch(/^\d+ days?$/);
+    expect(ledger.summary.oldestOpenInvoiceDateDisplay).toBe("05-02-2026");
     expect(ledger.rows.find((row) => row.invoiceId === "partial")?.balanceDueDisplay).toBe("$75.00");
   });
 

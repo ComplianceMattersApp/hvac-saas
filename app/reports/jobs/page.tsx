@@ -35,8 +35,8 @@ import {
 } from "@/lib/reports/job-visit-ledger";
 
 export const metadata = {
-  title: "Jobs Report",
-  description: "Internal jobs report",
+  title: "Jobs & Visits",
+  description: "See scheduled, completed, unassigned, and follow-up work in one list.",
 };
 
 function booleanPill(value: boolean, trueLabel: string) {
@@ -111,26 +111,26 @@ export default async function JobsReportPage({
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Jobs report"
-        description="Operational visit ledger for scheduling, assignment, lifecycle, paperwork, invoice, and closeout review."
-        countSummary={`Showing ${ledger.rows.length} of ${ledger.totalCount} visit rows`}
-        truncatedNote={ledger.truncated ? `Page view is capped at ${JOB_VISIT_LEDGER_PAGE_LIMIT} rows. Export includes up to ${JOB_VISIT_LEDGER_EXPORT_LIMIT} rows.` : null}
-        truthNote="Visit rows come from the jobs ledger. This report does not merge invoice, payment, or service case truth beyond linked references."
+        title="Jobs & visits"
+        description="See scheduled, completed, unassigned, and follow-up work in one list."
+        countSummary={`Showing ${ledger.rows.length} of ${ledger.totalCount} jobs`}
+        truncatedNote={ledger.truncated ? `Page view is capped at ${JOB_VISIT_LEDGER_PAGE_LIMIT} items. Export includes up to ${JOB_VISIT_LEDGER_EXPORT_LIMIT} items.` : null}
+        truthNote="Use this page to find work. Open a job to update schedule, assignment, closeout, or billing details."
       />
 
       <ReportCenterTabs current="jobs" />
 
       <ReportStatGrid>
-        <ReportStatCard label="Visible rows" value={ledger.rows.length} helperText="Rows currently rendered with the active filters." />
-        <ReportStatCard label="Total matches" value={ledger.totalCount} helperText="All matching visit rows before the page cap." tone="blue" />
-        <ReportStatCard label="Unassigned visible" value={unassignedVisible} helperText="Visible visits with no assigned team member." tone="rose" />
-        <ReportStatCard label="Closeout visible" value={closeoutVisible} helperText="Visible visits currently marked for closeout follow-up." tone="emerald" />
-        <ReportStatCard label="Paperwork visible" value={paperworkVisible} helperText="Visible visits still showing paperwork requirements." />
+        <ReportStatCard label="Jobs shown" value={ledger.rows.length} helperText="Jobs currently shown with the active filters." />
+        <ReportStatCard label="Total matching jobs" value={ledger.totalCount} helperText="All matching jobs before the page cap." tone="blue" />
+        <ReportStatCard label="Unassigned" value={unassignedVisible} helperText="Jobs with no assigned team member." tone="rose" />
+        <ReportStatCard label="Needs closeout" value={closeoutVisible} helperText="Jobs currently marked for closeout follow-up." tone="emerald" />
+        <ReportStatCard label="Paperwork needed" value={paperworkVisible} helperText="Jobs still showing paperwork requirements." />
       </ReportStatGrid>
 
       <ReportFilterPanel
-        title="Filter visit rows"
-        description="Use date field, status, assignment, contractor, and scope to narrow the operational visit ledger."
+        title="Find jobs"
+        description="Narrow the list by date, status, contractor, team member, job type, or scope."
       >
         <form action="/reports/jobs" method="get" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           <label className="grid gap-1 text-sm text-slate-700">
@@ -153,7 +153,7 @@ export default async function JobsReportPage({
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className={reportLabelClass}>Ops status</span>
+            <span className={reportLabelClass}>Status</span>
             <select name="ops_status" defaultValue={filters.opsStatus} className={reportControlClass}>
               <option value="">All statuses</option>
               {JOB_VISIT_LEDGER_OPS_STATUS_OPTIONS.map((option) => (
@@ -173,7 +173,7 @@ export default async function JobsReportPage({
           </label>
 
           <label className="grid gap-1 text-sm text-slate-700">
-            <span className={reportLabelClass}>Assigned Team</span>
+            <span className={reportLabelClass}>Assigned team</span>
             <select name="assignee" defaultValue={filters.assigneeUserId} className={reportControlClass}>
               <option value="">All team members</option>
               <option value="unassigned">Unassigned</option>
@@ -223,23 +223,23 @@ export default async function JobsReportPage({
             </Link>
           </div>
         </form>
-        <p className="mt-3 text-xs leading-5 text-slate-600">Scope controls whether you are viewing active, historical, or all visits. Date field controls which visit date the From/To range uses (created, scheduled, or completed).</p>
+        <p className="mt-3 text-xs leading-5 text-slate-600">Scope controls whether you are viewing active, historical, or all jobs. Date field controls which job date the From/To range uses (created, scheduled, or completed).</p>
       </ReportFilterPanel>
 
-      <ReportTableShell note="Scan left to right: visit identity and assignment first, then ops and lifecycle status, then paperwork, invoice, and closeout requirements.">
+      <ReportTableShell note="Start with the job and assigned team, then check status, schedule, paperwork, invoice, and closeout needs.">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50/90">
               <tr className={reportTableHeadClass}>
-                <th className="px-3 py-3">Job Ref</th>
+                <th className="px-3 py-3">Job</th>
                 <th className="px-3 py-3">Visit</th>
                 <th className="px-3 py-3">Type</th>
                 <th className="px-3 py-3">Customer</th>
                 <th className="px-3 py-3">Location</th>
                 <th className="px-3 py-3">Contractor</th>
-                <th className="px-3 py-3">Assigned Tech</th>
-                <th className="px-3 py-3">Ops Status</th>
-                <th className="px-3 py-3">Lifecycle</th>
-                <th className="px-3 py-3">Service Case</th>
+                <th className="px-3 py-3">Assigned team</th>
+                <th className="px-3 py-3">Status</th>
+                <th className="px-3 py-3">Stage</th>
+                <th className="px-3 py-3">Work History</th>
                 <th className="px-3 py-3">Created</th>
                 <th className="px-3 py-3">Scheduled</th>
                 <th className="px-3 py-3">Completed</th>
@@ -253,8 +253,8 @@ export default async function JobsReportPage({
                 <tr>
                   <td colSpan={16} className="px-4 py-12 text-center text-sm text-slate-500">
                     <div className="mx-auto max-w-md space-y-2">
-                      <div className="font-semibold text-slate-700">No visits match the current filters</div>
-                      <div className="text-xs leading-5 text-slate-500">Adjust the filters above or reset the report to see a broader set of jobs.</div>
+                      <div className="font-semibold text-slate-700">No jobs found</div>
+                      <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing a filter.</div>
                     </div>
                   </td>
                 </tr>

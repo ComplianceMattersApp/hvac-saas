@@ -18,7 +18,7 @@ import { getDepositDetailLedger, type DepositDetailSettlementRow } from "@/lib/r
 
 export const metadata = {
   title: "Deposit Detail",
-  description: "Read-only Stripe payout settlement detail",
+  description: "Review the online payments, fees, net amount, and payout timing behind this deposit group.",
 };
 
 function formatUsdCents(value: number) {
@@ -118,7 +118,7 @@ export default async function DepositDetailPage({
         businessName={internalBusinessIdentity.display_name}
         title="Deposit Detail"
         description="Review the online payments, fees, net amount, and payout timing behind this deposit group."
-        countSummary={detail.found ? `${detail.rows.length} settlement rows in ${detail.payoutLabel}` : "Deposit group not found"}
+        countSummary={detail.found ? `${detail.rows.length} payments in ${detail.payoutLabel}` : "Deposit group not found"}
         truthNote="Deposits help explain how online payments become bank deposits. Your invoices and payment records stay unchanged."
       />
 
@@ -146,7 +146,7 @@ export default async function DepositDetailPage({
 
       {!detail.found ? (
         <section className="rounded-lg border border-slate-200 bg-white p-6 text-sm leading-6 text-slate-600 shadow-sm shadow-slate-950/5">
-          No settlement rows match this deposit group in your account. The page does not reveal whether the payout exists elsewhere.
+          No payments match this deposit group in your account. The page does not reveal whether the payout exists elsewhere.
         </section>
       ) : (
         <>
@@ -178,18 +178,18 @@ export default async function DepositDetailPage({
             <ReportStatCard
               label="Payments"
               value={detail.summary.paymentCount}
-              helperText="Payment-kind settlement rows included in this group."
+              helperText="Payments included in this group."
               tone="slate"
             />
             <ReportStatCard
               label="Unmatched / Needs Review"
               value={detail.summary.unmatchedNeedsReviewCount}
-              helperText="Settlement rows that need review before they can be fully matched."
+              helperText="Payments that need review before they can be fully matched."
               tone={detail.summary.unmatchedNeedsReviewCount > 0 ? "rose" : "slate"}
             />
           </ReportStatGrid>
 
-          <ReportTableShell note="Read-only settlement detail. No sync, export, refund, dispute, correction, or payment recording actions are available here.">
+          <ReportTableShell note="Read-only deposit detail. No sync, refund, dispute, correction, or payment recording actions are available here.">
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50/90">
                 <tr className={reportTableHeadClass}>

@@ -58,7 +58,7 @@ describe("failed payment reconciliation queue page wiring", () => {
 
   it("renders empty state when no items are open", () => {
     expect(queuePageSource).toContain("No failed payments need attention.");
-    expect(queuePageSource).toContain("Failed rows may still appear in the Payments Register as payment-event history.");
+    expect(queuePageSource).toContain("Failed attempts may still appear on Payments Received as payment history.");
   });
 
   it("does not expose retry actions", () => {
@@ -76,17 +76,17 @@ describe("failed payment reconciliation queue page wiring", () => {
     expect(queuePageSource).not.toContain("stripe");
   });
 
-  it("does not mutate payment/allocation/invoice/visit/next_due_date truth", () => {
+  it("does not mutate payment/allocation/invoice/visit/next_due_date records", () => {
     expect(queuePageSource).not.toContain("insert(");
     expect(queuePageSource).not.toContain("update(");
     expect(queuePageSource).not.toContain("upsert(");
     expect(queuePageSource).not.toContain("delete(");
-    expect(queuePageSource).toContain("No Stripe calls. No payment/allocation/invoice/visit/next_due_date mutations in this queue slice.");
+    expect(queuePageSource).toContain("This queue does not contact Stripe or change invoices, payments, visits, or follow-up dates.");
   });
 
   it("uses reports tab and labels this as reconciliation queue surface", () => {
     expect(queuePageSource).toContain('ReportCenterTabs current="failed-payments"');
-    expect(queuePageSource).toContain("Failed Payment Reconciliation");
+    expect(queuePageSource).toContain("Failed Payments");
     expect(queuePageSource).toContain("Failed Payments shows failed attempts needing review.");
   });
 });

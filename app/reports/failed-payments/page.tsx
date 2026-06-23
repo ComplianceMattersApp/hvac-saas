@@ -17,8 +17,8 @@ import {
 } from "@/components/reports/ReportLedgerChrome";
 
 export const metadata = {
-  title: "Failed Payment Reconciliation",
-  description: "Read-only queue for unresolved failed payment reconciliation attention",
+  title: "Failed Payments",
+  description: "Failed payment attempts that need review before anyone retries or contacts the customer.",
 };
 
 function formatUsdFromCents(cents: number | null | undefined) {
@@ -111,21 +111,21 @@ export default async function FailedPaymentReconciliationPage() {
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Failed Payment Reconciliation"
+        title="Failed Payments"
         description="Failed attempts are not collected payments. Review the invoice workspace before retrying or contacting the customer."
         countSummary={`Open failed payments: ${queue.summary.openCount}`}
-        truthNote="Attention queue truth is tenant_saved_method_payment_attempts. Payment-event truth remains internal_invoice_payments and allocation truth remains internal_invoice_payment_allocations."
+        truthNote="This queue is for attention only. Failed attempts do not count as money received."
       />
 
       <ReportCenterTabs current="failed-payments" />
 
       <section className="rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-600">
-        Failed Payments shows failed attempts needing review. Payments Register shows collected payment truth. Confirm Payment shows reported payments awaiting verification.
+        Failed Payments shows failed attempts needing review. Payments Received shows money already recorded. Confirm Payment shows reported payments awaiting verification.
       </section>
 
       <ReportStatGrid>
         <ReportStatCard label="Open failed payments" value={queue.summary.openCount} helperText="Unresolved scheduled autopay failures needing operator review." tone="rose" />
-        <ReportStatCard label="Balance at risk" value={formatUsdFromCents(queue.summary.totalBalanceDueCents)} helperText="Balance due from collected-payment truth projection only." tone="blue" />
+        <ReportStatCard label="Balance at risk" value={formatUsdFromCents(queue.summary.totalBalanceDueCents)} helperText="Balance due from invoice and payment records." tone="blue" />
         <ReportStatCard label="Declined" value={queue.summary.declinedCount} helperText="Decline failures awaiting human review." tone="rose" />
         <ReportStatCard label="Requires action" value={queue.summary.requiresActionCount} helperText="Authentication/customer action required failures." tone="blue" />
         <ReportStatCard label="Blocked/precondition" value={queue.summary.blockedPreconditionCount} helperText="Setup/precondition blockers preventing collection attempts." tone="slate" />
@@ -144,16 +144,16 @@ export default async function FailedPaymentReconciliationPage() {
           </div>
         </div>
         <div className="mt-1 text-xs text-slate-600">
-          This queue is unresolved attempt/attention truth, not full payment-event history.
+          This queue shows unresolved failed attempts, not full payment history.
         </div>
       </section>
 
-      <ReportTableShell note="Queue actions are read-only. Use invoice workspace links for investigation; payment/register flows remain the source-of-truth workflows.">
+      <ReportTableShell note="Queue actions are read-only. Use invoice workspace links for investigation; payment history stays on Payments Received.">
         {items.length === 0 ? (
           <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm text-slate-600">
             <div className="font-semibold text-slate-900">No failed payments need attention.</div>
             <div className="mt-1">
-              Failed rows may still appear in the Payments Register as payment-event history.
+              Failed attempts may still appear on Payments Received as payment history.
             </div>
           </div>
         ) : (
@@ -209,7 +209,7 @@ export default async function FailedPaymentReconciliationPage() {
       </ReportTableShell>
 
       <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 shadow-sm shadow-slate-950/5">
-        No Stripe calls. No payment/allocation/invoice/visit/next_due_date mutations in this queue slice.
+        This queue does not contact Stripe or change invoices, payments, visits, or follow-up dates.
       </section>
     </div>
   );

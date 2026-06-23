@@ -32,8 +32,8 @@ import {
 } from "@/lib/reports/closeout-follow-up-ledger";
 
 export const metadata = {
-  title: "Closeout Report",
-  description: "Internal closeout report",
+  title: "Closeout Follow-up",
+  description: "Find completed work that still needs paperwork, invoice action, or final review.",
 };
 
 function booleanPill(value: boolean, trueLabel: string) {
@@ -104,46 +104,46 @@ export default async function CloseoutFollowUpLedgerPage({
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Closeout report"
-        description="Admin follow-up ledger for field-complete work, paperwork needs, invoice follow-up, closeout ownership, and aging risk."
-        countSummary={`Showing ${ledger.rows.length} of ${ledger.totalCount} visit rows`}
-        truncatedNote={ledger.truncated ? `Page view is capped at ${CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT} rows. Export includes up to ${CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT} rows.` : null}
-        truthNote="Closeout rows are operational follow-up truth. They do not convert visits into invoice, payment, or service case truth."
+        title="Closeout follow-up"
+        description="Find completed work that still needs paperwork, invoice action, or final review."
+        countSummary={`Showing ${ledger.rows.length} of ${ledger.totalCount} closeout items`}
+        truncatedNote={ledger.truncated ? `Page view is capped at ${CLOSEOUT_FOLLOW_UP_LEDGER_PAGE_LIMIT} items. Export includes up to ${CLOSEOUT_FOLLOW_UP_LEDGER_EXPORT_LIMIT} items.` : null}
+        truthNote="Use this page to clear follow-up. Open the job to finish paperwork, invoicing, or closeout steps."
       />
 
       <ReportCenterTabs current="closeout" />
 
       <ReportStatGrid>
-        <ReportStatCard label="Visible rows" value={ledger.rows.length} helperText="Rows currently rendered with the active filters." />
-        <ReportStatCard label="Closeout visible" value={closeoutVisible} helperText="Visible visits still in closeout follow-up." tone="rose" />
-        <ReportStatCard label="Invoice needed" value={invoiceVisible} helperText="Visible visits still waiting on invoice action." tone="blue" />
-        <ReportStatCard label="Aging 7+ days" value={agingSevenPlusVisible} helperText="Visible follow-up rows with seven or more aging days." tone="rose" />
-        <ReportStatCard label="Paperwork needed" value={paperworkVisible} helperText="Visible visits still showing paperwork requirements." />
+        <ReportStatCard label="Items shown" value={ledger.rows.length} helperText="Closeout items currently shown with the active filters." />
+        <ReportStatCard label="Needs final review" value={closeoutVisible} helperText="Jobs still in closeout follow-up." tone="rose" />
+        <ReportStatCard label="Needs invoice" value={invoiceVisible} helperText="Jobs still waiting on invoice action." tone="blue" />
+        <ReportStatCard label="7+ days waiting" value={agingSevenPlusVisible} helperText="Follow-up items waiting seven days or more." tone="rose" />
+        <ReportStatCard label="Needs paperwork" value={paperworkVisible} helperText="Jobs still showing paperwork requirements." />
       </ReportStatGrid>
 
       <ReportFilterPanel
-        title="Filter closeout rows"
-        description="Use the closeout, paperwork, invoice, assignee, contractor, status, scope, and date controls to find admin follow-up work."
+        title="Find closeout work"
+        description="Narrow the list by closeout need, paperwork, invoice status, contractor, team member, date, or status."
       >
         <form action="/reports/closeout" method="get" className="space-y-3">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[auto_auto_auto_1fr_0.9fr_0.9fr_0.9fr]">
             <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 xl:mt-6">
               <input type="checkbox" name="closeout_only" value="1" defaultChecked={filters.closeoutOnly} className={reportCheckboxClass} />
-              <span>Closeout queue only</span>
+              <span>Needs final review only</span>
             </label>
 
             <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 xl:mt-6">
               <input type="checkbox" name="paperwork_only" value="1" defaultChecked={filters.paperworkOnly} className={reportCheckboxClass} />
-              <span>Paperwork required</span>
+              <span>Needs paperwork</span>
             </label>
 
             <label className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 xl:mt-6">
               <input type="checkbox" name="invoice_only" value="1" defaultChecked={filters.invoiceOnly} className={reportCheckboxClass} />
-              <span>Invoice required</span>
+              <span>Needs invoice</span>
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className={reportLabelClass}>Ops status</span>
+              <span className={reportLabelClass}>Status</span>
               <select name="ops_status" defaultValue={filters.opsStatus} className={reportControlClass}>
                 <option value="">All statuses</option>
                 {CLOSEOUT_FOLLOW_UP_LEDGER_OPS_STATUS_OPTIONS.map((option) => (
@@ -185,7 +185,7 @@ export default async function CloseoutFollowUpLedgerPage({
               </label>
 
               <label className="grid gap-1 text-sm text-slate-700">
-                <span className={reportLabelClass}>Assigned tech</span>
+                <span className={reportLabelClass}>Assigned team</span>
                 <select name="assignee" defaultValue={filters.assigneeUserId} className={reportControlClass}>
                   <option value="">All assignees</option>
                   {filterOptions.assignees.map((assignee) => (
@@ -226,30 +226,30 @@ export default async function CloseoutFollowUpLedgerPage({
             </div>
           </div>
         </form>
-        <p className="text-xs leading-5 text-slate-600">Scope controls whether you are viewing active backlog, historical, or all closeout rows. Date field controls which closeout milestone date the From/To range filters.</p>
+        <p className="text-xs leading-5 text-slate-600">Scope controls whether you are viewing active backlog, historical, or all closeout work. Date field controls which closeout milestone date the From/To range filters.</p>
       </ReportFilterPanel>
 
-      <ReportTableShell note="Scan left to right: visit identity and assignment first, then closeout blockers, follow-up ownership, and aging.">
+      <ReportTableShell note="Start with the job, then check what is blocking closeout and how long it has been waiting.">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50/90">
               <tr className={reportTableHeadClass}>
-                <th className="px-3 py-3">Job Ref</th>
+                <th className="px-3 py-3">Job</th>
                 <th className="px-3 py-3">Visit</th>
                 <th className="px-3 py-3">Type</th>
                 <th className="px-3 py-3">Customer</th>
                 <th className="px-3 py-3">Location</th>
                 <th className="px-3 py-3">Contractor</th>
-                <th className="px-3 py-3">Assigned Tech</th>
-                <th className="px-3 py-3">Ops Status</th>
-                <th className="px-3 py-3">Lifecycle Status</th>
-                <th className="px-3 py-3">Service Case</th>
+                <th className="px-3 py-3">Assigned team</th>
+                <th className="px-3 py-3">Status</th>
+                <th className="px-3 py-3">Stage</th>
+                <th className="px-3 py-3">Work History</th>
                 <th className="px-3 py-3">Scheduled</th>
-                <th className="px-3 py-3">Field Complete</th>
+                <th className="px-3 py-3">Completed</th>
                 <th className="px-3 py-3">Follow-up</th>
                 <th className="px-3 py-3">Paperwork</th>
-                <th className="px-3 py-3">Invoice Needed</th>
-                <th className="px-3 py-3">Closeout Needed</th>
-                <th className="px-3 py-3">Aging</th>
+                <th className="px-3 py-3">Invoice</th>
+                <th className="px-3 py-3">Closeout</th>
+                <th className="px-3 py-3">Days waiting</th>
               </tr>
             </thead>
             <tbody>
@@ -257,8 +257,8 @@ export default async function CloseoutFollowUpLedgerPage({
                 <tr>
                   <td colSpan={17} className="px-4 py-12 text-center text-sm text-slate-500">
                     <div className="mx-auto max-w-md space-y-2">
-                      <div className="font-semibold text-slate-700">No closeout rows match the current filters</div>
-                      <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing one of the closeout filters.</div>
+                      <div className="font-semibold text-slate-700">No closeout work found</div>
+                      <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing a filter.</div>
                     </div>
                   </td>
                 </tr>

@@ -33,8 +33,8 @@ import {
 } from "@/lib/reports/payments-register";
 
 export const metadata = {
-  title: "Payments Register",
-  description: "Read-only internal payments register from invoice payment truth",
+  title: "Payments Received",
+  description: "Payments recorded in the app, with failed attempts kept separate.",
 };
 
 export default async function PaymentsRegisterPage({
@@ -132,25 +132,25 @@ export default async function PaymentsRegisterPage({
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Payments Register"
-        description="Read-only register view over current invoice-bound payment truth. Recorded and failed payment attempts are shown as separate lanes."
-        countSummary={usesInternalInvoicing ? `Showing ${register.rows.length} of ${register.totalCount} payment rows` : "External billing mode"}
-        truncatedNote={usesInternalInvoicing && register.truncated ? `Page view is capped at ${PAYMENTS_REGISTER_PAGE_LIMIT} rows.` : null}
-        truthNote="Current source of truth is internal_invoice_payments. This slice is read-only and does not add payment mutations or allocation behavior."
+        title="Payments received"
+        description="Payments recorded in the app, with failed attempts kept separate."
+        countSummary={usesInternalInvoicing ? `Showing ${register.rows.length} of ${register.totalCount} payments` : "External billing mode"}
+        truncatedNote={usesInternalInvoicing && register.truncated ? `Page view is capped at ${PAYMENTS_REGISTER_PAGE_LIMIT} payments.` : null}
+        truthNote="This page is view-only. Failed attempts do not count as money received."
       />
 
       <ReportCenterTabs current="payments" showDeposits />
 
       <section className="rounded-lg border border-slate-200 bg-slate-50/70 px-4 py-2.5 text-xs text-slate-600">
-        Payments Register shows collected payment truth. Confirm Payment shows reported payments awaiting verification. Failed Payments shows failed attempts needing review.
+        Open Invoices shows who still owes money. Payments Received shows money already recorded. Confirm Payment is for field-reported payments that still need review.
       </section>
 
       {!usesInternalInvoicing ? (
         <section className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm shadow-slate-950/5">
           <div className="max-w-2xl space-y-3">
-            <h2 className="text-lg font-semibold text-slate-950">No payments register in this billing mode</h2>
+            <h2 className="text-lg font-semibold text-slate-950">No app payments to show</h2>
             <p className="text-sm leading-6 text-slate-600">
-              This company is configured for external billing. The register only shows rows from internal invoice payment truth and stays empty outside internal invoicing mode.
+              This account tracks billing outside the app, so payment history is not recorded here.
             </p>
           </div>
         </section>
@@ -169,31 +169,31 @@ export default async function PaymentsRegisterPage({
               helperText="Recorded payments only. Rolling 30-day snapshot; not filter-dependent."
               tone="blue"
             />
-            <ReportStatCard label="Recorded total" value={totalRecordedDisplay} helperText="Sum of visible recorded rows only." tone="blue" />
+            <ReportStatCard label="Total shown" value={totalRecordedDisplay} helperText="Sum of payments shown in the current view." tone="blue" />
             <ReportStatCard
               label="Failed attempts"
               value={viewSnapshot.failedAttemptsCount}
-              helperText="Failed rows in current view/filter window; never counted as collected money."
+              helperText="Failed attempts in the current view; never counted as collected money."
               tone="rose"
             />
             <ReportStatCard
-              label="Recent payments"
-              value={`${viewSnapshot.recentRecordedCount} rows`}
-              helperText={`Latest collected payments in the current view, up to 10 (${viewSnapshot.recentRecordedAmountDisplay}).`}
+              label="Recent received"
+              value={`${viewSnapshot.recentRecordedCount} payments`}
+              helperText={`Latest received payments in the current view, up to 10 (${viewSnapshot.recentRecordedAmountDisplay}).`}
               tone="slate"
             />
             <ReportStatCard
-              label="Method mix"
+              label="Payment methods"
               value={recordedRows.length}
-              helperText={`Recorded totals in current view by taxonomy: ${methodMixSummary}`}
+              helperText={`Received totals in current view by method: ${methodMixSummary}`}
               tone="slate"
             />
             <ReportStatCard label="Payments shown" value={register.rows.length} helperText="Payments matching the current filters." />
           </ReportStatGrid>
 
           <ReportFilterPanel
-            title="Filter payments register"
-            description="Narrow by payment status, method taxonomy, paid date range, or quick text search."
+            title="Find payments"
+            description="Narrow by payment status, method, paid date, invoice, customer, job, or reference."
           >
             <form action="/reports/payments" method="get" className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
               <label className="grid gap-1 text-sm text-slate-700">
@@ -251,14 +251,14 @@ export default async function PaymentsRegisterPage({
             </form>
           </ReportFilterPanel>
 
-          <ReportTableShell note="Recorded payments and failed attempts are intentionally separated so failed rows never look like collected money.">
+          <ReportTableShell note="Recorded payments are money received. Failed attempts are shown separately and do not count as collected.">
             <div className="space-y-6">
               <section>
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Recorded payments</h3>
+                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Money received</h3>
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-50/90">
                     <tr className={reportTableHeadClass}>
-                      <th className="px-3 py-3">Paid Date</th>
+                      <th className="px-3 py-3">Date paid</th>
                       <th className="px-3 py-3">Amount</th>
                       <th className="px-3 py-3">Method</th>
                       <th className="px-3 py-3">Customer</th>
@@ -271,7 +271,7 @@ export default async function PaymentsRegisterPage({
                   <tbody>
                     {recordedRows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">No recorded payments match current filters.</td>
+                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">No payments found. Try widening the date range or clearing a filter.</td>
                       </tr>
                     ) : (
                       recordedRows.map((row) => (
@@ -292,11 +292,11 @@ export default async function PaymentsRegisterPage({
               </section>
 
               <section>
-                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Failed attempts</h3>
+                <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Failed payment attempts</h3>
                 <table className="min-w-full text-sm">
                   <thead className="bg-slate-50/90">
                     <tr className={reportTableHeadClass}>
-                      <th className="px-3 py-3">Attempt Date</th>
+                      <th className="px-3 py-3">Attempt date</th>
                       <th className="px-3 py-3">Amount</th>
                       <th className="px-3 py-3">Method</th>
                       <th className="px-3 py-3">Customer</th>
@@ -309,7 +309,7 @@ export default async function PaymentsRegisterPage({
                   <tbody>
                     {failedRows.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">No failed attempts match current filters.</td>
+                        <td colSpan={8} className="px-4 py-8 text-center text-sm text-slate-500">No failed attempts found. Try widening the date range or clearing a filter.</td>
                       </tr>
                     ) : (
                       failedRows.map((row) => (
@@ -331,7 +331,7 @@ export default async function PaymentsRegisterPage({
 
               {otherRows.length > 0 ? (
                 <section>
-                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Other payment states</h3>
+                  <h3 className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-600">Other payment records</h3>
                   <table className="min-w-full text-sm">
                     <thead className="bg-slate-50/90">
                       <tr className={reportTableHeadClass}>

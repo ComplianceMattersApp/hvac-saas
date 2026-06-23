@@ -32,8 +32,8 @@ import {
 } from "@/lib/reports/service-case-continuity";
 
 export const metadata = {
-  title: "Service Cases Report",
-  description: "Internal service cases report",
+  title: "Work History",
+  description: "Follow repeat visits, callbacks, open follow-up, and resolved work.",
 };
 
 export default async function ServiceCaseContinuityPage({
@@ -90,31 +90,31 @@ export default async function ServiceCaseContinuityPage({
     <div className={reportPageClass}>
       <ReportPageHeader
         businessName={internalBusinessIdentity.display_name}
-        title="Service cases report"
-        description="Continuity ledger for callbacks, repeat visits, unresolved cases, and case resolution history."
-        countSummary={`Showing ${ledger.rows.length} of ${ledger.totalCount} service cases`}
-        truncatedNote={ledger.truncated ? `Page view is capped at ${SERVICE_CASE_CONTINUITY_PAGE_LIMIT} rows. Export includes up to ${SERVICE_CASE_CONTINUITY_EXPORT_LIMIT} rows.` : null}
-        truthNote="Service case rows come from continuity records and linked jobs. This report does not turn linked visits into invoice or payment truth."
+        title="Work History"
+        description="Follow repeat visits, callbacks, open follow-up, and resolved work."
+        countSummary={`Showing ${ledger.rows.length} of ${ledger.totalCount} work history items`}
+        truncatedNote={ledger.truncated ? `Page view is capped at ${SERVICE_CASE_CONTINUITY_PAGE_LIMIT} items. Export includes up to ${SERVICE_CASE_CONTINUITY_EXPORT_LIMIT} items.` : null}
+        truthNote="Use this page to review repeat work and unresolved follow-up. Open a linked job to update scheduling, closeout, or billing details."
       />
 
       <ReportCenterTabs current="service-cases" />
 
       <ReportStatGrid>
-        <ReportStatCard label="Visible cases" value={ledger.rows.length} helperText="Cases currently rendered with the active filters." />
-        <ReportStatCard label="Total matches" value={ledger.totalCount} helperText="All matching service cases before the page cap." tone="blue" />
-        <ReportStatCard label="Open visible" value={openVisible} helperText="Visible cases that still need a continuity outcome." tone="rose" />
-        <ReportStatCard label="Active linked visits" value={activeLinkedVisible} helperText="Open linked visits across the visible service cases." tone="emerald" />
-        <ReportStatCard label="Repeat visible" value={repeatVisible} helperText="Visible cases with more than one linked visit." />
+        <ReportStatCard label="Items shown" value={ledger.rows.length} helperText="Work history items currently shown with the active filters." />
+        <ReportStatCard label="Total matching items" value={ledger.totalCount} helperText="All matching work history items before the page cap." tone="blue" />
+        <ReportStatCard label="Open follow-up" value={openVisible} helperText="Items that still need an outcome." tone="rose" />
+        <ReportStatCard label="Active linked jobs" value={activeLinkedVisible} helperText="Open linked jobs across the visible work history." tone="emerald" />
+        <ReportStatCard label="Repeat work" value={repeatVisible} helperText="Items with more than one linked visit." />
       </ReportStatGrid>
 
       <ReportFilterPanel
-        title="Filter service cases"
-        description="Narrow continuity work by status, case kind, repeat-visit state, contractor, date field, and sort order."
+        title="Find work history"
+        description="Narrow by status, issue type, repeat-visit state, contractor, date field, and sort order."
       >
         <form action="/reports/service-cases" method="get" className="space-y-3">
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-[1fr_1fr_0.85fr_0.9fr_0.9fr_auto]">
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className={reportLabelClass}>Case status</span>
+              <span className={reportLabelClass}>Status</span>
               <select name="case_status" defaultValue={filters.caseStatus} className={reportControlClass}>
                 <option value="">All statuses</option>
                 {SERVICE_CASE_CONTINUITY_STATUS_OPTIONS.map((option) => (
@@ -124,7 +124,7 @@ export default async function ServiceCaseContinuityPage({
             </label>
 
             <label className="grid gap-1 text-sm text-slate-700">
-              <span className={reportLabelClass}>Case kind</span>
+              <span className={reportLabelClass}>Issue type</span>
               <select name="case_kind" defaultValue={filters.caseKind} className={reportControlClass}>
                 <option value="">All kinds</option>
                 {SERVICE_CASE_CONTINUITY_KIND_OPTIONS.map((option) => (
@@ -199,15 +199,15 @@ export default async function ServiceCaseContinuityPage({
           </div>
           </div>
         </form>
-        <p className="text-xs leading-5 text-slate-600">Case status, kind, and repeat toggles define the scope of cases shown. Date field controls whether the From/To range applies to case creation or case resolution dates.</p>
+        <p className="text-xs leading-5 text-slate-600">Status, issue type, and repeat toggles define the work shown. Date field controls whether the From/To range applies to creation or resolution dates.</p>
       </ReportFilterPanel>
 
-      <ReportTableShell note="Scan left to right: case identity and status first, then customer/location, latest contractor, resolution, and linked-visit pressure.">
+      <ReportTableShell note="Start with status and customer, then check the latest contractor, resolution, and linked-job pressure.">
           <table className="min-w-full text-sm">
             <thead className="bg-slate-50/90">
               <tr className={reportTableHeadClass}>
-                <th className="px-3 py-3">Case Ref</th>
-                <th className="px-3 py-3">Case Summary</th>
+                <th className="px-3 py-3">Work Ref</th>
+                <th className="px-3 py-3">Summary</th>
                 <th className="px-3 py-3">Kind</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Customer</th>
@@ -215,12 +215,12 @@ export default async function ServiceCaseContinuityPage({
                 <th className="px-3 py-3">Latest Contractor</th>
                 <th className="px-3 py-3">Created</th>
                 <th className="px-3 py-3">Resolved</th>
-                <th className="px-3 py-3">Resolved By Job</th>
+                <th className="px-3 py-3">Resolved by job</th>
                 <th className="px-3 py-3">Visit Count</th>
                 <th className="px-3 py-3">Latest Visit</th>
-                <th className="px-3 py-3">Latest Visit Ops</th>
-                <th className="px-3 py-3">Latest Assigned Tech</th>
-                <th className="px-3 py-3">Open Linked Visits</th>
+                <th className="px-3 py-3">Latest status</th>
+                <th className="px-3 py-3">Latest assigned team</th>
+                <th className="px-3 py-3">Open linked visits</th>
               </tr>
             </thead>
             <tbody>
@@ -228,8 +228,8 @@ export default async function ServiceCaseContinuityPage({
                 <tr>
                   <td colSpan={15} className="px-4 py-12 text-center text-sm text-slate-500">
                     <div className="mx-auto max-w-md space-y-2">
-                      <div className="font-semibold text-slate-700">No service cases match the current filters</div>
-                      <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing one of the case filters.</div>
+                      <div className="font-semibold text-slate-700">No work history found</div>
+                      <div className="text-xs leading-5 text-slate-500">Try widening the date range or clearing a filter.</div>
                     </div>
                   </td>
                 </tr>

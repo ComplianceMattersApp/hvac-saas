@@ -37,20 +37,20 @@ describe("deposits report page wiring", () => {
     }
 
     expect(depositsPageSource).toContain(
-      "Track how online invoice payments become bank deposits, including fees, net deposits, payout timing, and exportable records.",
+      "Review online payment deposits, fees, net amounts, payout timing, and exportable records.",
     );
     expect(depositsPageSource).toContain(
       "Deposits help you see how online payments turn into bank deposits, including Stripe fees, net amounts, and payout timing.",
     );
     expect(depositsPageSource).toContain("Your invoices and payment records stay unchanged.");
-    expect(depositsPageSource).toContain("Online payments included in this deposits report.");
+    expect(depositsPageSource).toContain("Online payments included in this report.");
     expect(depositsPageSource).toContain("Stripe fees, platform fees when present, and settlement adjustments.");
     expect(depositsPageSource).toContain(
       "Estimated amount moving toward bank deposit after fees and adjustments.",
     );
     expect(depositsPageSource).toContain("Net amounts that have not been tied to a completed payout yet.");
     expect(depositsPageSource).toContain(
-      "Settlement rows that need review before they can be fully matched.",
+      "Payments that need review before they can be fully matched.",
     );
   });
 

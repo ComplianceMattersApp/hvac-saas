@@ -8,19 +8,19 @@ const paymentsPageSource = readFileSync(
 );
 
 describe("payments register page wiring", () => {
-  it("keeps register truth language focused on collected payment truth", () => {
-    expect(paymentsPageSource).toContain("Payments Register");
+  it("keeps payments received language focused on recorded money", () => {
+    expect(paymentsPageSource).toContain("Payments received");
     expect(paymentsPageSource).toContain(
-      "Current source of truth is internal_invoice_payments. This slice is read-only and does not add payment mutations or allocation behavior.",
+      "This page is view-only. Failed attempts do not count as money received.",
     );
     expect(paymentsPageSource).toContain(
-      "Payments Register shows collected payment truth. Confirm Payment shows reported payments awaiting verification. Failed Payments shows failed attempts needing review.",
+      "Open Invoices shows who still owes money. Payments Received shows money already recorded. Confirm Payment is for field-reported payments that still need review.",
     );
   });
 
   it("keeps recorded and failed lanes split", () => {
-    expect(paymentsPageSource).toContain("Recorded payments");
-    expect(paymentsPageSource).toContain("Failed attempts");
-    expect(paymentsPageSource).toContain("Other payment states");
+    expect(paymentsPageSource).toContain("Money received");
+    expect(paymentsPageSource).toContain("Failed payment attempts");
+    expect(paymentsPageSource).toContain("Other payment records");
   });
 });

@@ -21,6 +21,8 @@ const emptyInvoiceLedger = {
     totalArDisplay: "$0.00",
     partialOpenCount: 0,
     unpaidOpenCount: 0,
+    oldestOpenInvoiceDaysOpen: null,
+    oldestOpenInvoiceDaysOpenDisplay: "-",
     oldestOpenInvoiceDateDisplay: "-",
   },
 };
