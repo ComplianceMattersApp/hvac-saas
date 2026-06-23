@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ensureContractorMembershipFromInvite } from "@/lib/actions/contractor-acceptance-actions";
 import { resolveSetPasswordDestinationWithFirstOwnerGate } from "@/lib/auth/first-owner-routing";
+import { isInviteSetPasswordMode, shouldShowExpiredInviteRecovery } from "@/lib/auth/invite-link-recovery";
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -31,6 +32,7 @@ async function handoffRedirectAfterPasswordSet(
 export default function SetPasswordPage() {
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
+  const [inviteRecoveryState, setInviteRecoveryState] = useState<"expired" | null>(null);
 
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -43,6 +45,15 @@ export default function SetPasswordPage() {
     let isMounted = true;
 
     async function ensureSession() {
+      const search = window.location.search;
+      const isInviteMode = isInviteSetPasswordMode(search);
+
+      if (shouldShowExpiredInviteRecovery(search)) {
+        setInviteRecoveryState("expired");
+        setCheckingSession(false);
+        return;
+      }
+
       // Invite session hand-off can arrive slightly after initial hydration.
       // Retry getUser briefly before deciding session is missing.
       for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -61,6 +72,12 @@ export default function SetPasswordPage() {
       }
 
       if (!isMounted) return;
+      if (isInviteMode) {
+        setInviteRecoveryState("expired");
+        setCheckingSession(false);
+        return;
+      }
+
       router.replace("/login");
     }
 
@@ -160,6 +177,35 @@ export default function SetPasswordPage() {
       <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-950">
         <div className="w-full max-w-md rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-6 shadow-md text-sm text-gray-700 dark:text-gray-300">
           Validating invite session...
+        </div>
+      </div>
+    );
+  }
+
+  if (inviteRecoveryState === "expired") {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 dark:bg-gray-950">
+        <div className="w-full max-w-md rounded-2xl border border-amber-200 bg-white p-8 shadow-md dark:border-amber-900 dark:bg-gray-900">
+          <div className="space-y-2">
+            <div className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">EveryStep FieldWorks</div>
+            <div className="text-sm font-medium text-gray-500 dark:text-gray-400">by Compliance Matters</div>
+            <h1 className="pt-3 text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100">
+              Invite Link Expired
+            </h1>
+            <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
+              This invite link is expired, invalid, already used, or could not establish a secure invite session.
+            </p>
+            <p className="text-sm leading-6 text-gray-600 dark:text-gray-300">
+              Ask your administrator to resend the invite from People &amp; Access or the contractor profile.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => router.replace("/login")}
+            className="mt-6 w-full rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-medium text-gray-900 transition-colors hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-100 dark:hover:bg-gray-800"
+          >
+            Back to login
+          </button>
         </div>
       </div>
     );

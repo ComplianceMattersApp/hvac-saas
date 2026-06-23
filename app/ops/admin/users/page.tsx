@@ -144,6 +144,7 @@ const NOTICE_TEXT: Record<string, { tone: "success" | "warn" | "error"; message:
   invite_resent: { tone: "success", message: "Invite link resent successfully." },
   invite_failed: { tone: "error", message: "Invite email could not be sent. Please check email configuration and try again." },
   invite_not_pending: { tone: "warn", message: "That invite is no longer pending." },
+  invite_already_accepted: { tone: "warn", message: "That invite has already been accepted and cannot be resent." },
   recovery_sent: { tone: "success", message: "Account setup recovery email sent successfully." },
   password_reset_sent: { tone: "success", message: "Password reset email sent successfully." },
   password_reset_failed: { tone: "error", message: "Could not send password reset email. Verify reset redirect configuration and try again." },

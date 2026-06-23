@@ -9,7 +9,7 @@ type InviteRow = {
   owner_user_id: string;
   auth_user_id: string | null;
   email: string;
-  status: "pending" | "accepted";
+  status: "pending" | "accepted" | "expired";
   created_at: string;
 };
 
@@ -300,6 +300,42 @@ describe("contractor invite acceptance same-scope hardening", () => {
     await expect(ensureContractorMembershipFromInvite()).resolves.toEqual({
       isContractor: false,
       error: "INVITE_SCOPE_INVALID",
+    });
+
+    expect(fixture.contractorUserWrites).toHaveLength(0);
+    expect(fixture.contractorInviteWrites).toHaveLength(0);
+  });
+
+  it("does not mutate contractor access for expired invites", async () => {
+    const fixture = buildAdminFixture({
+      invites: [
+        {
+          id: "invite-1",
+          contractor_id: "contractor-1",
+          owner_user_id: "owner-1",
+          auth_user_id: "user-1",
+          email: "contractor@example.com",
+          status: "expired",
+          created_at: "2026-04-24T00:00:00.000Z",
+        },
+      ],
+      contractors: {
+        "contractor-1": {
+          id: "contractor-1",
+          owner_user_id: "owner-1",
+        },
+      },
+    });
+
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const { ensureContractorMembershipFromInvite } = await import(
+      "@/lib/actions/contractor-acceptance-actions"
+    );
+
+    await expect(ensureContractorMembershipFromInvite()).resolves.toEqual({
+      isContractor: false,
+      error: undefined,
     });
 
     expect(fixture.contractorUserWrites).toHaveLength(0);

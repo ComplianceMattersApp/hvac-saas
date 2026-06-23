@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
 import { resolvePostLoginDestination } from "@/lib/auth/post-login-destination";
+import { isInviteOrRecoveryCallbackError } from "@/lib/auth/invite-link-recovery";
 
 async function waitForSessionCommit(supabase: ReturnType<typeof createClient>) {
   for (let attempt = 0; attempt < 10; attempt += 1) {
@@ -59,6 +60,12 @@ export default function AuthCallbackPage() {
         const queryType = queryParams.get("type");
         const nextPath = queryParams.get("next");
 
+        if (isInviteOrRecoveryCallbackError(queryParams)) {
+          setStatus("This invite link is expired or invalid. Opening recovery instructions...");
+          router.push("/set-password?mode=invite&invite_state=expired");
+          return;
+        }
+
         // Determine flow type
         const hasHashTokens = !!(hashAccessToken && hashRefreshToken);
         const hasCodeFlow = !!code;
@@ -74,6 +81,11 @@ export default function AuthCallbackPage() {
           });
 
           if (sessionError) {
+            if (hashType === "invite" || hashType === "recovery") {
+              setStatus("This invite link is expired or invalid. Opening recovery instructions...");
+              router.push("/set-password?mode=invite&invite_state=expired");
+              return;
+            }
             setStatus("We could not complete sign-in. Redirecting to login...");
             setTimeout(() => router.push("/login"), 1500);
             return;
@@ -97,6 +109,11 @@ export default function AuthCallbackPage() {
           const { error: codeError } = await supabase.auth.exchangeCodeForSession(code);
 
           if (codeError) {
+            if (queryType === "invite" || queryType === "recovery") {
+              setStatus("This invite link is expired or invalid. Opening recovery instructions...");
+              router.push("/set-password?mode=invite&invite_state=expired");
+              return;
+            }
             setStatus("We could not complete sign-in. Redirecting to login...");
             setTimeout(() => router.push("/login"), 1500);
             return;
@@ -136,6 +153,11 @@ export default function AuthCallbackPage() {
           });
 
           if (otpError) {
+            if (queryType === "invite" || queryType === "recovery") {
+              setStatus("This invite link is expired or invalid. Opening recovery instructions...");
+              router.push("/set-password?mode=invite&invite_state=expired");
+              return;
+            }
             setStatus("We could not complete sign-in. Redirecting to login...");
             setTimeout(() => router.push("/login"), 1500);
             return;

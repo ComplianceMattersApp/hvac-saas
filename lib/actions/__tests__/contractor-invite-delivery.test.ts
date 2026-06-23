@@ -407,6 +407,37 @@ describe("contractor invite delivery", () => {
     expect(fixture.writes.contractorUserWrites).toBe(0);
   });
 
+  it("does not resend an accepted contractor invite through direct invite issuance", async () => {
+    const fixture = buildFixture({
+      existingInvites: [
+        {
+          id: "invite-1",
+          owner_user_id: "owner-1",
+          contractor_id: "contractor-1",
+          email: "target@example.com",
+          invited_by: "actor-1",
+          status: "accepted",
+          sent_count: 1,
+          last_sent_at: "2026-06-20T12:00:00.000Z",
+          auth_user_id: "auth-user-1",
+          created_at: "2026-06-20T12:00:00.000Z",
+        },
+      ],
+    });
+    createClientMock.mockResolvedValue(fixture.supabase);
+    createAdminClientMock.mockReturnValue(fixture.admin);
+
+    const mod = await import("@/lib/actions/contractor-invite-actions");
+    await expect(mod.inviteContractor({ contractorId: "contractor-1", email: "target@example.com" })).rejects.toThrow(
+      "CONTRACTOR_INVITE_ALREADY_ACCEPTED",
+    );
+
+    expect(sendInviteEmailMock).not.toHaveBeenCalled();
+    expect(fixture.writes.inviteUpserts).toBe(0);
+    expect(fixture.writes.inviteUpdates).toHaveLength(0);
+    expect(fixture.writes.contractorUserWrites).toBe(0);
+  });
+
   it("blocks cross-account contractor resend before email side effects", async () => {
     const fixture = buildFixture({ contractorOwner: "owner-2" });
     createClientMock.mockResolvedValue(fixture.supabase);

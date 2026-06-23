@@ -138,11 +138,15 @@ export async function inviteContractor(args: {
 
   if (existingInviteErr) throw new Error(existingInviteErr.message);
 
+  if (existingInvite?.status === "accepted") {
+    throw new Error("CONTRACTOR_INVITE_ALREADY_ACCEPTED");
+  }
+
   if (args.requirePendingInvite && existingInvite?.status !== "pending") {
     throw new Error("CONTRACTOR_INVITE_NOT_PENDING");
   }
 
-  const nextInviteStatus = existingInvite?.status === "accepted" ? "accepted" : "pending";
+  const nextInviteStatus = "pending";
 
   // 2) Upsert invite row (status tracking + resend support)
   // We store one invite row per (owner, contractor, email). Resends just update it.

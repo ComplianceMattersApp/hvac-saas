@@ -312,6 +312,9 @@ export async function resendContractorInviteFromForm(formData: FormData): Promis
     if (error instanceof Error && error.message === "CONTRACTOR_INVITE_NOT_PENDING") {
       redirect(withNotice(returnTo, "invite_not_pending"));
     }
+    if (error instanceof Error && error.message === "CONTRACTOR_INVITE_ALREADY_ACCEPTED") {
+      redirect(withNotice(returnTo, "invite_already_accepted"));
+    }
 
     console.warn("admin-user-actions: contractor invite resend failed", {
       contractorId,
@@ -353,6 +356,10 @@ export async function inviteContractorUserFromForm(formData: FormData): Promise<
       email,
     });
   } catch (error) {
+    if (error instanceof Error && error.message === "CONTRACTOR_INVITE_ALREADY_ACCEPTED") {
+      redirect(withNotice(returnTo, "invite_already_accepted"));
+    }
+
     console.warn("admin-user-actions: contractor invite failed", {
       contractorId,
       email,
