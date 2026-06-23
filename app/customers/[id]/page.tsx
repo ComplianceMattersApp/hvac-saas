@@ -24,6 +24,11 @@ import {
   formatCustomerWorkFailureReason,
   formatCustomerWorkPersonName,
 } from "@/lib/customers/customer-work-display";
+import {
+  loadCustomerSystemsEquipmentSummary,
+  type CustomerEquipmentSummaryRow,
+  type CustomerEquipmentSourceJob,
+} from "@/lib/customers/customer-systems-equipment-read-model";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { listEstimatesByAccount, type EstimateListItem } from "@/lib/estimates/estimate-read";
 import { requireInternalUser, isInternalAccessError } from "@/lib/auth/internal-user";
@@ -76,6 +81,7 @@ import { listCustomerPaymentHistory, type CustomerPaymentHistoryRow } from "@/li
 import { canManageInvoiceLifecycle, canViewFinancialRegister } from "@/lib/auth/financial-access";
 import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";
 import { getActiveJobAssignmentDisplayMap, type ActiveJobAssignmentDisplay } from "@/lib/staffing/human-layer";
+import { equipmentRoleLabel, equipmentUsesRefrigerant, isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import PaymentHistoryCard from "./_components/PaymentHistoryCard";
 
 
@@ -218,6 +224,51 @@ function formatShortNote(value?: string | null, maxLength = 120) {
   if (!raw) return null;
   if (raw.length <= maxLength) return raw;
   return `${raw.slice(0, maxLength - 3).trimEnd()}...`;
+}
+
+function formatEquipmentNumber(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return raw;
+  return Number.isInteger(parsed) ? String(parsed) : String(parsed).replace(/\.?0+$/, "");
+}
+
+function formatEquipmentSourceJobLabel(job: CustomerEquipmentSourceJob) {
+  const reference = formatJobDisplayReference({
+    jobDisplayNumber: job.jobDisplayNumber,
+    jobId: job.id,
+  });
+  const title = normalizeRetestLinkedJobTitle(job.title) || "Job";
+  const date = formatDate(job.scheduledDate ?? job.createdAt);
+  return `${reference} | ${title} | ${date}`;
+}
+
+function equipmentDetailChips(eq: CustomerEquipmentSummaryRow) {
+  const rawRole = eq.equipmentRole || eq.componentType;
+  const chips = [
+    equipmentRoleLabel(rawRole),
+    eq.manufacturer ? `Manufacturer: ${eq.manufacturer}` : null,
+    eq.model ? `Model: ${eq.model}` : null,
+    eq.serial ? `Serial: ${eq.serial}` : null,
+  ];
+
+  if (rawRole && equipmentUsesRefrigerant(rawRole)) {
+    const tonnage = formatEquipmentNumber(eq.tonnage);
+    if (tonnage) chips.push(`Tonnage: ${tonnage}`);
+    if (eq.refrigerantType) chips.push(`Refrigerant: ${eq.refrigerantType}`);
+  }
+
+  if (rawRole && isHeatingOnlyEquipment(rawRole)) {
+    const heatingCapacity = formatEquipmentNumber(eq.heatingCapacityKbtu);
+    const heatingOutput = formatEquipmentNumber(eq.heatingOutputBtu);
+    const heatingEfficiency = formatEquipmentNumber(eq.heatingEfficiencyPercent);
+    if (heatingCapacity) chips.push(`Heating Input: ${heatingCapacity} KBTU/h`);
+    if (heatingOutput) chips.push(`Heating Output: ${heatingOutput} BTU/h`);
+    if (heatingEfficiency) chips.push(`Efficiency / AFUE: ${heatingEfficiency}%`);
+  }
+
+  return chips.filter(Boolean) as string[];
 }
 
 function readTemplateSnapshotString(snapshot: Record<string, unknown> | null, key: string) {
@@ -701,6 +752,18 @@ export default async function CustomerDetailPage(props: {
   const firstLocationWithAddress = locations.find((loc) => locationAddressLine(loc).trim().length > 0) ?? null;
   const serviceAddressFallback = describeServiceAddressFallback(firstLocationWithAddress);
   const activeJobs = jobs.filter((job) => isOperationallyActiveJob(job));
+  const systemsEquipmentSummary =
+    isInternalViewer && visibilityScope.kind === "internal"
+      ? await loadCustomerSystemsEquipmentSummary({
+          supabase,
+          accountOwnerUserId: visibilityScope.accountOwnerUserId,
+          customerId,
+        })
+      : {
+          locations: [],
+          totalSystemCount: 0,
+          totalEquipmentCount: 0,
+        };
 
   // Lightweight service-case awareness
   const serviceCaseIds = Array.from(
@@ -1108,6 +1171,7 @@ export default async function CustomerDetailPage(props: {
   const workspaceNavigationItems = [
     { id: "overview", label: "Overview" },
     { id: "work", label: "Work" },
+    { id: "systems-equipment", label: "Systems & Equipment" },
     { id: "money", label: "Money" },
     { id: "service-plans", label: "Service Plans" },
     { id: "locations-contacts", label: "Locations & Contacts" },
@@ -1980,9 +2044,9 @@ export default async function CustomerDetailPage(props: {
         <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <h2 className="text-lg font-semibold text-slate-900">Service Locations</h2>
+              <h2 className="text-lg font-semibold text-slate-900">Managed Locations</h2>
               <p className="text-sm text-slate-500">
-                Saved service addresses for this customer account.
+                Saved service addresses for this customer account. Add locations when this customer has more than one service address.
               </p>
             </div>
             {isInternalViewer ? (
@@ -2251,7 +2315,7 @@ export default async function CustomerDetailPage(props: {
                         {locId && isInternalViewer ? (
                           <details className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3">
                             <summary className="cursor-pointer text-sm font-semibold text-slate-900">
-                              Edit
+                              Edit Service Address
                             </summary>
                             <form action={updateLocationServiceAddressFromForm} className="mt-3 grid gap-3 sm:grid-cols-2">
                               <input type="hidden" name="location_id" value={locId} />
@@ -2350,6 +2414,151 @@ export default async function CustomerDetailPage(props: {
             </div>
           )}
         </section>
+        ) : null}
+
+        {activeWorkspaceTab === "systems-equipment" && isInternalViewer ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">Systems &amp; Equipment</h2>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  Read-only systems and equipment records captured from customer jobs.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-slate-600">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                  {systemsEquipmentSummary.totalSystemCount} system{systemsEquipmentSummary.totalSystemCount === 1 ? "" : "s"}
+                </span>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                  {systemsEquipmentSummary.totalEquipmentCount} equipment record{systemsEquipmentSummary.totalEquipmentCount === 1 ? "" : "s"}
+                </span>
+              </div>
+            </div>
+
+            {systemsEquipmentSummary.locations.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">
+                No systems or equipment records yet. Add equipment from a job when system details are captured.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {systemsEquipmentSummary.locations.map((location) => (
+                  <div key={location.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    <div className="border-b border-slate-200 bg-slate-50/80 px-4 py-3">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                        <div>
+                          <h3 className="text-sm font-semibold text-slate-900">{location.label}</h3>
+                          {location.address ? (
+                            <div className="mt-0.5 text-xs text-slate-500">{location.address}</div>
+                          ) : null}
+                        </div>
+                        <span className="inline-flex w-fit rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-medium text-slate-600">
+                          {location.systems.length} system{location.systems.length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="divide-y divide-slate-200">
+                      {location.systems.map((system) => (
+                        <div key={system.id} className="p-4">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <h4 className="text-sm font-semibold text-slate-900">{system.name}</h4>
+                              {system.sourceJob ? (
+                                <div className="mt-0.5 text-xs text-slate-500">
+                                  Latest source: {formatEquipmentSourceJobLabel(system.sourceJob)}
+                                </div>
+                              ) : null}
+                            </div>
+                            {system.sourceJob ? (
+                              <div className="flex flex-wrap gap-2">
+                                <Link
+                                  href={`/jobs/${system.sourceJob.id}/equipment`}
+                                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                                >
+                                  View Equipment
+                                </Link>
+                                <Link
+                                  href={`/jobs/${system.sourceJob.id}/info?f=equipment`}
+                                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                                >
+                                  Manage Equipment
+                                </Link>
+                                <Link
+                                  href={`/jobs/${system.sourceJob.id}`}
+                                  className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                                >
+                                  Open Job
+                                </Link>
+                              </div>
+                            ) : null}
+                          </div>
+
+                          {system.equipment.length === 0 ? (
+                            <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
+                              No equipment records under this system yet.
+                            </div>
+                          ) : (
+                            <div className="mt-3 space-y-2">
+                              {system.equipment.map((equipment) => {
+                                const chips = equipmentDetailChips(equipment);
+                                return (
+                                  <div key={equipment.id} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                                    <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                      <div className="min-w-0">
+                                        <div className="flex flex-wrap gap-1.5">
+                                          {chips.map((chip) => (
+                                            <span
+                                              key={chip}
+                                              className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-700"
+                                            >
+                                              {chip}
+                                            </span>
+                                          ))}
+                                        </div>
+                                        <div className="mt-2 text-xs text-slate-500">
+                                          Source: {formatEquipmentSourceJobLabel(equipment.sourceJob)}
+                                        </div>
+                                      </div>
+                                      <div className="flex shrink-0 flex-wrap gap-2">
+                                        <Link
+                                          href={`/jobs/${equipment.sourceJob.id}/equipment`}
+                                          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                                        >
+                                          View Equipment
+                                        </Link>
+                                        <Link
+                                          href={`/jobs/${equipment.sourceJob.id}/info?f=equipment`}
+                                          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                                        >
+                                          Manage Equipment
+                                        </Link>
+                                        <Link
+                                          href={`/jobs/${equipment.sourceJob.id}`}
+                                          className="inline-flex items-center rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                                        >
+                                          Open Job
+                                        </Link>
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        ) : null}
+
+        {activeWorkspaceTab === "systems-equipment" && !isInternalViewer ? (
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm text-slate-600 shadow-sm">
+            Systems and equipment records are not available for this viewer.
+          </section>
         ) : null}
 
         {/* Job history */}

@@ -25,6 +25,7 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Workspace Navigation");
     expect(customerPageSource).toContain("Overview");
     expect(customerPageSource).toContain("Work");
+    expect(customerPageSource).toContain("Systems & Equipment");
     expect(customerPageSource).toContain("Money");
     expect(customerPageSource).toContain("Service Plans");
     expect(customerPageSource).toContain("Locations & Contacts");
@@ -40,6 +41,7 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain(': "overview";');
     expect(customerPageSource).toContain('activeWorkspaceTab === "overview"');
     expect(customerPageSource).toContain('activeWorkspaceTab === "work"');
+    expect(customerPageSource).toContain('activeWorkspaceTab === "systems-equipment"');
     expect(customerPageSource).toContain('activeWorkspaceTab === "money"');
     expect(customerPageSource).toContain('activeWorkspaceTab === "service-plans"');
     expect(customerPageSource).toContain('activeWorkspaceTab === "locations-contacts"');
@@ -213,6 +215,35 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("Recent / Active Work");
     expect(customerPageSource).toContain("Edit Service Address");
     expect(customerPageSource).toContain("Site / Access Contact");
+  });
+
+  it("renders read-only Systems & Equipment profile section with grouped records and empty state", () => {
+    expect(customerPageSource).toContain("loadCustomerSystemsEquipmentSummary");
+    expect(customerPageSource).toContain("Systems &amp; Equipment");
+    expect(customerPageSource).toContain('activeWorkspaceTab === "systems-equipment" && isInternalViewer');
+    expect(customerPageSource).toContain("systemsEquipmentSummary.locations.map((location)");
+    expect(customerPageSource).toContain("location.systems.map((system)");
+    expect(customerPageSource).toContain("system.equipment.map((equipment)");
+    expect(customerPageSource).toContain("No systems or equipment records yet. Add equipment from a job when system details are captured.");
+  });
+
+  it("keeps customer profile equipment visibility navigational, not mutating", () => {
+    const systemsEquipmentTabSource =
+      customerPageSource.match(/activeWorkspaceTab === "systems-equipment"[\s\S]*?\/\* Job history \*\//)?.[0] ?? "";
+
+    expect(systemsEquipmentTabSource).toContain("View Equipment");
+    expect(systemsEquipmentTabSource).toContain("Manage Equipment");
+    expect(systemsEquipmentTabSource).toContain("Open Job");
+    expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}/equipment`}');
+    expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}/info?f=equipment`}');
+    expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}`}');
+    expect(systemsEquipmentTabSource).not.toContain("EquipmentCreateForm");
+    expect(systemsEquipmentTabSource).not.toContain("EquipmentEditCard");
+    expect(systemsEquipmentTabSource).not.toContain("addJobEquipmentFromForm");
+    expect(systemsEquipmentTabSource).not.toContain("updateJobEquipmentFromForm");
+    expect(systemsEquipmentTabSource).not.toContain("deleteJobEquipmentFromForm");
+    expect(systemsEquipmentTabSource).not.toContain("<form");
+    expect(systemsEquipmentTabSource).not.toContain("<button");
   });
 
   it("includes read-only billing periods inside maintenance agreement cards", () => {
