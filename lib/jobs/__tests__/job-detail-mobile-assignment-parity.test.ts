@@ -176,6 +176,20 @@ describe("mobile job detail assignment parity", () => {
     expect(fieldOpsBoard).not.toContain("mobileCustomerHref");
   });
 
+  it("styles the mobile Notes & Attachments attachment link as a blue action", () => {
+    const notesHubStart = pageSource.indexOf('id="mobile-notes-hub"');
+    const notesHubEnd = pageSource.indexOf('id="mobile-internal-notes"', notesHubStart);
+    const notesHub = pageSource.slice(notesHubStart, notesHubEnd);
+
+    expect(notesHubStart).toBeGreaterThan(-1);
+    expect(notesHubEnd).toBeGreaterThan(notesHubStart);
+    expect(notesHub).toContain('href={`/jobs/${job.id}/attachments`}');
+    expect(notesHub).toContain("rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white");
+    expect(notesHub).toContain("hover:bg-blue-800");
+    expect(notesHub).toContain("focus-visible:ring-2 focus-visible:ring-blue-300");
+    expect(notesHub).toContain("active:translate-y-[0.5px]");
+  });
+
   it("folds the mobile service address edit affordance into the address row", () => {
     const mobileHeaderStart = pageSource.indexOf("<h1");
     const mobileHeaderEnd = pageSource.indexOf('id="mobile-when-panel"', mobileHeaderStart);

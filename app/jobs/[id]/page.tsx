@@ -4684,7 +4684,7 @@ const failureResolutionPathCount =
               </div>
               <Link
                 href={`/jobs/${job.id}/attachments`}
-                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-900 shadow-[0_8px_18px_-22px_rgba(15,23,42,0.24)] transition-colors hover:border-blue-200 hover:bg-blue-50/35"
+                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-lg bg-blue-700 px-3 py-2 text-sm font-semibold text-white shadow-[0_12px_24px_-20px_rgba(37,99,235,0.55)] transition-[background-color,box-shadow,transform] hover:bg-blue-800 hover:shadow-[0_16px_28px_-20px_rgba(37,99,235,0.65)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-300 active:translate-y-[0.5px]"
               >
                 Attachments
               </Link>
