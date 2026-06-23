@@ -55,6 +55,8 @@ import {
   isTodayWithoutTechCandidateJob,
 } from "@/lib/ops/without-tech-predicate";
 import { countPendingContractorIntakeQueueRows } from "@/lib/ops/contractor-intake-queue";
+
+const OPEN_INVOICES_REPORT_HREF = "/reports/invoices?view=open";
 // -----------------------------------------------------------------------------
 // Public types
 // -----------------------------------------------------------------------------
@@ -964,13 +966,12 @@ async function safeLoadOpenInvoiceSnapshot(params: {
   supabase: any;
   accountOwnerUserId: string;
 }): Promise<{ count: number | null; balanceCents: number | null }> {
-  // internal_invoices.status is currently one of: draft | issued | void.
-  // "Open" means issued but not fully paid; balance is derived by subtracting
-  // recorded payments in internal_invoice_payments from invoice total_cents.
+  // Lightweight Today snapshot for Open Invoices V1: issued, non-void invoices
+  // with positive balance after recorded internal invoice payments only.
   try {
     const { data: invoices, error } = await params.supabase
       .from("internal_invoices")
-      .select("id, total_cents")
+      .select("id, total_cents, voided_at")
       .eq("account_owner_user_id", params.accountOwnerUserId)
       .eq("status", "issued")
       .limit(500);
@@ -984,6 +985,7 @@ async function safeLoadOpenInvoiceSnapshot(params: {
       .filter(Boolean);
     const totalsById = new Map<string, number>();
     for (const row of invoiceRows) {
+      if (String((row as any)?.voided_at ?? "").trim()) continue;
       const id = String((row as any)?.id ?? "").trim();
       if (!id) continue;
       totalsById.set(id, Number((row as any)?.total_cents ?? 0) || 0);
@@ -1096,7 +1098,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
         kind: "billing_money_stuck",
         headline: `${openInvoiceCount} open invoice${openInvoiceCount === 1 ? "" : "s"} awaiting payment`,
         detail: "Review open balances and follow up on the oldest first.",
-        primaryHref: "/reports/payments",
+        primaryHref: OPEN_INVOICES_REPORT_HREF,
         primaryLabel: "Review Open Invoices",
         focusKey: "open_invoices",
       };
@@ -1183,7 +1185,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       kind: "billing_money_stuck",
       headline: `${openInvoiceCount} open invoice${openInvoiceCount === 1 ? "" : "s"} need urgent payment follow-up`,
       detail: "High-value receivables need immediate billing action.",
-      primaryHref: "/reports/payments",
+      primaryHref: OPEN_INVOICES_REPORT_HREF,
       primaryLabel: "Review Open Invoices",
       focusKey: "open_invoices",
     };
@@ -1194,7 +1196,7 @@ export function selectNextBestAction(inputs: NextBestActionInputs): NextBestActi
       kind: "billing_money_stuck",
       headline: `${openInvoiceCount} open invoice${openInvoiceCount === 1 ? "" : "s"}`,
       detail: "Keep collections moving after operational priorities are handled.",
-      primaryHref: "/reports/payments",
+      primaryHref: OPEN_INVOICES_REPORT_HREF,
       primaryLabel: "Review Open Invoices",
       focusKey: "open_invoices",
     };
@@ -1309,7 +1311,7 @@ export function buildDailyBriefing(params: {
   }
 
   if ((params.openInvoiceCount ?? 0) > 0) {
-    return `${params.openInvoiceCount} open ${params.openInvoiceCount === 1 ? "invoice is" : "invoices are"} waiting in payments.`;
+    return `${params.openInvoiceCount} open ${params.openInvoiceCount === 1 ? "invoice is" : "invoices are"} awaiting payment follow-up.`;
   }
 
   return "Today is clear. No urgent queues need action right now.";
@@ -1411,11 +1413,11 @@ export function buildFollowUpGroups(params: {
   if (params.canViewBusinessPulse && (params.openInvoiceCount ?? 0) > 0) {
     groups.push({
       key: "payments",
-      label: "Payment Follow-Up",
+      label: "Open Invoice Follow-Up",
       count: params.openInvoiceCount ?? 0,
-      href: "/reports/payments",
+      href: OPEN_INVOICES_REPORT_HREF,
       preview: [],
-      summary: `${params.openInvoiceCount} open ${params.openInvoiceCount === 1 ? "invoice" : "invoices"} awaiting payment.`,
+      summary: `${params.openInvoiceCount} open ${params.openInvoiceCount === 1 ? "invoice" : "invoices"} awaiting payment follow-up.`,
     });
   }
 
@@ -1550,7 +1552,7 @@ export function buildPriorityChips(params: {
       key: "open_invoices",
       label: "Money: Open Invoices",
       count: params.openInvoiceCount ?? 0,
-      href: "/reports/payments",
+      href: OPEN_INVOICES_REPORT_HREF,
       tone: "info",
       urgent: false,
     });
@@ -1596,8 +1598,8 @@ function buildRoleAwarePulse(params: {
         params.openInvoiceBalanceCents != null
           ? formatCurrencyCents(params.openInvoiceBalanceCents)
           : null,
-      href: "/reports/payments",
-      context: "Financial attention",
+      href: OPEN_INVOICES_REPORT_HREF,
+      context: "Accounts receivable follow-up",
       tone: "info",
     });
   }

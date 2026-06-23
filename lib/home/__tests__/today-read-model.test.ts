@@ -164,6 +164,29 @@ describe("selectNextBestAction", () => {
     expect(result.kind).toBe("billing_money_stuck");
     expect(result.headline).toContain("7 open invoices");
     expect(result.primaryLabel).toBe("Review Open Invoices");
+    expect(result.primaryHref).toBe("/reports/invoices?view=open");
+  });
+
+  it("admin: sends urgent open invoice action to Open Invoices", () => {
+    const result = selectNextBestAction(nbaInput({
+      role: "admin",
+      openInvoiceCount: 6,
+      openInvoiceBalanceCents: 600000,
+    }));
+    expect(result.kind).toBe("billing_money_stuck");
+    expect(result.primaryLabel).toBe("Review Open Invoices");
+    expect(result.primaryHref).toBe("/reports/invoices?view=open");
+  });
+
+  it("admin: sends non-urgent open invoice action to Open Invoices after ops priorities", () => {
+    const result = selectNextBestAction(nbaInput({
+      role: "admin",
+      openInvoiceCount: 1,
+      openInvoiceBalanceCents: 10000,
+    }));
+    expect(result.kind).toBe("billing_money_stuck");
+    expect(result.primaryLabel).toBe("Review Open Invoices");
+    expect(result.primaryHref).toBe("/reports/invoices?view=open");
   });
 
   it("admin: keeps scheduling ahead of a normal small open invoice", () => {
@@ -225,7 +248,21 @@ describe("buildPriorityChips", () => {
       openInvoiceCount: 2,
       canViewBusinessPulse: true,
     });
-    expect(chips.find((c) => c.key === "open_invoices")?.count).toBe(2);
+    const openInvoices = chips.find((c) => c.key === "open_invoices");
+    expect(openInvoices?.count).toBe(2);
+    expect(openInvoices?.href).toBe("/reports/invoices?view=open");
+  });
+
+  it("does not expose open invoices chip to non-financial roles", () => {
+    const chips = buildPriorityChips({
+      productMode: "hybrid",
+      role: "office",
+      priorityCounts: baseCounts,
+      servicePlansOverdue: null,
+      openInvoiceCount: 2,
+      canViewBusinessPulse: false,
+    });
+    expect(chips.find((c) => c.key === "open_invoices")).toBeUndefined();
   });
 
   it("suppresses need-scheduling chip when it is the primary action focus", () => {
@@ -552,8 +589,10 @@ describe("buildFollowUpGroups", () => {
     expect(groups.find((g) => g.key === "scheduling")?.label).toBe("Needs Scheduling");
     expect(groups.find((g) => g.key === "closeout")?.count).toBe(4);
     expect(groups.find((g) => g.key === "closeout")?.label).toBe("Closeout & Review");
-    expect(groups.find((g) => g.key === "payments")?.count).toBe(1);
-    expect(groups.find((g) => g.key === "payments")?.label).toBe("Payment Follow-Up");
+    const openInvoiceGroup = groups.find((g) => g.key === "payments");
+    expect(openInvoiceGroup?.count).toBe(1);
+    expect(openInvoiceGroup?.label).toBe("Open Invoice Follow-Up");
+    expect(openInvoiceGroup?.href).toBe("/reports/invoices?view=open");
   });
 
   it("maps waiting, exceptions, and without-tech groups to the main Ops board", () => {

@@ -58,10 +58,12 @@ describe("today greeting polish", () => {
     expect(todayPageSource).toContain("action.detail");
   });
 
-  it("keeps business attention and link surfaces unchanged", () => {
-    expect(todayPageSource).toContain("/reports/failed-payments");
-    expect(todayPageSource).toContain("/reports/payments");
-    expect(todayPageSource).toContain("href=\"/service-plans\"");
+  it("keeps business attention and link surfaces wired through the read model", () => {
+    expect(todayReadModelSource).toContain("/reports/failed-payments");
+    expect(todayReadModelSource).toContain("/reports/payment-reconciliation");
+    expect(todayReadModelSource).toContain("/reports/invoices?view=open");
+    expect(todayReadModelSource).toContain("/reports/payments");
+    expect(todayReadModelSource).toContain("/service-plans");
     expect(todayReadModelSource).toContain("failedPaymentAttentionPromise");
     expect(todayReadModelSource).toContain("summarizeMaintenanceAgreementsForAccount");
   });

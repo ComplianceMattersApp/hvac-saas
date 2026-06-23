@@ -36,14 +36,23 @@ describe("today business attention wiring", () => {
     expect(todayReadModelSource).toContain("OPEN INVOICES");
     expect(todayReadModelSource).toContain("/reports/failed-payments");
     expect(todayReadModelSource).toContain("/reports/payment-reconciliation");
+    expect(todayReadModelSource).toContain('/reports/invoices?view=open');
     expect(todayReadModelSource).toContain("/reports/payments");
   });
 
   it("uses copy that distinguishes reported and failed attention from collected truth", () => {
     expect(todayReadModelSource).toContain("Reported, not collected truth");
     expect(todayReadModelSource).toContain("Failed attempt, not collected money");
+    expect(todayReadModelSource).toContain("Accounts receivable follow-up");
+    expect(todayReadModelSource).toContain("awaiting payment follow-up");
     expect(todayReadModelSource).toContain("reported");
     expect(todayPageSource).toContain("tile.context");
+  });
+
+  it("keeps the lightweight Today open-invoice snapshot aligned with Open Invoices V1", () => {
+    expect(todayReadModelSource).toContain("Lightweight Today snapshot for Open Invoices V1");
+    expect(todayReadModelSource).toContain('.select("id, total_cents, voided_at")');
+    expect(todayReadModelSource).toContain('status !== "recorded"');
   });
 
   it("does not expose retry, acknowledge, resolve, or customer-message actions", () => {
