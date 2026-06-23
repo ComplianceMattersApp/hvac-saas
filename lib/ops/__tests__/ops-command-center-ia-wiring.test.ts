@@ -37,6 +37,11 @@ const opsWorkspaceQueuesSource = readFileSync(
   "utf-8",
 );
 
+const contractorFocusSelectorSource = readFileSync(
+  resolve(__dirname, "../../../app/ops/_components/ContractorFocusSelector.tsx"),
+  "utf-8",
+);
+
 function assertFound(label: string, index: number) {
   expect(index, `${label} marker should exist in the Full Ops branch`).toBeGreaterThan(-1);
 }
@@ -62,18 +67,19 @@ describe("/ops Full Ops command center IA wiring", () => {
     expect(opsPageSource).toContain("Open Job");
   });
 
-  it("renders Contractor Focus boxes for ECC/hybrid while queue chips own bucket selection", () => {
+  it("renders an Excel-style Contractor Focus selector for ECC/hybrid while queue chips own bucket selection", () => {
     expect(opsPageSource).toContain("Board Filters");
     expect(opsPageSource).toContain('const showContractorFocusSelection = productMode === "ecc_hers" || productMode === "hybrid";');
-    expect(opsPageSource).toContain("Contractor Focus");
-    expect(opsPageSource).toContain("All Contractors");
-    expect(opsPageSource).toContain("Internal Work");
+    expect(opsPageSource).toContain("<ContractorFocusSelector");
     expect(opsPageSource).toContain("contractorFocusInternalCount");
-    expect(opsPageSource).toContain("visibleContractorFocusOptions.map");
-    expect(opsPageSource).toContain("overflowContractorFocusOptions.map");
-    expect(opsPageSource).toContain("contractorFocusHref(nextIds)");
-    expect(opsPageSource).toContain("contractorFocusHref([])");
-    expect(opsPageSource).toContain("Show {overflowContractorFocusOptions.length} more contractors");
+    expect(contractorFocusSelectorSource).toContain("Contractor Focus");
+    expect(contractorFocusSelectorSource).toContain("Change");
+    expect(contractorFocusSelectorSource).toContain("Search contractors");
+    expect(contractorFocusSelectorSource).toContain("All Contractors");
+    expect(contractorFocusSelectorSource).toContain("Internal Work");
+    expect(contractorFocusSelectorSource).toContain("Clear");
+    expect(contractorFocusSelectorSource).toContain("Apply");
+    expect(contractorFocusSelectorSource).toContain('params.set("contractor", nextIds.join(","))');
     expect(opsPageSource).not.toContain("OPS_BOARD_BUCKET_FILTERS");
     expect(opsPageSource).not.toContain("Tap to narrow");
   });

@@ -1,5 +1,6 @@
 // app/ops/page
 import Link from "next/link";
+import ContractorFocusSelector from "./_components/ContractorFocusSelector";
 import QueueCard from "@/components/ops/QueueCard";
 import QueueCardOpenAndAct from "@/components/ops/QueueCardOpenAndAct";
 import { redirect } from "next/navigation";
@@ -1123,30 +1124,13 @@ function telHref(phone?: string | null) {
     }
     const showWorkspaceContractorFilter =
       showContractorFocusSelection && (workspaceContractors.length > 0 || contractorFocusInternalCount > 0);
-    const contractorFocusOptions: ContractorFocusOption[] =
-      workspaceContractors
-        .map((contractorOption: { id: string; name: string | null }): ContractorFocusOption => ({
-          id: contractorOption.id,
-          name: String(contractorOption.name ?? "").trim() || contractorOption.id,
-          count: contractorFocusCounts.get(contractorOption.id) ?? 0,
-          selected: contractorFocusIdSet.has(contractorOption.id),
-        }))
-        .sort((a: ContractorFocusOption, b: ContractorFocusOption) => {
-          if (a.count > 0 && b.count === 0) return -1;
-          if (a.count === 0 && b.count > 0) return 1;
-          return a.name.localeCompare(b.name);
-        });
-    const visibleContractorFocusOptions = contractorFocusOptions.slice(0, 14);
-    const overflowContractorFocusOptions = contractorFocusOptions.slice(14);
+    const contractorFocusOptions: ContractorFocusOption[] = workspaceContractors.map((contractorOption: { id: string; name: string | null }): ContractorFocusOption => ({
+      id: contractorOption.id,
+      name: String(contractorOption.name ?? "").trim() || contractorOption.id,
+      count: contractorFocusCounts.get(contractorOption.id) ?? 0,
+      selected: contractorFocusIdSet.has(contractorOption.id),
+    }));
     const contractorFocusAllCount = contractorFocusSourceRows.length;
-    function contractorFocusHref(nextIds: string[]) {
-      return `/ops${buildQueryString({
-        bucket: effectiveBoardBucketFilter,
-        contractor: nextIds.length > 0 ? nextIds.join(",") : "",
-        reason: effectiveBoardReasonFilter ?? "",
-        sort: boardSort === "oldest" ? "" : boardSort,
-      })}#ops-workspace`;
-    }
     const shouldLoadPermitJobOptions = selectedWorkspaceKey === "permits";
     const [permitJobCustomersRes, permitJobLocationsRes] = shouldLoadPermitJobOptions
       ? await Promise.all([
@@ -1826,104 +1810,13 @@ function telHref(phone?: string | null) {
           </div>
 
           {showWorkspaceContractorFilter ? (
-            <div className="mb-3 rounded-2xl border border-slate-200 bg-slate-50/70 px-3 py-2.5">
-              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Contractor Focus</div>
-                  <div className="text-sm font-semibold text-slate-950">{contractorFocusIds.length > 0 ? `${contractorFocusIds.length} selected` : "All Contractors"}</div>
-                </div>
-                {contractorFocusIds.length > 0 ? (
-                  <Link href={contractorFocusHref([])} className="text-xs font-semibold text-blue-700 underline-offset-2 hover:underline">
-                    Reset
-                  </Link>
-                ) : null}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                <Link
-                  href={contractorFocusHref([])}
-                  aria-current={contractorFocusIds.length === 0 ? "page" : undefined}
-                  className={[
-                    "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-[border-color,background-color,box-shadow,color]",
-                    contractorFocusIds.length === 0
-                      ? "border-slate-900 bg-slate-900 text-white shadow-[0_8px_18px_-16px_rgba(15,23,42,0.5)]"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100",
-                  ].join(" ")}
-                >
-                  <span>All Contractors</span>
-                  <span className={contractorFocusIds.length === 0 ? "text-slate-200" : "text-slate-500"}>{contractorFocusAllCount}</span>
-                </Link>
-                <Link
-                  href={contractorFocusHref(
-                    contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)
-                      ? contractorFocusIds.filter((id) => id !== INTERNAL_WORK_CONTRACTOR_FOCUS_ID)
-                      : [...contractorFocusIds, INTERNAL_WORK_CONTRACTOR_FOCUS_ID],
-                  )}
-                  aria-current={contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID) ? "true" : undefined}
-                  className={[
-                    "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-[border-color,background-color,box-shadow,color]",
-                    contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID)
-                      ? "border-blue-700 bg-blue-700 text-white shadow-[0_8px_18px_-16px_rgba(29,78,216,0.55)]"
-                      : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100",
-                  ].join(" ")}
-                >
-                  <span>Internal Work</span>
-                  <span className={contractorFocusIdSet.has(INTERNAL_WORK_CONTRACTOR_FOCUS_ID) ? "text-blue-100" : "text-slate-500"}>
-                    {contractorFocusInternalCount}
-                  </span>
-                </Link>
-                {visibleContractorFocusOptions.map((option) => {
-                  const nextIds = option.selected
-                    ? contractorFocusIds.filter((id) => id !== option.id)
-                    : [...contractorFocusIds, option.id];
-                  return (
-                    <Link
-                      key={option.id}
-                      href={contractorFocusHref(nextIds)}
-                      aria-current={option.selected ? "true" : undefined}
-                      className={[
-                        "inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-[border-color,background-color,box-shadow,color]",
-                        option.selected
-                          ? "border-blue-700 bg-blue-700 text-white shadow-[0_8px_18px_-16px_rgba(29,78,216,0.55)]"
-                          : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100",
-                      ].join(" ")}
-                    >
-                      <span className="truncate">{option.name}</span>
-                      <span className={option.selected ? "text-blue-100" : "text-slate-500"}>{option.count}</span>
-                    </Link>
-                  );
-                })}
-              </div>
-              {overflowContractorFocusOptions.length > 0 ? (
-                <details className="mt-1.5">
-                  <summary className="cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-900">
-                    Show {overflowContractorFocusOptions.length} more contractors
-                  </summary>
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {overflowContractorFocusOptions.map((option) => {
-                      const nextIds = option.selected
-                        ? contractorFocusIds.filter((id) => id !== option.id)
-                        : [...contractorFocusIds, option.id];
-                      return (
-                        <Link
-                          key={option.id}
-                          href={contractorFocusHref(nextIds)}
-                          aria-current={option.selected ? "true" : undefined}
-                          className={[
-                            "inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition-[border-color,background-color,box-shadow,color]",
-                            option.selected
-                              ? "border-blue-700 bg-blue-700 text-white shadow-[0_8px_18px_-16px_rgba(29,78,216,0.55)]"
-                              : "border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-100",
-                          ].join(" ")}
-                        >
-                          <span className="truncate">{option.name}</span>
-                          <span className={option.selected ? "text-blue-100" : "text-slate-500"}>{option.count}</span>
-                        </Link>
-                      );
-                    })}
-                  </div>
-                </details>
-              ) : null}
-            </div>
+            <ContractorFocusSelector
+              allCount={contractorFocusAllCount}
+              internalWorkCount={contractorFocusInternalCount}
+              internalWorkId={INTERNAL_WORK_CONTRACTOR_FOCUS_ID}
+              options={contractorFocusOptions}
+              selectedIds={contractorFocusIds}
+            />
           ) : null}
 
           <div className="mb-3 grid gap-2 md:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] lg:items-end">
