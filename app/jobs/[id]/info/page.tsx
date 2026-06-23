@@ -7,9 +7,14 @@ import {
 } from "@/lib/auth/internal-user";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
+import {
+  listSystemFiltersBySystemIds,
+  type JobSystemFilterRow,
+} from "@/lib/customers/system-filters-read-model";
 
 import EquipmentEditCard from "../_components/EquipmentEditCard";
 import EquipmentCreateForm from "../_components/EquipmentCreateForm";
+import SystemFiltersCard from "../_components/SystemFiltersCard";
 import JobSubpageContextHeader from "../_components/JobSubpageContextHeader";
 
 function formatTimeDisplay(time?: string | null) {
@@ -101,8 +106,10 @@ export default async function JobInfoPage({
 
   if (!user) redirect("/login");
 
+  let internalAccess: Awaited<ReturnType<typeof requireInternalUser>>;
+
   try {
-    await requireInternalUser({ supabase, userId: user.id });
+    internalAccess = await requireInternalUser({ supabase, userId: user.id });
   } catch (error) {
     if (isInternalAccessError(error)) {
       const { data: contractorUser, error: contractorUserErr } = await supabase
@@ -171,6 +178,24 @@ if (!job) return notFound();
     .order("name", { ascending: true });
 
   if (systemsErr) throw systemsErr;
+
+  const systemIds = ((systems ?? []) as Array<{ id?: string | null }>)
+    .map((system) => String(system.id ?? "").trim())
+    .filter(Boolean);
+
+  const systemFilters = systemIds.length
+    ? await listSystemFiltersBySystemIds({
+        supabase,
+        accountOwnerUserId: internalAccess.internalUser.account_owner_user_id,
+        systemIds,
+      })
+    : [];
+
+  const filtersBySystemId = systemFilters.reduce<Record<string, JobSystemFilterRow[]>>((acc, filter) => {
+    if (!acc[filter.system_id]) acc[filter.system_id] = [];
+    acc[filter.system_id].push(filter);
+    return acc;
+  }, {});
 
     const customerName =
       [job.customer_first_name, job.customer_last_name]
@@ -291,6 +316,19 @@ if (!job) return notFound();
                 </div>
               )}
             </div>
+
+            {systems && systems.length > 0 ? (
+              <div className="space-y-3">
+                {systems.map((system) => (
+                  <SystemFiltersCard
+                    key={system.id}
+                    jobId={job.id}
+                    system={system}
+                    filters={filtersBySystemId[system.id] ?? []}
+                  />
+                ))}
+              </div>
+            ) : null}
 
             {/* Add Equipment Form */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">

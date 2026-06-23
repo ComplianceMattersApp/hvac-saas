@@ -1,3 +1,8 @@
+import {
+  listSystemFiltersBySystemIds,
+  type JobSystemFilterRow,
+} from "@/lib/customers/system-filters-read-model";
+
 export type CustomerEquipmentSummaryRow = {
   id: string;
   jobId: string;
@@ -29,7 +34,18 @@ export type CustomerSystemSummary = {
   id: string;
   name: string;
   sourceJob: CustomerEquipmentSourceJob | null;
+  filters: CustomerSystemFilterSummary[];
   equipment: CustomerEquipmentSummaryRow[];
+};
+
+export type CustomerSystemFilterSummary = {
+  id: string;
+  label: string | null;
+  length: number;
+  width: number;
+  height: number;
+  dateChanged: string;
+  notes: string | null;
 };
 
 export type CustomerEquipmentLocationSummary = {
@@ -147,6 +163,22 @@ function compareSystems(a: CustomerSystemSummary, b: CustomerSystemSummary) {
   return a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
 }
 
+function compareFilters(a: CustomerSystemFilterSummary, b: CustomerSystemFilterSummary) {
+  return b.dateChanged.localeCompare(a.dateChanged) || a.id.localeCompare(b.id);
+}
+
+function mapSystemFilter(filter: JobSystemFilterRow): CustomerSystemFilterSummary {
+  return {
+    id: filter.id,
+    label: filter.label,
+    length: filter.length,
+    width: filter.width,
+    height: filter.height,
+    dateChanged: filter.date_changed,
+    notes: filter.notes,
+  };
+}
+
 export async function loadCustomerSystemsEquipmentSummary(params: {
   supabase: any;
   accountOwnerUserId: string;
@@ -253,6 +285,12 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
     if (id) systemsById.set(id, system);
   }
 
+  const filterRows = await listSystemFiltersBySystemIds({
+    supabase: params.supabase,
+    accountOwnerUserId,
+    systemIds: Array.from(systemsById.keys()),
+  });
+
   const locationMap = new Map<string, CustomerEquipmentLocationSummary>();
   const systemMap = new Map<string, CustomerSystemSummary>();
 
@@ -287,6 +325,7 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
         id: key,
         name: args.systemName || "System",
         sourceJob: sourceJob(args.job),
+        filters: [],
         equipment: [],
       };
       systemMap.set(key, system);
@@ -338,6 +377,12 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
     totalEquipmentCount += 1;
   }
 
+  for (const filter of filterRows) {
+    const system = systemMap.get(filter.system_id);
+    if (!system) continue;
+    system.filters.push(mapSystemFilter(filter));
+  }
+
   const locations = Array.from(locationMap.values())
     .map((location) => ({
       ...location,
@@ -345,6 +390,7 @@ export async function loadCustomerSystemsEquipmentSummary(params: {
         .filter((system) => system.equipment.length > 0 || system.sourceJob)
         .map((system) => ({
           ...system,
+          filters: system.filters.slice().sort(compareFilters),
           equipment: system.equipment.slice().sort(compareLatestEquipment),
         }))
         .sort(compareSystems),

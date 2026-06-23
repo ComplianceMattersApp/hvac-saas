@@ -28,6 +28,7 @@ import {
   loadCustomerSystemsEquipmentSummary,
   type CustomerEquipmentSummaryRow,
   type CustomerEquipmentSourceJob,
+  type CustomerSystemFilterSummary,
 } from "@/lib/customers/customer-systems-equipment-read-model";
 import { isEstimatesEnabled } from "@/lib/estimates/estimate-exposure";
 import { listEstimatesByAccount, type EstimateListItem } from "@/lib/estimates/estimate-read";
@@ -269,6 +270,25 @@ function equipmentDetailChips(eq: CustomerEquipmentSummaryRow) {
   }
 
   return chips.filter(Boolean) as string[];
+}
+
+function formatSystemFilterDimension(value: number) {
+  if (!Number.isFinite(value)) return "";
+  return Number.isInteger(value) ? String(value) : String(value).replace(/\.?0+$/, "");
+}
+
+function formatSystemFilterDate(value?: string | null) {
+  const raw = String(value ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw || "unknown";
+  const [year, month, day] = raw.split("-");
+  return `${month}/${day}/${year}`;
+}
+
+function formatSystemFilterSummary(filter: CustomerSystemFilterSummary) {
+  const dimensions = [filter.length, filter.width, filter.height].map(formatSystemFilterDimension).join(" x ");
+  return [filter.label, dimensions, `Changed ${formatSystemFilterDate(filter.dateChanged)}`]
+    .filter(Boolean)
+    .join(" \u00b7 ");
 }
 
 function readTemplateSnapshotString(snapshot: Record<string, unknown> | null, key: string) {
@@ -2492,6 +2512,22 @@ export default async function CustomerDetailPage(props: {
                               </div>
                             ) : null}
                           </div>
+
+                          {system.filters.length > 0 ? (
+                            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Filters</div>
+                              <div className="mt-2 space-y-1.5">
+                                {system.filters.map((filter) => (
+                                  <div key={filter.id} className="text-sm text-slate-700">
+                                    {formatSystemFilterSummary(filter)}
+                                    {filter.notes ? (
+                                      <span className="text-xs text-slate-500"> ({formatShortNote(filter.notes, 80)})</span>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
 
                           {system.equipment.length === 0 ? (
                             <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">

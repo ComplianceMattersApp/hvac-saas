@@ -223,6 +223,8 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain('activeWorkspaceTab === "systems-equipment" && isInternalViewer');
     expect(customerPageSource).toContain("systemsEquipmentSummary.locations.map((location)");
     expect(customerPageSource).toContain("location.systems.map((system)");
+    expect(customerPageSource).toContain("system.filters.map((filter)");
+    expect(customerPageSource).toContain("formatSystemFilterSummary(filter)");
     expect(customerPageSource).toContain("system.equipment.map((equipment)");
     expect(customerPageSource).toContain("No systems or equipment records yet. Add equipment from a job when system details are captured.");
   });
@@ -234,6 +236,7 @@ describe("customer detail relationship hub wiring", () => {
     expect(systemsEquipmentTabSource).toContain("View Equipment");
     expect(systemsEquipmentTabSource).toContain("Manage Equipment");
     expect(systemsEquipmentTabSource).toContain("Open Job");
+    expect(systemsEquipmentTabSource).toContain("Filters");
     expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}/equipment`}');
     expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}/info?f=equipment`}');
     expect(systemsEquipmentTabSource).toContain('href={`/jobs/${equipment.sourceJob.id}`}');
@@ -242,6 +245,12 @@ describe("customer detail relationship hub wiring", () => {
     expect(systemsEquipmentTabSource).not.toContain("addJobEquipmentFromForm");
     expect(systemsEquipmentTabSource).not.toContain("updateJobEquipmentFromForm");
     expect(systemsEquipmentTabSource).not.toContain("deleteJobEquipmentFromForm");
+    expect(systemsEquipmentTabSource).not.toContain("Add Filter");
+    expect(systemsEquipmentTabSource).not.toContain("Edit Filter");
+    expect(systemsEquipmentTabSource).not.toContain("Remove");
+    expect(systemsEquipmentTabSource).not.toContain("addSystemFilterFromForm");
+    expect(systemsEquipmentTabSource).not.toContain("updateSystemFilterFromForm");
+    expect(systemsEquipmentTabSource).not.toContain("archiveSystemFilterFromForm");
     expect(systemsEquipmentTabSource).not.toContain("<form");
     expect(systemsEquipmentTabSource).not.toContain("<button");
   });

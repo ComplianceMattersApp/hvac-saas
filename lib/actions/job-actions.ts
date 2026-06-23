@@ -34,6 +34,11 @@ import {
   loadScopedInternalJobEquipmentForMutation,
 } from "@/lib/auth/internal-equipment-scope";
 import {
+  archiveSystemFilter,
+  createSystemFilter,
+  updateSystemFilter,
+} from "@/lib/customers/system-filters-read-model";
+import {
   loadScopedActiveInternalContractorForMutation,
   loadScopedInternalContractorForMutation,
 } from "@/lib/auth/internal-contractor-scope";
@@ -4483,6 +4488,161 @@ await cleanupOrphanSystem({ supabase, jobId, systemId });
 revalidatePath(`/jobs/${jobId}`);
 revalidatePath(`/jobs/${jobId}/info`);
 revalidatePath(`/jobs/${jobId}/tests`);
+}
+
+function readSystemFilterFormText(formData: FormData, field: string) {
+  const value = formData.get(field);
+  return typeof value === "string" ? value.trim() || null : null;
+}
+
+async function requireSystemBelongsToJobForFilterAction(params: {
+  supabase: any;
+  jobId: string;
+  systemId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from("job_systems")
+    .select("id")
+    .eq("id", params.systemId)
+    .eq("job_id", params.jobId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data?.id) redirect(`/jobs/${params.jobId}?notice=not_authorized`);
+}
+
+async function requireFilterBelongsToJobForFilterAction(params: {
+  supabase: any;
+  jobId: string;
+  filterId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from("job_system_filters")
+    .select("system_id")
+    .eq("id", params.filterId)
+    .maybeSingle();
+
+  if (error) throw error;
+  const systemId = String(data?.system_id ?? "").trim();
+  if (!systemId) redirect(`/jobs/${params.jobId}?notice=not_authorized`);
+
+  await requireSystemBelongsToJobForFilterAction({
+    supabase: params.supabase,
+    jobId: params.jobId,
+    systemId,
+  });
+}
+
+export async function addSystemFilterFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const systemId = String(formData.get("system_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!systemId) throw new Error("Missing system_id");
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEquipmentMutationAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  await requireSystemBelongsToJobForFilterAction({ supabase, jobId, systemId });
+
+  await createSystemFilter({
+    supabase,
+    input: {
+      systemId,
+      accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+      label: readSystemFilterFormText(formData, "label"),
+      length: formData.get("length"),
+      width: formData.get("width"),
+      height: formData.get("height"),
+      dateChanged: formData.get("date_changed"),
+      notes: readSystemFilterFormText(formData, "notes"),
+      userId: scoped.internalUser.user_id,
+    },
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/info`);
+  revalidatePath(`/jobs/${jobId}/tests`);
+  redirect(`/jobs/${jobId}/info?f=equipment`);
+}
+
+export async function updateSystemFilterFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const filterId = String(formData.get("filter_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!filterId) throw new Error("Missing filter_id");
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEquipmentMutationAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  await requireFilterBelongsToJobForFilterAction({ supabase, jobId, filterId });
+
+  await updateSystemFilter({
+    supabase,
+    input: {
+      filterId,
+      accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+      label: readSystemFilterFormText(formData, "label"),
+      length: formData.get("length"),
+      width: formData.get("width"),
+      height: formData.get("height"),
+      dateChanged: formData.get("date_changed"),
+      notes: readSystemFilterFormText(formData, "notes"),
+      userId: scoped.internalUser.user_id,
+    },
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/info`);
+  revalidatePath(`/jobs/${jobId}/tests`);
+  redirect(`/jobs/${jobId}/info?f=equipment`);
+}
+
+export async function archiveSystemFilterFromForm(formData: FormData) {
+  "use server";
+
+  const jobId = String(formData.get("job_id") || "").trim();
+  const filterId = String(formData.get("filter_id") || "").trim();
+
+  if (!jobId) throw new Error("Missing job_id");
+  if (!filterId) throw new Error("Missing filter_id");
+
+  const supabase = await createClient();
+  const scoped = await requireInternalEquipmentMutationAccess({ supabase, jobId });
+
+  await requireOperationalScopedJobMutationAccessOrRedirect({
+    supabase,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+  });
+
+  await requireFilterBelongsToJobForFilterAction({ supabase, jobId, filterId });
+
+  await archiveSystemFilter({
+    supabase,
+    filterId,
+    accountOwnerUserId: scoped.internalUser.account_owner_user_id,
+    userId: scoped.internalUser.user_id,
+  });
+
+  revalidatePath(`/jobs/${jobId}`);
+  revalidatePath(`/jobs/${jobId}/info`);
+  revalidatePath(`/jobs/${jobId}/tests`);
+  redirect(`/jobs/${jobId}/info?f=equipment`);
 }
 
 export async function saveEccTestOverrideFromForm(formData: FormData) {

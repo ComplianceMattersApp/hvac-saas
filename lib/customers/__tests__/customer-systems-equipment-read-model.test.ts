@@ -86,6 +86,31 @@ describe("loadCustomerSystemsEquipmentSummary", () => {
         { id: "sys-1", job_id: "job-1", name: "Upstairs" },
         { id: "sys-2", job_id: "job-2", name: "Roof Pack" },
       ],
+      job_system_filters: [
+        {
+          id: "filter-1",
+          system_id: "sys-1",
+          account_owner_user_id: "owner-1",
+          label: "Hall return",
+          length: 20,
+          width: 25,
+          height: 1,
+          date_changed: "2026-06-23",
+          notes: "MERV 11",
+          archived_at: null,
+        },
+        {
+          id: "filter-archived",
+          system_id: "sys-1",
+          account_owner_user_id: "owner-1",
+          label: "Old return",
+          length: 16,
+          width: 20,
+          height: 1,
+          date_changed: "2026-01-01",
+          archived_at: "2026-06-01T00:00:00Z",
+        },
+      ],
       job_equipment: [
         { id: "eq-1", job_id: "job-1", system_id: "sys-1", equipment_role: "condenser", manufacturer: "Carrier", model: "CX", serial: "A1" },
         { id: "eq-2", job_id: "job-2", system_id: "sys-2", equipment_role: "package_unit", manufacturer: "Trane", model: "TZ", serial: "B2" },
@@ -102,6 +127,17 @@ describe("loadCustomerSystemsEquipmentSummary", () => {
     expect(summary.totalEquipmentCount).toBe(2);
     expect(summary.locations.map((location) => location.label)).toEqual(["Main House", "Shop"]);
     expect(summary.locations[0].systems[0].name).toBe("Upstairs");
+    expect(summary.locations[0].systems[0].filters).toEqual([
+      {
+        id: "filter-1",
+        label: "Hall return",
+        length: 20,
+        width: 25,
+        height: 1,
+        dateChanged: "2026-06-23",
+        notes: "MERV 11",
+      },
+    ]);
     expect(summary.locations[0].systems[0].equipment[0]).toMatchObject({
       manufacturer: "Carrier",
       sourceJob: { id: "job-1", jobType: "ecc" },
