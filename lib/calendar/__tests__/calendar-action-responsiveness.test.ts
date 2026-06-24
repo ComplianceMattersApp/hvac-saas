@@ -102,6 +102,18 @@ describe("calendar action responsiveness", () => {
     expect(calendarViewSource).toContain("Next dispatch action");
   });
 
+  it("mobile list agenda receives the continuous loaded date range", () => {
+    expect(calendarViewSource).toContain("mergeAgendaDateKeys");
+    expect(calendarViewSource).toContain("visibleDates={data.range.days.map((day) => day.date)}");
+    expect(calendarViewSource).toContain("No work scheduled");
+    expect(calendarViewSource).toContain("Open day for scheduling");
+  });
+
+  it("empty agenda days are hidden at desktop widths", () => {
+    expect(calendarViewSource).toContain("isEmptyDay ? 'md:hidden' : ''");
+    expect(calendarViewSource).toContain("hidden rounded-xl border border-dashed border-slate-300/80 bg-white px-4 py-10 text-center md:block");
+  });
+
   it("mobile day and week grids have intentional horizontal scrolling instead of clipped columns", () => {
     expect(calendarViewSource).toContain("overflow-x-auto overscroll-x-contain pb-2");
     expect(dispatchGridSource).toContain("const minGridWidth = 84 + columnCount * 170");

@@ -37,6 +37,7 @@ import {
   type DispatchJob,
   type DispatchViewMode,
 } from '@/lib/actions/calendar';
+import { mergeAgendaDateKeys } from '@/lib/calendar/agenda-date-range';
 import { getMonthVisibleRange } from '@/lib/calendar/month-visible-range';
 import { normalizeRetestLinkedJobTitle } from '@/lib/utils/job-title-display';
 import { displayWindowLA, formatBusinessDateUS } from '@/lib/utils/schedule-la';
@@ -379,10 +380,11 @@ function AgendaList(props: {
   jobs: DispatchJob[];
   blockEvents: DispatchCalendarBlockEvent[];
   date: string;
+  visibleDates?: string[];
   tech?: string | null;
   selectedBlockId?: string;
 }) {
-  const { jobs, blockEvents, date, tech, selectedBlockId } = props;
+  const { jobs, blockEvents, date, visibleDates, tech, selectedBlockId } = props;
 
   const grouped = new Map<string, DispatchJob[]>();
   for (const job of jobs) {
@@ -399,7 +401,9 @@ function AgendaList(props: {
     groupedBlocks.get(eventDate)?.push(event);
   }
 
-  const sortedDates = Array.from(new Set([...grouped.keys(), ...groupedBlocks.keys()])).sort();
+  const occupiedDates = [...grouped.keys(), ...groupedBlocks.keys()];
+  const sortedDates = mergeAgendaDateKeys({ occupiedDates, visibleDates });
+  const hasOccupiedDates = occupiedDates.length > 0;
 
   if (!sortedDates.length) {
     return (
@@ -412,23 +416,55 @@ function AgendaList(props: {
 
   return (
     <div className="space-y-4">
-      {sortedDates.map((dateKey) => (
-        <div key={dateKey} id={`calendar-list-date-${dateKey}`} data-calendar-list-date={dateKey} className="rounded-xl border border-l-4 border-l-blue-500 border-slate-200/80 bg-white p-3.5 shadow-[0_10px_28px_-20px_rgba(15,31,53,0.28)]">
+      {!hasOccupiedDates ? (
+        <div className="hidden rounded-xl border border-dashed border-slate-300/80 bg-white px-4 py-10 text-center md:block">
+          <p className="text-sm font-semibold text-[#0f1f35]">No scheduled work in this range.</p>
+          <p className="mt-1 text-sm text-slate-500">Use the planner queue to open an unscheduled job and place it on the calendar.</p>
+        </div>
+      ) : null}
+      {sortedDates.map((dateKey) => {
+        const dayJobs = grouped.get(dateKey) ?? [];
+        const dayBlocks = groupedBlocks.get(dateKey) ?? [];
+        const isEmptyDay = dayJobs.length === 0 && dayBlocks.length === 0;
+
+        return (
+          <div key={dateKey} id={`calendar-list-date-${dateKey}`} data-calendar-list-date={dateKey} className={`rounded-xl border border-l-4 border-l-blue-500 border-slate-200/80 bg-white p-3.5 shadow-[0_10px_28px_-20px_rgba(15,31,53,0.28)] ${isEmptyDay ? 'md:hidden' : ''}`}>
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <span className="text-sm font-bold text-[#0f1f35]">{formatDayDateHeader(dateKey)}</span>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500">
               {(() => {
-                const jobCount = grouped.get(dateKey)?.length ?? 0;
-                const blockCount = groupedBlocks.get(dateKey)?.length ?? 0;
+                const jobCount = dayJobs.length;
+                const blockCount = dayBlocks.length;
                 const parts: string[] = [];
                 if (jobCount) parts.push(`${jobCount} job${jobCount > 1 ? 's' : ''}`);
                 if (blockCount) parts.push(`${blockCount} block${blockCount > 1 ? 's' : ''}`);
-                return parts.join(' · ');
+                return parts.join(' · ') || 'No work scheduled';
               })()}
             </span>
           </div>
           <div className="space-y-2">
-            {(grouped.get(dateKey) ?? []).map((job) => {
+            {isEmptyDay ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 px-3.5 py-3">
+                <p className="text-sm font-semibold text-slate-700">No work scheduled</p>
+                <p className="mt-0.5 text-xs text-slate-500">Open day for scheduling</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Link
+                    href="/jobs/new"
+                    className="inline-flex min-h-9 items-center rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-100"
+                  >
+                    Schedule Work
+                  </Link>
+                  <Link
+                    href="/ops?bucket=pending#ops-workspace"
+                    className="inline-flex min-h-9 items-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 transition hover:bg-blue-100"
+                  >
+                    View Unscheduled
+                  </Link>
+                </div>
+              </div>
+            ) : null}
+
+            {dayJobs.map((job) => {
               const needsTech = job.scheduled_date && (!job.assignments || job.assignments.length === 0);
               const lifecycle = getCalendarDisplayStatus(job);
               const dotClass = calendarStatusDotClass(lifecycle);
@@ -469,7 +505,7 @@ function AgendaList(props: {
               );
             })}
 
-            {(groupedBlocks.get(dateKey) ?? []).map((event) => (
+            {dayBlocks.map((event) => (
               <div
                 key={event.id}
                 className={`flex items-center gap-3 rounded-xl border border-dashed border-emerald-200 bg-emerald-50/60 px-3.5 py-3 text-[13px] text-emerald-950 ${selectedBlockId === event.id ? 'ring-2 ring-emerald-300' : ''}`}
@@ -494,8 +530,9 @@ function AgendaList(props: {
               </div>
             ))}
           </div>
-        </div>
-      ))}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -1816,7 +1853,7 @@ export async function CalendarView(props: Props) {
                 currentDate={todayDate}
                 focusedDate={data.anchorDate}
               />
-              <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} tech={activeCalendarTechParam} selectedBlockId={selectedBlockId} />
+              <AgendaList jobs={filteredJobsForRange} blockEvents={techFilteredBlockEvents} date={data.anchorDate} visibleDates={data.range.days.map((day) => day.date)} tech={activeCalendarTechParam} selectedBlockId={selectedBlockId} />
             </section>
           ) : uiView === 'month' ? (
             <section>
