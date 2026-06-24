@@ -26,6 +26,15 @@ type Item = {
   signedUrl: string | null;
 };
 
+type UploadPickerControl = {
+  idSuffix: "job-photo-library" | "job-photo-camera" | "job-file-picker";
+  name: string;
+  label: "Upload Photo" | "Choose Files" | "Take Photo" | "Upload from Library";
+  accept?: string;
+  capture?: "environment";
+  multiple?: boolean;
+};
+
 function formatFileSize(bytes: number | null) {
   if (!bytes || bytes <= 0) return null;
   if (bytes < 1024) return `${bytes} B`;
@@ -116,6 +125,39 @@ export default function JobAttachmentsInternal({
   const hasNeedsReview = correctionReviewUploadCount > 0;
   const hasReviewAnchorUploads = !hasNeedsReview && reviewAnchorUploadCount > 0;
   const hasContractorUploads = !hasNeedsReview && !hasReviewAnchorUploads && contractorUploadCount > 0;
+  const uploadPickerControls: UploadPickerControl[] = isImageCaptureMode
+    ? [
+        {
+          idSuffix: "job-photo-camera",
+          name: "job_photo_camera",
+          label: "Take Photo",
+          accept: "image/*",
+          capture: "environment",
+          multiple: false,
+        },
+        {
+          idSuffix: "job-photo-library",
+          name: "job_photo_library",
+          label: "Upload from Library",
+          accept: "image/*",
+          multiple: true,
+        },
+      ]
+    : [
+        {
+          idSuffix: "job-photo-library",
+          name: "job_photo_library",
+          label: "Upload Photo",
+          accept: "image/*",
+          multiple: true,
+        },
+        {
+          idSuffix: "job-file-picker",
+          name: "job_file_picker",
+          label: "Choose Files",
+          multiple: true,
+        },
+      ];
 
   function preparePicker() {
     setError(null);
@@ -321,79 +363,38 @@ export default function JobAttachmentsInternal({
 
       <div className="p-4 space-y-4">
         <div className="space-y-4">
-          <input
-            id={`${pickerIdPrefix}-job-photo-library`}
-            type="file"
-            multiple
-            accept="image/*"
-            onClick={(event) => {
-              preparePicker();
-              event.currentTarget.value = "";
-            }}
-            onChange={onPickFiles}
-            className="sr-only"
-            disabled={isPending}
-          />
-          {isImageCaptureMode ? (
-            <input
-              id={`${pickerIdPrefix}-job-photo-camera`}
-              type="file"
-              multiple
-              accept="image/*"
-              capture="environment"
-              onClick={(event) => {
-                preparePicker();
-                event.currentTarget.value = "";
-              }}
-              onChange={onPickFiles}
-              className="sr-only"
-              disabled={isPending}
-            />
-          ) : null}
-          <input
-            id={`${pickerIdPrefix}-job-file-picker`}
-            type="file"
-            multiple
-            onClick={(event) => {
-              preparePicker();
-              event.currentTarget.value = "";
-            }}
-            onChange={onPickFiles}
-            className="sr-only"
-            disabled={isPending}
-          />
-
           {error ? <div role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</div> : null}
           {ok ? <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{ok}</div> : null}
 
           <div className="flex flex-wrap items-center gap-2">
-            {isImageCaptureMode ? (
-              <label
-                htmlFor={`${pickerIdPrefix}-job-photo-camera`}
-                aria-disabled={isPending}
-                className={`inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${isPending ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
-              >
-                Take Photo
-              </label>
-            ) : null}
-
-            <label
-              htmlFor={`${pickerIdPrefix}-job-photo-library`}
-              aria-disabled={isPending}
-              className={`inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${isPending ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
-            >
-              {isImageCaptureMode ? "Upload from Library" : "Upload Photo"}
-            </label>
-
-            {!isImageCaptureMode ? (
-              <label
-                htmlFor={`${pickerIdPrefix}-job-file-picker`}
-                aria-disabled={isPending}
-                className={`inline-flex min-h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${isPending ? "pointer-events-none opacity-50" : "cursor-pointer"}`}
-              >
-                Choose Files
-              </label>
-            ) : null}
+            {uploadPickerControls.map((control) => {
+              const pickerId = `${pickerIdPrefix}-${control.idSuffix}`;
+              return (
+                <label
+                  key={control.idSuffix}
+                  htmlFor={pickerId}
+                  aria-disabled={isPending}
+                  className={`relative inline-flex min-h-11 items-center justify-center overflow-hidden rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition-colors hover:bg-slate-50 focus-within:outline-none focus-within:ring-2 focus-within:ring-slate-300 ${isPending ? "opacity-50" : "cursor-pointer"}`}
+                >
+                  <input
+                    id={pickerId}
+                    name={control.name}
+                    type="file"
+                    multiple={control.multiple}
+                    accept={control.accept}
+                    capture={control.capture}
+                    onClick={(event) => {
+                      preparePicker();
+                      event.currentTarget.value = "";
+                    }}
+                    onChange={onPickFiles}
+                    className={`absolute inset-0 z-10 h-full w-full opacity-0 ${isPending ? "cursor-default" : "cursor-pointer"}`}
+                    disabled={isPending}
+                  />
+                  <span className="pointer-events-none">{control.label}</span>
+                </label>
+              );
+            })}
 
             <div className="inline-flex min-h-9 items-center rounded-full border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-600">
               {hasFiles

@@ -203,42 +203,53 @@ describe("job tests page wiring", () => {
   });
 
   it("keeps refrigerant charge attachment uploads split between camera and photo library", () => {
-    expect(jobAttachmentsInternalSource).toContain('id={`${pickerIdPrefix}-job-photo-camera`}');
-    expect(jobAttachmentsInternalSource).toContain('htmlFor={`${pickerIdPrefix}-job-photo-camera`}');
-    expect(jobAttachmentsInternalSource).toContain('capture="environment"');
-    expect(jobAttachmentsInternalSource.match(/capture=/g) ?? []).toHaveLength(1);
+    expect(jobAttachmentsInternalSource).toContain('idSuffix: "job-photo-camera"');
+    expect(jobAttachmentsInternalSource).toContain('idSuffix: "job-photo-library"');
+    expect(jobAttachmentsInternalSource).toContain('const pickerId = `${pickerIdPrefix}-${control.idSuffix}`;');
+    expect(jobAttachmentsInternalSource).toContain('htmlFor={pickerId}');
+    expect(jobAttachmentsInternalSource).toContain('id={pickerId}');
+    expect(jobAttachmentsInternalSource).toContain('name={control.name}');
+    expect(jobAttachmentsInternalSource).toContain('type="file"');
+    expect(jobAttachmentsInternalSource).toContain('capture: "environment"');
+    expect(jobAttachmentsInternalSource.match(/capture:\s*"environment"/g) ?? []).toHaveLength(1);
+    expect(jobAttachmentsInternalSource).toContain('capture={control.capture}');
     expect(jobAttachmentsInternalSource).toContain('Take Photo');
-    expect(jobAttachmentsInternalSource).toContain('id={`${pickerIdPrefix}-job-photo-library`}');
-    expect(jobAttachmentsInternalSource).toContain('htmlFor={`${pickerIdPrefix}-job-photo-library`}');
     expect(jobAttachmentsInternalSource).toContain('Upload from Library');
-    expect(jobAttachmentsInternalSource).toContain('accept="image/*"');
+    expect(jobAttachmentsInternalSource).toContain('accept: "image/*"');
+    expect(jobAttachmentsInternalSource).toContain('accept={control.accept}');
+    expect(jobAttachmentsInternalSource).toContain('onChange={onPickFiles}');
+    expect(jobAttachmentsInternalSource).toContain('setFiles(list);');
     expect(jobAttachmentsInternalSource).not.toContain('Take or Choose Photo');
   });
 
   it("keeps the generic job attachment upload path available outside image-only mode", () => {
     expect(jobAttachmentsInternalSource).toContain('attachmentInputMode?: "all" | "images";');
     expect(jobAttachmentsInternalSource).toContain('attachmentInputMode = "all"');
-    expect(jobAttachmentsInternalSource).toContain('{isImageCaptureMode ? "Upload from Library" : "Upload Photo"}');
-    expect(jobAttachmentsInternalSource).toContain('htmlFor={`${pickerIdPrefix}-job-photo-library`}');
-    expect(jobAttachmentsInternalSource).toContain('htmlFor={`${pickerIdPrefix}-job-file-picker`}');
+    expect(jobAttachmentsInternalSource).toContain('idSuffix: "job-photo-library"');
+    expect(jobAttachmentsInternalSource).toContain('idSuffix: "job-file-picker"');
+    expect(jobAttachmentsInternalSource).toContain('label: "Upload Photo"');
     expect(jobAttachmentsInternalSource).toContain('Choose Files');
+    expect(jobAttachmentsInternalSource).toContain('name: "job_photo_library"');
+    expect(jobAttachmentsInternalSource).toContain('name: "job_file_picker"');
     expect(jobAttachmentsInternalSource).toContain('attachmentEvidenceContext,');
     expect(jobAttachmentsInternalSource).toContain('finalizeInternalJobAttachmentUpload');
   });
 
   it("keeps normal job photo upload mobile-safe and non-capture-forced", () => {
-    const photoInputIndex = jobAttachmentsInternalSource.indexOf('id={`${pickerIdPrefix}-job-photo-library`}');
-    const cameraInputIndex = jobAttachmentsInternalSource.indexOf('id={`${pickerIdPrefix}-job-photo-camera`}');
-    const fileInputIndex = jobAttachmentsInternalSource.indexOf('id={`${pickerIdPrefix}-job-file-picker`}');
-    const uploadPhotoLabelIndex = jobAttachmentsInternalSource.indexOf('"Upload Photo"');
+    const normalControlsStart = jobAttachmentsInternalSource.indexOf(': [\n        {\n          idSuffix: "job-photo-library"');
+    const normalControlsEnd = jobAttachmentsInternalSource.indexOf("      ];", normalControlsStart);
+    const normalControls = jobAttachmentsInternalSource.slice(normalControlsStart, normalControlsEnd);
 
-    expect(photoInputIndex).toBeGreaterThanOrEqual(0);
-    expect(fileInputIndex).toBeGreaterThan(photoInputIndex);
-    expect(uploadPhotoLabelIndex).toBeGreaterThan(fileInputIndex);
-    expect(jobAttachmentsInternalSource.slice(photoInputIndex, cameraInputIndex)).toContain('accept="image/*"');
-    expect(jobAttachmentsInternalSource.slice(photoInputIndex, cameraInputIndex)).not.toContain('capture=');
+    expect(normalControlsStart).toBeGreaterThanOrEqual(0);
+    expect(normalControls).toContain('idSuffix: "job-photo-library"');
+    expect(normalControls).toContain('label: "Upload Photo"');
+    expect(normalControls).toContain('accept: "image/*"');
+    expect(normalControls).toContain('idSuffix: "job-file-picker"');
+    expect(normalControls).toContain('label: "Choose Files"');
+    expect(normalControls).not.toContain('capture:');
     expect(jobAttachmentsInternalSource).not.toContain('.click()');
     expect(jobAttachmentsInternalSource).not.toContain('className="hidden"');
+    expect(jobAttachmentsInternalSource).not.toContain('display: "none"');
   });
 
   it("retains selected file state and surfaces attachment upload failures visibly", () => {
