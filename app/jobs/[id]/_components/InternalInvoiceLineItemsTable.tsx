@@ -92,6 +92,7 @@ function formatBillingDispositionLabel(disposition?: 'externally_billed' | 'no_c
 function invoiceBannerMessage(banner?: string | null) {
   const normalized = String(banner ?? '').trim().toLowerCase();
   const messages: Record<string, string> = {
+    external_billing_recorded: 'Billed outside EveryStep FieldWorks. Draft charges were kept for reference. No internal payment or Stripe collection was recorded.',
     internal_invoice_draft_saved: 'Draft invoice saved.',
     internal_invoice_required_fields: 'Invoice number is required.',
     internal_invoice_number_taken: 'Invoice number is already in use.',
@@ -330,6 +331,10 @@ export default function InternalInvoiceLineItemsTable({
     });
   }
 
+  async function handleExternalBillingDisposition(formData: FormData) {
+    await markExternallyBilledAction(formData);
+  }
+
   async function handleUpdateLineItem(formData: FormData) {
     await runInlineMutation({
       formData,
@@ -405,10 +410,11 @@ export default function InternalInvoiceLineItemsTable({
                   Mark No Charge
                 </SubmitButton>
               </form>
-              <form action={(formData) => handleBillingDisposition(formData, markExternallyBilledAction)}>
+              <form action={handleExternalBillingDisposition}>
                 <input type="hidden" name="job_id" value={jobId} />
                 <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
                 <input type="hidden" name="tab" value={tab} />
+                <input type="hidden" name="return_to" value={`/jobs/${jobId}/invoice?banner=external_billing_recorded#invoice-workspace`} />
                 <SubmitButton
                   loadingText="Saving..."
                   className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"
@@ -436,10 +442,11 @@ export default function InternalInvoiceLineItemsTable({
                 Mark this job as billed outside EveryStep FieldWorks. Existing draft line items will stay here for reference, but this draft will not be treated as the invoice sent through the app.
               </div>
             </div>
-            <form className="shrink-0" action={(formData) => handleBillingDisposition(formData, markExternallyBilledAction)}>
+            <form className="shrink-0" action={handleExternalBillingDisposition}>
               <input type="hidden" name="job_id" value={jobId} />
               <input type="hidden" name="invoice_id" value={selectedInvoiceId} />
               <input type="hidden" name="tab" value={tab} />
+              <input type="hidden" name="return_to" value={`/jobs/${jobId}/invoice?banner=external_billing_recorded#invoice-workspace`} />
               <SubmitButton
                 loadingText="Saving..."
                 className="inline-flex min-h-9 w-full items-center justify-center rounded-lg border border-sky-300 bg-white px-3 py-2 text-xs font-semibold text-sky-800 shadow-[0_1px_2px_rgba(15,23,42,0.03)] transition-[background-color,border-color,transform] hover:bg-sky-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-200 active:translate-y-[0.5px]"

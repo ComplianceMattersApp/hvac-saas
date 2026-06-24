@@ -119,6 +119,24 @@ describe("internal invoice line items table capability wiring", () => {
     expect(source).not.toContain("sendZeroDollarInvoice");
   });
 
+  it("submits external billing completion through the redirecting server action path", () => {
+    const zeroRailIndex = source.indexOf("$0.00 invoice - choose how to handle it");
+    const externalRailIndex = source.indexOf("External billing option");
+    const zeroRailSlice = source.slice(zeroRailIndex, zeroRailIndex + 2600);
+    const externalRailSlice = source.slice(externalRailIndex, externalRailIndex + 2200);
+
+    expect(source).toContain("async function handleExternalBillingDisposition(formData: FormData)");
+    expect(source).toContain("await markExternallyBilledAction(formData);");
+    expect(source.match(/action=\{handleExternalBillingDisposition\}/g)).toHaveLength(2);
+    expect(zeroRailSlice).not.toContain("handleBillingDisposition(formData, markExternallyBilledAction)");
+    expect(externalRailSlice).not.toContain("handleBillingDisposition(formData, markExternallyBilledAction)");
+    expect(zeroRailSlice).toContain('name="return_to" value={`/jobs/${jobId}/invoice?banner=external_billing_recorded#invoice-workspace`}');
+    expect(externalRailSlice).toContain('name="return_to" value={`/jobs/${jobId}/invoice?banner=external_billing_recorded#invoice-workspace`}');
+    expect(source).toContain("external_billing_recorded");
+    expect(invoicePageSource).toContain("external_billing_recorded");
+    expect(invoicePageSource).toContain("Billed outside EveryStep FieldWorks. Draft charges were kept for reference. No internal payment or Stripe collection was recorded.");
+  });
+
   it("keeps Add Charge wired to the existing pricebook invoice action fields", () => {
     const pricebookFormIndex = source.indexOf("action={handleAddPricebook}");
     const pricebookFormSlice = source.slice(pricebookFormIndex, pricebookFormIndex + 6000);

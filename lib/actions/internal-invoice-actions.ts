@@ -1780,6 +1780,10 @@ function billingDispositionBanner(disposition: JobBillingDisposition) {
     : 'internal_invoice_externally_billed_saved';
 }
 
+function buildExternalBillingRecordedInvoiceWorkspaceHref(jobId: string) {
+  return `/jobs/${jobId}/invoice?banner=external_billing_recorded#invoice-workspace`;
+}
+
 async function markInternalInvoiceBillingDispositionFromForm(
   formData: FormData,
   disposition: JobBillingDisposition,
@@ -1895,6 +1899,10 @@ async function markInternalInvoiceBillingDispositionFromForm(
   revalidatePath('/ops');
   revalidatePath('/ops/closeout-queue');
   revalidatePath('/reports/closeout');
+
+  if (!noRedirect && disposition === 'externally_billed') {
+    redirect(buildExternalBillingRecordedInvoiceWorkspaceHref(context.jobId));
+  }
 
   return resolveSmallMutationResult({
     jobId: context.jobId,

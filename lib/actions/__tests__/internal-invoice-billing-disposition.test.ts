@@ -104,6 +104,22 @@ function buildFormData(overrides: Record<string, string> = {}) {
   return formData;
 }
 
+function buildRedirectFormData(overrides: Record<string, string> = {}) {
+  const formData = new FormData();
+  formData.set("job_id", "job-1");
+  formData.set("tab", "info");
+  formData.set(
+    "return_to",
+    "/jobs/job-1/invoice?banner=external_billing_recorded#invoice-workspace",
+  );
+
+  for (const [key, value] of Object.entries(overrides)) {
+    formData.set(key, value);
+  }
+
+  return formData;
+}
+
 function draftInvoice(overrides: Record<string, unknown> = {}) {
   return {
     id: "invoice-1",
@@ -321,6 +337,37 @@ describe("internal invoice billing disposition actions", () => {
       invoiceId: "invoice-1",
       supabase: fixture.supabase,
     });
+  });
+
+  it("redirects cleanly back to the refreshed invoice workspace after recording external billing", async () => {
+    const fixture = makeSupabaseFixture();
+    createClientMock.mockResolvedValue(fixture.supabase);
+
+    const { markInternalInvoiceExternallyBilledFromForm } = await import(
+      "@/lib/actions/internal-invoice-actions"
+    );
+
+    await expect(
+      markInternalInvoiceExternallyBilledFromForm(buildRedirectFormData()),
+    ).rejects.toThrow(
+      "REDIRECT:/jobs/job-1/invoice?banner=external_billing_recorded#invoice-workspace",
+    );
+
+    expect(fixture.jobUpdates[0]).toEqual(
+      expect.objectContaining({
+        invoice_complete: true,
+        billing_disposition: "externally_billed",
+        billing_disposition_at: expect.any(String),
+        billing_disposition_by_user_id: "owner-1",
+      }),
+    );
+    expect(fixture.forbiddenWrites).toHaveLength(0);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/jobs/job-1/invoice");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/jobs");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/ops");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/ops/closeout-queue");
+    expect(revalidatePathMock).toHaveBeenCalledWith("/reports/closeout");
   });
 
   it("marks a positive draft invoice as externally billed without deleting draft lines or creating payment truth", async () => {

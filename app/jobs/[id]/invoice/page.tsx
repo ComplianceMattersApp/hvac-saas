@@ -199,6 +199,8 @@ function stripePaymentReceivedCopy(payment: InternalInvoicePaymentRow, invoiceRe
 function bannerMessage(value?: string | null) {
   const key = String(value ?? "").trim().toLowerCase();
   const messages: Record<string, string> = {
+    external_billing_recorded:
+      "Billed outside EveryStep FieldWorks. Draft charges were kept for reference. No internal payment or Stripe collection was recorded.",
     internal_invoice_draft_created: "Draft invoice created.",
     internal_invoice_supplemental_draft_created: "Supplemental draft invoice created.",
     internal_invoice_selection_invalid: "Requested invoice selection is unavailable. Showing the default invoice workspace.",
