@@ -770,12 +770,9 @@ function MonthInspectorDaySummary(props: {
     );
   }
 
-  const previewJobs = jobs.slice(0, 5);
-  const remainingCount = Math.max(jobs.length - previewJobs.length, 0);
-
   return (
-    <div className="mt-3 space-y-2.5">
-      {previewJobs.map((job) => {
+    <div className="mt-3 max-h-96 space-y-2.5 overflow-y-auto pr-1">
+      {jobs.map((job) => {
         const lifecycle = getCalendarDisplayStatus(job);
         const dotClass = calendarStatusDotClass(lifecycle);
         const needsTech = !!job.scheduled_date && (!job.assignments || job.assignments.length === 0);
@@ -811,16 +808,6 @@ function MonthInspectorDaySummary(props: {
           </Link>
         );
       })}
-
-      {remainingCount > 0 ? (
-        <Link
-          href={buildCalendarHref('day', date, { tech })}
-          scroll={false}
-          className="block px-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:underline"
-        >
-          +{remainingCount} more scheduled job{remainingCount === 1 ? '' : 's'} for this day.
-        </Link>
-      ) : null}
     </div>
   );
 }
