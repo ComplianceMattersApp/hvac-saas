@@ -179,8 +179,8 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                   const isCancelledJob = lifecycle === 'cancelled';
                   const dotClass = calendarStatusDotClass(lifecycle);
                   const faded = lifecycle === 'closed' || lifecycle === 'cancelled' ? 'opacity-50' : '';
-                  const primaryLine = shortTitle(job);
-                  const secondaryLine = job.city || 'City not available';
+                  const primaryLine = job.city || 'City not available';
+                  const secondaryLine = shortTitle(job);
                   const workContextLabel = String(job.work_context_label ?? '').trim();
 
                   return (
@@ -196,13 +196,13 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                         jobCity={job.city}
                         assigneeSummary={Array.isArray(job.assignments) ? job.assignments.map((a) => a.display_name).filter(Boolean).join(', ') : null}
                         hasNoTechAssigned={!job.assignments || job.assignments.length === 0}
-                        className={`flex min-h-[36px] min-w-0 items-start gap-2 overflow-hidden rounded-xl border border-slate-200/80 bg-white px-2.5 py-1.5 text-xs shadow-[0_4px_12px_-8px_rgba(15,31,53,0.25)] transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
+                        className={`flex min-h-[36px] min-w-0 items-start gap-2 overflow-hidden rounded-xl border border-slate-200/80 bg-white px-2.5 py-1 text-xs shadow-[0_4px_12px_-8px_rgba(15,31,53,0.25)] transition ${isCancelledJob ? 'cursor-default' : 'cursor-grab active:cursor-grabbing hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50 hover:shadow-md'} ${faded} ${selectedJobId === job.id ? 'ring-2 ring-slate-800/45 border-slate-700 shadow-md' : ''}`}
                         scroll={false}
                       >
                         <div className={`mt-[5px] h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
                         <div className="min-w-0 flex-1">
-                          <div className="truncate font-medium text-[#0f1f35]">{primaryLine}</div>
-                          <div className="mt-0.5 truncate text-[10px] text-slate-500">{secondaryLine}</div>
+                          <div className="truncate text-[11px] font-semibold text-[#0f1f35]">{primaryLine}</div>
+                          <div className="mt-0.5 truncate text-[10px] text-slate-400">{secondaryLine}</div>
                           {workContextLabel ? (
                             <div className="mt-0.5 truncate text-[10px] text-slate-500">Work: {workContextLabel}</div>
                           ) : null}
@@ -289,7 +289,13 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                 ))}
 
                 {hiddenEntryCount > 0 ? (
-                  <div className="mt-1 text-center text-[11px] font-semibold text-slate-500">+{hiddenEntryCount} more</div>
+                  <Link
+                    href={buildCalendarHref('day', ymd, { tech })}
+                    scroll={false}
+                    className="mt-1 block text-center text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:underline"
+                  >
+                    +{hiddenEntryCount} more
+                  </Link>
                 ) : null}
               </div>
             </div>

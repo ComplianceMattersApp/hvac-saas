@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useContext, useState, useTransition } from "react";
+import { Fragment, useContext, useEffect, useRef, useState, useTransition } from "react";
 import type { DispatchCalendarBlockEvent, DispatchJob, DispatchViewMode } from "@/lib/actions/calendar";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { compactCalendarUserLabel } from "@/lib/calendar/calendar-user-label";
@@ -269,8 +269,39 @@ export default function CalendarDispatchGrid(props: Props) {
 
   const currentView = mode === "week" ? "week" : "day";
 
-  const startHour = 6;
-  const endHour = 18;
+  const dayJobs = jobs.filter((job) => {
+    if (mode === "day") return String(job.scheduled_date) === date;
+    return true;
+  });
+
+  const dayBlockEvents = blockEvents.filter((event) => event.calendar_date === date);
+
+  const rawStartMinutes: number[] = [];
+  const rawEndMinutes: number[] = [];
+
+  for (const job of dayJobs) {
+    const start = parseMinutes(job.window_start);
+    if (start == null) continue;
+    rawStartMinutes.push(start);
+    rawEndMinutes.push(parseMinutes(job.window_end) ?? start);
+  }
+
+  for (const event of dayBlockEvents) {
+    const start = parseMinutes(event.start_time);
+    const end = parseMinutes(event.end_time);
+    if (start == null || end == null) continue;
+    rawStartMinutes.push(start);
+    rawEndMinutes.push(end);
+  }
+
+  const earliestStartHour = rawStartMinutes.length ? Math.floor(Math.min(...rawStartMinutes) / 60) : null;
+  const latestEndHour = rawEndMinutes.length ? Math.ceil(Math.max(...rawEndMinutes) / 60) : null;
+
+  // One hour of buffer on each side of the actual content, but never narrower
+  // than the 6AM-6PM default range so empty days still show a useful grid.
+  const startHour = earliestStartHour != null ? Math.max(0, Math.min(6, earliestStartHour - 1)) : 6;
+  const endHour = latestEndHour != null ? Math.min(24, Math.max(18, latestEndHour + 1)) : 18;
+
   const hourHeight = 50;
   const gridStartMinutes = startHour * 60;
   const gridEndMinutes = endHour * 60;
@@ -283,17 +314,26 @@ export default function CalendarDispatchGrid(props: Props) {
   const [optimisticDrop, setOptimisticDrop] = useState<OptimisticJobDrop | null>(null);
   const [pendingReassignDrop, setPendingReassignDrop] = useState<PendingReassignDrop | null>(null);
   const [pendingUnassignDrop, setPendingUnassignDrop] = useState<PendingUnassignDrop | null>(null);
+  const [showBottomFade, setShowBottomFade] = useState(false);
+  const gridScrollRef = useRef<HTMLDivElement | null>(null);
+  const bottomSentinelRef = useRef<HTMLDivElement | null>(null);
 
   const router = useRouter();
   const [isSavingDrop, startSavingDrop] = useTransition();
   const inspectorContext = useContext(CalendarInspectorContext);
 
-  const dayJobs = jobs.filter((job) => {
-    if (mode === "day") return String(job.scheduled_date) === date;
-    return true;
-  });
+  useEffect(() => {
+    const root = gridScrollRef.current;
+    const sentinel = bottomSentinelRef.current;
+    if (!root || !sentinel) return;
 
-  const dayBlockEvents = blockEvents.filter((event) => event.calendar_date === date);
+    const observer = new IntersectionObserver(([entry]) => setShowBottomFade(!entry.isIntersecting), {
+      root,
+      threshold: 1,
+    });
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [totalGridHeight]);
 
   const columns: GridColumn[] = [
     ...(includeUnassignedColumn ? [{ key: UNASSIGNED_COLUMN_KEY, label: "Unassigned", title: "Unassigned" }] : []),
@@ -526,11 +566,15 @@ export default function CalendarDispatchGrid(props: Props) {
         <div className="mb-2 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-medium text-blue-700">Saving schedule...</div>
       ) : null}
 
-      <div className="w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5" style={{ minWidth: `${minGridWidth}px` }}>
+      <div className="relative w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm shadow-slate-950/5" style={{ minWidth: `${minGridWidth}px` }}>
         <div className="border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-2">
           <p className="truncate text-[11px] text-slate-500">Drag changes date and time only. Technician assignment stays attached to the job.</p>
         </div>
-        <div className="grid" style={{ gridTemplateColumns: `84px repeat(${columnCount}, minmax(170px, 1fr))` }}>
+        <div
+          ref={gridScrollRef}
+          className="grid max-h-[640px] overflow-y-auto"
+          style={{ gridTemplateColumns: `84px repeat(${columnCount}, minmax(170px, 1fr))` }}
+        >
           <div className="border-b border-r border-slate-200 bg-slate-50 px-3 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Time</div>
           {columns.map((column) => (
             <div key={`header-${column.key}`} className="min-w-0 border-b border-r border-slate-200 bg-slate-50 px-3 py-3">
@@ -890,7 +934,11 @@ export default function CalendarDispatchGrid(props: Props) {
               </div>
             ) : null}
           </div>
+          <div ref={bottomSentinelRef} style={{ gridColumn: "1 / -1" }} className="h-px" />
         </div>
+        {showBottomFade ? (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white to-transparent" />
+        ) : null}
       </div>
 
       {pendingReassignDrop ? (
