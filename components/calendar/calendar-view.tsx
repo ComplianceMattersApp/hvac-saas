@@ -813,7 +813,13 @@ function MonthInspectorDaySummary(props: {
       })}
 
       {remainingCount > 0 ? (
-        <p className="px-1 text-[11px] text-slate-500">+{remainingCount} more scheduled job{remainingCount === 1 ? '' : 's'} for this day.</p>
+        <Link
+          href={buildCalendarHref('day', date, { tech })}
+          scroll={false}
+          className="block px-1 text-[11px] font-semibold text-slate-500 hover:text-slate-700 hover:underline"
+        >
+          +{remainingCount} more scheduled job{remainingCount === 1 ? '' : 's'} for this day.
+        </Link>
       ) : null}
     </div>
   );
@@ -1787,9 +1793,8 @@ export async function CalendarView(props: Props) {
                 </p>
                 <MonthInspectorDaySummary date={data.anchorDate} jobs={selectedDayJobs} tech={activeCalendarTechParam} />
                 <p className="mt-3 text-xs text-slate-600">
-                  Use Add Block in the planner column to create an internal block for this selected day.
+                  Tap a job above to view its details and make changes. Use Add Block to hold time on this day for travel, parts pickup, or other non-job needs.
                 </p>
-                <p className="mt-3 text-xs text-slate-500">Select a preview row or job chip to open schedule and assignment controls.</p>
               </div>
             ) : null
           ) : null
