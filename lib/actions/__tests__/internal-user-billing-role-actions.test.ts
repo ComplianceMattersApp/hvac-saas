@@ -151,6 +151,19 @@ function makeAdminFixture() {
           error: null,
         })),
         listUsers: vi.fn(async () => ({ data: { users: [] }, error: null })),
+        getUserById: vi.fn(async (userId: string) => ({
+          data: {
+            user: {
+              id: userId,
+              email: "billing.user@example.com",
+              invited_at: new Date().toISOString(),
+              email_confirmed_at: null,
+              user_metadata: {},
+            },
+          },
+          error: null,
+        })),
+        updateUserById: vi.fn(async () => ({ data: { user: null }, error: null })),
       },
     },
   };

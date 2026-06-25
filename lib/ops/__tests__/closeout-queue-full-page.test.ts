@@ -76,8 +76,9 @@ describe("/ops/closeout-queue page", () => {
   });
 
   it("uses a pending-aware submit button for External Billing Complete", () => {
-    expect(closeoutQueuePageSource).toContain("SubmitButton");
-    expect(closeoutQueuePageSource).toContain('loadingText="Marking..."');
+    expect(closeoutQueuePageSource).toContain("CloseoutSubmitButton");
+    expect(closeoutQueuePageSource).toContain("<CloseoutSubmitButton className={compactActionClass}>");
+    expect(closeoutQueuePageSource).toMatch(/<CloseoutSubmitButton[^>]*>\s*External Billing Complete/);
   });
 
   it("adds a By Contractor sort option", () => {

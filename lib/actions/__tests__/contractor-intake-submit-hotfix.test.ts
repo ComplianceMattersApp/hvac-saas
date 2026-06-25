@@ -63,8 +63,10 @@ function buildContractorProposalFormData(overrides?: {
   zip?: string;
   state?: string;
   address?: string;
+  intakeContext?: string;
 }) {
   const formData = new FormData();
+  formData.set("intake_context", overrides?.intakeContext ?? "portal");
   formData.set("job_type", "ecc");
   formData.set("project_type", "alteration");
   formData.set("customer_first_name", "Sam");
@@ -363,9 +365,9 @@ describe("contractor intake submit hotfix", () => {
 
     const { createJobFromForm } = await import("@/lib/actions/job-actions");
 
-    await expect(createJobFromForm(buildContractorProposalFormData())).rejects.toThrow(
-      "REDIRECT:/forbidden",
-    );
+    await expect(
+      createJobFromForm(buildContractorProposalFormData({ intakeContext: "" })),
+    ).rejects.toThrow("REDIRECT:/forbidden");
 
     expect(fixture.proposalInsertPayloads).toHaveLength(0);
   });

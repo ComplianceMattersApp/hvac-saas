@@ -55,7 +55,7 @@ describe("/ops Needs Scheduling rich cards", () => {
 
   it("does not cap the selected Needs Scheduling workspace list at the generic ten-row preview limit", () => {
     expect(loadWorkspaceRowsSource).toContain('workspaceKey === "need_to_schedule"');
-    expect(loadWorkspaceRowsSource).toContain('Math.max(countsWs.get("need_to_schedule") ?? 0, 10)');
+    expect(loadWorkspaceRowsSource).toContain("Math.max(tabCount, 10)");
     expect(loadWorkspaceRowsSource).toContain(".limit(queuePreviewLimit)");
     expect(loadWorkspaceRowsSource).not.toContain(".limit(10)");
   });

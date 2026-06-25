@@ -76,7 +76,7 @@ describe("callback visit UI placement", () => {
     expect(jobPageSource).toContain("Use when the customer calls back after the job was believed complete.");
     expect(jobPageSource).toContain("This records the customer report and creates a new unscheduled office/dispatch callback item.");
     expect(jobPageSource).toContain("What did the customer report?");
-    expect(jobPageSource).toContain("It will not appear in technician My Work until it is scheduled and assigned.");
+    expect(jobPageSource).toContain("It will not appear in {surfaceProfile.labels.fieldUser.toLowerCase()} My Work until it is scheduled and assigned.");
     expect(jobPageSource).toContain("createCallbackVisitFromForm");
   });
 
@@ -90,7 +90,7 @@ describe("callback visit UI placement", () => {
     expect(jobPageSource).toContain('banner === "callback_report_recorded"');
     expect(jobPageSource).toContain('banner === "callback_visit_created"');
     expect(jobPageSource).toContain(
-      "Callback visit created. This is an unscheduled office/dispatch item and will not appear in technician My Work until scheduled and assigned.",
+      "Callback visit created. This is an unscheduled office/dispatch item and will not appear in ${surfaceProfile.labels.fieldUser.toLowerCase()} My Work until scheduled and assigned.",
     );
     expect(jobPageSource).toContain('banner === "callback_visit_requires_historical_anchor"');
     expect(jobPageSource).toContain('banner === "callback_report_requires_historical_anchor"');

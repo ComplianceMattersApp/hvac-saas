@@ -13,7 +13,7 @@ describe("/jobs/new guided builder refresh", () => {
     expect(formSource).toContain("renderGuidedSectionIntro({");
     expect(formSource).toContain('title: "Customer & Service Location"');
     expect(formSource).toContain('title: "Schedule"');
-    expect(formSource).toContain('title: isContractorMode ? "Equipment" : "Additional Details"');
+    expect(formSource).toContain('title: isCleaningMode ? "Site Details" : isContractorMode ? "Equipment" : "Additional Details"');
     expect(formSource).toContain('title: createSectionTitle');
   });
 

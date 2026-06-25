@@ -99,6 +99,9 @@ function makeServiceActionsSupabaseMock() {
                     id: "job-1",
                     invoice_complete: true,
                     data_entry_completed_at: "2026-04-30T12:00:00Z",
+                    billing_disposition: "externally_billed",
+                    billing_disposition_at: "2026-04-30T12:00:00Z",
+                    billing_disposition_by_user_id: "internal-user-1",
                   },
                   error: null,
                 }),
@@ -177,6 +180,21 @@ function makeInternalInvoiceSupabaseMock() {
         };
       }
 
+      if (table === "internal_user_access_capabilities") {
+        return {
+          select: () => ({
+            eq: () => ({
+              eq: () => ({
+                eq: async () => ({
+                  data: [{ capability_key: "field_billing_enabled" }],
+                  error: null,
+                }),
+              }),
+            }),
+          }),
+        };
+      }
+
       throw new Error(`Unexpected table: ${table}`);
     },
   };
@@ -238,6 +256,8 @@ describe("service-case reconciliation wiring", () => {
       total_cents: 5000,
       line_items: [{ id: "line-1" }],
       invoice_number: "INV-1001",
+      account_owner_user_id: "owner-1",
+      job_id: "job-1",
     });
 
     const formData = new FormData();

@@ -25,8 +25,8 @@ describe("invoice ledger send action wiring", () => {
     expect(reportPageSource).toContain("Add recipient");
   });
 
-  it("keeps the job detail invoice send form pinned to the concrete invoice id", () => {
-    expect(jobDetailSource).toContain("<form action={sendInternalInvoiceEmailFromForm}");
-    expect(jobDetailSource).toContain('name="invoice_id" value={internalInvoiceTruth.id}');
+  it("does not duplicate the invoice send form on the job detail page (handled by the Invoice Workspace)", () => {
+    expect(jobDetailSource).not.toContain("sendInternalInvoiceEmailFromForm");
+    expect(jobDetailSource).toContain("/invoice#invoice-workspace");
   });
 });

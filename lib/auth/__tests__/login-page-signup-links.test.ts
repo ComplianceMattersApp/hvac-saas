@@ -26,8 +26,8 @@ describe("login page signup entry options", () => {
   it("keeps login form and next-path return resolver wiring", () => {
     expect(loginPageSource).toContain("<form onSubmit={onSubmit}");
     expect(loginPageSource).toContain("const nextPath = searchParams.get(\"next\")");
-    expect(loginPageSource).toContain("resolveSafeAuthReturnPath({");
-    expect(loginPageSource).toContain("candidateNext: nextPath");
+    expect(loginPageSource).toContain("resolvePostLoginDestination({");
+    expect(loginPageSource).toContain("access, nextPath");
   });
 
   it("waits for session commit before protected redirect and always clears pending state", () => {
@@ -39,7 +39,7 @@ describe("login page signup entry options", () => {
 
   it("persists session explicitly and uses hard navigation to ensure server-visible cookies", () => {
     expect(loginPageSource).toContain("supabase.auth.setSession(");
-    expect(loginPageSource).toContain("window.location.href = resumePath");
+    expect(loginPageSource).toContain("window.location.href = destination.path");
     expect(loginPageSource).not.toContain("router.push(");
   });
 });

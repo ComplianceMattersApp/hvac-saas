@@ -91,7 +91,6 @@ import {
 } from "@/lib/business/internal-invoice";
 import {
   resolveInvoiceCollectedPaymentLedger,
-  resolveInvoiceCollectedPaymentSummary,
   type InternalInvoiceCollectedPaymentSummary,
   type InternalInvoicePaymentRow,
 } from "@/lib/business/internal-invoice-payments";
@@ -111,7 +110,6 @@ import {
   markInternalInvoiceNoChargeFromForm,
   removeInternalInvoiceLineItemFromForm,
   saveInternalInvoiceDraftFromForm,
-  sendInternalInvoiceEmailFromForm,
   updateInternalInvoiceLineItemFromForm,
   voidInternalInvoiceFromForm,
 } from "@/lib/actions/internal-invoice-actions";
@@ -243,6 +241,15 @@ function isStripeSourcedPayment(payment: InternalInvoicePaymentRow) {
     String(payment.stripe_checkout_session_id ?? "").trim().length > 0 ||
     String(payment.stripe_payment_intent_id ?? "").trim().length > 0
   );
+}
+
+function stripePaymentReceivedCopy(payment: InternalInvoicePaymentRow, invoiceReference: string) {
+  const amount = formatCurrencyFromCents(payment.amount_cents);
+  return {
+    title: "Payment received",
+    summary: `${amount} received for ${invoiceReference}.`,
+    detail: "Stripe confirmed this payment. Payout timing is handled by Stripe.",
+  };
 }
 
 function formatCentsForInput(cents?: number | null) {
@@ -1769,6 +1776,7 @@ export default async function JobDetailPage({
           visit_scope_source_ids: string[];
         } | null,
         internalInvoicePaymentSummaryTruth: null as InternalInvoiceCollectedPaymentSummary | null,
+        internalInvoicePaymentRowsTruth: [] as InternalInvoicePaymentRow[],
       };
     }
 
@@ -1786,18 +1794,19 @@ export default async function JobDetailPage({
       return {
         internalInvoiceTruth: null,
         internalInvoicePaymentSummaryTruth: null,
+        internalInvoicePaymentRowsTruth: [] as InternalInvoicePaymentRow[],
       };
     }
 
     const [
       { data: invoiceLineRows, error: invoiceLineRowsErr },
-      internalInvoicePaymentSummaryTruth,
+      internalInvoicePaymentLedger,
     ] = await Promise.all([
       supabase
         .from("internal_invoice_line_items")
         .select("id, source_kind, source_visit_scope_item_id")
         .eq("invoice_id", invoiceTruthRow.id),
-      resolveInvoiceCollectedPaymentSummary(
+      resolveInvoiceCollectedPaymentLedger(
         internalUser.account_owner_user_id,
         String(invoiceTruthRow.id),
         supabase,
@@ -1824,7 +1833,8 @@ export default async function JobDetailPage({
         line_item_count: invoiceLineItems.length,
         visit_scope_source_ids: visitScopeSourceIds,
       },
-      internalInvoicePaymentSummaryTruth,
+      internalInvoicePaymentSummaryTruth: internalInvoicePaymentLedger.summary,
+      internalInvoicePaymentRowsTruth: internalInvoicePaymentLedger.rows,
     };
   });
 
@@ -2146,7 +2156,7 @@ export default async function JobDetailPage({
       .filter((row) => row.id && row.item_name);
   });
 
-  const { internalInvoiceTruth, internalInvoicePaymentSummaryTruth } = await immediateInvoiceTruthPromise;
+  const { internalInvoiceTruth, internalInvoicePaymentSummaryTruth, internalInvoicePaymentRowsTruth } = await immediateInvoiceTruthPromise;
   const showInternalInvoicePanelForFieldBillingRead =
     isInternalUser &&
     buildJobBillingStateReadModel({
@@ -3135,6 +3145,15 @@ const jobPageInvoiceSummaryText = internalInvoiceTruth
   : hasVisitScopeDefined
     ? `${visitScopeCount} work item${visitScopeCount === 1 ? "" : "s"} ready to price and review.`
     : "Add work performed, then price it before building the invoice.";
+const recordedInternalInvoicePaymentRows = internalInvoicePaymentRowsTruth.filter(
+  (payment) => payment.payment_status === "recorded",
+);
+const latestStripeReceivedPayment =
+  recordedInternalInvoicePaymentRows.find((payment) => isStripeSourcedPayment(payment)) ?? null;
+const latestStripeReceivedCopy =
+  latestStripeReceivedPayment && internalInvoiceTruth
+    ? stripePaymentReceivedCopy(latestStripeReceivedPayment, jobPageInvoiceDisplayReference ?? "Internal Invoice")
+    : null;
 const showSeparateFieldBillingDetails =
   showInternalInvoicePanel &&
   (
@@ -7634,6 +7653,19 @@ const failureResolutionPathCount =
         </div>
       </div>
     </div>
+
+    {latestStripeReceivedPayment && latestStripeReceivedCopy ? (
+      <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/85 px-4 py-3 text-sm text-emerald-950">
+        <div className="font-semibold">{latestStripeReceivedCopy.title}</div>
+        <div className="mt-1">{latestStripeReceivedCopy.summary}</div>
+        <div className="mt-1 text-xs leading-5 text-emerald-800">
+          {latestStripeReceivedCopy.detail}
+          {latestStripeReceivedPayment.paid_at
+            ? ` Received ${formatTimestampDateDisplayLA(latestStripeReceivedPayment.paid_at)}.`
+            : ""}
+        </div>
+      </div>
+    ) : null}
 
     <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-200/80 pt-3">
       {hasDirectInvoiceWorkflowAccess ? (!internalInvoiceTruth ? (

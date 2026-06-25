@@ -9,7 +9,7 @@ const source = readFileSync(
 
 describe("job detail header short reference wiring", () => {
   it("uses the shared short job reference helper in the job detail header", () => {
-    expect(source).toContain('import { formatJobDisplayReference } from "@/lib/utils/display-references";');
+    expect(source).toContain('import { formatInvoiceDisplayReference, formatJobDisplayReference } from "@/lib/utils/display-references";');
     expect(source).toContain("const jobHeaderReference = formatJobDisplayReference({");
     expect(source).toContain("jobDisplayNumber:");
     expect(source).toContain("jobId: job.id");

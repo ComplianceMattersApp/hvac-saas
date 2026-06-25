@@ -879,6 +879,9 @@ describe("internal notification readers", () => {
   });
 
   it("keeps resolved scheduled new-work notifications in all/history view", async () => {
+    const recentCreatedAt = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
+    const recentReadAt = new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString();
+
     createClientMock.mockResolvedValue(
       makeSupabase({
         notifications: [
@@ -893,8 +896,8 @@ describe("internal notification readers", () => {
             body: "A contractor submitted a new job that needs internal review and scheduling.",
             payload: { job_id: "job-scheduled-2" },
             status: "queued",
-            read_at: "2026-05-23T09:30:00.000Z",
-            created_at: "2026-05-23T09:00:00.000Z",
+            read_at: recentReadAt,
+            created_at: recentCreatedAt,
           },
         ],
         submissions: [],

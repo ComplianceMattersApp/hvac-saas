@@ -10,7 +10,7 @@ describe("account handoff connections company profile wiring", () => {
     const pageSource = readWorkspaceFile("app/ops/admin/company-profile/page.tsx");
 
     expect(pageSource).toContain("Connected Handoff Accounts");
-    expect(pageSource).toContain("Manage trusted company-to-company connections for future ECC/HERS handoffs.");
+    expect(pageSource).toContain("Manage trusted company-to-company connections for ECC/HERS handoffs.");
     expect(pageSource).toContain("No handoff accounts connected yet");
     expect(pageSource).toContain("Advanced ECC/HERS handoff details");
     expect(pageSource).toContain("It does not share jobs, customers, service cases, or payment data.");

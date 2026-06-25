@@ -10,13 +10,13 @@ const formSource = readFileSync(
 describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
   it("gates Step 3 Work Order Setup card off in HVAC Service mode while preserving hidden job_type", () => {
     expect(formSource).toContain(
-      "isInternalMode && internalResolutionReady && isHvacServiceMode ? (",
+      "isInternalMode && internalResolutionReady && isServiceSurfaceMode ? (",
     );
     expect(formSource).toContain(
-      "isInternalMode && internalResolutionReady && !isHvacServiceMode ? (",
+      "isInternalMode && internalResolutionReady && !isServiceSurfaceMode ? (",
     );
     expect(formSource).toMatch(
-      /isInternalMode && internalResolutionReady && isHvacServiceMode \? \(\s*<input type="hidden" name="job_type"/,
+      /isInternalMode && internalResolutionReady && isServiceSurfaceMode \? \(\s*<input type="hidden" name="job_type"/,
     );
   });
 
@@ -30,8 +30,8 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
     expect(formSource).toContain(
       "What kind of visit is this, and what work needs to be done?",
     );
-    expect(formSource).toContain('<option value="install">Install Visit</option>');
-    expect(formSource).toContain('isHvacServiceMode && jobType === "service" && !isServicePlanQuickScheduleMode ? (');
+    expect(formSource).toContain('<option value="install">{isCleaningMode ? "Deep Cleaning Visit" : "Install Visit"}</option>');
+    expect(formSource).toContain('isServiceSurfaceMode && jobType === "service" && !isServicePlanQuickScheduleMode ? (');
     expect(formSource).toContain('name="service_case_kind"');
     expect(formSource).toContain('name="service_visit_type"');
     expect(formSource).toContain('isServicePlanPrefillFlow && jobType === "service" ? (');
@@ -48,7 +48,7 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
 
   it("preserves permit field names inside Additional Details disclosure for Service mode", () => {
     expect(formSource).toMatch(
-      /isHvacServiceMode \? \(\s*<details[\s\S]*Permit information[\s\S]*name="permit_number"[\s\S]*name="jurisdiction"[\s\S]*name="permit_date"[\s\S]*<\/details>/,
+      /isHvacServiceMode && surfaceProfile\.surfaces\.permits \? \(\s*<details[\s\S]*Permit information[\s\S]*name="permit_number"[\s\S]*name="jurisdiction"[\s\S]*name="permit_date"[\s\S]*<\/details>/,
     );
   });
 

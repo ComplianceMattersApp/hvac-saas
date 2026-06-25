@@ -127,10 +127,11 @@ describe("checkout session id constraint fix migration", () => {
 
   it("does not touch any other table or constraint", () => {
     expect(fixSql).not.toMatch(/DROP\s+TABLE/i);
-    // Exactly one DROP CONSTRAINT and one ADD CONSTRAINT — the expected pair
+    // Two DROP CONSTRAINT statements (the "_c" and legacy "_chk" truncated name
+    // variants, dropped defensively for idempotency) and one ADD CONSTRAINT.
     const dropConstraintCount = (fixSql.match(/DROP\s+CONSTRAINT/gi) ?? []).length;
     const addConstraintCount = (fixSql.match(/ADD\s+CONSTRAINT/gi) ?? []).length;
-    expect(dropConstraintCount).toBe(1);
+    expect(dropConstraintCount).toBe(2);
     expect(addConstraintCount).toBe(1);
     // Both reference only the expected constraint name
     expect(fixSql).toContain("tenant_saved_payment_method_setups_checkout_session_id_format_c");

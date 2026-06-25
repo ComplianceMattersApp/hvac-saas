@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const createClientMock = vi.fn();
+const createAdminClientMock = vi.fn();
 const requireInternalUserMock = vi.fn();
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: (...args: unknown[]) => createClientMock(...args),
+  createAdminClient: (...args: unknown[]) => createAdminClientMock(...args),
 }));
 
 vi.mock("@/lib/auth/internal-user", () => ({
@@ -244,6 +246,7 @@ describe("notification read-state same-account hardening", () => {
         account_owner_user_id: "owner-1",
       },
     });
+    createAdminClientMock.mockReturnValue({});
   });
 
   it("allows same-account internal listInternalNotifications and excludes cross-account rows", async () => {

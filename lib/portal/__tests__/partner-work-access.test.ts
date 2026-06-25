@@ -69,7 +69,13 @@ describe("partner work access", () => {
     expect(portalJobsSource).toContain("sourceLabel={partnerWorkSourceLabelByJobId.get(String(j.id)) ?? \"Created by Rater\"}");
     expect(portalSource).not.toContain("invoice_number");
     expect(portalSource).not.toContain("payment_intent");
-    expect(portalSource).not.toContain("stripe");
+    // "stripe" may appear in a benign module import path (billing availability
+    // gating), but no Stripe billing data fields may be read or rendered here.
+    const portalSourceStripeReferences = portalSource
+      .split("\n")
+      .filter((line) => line.toLowerCase().includes("stripe"))
+      .filter((line) => !line.includes('from "@/lib/business/platform-billing-stripe"'));
+    expect(portalSourceStripeReferences).toEqual([]);
     expect(portalJobsSource).not.toContain("invoice_number");
     expect(portalJobsSource).not.toContain("payment_intent");
     expect(portalJobsSource).not.toContain("stripe");

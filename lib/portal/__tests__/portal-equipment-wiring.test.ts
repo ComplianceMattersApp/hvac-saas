@@ -29,7 +29,7 @@ describe("portal equipment wiring", () => {
   it("renders proposed equipment capture only in portal intake copy", () => {
     const newJobForm = readRepoFile("app/jobs/new/NewJobForm.tsx");
 
-    expect(newJobForm).toContain('title: isContractorMode ? "Equipment" : "Additional Details"');
+    expect(newJobForm).toContain('title: isCleaningMode ? "Site Details" : isContractorMode ? "Equipment" : "Additional Details"');
     expect(newJobForm).toContain(
       "Add equipment now so Compliance Matters has the system details before the job is reviewed.",
     );

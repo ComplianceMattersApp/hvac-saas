@@ -9,8 +9,8 @@ const formSource = readFileSync(
 
 describe("/jobs/new hybrid guided-builder alignment", () => {
   it("uses Job Type wording instead of Job Family for internal non-service mode", () => {
-    expect(formSource).toMatch(/const jobFamilyStepTitle = isHvacServiceMode[\s\S]*: "Job Type";/);
-    expect(formSource).toContain('const jobFamilyControlLabel = isHvacServiceMode ? "Service / Work Order" : "Job Type";');
+    expect(formSource).toMatch(/const jobFamilyStepTitle = isCleaningMode[\s\S]*: "Job Type";/);
+    expect(formSource).toContain('const jobFamilyControlLabel = isServiceSurfaceMode ? surfaceProfile.labels.job : "Job Type";');
     expect(formSource).not.toContain(': "Job family";');
   });
 
