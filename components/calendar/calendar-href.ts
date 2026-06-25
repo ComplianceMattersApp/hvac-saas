@@ -23,6 +23,6 @@ export function buildCalendarHref(view: CalendarHrefView, date: string, params?:
   }
   if (params?.prefillDate) q.set("prefill_date", params.prefillDate);
   if (params?.inspector) q.set("inspector", params.inspector);
-  else if (params?.job) q.set("inspector", "1");
+  else if (params?.job && params?.inspector !== null) q.set("inspector", "1");
   return `/calendar?${q.toString()}`;
 }

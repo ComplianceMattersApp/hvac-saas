@@ -1,5 +1,9 @@
+"use client";
+
 import Link from "next/link";
+import { useContext } from "react";
 import type { ReactNode } from "react";
+import { CalendarInspectorContext } from "./calendar-inspector-context";
 
 type Props = {
   mobileHref: string;
@@ -24,6 +28,8 @@ export default function CalendarResponsiveJobLink(props: Props) {
     children,
   } = props;
 
+  const inspectorContext = useContext(CalendarInspectorContext);
+
   return (
     <>
       <Link
@@ -37,6 +43,7 @@ export default function CalendarResponsiveJobLink(props: Props) {
         href={desktopHref}
         title={title}
         scroll={scroll}
+        onClick={() => inspectorContext?.openInspector()}
         className={`${className} ${desktopClassName} hidden xl:block`}
       >
         {children}

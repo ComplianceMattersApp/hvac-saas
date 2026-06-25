@@ -186,7 +186,7 @@ export default function CalendarMonthGrid({ monthDate, jobs, blockEvents, tech, 
                   return (
                     <div key={job.id} className="group relative overflow-visible">
                       <CalendarDragJobLink
-                        href={buildCalendarHref('month', ymd, { job: job.id, tech })}
+                        href={buildCalendarHref('month', ymd, { job: job.id, tech, inspector: null })}
                         mobileHref={`/jobs/${job.id}`}
                         draggable={!isCancelledJob}
                         jobId={job.id}

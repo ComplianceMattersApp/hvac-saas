@@ -2,16 +2,35 @@
 
 import { useState, type ReactNode } from "react";
 import { PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { CalendarInspectorContext } from "./calendar-inspector-context";
 
 type Props = {
   leftPanel: ReactNode;
   mainContent: ReactNode;
   rightPanel: ReactNode;
-  showRightPanel: boolean;
+  hasRightPanelContent: boolean;
+  initialRightOpen: boolean;
+  selectedKey: string;
 };
 
-export default function CalendarLayoutShell({ leftPanel, mainContent, rightPanel, showRightPanel }: Props) {
+export default function CalendarLayoutShell({
+  leftPanel,
+  mainContent,
+  rightPanel,
+  hasRightPanelContent,
+  initialRightOpen,
+  selectedKey,
+}: Props) {
   const [leftOpen, setLeftOpen] = useState(false);
+  const [rightOpen, setRightOpen] = useState(initialRightOpen);
+  const [prevSelectedKey, setPrevSelectedKey] = useState(selectedKey);
+
+  if (selectedKey !== prevSelectedKey) {
+    setPrevSelectedKey(selectedKey);
+    if (initialRightOpen && !rightOpen) setRightOpen(true);
+  }
+
+  const showRightPanel = hasRightPanelContent && rightOpen;
 
   const desktopGridColsClass = showRightPanel
     ? leftOpen
@@ -22,32 +41,39 @@ export default function CalendarLayoutShell({ leftPanel, mainContent, rightPanel
     : "xl:grid-cols-[minmax(0,1fr)]";
 
   return (
-    <div className="space-y-3">
-      <div className="hidden xl:flex xl:justify-start">
-        <button
-          type="button"
-          onClick={() => setLeftOpen((open) => !open)}
-          aria-expanded={leftOpen}
-          aria-controls="calendar-left-queue-panel"
-          className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50"
-        >
-          {leftOpen ? <PanelLeftClose className="h-3.5 w-3.5" aria-hidden="true" /> : <PanelLeftOpen className="h-3.5 w-3.5" aria-hidden="true" />}
-          {leftOpen ? "Hide queue" : "Show queue"}
-        </button>
+    <CalendarInspectorContext.Provider
+      value={{
+        openInspector: () => setRightOpen(true),
+        closeInspector: () => setRightOpen(false),
+      }}
+    >
+      <div className="space-y-3">
+        <div className="hidden xl:flex xl:justify-start">
+          <button
+            type="button"
+            onClick={() => setLeftOpen((open) => !open)}
+            aria-expanded={leftOpen}
+            aria-controls="calendar-left-queue-panel"
+            className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm shadow-slate-950/5 transition hover:border-slate-300 hover:bg-slate-50"
+          >
+            {leftOpen ? <PanelLeftClose className="h-3.5 w-3.5" aria-hidden="true" /> : <PanelLeftOpen className="h-3.5 w-3.5" aria-hidden="true" />}
+            {leftOpen ? "Hide queue" : "Show queue"}
+          </button>
+        </div>
+
+        <div className={`grid gap-5 ${desktopGridColsClass}`}>
+          <aside
+            id="calendar-left-queue-panel"
+            className={`order-2 space-y-4 xl:sticky xl:top-24 xl:order-1 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto xl:pr-1 ${leftOpen ? "xl:block" : "xl:hidden"}`}
+          >
+            {leftPanel}
+          </aside>
+
+          <main className="order-1 min-w-0 space-y-4 xl:order-2">{mainContent}</main>
+
+          {showRightPanel ? <aside className="order-3 hidden xl:block">{rightPanel}</aside> : null}
+        </div>
       </div>
-
-      <div className={`grid gap-5 ${desktopGridColsClass}`}>
-        <aside
-          id="calendar-left-queue-panel"
-          className={`order-2 space-y-4 xl:sticky xl:top-24 xl:order-1 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto xl:pr-1 ${leftOpen ? "xl:block" : "xl:hidden"}`}
-        >
-          {leftPanel}
-        </aside>
-
-        <main className="order-1 min-w-0 space-y-4 xl:order-2">{mainContent}</main>
-
-        {showRightPanel ? <aside className="order-3 hidden xl:block">{rightPanel}</aside> : null}
-      </div>
-    </div>
+    </CalendarInspectorContext.Provider>
   );
 }

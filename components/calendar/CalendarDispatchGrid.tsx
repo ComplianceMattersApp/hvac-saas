@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Fragment, useState, useTransition } from "react";
+import { Fragment, useContext, useState, useTransition } from "react";
 import type { DispatchCalendarBlockEvent, DispatchJob, DispatchViewMode } from "@/lib/actions/calendar";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { compactCalendarUserLabel } from "@/lib/calendar/calendar-user-label";
 import { buildCalendarHref } from "./calendar-href";
+import { CalendarInspectorContext } from "./calendar-inspector-context";
 import { formatCalendarDisplayStatus, getCalendarDisplayStatus } from "./calendar-status";
 import {
   buildDragPayload,
@@ -285,6 +286,7 @@ export default function CalendarDispatchGrid(props: Props) {
 
   const router = useRouter();
   const [isSavingDrop, startSavingDrop] = useTransition();
+  const inspectorContext = useContext(CalendarInspectorContext);
 
   const dayJobs = jobs.filter((job) => {
     if (mode === "day") return String(job.scheduled_date) === date;
@@ -848,8 +850,9 @@ export default function CalendarDispatchGrid(props: Props) {
                     {jobCardBody}
                   </Link>
                   <Link
-                    href={buildCalendarHref(currentView, date, { job: job.id, tech })}
+                    href={buildCalendarHref(currentView, date, { job: job.id, tech, inspector: null })}
                     draggable={lifecycle !== "cancelled"}
+                    onClick={() => inspectorContext?.openInspector()}
                     onDragStart={(event) => {
                       if (lifecycle === "cancelled") {
                         event.preventDefault();

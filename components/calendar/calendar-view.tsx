@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { Suspense } from 'react';
-import { CalendarPlus, ChevronDown, X } from 'lucide-react';
+import { CalendarPlus, ChevronDown } from 'lucide-react';
 import { endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
 import CalendarLayoutShell from './CalendarLayoutShell';
+import CalendarInspectorCloseButton from './CalendarInspectorCloseButton';
 import CalendarMonthGrid from './CalendarMonthGrid';
 import CalendarDispatchGrid from './CalendarDispatchGrid';
 import CalendarDragJobLink from './CalendarDragJobLink';
@@ -426,7 +427,7 @@ function AgendaList(props: {
                 <CalendarResponsiveJobLink
                   key={job.id}
                   mobileHref={`/jobs/${job.id}`}
-                  desktopHref={buildCalendarHref('list', date, { job: job.id, tech })}
+                  desktopHref={buildCalendarHref('list', date, { job: job.id, tech, inspector: null })}
                   title={calendarJobTooltip(job)}
                   scroll={false}
                   className={`block rounded-xl border border-l-4 ${agendaJobLeftRailClass(lifecycle)} border-slate-200/80 bg-white px-3.5 py-3 shadow-[0_8px_22px_-18px_rgba(15,31,53,0.3)] transition hover:-translate-y-px hover:border-slate-300 hover:bg-slate-50/80 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-300 ${faded}`}
@@ -546,14 +547,7 @@ function DetailPanel(props: {
               </div>
             ) : null}
           </div>
-          <Link
-            href={closeHref}
-            scroll={false}
-            aria-label="Close details"
-            className="shrink-0 rounded-lg border border-transparent p-2 text-slate-500 transition hover:border-slate-200 hover:bg-slate-50 hover:text-slate-800"
-          >
-            <X className="h-4 w-4" />
-          </Link>
+          <CalendarInspectorCloseButton closeHref={closeHref} />
         </div>
 
         <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
@@ -994,7 +988,7 @@ async function CalendarQueueSidebar(props: {
               return (
                 <CalendarDragJobLink
                   key={`unassigned-${job.id}`}
-                  href={buildCalendarHref(props.uiView, props.anchorDate, { job: job.id, tech: props.activeTech })}
+                  href={buildCalendarHref(props.uiView, props.anchorDate, { job: job.id, tech: props.activeTech, inspector: null })}
                   mobileHref={`/jobs/${job.id}`}
                   title={calendarJobTooltip(job)}
                   draggable
@@ -1573,7 +1567,11 @@ export async function CalendarView(props: Props) {
   const filteredDayJobs = filteredJobsByDay.find((day) => day.date === data.day.date)?.jobs ?? [];
   const selectedDayJobs = techFilteredScheduledJobsByDay.find((day) => day.date === data.anchorDate)?.jobs ?? [];
   const mondayAnchorDate = startOfWeekMondayYmd(data.anchorDate);
-  const showDesktopInspectorColumn = inspectorOpen && (uiView === 'month' || Boolean(selectedJob) || Boolean(selectedJobId));
+  const hasRightPanelContent = uiView === 'month' || Boolean(selectedJob) || Boolean(selectedJobId);
+  const inspectorSelectedKey = `${selectedJobId}|${selectedBlockId}|${data.anchorDate}`;
+  // Kept for the desktop right-aside fallback render below; the mobile xl:hidden
+  // overlay further down still gates on inspectorOpen directly (untouched).
+  const showDesktopInspectorColumn = hasRightPanelContent;
 
   const targetDateForView = (viewValue: CalendarUIView) => {
     if (viewValue === 'week' || viewValue === 'list') return mondayAnchorDate;
@@ -1728,7 +1726,9 @@ export async function CalendarView(props: Props) {
       </div>
 
       <CalendarLayoutShell
-        showRightPanel={showDesktopInspectorColumn}
+        hasRightPanelContent={hasRightPanelContent}
+        initialRightOpen={inspectorOpen}
+        selectedKey={inspectorSelectedKey}
         leftPanel={
           <>
             <Suspense fallback={<CalendarBlockControlsFallback />}>

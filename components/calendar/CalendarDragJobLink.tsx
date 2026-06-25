@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { useContext } from "react";
 import { buildDragPayload, serializeDragPayload } from "./calendar-dnd";
+import { CalendarInspectorContext } from "./calendar-inspector-context";
 
 type Props = {
   href: string;
@@ -45,6 +47,8 @@ export default function CalendarDragJobLink(props: Props) {
     </>
   );
 
+  const inspectorContext = useContext(CalendarInspectorContext);
+
   return (
     <>
       {mobileHref ? (
@@ -62,6 +66,7 @@ export default function CalendarDragJobLink(props: Props) {
       draggable={draggable}
       scroll={scroll}
       className={mobileHref ? `${className} hidden xl:block` : className}
+      onClick={() => inspectorContext?.openInspector()}
       onDragStart={(event) => {
         if (!draggable) {
           event.preventDefault();
