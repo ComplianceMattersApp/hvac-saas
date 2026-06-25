@@ -95,7 +95,7 @@ function buildInternalServiceIntakeFormData(options?: {
   visitScopeSummary?: string;
   visitScopeItemsJson?: string;
   maintenanceAgreementId?: string;
-  serviceVisitType?: "diagnostic" | "repair" | "install" | "return_visit" | "callback" | "maintenance";
+  serviceVisitType?: "diagnostic" | "repair" | "return_visit" | "callback" | "maintenance";
   intakeContext?: "app" | "portal";
   equipmentJson?: string;
 }) {
@@ -736,7 +736,7 @@ describe("job intake create same-account hardening", () => {
     });
   });
 
-  it("accepts install service visit type in service intake", async () => {
+  it("falls back when legacy install service visit type is submitted", async () => {
     const fixture = buildSupabaseFixture({
       throwOnJobsInsert: true,
       accountSettingsProductMode: "hybrid",
@@ -751,21 +751,19 @@ describe("job intake create same-account hardening", () => {
 
     const { createJobFromForm } = await import("@/lib/actions/job-actions");
 
-    await expect(
-      createJobFromForm(
-        buildInternalServiceIntakeFormData({
-          serviceVisitType: "install",
-          visitScopeItemsJson: JSON.stringify([
-            { title: "Install condenser", details: "Back yard", kind: "primary" },
-          ]),
-        }),
-      ),
-    ).rejects.toThrow(ALLOW_PATH_REACHED);
+    const formData = buildInternalServiceIntakeFormData({
+      visitScopeItemsJson: JSON.stringify([
+        { title: "Install condenser", details: "Back yard", kind: "primary" },
+      ]),
+    });
+    formData.set("service_visit_type", "install");
+
+    await expect(createJobFromForm(formData)).rejects.toThrow(ALLOW_PATH_REACHED);
 
     const jobsInsert = fixture.insertCalls.find((call) => call.table === "jobs");
     expect(jobsInsert?.payload).toMatchObject({
       job_type: "service",
-      service_visit_type: "install",
+      service_visit_type: "diagnostic",
     });
   });
 

@@ -148,7 +148,6 @@ type NewJobDraft = {
   serviceVisitType?:
     | "diagnostic"
     | "repair"
-    | "install"
     | "return_visit"
     | "callback"
     | "maintenance";
@@ -184,6 +183,26 @@ type NewJobDraft = {
     category?: string | null;
   }>;
 };
+
+type ServiceVisitType =
+  | "diagnostic"
+  | "repair"
+  | "return_visit"
+  | "callback"
+  | "maintenance";
+
+function normalizeDraftServiceVisitType(value: unknown): ServiceVisitType {
+  const normalized = String(value ?? "").trim().toLowerCase();
+  if (
+    normalized === "repair" ||
+    normalized === "return_visit" ||
+    normalized === "callback" ||
+    normalized === "maintenance"
+  ) {
+    return normalized;
+  }
+  return "diagnostic";
+}
 
 type RelationshipAction = "new_case" | "open_active_job" | "create_follow_up";
 
@@ -498,7 +517,7 @@ export default function NewJobForm({
     "reactive" | "callback" | "warranty" | "maintenance"
   >(maintenanceAgreementPrefill ? "maintenance" : "reactive");
   const [serviceVisitType, setServiceVisitType] = useState<
-    "diagnostic" | "repair" | "install" | "return_visit" | "callback" | "maintenance"
+    ServiceVisitType
   >(maintenanceAgreementPrefill ? "maintenance" : "diagnostic");
   const [serviceVisitOutcome, setServiceVisitOutcome] = useState<
     "resolved" | "follow_up_required" | "no_issue_found"
@@ -1144,7 +1163,7 @@ const [billingRecipient, setBillingRecipient] = useState<
       }),
     );
     setServiceCaseKind(d.serviceCaseKind ?? "reactive");
-    setServiceVisitType(d.serviceVisitType ?? "diagnostic");
+    setServiceVisitType(normalizeDraftServiceVisitType(d.serviceVisitType));
     setServiceVisitOutcome(d.serviceVisitOutcome ?? "follow_up_required");
     const restoredBillingRecipient = d.billingRecipient ?? (myContractor?.id ? "contractor" : "customer");
     setBillingRecipient(
@@ -1861,7 +1880,6 @@ const [billingRecipient, setBillingRecipient] = useState<
                         e.target.value as
                           | "diagnostic"
                           | "repair"
-                          | "install"
                           | "return_visit"
                           | "callback"
                           | "maintenance",
@@ -1870,7 +1888,6 @@ const [billingRecipient, setBillingRecipient] = useState<
                   >
                     <option value="diagnostic">{isCleaningMode ? "Initial Cleaning" : "Diagnostic"}</option>
                     <option value="repair">{isCleaningMode ? "Cleaning Work" : "Repair"}</option>
-                    <option value="install">{isCleaningMode ? "Deep Cleaning" : "Install"}</option>
                     <option value="return_visit">Return Visit</option>
                     <option value="callback">Callback</option>
                     <option value="maintenance">Maintenance</option>
@@ -2679,7 +2696,6 @@ const [billingRecipient, setBillingRecipient] = useState<
                             e.target.value as
                               | "diagnostic"
                               | "repair"
-                              | "install"
                               | "return_visit"
                               | "callback"
                               | "maintenance",
@@ -2688,7 +2704,6 @@ const [billingRecipient, setBillingRecipient] = useState<
                       >
                         <option value="diagnostic">{isCleaningMode ? "Initial Cleaning Visit" : "Initial / Diagnostic Visit"}</option>
                         <option value="repair">{isCleaningMode ? "Cleaning Work Visit" : "Service Work Visit"}</option>
-                        <option value="install">{isCleaningMode ? "Deep Cleaning Visit" : "Install Visit"}</option>
                         <option value="return_visit">Return Visit</option>
                         <option value="callback">Callback Visit</option>
                         <option value="maintenance">Maintenance Visit</option>
@@ -2815,7 +2830,6 @@ const [billingRecipient, setBillingRecipient] = useState<
                                 e.target.value as
                                   | "diagnostic"
                                   | "repair"
-                                  | "install"
                                   | "return_visit"
                                   | "callback"
                                   | "maintenance",
@@ -2824,7 +2838,6 @@ const [billingRecipient, setBillingRecipient] = useState<
                           >
                             <option value="diagnostic">{isCleaningMode ? "Initial Cleaning Visit" : "Initial / Diagnostic Visit"}</option>
                             <option value="repair">{isCleaningMode ? "Cleaning Work Visit" : "Service Work Visit"}</option>
-                            <option value="install">{isCleaningMode ? "Deep Cleaning Visit" : "Install Visit"}</option>
                             <option value="return_visit">Return Visit</option>
                             <option value="callback">Callback Visit</option>
                             <option value="maintenance">Maintenance Visit</option>

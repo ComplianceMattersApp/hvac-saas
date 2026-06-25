@@ -30,7 +30,7 @@ describe("/jobs/new HVAC Service-mode simplification (Phase 4)", () => {
     expect(formSource).toContain(
       "What kind of visit is this, and what work needs to be done?",
     );
-    expect(formSource).toContain('<option value="install">{isCleaningMode ? "Deep Cleaning Visit" : "Install Visit"}</option>');
+    expect(formSource).not.toContain('value="install"');
     expect(formSource).toContain('isServiceSurfaceMode && jobType === "service" && !isServicePlanQuickScheduleMode ? (');
     expect(formSource).toContain('name="service_case_kind"');
     expect(formSource).toContain('name="service_visit_type"');

@@ -8311,15 +8311,14 @@ const failureResolutionPathCount =
                           >
                             <option value="diagnostic">{isCleaningMode ? "Initial Cleaning Visit" : "Diagnostic"}</option>
                             <option value="repair">{isCleaningMode ? "Cleaning Work Visit" : "Repair"}</option>
-                            <option value="install">{isCleaningMode ? "Deep Cleaning Visit" : "Install"}</option>
                             <option value="return_visit">Return Visit</option>
                             <option value="callback">Callback</option>
                             <option value="maintenance">Maintenance</option>
                           </select>
                           <p className="text-[11px] leading-5 text-slate-500">
                             {isCleaningMode
-                              ? "Category of visit, such as initial cleaning, cleaning work, deep cleaning, return visit, callback, or maintenance."
-                              : "Category of visit, such as diagnostic, repair, install, return visit, callback, or maintenance."}
+                              ? "Category of visit, such as initial cleaning, cleaning work, return visit, callback, or maintenance."
+                              : "Category of visit, such as diagnostic, repair, return visit, callback, or maintenance."}
                           </p>
                         </div>
                       </div>
