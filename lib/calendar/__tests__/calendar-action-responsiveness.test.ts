@@ -27,6 +27,11 @@ const responsiveJobLinkSource = readFileSync(
   "utf-8",
 );
 
+const layoutShellSource = readFileSync(
+  resolve(__dirname, "../../../components/calendar/CalendarLayoutShell.tsx"),
+  "utf-8",
+);
+
 describe("calendar action responsiveness", () => {
   it("uses a dedicated client open-job button in calendar inspector", () => {
     expect(calendarViewSource).toContain("CalendarOpenJobButton");
@@ -133,7 +138,7 @@ describe("calendar action responsiveness", () => {
   });
 
   it("keeps the desktop planner queue sticky while the calendar scrolls", () => {
-    expect(calendarViewSource).toContain("xl:sticky xl:top-24 xl:order-1 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto");
+    expect(layoutShellSource).toContain("xl:sticky xl:top-24 xl:order-1 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto");
     expect(calendarViewSource).toContain("<CalendarQueueSidebar queuePromise={queuePromise}");
     expect(calendarViewSource).toContain("Open or drag a job to place it on the schedule.");
   });

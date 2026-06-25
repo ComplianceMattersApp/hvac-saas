@@ -3,6 +3,7 @@ import { Suspense } from 'react';
 import { CalendarPlus, ChevronDown, X } from 'lucide-react';
 import { endOfMonth, format as formatDate, parseISO, startOfMonth } from 'date-fns';
 
+import CalendarLayoutShell from './CalendarLayoutShell';
 import CalendarMonthGrid from './CalendarMonthGrid';
 import CalendarDispatchGrid from './CalendarDispatchGrid';
 import CalendarDragJobLink from './CalendarDragJobLink';
@@ -82,20 +83,6 @@ function bannerMessage(banner?: string) {
   const key = String(banner ?? '').trim();
   if (!key) return null;
   return map[key] ?? null;
-}
-
-function dispatchBlockClass(status?: string | null) {
-  const value = String(status ?? '').toLowerCase();
-  if (value === 'failed') return 'border-rose-300 bg-rose-100 text-rose-950';
-  if (value === 'pending_info') return 'border-amber-200 bg-amber-100 text-amber-900';
-  if (value === 'on_hold') return 'border-slate-300 bg-slate-100 text-slate-900';
-  if (value === 'on_my_way') return 'border-blue-300 bg-blue-100 text-blue-950';
-  if (value === 'in_progress') return 'border-indigo-300 bg-indigo-100 text-indigo-950';
-  if (value === 'field_complete') return 'border-amber-200 bg-amber-100 text-amber-900';
-  if (value === 'cancelled') return 'border-slate-300 border-dashed bg-slate-100 text-slate-500';
-  if (value === 'closed') return 'border-green-200 border-dashed bg-green-50 text-green-900';
-  if (value === 'scheduled') return 'border-cyan-300 bg-cyan-100 text-cyan-950';
-  return 'border-indigo-200 bg-indigo-50 text-indigo-900';
 }
 
 function customerName(job: DispatchJob) {
@@ -209,46 +196,11 @@ function todayYmdLA(now = new Date()) {
   }).format(now);
 }
 
-function currentMinutesLA(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/Los_Angeles',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(now);
-  const h = Number(parts.find((p) => p.type === 'hour')?.value ?? '0');
-  const m = Number(parts.find((p) => p.type === 'minute')?.value ?? '0');
-  if (!Number.isFinite(h) || !Number.isFinite(m)) return null;
-  return h * 60 + m;
-}
-
-function parseMinutes(value?: string | null): number | null {
-  const raw = String(value ?? '').trim();
-  const m = raw.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
-  if (!m) return null;
-  const h = Number(m[1]);
-  const min = Number(m[2]);
-  if (!Number.isFinite(h) || !Number.isFinite(min)) return null;
-  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
-  return h * 60 + min;
-}
-
 function isDispatchVisibleForLayout(job: DispatchJob) {
   const ops = String(job.ops_status ?? '').toLowerCase();
   if (!job.scheduled_date || !job.window_start) return false;
   if (ops === 'on_hold') return false;
   return true;
-}
-
-function blockTimeLabel(startMinutes: number, endMinutes: number) {
-  const toLabel = (minutes: number) => {
-    const h24 = Math.floor(minutes / 60);
-    const m = minutes % 60;
-    const h12 = h24 % 12 === 0 ? 12 : h24 % 12;
-    const suffix = h24 >= 12 ? 'PM' : 'AM';
-    return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
-  };
-  return `${toLabel(startMinutes)} - ${toLabel(endMinutes)}`;
 }
 
 function listTimeWindowLabel(windowStart?: string | null, windowEnd?: string | null) {
@@ -1645,8 +1597,6 @@ export async function CalendarView(props: Props) {
   const noTechScheduledCount = filteredJobsForRange.filter(
     (job) => job.scheduled_date && (!job.assignments || job.assignments.length === 0),
   ).length;
-  const hiddenScheduledJobs: DispatchJob[] = [];
-  const unscheduledJobs: DispatchJob[] = [];
   const activeFilterLabel = activeUnassignedFilter
     ? 'Unassigned only'
     : hasAppliedSelectedCalendarUsers
@@ -1777,74 +1727,75 @@ export async function CalendarView(props: Props) {
         </div>
       </div>
 
-      <div className={`grid gap-5 ${showDesktopInspectorColumn ? 'xl:grid-cols-[280px_minmax(0,1fr)_360px]' : 'xl:grid-cols-[280px_minmax(0,1fr)]'}`}>
-        <aside className="order-2 space-y-4 xl:sticky xl:top-24 xl:order-1 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto xl:pr-1">
-          <Suspense fallback={<CalendarBlockControlsFallback />}>
-            <CalendarBlockControls
-              rosterPromise={rosterPromise}
-              selectedBlock={selectedBlock}
-              uiView={uiView}
-              anchorDate={data.anchorDate}
-              activeTech={activeCalendarTechParam}
-              activeTechnicianUserId={activeCalendarTechnicianUserId}
-            />
-          </Suspense>
+      <CalendarLayoutShell
+        showRightPanel={showDesktopInspectorColumn}
+        leftPanel={
+          <>
+            <Suspense fallback={<CalendarBlockControlsFallback />}>
+              <CalendarBlockControls
+                rosterPromise={rosterPromise}
+                selectedBlock={selectedBlock}
+                uiView={uiView}
+                anchorDate={data.anchorDate}
+                activeTech={activeCalendarTechParam}
+                activeTechnicianUserId={activeCalendarTechnicianUserId}
+              />
+            </Suspense>
 
-          <Suspense fallback={<CalendarQueueSidebarFallback />}>
-            <CalendarQueueSidebar queuePromise={queuePromise} uiView={uiView} anchorDate={data.anchorDate} activeTech={activeCalendarTechParam} />
-          </Suspense>
-
-          {hiddenScheduledJobs.length ? (
-            <section className="rounded-xl border border-l-4 border-l-rose-500 border-rose-200/80 bg-rose-50/70 p-3 shadow-[0_12px_30px_-24px_rgba(15,31,53,0.2)]">
-              <div className="mb-3 flex items-center justify-between gap-2">
-                <div>
-                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-800">Scheduled Jobs Needing Attention</h3>
-                  <p className="mt-0.5 text-[11px] text-rose-800/75">Scheduled but missing required info. Open each job before dispatching.</p>
-                </div>
+            <Suspense fallback={<CalendarQueueSidebarFallback />}>
+              <CalendarQueueSidebar queuePromise={queuePromise} uiView={uiView} anchorDate={data.anchorDate} activeTech={activeCalendarTechParam} />
+            </Suspense>
+          </>
+        }
+        rightPanel={
+          showDesktopInspectorColumn ? (
+            selectedJob ? (
+              <Suspense fallback={<CalendarQueueInspectorFallback className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 shadow-lg shadow-slate-950/10" />}>
+                <CalendarSelectedJobInspector
+                  rosterPromise={rosterPromise}
+                  job={selectedJob}
+                  returnTo={returnTo}
+                  closeHref={hideInspectorHref}
+                  view={uiView}
+                  date={data.anchorDate}
+                  tech={activeCalendarTechParam}
+                  prefillDate={prefillDate}
+                  className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
+                />
+              </Suspense>
+            ) : selectedJobId ? (
+              <Suspense fallback={<CalendarQueueInspectorFallback className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 shadow-lg shadow-slate-950/10" />}>
+                <CalendarQueueSelectedJobInspector
+                  queuePromise={queuePromise}
+                  rosterPromise={rosterPromise}
+                  selectedJobId={selectedJobId}
+                  returnTo={returnTo}
+                  closeHref={hideInspectorHref}
+                  view={uiView}
+                  date={data.anchorDate}
+                  tech={activeCalendarTechParam}
+                  prefillDate={prefillDate}
+                  className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
+                />
+              </Suspense>
+            ) : uiView === 'month' ? (
+              <div className="sticky top-24 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_20px_48px_-30px_rgba(15,31,53,0.3)]">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Inspector</p>
+                <h3 className="mt-1 text-sm font-semibold text-[#0f1f35]">{formatDayDateHeader(data.anchorDate)}</h3>
+                <p className="mt-2 text-xs text-slate-600">
+                  {selectedDayJobs.length} scheduled job{selectedDayJobs.length === 1 ? '' : 's'} in this day context.
+                </p>
+                <MonthInspectorDaySummary date={data.anchorDate} jobs={selectedDayJobs} tech={activeCalendarTechParam} />
+                <p className="mt-3 text-xs text-slate-600">
+                  Use Add Block in the planner column to create an internal block for this selected day.
+                </p>
+                <p className="mt-3 text-xs text-slate-500">Select a preview row or job chip to open schedule and assignment controls.</p>
               </div>
-              <div className="max-h-[32vh] space-y-2 overflow-y-auto pr-1">
-                {hiddenScheduledJobs.map((job) => {
-                  const issueSummary = dispatchVisibilityIssueLabels(job).join(' · ') || 'Needs review';
-                  const lifecycle = getCalendarDisplayStatus(job);
-                  const isCancelledJob = lifecycle === 'cancelled';
-
-                  return (
-                    <CalendarDragJobLink
-                      key={`hidden-scheduled-${job.id}`}
-                      href={buildCalendarHref(uiView, job.scheduled_date ?? data.anchorDate, { job: job.id, tech: activeCalendarTechParam })}
-                      mobileHref={`/jobs/${job.id}`}
-                      title={calendarJobTooltip(job)}
-                      draggable={!isCancelledJob}
-                      jobId={job.id}
-                      windowStart={job.window_start}
-                      windowEnd={job.window_end}
-                      jobTitle={shortTitle(job)}
-                      jobCity={job.city}
-                      assigneeSummary={Array.isArray(job.assignments) ? job.assignments.map((a) => a.display_name).filter(Boolean).join(', ') : null}
-                      hasNoTechAssigned={!job.assignments || job.assignments.length === 0}
-                      scroll={false}
-                      className={`group block rounded-xl border border-rose-200/80 bg-white/90 px-3 py-3 transition ${isCancelledJob ? 'cursor-default opacity-80' : 'cursor-grab hover:-translate-y-px hover:border-rose-300 hover:bg-white hover:shadow-md active:cursor-grabbing active:opacity-85'}`}
-                    >
-                      <p className="truncate text-xs font-semibold text-slate-900">{shortTitle(job)}</p>
-                      <p className="mt-0.5 truncate text-[11px] text-slate-600">{formatBusinessDateUS(job.scheduled_date ?? data.anchorDate)}</p>
-                      <p className="mt-1 truncate text-[11px] font-medium text-rose-900">{issueSummary}</p>
-                      <p className="mt-1 text-[10px] font-medium uppercase tracking-wide text-rose-700/90 group-hover:text-rose-800">
-                        {isCancelledJob
-                          ? 'Historical cancelled record'
-                          : uiView === 'list'
-                          ? 'Open to review'
-                          : 'Open to schedule'}
-                      </p>
-                    </CalendarDragJobLink>
-                  );
-                })}
-              </div>
-            </section>
-          ) : null}
-
-        </aside>
-
-        <main className="order-1 min-w-0 space-y-4 xl:order-2">
+            ) : null
+          ) : null
+        }
+        mainContent={
+          <>
           {uiView === 'list' ? (
             <section className="overflow-x-auto px-1">
               <CalendarMobileListAnchor
@@ -1922,56 +1873,9 @@ export async function CalendarView(props: Props) {
               ))}
             </section>
           )}
-        </main>
-
-        {showDesktopInspectorColumn ? (
-          <aside className="order-3 hidden xl:block">
-            {selectedJob ? (
-              <Suspense fallback={<CalendarQueueInspectorFallback className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 shadow-lg shadow-slate-950/10" />}>
-                <CalendarSelectedJobInspector
-                  rosterPromise={rosterPromise}
-                  job={selectedJob}
-                  returnTo={returnTo}
-                  closeHref={hideInspectorHref}
-                  view={uiView}
-                  date={data.anchorDate}
-                  tech={activeCalendarTechParam}
-                  prefillDate={prefillDate}
-                  className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
-                />
-              </Suspense>
-            ) : selectedJobId ? (
-              <Suspense fallback={<CalendarQueueInspectorFallback className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 shadow-lg shadow-slate-950/10" />}>
-                <CalendarQueueSelectedJobInspector
-                  queuePromise={queuePromise}
-                  rosterPromise={rosterPromise}
-                  selectedJobId={selectedJobId}
-                  returnTo={returnTo}
-                  closeHref={hideInspectorHref}
-                  view={uiView}
-                  date={data.anchorDate}
-                  tech={activeCalendarTechParam}
-                  prefillDate={prefillDate}
-                  className="sticky top-24 max-h-[calc(100vh-7rem)] rounded-2xl border border-slate-200 bg-white shadow-lg shadow-slate-950/10"
-                />
-              </Suspense>
-            ) : uiView === 'month' ? (
-              <div className="sticky top-24 rounded-2xl border border-slate-200/70 bg-white p-4 shadow-[0_20px_48px_-30px_rgba(15,31,53,0.3)]">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-blue-700/80">Inspector</p>
-                <h3 className="mt-1 text-sm font-semibold text-[#0f1f35]">{formatDayDateHeader(data.anchorDate)}</h3>
-                <p className="mt-2 text-xs text-slate-600">
-                  {selectedDayJobs.length} scheduled job{selectedDayJobs.length === 1 ? '' : 's'} in this day context.
-                </p>
-                <MonthInspectorDaySummary date={data.anchorDate} jobs={selectedDayJobs} tech={activeCalendarTechParam} />
-                <p className="mt-3 text-xs text-slate-600">
-                  Use Add Block in the planner column to create an internal block for this selected day.
-                </p>
-                <p className="mt-3 text-xs text-slate-500">Select a preview row or job chip to open schedule and assignment controls.</p>
-              </div>
-            ) : null}
-          </aside>
-        ) : null}
-      </div>
+          </>
+        }
+      />
 
       {inspectorOpen && (selectedJob || selectedJobId) ? (
         <div className="fixed inset-0 z-50 bg-black/30 px-3 pb-4 pt-24 sm:px-4 sm:pb-5 sm:pt-28 xl:hidden">
