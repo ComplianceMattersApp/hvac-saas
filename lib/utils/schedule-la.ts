@@ -96,6 +96,21 @@ export function displayWindowLA(start?: string | null, end?: string | null): str
   return a || b;
 }
 
+export function buildAutoScheduleWindowLA(now = new Date(), durationMs = 2 * 60 * 60 * 1000): {
+  scheduled_date: string;
+  window_start: string;
+  window_end: string;
+} {
+  const startIso = now.toISOString();
+  const endIso = new Date(now.getTime() + durationMs).toISOString();
+
+  return {
+    scheduled_date: displayDateLA(startIso),
+    window_start: displayTimeLA(startIso),
+    window_end: displayTimeLA(endIso),
+  };
+}
+
 // --- Parsing (UI -> DB) ---
 // Build a UTC ISO instant from an LA date (YYYY-MM-DD) and time (HH:MM).
 export function laDateTimeToUtcIso(dateYYYYMMDD: string, timeHHMM: string): string {

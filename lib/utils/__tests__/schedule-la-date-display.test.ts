@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatBusinessDateUS, formatDateOnlyDisplay, formatTimestampDateDisplayLA } from '@/lib/utils/schedule-la';
+import {
+  buildAutoScheduleWindowLA,
+  formatBusinessDateUS,
+  formatDateOnlyDisplay,
+  formatTimestampDateDisplayLA,
+  formatTimestampDateTimeDisplayLA,
+} from '@/lib/utils/schedule-la';
 
 describe('date-only display formatting', () => {
   it('formats YYYY-MM-DD to MM-DD-YYYY', () => {
@@ -22,5 +28,17 @@ describe('date-only display formatting', () => {
 
   it('formats LA timestamps to MM-DD-YYYY', () => {
     expect(formatTimestampDateDisplayLA('2026-04-29T18:30:00.000Z')).toBe('04-29-2026');
+  });
+
+  it('formats timestamps through the app LA timezone instead of raw UTC', () => {
+    expect(formatTimestampDateTimeDisplayLA('2026-04-29T01:30:00.000Z')).toBe('04-28-2026 18:30');
+  });
+
+  it('builds unscheduled On the way auto-filled windows in the app timezone', () => {
+    expect(buildAutoScheduleWindowLA(new Date('2026-04-29T01:30:00.000Z'))).toEqual({
+      scheduled_date: '2026-04-28',
+      window_start: '18:30',
+      window_end: '20:30',
+    });
   });
 });

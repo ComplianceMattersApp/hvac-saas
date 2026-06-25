@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
+import { formatTimestampDateTimeDisplayLA } from "@/lib/utils/schedule-la";
 
 import DeferredNarrativeSectionFailure from "./DeferredNarrativeSectionFailure";
 
@@ -9,27 +10,6 @@ type DeferredInternalNotesBodyProps = {
   hasDirectNarrativeChain: boolean;
   emptyStateClassName: string;
 };
-
-function formatDateTimeLAFromIso(iso: string) {
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return "";
-
-  const date = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-
-  const time = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
-
-  return `${date} ${time}`;
-}
 
 function getEventNoteText(meta?: any) {
   if (!meta) return "";
@@ -125,7 +105,7 @@ export default async function DeferredInternalNotesBody({
     return (
       <div className="space-y-3">
         {noteItems.map((e: any, idx: number) => {
-          const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "-";
+          const when = e?.created_at ? formatTimestampDateTimeDisplayLA(String(e.created_at)) : "-";
           const meta = e?.meta ?? {};
           const noteText = getEventNoteText(meta);
           const taggedDisplayNames = getTaggedUserIds(meta)

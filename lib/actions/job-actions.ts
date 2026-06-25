@@ -87,7 +87,7 @@ import {
   ensureQiiEnv22InsulationCompletionFields,
 } from "@/lib/ecc/qii-env22-insulation";
 import type { JobStatus } from "@/lib/types/job";
-import { displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
+import { buildAutoScheduleWindowLA, displayWindowLA, formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { mapToCanonicalRole, sanitizeEquipmentFields } from "@/lib/utils/equipment-domain";
 import { equipmentRoleLabel } from "@/lib/utils/equipment-display";
 import {
@@ -10049,21 +10049,6 @@ export async function advanceJobStatusFromForm(formData: FormData) {
 
     const now = new Date();
 
-    const toLocalDate = (d: Date) => {
-      const year = d.getFullYear();
-      const month = String(d.getMonth() + 1).padStart(2, "0");
-      const day = String(d.getDate()).padStart(2, "0");
-      return `${year}-${month}-${day}`;
-    };
-
-    const toLocalTime = (d: Date) => {
-      const hours = String(d.getHours()).padStart(2, "0");
-      const minutes = String(d.getMinutes()).padStart(2, "0");
-      return `${hours}:${minutes}`;
-    };
-
-    const plusTwoHours = new Date(now.getTime() + 2 * 60 * 60 * 1000);
-
     if (!hasFullSchedule && !autoScheduleConfirmed) {
       console.log("[ADVANCE_STATUS_REDIRECT]", { jobId: id, reason: "schedule_required", current, next, hasFullSchedule });
       _ftEmit("guard:schedule_required", buildJobRedirect({ schedule_required: "1" }));
@@ -10090,9 +10075,7 @@ export async function advanceJobStatusFromForm(formData: FormData) {
     };
 
     if (!hasFullSchedule && autoScheduleConfirmed) {
-      updatePayload.scheduled_date = toLocalDate(now);
-      updatePayload.window_start = toLocalTime(now);
-      updatePayload.window_end = toLocalTime(plusTwoHours);
+      Object.assign(updatePayload, buildAutoScheduleWindowLA(now));
     }
 
     const { data: onTheWayApplied, error: updErr } = await _ftTimeSubphase(

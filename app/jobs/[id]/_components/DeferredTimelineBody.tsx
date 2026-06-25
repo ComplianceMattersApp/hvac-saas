@@ -2,6 +2,7 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { resolveUserDisplayMap } from "@/lib/staffing/human-layer";
+import { formatTimestampDateTimeDisplayLA } from "@/lib/utils/schedule-la";
 import {
   buildJobHistorySummary,
   type JobHistorySummaryJobInput,
@@ -27,27 +28,6 @@ function sanitizeStoryLine(value: string): string {
 
   const withoutUuids = normalized.replace(UUID_PATTERN, "linked job");
   return withoutUuids.replace(/\bjob-[0-9a-z-]+\b/gi, "linked job").trim();
-}
-
-function formatDateTimeLAFromIso(iso: string) {
-  const d = new Date(iso);
-  if (!Number.isFinite(d.getTime())) return "";
-
-  const date = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(d);
-
-  const time = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
-
-  return `${date} ${time}`;
 }
 
 function getEventAttachmentCount(meta?: any) {
@@ -283,7 +263,7 @@ function formatTimelineEvent(type?: string | null, meta?: any, message?: string 
 }
 
 function renderTimelineItem(e: any, key: string, actorDisplayMap: Record<string, string>) {
-  const when = e?.created_at ? formatDateTimeLAFromIso(String(e.created_at)) : "-";
+  const when = e?.created_at ? formatTimestampDateTimeDisplayLA(String(e.created_at)) : "-";
   const type = String(e?.event_type ?? "");
   const meta = e?.meta ?? {};
   const actorUserId = String(meta?.actor_user_id ?? e?.user_id ?? "").trim();
