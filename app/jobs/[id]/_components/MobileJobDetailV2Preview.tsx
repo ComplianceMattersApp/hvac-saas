@@ -457,11 +457,13 @@ export default function MobileJobDetailV2Preview(props: any) {
     surfaceProfile,
     closeoutNeeds,
   });
+  const standardJobHref = `/jobs/${job.id}?tab=${tab}`;
+  const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
   const currentActionHref = nextStep.anchor
-    ? `/jobs/${job.id}?tab=${tab}#${nextStep.anchor}`
+    ? standardJobAnchorHref(nextStep.anchor)
     : nextStep.href
     ? nextStep.href
-    : `/jobs/${job.id}?tab=${tab}`;
+    : standardJobHref;
   const isEcc = String(job?.job_type ?? "").trim().toLowerCase() === "ecc";
   const billingPreview = buildBillingPreview({
     billingState,
@@ -509,7 +511,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                 <span>Job Workbench</span>
               </div>
               <Link
-                href={`/jobs/${job.id}?tab=${tab}`}
+                href={standardJobHref}
                 className="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
               >
                 Standard view
@@ -710,7 +712,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             )}
           </div>
           {onTheWayUndoEligibility?.eligible ? (
-            <Link href={`/jobs/${job.id}?tab=${tab}`} className="mt-3 inline-flex w-full justify-center text-sm font-semibold text-blue-100 underline underline-offset-4">
+            <Link href={standardJobHref} className="mt-3 inline-flex w-full justify-center text-sm font-semibold text-blue-100 underline underline-offset-4">
               Undo On the Way is available from job tools
             </Link>
           ) : null}
@@ -733,7 +735,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </div>
               </div>
             </div>
-            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-work-scope`} className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
+            <Link href={standardJobAnchorHref("mobile-work-scope")} className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
               {isEcc ? "Compliance details" : "View details"}
             </Link>
           </div>
@@ -757,7 +759,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Open</span>
                   </Link>
                 ) : null}
-                <Link href={`/jobs/${job.id}?tab=${tab}#mobile-tools`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
+                <Link href={standardJobAnchorHref("mobile-tools")} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
                   <span>
                     <span className="block font-semibold text-slate-950">Permit Info</span>
                     <span className="block text-sm text-slate-600">Review permit details and actions</span>
@@ -766,7 +768,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </Link>
               </>
             ) : (
-              <Link href={`/jobs/${job.id}?tab=${tab}#mobile-work-scope`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
+              <Link href={standardJobAnchorHref("mobile-work-scope")} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
                 <span>
                   <span className="block font-semibold text-slate-950">{surfaceProfile.labels.workItems}</span>
                   <span className="block text-sm text-slate-600">
@@ -794,7 +796,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             </div>
           </div>
           <div className="mt-3 space-y-2">
-            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-internal-notes`} className={evidenceActionClass}>
+            <Link href={standardJobAnchorHref("mobile-internal-notes")} className={evidenceActionClass}>
               <span className={evidenceActionTopClass}>
                 <span className={evidenceIconClass}>
                   <LockIcon className="h-4 w-4" />
@@ -808,7 +810,7 @@ export default function MobileJobDetailV2Preview(props: any) {
               </span>
             </Link>
             {showSharedNotesCard ? (
-              <Link href={`/jobs/${job.id}?tab=${tab}#mobile-shared-notes`} className={evidenceActionClass}>
+              <Link href={standardJobAnchorHref("mobile-shared-notes")} className={evidenceActionClass}>
                 <span className={evidenceActionTopClass}>
                   <span className={evidenceIconClass}>
                     <ChatIcon className="h-4 w-4" />
@@ -851,7 +853,7 @@ export default function MobileJobDetailV2Preview(props: any) {
           </div>
           {billingPreview.hrefAnchor ? (
             <Link
-              href={`/jobs/${job.id}?tab=${tab}#${billingPreview.hrefAnchor}`}
+              href={standardJobAnchorHref(billingPreview.hrefAnchor)}
               className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700"
             >
               <span>{billingPreview.actionLabel}</span>
@@ -868,7 +870,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             </div>
           </summary>
           <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
-            <Link href={`/jobs/${job.id}?tab=${tab}#mobile-tools`} className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
+            <Link href={standardJobAnchorHref("mobile-tools")} className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">
                   <ToolIcon className="h-4 w-4" />

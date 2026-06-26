@@ -53,6 +53,21 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("Preview only");
   });
 
+  it("keeps V2 preview anchor CTAs routed to standard current mobile anchors or real workspaces", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain('const standardJobHref = `/jobs/${job.id}?tab=${tab}`;');
+    expect(mobileJobDetailV2PreviewSource).toContain("const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;");
+    expect(mobileJobDetailV2PreviewSource).toContain("? standardJobAnchorHref(nextStep.anchor)");
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-work-scope")');
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-tools")');
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-internal-notes")');
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-shared-notes")');
+    expect(mobileJobDetailV2PreviewSource).toContain("standardJobAnchorHref(billingPreview.hrefAnchor)");
+    expect(mobileJobDetailV2PreviewSource).toContain("nextStep.href");
+    expect(mobileJobDetailV2PreviewSource).toContain("href: `/jobs/${props.job.id}/tests`");
+    expect(mobileJobDetailV2PreviewSource).toContain('href={`/jobs/${job.id}/attachments`}');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('href={`/jobs/${job.id}?tab=${tab}#');
+  });
+
   it("exposes mobile assignment controls in the visible Team Assignment card", () => {
     const mobilePanelStart = mobileJobDetailCurrentSource.indexOf("<AssignedTeamControls", mobileJobDetailCurrentSource.indexOf("Contact Logging"));
     const mobilePanelEnd = mobileJobDetailCurrentSource.indexOf("showMobileContractorContext", mobilePanelStart);
