@@ -162,7 +162,7 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("serviceAddressDisplay =");
   });
 
-  it("routes unscheduled V2 jobs to the existing current mobile scheduling panel", () => {
+  it("routes the compact V2 schedule display to the existing current mobile scheduling panel", () => {
     expect(mobileJobDetailV2PreviewSource).toContain(
       "hasFullSchedule || job?.scheduled_date || job?.window_start || job?.window_end || mobileAppointmentTimeLabel",
     );
@@ -174,10 +174,10 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Schedule Job"');
     expect(mobileJobDetailV2PreviewSource).toContain('const schedulePanelHref = standardJobAnchorHref("mobile-when-panel");');
     expect(mobileJobDetailV2PreviewSource).toContain("href={schedulePanelHref}");
+    expect(mobileJobDetailV2PreviewSource).toContain('{hasScheduleInformation ? "Edit" : "Schedule"}');
     expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
-    expect(mobileJobDetailV2PreviewSource).toContain("hasScheduleInformation && !isReadOnlyState");
-    expect(mobileJobDetailV2PreviewSource).toContain("Change appointment date or arrival window.");
-    expect(mobileJobDetailV2PreviewSource).toContain("Edit Schedule");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("Change appointment date or arrival window.");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("Edit Schedule");
     expect(mobileJobDetailV2PreviewSource).not.toContain("updateJobScheduleFromForm");
     expect(mobileJobDetailV2PreviewSource).not.toContain('name="scheduled_date"');
   });

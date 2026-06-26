@@ -971,42 +971,28 @@ export default function MobileJobDetailV2Preview(props: any) {
               </div>
 
               <div className="min-w-0 border-slate-200 min-[420px]:border-l min-[420px]:pl-4">
-                <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500">
-                  <ClockIcon className="h-4 w-4" />
-                  <span>Schedule</span>
-                </div>
-                <div className="mt-1 break-words text-lg font-semibold leading-tight text-slate-950">
-                  {appointmentDateLabel}
-                </div>
-                {mobileAppointmentTimeLabel ? (
-                  <div className="mt-1 text-sm font-semibold text-slate-700">{mobileAppointmentTimeLabel}</div>
-                ) : null}
-                {!hasScheduleInformation ? (
-                  <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3">
-                    <p className="text-sm font-semibold leading-5 text-amber-950">
-                      Set an appointment before heading to the field.
-                    </p>
-                    <Link
-                      href={schedulePanelHref}
-                      className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950"
-                    >
-                      Schedule Job
-                    </Link>
+                <Link
+                  href={schedulePanelHref}
+                  className="group block rounded-xl border border-transparent px-2 py-2 -mx-2 -my-2 transition-colors hover:border-slate-200 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-500">
+                      <ClockIcon className="h-4 w-4" />
+                      <span>Schedule</span>
+                    </div>
+                    {!isReadOnlyState ? (
+                      <span className="shrink-0 text-xs font-semibold text-blue-700 underline-offset-4 group-hover:underline">
+                        {hasScheduleInformation ? "Edit" : "Schedule"}
+                      </span>
+                    ) : null}
                   </div>
-                ) : null}
-                {hasScheduleInformation && !isReadOnlyState ? (
-                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
-                    <p className="text-sm font-semibold leading-5 text-slate-700">
-                      Change appointment date or arrival window.
-                    </p>
-                    <Link
-                      href={schedulePanelHref}
-                      className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
-                    >
-                      Edit Schedule
-                    </Link>
+                  <div className="mt-1 break-words text-lg font-semibold leading-tight text-slate-950">
+                    {appointmentDateLabel}
                   </div>
-                ) : null}
+                  {mobileAppointmentTimeLabel ? (
+                    <div className="mt-1 text-sm font-semibold text-slate-700">{mobileAppointmentTimeLabel}</div>
+                  ) : null}
+                </Link>
               </div>
             </div>
           </div>
