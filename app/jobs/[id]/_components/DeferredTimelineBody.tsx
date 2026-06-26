@@ -31,6 +31,10 @@ class DeferredTimelineSoftTimeoutError extends Error {
   }
 }
 
+function isDeferredTimelineSoftTimeoutError(error: unknown) {
+  return error instanceof DeferredTimelineSoftTimeoutError;
+}
+
 async function withDeferredTimelineSoftTimeout<T>(
   operation: string,
   run: (signal: AbortSignal) => Promise<T>,
@@ -625,7 +629,10 @@ export default async function DeferredTimelineBody({
       </>
     );
   } catch (error) {
-    console.error("DeferredTimelineBody failed", error);
+    if (!isDeferredTimelineSoftTimeoutError(error)) {
+      console.error("DeferredTimelineBody failed", error);
+    }
+
     return (
       <DeferredNarrativeSectionFailure message="Timeline is temporarily unavailable. Core job details remain available. Refresh to try again." />
     );

@@ -214,6 +214,7 @@ describe("job detail deferred narrative fail-open behavior", () => {
 
     expect(html).toContain("Section temporarily unavailable");
     expect(html).toContain("Timeline is temporarily unavailable");
+    expect(consoleErrorSpy).toHaveBeenCalledWith("DeferredTimelineBody failed", expect.any(Error));
   });
 
   it("returns an isolated fallback when timeline query exceeds the local soft timeout", async () => {
@@ -240,6 +241,7 @@ describe("job detail deferred narrative fail-open behavior", () => {
       expect(html).toContain("Section temporarily unavailable");
       expect(html).toContain("Timeline is temporarily unavailable");
       expect(calls.some((call) => call.method === "abortSignal")).toBe(true);
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith("DeferredTimelineBody failed", expect.any(Error));
     } finally {
       vi.useRealTimers();
     }
