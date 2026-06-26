@@ -893,15 +893,30 @@ export default function MobileJobDetailV2Preview(props: any) {
                 <div key={stage.key} className="relative z-10 min-w-0 text-center">
                   <div
                     className={[
-                      "mx-auto flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold min-[390px]:h-8 min-[390px]:w-8 min-[390px]:text-sm",
+                      "relative mx-auto flex h-7 w-7 items-center justify-center rounded-full border min-[390px]:h-8 min-[390px]:w-8",
                       isActive
-                        ? "border-blue-600 bg-blue-600 text-white shadow-[0_0_0_4px_rgba(37,99,235,0.14)]"
+                        ? "border-blue-600 bg-white text-blue-600 shadow-[0_0_0_4px_rgba(37,99,235,0.14)]"
                         : isPast
                         ? "border-blue-500 bg-blue-500 text-white"
                         : "border-slate-300 bg-white text-slate-300",
                     ].join(" ")}
                   >
-                    {isPast ? "v" : isActive ? "o" : ""}
+                    {isPast ? (
+                      <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden="true">
+                        <path
+                          d="M5 10.5 8.2 13.7 15 6.5"
+                          stroke="currentColor"
+                          strokeWidth="2.25"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                    ) : isActive ? (
+                      <>
+                        <span className="absolute inset-0 rounded-full bg-blue-500/15 motion-safe:animate-ping motion-reduce:animate-none" />
+                        <span className="relative h-2.5 w-2.5 rounded-full bg-blue-600" />
+                      </>
+                    ) : null}
                   </div>
                   <div className={isActive ? "mt-2 text-[11px] font-semibold leading-tight text-slate-950 min-[390px]:text-xs" : "mt-2 text-[11px] font-medium leading-tight text-slate-500 min-[390px]:text-xs"}>
                     {stage.label}
