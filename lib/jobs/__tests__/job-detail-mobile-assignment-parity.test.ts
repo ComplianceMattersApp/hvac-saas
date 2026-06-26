@@ -162,6 +162,23 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("serviceAddressDisplay =");
   });
 
+  it("routes unscheduled V2 jobs to the existing current mobile scheduling panel", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain(
+      "hasFullSchedule || job?.scheduled_date || job?.window_start || job?.window_end || mobileAppointmentTimeLabel",
+    );
+    expect(mobileJobDetailV2PreviewSource).toContain("hasScheduleInformation: boolean");
+    expect(mobileJobDetailV2PreviewSource).toContain("if (!props.hasScheduleInformation && !props.isFieldComplete)");
+    expect(mobileJobDetailV2PreviewSource).toContain('title: "Schedule this job"');
+    expect(mobileJobDetailV2PreviewSource).toContain('summary: "Set an appointment before heading to the field."');
+    expect(mobileJobDetailV2PreviewSource).toContain('anchor: "mobile-when-panel"');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Schedule Job"');
+    expect(mobileJobDetailV2PreviewSource).toContain('const schedulePanelHref = standardJobAnchorHref("mobile-when-panel");');
+    expect(mobileJobDetailV2PreviewSource).toContain("href={schedulePanelHref}");
+    expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("updateJobScheduleFromForm");
+    expect(mobileJobDetailV2PreviewSource).not.toContain('name="scheduled_date"');
+  });
+
   it("does not treat ECC test availability as required test attention in the V2 preview", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("function hasCompletedEccTestRun");
     expect(mobileJobDetailV2PreviewSource).toContain('String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job)');

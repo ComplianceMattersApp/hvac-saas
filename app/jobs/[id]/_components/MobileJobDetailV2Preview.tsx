@@ -291,6 +291,7 @@ function buildNextStepPreview(props: {
   serviceFollowUpProgressState: any;
   surfaceProfile: any;
   hasRequiredEccTestAttention: boolean;
+  hasScheduleInformation: boolean;
   activeWaitingState: any;
   failedReasonBannerText: string;
   isHistoricalServiceFollowUpContinued: boolean;
@@ -456,6 +457,17 @@ function buildNextStepPreview(props: {
       summary: props.primaryCloseoutMessage || "Review remaining closeout responsibilities.",
       anchor: "mobile-next-service-action",
       actionLabel: "Review closeout",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (!props.hasScheduleInformation && !props.isFieldComplete) {
+    return {
+      eyebrow: "Scheduling",
+      title: "Schedule this job",
+      summary: "Set an appointment before heading to the field.",
+      anchor: "mobile-when-panel",
+      actionLabel: "Schedule Job",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -729,13 +741,16 @@ export default function MobileJobDetailV2Preview(props: any) {
     Boolean(job?.deleted_at);
   const hasRequiredEccTestAttention =
     String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job);
+  const hasScheduleInformation = Boolean(
+    hasFullSchedule || job?.scheduled_date || job?.window_start || job?.window_end || mobileAppointmentTimeLabel,
+  );
 
   const lifecycle = buildLifecyclePreview({
     job,
     isFieldComplete,
     billingState,
     closeoutNeeds,
-    hasScheduleInformation: hasFullSchedule || Boolean(appointmentDateLabel || mobileAppointmentTimeLabel),
+    hasScheduleInformation,
     activeWaitingState,
     isHistoricalServiceFollowUpContinued,
     showLinkedRetestCreated,
@@ -763,6 +778,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     serviceFollowUpProgressState,
     surfaceProfile,
     hasRequiredEccTestAttention,
+    hasScheduleInformation,
     activeWaitingState,
     failedReasonBannerText,
     isHistoricalServiceFollowUpContinued,
@@ -786,6 +802,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   const servicePlanToolHelper = hasServicePlanToolContext
     ? "View agreement, visits, and next due details"
     : "Sign customer up for a service plan";
+  const schedulePanelHref = standardJobAnchorHref("mobile-when-panel");
   const currentActionHref = nextStep.anchor
     ? standardJobAnchorHref(nextStep.anchor)
     : "href" in nextStep && nextStep.href
@@ -963,6 +980,19 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </div>
                 {mobileAppointmentTimeLabel ? (
                   <div className="mt-1 text-sm font-semibold text-slate-700">{mobileAppointmentTimeLabel}</div>
+                ) : null}
+                {!hasScheduleInformation ? (
+                  <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3">
+                    <p className="text-sm font-semibold leading-5 text-amber-950">
+                      Set an appointment before heading to the field.
+                    </p>
+                    <Link
+                      href={schedulePanelHref}
+                      className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950"
+                    >
+                      Schedule Job
+                    </Link>
+                  </div>
                 ) : null}
               </div>
             </div>
