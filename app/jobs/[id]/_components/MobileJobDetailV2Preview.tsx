@@ -131,6 +131,7 @@ function buildExceptionNextStepPreview(props: {
   isHistoricalServiceFollowUpContinued: boolean;
   linkedRetestPassiveCopy: string;
   linkedRetestPassiveHeading: string;
+  showCorrectionReviewResolution: boolean;
   showLinkedRetestCreated: boolean;
 }) {
   const status = String(props.job?.status ?? "").trim().toLowerCase();
@@ -142,13 +143,13 @@ function buildExceptionNextStepPreview(props: {
 
   if (props.isHistoricalServiceFollowUpContinued || props.showLinkedRetestCreated) {
     return {
-      eyebrow: "Linked work",
-      title: props.linkedRetestPassiveHeading || "Linked active job",
+      eyebrow: props.showLinkedRetestCreated ? "Linked retest" : "Linked work",
+      title: props.linkedRetestPassiveHeading || "Linked retest job exists",
       summary:
         props.linkedRetestPassiveCopy ||
-        "This job has linked follow-up work. Review the current job tools before taking action here.",
+        "This original job is historical while the linked retest or follow-up job carries the active work.",
       anchor: "mobile-tools",
-      actionLabel: "Review job history",
+      actionLabel: "Review retest history",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -199,11 +200,13 @@ function buildExceptionNextStepPreview(props: {
 
   if (opsStatus === "failed" || opsStatus === "pending_office_review") {
     return {
-      eyebrow: "Review",
-      title: opsStatus === "pending_office_review" ? "Review needed" : "Correction needed",
-      summary: props.failedReasonBannerText || "Review the failed or pending review state before continuing.",
+      eyebrow: "ECC review",
+      title: opsStatus === "pending_office_review" ? "Office review needed" : "Correction or retest needed",
+      summary:
+        props.failedReasonBannerText ||
+        "This failed ECC result needs correction review or retest review before normal closeout can continue.",
       anchor: "mobile-next-service-action",
-      actionLabel: "Review next action",
+      actionLabel: props.showCorrectionReviewResolution ? "Review correction path" : "Review retest path",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -212,9 +215,9 @@ function buildExceptionNextStepPreview(props: {
     return {
       eyebrow: "Retest",
       title: "Retest needed",
-      summary: "Review the retest workflow from the standard job view.",
+      summary: "This original failed visit needs retest scheduling or review from the standard job action area.",
       anchor: "mobile-next-service-action",
-      actionLabel: "Review retest",
+      actionLabel: "Open retest actions",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -285,6 +288,7 @@ function buildNextStepPreview(props: {
   isHistoricalServiceFollowUpContinued: boolean;
   linkedRetestPassiveCopy: string;
   linkedRetestPassiveHeading: string;
+  showCorrectionReviewResolution: boolean;
   showLinkedRetestCreated: boolean;
 }) {
   const status = String(props.job?.status ?? "").trim().toLowerCase();
@@ -306,6 +310,7 @@ function buildNextStepPreview(props: {
     isHistoricalServiceFollowUpContinued: props.isHistoricalServiceFollowUpContinued,
     linkedRetestPassiveCopy: props.linkedRetestPassiveCopy,
     linkedRetestPassiveHeading: props.linkedRetestPassiveHeading,
+    showCorrectionReviewResolution: props.showCorrectionReviewResolution,
     showLinkedRetestCreated: props.showLinkedRetestCreated,
   });
 
@@ -333,7 +338,9 @@ function buildNextStepPreview(props: {
     return {
       eyebrow: "Retest review",
       title: "Confirm retest readiness",
-      summary: "Confirm that corrections are ready before scheduling the retest.",
+      summary:
+        props.failedReasonBannerText ||
+        "Confirm that corrections are ready before scheduling the retest.",
       anchor: "mobile-next-service-action",
       actionLabel: "Confirm retest ready",
       isSafeInlineLifecycleAction: false,
@@ -343,7 +350,7 @@ function buildNextStepPreview(props: {
   if (props.showRetestSection) {
     return {
       eyebrow: "Retest scheduling",
-      title: "Schedule the retest",
+      title: "Retest needed",
       summary: "Schedule the linked retest now or move it to the scheduling queue.",
       anchor: "mobile-next-service-action",
       actionLabel: "Schedule retest",
@@ -630,6 +637,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     serviceState,
     serviceZip,
     showConfirmRetestReady,
+    showCorrectionReviewResolution,
     showExternalDataEntryPrompt,
     showInternalInvoicePanel,
     showInternalInvoicingPlaceholder,
@@ -692,6 +700,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     isHistoricalServiceFollowUpContinued,
     linkedRetestPassiveCopy,
     linkedRetestPassiveHeading,
+    showCorrectionReviewResolution,
     showLinkedRetestCreated,
   });
   const standardJobHref = `/jobs/${job.id}?tab=${tab}`;
@@ -715,6 +724,10 @@ export default function MobileJobDetailV2Preview(props: any) {
     ? nextStep.href
     : standardJobHref;
   const isEcc = String(job?.job_type ?? "").trim().toLowerCase() === "ecc";
+  const normalizedOpsStatus = String(job?.ops_status ?? "").trim().toLowerCase();
+  const isEccFailedReviewState =
+    isEcc && (normalizedOpsStatus === "failed" || normalizedOpsStatus === "pending_office_review");
+  const isEccRetestNeededState = isEcc && normalizedOpsStatus === "retest_needed";
   const billingPreview = buildBillingPreview({
     billingState,
     closeoutNeeds,
@@ -753,6 +766,29 @@ export default function MobileJobDetailV2Preview(props: any) {
     .slice(0, 3);
   const serviceWorkSummary = String(visitScopeSummary || visitReasonText || "").trim();
   const showServiceWorkLane = isEcc ? companionServiceItems.length > 0 : Boolean(hasVisitScopeDefined || serviceWorkSummary);
+  const showEccReviewSummary =
+    isEcc &&
+    (showLinkedRetestCreated ||
+      showConfirmRetestReady ||
+      showRetestSection ||
+      showCorrectionReviewResolution ||
+      isEccFailedReviewState ||
+      isEccRetestNeededState);
+  const eccReviewSummaryTitle = showLinkedRetestCreated
+    ? linkedRetestPassiveHeading || "Linked retest job exists"
+    : showRetestSection || isEccRetestNeededState
+    ? "Retest needed"
+    : showConfirmRetestReady
+    ? "Confirm retest readiness"
+    : normalizedOpsStatus === "pending_office_review"
+    ? "Office review needed"
+    : "Correction or retest needed";
+  const eccReviewSummaryBody = showLinkedRetestCreated
+    ? linkedRetestPassiveCopy ||
+      "This original ECC job is historical while the linked retest job carries the active work."
+    : failedReasonBannerText ||
+      "Review the failed ECC result, correction-review path, or retest action in the standard job view.";
+  const eccReviewSummaryHref = standardJobAnchorHref(showLinkedRetestCreated ? "mobile-tools" : "mobile-next-service-action");
   const serviceWorkLaneTitle = isEcc
     ? "Companion Service Work"
     : isFieldComplete
@@ -1041,6 +1077,21 @@ export default function MobileJobDetailV2Preview(props: any) {
               {isEcc ? "Compliance details" : "View work details"}
             </Link>
           </div>
+
+          {showEccReviewSummary ? (
+            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-3 text-amber-950">
+              <div className="text-sm font-semibold uppercase tracking-[0.1em] text-amber-700">ECC attention</div>
+              <div className="mt-1 text-base font-semibold leading-tight">{eccReviewSummaryTitle}</div>
+              <p className="mt-1 text-sm leading-5">{eccReviewSummaryBody}</p>
+              <Link
+                href={eccReviewSummaryHref}
+                className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950"
+              >
+                <span>{showLinkedRetestCreated ? "Review retest history" : "Open correction / retest tools"}</span>
+                <ChevronRightIcon className="h-4 w-4" />
+              </Link>
+            </div>
+          ) : null}
 
           <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
             {isEcc ? (

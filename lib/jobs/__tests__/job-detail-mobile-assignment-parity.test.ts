@@ -178,6 +178,29 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("form action={markJobApprovalNeededFromForm}");
   });
 
+  it("hardens ECC failed, correction-review, and retest states without duplicating forms", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: props.showLinkedRetestCreated ? "Linked retest" : "Linked work"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"This original job is historical while the linked retest or follow-up job carries the active work."');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review retest history"');
+    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: "ECC review"');
+    expect(mobileJobDetailV2PreviewSource).toContain('title: opsStatus === "pending_office_review" ? "Office review needed" : "Correction or retest needed"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"This failed ECC result needs correction review or retest review before normal closeout can continue."');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: props.showCorrectionReviewResolution ? "Review correction path" : "Review retest path"');
+    expect(mobileJobDetailV2PreviewSource).toContain('title: "Retest needed"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"This original failed visit needs retest scheduling or review from the standard job action area."');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Open retest actions"');
+    expect(mobileJobDetailV2PreviewSource).toContain("const showEccReviewSummary =");
+    expect(mobileJobDetailV2PreviewSource).toContain("showCorrectionReviewResolution");
+    expect(mobileJobDetailV2PreviewSource).toContain("ECC attention");
+    expect(mobileJobDetailV2PreviewSource).toContain("eccReviewSummaryHref");
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref(showLinkedRetestCreated ? "mobile-tools" : "mobile-next-service-action")');
+    expect(mobileJobDetailV2PreviewSource).toContain("Open correction / retest tools");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={confirmEccRetestReadyFromForm}");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={scheduleRetestNowFromForm}");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={createRetestJobFromForm}");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={resolveFailureByCorrectionReviewFromForm}");
+  });
+
   it("hardens V2 preview lifecycle exceptions as read-only or attention states", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("function getLifecycleExceptionLabel");
     expect(mobileJobDetailV2PreviewSource).toContain("function getWaitingStateLabel");
