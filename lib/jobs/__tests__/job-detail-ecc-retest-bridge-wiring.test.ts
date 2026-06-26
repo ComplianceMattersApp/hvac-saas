@@ -8,33 +8,40 @@ const jobDetailSource = readFileSync(
   "utf-8",
 );
 
+const mobileJobDetailCurrentSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobDetailCurrent.tsx"),
+  "utf-8",
+);
+
 const serviceChainSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/DeferredServiceChainPanelBody.tsx"),
   "utf-8",
 );
 
+const jobDetailAndCurrentMobileSource = `${jobDetailSource}\n${mobileJobDetailCurrentSource}`;
+
 describe("job detail ECC retest bridge wiring", () => {
   it("wires confirmed Retest Ready before moving a linked retest to scheduling", () => {
     expect(jobDetailSource).toContain("confirmEccRetestReadyFromForm");
     expect(jobDetailSource).toContain("scheduleRetestNowFromForm");
-    expect(jobDetailSource).toContain("Confirm Retest Ready");
-    expect(jobDetailSource).toContain("Retest Ready");
-    expect(jobDetailSource).toContain("Schedule a linked retest now, or move it to the scheduling queue.");
-    expect(jobDetailSource).not.toContain("Creates the linked retest job and schedules it immediately.");
-    expect(jobDetailSource).not.toContain("Creates a linked retest job and places it in the scheduling queue.");
-    expect(jobDetailSource).toContain("Schedule Retest Now");
-    expect(jobDetailSource).toContain("Move to Needs Scheduling");
-    expect(jobDetailSource).toContain('name="scheduled_date"');
-    expect(jobDetailSource).toContain('name="window_start"');
-    expect(jobDetailSource).toContain('name="window_end"');
-    expect(jobDetailSource).toContain("formAction={async (formData: FormData) =>");
+    expect(jobDetailAndCurrentMobileSource).toContain("Confirm Retest Ready");
+    expect(jobDetailAndCurrentMobileSource).toContain("Retest Ready");
+    expect(jobDetailAndCurrentMobileSource).toContain("Schedule a linked retest now, or move it to the scheduling queue.");
+    expect(jobDetailAndCurrentMobileSource).not.toContain("Creates the linked retest job and schedules it immediately.");
+    expect(jobDetailAndCurrentMobileSource).not.toContain("Creates a linked retest job and places it in the scheduling queue.");
+    expect(jobDetailAndCurrentMobileSource).toContain("Schedule Retest Now");
+    expect(jobDetailAndCurrentMobileSource).toContain("Move to Needs Scheduling");
+    expect(jobDetailAndCurrentMobileSource).toContain('name="scheduled_date"');
+    expect(jobDetailAndCurrentMobileSource).toContain('name="window_start"');
+    expect(jobDetailAndCurrentMobileSource).toContain('name="window_end"');
+    expect(jobDetailAndCurrentMobileSource).toContain("formAction={async (formData: FormData) =>");
     expect(jobDetailSource).toContain('id="next-service-action"');
-    expect(jobDetailSource).not.toContain(">Create Retest Job<");
+    expect(jobDetailAndCurrentMobileSource).not.toContain(">Create Retest Job<");
   });
 
   it("renders one consolidated Retest Ready card with one copy-equipment control per responsive surface", () => {
-    const mobileRetestIndex = jobDetailSource.indexOf('id="mobile-next-service-action"', jobDetailSource.indexOf("Retest Ready"));
-    const mobileRetestBlock = jobDetailSource.slice(mobileRetestIndex, jobDetailSource.indexOf(") : isHistoricalServiceFollowUpContinued", mobileRetestIndex));
+    const mobileRetestIndex = mobileJobDetailCurrentSource.indexOf('id="mobile-next-service-action"', mobileJobDetailCurrentSource.indexOf("Retest Ready"));
+    const mobileRetestBlock = mobileJobDetailCurrentSource.slice(mobileRetestIndex, mobileJobDetailCurrentSource.indexOf(") : isHistoricalServiceFollowUpContinued", mobileRetestIndex));
     const desktopRetestIndex = jobDetailSource.indexOf('id="next-service-action"', jobDetailSource.indexOf("{showRetestSection ? ("));
     const desktopRetestBlock = jobDetailSource.slice(desktopRetestIndex, jobDetailSource.indexOf(") : null}", desktopRetestIndex) + 9);
 
@@ -60,7 +67,7 @@ describe("job detail ECC retest bridge wiring", () => {
     expect(jobDetailSource).toContain("Retest Scheduled");
     expect(jobDetailSource).toContain("linkedRetestChildClosed");
     expect(jobDetailSource).toContain("activeRetestChildScheduled");
-    expect(jobDetailSource).toContain("Open Linked Retest");
+    expect(jobDetailAndCurrentMobileSource).toContain("Open Linked Retest");
     expect(jobDetailSource).toContain('neq("status", "cancelled")');
     expect(jobDetailSource).not.toContain('.neq("ops_status", "closed")');
     expect(serviceChainSource).toContain("retestParentIdsWithActiveChild");
