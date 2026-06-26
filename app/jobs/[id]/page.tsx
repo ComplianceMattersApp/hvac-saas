@@ -3442,18 +3442,6 @@ const showCorrectionReviewResolution =
   job.job_type === "ecc" &&
   !hasActiveRetestChild &&
   ["failed", "pending_office_review"].includes(normalizedJobOpsStatus);
-const failureResolutionSummaryText = showLinkedRetestCreated
-  ? "Linked retest child is now the active scheduling item."
-  : showConfirmRetestReady && showCorrectionReviewResolution
-  ? "Confirm retest readiness or resolve the failure through correction review."
-  : showRetestSection
-  ? "Schedule this confirmed retest-ready job now, or place it in the scheduling queue."
-  : showConfirmRetestReady
-  ? "Confirm this job is ready for a linked retest visit."
-  : "Resolve this failure through correction review only when a return visit is not needed.";
-const failureResolutionPathCount =
-  Number(showRetestSection) + Number(showConfirmRetestReady) + Number(showCorrectionReviewResolution);
-
   const JobDetailTimingLog = () => {
     emitTimingLog({
       invoicePanelActive: showInternalInvoicePanel,
@@ -3478,10 +3466,8 @@ const failureResolutionPathCount =
     "rounded-xl border-l-4 border-amber-400 bg-amber-50 px-3.5 py-2.5 text-base leading-6 text-amber-950";
   const mobileAttentionActionClass =
     "inline-flex min-h-10 items-center justify-center rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm font-semibold text-amber-950 transition-colors hover:bg-amber-100";
-  const mobileIconChipClass = "inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-600";
 
   const mobileLifecycleStatus = String(job.status ?? "").trim().toLowerCase();
-  const mobileOpsStatus = String(job.ops_status ?? "").trim().toLowerCase();
   const mobileLifecycleStatusLabelMap: Record<string, string> = {
     open: "Open",
     on_the_way: "On The Way",
@@ -3492,24 +3478,6 @@ const failureResolutionPathCount =
   };
   const mobileLifecycleStatusLabel =
     mobileLifecycleStatusLabelMap[mobileLifecycleStatus] ?? formatStatus(job.status);
-  const mobileOpsStatusLabel = formatOpsStatusLabel(job.ops_status, job.job_type);
-  const mobileFieldLifecycleActive =
-    mobileLifecycleStatus === "on_the_way" ||
-    mobileLifecycleStatus === "in_process" ||
-    (mobileLifecycleStatus === "completed" && !isFieldComplete);
-  const mobilePrimaryStateLabel = mobileFieldLifecycleActive
-    ? mobileLifecycleStatusLabel
-    : mobileLifecycleStatus === "open" && (mobileOpsStatus === "on_the_way" || mobileOpsStatus === "in_process")
-    ? mobileOpsStatus === "in_process"
-      ? "In Progress"
-      : "On The Way"
-    : mobileOpsStatusLabel;
-  const mobileSecondaryStateLabel =
-    !mobileFieldLifecycleActive &&
-    mobileOpsStatusLabel !== "—" &&
-    mobileOpsStatusLabel !== mobilePrimaryStateLabel
-      ? `Scheduling: ${mobileOpsStatusLabel}`
-      : null;
   const mobileCustomerHref = job.customer_id ? `/customers/${job.customer_id}` : null;
   const showMobileEccTestAction = surfaceProfile.surfaces.eccTests && job.job_type === "ecc";
   const mobileInvoiceActionRelevant =
