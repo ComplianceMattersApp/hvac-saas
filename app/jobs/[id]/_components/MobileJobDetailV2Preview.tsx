@@ -352,12 +352,26 @@ function buildNextStepPreview(props: {
   }
 
   if (props.isServiceFieldFollowUpPendingInfo && props.serviceFollowUpProgressState?.reason) {
+    const progressLabel = String(props.serviceFollowUpProgressState.progressLabel ?? "").trim();
+    const nextActionLabel = String(
+      props.serviceFollowUpProgressState.bridgeActionLabel ??
+        props.serviceFollowUpProgressState.nextActionLabel ??
+        "",
+    ).trim();
+    const returnPromptLabel = String(props.serviceFollowUpProgressState.returnPromptLabel ?? "").trim();
+    const followUpSummary = [
+      progressLabel ? `Progress: ${progressLabel}.` : "",
+      returnPromptLabel || "This service job is waiting on follow-up before normal field work can continue.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+
     return {
-      eyebrow: "Follow-up",
+      eyebrow: "Service follow-up",
       title: String(props.serviceFollowUpProgressState.reason.display ?? "Follow-up needed"),
-      summary: "Update follow-up progress or create the return visit when ready.",
+      summary: followUpSummary,
       anchor: "mobile-next-service-action",
-      actionLabel: "Update follow-up",
+      actionLabel: nextActionLabel || "Open follow-up tools",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -409,9 +423,11 @@ function buildNextStepPreview(props: {
 
   if (props.showMobileServiceInvoiceFieldAction) {
     return {
-      eyebrow: "Billing",
-      title: "Review billing",
-      summary: "Build or review the invoice so closeout can continue.",
+      eyebrow: "Service closeout",
+      title: "Review service billing",
+      summary: props.isFieldComplete
+        ? "The field visit is complete. Build or review billing so closeout can continue."
+        : "Review the existing billing action from the standard job view.",
       anchor: "mobile-invoice-summary-card",
       actionLabel: "Review billing",
       isSafeInlineLifecycleAction: false,
@@ -455,8 +471,10 @@ function buildNextStepPreview(props: {
 
   return {
     eyebrow: "Status",
-    title: isEcc ? "Review compliance closeout" : "Review remaining closeout",
-    summary: "Field work is complete. Continue with any closeout, notes, or billing responsibilities below.",
+    title: isEcc ? "Review compliance closeout" : "Review service closeout",
+    summary: isEcc
+      ? "Field work is complete. Continue with any closeout, notes, or billing responsibilities below."
+      : "Field work is complete. Review work performed, notes, and any billing or closeout items below.",
     anchor: "mobile-tools",
     actionLabel: "Open job tools",
     isSafeInlineLifecycleAction: false,

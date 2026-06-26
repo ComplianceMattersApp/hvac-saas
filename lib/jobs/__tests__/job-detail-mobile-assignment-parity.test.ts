@@ -160,6 +160,24 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");
   });
 
+  it("hardens Service-specific V2 follow-up, completion, and billing copy without duplicating forms", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: "Service follow-up"');
+    expect(mobileJobDetailV2PreviewSource).toContain("props.serviceFollowUpProgressState.progressLabel");
+    expect(mobileJobDetailV2PreviewSource).toContain("props.serviceFollowUpProgressState.bridgeActionLabel");
+    expect(mobileJobDetailV2PreviewSource).toContain("props.serviceFollowUpProgressState.nextActionLabel");
+    expect(mobileJobDetailV2PreviewSource).toContain('"This service job is waiting on follow-up before normal field work can continue."');
+    expect(mobileJobDetailV2PreviewSource).toContain('anchor: "mobile-next-service-action"');
+    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: nextActionLabel || "Open follow-up tools"');
+    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: "Service closeout"');
+    expect(mobileJobDetailV2PreviewSource).toContain('title: "Review service billing"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"The field visit is complete. Build or review billing so closeout can continue."');
+    expect(mobileJobDetailV2PreviewSource).toContain('title: isEcc ? "Review compliance closeout" : "Review service closeout"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Field work is complete. Review work performed, notes, and any billing or closeout items below."');
+    expect(mobileJobDetailV2PreviewSource).not.toContain("<FieldOutcomePanel");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("form action={markJobPartsNeededFromForm}");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("form action={markJobApprovalNeededFromForm}");
+  });
+
   it("hardens V2 preview lifecycle exceptions as read-only or attention states", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("function getLifecycleExceptionLabel");
     expect(mobileJobDetailV2PreviewSource).toContain("function getWaitingStateLabel");
