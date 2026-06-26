@@ -696,7 +696,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     isFieldComplete,
   });
   const heroPreviewClassName =
-    "px-0 pb-0 [&_a:first-child]:rounded-none [&_a:first-child]:border-0 [&_a:first-child]:shadow-none [&_img]:h-56 [&_img]:rounded-none [&_img]:object-cover";
+    "px-0 pb-0 [&_a:first-child]:rounded-none [&_a:first-child]:border-0 [&_a:first-child]:shadow-none [&_img]:h-52 [&_img]:rounded-none [&_img]:object-cover min-[390px]:[&_img]:h-56";
   const lifecycleActionClass =
     "inline-flex min-h-14 w-full items-center justify-center rounded-2xl border border-blue-500 bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-[0_20px_42px_-24px_rgba(37,99,235,0.7)] transition-colors hover:bg-blue-700";
   const finishWorkLabel = getActionOrientedWorkLabel(surfaceProfile.labels.finishComplete);
@@ -725,35 +725,44 @@ export default function MobileJobDetailV2Preview(props: any) {
   const serviceWorkLaneHelper = isEcc
     ? "Service scope connected to this compliance visit."
     : "Visit scope and Work Items for this trip.";
+  const previewSectionClass =
+    "rounded-2xl border border-slate-200/90 bg-white px-3.5 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)] min-[390px]:px-4";
+  const previewHeaderActionClass =
+    "inline-flex min-h-11 shrink-0 items-center justify-center rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold leading-tight text-blue-700";
+  const previewRowClass =
+    "flex min-h-16 min-w-0 items-center justify-between gap-3 px-3 py-3 text-left";
+  const previewRowTextClass = "min-w-0 flex-1";
+  const previewPillClass =
+    "shrink-0 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold leading-tight text-slate-600";
   const evidenceActionClass =
-    "flex min-h-14 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700";
-  const evidenceActionTopClass = "flex min-w-0 items-center gap-2";
+    "flex min-h-16 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-base font-semibold text-slate-700";
+  const evidenceActionTopClass = "flex min-w-0 flex-1 items-center gap-2";
   const evidenceIconClass = "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200";
   const evidenceLabelClass = "min-w-0 break-words leading-tight";
   const evidenceBadgeClass = "inline-flex max-w-full rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold leading-tight text-slate-600";
   const evidenceSignalClass = "inline-flex max-w-full rounded-full border border-blue-100 bg-blue-50 px-2 py-0.5 text-xs font-semibold leading-tight text-blue-700";
 
   return (
-    <div className="block min-h-screen bg-slate-100 px-3 py-3.5 text-slate-950 lg:hidden">
-      <div className="mx-auto max-w-lg space-y-3">
+    <div className="block min-h-screen overflow-x-hidden bg-slate-100 px-2.5 py-3 text-slate-950 min-[390px]:px-3 min-[390px]:py-3.5 lg:hidden">
+      <div className="mx-auto max-w-lg space-y-3.5">
         <section className="overflow-hidden rounded-[1.35rem] border border-slate-200/90 bg-white shadow-[0_24px_52px_-34px_rgba(15,23,42,0.38)]">
-          <div className="px-4 pb-3.5 pt-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-blue-700">
+          <div className="px-3.5 pb-3.5 pt-4 min-[390px]:px-4">
+            <div className="flex flex-wrap items-center justify-between gap-2.5">
+              <div className="inline-flex min-w-0 items-center gap-2 text-xs font-bold uppercase tracking-[0.12em] text-blue-700">
                 <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#0f1f35] text-blue-100">
                   <ToolIcon className="h-4 w-4" />
                 </span>
-                <span>Job Workbench</span>
+                <span className="min-w-0 break-words">Job Workbench</span>
               </div>
               <Link
                 href={standardJobHref}
-                className="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
+                className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
               >
                 Standard view
               </Link>
             </div>
 
-            <h1 className="mt-4 break-words text-[2rem] font-semibold leading-[1.05] tracking-normal text-[#071225]">
+            <h1 className="mt-4 break-words text-[1.8rem] font-semibold leading-[1.08] tracking-normal text-[#071225] min-[390px]:text-[2rem]">
               {jobWorkbenchTitle}
             </h1>
 
@@ -769,7 +778,7 @@ export default function MobileJobDetailV2Preview(props: any) {
             <div className="mt-4 grid grid-cols-1 gap-4 border-t border-slate-200 pt-4 min-[420px]:grid-cols-[minmax(0,1fr)_minmax(8rem,0.72fr)]">
               <div className="min-w-0">
                 <div className="text-sm font-semibold text-slate-500">Customer</div>
-                <div className="mt-1 break-words text-xl font-semibold leading-tight text-slate-950">
+                <div className="mt-1 break-words text-lg font-semibold leading-tight text-slate-950 min-[390px]:text-xl">
                   {mobileCustomerHref ? (
                     <Link href={mobileCustomerHref} className="underline decoration-slate-300 underline-offset-4">
                       {jobWorkbenchAccountLabel || "Customer"}
@@ -825,30 +834,30 @@ export default function MobileJobDetailV2Preview(props: any) {
                 onPhaseTiming={recordBlockingPhase}
               />
             </Suspense>
-            <div className="pointer-events-none absolute inset-x-3 bottom-3 rounded-2xl border border-white/30 bg-slate-950/78 p-3 text-white shadow-[0_18px_36px_-18px_rgba(15,23,42,0.78)] backdrop-blur-md">
+            <div className="pointer-events-none absolute inset-x-2 bottom-2 rounded-2xl border border-white/30 bg-slate-950/78 p-2.5 text-white shadow-[0_18px_36px_-18px_rgba(15,23,42,0.78)] backdrop-blur-md min-[390px]:inset-x-3 min-[390px]:bottom-3 min-[390px]:p-3">
               <div className="flex items-start gap-2">
                 <MapPinIcon className="mt-0.5 h-5 w-5 shrink-0" />
-                <div className="min-w-0 break-words text-lg font-semibold leading-tight">{serviceAddressDisplay}</div>
+                <div className="min-w-0 break-words text-base font-semibold leading-tight min-[390px]:text-lg">{serviceAddressDisplay}</div>
               </div>
               <div className="pointer-events-auto mt-3 grid grid-cols-3 gap-2">
                 {mobileCallHref ? (
-                  <a href={mobileCallHref} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-2 text-sm font-semibold text-white">
+                  <a href={mobileCallHref} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/25 bg-white/10 px-1.5 text-xs font-semibold text-white min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
                     <PhoneIcon className="h-4 w-4" />
                     <span>Call</span>
                   </a>
                 ) : (
-                  <span className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-semibold text-white/45">
+                  <span className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-1.5 text-xs font-semibold text-white/45 min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
                     <PhoneIcon className="h-4 w-4" />
                     <span>Call</span>
                   </span>
                 )}
                 {mobileTextHref ? (
-                  <a href={mobileTextHref} className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-2 text-sm font-semibold text-white">
+                  <a href={mobileTextHref} className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/25 bg-white/10 px-1.5 text-xs font-semibold text-white min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
                     <ChatIcon className="h-4 w-4" />
                     <span>Text</span>
                   </a>
                 ) : (
-                  <span className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-semibold text-white/45">
+                  <span className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-1.5 text-xs font-semibold text-white/45 min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
                     <ChatIcon className="h-4 w-4" />
                     <span>Text</span>
                   </span>
@@ -858,13 +867,13 @@ export default function MobileJobDetailV2Preview(props: any) {
                     href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(serviceAddressDisplay)}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/25 bg-white/10 px-2 text-sm font-semibold text-white"
+                    className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/25 bg-white/10 px-1.5 text-xs font-semibold text-white min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm"
                   >
                     <MapPinIcon className="h-4 w-4" />
                     <span>Navigate</span>
                   </a>
                 ) : (
-                  <span className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2 text-sm font-semibold text-white/45">
+                  <span className="inline-flex min-h-11 items-center justify-center gap-1 rounded-xl border border-white/10 bg-white/5 px-1.5 text-xs font-semibold text-white/45 min-[390px]:gap-1.5 min-[390px]:px-2 min-[390px]:text-sm">
                     <MapPinIcon className="h-4 w-4" />
                     <span>Navigate</span>
                   </span>
@@ -874,9 +883,9 @@ export default function MobileJobDetailV2Preview(props: any) {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
+        <section className={previewSectionClass}>
           <div className="relative grid grid-cols-5 gap-1">
-            <div className="absolute left-[10%] right-[10%] top-4 h-px bg-slate-200" />
+            <div className="absolute left-[10%] right-[10%] top-3.5 h-px bg-slate-200 min-[390px]:top-4" />
             {lifecycle.stages.map((stage, index) => {
               const isPast = index < lifecycle.activeIndex;
               const isActive = index === lifecycle.activeIndex;
@@ -884,7 +893,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                 <div key={stage.key} className="relative z-10 min-w-0 text-center">
                   <div
                     className={[
-                      "mx-auto flex h-8 w-8 items-center justify-center rounded-full border text-sm font-bold",
+                      "mx-auto flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold min-[390px]:h-8 min-[390px]:w-8 min-[390px]:text-sm",
                       isActive
                         ? "border-blue-600 bg-blue-600 text-white shadow-[0_0_0_4px_rgba(37,99,235,0.14)]"
                         : isPast
@@ -894,7 +903,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                   >
                     {isPast ? "v" : isActive ? "o" : ""}
                   </div>
-                  <div className={isActive ? "mt-2 text-xs font-semibold text-slate-950" : "mt-2 text-xs font-medium text-slate-500"}>
+                  <div className={isActive ? "mt-2 text-[11px] font-semibold leading-tight text-slate-950 min-[390px]:text-xs" : "mt-2 text-[11px] font-medium leading-tight text-slate-500 min-[390px]:text-xs"}>
                     {stage.label}
                   </div>
                 </div>
@@ -908,14 +917,14 @@ export default function MobileJobDetailV2Preview(props: any) {
           ) : null}
         </section>
 
-        <section className="rounded-2xl border border-[#071225] bg-[#071225] px-4 py-4 text-white shadow-[0_22px_46px_-28px_rgba(15,23,42,0.7)]">
+        <section className="rounded-2xl border border-[#071225] bg-[#071225] px-3.5 py-4 text-white shadow-[0_22px_46px_-28px_rgba(15,23,42,0.7)] min-[390px]:px-4">
           <div className="flex items-start gap-3">
             <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[#071225]">
               <ToolIcon className="h-5 w-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-blue-100/80">{nextStep.eyebrow}</div>
-              <h2 className="mt-1 text-2xl font-semibold leading-tight tracking-normal">{nextStep.title}</h2>
+              <div className="text-sm font-semibold uppercase tracking-[0.1em] text-blue-100/80">{nextStep.eyebrow}</div>
+              <h2 className="mt-1 break-words text-[1.45rem] font-semibold leading-tight tracking-normal min-[390px]:text-2xl">{nextStep.title}</h2>
               <p className="mt-2 text-base leading-6 text-slate-200">{nextStep.summary}</p>
             </div>
           </div>
@@ -940,8 +949,8 @@ export default function MobileJobDetailV2Preview(props: any) {
                 />
               )
             ) : (
-              <Link href={currentActionHref} className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-blue-500 bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-[0_20px_42px_-24px_rgba(37,99,235,0.7)] transition-colors hover:bg-blue-700">
-                <span>{nextStep.actionLabel}</span>
+              <Link href={currentActionHref} className="inline-flex min-h-14 w-full items-center justify-center gap-2 rounded-2xl border border-blue-500 bg-blue-600 px-4 py-3 text-base font-semibold leading-tight text-white shadow-[0_20px_42px_-24px_rgba(37,99,235,0.7)] transition-colors hover:bg-blue-700 min-[390px]:px-5">
+                <span className="min-w-0 break-words text-center">{nextStep.actionLabel}</span>
                 <ChevronRightIcon className="h-5 w-5" />
               </Link>
             )}
@@ -953,14 +962,14 @@ export default function MobileJobDetailV2Preview(props: any) {
           ) : null}
         </section>
 
-        <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
-          <div className="flex items-start justify-between gap-3">
+        <section className={previewSectionClass}>
+          <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">
             <div className="min-w-0">
-              <div className="inline-flex items-center gap-2">
+              <div className="inline-flex min-w-0 items-start gap-2">
                 <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
                   {isEcc ? <ClipboardIcon className="h-5 w-5" /> : <ToolIcon className="h-5 w-5" />}
                 </span>
-                <div>
+                <div className="min-w-0">
                   <h2 className="text-xl font-semibold leading-tight text-[#071225]">
                     {isEcc ? "Compliance Work" : serviceWorkLaneTitle}
                   </h2>
@@ -970,7 +979,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </div>
               </div>
             </div>
-            <Link href={standardJobAnchorHref("mobile-work-scope")} className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
+            <Link href={standardJobAnchorHref("mobile-work-scope")} className={previewHeaderActionClass}>
               {isEcc ? "Compliance details" : "View work details"}
             </Link>
           </div>
@@ -978,28 +987,28 @@ export default function MobileJobDetailV2Preview(props: any) {
           <div className="mt-4 divide-y divide-slate-200 rounded-2xl border border-slate-200">
             {isEcc ? (
               <>
-                <Link href={`/jobs/${job.id}/info?f=equipment`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
-                  <span>
+                <Link href={`/jobs/${job.id}/info?f=equipment`} className={previewRowClass}>
+                  <span className={previewRowTextClass}>
                     <span className="block font-semibold text-slate-950">Equipment</span>
                     <span className="block text-sm text-slate-600">Manage equipment and furnace details</span>
                   </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Open</span>
+                  <span className={previewPillClass}>Open</span>
                 </Link>
                 {showMobileEccTestAction ? (
-                  <Link href={`/jobs/${job.id}/tests`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
-                    <span>
+                  <Link href={`/jobs/${job.id}/tests`} className={previewRowClass}>
+                    <span className={previewRowTextClass}>
                       <span className="block font-semibold text-slate-950">ECC Tests</span>
                       <span className="block text-sm text-slate-600">Open test workflow</span>
                     </span>
-                    <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Open</span>
+                    <span className={previewPillClass}>Open</span>
                   </Link>
                 ) : null}
-                <Link href={standardJobAnchorHref("mobile-tools")} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
-                  <span>
+                <Link href={standardJobAnchorHref("mobile-tools")} className={previewRowClass}>
+                  <span className={previewRowTextClass}>
                     <span className="block font-semibold text-slate-950">Permit Info</span>
                     <span className="block text-sm text-slate-600">Review permit details and actions</span>
                   </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Status</span>
+                  <span className={previewPillClass}>Status</span>
                 </Link>
               </>
             ) : (
@@ -1024,14 +1033,14 @@ export default function MobileJobDetailV2Preview(props: any) {
                     No Work Items saved yet.
                   </div>
                 )}
-                <Link href={standardJobAnchorHref("mobile-work-scope")} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
-                  <span>
+                <Link href={standardJobAnchorHref("mobile-work-scope")} className={previewRowClass}>
+                  <span className={previewRowTextClass}>
                     <span className="block font-semibold text-slate-950">{surfaceProfile.labels.workItems}</span>
                     <span className="block text-sm text-slate-600">
                       {serviceWorkCount > 0 ? `${getVisitScopeCountLabel(serviceWorkCount)} recorded` : "View details"}
                     </span>
                   </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Details</span>
+                  <span className={previewPillClass}>Details</span>
                 </Link>
               </>
             )}
@@ -1039,20 +1048,20 @@ export default function MobileJobDetailV2Preview(props: any) {
         </section>
 
         {isEcc && showServiceWorkLane ? (
-          <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
-            <div className="flex items-start justify-between gap-3">
+          <section className={previewSectionClass}>
+            <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">
               <div className="min-w-0">
-                <div className="inline-flex items-center gap-2">
+                <div className="inline-flex min-w-0 items-start gap-2">
                   <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-slate-50 text-slate-700 ring-1 ring-slate-200">
                     <ToolIcon className="h-5 w-5" />
                   </span>
-                  <div>
+                  <div className="min-w-0">
                     <h2 className="text-xl font-semibold leading-tight text-[#071225]">{serviceWorkLaneTitle}</h2>
                     <p className="mt-0.5 text-sm text-slate-600">{serviceWorkLaneHelper}</p>
                   </div>
                 </div>
               </div>
-              <Link href={standardJobAnchorHref("mobile-work-scope")} className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
+              <Link href={standardJobAnchorHref("mobile-work-scope")} className={previewHeaderActionClass}>
                 View work details
               </Link>
             </div>
@@ -1069,20 +1078,20 @@ export default function MobileJobDetailV2Preview(props: any) {
                   {item.details ? <div className="mt-1 text-sm leading-5 text-slate-600">{item.details}</div> : null}
                 </div>
               ))}
-              <Link href={standardJobAnchorHref("mobile-work-scope")} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
-                <span>
+              <Link href={standardJobAnchorHref("mobile-work-scope")} className={previewRowClass}>
+                <span className={previewRowTextClass}>
                   <span className="block font-semibold text-slate-950">Service Work</span>
                   <span className="block text-sm text-slate-600">{getVisitScopeCountLabel(serviceWorkCount)} recorded</span>
                 </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Details</span>
+                <span className={previewPillClass}>Details</span>
               </Link>
             </div>
           </section>
         ) : null}
 
-        <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
+        <section className={previewSectionClass}>
           <div className="flex items-start gap-3">
-            <div className="inline-flex items-center gap-2 text-xl font-semibold text-[#071225]">
+            <div className="inline-flex min-w-0 items-start gap-2 text-xl font-semibold text-[#071225]">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-700 ring-1 ring-blue-100">
                 <MessageIcon className="h-5 w-5" />
               </span>
@@ -1102,7 +1111,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </span>
                 <span className={evidenceLabelClass}>Team Notes</span>
               </span>
-              <span className="flex shrink-0 items-center gap-1.5">
+              <span className="flex max-w-[52%] shrink-0 flex-wrap items-center justify-end gap-1.5">
                 {internalNotesSignal ? <span className={evidenceSignalClass}>{internalNotesSignal}</span> : null}
                 {internalNotesBadge ? <span className={evidenceBadgeClass}>{internalNotesBadge}</span> : null}
                 <ChevronRightIcon className="h-5 w-5 text-slate-400" />
@@ -1116,7 +1125,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                   </span>
                   <span className={evidenceLabelClass}>Shared Notes</span>
                 </span>
-                <span className="flex shrink-0 items-center gap-1.5">
+                <span className="flex max-w-[52%] shrink-0 flex-wrap items-center justify-end gap-1.5">
                   {sharedNotesSignal ? <span className={evidenceSignalClass}>{sharedNotesSignal}</span> : null}
                   {sharedNotesBadge ? <span className={evidenceBadgeClass}>{sharedNotesBadge}</span> : null}
                   <ChevronRightIcon className="h-5 w-5 text-slate-400" />
@@ -1135,10 +1144,10 @@ export default function MobileJobDetailV2Preview(props: any) {
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
-          <div className="flex items-start justify-between gap-3">
+        <section className={previewSectionClass}>
+          <div className="flex flex-col gap-3 min-[390px]:flex-row min-[390px]:items-start min-[390px]:justify-between">
             <div className="min-w-0">
-              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <div className="text-sm font-semibold uppercase tracking-[0.1em] text-slate-500">
                 Billing / Closeout
               </div>
               <h2 className="mt-1 text-xl font-semibold leading-tight text-[#071225]">
@@ -1146,31 +1155,31 @@ export default function MobileJobDetailV2Preview(props: any) {
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">{billingPreview.summary}</p>
             </div>
-            <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">
+            <span className="inline-flex min-h-8 w-fit shrink-0 items-center rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold leading-tight text-slate-600">
               {billingPreview.statusLabel}
             </span>
           </div>
           {billingPreview.hrefAnchor ? (
             <Link
               href={standardJobAnchorHref(billingPreview.hrefAnchor)}
-              className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700"
+              className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold leading-tight text-slate-700"
             >
-              <span>{billingPreview.actionLabel}</span>
+              <span className="min-w-0 break-words text-center">{billingPreview.actionLabel}</span>
               <ChevronRightIcon className="h-5 w-5" />
             </Link>
           ) : null}
         </section>
 
-        <details className="group rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
+        <details className={`${previewSectionClass} group`}>
           <summary className="cursor-pointer list-none">
-            <div className={`${mobileToolLinkClass} justify-between`}>
-              <span>More Details / Tools</span>
+            <div className={`${mobileToolLinkClass} min-h-14 justify-between`}>
+              <span className="min-w-0 break-words">More Details / Tools</span>
               <ChevronRightIcon className="h-5 w-5 shrink-0 transition-transform group-open:rotate-90" />
             </div>
           </summary>
           <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
-            <Link href={standardJobAnchorHref("mobile-tools")} className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
-              <span className="flex min-w-0 items-center gap-2">
+            <Link href={standardJobAnchorHref("mobile-tools")} className="flex min-h-16 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
+              <span className="flex min-w-0 flex-1 items-center gap-2">
                 <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">
                   <ToolIcon className="h-4 w-4" />
                 </span>
@@ -1182,8 +1191,8 @@ export default function MobileJobDetailV2Preview(props: any) {
               <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
             </Link>
             {isInternalUser && serviceLocationEditHref ? (
-              <Link href={serviceLocationEditHref} className="flex min-h-16 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
-                <span className="flex min-w-0 items-center gap-2">
+              <Link href={serviceLocationEditHref} className="flex min-h-16 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
+                <span className="flex min-w-0 flex-1 items-center gap-2">
                   <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">
                     <MapPinIcon className="h-4 w-4" />
                   </span>
