@@ -146,7 +146,7 @@ export default function MobileShellMenu({
                       <Link href="/jobs/new" onClick={closeMenu} className="rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-[0_12px_20px_-16px_rgba(37,99,235,0.55)] transition-colors hover:bg-blue-700">
                         {primaryJobCtaLabel}
                       </Link>
-                      <Link href="/jobs/new?create_customer=1" onClick={closeMenu} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50">
+                      <Link href="/customers/new" onClick={closeMenu} className="rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-800 transition-colors hover:bg-slate-50">
                         New Customer
                       </Link>
                       {showPermitRequestCreateItem ? (

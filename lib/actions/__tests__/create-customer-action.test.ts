@@ -45,9 +45,36 @@ type TableWrite = Record<string, unknown>;
 function makeAdminFixture() {
   const customerInserts: TableWrite[] = [];
   const locationInserts: TableWrite[] = [];
+  const sideEffectWrites: Array<{ table: string; payload: TableWrite }> = [];
+  const forbiddenSideEffectTables = new Set([
+    "jobs",
+    "contractor_intake_submissions",
+    "service_cases",
+    "job_events",
+    "notifications",
+    "estimates",
+    "invoices",
+    "internal_invoices",
+    "payments",
+  ]);
 
   const admin = {
     from(table: string) {
+      if (forbiddenSideEffectTables.has(table)) {
+        return {
+          insert: vi.fn((payload: TableWrite) => {
+            sideEffectWrites.push({ table, payload });
+            return Promise.resolve({ data: null, error: null });
+          }),
+          update: vi.fn((payload: TableWrite) => {
+            sideEffectWrites.push({ table, payload });
+            return {
+              eq: vi.fn(async () => ({ error: null })),
+            };
+          }),
+        };
+      }
+
       if (table === "customers") {
         return {
           insert: vi.fn((payload: TableWrite) => {
@@ -77,10 +104,10 @@ function makeAdminFixture() {
     },
   };
 
-  return { admin, customerInserts, locationInserts };
+  return { admin, customerInserts, locationInserts, sideEffectWrites };
 }
 
-describe("createCustomerFromForm", () => {
+describe("createCustomerOnlyFromForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.resetModules();
@@ -105,10 +132,10 @@ describe("createCustomerFromForm", () => {
     const fixture = makeAdminFixture();
     createAdminClientMock.mockReturnValue(fixture.admin);
 
-    const { createCustomerFromForm } = await import("@/lib/actions/customer-actions");
+    const { createCustomerOnlyFromForm } = await import("@/lib/actions/customer-actions");
 
     await expect(
-      createCustomerFromForm(
+      createCustomerOnlyFromForm(
         buildFormData({
           first_name: "Jane",
           last_name: "Smith",
@@ -128,16 +155,17 @@ describe("createCustomerFromForm", () => {
     });
     // No location when address fields are absent
     expect(fixture.locationInserts).toHaveLength(0);
+    expect(fixture.sideEffectWrites).toHaveLength(0);
   });
 
   it("creates a customer AND a primary service location when address fields are provided", async () => {
     const fixture = makeAdminFixture();
     createAdminClientMock.mockReturnValue(fixture.admin);
 
-    const { createCustomerFromForm } = await import("@/lib/actions/customer-actions");
+    const { createCustomerOnlyFromForm } = await import("@/lib/actions/customer-actions");
 
     await expect(
-      createCustomerFromForm(
+      createCustomerOnlyFromForm(
         buildFormData({
           first_name: "Bob",
           last_name: "Jones",
@@ -161,16 +189,17 @@ describe("createCustomerFromForm", () => {
       postal_code: "90001",
       owner_user_id: "owner-1",
     });
+    expect(fixture.sideEffectWrites).toHaveLength(0);
   });
 
   it("does NOT create a location when address_line1 is provided but city or zip is missing", async () => {
     const fixture = makeAdminFixture();
     createAdminClientMock.mockReturnValue(fixture.admin);
 
-    const { createCustomerFromForm } = await import("@/lib/actions/customer-actions");
+    const { createCustomerOnlyFromForm } = await import("@/lib/actions/customer-actions");
 
     await expect(
-      createCustomerFromForm(
+      createCustomerOnlyFromForm(
         buildFormData({
           first_name: "Sam",
           last_name: "Lee",
@@ -183,19 +212,21 @@ describe("createCustomerFromForm", () => {
 
     expect(fixture.customerInserts).toHaveLength(1);
     expect(fixture.locationInserts).toHaveLength(0);
+    expect(fixture.sideEffectWrites).toHaveLength(0);
   });
 
   it("throws when neither first_name nor last_name is provided", async () => {
     const fixture = makeAdminFixture();
     createAdminClientMock.mockReturnValue(fixture.admin);
 
-    const { createCustomerFromForm } = await import("@/lib/actions/customer-actions");
+    const { createCustomerOnlyFromForm } = await import("@/lib/actions/customer-actions");
 
     await expect(
-      createCustomerFromForm(buildFormData({ phone: "3105559999" })),
+      createCustomerOnlyFromForm(buildFormData({ phone: "3105559999" })),
     ).rejects.toThrow("At least a first name or last name is required.");
 
     expect(fixture.customerInserts).toHaveLength(0);
+    expect(fixture.sideEffectWrites).toHaveLength(0);
   });
 
   it("redirects to /login when the caller is not an internal user", async () => {
@@ -206,13 +237,14 @@ describe("createCustomerFromForm", () => {
     requireInternalUserMock.mockRejectedValue(accessError);
     isInternalAccessErrorMock.mockReturnValue(true);
 
-    const { createCustomerFromForm } = await import("@/lib/actions/customer-actions");
+    const { createCustomerOnlyFromForm } = await import("@/lib/actions/customer-actions");
 
     await expect(
-      createCustomerFromForm(buildFormData({ first_name: "Eve" })),
+      createCustomerOnlyFromForm(buildFormData({ first_name: "Eve" })),
     ).rejects.toThrow("REDIRECT:/login");
 
     expect(fixture.customerInserts).toHaveLength(0);
+    expect(fixture.sideEffectWrites).toHaveLength(0);
   });
 
   it("respects account scoping: owner_user_id matches internalUser.account_owner_user_id", async () => {
@@ -227,12 +259,13 @@ describe("createCustomerFromForm", () => {
       },
     });
 
-    const { createCustomerFromForm } = await import("@/lib/actions/customer-actions");
+    const { createCustomerOnlyFromForm } = await import("@/lib/actions/customer-actions");
 
     await expect(
-      createCustomerFromForm(buildFormData({ first_name: "Test", last_name: "Scope" })),
+      createCustomerOnlyFromForm(buildFormData({ first_name: "Test", last_name: "Scope" })),
     ).rejects.toThrow("REDIRECT:/customers/new-customer-1?created=1");
 
     expect(fixture.customerInserts[0]).toMatchObject({ owner_user_id: "owner-99" });
+    expect(fixture.sideEffectWrites).toHaveLength(0);
   });
 });

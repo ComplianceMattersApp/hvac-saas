@@ -319,7 +319,7 @@ export async function claimNullOwnerCustomer(customerId: string, _formData: Form
  * Does NOT create any job, estimate, invoice, or service case.
  * On success, redirects to the new customer profile.
  */
-export async function createCustomerFromForm(formData: FormData) {
+export async function createCustomerOnlyFromForm(formData: FormData) {
   const supabase = await createClient();
 
   let internalUser;
@@ -400,6 +400,8 @@ export async function createCustomerFromForm(formData: FormData) {
 
   redirect(`/customers/${customerId}?created=1`);
 }
+
+export const createCustomerFromForm = createCustomerOnlyFromForm;
 
 export async function addCustomerServiceLocationFromForm(formData: FormData) {
   const supabase = await createClient();

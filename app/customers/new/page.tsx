@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isInternalAccessError, requireInternalUser } from "@/lib/auth/internal-user";
-import { createCustomerFromForm } from "@/lib/actions/customer-actions";
+import { createCustomerOnlyFromForm } from "@/lib/actions/customer-actions";
 import SubmitButton from "@/components/SubmitButton";
 
 export const metadata = { title: "New Customer" };
@@ -40,7 +40,7 @@ export default async function NewCustomerPage() {
           </p>
         </div>
 
-        <form action={createCustomerFromForm} className="divide-y divide-slate-100">
+        <form action={createCustomerOnlyFromForm} className="divide-y divide-slate-100">
           {/* Identity */}
           <section className="px-6 py-5">
             <h2 className="mb-4 text-xs font-semibold uppercase tracking-wide text-slate-500">

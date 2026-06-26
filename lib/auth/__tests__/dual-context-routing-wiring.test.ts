@@ -33,6 +33,7 @@ describe("dual-context routing wiring", () => {
 
     expect(mobileMenu).toContain("{isInternalUser ? (");
     expect(mobileMenu).toContain('href="/jobs/new"');
+    expect(mobileMenu).toContain('href="/customers/new"');
     expect(mobileMenu).toContain("Partner Work");
   });
 
