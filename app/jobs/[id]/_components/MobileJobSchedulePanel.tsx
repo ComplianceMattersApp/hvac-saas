@@ -16,6 +16,10 @@ export default function MobileJobSchedulePanel(props: MobileJobSchedulePanelProp
     updateJobScheduleFromForm,
   } = props;
   const presentation = props.presentation ?? "current";
+  const closeHref =
+    presentation === "v2TargetPanel"
+      ? "#mobile-v2-schedule-summary"
+      : `/jobs/${job.id}?tab=${tab}`;
 
   const scheduleForm = (
     <form action={updateJobScheduleFromForm} className="space-y-3">
@@ -69,7 +73,7 @@ export default function MobileJobSchedulePanel(props: MobileJobSchedulePanelProp
         ) : null}
 
         <Link
-          href={`/jobs/${job.id}?tab=${tab}`}
+          href={closeHref}
           className="inline-flex min-h-11 w-full items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-base font-semibold text-slate-800"
         >
           Close
@@ -96,7 +100,7 @@ export default function MobileJobSchedulePanel(props: MobileJobSchedulePanelProp
             ) : null}
           </div>
           <Link
-            href={`/jobs/${job.id}?tab=${tab}`}
+            href={closeHref}
             className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
           >
             Close

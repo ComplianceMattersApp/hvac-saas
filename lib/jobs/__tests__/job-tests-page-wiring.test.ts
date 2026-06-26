@@ -525,6 +525,9 @@ describe("job detail field operations board layout", () => {
     expect(mobileScheduleSlice).toContain("{appointmentDateLabel}");
     expect(mobileScheduleSlice).toContain("{mobileAppointmentTimeLabel}");
     expect(mobileScheduleSlice).toContain('group-open:block');
+    expect(mobileScheduleSlice).toContain('const closeHref =');
+    expect(mobileScheduleSlice).toContain(': `/jobs/${job.id}?tab=${tab}`');
+    expect(mobileScheduleSlice).toContain("href={closeHref}");
     expect(mobileScheduleSlice).toContain('form action={updateJobScheduleFromForm}');
     expect(mobileScheduleSlice).toContain('name="scheduled_date"');
     expect(mobileScheduleSlice).toContain('name="window_start"');

@@ -579,6 +579,7 @@ export default function MobileJobDetailV2Preview(props: any) {
 
               <div className="min-w-0 border-slate-200 min-[420px]:border-l min-[420px]:pl-4">
                 <a
+                  id="mobile-v2-schedule-summary"
                   href="#mobile-when-panel"
                   className="group block min-h-full rounded-lg py-0.5 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
