@@ -11,6 +11,7 @@ import PwaUpdateNotice from "@/components/layout/PwaUpdateNotice";
 import ShellCreateMenu, { type ShellCreateItem } from "@/components/layout/ShellCreateMenu";
 import ShellMoreMenu, { type ShellMoreItem } from "@/components/layout/ShellMoreMenu";
 import ShellNavLink from "@/components/layout/ShellNavLink";
+import ShellOpsMenu from "@/components/layout/ShellOpsMenu";
 import UserAccountMenu from "@/components/layout/UserAccountMenu";
 import { getInternalUnreadNotificationBadgeCount } from "@/lib/actions/notification-read-actions";
 import { resolveDualContextAccess } from "@/lib/auth/dual-context-access";
@@ -273,7 +274,7 @@ export default async function RootLayout({
                         <ShellNavLink href="/today" exact>Today</ShellNavLink>
                       ) : null}
                       {isInternalUser ? (
-                        <ShellNavLink href="/ops">Operations</ShellNavLink>
+                        <ShellOpsMenu />
                       ) : null}
                       {isInternalUser ? (
                         <ShellNavLink href="/calendar">Calendar</ShellNavLink>

@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import LogoutButton from "@/components/auth/LogoutButton";
 import HeaderCustomerSearch from "@/components/layout/HeaderCustomerSearch";
+import { OPS_NAV_QUEUE_LINKS } from "@/lib/ops/ops-nav-queue-links";
 
 type Props = {
   isInternalUser: boolean;
@@ -180,6 +181,20 @@ export default function MobileShellMenu({
                       <ClipboardList className={itemIconClass(operationsActive)} aria-hidden="true" />
                       Operations
                     </Link>
+                  ) : null}
+                  {isInternalUser ? (
+                    <div className="col-span-2 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50/70 p-1">
+                      {OPS_NAV_QUEUE_LINKS.map((item) => (
+                        <Link
+                          key={item.bucket}
+                          href={item.href}
+                          onClick={closeMenu}
+                          className="min-h-9 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-700 transition-colors hover:bg-white hover:text-slate-950"
+                        >
+                          {item.label}
+                        </Link>
+                      ))}
+                    </div>
                   ) : null}
                   {isInternalUser ? (
                     <Link href="/calendar" onClick={closeMenu} className={mobileMenuItemClass(calendarActive)}>
