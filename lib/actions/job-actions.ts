@@ -4233,7 +4233,7 @@ export async function addJobEquipmentFromForm(formData: FormData) {
   if (!jobId) throw new Error("Missing job_id");
   if (!equipmentRole) throw new Error("Missing equipment_role");
 
-  const systemChoice = String(formData.get("system_location") || "").trim();
+  const systemChoice = String(formData.get("system_location") || formData.get("system_location_choice") || "").trim();
   const systemCustom = String(formData.get("system_location_custom") || "").trim();
 
   if (systemChoice === "__new__" && !systemCustom) {
@@ -4536,10 +4536,9 @@ export async function addSystemFilterFromForm(formData: FormData) {
   "use server";
 
   const jobId = String(formData.get("job_id") || "").trim();
-  const systemId = String(formData.get("system_id") || "").trim();
+  let systemId = String(formData.get("system_id") || "").trim();
 
   if (!jobId) throw new Error("Missing job_id");
-  if (!systemId) throw new Error("Missing system_id");
 
   const supabase = await createClient();
   const scoped = await requireInternalEquipmentMutationAccess({ supabase, jobId });
@@ -4549,7 +4548,42 @@ export async function addSystemFilterFromForm(formData: FormData) {
     accountOwnerUserId: scoped.internalUser.account_owner_user_id,
   });
 
-  await requireSystemBelongsToJobForFilterAction({ supabase, jobId, systemId });
+  if (systemId) {
+    await requireSystemBelongsToJobForFilterAction({ supabase, jobId, systemId });
+  } else {
+    const systemChoice = String(formData.get("system_location") || formData.get("system_location_choice") || "").trim();
+    const systemCustom = String(formData.get("system_location_custom") || "").trim();
+
+    if (systemChoice === "__new__" && !systemCustom) {
+      throw new Error("Please type a new System Location name.");
+    }
+
+    const systemLocation = systemChoice === "__new__" ? systemCustom : systemChoice;
+    if (!systemLocation) throw new Error("Missing system_location");
+
+    const { data: existingSystem, error: sysFindErr } = await supabase
+      .from("job_systems")
+      .select("id")
+      .eq("job_id", jobId)
+      .eq("name", systemLocation)
+      .maybeSingle();
+
+    if (sysFindErr) throw sysFindErr;
+    systemId = String(existingSystem?.id ?? "").trim();
+
+    if (!systemId) {
+      const { data: newSystem, error: sysCreateErr } = await supabase
+        .from("job_systems")
+        .insert({ job_id: jobId, name: systemLocation })
+        .select("id")
+        .single();
+
+      if (sysCreateErr) throw sysCreateErr;
+      systemId = String(newSystem?.id ?? "").trim();
+    }
+  }
+
+  if (!systemId) throw new Error("Unable to resolve system_id");
 
   await createSystemFilter({
     supabase,

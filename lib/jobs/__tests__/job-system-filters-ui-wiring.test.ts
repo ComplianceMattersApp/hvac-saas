@@ -22,6 +22,16 @@ const equipmentEditCardSource = readFileSync(
   "utf8",
 );
 
+const equipmentCreateFormSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/EquipmentCreateForm.tsx"),
+  "utf8",
+);
+
+const systemLocationPickerSource = readFileSync(
+  resolve(__dirname, "../../../components/jobs/SystemLocationPicker.tsx"),
+  "utf8",
+);
+
 const jobActionsSource = readFileSync(
   resolve(__dirname, "../../actions/job-actions.ts"),
   "utf8",
@@ -68,6 +78,29 @@ describe("job equipment system filter management wiring", () => {
     expect(equipmentEditCardSource).toContain("Legacy filter equipment record. Add new filters in System Filters.");
   });
 
+  it("offers Filter in the add selector and routes it to system filter creation", () => {
+    expect(equipmentCreateFormSource).toContain("Add Equipment or Filter");
+    expect(equipmentCreateFormSource).toContain('const FILTER_ROLE_VALUE = "__system_filter__";');
+    expect(equipmentCreateFormSource).toContain('<option value={FILTER_ROLE_VALUE}>Filter</option>');
+    expect(equipmentCreateFormSource).toContain("addingFilter ? addSystemFilterFromForm : addJobEquipmentFromForm");
+    expect(equipmentCreateFormSource).toContain("Filter Details");
+    expect(equipmentCreateFormSource).toContain("Filter location");
+    expect(equipmentCreateFormSource).toContain("Date changed");
+    expect(equipmentCreateFormSource).toContain('name="height"');
+    expect(equipmentCreateFormSource).toContain('{addingFilter ? "Add Filter" : "Add Equipment"}');
+    expect(equipmentCreateFormSource).not.toContain('value: "filter"');
+  });
+
+  it("preserves normal equipment create routing and submits selected system context", () => {
+    expect(equipmentCreateFormSource).toContain("addJobEquipmentFromForm");
+    expect(equipmentCreateFormSource).toContain("Product Details");
+    expect(equipmentCreateFormSource).toContain('name="manufacturer"');
+    expect(equipmentCreateFormSource).toContain('name="serial"');
+    expect(systemLocationPickerSource).toContain('name="system_id"');
+    expect(systemLocationPickerSource).toContain('name="system_location"');
+    expect(jobActionsSource).toContain('formData.get("system_location") || formData.get("system_location_choice")');
+  });
+
   it("keeps filter mutations server-side and uses archive instead of hard delete", () => {
     expect(jobActionsSource).toContain("createSystemFilter");
     expect(jobActionsSource).toContain("updateSystemFilter");
@@ -82,7 +115,10 @@ describe("job equipment system filter management wiring", () => {
 
     expect(filterActionsSlice).toContain("requireInternalEquipmentMutationAccess");
     expect(filterActionsSlice).toContain("requireOperationalScopedJobMutationAccessOrRedirect");
+    expect(filterActionsSlice).toContain("createSystemFilter");
+    expect(filterActionsSlice).toContain(".from(\"job_systems\")");
     expect(filterActionsSlice).toContain("redirect(`/jobs/${jobId}/info?f=equipment`)");
+    expect(filterActionsSlice).not.toContain(".from(\"job_equipment\").insert");
     expect(filterActionsSlice).not.toContain(".delete()");
     expect(filterActionsSlice).not.toContain("maintenance_agreements");
     expect(filterActionsSlice).not.toContain("next_due_date");

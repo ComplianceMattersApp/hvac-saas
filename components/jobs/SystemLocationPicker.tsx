@@ -5,9 +5,11 @@ import { useMemo, useState } from "react";
 type SystemRow = { id: string; name: string | null };
 
 export default function SystemLocationPicker({ systems }: { systems: SystemRow[] }) {
-  const first = useMemo(() => systems?.[0]?.name ?? "", [systems]);
+  const first = useMemo(() => systems?.[0]?.id ?? "", [systems]);
   const [choice, setChoice] = useState(first);
   const isNew = choice === "__new__";
+  const selectedSystem = systems.find((system) => system.id === choice) ?? null;
+  const selectedSystemName = selectedSystem?.name ?? "";
 
   return (
     <div className="grid gap-1">
@@ -19,14 +21,14 @@ export default function SystemLocationPicker({ systems }: { systems: SystemRow[]
         <>
           <select
             id="system_location"
-            name="system_location"
+            name="system_location_choice"
             className="w-full rounded-md border px-3 py-2 text-gray-900"
             required
             value={choice}
             onChange={(e) => setChoice(e.target.value)}
           >
             {systems.map((s) => (
-              <option key={s.id} value={s.name ?? ""}>
+              <option key={s.id} value={s.id}>
                 {s.name}
               </option>
             ))}
@@ -44,6 +46,8 @@ export default function SystemLocationPicker({ systems }: { systems: SystemRow[]
           )}
 
           {/* always include the field so FormData.get(...) exists */}
+          {!isNew && <input type="hidden" name="system_id" value={selectedSystem?.id ?? ""} />}
+          {!isNew && <input type="hidden" name="system_location" value={selectedSystemName} />}
           {!isNew && <input type="hidden" name="system_location_custom" value="" />}
         </>
       ) : (

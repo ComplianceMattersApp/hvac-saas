@@ -3,7 +3,7 @@
 import { useState } from "react";
 import SystemLocationPicker from "@/components/jobs/SystemLocationPicker";
 import SubmitButton from "@/components/SubmitButton";
-import { addJobEquipmentFromForm } from "@/lib/actions/job-actions";
+import { addJobEquipmentFromForm, addSystemFilterFromForm } from "@/lib/actions/job-actions";
 import {
   EQUIPMENT_ROLE_OPTIONS,
   equipmentUsesRefrigerant,
@@ -11,6 +11,7 @@ import {
 } from "@/lib/utils/equipment-display";
 
 type SystemRow = { id: string; name: string | null };
+const FILTER_ROLE_VALUE = "__system_filter__";
 
 export default function EquipmentCreateForm({
   jobId,
@@ -20,23 +21,25 @@ export default function EquipmentCreateForm({
   systems: SystemRow[];
 }) {
   const [role, setRole] = useState("outdoor_unit");
+  const [filterDateDefault] = useState(() => new Date().toISOString().slice(0, 10));
+  const addingFilter = role === FILTER_ROLE_VALUE;
   const showRefrigerant = equipmentUsesRefrigerant(role);
   const showHeatingCapacity = isHeatingOnlyEquipment(role);
 
   return (
-    <form action={addJobEquipmentFromForm} className="pt-4 border-t border-gray-200">
+    <form action={addingFilter ? addSystemFilterFromForm : addJobEquipmentFromForm} className="pt-4 border-t border-gray-200">
       <input type="hidden" name="job_id" value={jobId} />
 
       <div className="px-5 py-4 sm:px-6">
         <div className="mb-5">
-          <h3 className="text-base font-semibold text-gray-950">Add Equipment</h3>
-          <p className="mt-1 text-sm text-gray-600">Capture equipment details to build the system inventory.</p>
+          <h3 className="text-base font-semibold text-gray-950">Add Equipment or Filter</h3>
+          <p className="mt-1 text-sm text-gray-600">Add an equipment record or a system-level filter to the selected system.</p>
         </div>
 
         <div className="space-y-5">
           <div>
             <label className="text-xs font-semibold uppercase tracking-wide text-gray-600 block mb-2" htmlFor="equipment_role">
-              Equipment Role
+              System Item Type
             </label>
             <select
               id="equipment_role"
@@ -51,11 +54,105 @@ export default function EquipmentCreateForm({
                   {option.label}
                 </option>
               ))}
+              <option value={FILTER_ROLE_VALUE}>Filter</option>
             </select>
           </div>
 
           <SystemLocationPicker systems={systems} />
 
+          {addingFilter ? (
+            <div className="pt-2">
+              <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Filter Details</div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="sm:col-span-3">
+                  <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-label">
+                    Filter location
+                  </label>
+                  <input
+                    id="filter-label"
+                    name="label"
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="Hall return"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-length">
+                    Length
+                  </label>
+                  <input
+                    id="filter-length"
+                    name="length"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="20"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-width">
+                    Width
+                  </label>
+                  <input
+                    id="filter-width"
+                    name="width"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="25"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-height">
+                    Depth
+                  </label>
+                  <input
+                    id="filter-height"
+                    name="height"
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    required
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="1"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-date-changed">
+                    Date changed
+                  </label>
+                  <input
+                    id="filter-date-changed"
+                    name="date_changed"
+                    type="date"
+                    required
+                    defaultValue={filterDateDefault}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="sm:col-span-3">
+                  <label className="text-xs font-medium text-gray-700 block mb-1.5" htmlFor="filter-notes">
+                    Notes (optional)
+                  </label>
+                  <textarea
+                    id="filter-notes"
+                    name="notes"
+                    rows={2}
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm text-gray-900 bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                    placeholder="Optional notes"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : (
           <div className="pt-2">
             <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-3">Product Details</div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -186,11 +283,12 @@ export default function EquipmentCreateForm({
               </div>
             </div>
           </div>
+          )}
         </div>
 
         <div className="mt-6 pt-4 border-t border-gray-200">
           <SubmitButton loadingText="Adding..." className="w-fit rounded-md bg-blue-600 px-4 py-2 text-white text-sm font-medium hover:bg-blue-700 transition-colors">
-            Add Equipment
+            {addingFilter ? "Add Filter" : "Add Equipment"}
           </SubmitButton>
         </div>
       </div>
