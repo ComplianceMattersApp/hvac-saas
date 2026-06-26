@@ -175,6 +175,9 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('const schedulePanelHref = standardJobAnchorHref("mobile-when-panel");');
     expect(mobileJobDetailV2PreviewSource).toContain("href={schedulePanelHref}");
     expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
+    expect(mobileJobDetailV2PreviewSource).toContain("hasScheduleInformation && !isReadOnlyState");
+    expect(mobileJobDetailV2PreviewSource).toContain("Change appointment date or arrival window.");
+    expect(mobileJobDetailV2PreviewSource).toContain("Edit Schedule");
     expect(mobileJobDetailV2PreviewSource).not.toContain("updateJobScheduleFromForm");
     expect(mobileJobDetailV2PreviewSource).not.toContain('name="scheduled_date"');
   });

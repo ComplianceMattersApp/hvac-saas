@@ -994,6 +994,19 @@ export default function MobileJobDetailV2Preview(props: any) {
                     </Link>
                   </div>
                 ) : null}
+                {hasScheduleInformation && !isReadOnlyState ? (
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <p className="text-sm font-semibold leading-5 text-slate-700">
+                      Change appointment date or arrival window.
+                    </p>
+                    <Link
+                      href={schedulePanelHref}
+                      className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-800"
+                    >
+                      Edit Schedule
+                    </Link>
+                  </div>
+                ) : null}
               </div>
             </div>
           </div>
