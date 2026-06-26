@@ -226,7 +226,7 @@ function getActionOrientedWorkLabel(label: string | undefined) {
   const trimmed = String(label ?? "").trim();
 
   if (trimmed.toLowerCase() === "work completed") {
-    return "Complete work";
+    return "Mark Field Work Complete";
   }
 
   return trimmed || "Finish Visit";
@@ -433,14 +433,14 @@ function buildNextStepPreview(props: {
     const title =
       status === "on_the_way" || opsStatus === "on_the_way"
         ? "Start the visit"
-        : status === "in_process" || opsStatus === "in_process"
-        ? finishWorkLabel
+      : status === "in_process" || opsStatus === "in_process"
+        ? "Finish field visit"
         : "Head to the job";
     const summary =
       status === "on_the_way" || opsStatus === "on_the_way"
         ? "When you arrive, start field work."
-        : status === "in_process" || opsStatus === "in_process"
-        ? "Complete the field visit when the work is done."
+      : status === "in_process" || opsStatus === "in_process"
+        ? "When the field work is done, mark this visit complete."
         : "Mark yourself on the way when you are ready to go.";
 
     return {
@@ -564,6 +564,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     ClockIcon,
     closeoutNeeds,
     contractorName,
+    createEstimateFromJobHref,
     failedReasonBannerText,
     FolderIcon,
     hasFullSchedule,
@@ -734,6 +735,13 @@ export default function MobileJobDetailV2Preview(props: any) {
   const previewRowTextClass = "min-w-0 flex-1";
   const previewPillClass =
     "shrink-0 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold leading-tight text-slate-600";
+  const toolsGroupHeadingClass =
+    "px-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500";
+  const toolsRowClass =
+    "flex min-h-16 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700";
+  const toolsRowIconClass =
+    "inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200";
+  const toolsRowTextClass = "min-w-0 flex-1";
   const evidenceActionClass =
     "flex min-h-16 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-base font-semibold text-slate-700";
   const evidenceActionTopClass = "flex min-w-0 flex-1 items-center gap-2";
@@ -1188,37 +1196,107 @@ export default function MobileJobDetailV2Preview(props: any) {
         <details className={`${previewSectionClass} group`}>
           <summary className="cursor-pointer list-none">
             <div className={`${mobileToolLinkClass} min-h-14 justify-between`}>
-              <span className="min-w-0 break-words">More Details / Tools</span>
+              <span className="min-w-0">
+                <span className="block break-words">More Details / Tools</span>
+                <span className="mt-0.5 block text-sm font-medium leading-5 text-slate-500">
+                  Admin tools, permits, history, and follow-up.
+                </span>
+              </span>
               <ChevronRightIcon className="h-5 w-5 shrink-0 transition-transform group-open:rotate-90" />
             </div>
           </summary>
-          <div className="mt-3 space-y-3 border-t border-slate-200 pt-3">
-            <Link href={standardJobAnchorHref("mobile-tools")} className="flex min-h-16 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
-              <span className="flex min-w-0 flex-1 items-center gap-2">
-                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">
-                  <ToolIcon className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block font-semibold text-slate-950">Job Tools</span>
-                  <span className="block text-sm text-slate-600">Open tools area</span>
-                </span>
-              </span>
-              <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
-            </Link>
+          <div className="mt-3 space-y-4 border-t border-slate-200 pt-3">
+            <div className="space-y-2">
+              <div className={toolsGroupHeadingClass}>Tools</div>
+              <div className="grid gap-2">
+                {createEstimateFromJobHref ? (
+                  <Link href={createEstimateFromJobHref} className={toolsRowClass}>
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className={toolsRowIconClass}>
+                        <ToolIcon className="h-4 w-4" />
+                      </span>
+                      <span className={toolsRowTextClass}>
+                        <span className="block font-semibold text-slate-950">Create Estimate</span>
+                        <span className="block text-sm font-medium text-slate-600">Open estimate workflow</span>
+                      </span>
+                    </span>
+                    <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+                  </Link>
+                ) : null}
+                {isInternalUser && String(job?.job_type ?? "").trim().toLowerCase() === "service" ? (
+                  <Link href={standardJobAnchorHref("mobile-follow-up-job")} className={toolsRowClass}>
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className={toolsRowIconClass}>
+                        <ToolIcon className="h-4 w-4" />
+                      </span>
+                      <span className={toolsRowTextClass}>
+                        <span className="block font-semibold text-slate-950">Create Return Visit</span>
+                        <span className="block text-sm font-medium text-slate-600">Open return visit tools in standard view</span>
+                      </span>
+                    </span>
+                    <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+                  </Link>
+                ) : null}
+                {surfaceProfile?.surfaces?.permits ? (
+                  <Link href={standardJobAnchorHref("mobile-permit-info")} className={toolsRowClass}>
+                    <span className="flex min-w-0 flex-1 items-center gap-2">
+                      <span className={toolsRowIconClass}>
+                        <ClipboardIcon className="h-4 w-4" />
+                      </span>
+                      <span className={toolsRowTextClass}>
+                        <span className="block font-semibold text-slate-950">Permit Information</span>
+                        <span className="block text-sm font-medium text-slate-600">Review or edit permit records</span>
+                      </span>
+                    </span>
+                    <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+                  </Link>
+                ) : null}
+                <Link href={standardJobAnchorHref("mobile-tools")} className={toolsRowClass}>
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className={toolsRowIconClass}>
+                      <ToolIcon className="h-4 w-4" />
+                    </span>
+                    <span className={toolsRowTextClass}>
+                      <span className="block font-semibold text-slate-950">Job Status Tools</span>
+                      <span className="block text-sm font-medium text-slate-600">Open status and interrupt tools</span>
+                    </span>
+                  </span>
+                  <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <div className={toolsGroupHeadingClass}>Admin / Records</div>
+              <div className="grid gap-2">
+                <Link href={standardJobAnchorHref("mobile-tools-timeline")} className={toolsRowClass}>
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className={toolsRowIconClass}>
+                      <FolderIcon className="h-4 w-4" />
+                    </span>
+                    <span className={toolsRowTextClass}>
+                      <span className="block font-semibold text-slate-950">Timeline / History</span>
+                      <span className="block text-sm font-medium text-slate-600">Open job history in standard view</span>
+                    </span>
+                  </span>
+                  <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
+                </Link>
             {isInternalUser && serviceLocationEditHref ? (
-              <Link href={serviceLocationEditHref} className="flex min-h-16 min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700">
+              <Link href={serviceLocationEditHref} className={toolsRowClass}>
                 <span className="flex min-w-0 flex-1 items-center gap-2">
-                  <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">
+                  <span className={toolsRowIconClass}>
                     <MapPinIcon className="h-4 w-4" />
                   </span>
-                  <span className="min-w-0">
+                  <span className={toolsRowTextClass}>
                     <span className="block font-semibold text-slate-950">Location & Address</span>
-                    <span className="block text-sm text-slate-600">Edit service location</span>
+                    <span className="block text-sm font-medium text-slate-600">Edit service location</span>
                   </span>
                 </span>
                 <ChevronRightIcon className="h-5 w-5 shrink-0 text-slate-400" />
               </Link>
             ) : null}
+              </div>
+            </div>
           </div>
         </details>
       </div>

@@ -78,6 +78,14 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("Open the required test workflow");
   });
 
+  it("uses action-oriented wording for the generic V2 field completion branch", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain('return "Mark Field Work Complete";');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Finish field visit"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"When the field work is done, mark this visit complete."');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('return "Complete work";');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('"Complete the field visit when the work is done."');
+  });
+
   it("surfaces existing Visit Scope as Service work without treating it as billing truth", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("const allVisitScopeItems = Array.isArray(visitScopeItems) ? visitScopeItems : [];");
     expect(mobileJobDetailV2PreviewSource).toContain('item?.kind === "companion_service"');
@@ -109,6 +117,23 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Open waiting tools"');
     expect(mobileJobDetailV2PreviewSource).toContain('anchor: "mobile-tools"');
     expect(mobileJobDetailV2PreviewSource).toContain('"href" in nextStep && nextStep.href');
+  });
+
+  it("keeps V2 More Details tools flattened into direct grouped rows", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain("Admin tools, permits, history, and follow-up.");
+    expect(mobileJobDetailV2PreviewSource).toContain("toolsGroupHeadingClass");
+    expect(mobileJobDetailV2PreviewSource).toContain("Admin / Records");
+    expect(mobileJobDetailV2PreviewSource).toContain("Create Estimate");
+    expect(mobileJobDetailV2PreviewSource).toContain("Create Return Visit");
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-follow-up-job")');
+    expect(mobileJobDetailV2PreviewSource).toContain("Permit Information");
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-permit-info")');
+    expect(mobileJobDetailV2PreviewSource).toContain("Job Status Tools");
+    expect(mobileJobDetailV2PreviewSource).toContain("Timeline / History");
+    expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-tools-timeline")');
+    expect(mobileJobDetailV2PreviewSource).toContain("Location & Address");
+    expect(mobileJobDetailV2PreviewSource).not.toContain(">Job Tools</span>");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("Open tools area");
   });
 
   it("exposes mobile assignment controls in the visible Team Assignment card", () => {
