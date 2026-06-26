@@ -97,4 +97,16 @@ describe("resolveEccScenario mini split trigger alignment", () => {
     expect(result.scenario).toBe("mini_split");
     expect(result.suggestedTests.map((test) => test.testType)).toEqual(["refrigerant_charge"]);
   });
+
+  it("treats legacy and new packaged unit values as package-unit scenarios", () => {
+    for (const component_type of ["package_unit", "gas_pack_unit", "heat_pump_pack_unit"]) {
+      const result = resolveEccScenario({
+        projectType: "alteration",
+        systemEquipment: [{ component_type }],
+      });
+
+      expect(result.scenario).toBe("package_unit_alteration");
+      expect(result.suggestedTests.map((test) => test.testType)).toEqual(["duct_leakage", "airflow"]);
+    }
+  });
 });

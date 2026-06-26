@@ -59,6 +59,7 @@ import { formatAreaSquareInches } from "@/lib/ecc/air-filter-device";
 import { formatFanEfficacy } from "@/lib/ecc/fan-watt-draw";
 import { isHeatingOnlyEquipment } from "@/lib/utils/equipment-display";
 import { buildEquipmentSummaryLine } from "@/lib/utils/equipment-summary";
+import { isPackagedUnitEquipmentType } from "@/lib/utils/equipment-domain";
 import { normalizeRetestLinkedJobTitle } from "@/lib/utils/job-title-display";
 import { formatBusinessDateUS } from "@/lib/utils/schedule-la";
 import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-display";
@@ -463,14 +464,7 @@ function equipmentKindTokens(eq: any) {
 
 function isPackageEquipment(eq: any) {
   const tokens = equipmentKindTokens(eq);
-  return tokens.some(
-    (token) =>
-      token === "package_unit" ||
-      token === "pack_unit" ||
-      token === "package_gas_electric" ||
-      token === "package_heat_pump" ||
-      token.includes("package")
-  );
+  return tokens.some((token) => isPackagedUnitEquipmentType(token) || token.includes("package"));
 }
 
 function isOutdoorEquipment(eq: any) {

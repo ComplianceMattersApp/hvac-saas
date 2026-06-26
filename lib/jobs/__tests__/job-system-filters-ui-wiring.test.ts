@@ -93,6 +93,7 @@ describe("job equipment system filter management wiring", () => {
     expect(equipmentDisplaySource).not.toContain("label: \"Filter\"");
     expect(equipmentEditCardSource).toContain("isLegacyFilterEquipment");
     expect(equipmentEditCardSource).toContain("Legacy filter equipment record. Add new filters from Add Equipment or Filter.");
+    expect(equipmentEditCardSource).toContain("equipmentRoleOptionsForValue");
   });
 
   it("offers Filter in the add selector and routes it to system filter creation", () => {
@@ -114,6 +115,9 @@ describe("job equipment system filter management wiring", () => {
     expect(equipmentCreateFormFieldsSource).toContain("Product Details");
     expect(equipmentCreateFormFieldsSource).toContain('name="manufacturer"');
     expect(equipmentCreateFormFieldsSource).toContain('name="serial"');
+    expect(equipmentDisplaySource).toContain('value: "gas_pack_unit", label: "Gas Pack Unit"');
+    expect(equipmentDisplaySource).toContain('value: "heat_pump_pack_unit", label: "Heat Pump Pack Unit"');
+    expect(equipmentDisplaySource).not.toContain('value: "package_unit", label: "Pack Unit"');
     expect(systemLocationPickerSource).toContain('name="system_id"');
     expect(systemLocationPickerSource).toContain('name="system_location"');
     expect(jobActionsSource).toContain('formData.get("system_location") || formData.get("system_location_choice")');

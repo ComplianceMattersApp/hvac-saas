@@ -46,11 +46,13 @@ describe("rule-profiles airflow threshold normalization", () => {
   });
 
   it("excludes refrigerant charge for package-unit systems", () => {
-    const required = getRequiredTestsForSystem({
-      projectType: "all_new",
-      systemEquipment: [{ component_type: "package_unit" }],
-    });
+    for (const component_type of ["package_unit", "gas_pack_unit", "heat_pump_pack_unit"]) {
+      const required = getRequiredTestsForSystem({
+        projectType: "all_new",
+        systemEquipment: [{ component_type }],
+      });
 
-    expect(required).not.toContain("refrigerant_charge");
+      expect(required).not.toContain("refrigerant_charge");
+    }
   });
 });

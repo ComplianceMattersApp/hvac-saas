@@ -1,4 +1,5 @@
 import type { EccTestType } from "@/lib/ecc/test-registry";
+import { isPackagedUnitEquipmentType } from "@/lib/utils/equipment-domain";
 
 export type EquipmentLike = {
   component_type?: string | null;
@@ -59,10 +60,7 @@ function normalizeOneType(raw: string): string {
   if (normalized === "heat_pump") return "heat_pump";
   if (normalized === "heat_pump_outdoor") return "heat_pump";
 
-  if (normalized === "pack_unit") return "package_unit";
-  if (normalized === "package_unit") return "package_unit";
-  if (normalized === "package_gas_electric") return "package_unit";
-  if (normalized === "package_heat_pump") return "package_unit";
+  if (isPackagedUnitEquipmentType(normalized)) return "package_unit";
 
   if (normalized === "mini_split_outdoor") return "mini_split_outdoor";
   if (normalized === "mini_split_head") return "mini_split_head";

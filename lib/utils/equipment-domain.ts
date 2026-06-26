@@ -44,9 +44,31 @@ export function mapToCanonicalRole(raw: IntakeComponentType): string {
   if (v === "furnace_gas") return "furnace";
   if (v === "air_handler_electric") return "air_handler";
   if (v === "heat_pump_outdoor") return "heat_pump";
-  if (v === "package_gas_electric" || v === "package_heat_pump") return "package_unit";
+  if (v === "package_gas_electric") return "gas_pack_unit";
+  if (v === "package_heat_pump") return "heat_pump_pack_unit";
   // Already canonical or unknown — return as-is
   return v;
+}
+
+function normalizeEquipmentType(value: string | null | undefined): string {
+  return String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[\s-]+/g, "_");
+}
+
+const PACKAGED_UNIT_ROLES = new Set([
+  "pack_unit",
+  "package",
+  "package_unit",
+  "package_gas_electric",
+  "package_heat_pump",
+  "gas_pack_unit",
+  "heat_pump_pack_unit",
+]);
+
+export function isPackagedUnitEquipmentType(type: string | null | undefined) {
+  return PACKAGED_UNIT_ROLES.has(normalizeEquipmentType(type));
 }
 
 /** Furnace (heating-only) canonical roles. */
@@ -58,6 +80,8 @@ const COOLING_ROLES = new Set([
   "indoor_unit",
   "heat_pump",
   "package_unit",
+  "gas_pack_unit",
+  "heat_pump_pack_unit",
   "air_handler",
   "mini_split_outdoor",
   "mini_split_head",

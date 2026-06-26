@@ -5,7 +5,7 @@ import { useFormStatus } from "react-dom";
 import { updateJobEquipmentFromForm, deleteJobEquipmentFromForm } from "@/lib/actions/job-actions";
 import SubmitButton from "@/components/SubmitButton";
 import {
-  EQUIPMENT_ROLE_OPTIONS,
+  equipmentRoleOptionsForValue,
   equipmentRoleLabel,
   equipmentUsesRefrigerant,
   isHeatingOnlyEquipment,
@@ -78,6 +78,7 @@ export default function EquipmentEditCard({
 
   const showRefrigerant = equipmentUsesRefrigerant(role);
   const showHeatingCapacity = isHeatingOnlyEquipment(role);
+  const equipmentRoleOptions = equipmentRoleOptionsForValue(eq.equipment_role ?? eq.component_type);
 
   if (!editing) {
     return (
@@ -173,7 +174,7 @@ export default function EquipmentEditCard({
             value={role}
             onChange={(e) => setRole(e.target.value)}
           >
-            {EQUIPMENT_ROLE_OPTIONS.map((option) => (
+            {equipmentRoleOptions.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>

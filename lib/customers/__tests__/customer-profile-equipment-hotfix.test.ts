@@ -27,6 +27,11 @@ const equipmentCreateFormFieldsSource = readFileSync(
   "utf8",
 );
 
+const equipmentDisplaySource = readFileSync(
+  resolve(__dirname, "../../utils/equipment-display.ts"),
+  "utf8",
+);
+
 const jobInfoPageSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/info/page.tsx"),
   "utf8",
@@ -81,6 +86,10 @@ describe("customer profile equipment hotfix", () => {
     expect(equipmentCreateFormFieldsSource).toContain('name="equipment_role"');
     expect(equipmentCreateFormFieldsSource).toContain('name="manufacturer"');
     expect(equipmentCreateFormFieldsSource).toContain('name="serial"');
+    expect(equipmentCreateFormFieldsSource).toContain("EQUIPMENT_ROLE_OPTIONS.map");
+    expect(equipmentDisplaySource).toContain('value: "gas_pack_unit", label: "Gas Pack Unit"');
+    expect(equipmentDisplaySource).toContain('value: "heat_pump_pack_unit", label: "Heat Pump Pack Unit"');
+    expect(equipmentDisplaySource).not.toContain('value: "package_unit", label: "Pack Unit"');
     expect(customerPageSource).toContain("Saved property equipment");
     expect(customerPageSource).toContain("No systems or equipment saved for this property yet.");
     expect(customerPageSource).toContain('href={`/jobs/${equipment.sourceJob.id}/info?f=equipment`}');

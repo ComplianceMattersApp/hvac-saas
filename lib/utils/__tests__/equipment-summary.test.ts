@@ -77,4 +77,10 @@ describe("buildEquipmentSummaryLine", () => {
     expect(outdoor).toContain("Mini-Split Outdoor");
     expect(indoor).toContain("Mini-Split Indoor Head");
   });
+
+  it("preserves legacy Pack Unit and labels new packaged unit summaries", () => {
+    expect(buildEquipmentSummaryLine({ equipment_role: "package_unit" })).toContain("Pack Unit");
+    expect(buildEquipmentSummaryLine({ equipment_role: "gas_pack_unit" })).toContain("Gas Pack Unit");
+    expect(buildEquipmentSummaryLine({ equipment_role: "heat_pump_pack_unit" })).toContain("Heat Pump Pack Unit");
+  });
 });

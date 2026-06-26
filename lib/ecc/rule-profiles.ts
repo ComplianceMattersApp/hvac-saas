@@ -1,6 +1,7 @@
 // lib/ecc/rule-profiles.ts
 
 import type { EccTestType } from "@/lib/ecc/test-registry";
+import { isPackagedUnitEquipmentType } from "@/lib/utils/equipment-domain";
 
 
 export type RuleProfileCode =
@@ -51,14 +52,6 @@ export type RuleProfile = {
 };
 
 
-const PACKAGE_ALIASES = new Set([
-  "pack_unit",
-  "package",
-  "package_unit",
-  "package_gas_electric",
-  "package_heat_pump",
-]);
-
 type SystemEquipmentLike = {
   component_type?: string | null;
   equipment_role?: string | null;
@@ -76,7 +69,7 @@ export function isPackageSystem(systemEquipment: SystemEquipmentLike[] | null | 
     const componentType = normalizeEquipmentType(eq?.component_type);
     const equipmentRole = normalizeEquipmentType(eq?.equipment_role);
 
-    if (PACKAGE_ALIASES.has(componentType) || PACKAGE_ALIASES.has(equipmentRole)) {
+    if (isPackagedUnitEquipmentType(componentType) || isPackagedUnitEquipmentType(equipmentRole)) {
       return true;
     }
 
