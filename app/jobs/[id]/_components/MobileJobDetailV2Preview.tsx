@@ -756,7 +756,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     showCorrectionReviewResolution,
     showLinkedRetestCreated,
   });
-  const standardJobHref = `/jobs/${job.id}?tab=${tab}`;
+  const standardJobHref = `/jobs/${job.id}?tab=${tab}&mobileLayout=current`;
   const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;
   const hasServicePlanToolContext = Boolean(
     markVisitCountedLinkId ||

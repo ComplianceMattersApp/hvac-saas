@@ -1273,6 +1273,29 @@ const workspaceSoftCardClass =
 const workspaceEmptyStateClass =
   "rounded-lg border border-dashed border-slate-300 bg-slate-50/72 px-4 py-4 text-sm text-slate-600";
 
+function parseMobileJobV2Allowlist(value: string | undefined) {
+  return String(value ?? "")
+    .split(",")
+    .map((item) => item.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function isMobileJobV2OwnerDefaultEnabled() {
+  return String(process.env.ENABLE_MOBILE_JOB_V2_OWNER_DEFAULT ?? "").trim().toLowerCase() === "true";
+}
+
+function isMobileJobV2AllowlistedUser(user: { id?: string | null; email?: string | null }) {
+  const allowedEmails = parseMobileJobV2Allowlist(process.env.MOBILE_JOB_V2_ALLOWED_EMAILS);
+  const allowedUserIds = parseMobileJobV2Allowlist(process.env.MOBILE_JOB_V2_ALLOWED_USER_IDS);
+  const userEmail = String(user.email ?? "").trim().toLowerCase();
+  const userId = String(user.id ?? "").trim().toLowerCase();
+
+  return Boolean(
+    (userEmail && allowedEmails.includes(userEmail)) ||
+      (userId && allowedUserIds.includes(userId)),
+  );
+}
+
 export default async function JobDetailPage({
   params,
   searchParams,
@@ -1294,7 +1317,9 @@ export default async function JobDetailPage({
       : typeof mobileLayoutRaw === "string"
       ? mobileLayoutRaw
       : "";
-  const useMobileV2Preview = mobileLayout === "v2";
+  const mobileLayoutMode = mobileLayout.trim().toLowerCase();
+  const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";
+  const explicitlyRequestedMobileV2Preview = mobileLayoutMode === "v2";
 
   const tabRaw = sp.tab;
   const tab =
@@ -3499,6 +3524,16 @@ const showCorrectionReviewResolution =
   const mobileCurrentStatusLabel = isFieldComplete ? "Field Complete" : mobileLifecycleStatusLabel;
   const showMobileContractorContext =
     surfaceProfile.surfaces.contractorRaterHandoff && job.job_type === "ecc" && Boolean(contractorId);
+  const mobileV2OwnerDefaultAllowed =
+    isInternalUser &&
+    !hasContractorShadowMembership &&
+    String((internalUser as any).status ?? "").trim().toLowerCase() !== "inactive" &&
+    (internalUser as any).active !== false &&
+    isMobileJobV2OwnerDefaultEnabled() &&
+    isMobileJobV2AllowlistedUser(user);
+  const useMobileV2Preview =
+    !forceCurrentMobileLayout &&
+    (explicitlyRequestedMobileV2Preview || mobileV2OwnerDefaultAllowed);
   const MobileJobDetailMobileComponent = useMobileV2Preview
     ? MobileJobDetailV2Preview
     : MobileJobDetailCurrent;

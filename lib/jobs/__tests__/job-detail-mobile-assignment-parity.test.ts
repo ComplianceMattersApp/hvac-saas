@@ -57,7 +57,7 @@ const realPreviewWorkspacePatterns = [
 ];
 
 describe("mobile job detail assignment parity", () => {
-  it("keeps current mobile as default and gates the V2 preview behind mobileLayout=v2", () => {
+  it("keeps current mobile as default and gates V2 behind explicit preview or owner env allowlist", () => {
     const mobileSelectionStart = pageSource.indexOf("const MobileJobDetailMobileComponent = useMobileV2Preview");
     const mobileSelection = pageSource.slice(mobileSelectionStart, mobileSelectionStart + 220);
 
@@ -65,7 +65,17 @@ describe("mobile job detail assignment parity", () => {
     expect(pageSource).toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
     expect(pageSource).toContain('import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";');
     expect(pageSource).toContain("const mobileLayoutRaw = sp.mobileLayout;");
-    expect(pageSource).toContain('const useMobileV2Preview = mobileLayout === "v2";');
+    expect(pageSource).toContain('const explicitlyRequestedMobileV2Preview = mobileLayoutMode === "v2";');
+    expect(pageSource).toContain('const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";');
+    expect(pageSource).toContain("function isMobileJobV2OwnerDefaultEnabled()");
+    expect(pageSource).toContain("process.env.ENABLE_MOBILE_JOB_V2_OWNER_DEFAULT");
+    expect(pageSource).toContain("process.env.MOBILE_JOB_V2_ALLOWED_EMAILS");
+    expect(pageSource).toContain("process.env.MOBILE_JOB_V2_ALLOWED_USER_IDS");
+    expect(pageSource).toContain("const mobileV2OwnerDefaultAllowed =");
+    expect(pageSource).toContain("isMobileJobV2OwnerDefaultEnabled() &&");
+    expect(pageSource).toContain("isMobileJobV2AllowlistedUser(user)");
+    expect(pageSource).toContain("!forceCurrentMobileLayout &&");
+    expect(pageSource).toContain("(explicitlyRequestedMobileV2Preview || mobileV2OwnerDefaultAllowed)");
     expect(mobileSelection).toContain("? MobileJobDetailV2Preview");
     expect(mobileSelection).toContain(": MobileJobDetailCurrent");
     expect(pageSource).toContain("<MobileJobDetailMobileComponent");
@@ -87,9 +97,10 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("keeps V2 preview anchor CTAs routed to standard current mobile anchors or real workspaces", () => {
-    expect(mobileJobDetailV2PreviewSource).toContain('const standardJobHref = `/jobs/${job.id}?tab=${tab}`;');
+    expect(mobileJobDetailV2PreviewSource).toContain('const standardJobHref = `/jobs/${job.id}?tab=${tab}&mobileLayout=current`;');
     expect(mobileJobDetailV2PreviewSource).toContain("const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;");
     expect(mobileJobDetailV2PreviewSource).not.toContain("mobileLayout=v2");
+    expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
     expect(mobileJobDetailV2PreviewSource).toContain("? standardJobAnchorHref(nextStep.anchor)");
     expect(mobileJobDetailV2PreviewSource).toContain("standardJobAnchorHref(billingPreview.hrefAnchor)");
     expect(mobileJobDetailV2PreviewSource).toContain("nextStep.href");

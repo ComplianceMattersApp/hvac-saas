@@ -58,14 +58,23 @@ const refrigerantChargePhotoEvidencePanelSource = readFileSync(
 );
 
 describe("job tests page wiring", () => {
-  it("keeps current mobile extracted while V2 remains explicitly preview-gated", () => {
+  it("keeps current mobile extracted while V2 remains preview or owner-allowlist gated", () => {
     const mobileSelectionStart = jobPageSource.indexOf("const MobileJobDetailMobileComponent = useMobileV2Preview");
     const mobileSelection = jobPageSource.slice(mobileSelectionStart, mobileSelectionStart + 220);
 
     expect(jobPageSource).toContain('import MobileJobDetailCurrent from "./_components/MobileJobDetailCurrent";');
     expect(jobPageSource).toContain('import MobileJobDetailV2Preview from "./_components/MobileJobDetailV2Preview";');
     expect(jobPageSource).toContain("const mobileLayoutRaw = sp.mobileLayout;");
-    expect(jobPageSource).toContain('const useMobileV2Preview = mobileLayout === "v2";');
+    expect(jobPageSource).toContain('const explicitlyRequestedMobileV2Preview = mobileLayoutMode === "v2";');
+    expect(jobPageSource).toContain('const forceCurrentMobileLayout = mobileLayoutMode === "current" || mobileLayoutMode === "classic";');
+    expect(jobPageSource).toContain("function isMobileJobV2OwnerDefaultEnabled()");
+    expect(jobPageSource).toContain("process.env.ENABLE_MOBILE_JOB_V2_OWNER_DEFAULT");
+    expect(jobPageSource).toContain("process.env.MOBILE_JOB_V2_ALLOWED_EMAILS");
+    expect(jobPageSource).toContain("process.env.MOBILE_JOB_V2_ALLOWED_USER_IDS");
+    expect(jobPageSource).toContain("const mobileV2OwnerDefaultAllowed =");
+    expect(jobPageSource).toContain("isMobileJobV2AllowlistedUser(user)");
+    expect(jobPageSource).toContain("!forceCurrentMobileLayout &&");
+    expect(jobPageSource).toContain("(explicitlyRequestedMobileV2Preview || mobileV2OwnerDefaultAllowed)");
     expect(mobileSelectionStart).toBeGreaterThan(-1);
     expect(mobileSelection).toContain("? MobileJobDetailV2Preview");
     expect(mobileSelection).toContain(": MobileJobDetailCurrent");
