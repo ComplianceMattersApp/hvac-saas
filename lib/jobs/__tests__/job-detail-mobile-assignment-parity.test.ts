@@ -17,6 +17,13 @@ const mobileJobDetailV2PreviewSource = readFileSync(
   "utf8",
 );
 
+const mobileJobStatusActionSurfaceSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/MobileJobStatusActionSurface.tsx"),
+  "utf8",
+);
+
+const currentMobileSurfaceSource = `${mobileJobDetailCurrentSource}\n${mobileJobStatusActionSurfaceSource}`;
+
 const controlsSource = readFileSync(
   resolve(__dirname, "../../../app/jobs/[id]/_components/AssignedTeamControls.tsx"),
   "utf8",
@@ -83,6 +90,8 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("Billing / Closeout");
     expect(mobileJobDetailV2PreviewSource).toContain("No billing action needed yet.");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Preview only");
+    expect(mobileJobDetailCurrentSource).toContain("<MobileJobStatusActionSurface {...props} />");
+    expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobStatusActionSurface {...props} />");
   });
 
   it("keeps the desktop branch separate from the V2 preview selector", () => {
@@ -101,12 +110,12 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("const standardJobAnchorHref = (anchor: string) => `${standardJobHref}#${anchor}`;");
     expect(mobileJobDetailV2PreviewSource).not.toContain("mobileLayout=v2");
     expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
-    expect(mobileJobDetailV2PreviewSource).toContain("? standardJobAnchorHref(nextStep.anchor)");
+    expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobStatusActionSurface from "./MobileJobStatusActionSurface";');
     expect(mobileJobDetailV2PreviewSource).toContain("standardJobAnchorHref(billingPreview.hrefAnchor)");
-    expect(mobileJobDetailV2PreviewSource).toContain("nextStep.href");
-    expect(mobileJobDetailV2PreviewSource).toContain("href: `/jobs/${props.job.id}/tests`");
+    expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobStatusActionSurface {...props} />");
+    expect(mobileJobDetailV2PreviewSource).toContain("`/jobs/${job.id}/tests`");
     for (const anchor of standardViewAnchors) {
-      expect(mobileJobDetailCurrentSource).toContain(`id="${anchor}"`);
+      expect(currentMobileSurfaceSource).toContain(`id="${anchor}"`);
       expect(mobileJobDetailV2PreviewSource).toContain(anchor);
     }
     for (const routePattern of realPreviewWorkspacePatterns) {
@@ -166,12 +175,6 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain(
       "hasFullSchedule || job?.scheduled_date || job?.window_start || job?.window_end || mobileAppointmentTimeLabel",
     );
-    expect(mobileJobDetailV2PreviewSource).toContain("hasScheduleInformation: boolean");
-    expect(mobileJobDetailV2PreviewSource).toContain("if (!props.hasScheduleInformation && !props.isFieldComplete)");
-    expect(mobileJobDetailV2PreviewSource).toContain('title: "Schedule this job"');
-    expect(mobileJobDetailV2PreviewSource).toContain('summary: "Set an appointment before heading to the field."');
-    expect(mobileJobDetailV2PreviewSource).toContain('anchor: "mobile-when-panel"');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Schedule Job"');
     expect(mobileJobDetailV2PreviewSource).toContain('const schedulePanelHref = standardJobAnchorHref("mobile-when-panel");');
     expect(mobileJobDetailV2PreviewSource).toContain("href={schedulePanelHref}");
     expect(mobileJobDetailV2PreviewSource).toContain('{hasScheduleInformation ? "Edit" : "Schedule"}');
@@ -185,19 +188,19 @@ describe("mobile job detail assignment parity", () => {
   it("does not treat ECC test availability as required test attention in the V2 preview", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("function hasCompletedEccTestRun");
     expect(mobileJobDetailV2PreviewSource).toContain('String(sp?.notice ?? "").trim() === "ecc_test_required" && !hasCompletedEccTestRun(job)');
-    expect(mobileJobDetailV2PreviewSource).toContain("hasRequiredEccTestAttention: boolean");
-    expect(mobileJobDetailV2PreviewSource).toContain("props.hasRequiredEccTestAttention");
+    expect(mobileJobDetailV2PreviewSource).toContain("const hasRequiredEccTestAttention =");
     expect(mobileJobDetailV2PreviewSource).not.toContain("!props.isFieldComplete ||\n      props.showMobileEccTestAction");
     expect(mobileJobDetailV2PreviewSource).toContain("Open test workflow");
     expect(mobileJobDetailV2PreviewSource).not.toContain("Open the required test workflow");
   });
 
-  it("uses action-oriented wording for the generic V2 field completion branch", () => {
-    expect(mobileJobDetailV2PreviewSource).toContain('return "Mark Field Work Complete";');
-    expect(mobileJobDetailV2PreviewSource).toContain('"Finish field visit"');
-    expect(mobileJobDetailV2PreviewSource).toContain('"When the field work is done, mark this visit complete."');
-    expect(mobileJobDetailV2PreviewSource).not.toContain('return "Complete work";');
-    expect(mobileJobDetailV2PreviewSource).not.toContain('"Complete the field visit when the work is done."');
+  it("reuses the current mobile status/action surface for field lifecycle actions", () => {
+    expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobStatusActionSurface {...props} />");
+    expect(mobileJobStatusActionSurfaceSource).toContain("<JobFieldActionButton");
+    expect(mobileJobStatusActionSurfaceSource).toContain("<FieldOutcomePanel");
+    expect(mobileJobStatusActionSurfaceSource).toContain("Mark Field Complete");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("function buildNextStepPreview");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("Open Standard Controls");
   });
 
   it("surfaces existing Visit Scope as Service work without treating it as billing truth", () => {
@@ -213,80 +216,61 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("Invoice Charges are billed scope. Work Items remain operational scope.");
   });
 
-  it("hardens Service-specific V2 follow-up, completion, and billing copy without duplicating forms", () => {
-    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: "Service follow-up"');
-    expect(mobileJobDetailV2PreviewSource).toContain("props.serviceFollowUpProgressState.progressLabel");
-    expect(mobileJobDetailV2PreviewSource).toContain("props.serviceFollowUpProgressState.bridgeActionLabel");
-    expect(mobileJobDetailV2PreviewSource).toContain("props.serviceFollowUpProgressState.nextActionLabel");
-    expect(mobileJobDetailV2PreviewSource).toContain('"This service job is waiting on follow-up before normal field work can continue."');
-    expect(mobileJobDetailV2PreviewSource).toContain('anchor: "mobile-next-service-action"');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: nextActionLabel || "Open follow-up tools"');
-    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: isService ? "Service closeout" : "Billing closeout"');
-    expect(mobileJobDetailV2PreviewSource).toContain('title: props.internalInvoiceTruth ? "Review invoice" : "Billing review"');
-    expect(mobileJobDetailV2PreviewSource).toContain('"The field visit is complete. Build or review billing so closeout can continue."');
-    expect(mobileJobDetailV2PreviewSource).toContain('title: isEcc ? "Review compliance closeout" : "Review service closeout"');
-    expect(mobileJobDetailV2PreviewSource).toContain('"Field work is complete. Review work performed, notes, and any billing or closeout items below."');
-    expect(mobileJobDetailV2PreviewSource).not.toContain("<FieldOutcomePanel");
+  it("reuses current mobile service follow-up, completion, and billing controls", () => {
+    expect(mobileJobStatusActionSurfaceSource).toContain("serviceFollowUpProgressState.progressLabel");
+    expect(mobileJobStatusActionSurfaceSource).toContain("serviceFollowUpProgressState.bridgeActionLabel");
+    expect(mobileJobStatusActionSurfaceSource).toContain("serviceFollowUpProgressState.nextActionLabel");
+    expect(mobileJobStatusActionSurfaceSource).toContain('id="mobile-next-service-action"');
+    expect(mobileJobStatusActionSurfaceSource).toContain("markServicePartOrderedFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain("markServicePartArrivedFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain("markServiceApprovalReceivedFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain("createNextServiceVisitFromForm");
     expect(mobileJobDetailV2PreviewSource).not.toContain("form action={markJobPartsNeededFromForm}");
     expect(mobileJobDetailV2PreviewSource).not.toContain("form action={markJobApprovalNeededFromForm}");
   });
 
-  it("hardens V2 permit, billing, external billing, and closeout blockers without duplicating forms", () => {
-    const requiredTestsIndex = mobileJobDetailV2PreviewSource.indexOf('title: "Complete required tests"');
-    const permitIndex = mobileJobDetailV2PreviewSource.indexOf('title: "Permit needed"');
-    const externalBillingIndex = mobileJobDetailV2PreviewSource.indexOf('title: "External billing review"');
-    const invoiceIndex = mobileJobDetailV2PreviewSource.indexOf('title: props.internalInvoiceTruth ? "Review invoice" : "Billing review"');
-
-    expect(requiredTestsIndex).toBeGreaterThan(-1);
-    expect(permitIndex).toBeGreaterThan(requiredTestsIndex);
-    expect(externalBillingIndex).toBeGreaterThan(permitIndex);
-    expect(invoiceIndex).toBeGreaterThan(externalBillingIndex);
-    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: "Permit blocker"');
-    expect(mobileJobDetailV2PreviewSource).toContain('"Add or review permit details before closeout."');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review permit info"');
+  it("reuses current mobile permit, billing, external billing, and closeout blockers", () => {
+    expect(mobileJobStatusActionSurfaceSource).toContain('id="mobile-ecc-permit-needed-action"');
+    expect(mobileJobStatusActionSurfaceSource).toContain("markEccPermitAvailableFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain('name="permit_number"');
+    expect(mobileJobStatusActionSurfaceSource).toContain('name="jurisdiction"');
+    expect(mobileJobStatusActionSurfaceSource).toContain('name="permit_date"');
+    expect(mobileJobStatusActionSurfaceSource).toContain("createInternalInvoiceDraftFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain("markInvoiceCompleteFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain("completeDataEntryFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain("markCertsCompleteFromForm");
     expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref("mobile-permit-info")');
     expect(mobileJobDetailV2PreviewSource).toContain('isEccComplianceActive');
     expect(mobileJobDetailV2PreviewSource).toContain('!isFieldComplete || hasRequiredEccTestAttention || isEccPermitNeededActive || Boolean(closeoutNeeds?.needsCerts)');
-    expect(mobileJobDetailV2PreviewSource).toContain('"Confirm external billing before closeout."');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review external billing"');
-    expect(mobileJobDetailV2PreviewSource).toContain('title: "Closeout review"');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Review closeout"');
     expect(mobileJobDetailV2PreviewSource).toContain('isReadOnlyState');
     expect(mobileJobDetailV2PreviewSource).toContain('"Review billing, closeout, and history from the standard job view."');
-    expect(mobileJobDetailV2PreviewSource).toContain("if (props.isFieldComplete && props.closeoutNeeds?.needsCerts)");
     expect(mobileJobDetailV2PreviewSource).not.toContain("props.isEccPermitNeededActive ||\n      Boolean(props.closeoutNeeds?.needsCerts)");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markEccPermitAvailableFromForm}");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={markInvoiceCompleteFromForm}");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={completeDataEntryFromForm}");
   });
 
-  it("hardens ECC failed, correction-review, and retest states without duplicating forms", () => {
-    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: props.showLinkedRetestCreated ? "Linked retest" : "Linked work"');
-    expect(mobileJobDetailV2PreviewSource).toContain('"This original job is historical while the linked retest or follow-up job carries the active work."');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Open Standard Controls"');
-    expect(mobileJobDetailV2PreviewSource).toContain('eyebrow: "ECC review"');
-    expect(mobileJobDetailV2PreviewSource).toContain('title: opsStatus === "pending_office_review" ? "Office review needed" : "Correction or retest needed"');
-    expect(mobileJobDetailV2PreviewSource).toContain('"This failed ECC result needs correction review or retest review before normal closeout can continue."');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: props.showCorrectionReviewResolution ? "Review correction path" : "Review retest path"');
-    expect(mobileJobDetailV2PreviewSource).toContain('title: "Retest needed"');
-    expect(mobileJobDetailV2PreviewSource).toContain('"This original failed visit needs retest scheduling or review from the standard job action area."');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Open retest actions"');
+  it("reuses current mobile ECC failed, correction-review, and retest action surfaces", () => {
+    expect(mobileJobStatusActionSurfaceSource).toContain("canShowEccFailedReasonBanner");
+    expect(mobileJobStatusActionSurfaceSource).toContain("failedReasonBannerText");
+    expect(mobileJobStatusActionSurfaceSource).toContain("confirmEccRetestReadyFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain("scheduleRetestNowFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain("createRetestJobFromForm");
+    expect(mobileJobStatusActionSurfaceSource).toContain("Confirm Retest Ready");
+    expect(mobileJobStatusActionSurfaceSource).toContain("Move to Needs Scheduling");
     expect(mobileJobDetailV2PreviewSource).toContain("const showEccReviewSummary =");
     expect(mobileJobDetailV2PreviewSource).toContain("showCorrectionReviewResolution");
     expect(mobileJobDetailV2PreviewSource).toContain("ECC attention");
     expect(mobileJobDetailV2PreviewSource).toContain("eccReviewSummaryHref");
     expect(mobileJobDetailV2PreviewSource).toContain('standardJobAnchorHref(showLinkedRetestCreated ? "mobile-tools" : "mobile-next-service-action")');
     expect(mobileJobDetailV2PreviewSource).toContain("Open correction / retest tools");
-    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={confirmEccRetestReadyFromForm}");
-    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={scheduleRetestNowFromForm}");
-    expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={createRetestJobFromForm}");
     expect(mobileJobDetailV2PreviewSource).not.toContain("<form action={resolveFailureByCorrectionReviewFromForm}");
   });
 
   it("hardens V2 preview lifecycle exceptions as read-only or attention states", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("function getLifecycleExceptionLabel");
     expect(mobileJobDetailV2PreviewSource).toContain("function getWaitingStateLabel");
-    expect(mobileJobDetailV2PreviewSource).toContain("function buildExceptionNextStepPreview");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("function buildExceptionNextStepPreview");
     expect(mobileJobDetailV2PreviewSource).toContain('return "Approval needed"');
     expect(mobileJobDetailV2PreviewSource).toContain('return "Waiting on part"');
     expect(mobileJobDetailV2PreviewSource).toContain('return "Waiting on info"');
@@ -295,14 +279,11 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain('return "Review needed"');
     expect(mobileJobDetailV2PreviewSource).toContain('return "Retest needed"');
     expect(mobileJobDetailV2PreviewSource).toContain('return "Linked active job"');
-    expect(mobileJobDetailV2PreviewSource).toContain('title: "Job cancelled"');
-    expect(mobileJobDetailV2PreviewSource).toContain('title: "Job closed"');
-    expect(mobileJobDetailV2PreviewSource).toContain('summary: waitingReason || "Open the standard job controls for this state."');
-    expect(mobileJobDetailV2PreviewSource).toContain('actionLabel: "Open Standard Controls"');
-    expect(mobileJobDetailV2PreviewSource).not.toContain('actionLabel: "Review job history"');
-    expect(mobileJobDetailV2PreviewSource).not.toContain('actionLabel: "Open waiting tools"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Job cancelled"');
+    expect(mobileJobDetailV2PreviewSource).toContain('"Job closed"');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('"Open Standard Controls"');
+    expect(mobileJobDetailV2PreviewSource).not.toContain('"Open waiting tools"');
     expect(mobileJobDetailV2PreviewSource).not.toContain('anchor: "mobile-tools"');
-    expect(mobileJobDetailV2PreviewSource).toContain('"href" in nextStep && nextStep.href');
   });
 
   it("keeps V2 More Details tools flattened into direct grouped rows", () => {
@@ -522,15 +503,15 @@ describe("mobile job detail assignment parity", () => {
   });
 
   it("uses the current mobile field status as the compact action card header", () => {
-    const actionCardStart = mobileJobDetailCurrentSource.indexOf('shadow-[0_18px_36px_-30px_rgba(29,78,216,0.32)]');
-    const actionCardEnd = mobileJobDetailCurrentSource.indexOf("<JobFieldActionButton", actionCardStart);
-    const actionCard = mobileJobDetailCurrentSource.slice(actionCardStart, actionCardEnd);
+    const actionCardStart = mobileJobStatusActionSurfaceSource.indexOf('shadow-[0_18px_36px_-30px_rgba(29,78,216,0.32)]');
+    const actionCardEnd = mobileJobStatusActionSurfaceSource.indexOf("<JobFieldActionButton", actionCardStart);
+    const actionCard = mobileJobStatusActionSurfaceSource.slice(actionCardStart, actionCardEnd);
 
     expect(actionCardStart).toBeGreaterThan(-1);
     expect(actionCardEnd).toBeGreaterThan(actionCardStart);
     expect(actionCard).toContain("<span>{mobileCurrentStatusLabel}</span>");
     expect(actionCard).not.toContain("Next Field Action");
     expect(actionCard).not.toContain("Current Status");
-    expect(mobileJobDetailCurrentSource).toContain("<JobFieldActionButton");
+    expect(mobileJobStatusActionSurfaceSource).toContain("<JobFieldActionButton");
   });
 });

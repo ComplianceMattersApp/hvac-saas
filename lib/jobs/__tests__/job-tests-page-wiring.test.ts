@@ -508,7 +508,7 @@ describe("job detail field operations board layout", () => {
 
   it("keeps the mobile schedule editor mounted in visible overflow containers", () => {
     const mobileScheduleStart = mobileJobDetailCurrentSource.indexOf('id="mobile-when-panel"');
-    const mobileScheduleEnd = mobileJobDetailCurrentSource.indexOf('id="mobile-ecc-permit-needed-action"', mobileScheduleStart);
+    const mobileScheduleEnd = mobileJobDetailCurrentSource.indexOf("Quick Field Actions", mobileScheduleStart);
     const mobileScheduleSlice =
       mobileScheduleStart > -1 && mobileScheduleEnd > mobileScheduleStart
         ? mobileJobDetailCurrentSource.slice(mobileScheduleStart, mobileScheduleEnd)
