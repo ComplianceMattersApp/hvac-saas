@@ -18,11 +18,22 @@ describe("completion report refrigerant evidence wiring", () => {
     expect(completionReportSource).toContain('focusedType === "refrigerant_charge" || isCompletionReportFocused');
   });
 
+  it("uses compact evidence-first rendering when structured refrigerant detail is empty", () => {
+    expect(completionReportSource).toContain("hasMeaningfulRefrigerantChargeDetail");
+    expect(completionReportSource).toContain("showCompactRefrigerantEvidenceOnly");
+    expect(completionReportSource).toContain("!hasStructuredRefrigerantDetail");
+    expect(completionReportSource).toContain("renderRefrigerantEvidenceSection(true)");
+    expect(completionReportSource).toContain(
+      "Structured refrigerant values were not entered for this run; the attached image is included as supporting evidence.",
+    );
+  });
+
   it("renders evidence inline inside the Refrigerant Charge report section", () => {
     expect(completionReportSource).toContain("Refrigerant Charge Evidence");
     expect(completionReportSource).toContain("Photo evidence attached for refrigerant-side measurements.");
     expect(completionReportSource).toContain("<RefrigerantEvidenceImage");
     expect(completionReportSource).toContain("refrigerantEvidenceAttachments.map");
+    expect(completionReportSource).toContain("renderRefrigerantEvidenceSection(false)");
     expect(completionReportSource).toContain("break-inside-avoid");
   });
 

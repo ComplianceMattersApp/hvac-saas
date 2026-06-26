@@ -65,6 +65,7 @@ import { formatEccOpsStatusLabel, isEccJobType } from "@/lib/ecc/ecc-workflow-di
 import {
   listJobRefrigerantChargeEvidenceImages,
 } from "@/lib/jobs/refrigerant-charge-evidence";
+import { hasMeaningfulRefrigerantChargeDetail } from "@/lib/jobs/refrigerant-charge-report-detail";
 
 function getEffectiveResultLabel(t: any) {
   if (t.override_pass === true) return "PASS (override)";
@@ -607,7 +608,9 @@ function isRefrigerantTemperatureException(run: any) {
 
 function refrigerantConciseReportStatus(run: any) {
   if (!run) return null;
-  if (isRefrigerantPhotoDocumentation(run)) return "Refrigerant charge documented by photo.";
+  if (isRefrigerantPhotoDocumentation(run) && !hasMeaningfulRefrigerantChargeDetail(run)) {
+    return "Refrigerant charge documented by photo.";
+  }
   if (isRefrigerantTemperatureException(run)) return "Temperature requirements were not met.";
   if (run.is_completed !== true && !hasRefrigerantNumericReportValues(run)) {
     return "Refrigerant Charge Test Still Open";
@@ -1993,8 +1996,65 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                 Boolean(sys.runRefrigerant?.data?.charge_exempt_reason) ||
                 String(sys.runRefrigerant?.computed?.status ?? "").toLowerCase() === "exempt";
               const rcConciseReportStatus = refrigerantConciseReportStatus(sys.runRefrigerant);
+              const hasRefrigerantEvidenceInThisSection =
+                sys.systemId === refrigerantEvidenceReportSystemId && refrigerantEvidenceAttachments.length > 0;
+              const hasStructuredRefrigerantDetail = hasMeaningfulRefrigerantChargeDetail(sys.runRefrigerant);
+              const showCompactRefrigerantEvidenceOnly =
+                hasRefrigerantEvidenceInThisSection &&
+                Boolean(sys.runRefrigerant) &&
+                !sys.systemIsHeatOnly &&
+                !isRefrigerantException &&
+                !hasStructuredRefrigerantDetail;
               const shouldForcePrintBreak =
-                index > 0 && Boolean(sys.runRefrigerant) && !isRefrigerantException && !rcConciseReportStatus;
+                index > 0 &&
+                Boolean(sys.runRefrigerant) &&
+                !isRefrigerantException &&
+                !rcConciseReportStatus &&
+                !showCompactRefrigerantEvidenceOnly;
+              const renderRefrigerantEvidenceSection = (includeStructuredValuesNote = false) => (
+                <div className="break-inside-avoid space-y-2 rounded-md border border-slate-200 bg-white p-3 print:rounded-none print:border-slate-400 print:p-2.5">
+                  <div>
+                    <div className="text-sm font-bold text-slate-950 print:text-[12px]">
+                      Refrigerant Charge Evidence
+                    </div>
+                    <div className="text-xs text-slate-700 print:text-[11px]">
+                      Photo evidence attached for refrigerant-side measurements.
+                    </div>
+                    {includeStructuredValuesNote ? (
+                      <div className="mt-1 text-xs text-slate-600 print:text-[11px]">
+                        Structured refrigerant values were not entered for this run; the attached image is included as supporting evidence.
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="grid gap-3 md:grid-cols-2 print:grid-cols-2">
+                    {refrigerantEvidenceAttachments.map((attachment) => {
+                      const uploadedAtLabel = formatBusinessDateTimeUS(attachment.uploadedAt);
+                      const caption = attachment.caption || attachment.fileName;
+                      return (
+                        <figure
+                          key={attachment.id}
+                          className="break-inside-avoid space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2 print:rounded-none print:border-slate-300 print:bg-white"
+                        >
+                          <RefrigerantEvidenceImage
+                            src={attachment.signedUrl}
+                            alt={`Refrigerant charge evidence photo: ${caption}`}
+                          />
+                          <figcaption className="space-y-0.5 text-xs text-slate-700 print:text-[10px]">
+                            <div className="break-words font-semibold text-slate-900">
+                              {caption}
+                            </div>
+                            <div className="break-all">{attachment.fileName}</div>
+                            <div>
+                              {uploadedAtLabel ? `Uploaded ${uploadedAtLabel}` : "Upload date unavailable"}
+                              {attachment.uploadedBy ? ` by ${attachment.uploadedBy}` : ""}
+                            </div>
+                          </figcaption>
+                        </figure>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
 
               return (
                 <div key={sys.systemId} className={`break-inside-avoid rounded-xl border border-slate-200 bg-white p-4 space-y-4 shadow-[0_14px_30px_-28px_rgba(15,23,42,0.34)] print:rounded-none print:border-slate-500 print:p-3 print:space-y-3 print:shadow-none ${shouldForcePrintBreak ? "print:break-before-page" : ""}`}>
@@ -2266,6 +2326,11 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                   </div>
 
                   {sys.showRefrigerantReport ? (
+                    showCompactRefrigerantEvidenceOnly ? (
+                      <div className="rounded-md border border-slate-300 bg-slate-100 p-3 print:rounded-none print:border-slate-400 print:bg-white print:p-2.5">
+                        {renderRefrigerantEvidenceSection(true)}
+                      </div>
+                    ) : (
                   <div className="rounded-md border border-slate-300 bg-slate-100 p-3 space-y-3 print:rounded-none print:border-slate-400 print:bg-white print:p-2.5 print:space-y-2">
                     <div className="text-sm font-bold text-slate-950 print:text-[13px]">Refrigerant Charge — Full Detailed Result</div>
 
@@ -2313,46 +2378,9 @@ const ahriMissingModelRows = ahriModelReadinessRows.filter((row) => !row.value);
                         </div>
                       </>
                     )}
-                    {sys.systemId === refrigerantEvidenceReportSystemId && refrigerantEvidenceAttachments.length > 0 ? (
-                      <div className="break-inside-avoid space-y-2 rounded-md border border-slate-200 bg-white p-3 print:rounded-none print:border-slate-400 print:p-2.5">
-                        <div>
-                          <div className="text-sm font-bold text-slate-950 print:text-[12px]">
-                            Refrigerant Charge Evidence
-                          </div>
-                          <div className="text-xs text-slate-700 print:text-[11px]">
-                            Photo evidence attached for refrigerant-side measurements.
-                          </div>
-                        </div>
-                        <div className="grid gap-3 md:grid-cols-2 print:grid-cols-2">
-                          {refrigerantEvidenceAttachments.map((attachment) => {
-                            const uploadedAtLabel = formatBusinessDateTimeUS(attachment.uploadedAt);
-                            const caption = attachment.caption || attachment.fileName;
-                            return (
-                              <figure
-                                key={attachment.id}
-                                className="break-inside-avoid space-y-2 rounded-md border border-slate-200 bg-slate-50 p-2 print:rounded-none print:border-slate-300 print:bg-white"
-                              >
-                                <RefrigerantEvidenceImage
-                                  src={attachment.signedUrl}
-                                  alt={`Refrigerant charge evidence photo: ${caption}`}
-                                />
-                                <figcaption className="space-y-0.5 text-xs text-slate-700 print:text-[10px]">
-                                  <div className="break-words font-semibold text-slate-900">
-                                    {caption}
-                                  </div>
-                                  <div className="break-all">{attachment.fileName}</div>
-                                  <div>
-                                    {uploadedAtLabel ? `Uploaded ${uploadedAtLabel}` : "Upload date unavailable"}
-                                    {attachment.uploadedBy ? ` by ${attachment.uploadedBy}` : ""}
-                                  </div>
-                                </figcaption>
-                              </figure>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ) : null}
+                    {hasRefrigerantEvidenceInThisSection ? renderRefrigerantEvidenceSection(false) : null}
                   </div>
+                    )
                   ) : null}
                 </div>
               );
