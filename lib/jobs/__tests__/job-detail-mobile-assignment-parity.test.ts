@@ -129,7 +129,10 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).toContain("servicePlanToolHref = mobileCustomerHref");
     expect(mobileJobDetailV2PreviewSource).not.toContain('href={`/jobs/${job.id}?tab=${tab}#');
     expect(mobileJobDetailV2PreviewSource).not.toContain('href={`?mobileLayout=v2#');
-    expect(mobileJobDetailV2PreviewSource).not.toContain('href="#mobile-');
+    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-when-panel"');
+    for (const anchor of standardViewAnchors.filter((anchor) => anchor !== "mobile-when-panel")) {
+      expect(mobileJobDetailV2PreviewSource).not.toContain(`href="#${anchor}"`);
+    }
   });
 
   it("keeps V2 preview out of source-of-truth and mutation ownership", () => {
@@ -182,7 +185,8 @@ describe("mobile job detail assignment parity", () => {
     );
     expect(mobileJobDetailCurrentSource).toContain("<MobileJobSchedulePanel {...props} />");
     expect(mobileJobDetailV2PreviewSource).toContain('import MobileJobSchedulePanel from "./MobileJobSchedulePanel";');
-    expect(mobileJobDetailV2PreviewSource).toContain("<MobileJobSchedulePanel {...props} />");
+    expect(mobileJobDetailV2PreviewSource).toContain('href="#mobile-when-panel"');
+    expect(mobileJobDetailV2PreviewSource).toContain('<MobileJobSchedulePanel {...props} presentation="v2TargetPanel" />');
     expect(mobileJobDetailV2PreviewSource).not.toContain('const schedulePanelHref = standardJobAnchorHref("mobile-when-panel");');
     expect(mobileJobDetailV2PreviewSource).not.toContain("href={schedulePanelHref}");
     expect(mobileJobDetailV2PreviewSource).toContain("mobileLayout=current");
@@ -191,6 +195,8 @@ describe("mobile job detail assignment parity", () => {
     expect(mobileJobDetailV2PreviewSource).not.toContain("updateJobScheduleFromForm");
     expect(mobileJobDetailV2PreviewSource).not.toContain('name="scheduled_date"');
     expect(mobileJobSchedulePanelSource).toContain('id="mobile-when-panel"');
+    expect(mobileJobSchedulePanelSource).toContain('presentation === "v2TargetPanel"');
+    expect(mobileJobSchedulePanelSource).toContain("target:block");
     expect(mobileJobSchedulePanelSource).toContain('form action={updateJobScheduleFromForm}');
     expect(mobileJobSchedulePanelSource).toContain('name="return_to" value={`/jobs/${job.id}?tab=${tab}#mobile-when-panel`}');
     expect(mobileJobSchedulePanelSource).toContain('name="permit_number"');

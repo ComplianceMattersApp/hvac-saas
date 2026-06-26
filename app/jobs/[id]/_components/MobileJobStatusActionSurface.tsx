@@ -459,7 +459,7 @@ export default function MobileJobStatusActionSurface(props: MobileJobStatusActio
                       pendingText="Saving..."
                       className={`${darkButtonClass} min-h-12 w-full`}
                     >
-                      âœ“ Certs Sent
+                      Certs Sent
                     </ImmediateSubmitButton>
                   </form>
                 ) : null}

@@ -567,9 +567,34 @@ export default function MobileJobDetailV2Preview(props: any) {
               </div>
 
               <div className="min-w-0 border-slate-200 min-[420px]:border-l min-[420px]:pl-4">
-                <MobileJobSchedulePanel {...props} />
+                <a
+                  href="#mobile-when-panel"
+                  className="group block rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition-colors hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-blue-900/70">
+                        <ClockIcon className="h-4 w-4" />
+                        <span>Schedule</span>
+                      </div>
+                      <div className="mt-1 break-words text-lg font-semibold leading-tight text-[#0f1f35]">
+                        {appointmentDateLabel}
+                      </div>
+                      {mobileAppointmentTimeLabel ? (
+                        <div className="mt-1 inline-flex max-w-full rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-sm font-semibold leading-tight text-blue-900">
+                          {mobileAppointmentTimeLabel}
+                        </div>
+                      ) : null}
+                    </div>
+                    <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200 transition-colors group-hover:text-blue-700">
+                      <ChevronRightIcon className="h-4 w-4" />
+                    </span>
+                  </div>
+                </a>
               </div>
             </div>
+
+            <MobileJobSchedulePanel {...props} presentation="v2TargetPanel" />
           </div>
 
           <div className="relative overflow-hidden border-t border-slate-200 bg-slate-200">

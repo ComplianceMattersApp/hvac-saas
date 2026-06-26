@@ -85,7 +85,7 @@ describe("job detail field outcome panel wiring", () => {
     expect(jobDetailSource).toContain("getJobDetailCloseoutReadinessMessage(closeoutProjectionJob)");
     expect(jobDetailSource).toContain("showPrimaryCloseoutBlockers");
     expect(jobDetailSource).toContain("jobPageInvoiceNextAction");
-    expect(jobDetailAndCurrentMobileSource).toContain("✓ Certs Sent");
+    expect(jobDetailAndCurrentMobileSource).toContain("Certs Sent");
     expect(panelSource).not.toContain('import { advanceJobStatusFromForm } from "@/lib/actions/job-actions";');
     expect(panelSource).not.toContain("form action={advanceJobStatusFromForm}");
     expect(panelSource).not.toContain("Confirm Work Completed");
@@ -276,7 +276,7 @@ describe("job detail field outcome panel wiring", () => {
     expect(permitBlockerSlice).toContain("!hasValidEccPermitNumber");
     expect(jobDetailSource).toContain("pending_info_reason: (job as any).pending_info_reason ?? null");
     expect(jobDetailSource).toContain("on_hold_reason: (job as any).on_hold_reason ?? null");
-    expect(jobDetailAndCurrentMobileSource).toContain("✓ Certs Sent");
+    expect(jobDetailAndCurrentMobileSource).toContain("Certs Sent");
     expect(jobDetailSource).toContain("invoice_complete: billingState.billedTruthSatisfied");
     expect(jobDetailSource).toContain('banner === "certs_closeout_closed"');
     expect(jobDetailSource).toContain("Certs sent. Job closed out.");
