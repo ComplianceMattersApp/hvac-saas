@@ -48,7 +48,9 @@ describe("mobile job detail assignment parity", () => {
     expect(pageSource).toContain(": MobileJobDetailCurrent");
     expect(pageSource).toContain("<MobileJobDetailMobileComponent");
     expect(mobileJobDetailV2PreviewSource).toContain("export default function MobileJobDetailV2Preview");
-    expect(mobileJobDetailV2PreviewSource).toContain("Preview only. Current ECC actions remain in the existing layout.");
+    expect(mobileJobDetailV2PreviewSource).toContain("Billing / Closeout");
+    expect(mobileJobDetailV2PreviewSource).toContain("No billing action needed yet.");
+    expect(mobileJobDetailV2PreviewSource).not.toContain("Preview only");
   });
 
   it("exposes mobile assignment controls in the visible Team Assignment card", () => {

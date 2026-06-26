@@ -5,6 +5,7 @@ function buildLifecyclePreview(props: {
   isFieldComplete: boolean;
   billingState: any;
   closeoutNeeds: any;
+  hasScheduleInformation: boolean;
 }) {
   const status = String(props.job?.status ?? "").trim().toLowerCase();
   const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
@@ -25,8 +26,6 @@ function buildLifecyclePreview(props: {
     "cancelled",
     "archived",
   ]);
-  const hasAttentionState = attentionStatuses.has(opsStatus) || attentionStatuses.has(status);
-
   const activeKey = isClosed
     ? "closeout"
     : props.isFieldComplete || status === "completed"
@@ -36,6 +35,12 @@ function buildLifecyclePreview(props: {
     : status === "on_the_way" || opsStatus === "on_the_way"
     ? "on_the_way"
     : "scheduled";
+  const isActiveFieldState = ["on_the_way", "in_progress", "field_done", "closeout"].includes(activeKey);
+  const hasSchedulingAttention =
+    (opsStatus === "need_to_schedule" || status === "need_to_schedule") &&
+    !props.hasScheduleInformation &&
+    !isActiveFieldState;
+  const hasAttentionState = attentionStatuses.has(opsStatus) || attentionStatuses.has(status);
 
   const stages = [
     { key: "scheduled", label: "Scheduled" },
@@ -51,11 +56,7 @@ function buildLifecyclePreview(props: {
       ? "Paused for information"
       : opsStatus === "on_hold"
       ? "On hold"
-      : opsStatus === "failed" || opsStatus === "pending_office_review"
-      ? "Needs review"
-      : opsStatus === "retest_needed"
-      ? "Retest needed"
-      : opsStatus === "need_to_schedule"
+      : opsStatus === "need_to_schedule" && hasSchedulingAttention
       ? "Needs scheduling"
       : status === "cancelled"
       ? "Cancelled"
@@ -71,6 +72,16 @@ function buildLifecyclePreview(props: {
   };
 }
 
+function getActionOrientedWorkLabel(label: string | undefined) {
+  const trimmed = String(label ?? "").trim();
+
+  if (trimmed.toLowerCase() === "work completed") {
+    return "Complete work";
+  }
+
+  return trimmed || "Finish Visit";
+}
+
 function buildNextStepPreview(props: {
   job: any;
   isFieldComplete: boolean;
@@ -80,21 +91,31 @@ function buildNextStepPreview(props: {
   showRetestSection: boolean;
   isServiceFieldFollowUpPendingInfo: boolean;
   showMobileServiceInvoiceFieldAction: boolean;
+  showMobileEccTestAction: boolean;
   primaryCloseoutMessage: string;
   serviceFollowUpProgressState: any;
   surfaceProfile: any;
+  closeoutNeeds: any;
 }) {
   const status = String(props.job?.status ?? "").trim().toLowerCase();
   const opsStatus = String(props.job?.ops_status ?? "").trim().toLowerCase();
   const isService = String(props.job?.job_type ?? "").trim().toLowerCase() === "service";
+  const isEcc = String(props.job?.job_type ?? "").trim().toLowerCase() === "ecc";
+  const finishWorkLabel = getActionOrientedWorkLabel(props.surfaceProfile?.labels?.finishComplete);
+  const isActiveEccWork =
+    isEcc &&
+    (!props.isFieldComplete ||
+      props.showMobileEccTestAction ||
+      props.isEccPermitNeededActive ||
+      Boolean(props.closeoutNeeds?.needsCerts));
 
   if (props.isEccPermitNeededActive && !props.showPrimaryCloseoutBlockers) {
     return {
       eyebrow: "Closeout blocker",
-      title: "Permit needed",
-      summary: "Add the permit in the current action area to continue cert closeout.",
+      title: "Add permit information",
+      summary: "Add the permit details so cert closeout can continue.",
       anchor: "mobile-ecc-permit-needed-action",
-      actionLabel: "Open current permit action",
+      actionLabel: "Add permit details",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -102,10 +123,10 @@ function buildNextStepPreview(props: {
   if (props.showConfirmRetestReady) {
     return {
       eyebrow: "Retest review",
-      title: "Confirm retest ready",
-      summary: "Use the current retest action area to confirm corrections are ready.",
+      title: "Confirm retest readiness",
+      summary: "Confirm that corrections are ready before scheduling the retest.",
       anchor: "mobile-next-service-action",
-      actionLabel: "Open current retest action",
+      actionLabel: "Confirm retest ready",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -113,10 +134,10 @@ function buildNextStepPreview(props: {
   if (props.showRetestSection) {
     return {
       eyebrow: "Retest scheduling",
-      title: "Retest ready",
-      summary: "Use the current retest action area to schedule or queue the linked retest.",
+      title: "Schedule the retest",
+      summary: "Schedule the linked retest now or move it to the scheduling queue.",
       anchor: "mobile-next-service-action",
-      actionLabel: "Open current retest action",
+      actionLabel: "Schedule retest",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -125,9 +146,9 @@ function buildNextStepPreview(props: {
     return {
       eyebrow: "Follow-up",
       title: String(props.serviceFollowUpProgressState.reason.display ?? "Follow-up needed"),
-      summary: "Use the current follow-up action area to update progress or create the return visit.",
+      summary: "Update follow-up progress or create the return visit when ready.",
       anchor: "mobile-next-service-action",
-      actionLabel: "Open current follow-up action",
+      actionLabel: "Update follow-up",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -135,10 +156,44 @@ function buildNextStepPreview(props: {
   if (props.showPrimaryCloseoutBlockers) {
     return {
       eyebrow: "Closeout",
-      title: isService ? "Closeout responsibility" : "Closeout blocker",
-      summary: props.primaryCloseoutMessage || "Use the current action area to complete closeout.",
+      title: isService ? "Closeout responsibility" : "Finish compliance closeout",
+      summary: props.primaryCloseoutMessage || "Finish the remaining closeout responsibility.",
       anchor: "mobile-next-service-action",
-      actionLabel: "Open current closeout action",
+      actionLabel: "Continue closeout",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (isActiveEccWork && props.showMobileEccTestAction) {
+    return {
+      eyebrow: "Compliance work",
+      title: "Complete required tests",
+      summary: "Open the test workflow and finish the required compliance checks.",
+      href: `/jobs/${props.job.id}/tests`,
+      anchor: "",
+      actionLabel: "Open tests",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (isActiveEccWork && props.isEccPermitNeededActive) {
+    return {
+      eyebrow: "Compliance closeout",
+      title: "Add permit information",
+      summary: "Add the permit details so cert closeout can continue.",
+      anchor: "mobile-ecc-permit-needed-action",
+      actionLabel: "Add permit details",
+      isSafeInlineLifecycleAction: false,
+    };
+  }
+
+  if (isActiveEccWork && props.closeoutNeeds?.needsCerts) {
+    return {
+      eyebrow: "Compliance closeout",
+      title: "Finish certification items",
+      summary: "Review the remaining certification items before billing closeout.",
+      anchor: "mobile-next-service-action",
+      actionLabel: "Review closeout",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -146,10 +201,10 @@ function buildNextStepPreview(props: {
   if (props.showMobileServiceInvoiceFieldAction) {
     return {
       eyebrow: "Billing",
-      title: "Invoice review needed",
-      summary: "Use the current invoice action area to build or review the invoice.",
+      title: "Review billing",
+      summary: "Build or review the invoice so closeout can continue.",
       anchor: "mobile-invoice-summary-card",
-      actionLabel: "Open current invoice action",
+      actionLabel: "Review billing",
       isSafeInlineLifecycleAction: false,
     };
   }
@@ -170,14 +225,14 @@ function buildNextStepPreview(props: {
       status === "on_the_way" || opsStatus === "on_the_way"
         ? "Start the visit"
         : status === "in_process" || opsStatus === "in_process"
-        ? props.surfaceProfile?.labels?.finishComplete ?? "Finish Visit"
+        ? finishWorkLabel
         : "Head to the job";
     const summary =
       status === "on_the_way" || opsStatus === "on_the_way"
-        ? "When you arrive, begin field work from the existing lifecycle action."
+        ? "When you arrive, start field work."
         : status === "in_process" || opsStatus === "in_process"
-        ? "Complete the current field lifecycle step from the existing action."
-        : "Use the current lifecycle action when you are ready to go.";
+        ? "Complete the field visit when the work is done."
+        : "Mark yourself on the way when you are ready to go.";
 
     return {
       eyebrow: "Next step",
@@ -191,11 +246,100 @@ function buildNextStepPreview(props: {
 
   return {
     eyebrow: "Status",
-    title: "Review remaining closeout",
-    summary: "Field work is complete. Continue with any current closeout, notes, or billing responsibilities below.",
+    title: isEcc ? "Review compliance closeout" : "Review remaining closeout",
+    summary: "Field work is complete. Continue with any closeout, notes, or billing responsibilities below.",
     anchor: "mobile-tools",
-    actionLabel: "Open current tools",
+    actionLabel: "Open job tools",
     isSafeInlineLifecycleAction: false,
+  };
+}
+
+function buildBillingPreview(props: {
+  billingState: any;
+  closeoutNeeds: any;
+  internalInvoiceTruth: any;
+  jobPageInvoiceNextAction: string;
+  jobPageInvoiceStateLabel: string;
+  jobPageInvoiceSummaryText: string;
+  showExternalDataEntryPrompt: boolean;
+  showInternalInvoicePanel: boolean;
+  showInternalInvoicingPlaceholder: boolean;
+  showMobileInvoiceOpenAttention: boolean;
+  showMobileServiceInvoiceFieldAction: boolean;
+  showPrimaryCloseoutBlockers: boolean;
+  isEcc: boolean;
+  isFieldComplete: boolean;
+}) {
+  const hasInvoiceAttention =
+    props.showMobileServiceInvoiceFieldAction ||
+    props.showInternalInvoicingPlaceholder ||
+    props.showMobileInvoiceOpenAttention ||
+    Boolean(props.internalInvoiceTruth) ||
+    Boolean(props.showInternalInvoicePanel && props.closeoutNeeds?.needsInvoice);
+  const hasExternalBillingAttention =
+    props.showExternalDataEntryPrompt ||
+    Boolean(props.closeoutNeeds?.needsInvoice && props.billingState?.lightweightBillingAllowed);
+  const hasCloseoutAttention =
+    props.showPrimaryCloseoutBlockers ||
+    Boolean(props.closeoutNeeds?.needsInvoice || props.closeoutNeeds?.needsCerts);
+  const isEccWorkStillActive =
+    props.isEcc &&
+    !props.isFieldComplete &&
+    !props.showMobileServiceInvoiceFieldAction &&
+    !props.showMobileInvoiceOpenAttention &&
+    !props.showInternalInvoicingPlaceholder &&
+    !props.showInternalInvoicePanel &&
+    !props.internalInvoiceTruth &&
+    !props.showExternalDataEntryPrompt;
+
+  if (isEccWorkStillActive) {
+    return {
+      title: "Billing / Closeout",
+      summary: "No billing action needed yet.",
+      actionLabel: "",
+      hrefAnchor: "",
+      statusLabel: "No action",
+    };
+  }
+
+  if (hasInvoiceAttention) {
+    return {
+      title: props.jobPageInvoiceStateLabel || "Billing review",
+      summary:
+        props.jobPageInvoiceSummaryText ||
+        "Review the invoice or billing requirements for this job.",
+      actionLabel: props.jobPageInvoiceNextAction || "Review billing",
+      hrefAnchor: "mobile-invoice-summary-card",
+      statusLabel: props.internalInvoiceTruth ? "Invoice active" : "Invoice needed",
+    };
+  }
+
+  if (hasExternalBillingAttention) {
+    return {
+      title: "External billing needed",
+      summary: "Mark external billing complete when billing is finished.",
+      actionLabel: "Open billing action",
+      hrefAnchor: "mobile-next-service-action",
+      statusLabel: "Action needed",
+    };
+  }
+
+  if (hasCloseoutAttention) {
+    return {
+      title: "Closeout attention",
+      summary: "Review the remaining closeout items for this job.",
+      actionLabel: "Open closeout",
+      hrefAnchor: "mobile-next-service-action",
+      statusLabel: "Review",
+    };
+  }
+
+  return {
+    title: "Billing / Closeout",
+    summary: "No billing action needed yet.",
+    actionLabel: "",
+    hrefAnchor: "",
+    statusLabel: "No action",
   };
 }
 
@@ -211,6 +355,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     contractorName,
     hasFullSchedule,
     headerJobTypeLabel,
+    internalInvoiceTruth,
     isEccPermitNeededActive,
     isFieldComplete,
     isInternalUser,
@@ -218,6 +363,9 @@ export default function MobileJobDetailV2Preview(props: any) {
     job,
     JobFieldActionButton,
     jobHeaderReference,
+    jobPageInvoiceNextAction,
+    jobPageInvoiceStateLabel,
+    jobPageInvoiceSummaryText,
     jobWorkbenchAccountLabel,
     jobWorkbenchTitle,
     Link,
@@ -241,7 +389,11 @@ export default function MobileJobDetailV2Preview(props: any) {
     serviceState,
     serviceZip,
     showConfirmRetestReady,
+    showExternalDataEntryPrompt,
+    showInternalInvoicePanel,
+    showInternalInvoicingPlaceholder,
     showMobileEccTestAction,
+    showMobileInvoiceOpenAttention,
     showMobileServiceInvoiceFieldAction,
     showPrimaryCloseoutBlockers,
     showRetestSection,
@@ -263,6 +415,7 @@ export default function MobileJobDetailV2Preview(props: any) {
     isFieldComplete,
     billingState,
     closeoutNeeds,
+    hasScheduleInformation: hasFullSchedule || Boolean(appointmentDateLabel || mobileAppointmentTimeLabel),
   });
   const nextStep = buildNextStepPreview({
     job,
@@ -273,18 +426,39 @@ export default function MobileJobDetailV2Preview(props: any) {
     showRetestSection,
     isServiceFieldFollowUpPendingInfo,
     showMobileServiceInvoiceFieldAction,
+    showMobileEccTestAction,
     primaryCloseoutMessage,
     serviceFollowUpProgressState,
     surfaceProfile,
+    closeoutNeeds,
   });
   const currentActionHref = nextStep.anchor
     ? `/jobs/${job.id}?tab=${tab}#${nextStep.anchor}`
+    : nextStep.href
+    ? nextStep.href
     : `/jobs/${job.id}?tab=${tab}`;
   const isEcc = String(job?.job_type ?? "").trim().toLowerCase() === "ecc";
+  const billingPreview = buildBillingPreview({
+    billingState,
+    closeoutNeeds,
+    internalInvoiceTruth,
+    jobPageInvoiceNextAction,
+    jobPageInvoiceStateLabel,
+    jobPageInvoiceSummaryText,
+    showExternalDataEntryPrompt,
+    showInternalInvoicePanel,
+    showInternalInvoicingPlaceholder,
+    showMobileInvoiceOpenAttention,
+    showMobileServiceInvoiceFieldAction,
+    showPrimaryCloseoutBlockers,
+    isEcc,
+    isFieldComplete,
+  });
   const heroPreviewClassName =
     "px-0 pb-0 [&_a:first-child]:rounded-none [&_a:first-child]:border-0 [&_a:first-child]:shadow-none [&_img]:h-56 [&_img]:rounded-none [&_img]:object-cover";
   const lifecycleActionClass =
     "inline-flex min-h-14 w-full items-center justify-center rounded-2xl border border-blue-500 bg-blue-600 px-5 py-3 text-base font-semibold text-white shadow-[0_20px_42px_-24px_rgba(37,99,235,0.7)] transition-colors hover:bg-blue-700";
+  const finishWorkLabel = getActionOrientedWorkLabel(surfaceProfile.labels.finishComplete);
 
   return (
     <div className="block min-h-screen bg-slate-100 px-3 py-3.5 text-slate-950 lg:hidden">
@@ -302,7 +476,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                 href={`/jobs/${job.id}?tab=${tab}`}
                 className="inline-flex min-h-10 items-center justify-center rounded-full border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700"
               >
-                Current
+                Standard view
               </Link>
             </div>
 
@@ -488,8 +662,8 @@ export default function MobileJobDetailV2Preview(props: any) {
                   tab={tab}
                   hasFullSchedule={hasFullSchedule}
                   variant="fieldMode"
-                  completeLabel={surfaceProfile.labels.finishComplete}
-                  completedLabel={surfaceProfile.labels.finishComplete}
+                  completeLabel={finishWorkLabel}
+                  completedLabel={finishWorkLabel}
                 />
               )
             ) : (
@@ -501,7 +675,7 @@ export default function MobileJobDetailV2Preview(props: any) {
           </div>
           {onTheWayUndoEligibility?.eligible ? (
             <Link href={`/jobs/${job.id}?tab=${tab}`} className="mt-3 inline-flex w-full justify-center text-sm font-semibold text-blue-100 underline underline-offset-4">
-              Undo On the Way is available in the current layout
+              Undo On the Way is available from job tools
             </Link>
           ) : null}
         </section>
@@ -515,16 +689,16 @@ export default function MobileJobDetailV2Preview(props: any) {
                 </span>
                 <div>
                   <h2 className="text-xl font-semibold leading-tight text-[#071225]">
-                    {isEcc ? "Compliance Work" : "Work Preview"}
+                    {isEcc ? "Compliance Work" : "Work Performed"}
                   </h2>
                   <p className="mt-0.5 text-sm text-slate-600">
-                    {isEcc ? "Preview only. Current ECC actions remain in the existing layout." : visitReasonText}
+                    {isEcc ? "Equipment, tests, permits, and closeout readiness." : visitReasonText}
                   </p>
                 </div>
               </div>
             </div>
             <Link href={`/jobs/${job.id}?tab=${tab}#mobile-work-scope`} className="shrink-0 rounded-full border border-blue-100 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700">
-              Current
+              {isEcc ? "Compliance details" : "View details"}
             </Link>
           </div>
 
@@ -534,7 +708,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                 <Link href={`/jobs/${job.id}/info?f=equipment`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
                   <span>
                     <span className="block font-semibold text-slate-950">Equipment</span>
-                    <span className="block text-sm text-slate-600">Capture equipment and furnace details</span>
+                    <span className="block text-sm text-slate-600">Manage equipment and furnace details</span>
                   </span>
                   <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Open</span>
                 </Link>
@@ -542,7 +716,7 @@ export default function MobileJobDetailV2Preview(props: any) {
                   <Link href={`/jobs/${job.id}/tests`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
                     <span>
                       <span className="block font-semibold text-slate-950">ECC Tests</span>
-                      <span className="block text-sm text-slate-600">Complete required tests</span>
+                      <span className="block text-sm text-slate-600">Open the required test workflow</span>
                     </span>
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Open</span>
                   </Link>
@@ -550,9 +724,9 @@ export default function MobileJobDetailV2Preview(props: any) {
                 <Link href={`/jobs/${job.id}?tab=${tab}#mobile-tools`} className="flex min-h-16 items-center justify-between gap-3 px-3 py-3">
                   <span>
                     <span className="block font-semibold text-slate-950">Permit Info</span>
-                    <span className="block text-sm text-slate-600">Use current permit details and actions</span>
+                    <span className="block text-sm text-slate-600">Review permit details and actions</span>
                   </span>
-                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Current</span>
+                  <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Status</span>
                 </Link>
               </>
             ) : (
@@ -560,10 +734,10 @@ export default function MobileJobDetailV2Preview(props: any) {
                 <span>
                   <span className="block font-semibold text-slate-950">{surfaceProfile.labels.workItems}</span>
                   <span className="block text-sm text-slate-600">
-                    {visitScopeCount > 0 ? `${visitScopeCount} item${visitScopeCount === 1 ? "" : "s"} recorded` : "Open current work details"}
+                    {visitScopeCount > 0 ? `${visitScopeCount} item${visitScopeCount === 1 ? "" : "s"} recorded` : "View details"}
                   </span>
                 </span>
-                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Current</span>
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">Details</span>
               </Link>
             )}
           </div>
@@ -594,12 +768,38 @@ export default function MobileJobDetailV2Preview(props: any) {
           </div>
         </section>
 
+        <section className="rounded-2xl border border-slate-200/90 bg-white px-4 py-4 shadow-[0_16px_34px_-30px_rgba(15,23,42,0.3)]">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-sm font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Billing / Closeout
+              </div>
+              <h2 className="mt-1 text-xl font-semibold leading-tight text-[#071225]">
+                {billingPreview.title}
+              </h2>
+              <p className="mt-2 text-sm leading-6 text-slate-600">{billingPreview.summary}</p>
+            </div>
+            <span className="shrink-0 rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-600">
+              {billingPreview.statusLabel}
+            </span>
+          </div>
+          {billingPreview.hrefAnchor ? (
+            <Link
+              href={`/jobs/${job.id}?tab=${tab}#${billingPreview.hrefAnchor}`}
+              className="mt-4 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700"
+            >
+              <span>{billingPreview.actionLabel}</span>
+              <ChevronRightIcon className="h-5 w-5" />
+            </Link>
+          ) : null}
+        </section>
+
         <Link href={`/jobs/${job.id}?tab=${tab}#mobile-tools`} className={mobileToolLinkClass}>
           More Details / Tools
         </Link>
         {isInternalUser && serviceLocationEditHref ? (
           <Link href={serviceLocationEditHref} className="inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700">
-            Edit service location in current tools
+            Edit service location
           </Link>
         ) : null}
       </div>
