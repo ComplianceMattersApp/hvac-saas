@@ -281,6 +281,16 @@ function getHeroAddressDisplay(address: unknown, state: unknown) {
     .trim();
 }
 
+function getHeroScheduleDateDisplay(scheduledDate: unknown, fallbackLabel: unknown) {
+  const rawDate = String(scheduledDate ?? "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+    const [year, month, day] = rawDate.split("-");
+    return `${month}/${day}/${year}`;
+  }
+
+  return String(fallbackLabel ?? "").trim() || "No appointment scheduled";
+}
+
 export default function MobileJobDetailV2Preview(props: any) {
   const {
     activeWaitingState,
@@ -435,6 +445,7 @@ export default function MobileJobDetailV2Preview(props: any) {
   });
   const heroDisplayTitle = getHeroDisplayTitle(jobWorkbenchTitle, serviceCity);
   const heroAddressDisplay = getHeroAddressDisplay(serviceAddressDisplay, serviceState);
+  const heroScheduleDateLabel = getHeroScheduleDateDisplay(job?.scheduled_date, appointmentDateLabel);
   const heroPreviewClassName =
     "px-0 pb-0 [&_a:first-child]:rounded-none [&_a:first-child]:border-0 [&_a:first-child]:shadow-none [&_img]:h-52 [&_img]:rounded-none [&_img]:object-cover min-[390px]:[&_img]:h-56";
   const heroContactActionClass =
@@ -569,26 +580,26 @@ export default function MobileJobDetailV2Preview(props: any) {
               <div className="min-w-0 border-slate-200 min-[420px]:border-l min-[420px]:pl-4">
                 <a
                   href="#mobile-when-panel"
-                  className="group block rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-left transition-colors hover:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                  className="group block min-h-full rounded-lg py-0.5 text-left transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
                 >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <div className="inline-flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-blue-900/70">
+                  <div className="min-w-0">
+                    <div className="flex min-w-0 items-center justify-between gap-2">
+                      <div className="inline-flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-blue-900/70">
                         <ClockIcon className="h-4 w-4" />
                         <span>Schedule</span>
                       </div>
-                      <div className="mt-1 break-words text-lg font-semibold leading-tight text-[#0f1f35]">
-                        {appointmentDateLabel}
-                      </div>
-                      {mobileAppointmentTimeLabel ? (
-                        <div className="mt-1 inline-flex max-w-full rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-sm font-semibold leading-tight text-blue-900">
-                          {mobileAppointmentTimeLabel}
-                        </div>
-                      ) : null}
+                      <span className="shrink-0 text-xs font-semibold text-blue-700 underline decoration-blue-200 underline-offset-4">
+                        {job?.scheduled_date ? "Edit" : "Schedule"}
+                      </span>
                     </div>
-                    <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-slate-500 ring-1 ring-slate-200 transition-colors group-hover:text-blue-700">
-                      <ChevronRightIcon className="h-4 w-4" />
-                    </span>
+                    <div className="mt-1 whitespace-nowrap text-base font-semibold leading-tight text-[#0f1f35] min-[390px]:text-lg">
+                      {heroScheduleDateLabel}
+                    </div>
+                    {mobileAppointmentTimeLabel ? (
+                      <div className="mt-1 inline-flex max-w-full whitespace-nowrap rounded-full bg-blue-50 px-2 py-0.5 text-xs font-semibold leading-tight text-blue-900 ring-1 ring-blue-100 min-[390px]:text-sm">
+                        {mobileAppointmentTimeLabel}
+                      </div>
+                    ) : null}
                   </div>
                 </a>
               </div>
