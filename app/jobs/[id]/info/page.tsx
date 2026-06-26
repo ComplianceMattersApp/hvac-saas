@@ -148,7 +148,9 @@ const { data: job, error } = await supabase
     window_end,
     job_equipment (
       id,
+      system_id,
       equipment_role,
+      component_type,
       system_location,
       manufacturer,
       model,
@@ -196,6 +198,30 @@ if (!job) return notFound();
     acc[filter.system_id].push(filter);
     return acc;
   }, {});
+
+  const equipmentRows = ((job.job_equipment ?? []) as Array<any>).filter((equipment) =>
+    String(equipment?.id ?? "").trim(),
+  );
+  const equipmentIdsAssignedToSystemCards = new Set<string>();
+  const equipmentBySystemId = ((systems ?? []) as Array<{ id: string; name: string | null }>).reduce<
+    Record<string, Array<any>>
+  >((acc, system) => {
+    const systemId = String(system.id ?? "").trim();
+    const systemName = String(system.name ?? "").trim();
+    acc[systemId] = equipmentRows.filter((equipment) => {
+      const equipmentSystemId = String(equipment?.system_id ?? "").trim();
+      const equipmentSystemLocation = String(equipment?.system_location ?? "").trim();
+      const belongsToSystem =
+        (systemId && equipmentSystemId === systemId) ||
+        (!equipmentSystemId && systemName && equipmentSystemLocation === systemName);
+      if (belongsToSystem) equipmentIdsAssignedToSystemCards.add(String(equipment.id));
+      return belongsToSystem;
+    });
+    return acc;
+  }, {});
+  const unassignedEquipmentRows = equipmentRows.filter(
+    (equipment) => !equipmentIdsAssignedToSystemCards.has(String(equipment.id)),
+  );
 
     const customerName =
       [job.customer_first_name, job.customer_last_name]
@@ -285,50 +311,110 @@ if (!job) return notFound();
               </div>
             ) : null}
 
-            {/* Existing Equipment */}
+            {/* System inventory */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">
               <div className="border-b border-gray-200 px-5 py-4 sm:px-6">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-base font-semibold text-gray-950">Current Equipment</h2>
-                  {job.job_equipment && job.job_equipment.length > 0 ? (
-                    <div className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-gray-100 text-xs font-medium text-gray-700">
-                      {job.job_equipment.length}
+                  <div>
+                    <h2 className="text-base font-semibold text-gray-950">System Inventory</h2>
+                    <p className="mt-0.5 text-xs text-gray-500">
+                      Equipment and filters are organized under each system.
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <div className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                      {(systems ?? []).length} system{(systems ?? []).length === 1 ? "" : "s"}
+                    </div>
+                    {equipmentRows.length > 0 ? (
+                      <div className="inline-flex items-center justify-center rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-700">
+                        {equipmentRows.length} equipment
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+
+              {(systems && systems.length > 0) || unassignedEquipmentRows.length > 0 ? (
+                <div className="space-y-4 p-4 sm:p-5">
+                  {(systems ?? []).map((system) => {
+                    const systemEquipment = equipmentBySystemId[system.id] ?? [];
+                    return (
+                      <div key={system.id} className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                        <div className="border-b border-gray-200 bg-gray-50/80 px-4 py-3">
+                          <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                              <h3 className="text-sm font-semibold text-gray-950">{system.name || "System"}</h3>
+                              <p className="mt-0.5 text-xs text-gray-500">System details, equipment, and filters.</p>
+                            </div>
+                            <span className="inline-flex w-fit rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[11px] font-medium text-gray-600">
+                              {systemEquipment.length} equipment record{systemEquipment.length === 1 ? "" : "s"}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4 p-4">
+                          <div>
+                            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Equipment
+                            </div>
+                            {systemEquipment.length > 0 ? (
+                              <div className="overflow-hidden rounded-lg border border-gray-200 bg-white">
+                                <div className="divide-y divide-gray-200">
+                                  {systemEquipment.map((eq) => (
+                                    <EquipmentEditCard
+                                      key={eq.id}
+                                      eq={eq}
+                                      systems={systems ?? []}
+                                      jobId={job.id}
+                                    />
+                                  ))}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
+                                No equipment records under this system yet.
+                              </div>
+                            )}
+                          </div>
+
+                          <SystemFiltersCard
+                            jobId={job.id}
+                            system={system}
+                            filters={filtersBySystemId[system.id] ?? []}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {unassignedEquipmentRows.length > 0 ? (
+                    <div className="overflow-hidden rounded-lg border border-amber-200 bg-amber-50/60">
+                      <div className="border-b border-amber-200 px-4 py-3">
+                        <h3 className="text-sm font-semibold text-amber-950">Legacy / Unassigned Equipment</h3>
+                        <p className="mt-0.5 text-xs text-amber-800">
+                          These records do not have a matching system link. They are preserved as equipment records.
+                        </p>
+                      </div>
+                      <div className="divide-y divide-amber-200 bg-white">
+                        {unassignedEquipmentRows.map((eq) => (
+                          <EquipmentEditCard
+                            key={eq.id}
+                            eq={eq}
+                            systems={systems ?? []}
+                            jobId={job.id}
+                          />
+                        ))}
+                      </div>
                     </div>
                   ) : null}
                 </div>
-              </div>
-
-              {job.job_equipment && job.job_equipment.length > 0 ? (
-                <div className="divide-y divide-gray-200">
-                  {job.job_equipment.map((eq) => (
-                    <EquipmentEditCard
-                      key={eq.id}
-                      eq={eq}
-                      systems={systems ?? []}
-                      jobId={job.id}
-                    />
-                  ))}
-                </div>
               ) : (
                 <div className="px-5 py-8 sm:px-6 text-center">
-                  <div className="text-sm text-gray-600">No equipment captured yet</div>
-                  <p className="mt-1 text-xs text-gray-500">Add equipment below to begin</p>
+                  <div className="text-sm text-gray-600">No systems captured yet</div>
+                  <p className="mt-1 text-xs text-gray-500">Add equipment below to create a system inventory.</p>
                 </div>
               )}
             </div>
-
-            {systems && systems.length > 0 ? (
-              <div className="space-y-3">
-                {systems.map((system) => (
-                  <SystemFiltersCard
-                    key={system.id}
-                    jobId={job.id}
-                    system={system}
-                    filters={filtersBySystemId[system.id] ?? []}
-                  />
-                ))}
-              </div>
-            ) : null}
 
             {/* Add Equipment Form */}
             <div className="bg-white rounded-lg border border-gray-200 shadow-sm overflow-hidden">

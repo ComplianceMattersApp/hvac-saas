@@ -2513,22 +2513,6 @@ export default async function CustomerDetailPage(props: {
                             ) : null}
                           </div>
 
-                          {system.filters.length > 0 ? (
-                            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
-                              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Filters</div>
-                              <div className="mt-2 space-y-1.5">
-                                {system.filters.map((filter) => (
-                                  <div key={filter.id} className="text-sm text-slate-700">
-                                    {formatSystemFilterSummary(filter)}
-                                    {filter.notes ? (
-                                      <span className="text-xs text-slate-500"> ({formatShortNote(filter.notes, 80)})</span>
-                                    ) : null}
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          ) : null}
-
                           {system.equipment.length === 0 ? (
                             <div className="mt-3 rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-500">
                               No equipment records under this system yet.
@@ -2581,6 +2565,22 @@ export default async function CustomerDetailPage(props: {
                               })}
                             </div>
                           )}
+
+                          {system.filters.length > 0 ? (
+                            <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">System Filters</div>
+                              <div className="mt-2 space-y-1.5">
+                                {system.filters.map((filter) => (
+                                  <div key={filter.id} className="text-sm text-slate-700">
+                                    {formatSystemFilterSummary(filter)}
+                                    {filter.notes ? (
+                                      <span className="text-xs text-slate-500"> ({formatShortNote(filter.notes, 80)})</span>
+                                    ) : null}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
                         </div>
                       ))}
                     </div>

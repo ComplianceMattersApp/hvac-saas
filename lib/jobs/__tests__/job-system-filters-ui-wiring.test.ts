@@ -12,6 +12,16 @@ const systemFiltersCardSource = readFileSync(
   "utf8",
 );
 
+const equipmentDisplaySource = readFileSync(
+  resolve(__dirname, "../../utils/equipment-display.ts"),
+  "utf8",
+);
+
+const equipmentEditCardSource = readFileSync(
+  resolve(__dirname, "../../../app/jobs/[id]/_components/EquipmentEditCard.tsx"),
+  "utf8",
+);
+
 const jobActionsSource = readFileSync(
   resolve(__dirname, "../../actions/job-actions.ts"),
   "utf8",
@@ -26,16 +36,36 @@ describe("job equipment system filter management wiring", () => {
     expect(jobInfoPageSource).toContain('focused === "equipment"');
   });
 
+  it("renders filters inside each system inventory block with system equipment", () => {
+    expect(jobInfoPageSource).toContain("System Inventory");
+    expect(jobInfoPageSource).toContain("Equipment and filters are organized under each system.");
+    expect(jobInfoPageSource).toContain("systemEquipment.length");
+    expect(jobInfoPageSource).toContain("<EquipmentEditCard");
+    expect(jobInfoPageSource).toContain("<SystemFiltersCard");
+    expect(jobInfoPageSource.indexOf("<EquipmentEditCard")).toBeLessThan(jobInfoPageSource.indexOf("<SystemFiltersCard"));
+    expect(jobInfoPageSource).not.toContain("Current Equipment");
+  });
+
   it("renders compact add, edit, and archive controls per system", () => {
-    expect(systemFiltersCardSource).toContain("Filters");
+    expect(systemFiltersCardSource).toContain("System Filters");
     expect(systemFiltersCardSource).toContain("No filters recorded for this system yet.");
-    expect(systemFiltersCardSource).toContain("Add Filter");
+    expect(systemFiltersCardSource).toContain("Add Filter to System");
+    expect(systemFiltersCardSource).toContain("Filter location");
+    expect(systemFiltersCardSource).toContain("Dimensions");
     expect(systemFiltersCardSource).toContain("Edit");
     expect(systemFiltersCardSource).toContain("Remove");
     expect(systemFiltersCardSource).toContain("addSystemFilterFromForm");
     expect(systemFiltersCardSource).toContain("updateSystemFilterFromForm");
     expect(systemFiltersCardSource).toContain("archiveSystemFilterFromForm");
     expect(systemFiltersCardSource).toContain('name="date_changed"');
+  });
+
+  it("does not offer filter as a normal standalone equipment role and preserves legacy rows", () => {
+    expect(equipmentDisplaySource).toContain("EQUIPMENT_ROLE_OPTIONS");
+    expect(equipmentDisplaySource).not.toContain('value: "filter"');
+    expect(equipmentDisplaySource).not.toContain("label: \"Filter\"");
+    expect(equipmentEditCardSource).toContain("isLegacyFilterEquipment");
+    expect(equipmentEditCardSource).toContain("Legacy filter equipment record. Add new filters in System Filters.");
   });
 
   it("keeps filter mutations server-side and uses archive instead of hard delete", () => {

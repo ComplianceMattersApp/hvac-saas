@@ -57,7 +57,7 @@ function FilterFields({
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
       <div className="sm:col-span-3">
         <label className="mb-1.5 block text-xs font-medium text-gray-700" htmlFor={`${prefix}-label`}>
-          Label/location
+          Filter location
         </label>
         <input
           id={`${prefix}-label`}
@@ -164,12 +164,14 @@ export default function SystemFiltersCard({
   const activeFilters = useMemo(() => filters.filter((filter) => !filter.archived_at), [filters]);
 
   return (
-    <div className="rounded-lg border border-gray-200 bg-white shadow-sm">
-      <div className="border-b border-gray-200 px-5 py-4 sm:px-6">
+    <div className="rounded-lg border border-gray-200 bg-gray-50/80">
+      <div className="border-b border-gray-200 px-4 py-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <div className="text-sm font-semibold text-gray-950">{system.name || "System"}</div>
-            <div className="mt-0.5 text-xs font-medium uppercase tracking-wide text-gray-500">Filters</div>
+            <div className="text-sm font-semibold text-gray-950">System Filters</div>
+            <div className="mt-0.5 text-xs text-gray-600">
+              Filters for {system.name || "this system"}.
+            </div>
           </div>
           <button
             type="button"
@@ -179,12 +181,12 @@ export default function SystemFiltersCard({
             }}
             className="inline-flex w-fit items-center justify-center rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
           >
-            Add Filter
+            Add Filter to System
           </button>
         </div>
       </div>
 
-      <div className="space-y-3 px-5 py-4 sm:px-6">
+      <div className="space-y-3 px-4 py-3">
         {activeFilters.length === 0 ? (
           <div className="rounded-md border border-dashed border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-600">
             No filters recorded for this system yet.
@@ -251,13 +253,14 @@ export default function SystemFiltersCard({
           <form action={addSystemFilterFromForm} className="rounded-md border border-blue-200 bg-blue-50/60 p-3">
             <input type="hidden" name="job_id" value={jobId} />
             <input type="hidden" name="system_id" value={system.id} />
+            <div className="mb-3 text-xs font-semibold uppercase tracking-wide text-blue-800">Dimensions</div>
             <FilterFields prefix={`filter-new-${system.id}`} />
             <div className="mt-3 flex flex-wrap gap-2">
               <SubmitButton
                 loadingText="Adding..."
                 className="rounded-md bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700"
               >
-                Add Filter
+                Add Filter to System
               </SubmitButton>
               <button
                 type="button"

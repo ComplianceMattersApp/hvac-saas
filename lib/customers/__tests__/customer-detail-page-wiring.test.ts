@@ -225,7 +225,11 @@ describe("customer detail relationship hub wiring", () => {
     expect(customerPageSource).toContain("location.systems.map((system)");
     expect(customerPageSource).toContain("system.filters.map((filter)");
     expect(customerPageSource).toContain("formatSystemFilterSummary(filter)");
+    expect(customerPageSource).toContain("System Filters");
     expect(customerPageSource).toContain("system.equipment.map((equipment)");
+    expect(customerPageSource.indexOf("system.equipment.map((equipment)")).toBeLessThan(
+      customerPageSource.indexOf("system.filters.map((filter)"),
+    );
     expect(customerPageSource).toContain("No systems or equipment records yet. Add equipment from a job when system details are captured.");
   });
 
